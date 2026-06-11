@@ -1,4 +1,5 @@
 import Filters, { FilterValue } from '@/components/filters/Filters';
+import InputError from '@/components/input-error';
 import {
     authParcelStatusConfig,
     orderStatusConfig,
@@ -16,6 +17,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Tooltip,
     TooltipContent,
@@ -32,7 +35,7 @@ import {
 } from '@/types/models/Pancake/OrderForDelivery';
 import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
-import { router, usePage } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import {
@@ -41,6 +44,7 @@ import {
     ChevronUp,
     ClipboardCopy,
     Download,
+    Lock,
     MapPin,
     Pencil,
     Phone,
@@ -74,6 +78,8 @@ const EXPORT_COLUMNS = [
 const ALL_COLUMN_KEYS = EXPORT_COLUMNS.map((c) => c.key);
 
 interface Props {
+    /** When true, the page is password-gated and data props are omitted. */
+    locked?: boolean;
     orders: PaginatedData<OrderForDelivery>;
     workspace: Workspace;
     query?: {
@@ -318,7 +324,7 @@ function CallLogBadge({
     );
 }
 
-export default function RmoManagement({
+function RmoManagement({
     orders,
     workspace,
     query,
@@ -573,6 +579,12 @@ export default function RmoManagement({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMyAssigneeOnly, showMyConfirmeeOnly]);
 
+    // Clear selection whenever the page data changes
+    useEffect(() => {
+        setSelectedIds(new Set());
+        setBulkConflict(null);
+    }, [orders.current_page, orders.data?.length]);
+
     const doExport = useCallback(
         (columns: string[]) => {
             localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
@@ -745,6 +757,57 @@ export default function RmoManagement({
 
     const [copiedRider, setCopiedRider] = useState(false);
     const [copiedCustomer, setCopiedCustomer] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+    const allPageIds = useMemo(() => (orders.data ?? []).map((o) => o.id), [orders.data]);
+    const allSelected = allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
+    const someSelected = allPageIds.some((id) => selectedIds.has(id));
+
+    const toggleRow = useCallback((id: number) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    }, []);
+
+    const toggleAll = useCallback(() => {
+        setSelectedIds((prev) => {
+            if (allPageIds.every((id) => prev.has(id))) {
+                const next = new Set(prev);
+                allPageIds.forEach((id) => next.delete(id));
+                return next;
+            }
+            return new Set([...prev, ...allPageIds]);
+        });
+    }, [allPageIds]);
+
+    const clearSelection = useCallback(() => { setSelectedIds(new Set()); setBulkConflict(null); }, []);
+
+    const [bulkConflict, setBulkConflict] = useState<{ already: number; toAssign: number } | null>(null);
+
+    const doBulkAssign = useCallback((userId: string) => {
+        router.post(
+            `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-assign`,
+            { ids: Array.from(selectedIds), userId },
+            { preserveScroll: true, onSuccess: () => { setSelectedIds(new Set()); setBulkConflict(null); } },
+        );
+    }, [selectedIds, workspace.slug]);
+
+    const handleBulkAssignToMe = useCallback(() => {
+        const userId = localStorage.getItem('user_id');
+        if (!userId) {
+            setIsOpen(true);
+            return;
+        }
+        const selectedOrders = (orders.data ?? []).filter((o) => selectedIds.has(o.id));
+        const alreadyAssigned = selectedOrders.filter((o) => o.assignee != null).length;
+        if (alreadyAssigned > 0) {
+            setBulkConflict({ already: alreadyAssigned, toAssign: selectedOrders.length - alreadyAssigned });
+            return;
+        }
+        doBulkAssign(userId);
+    }, [selectedIds, orders.data, doBulkAssign]);
 
     const pendingOrders = useMemo(
         () =>
@@ -781,6 +844,27 @@ export default function RmoManagement({
 
     const columns = useMemo<ColumnDef<OrderForDelivery>[]>(
         () => [
+            {
+                id: 'select',
+                enableSorting: false,
+                header: () => (
+                    <Checkbox
+                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                        onCheckedChange={toggleAll}
+                        aria-label="Select all"
+                        className="translate-y-px"
+                    />
+                ),
+                cell: ({ row }) => (
+                    <Checkbox
+                        checked={selectedIds.has(row.original.id)}
+                        onCheckedChange={() => toggleRow(row.original.id)}
+                        aria-label="Select row"
+                        className="translate-y-px"
+                    />
+                ),
+                size: 40,
+            },
             {
                 accessorFn: (row) =>
                     (row.order.items ?? []).map((item) => item.name).join(', '),
@@ -1138,6 +1222,11 @@ export default function RmoManagement({
             handleUpdatePhone,
             isToday,
             canEditPhone,
+            selectedIds,
+            allSelected,
+            someSelected,
+            toggleAll,
+            toggleRow,
         ],
     );
 
@@ -1576,6 +1665,60 @@ export default function RmoManagement({
                     </div>
                 </div>
 
+                {selectedIds.size > 0 && (
+                    <div className="mb-3 space-y-2">
+                        <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                            <span className="text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
+                                {selectedIds.size} order{selectedIds.size !== 1 ? 's' : ''} selected
+                            </span>
+                            <div className="h-3.5 w-px bg-emerald-200 dark:bg-emerald-500/30" />
+                            <button
+                                onClick={handleBulkAssignToMe}
+                                disabled={!isToday}
+                                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-[12px] font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <UserPlus className="h-3.5 w-3.5" />
+                                Assign to me
+                            </button>
+                            <button
+                                onClick={() => { clearSelection(); setBulkConflict(null); }}
+                                className="ml-auto flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                                Clear
+                            </button>
+                        </div>
+
+                        {bulkConflict && (
+                            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-500/30 dark:bg-amber-500/10">
+                                <span className="text-[12px] text-amber-700 dark:text-amber-400">
+                                    <span className="font-semibold">{bulkConflict.already}</span> order{bulkConflict.already !== 1 ? 's' : ''} already {bulkConflict.already !== 1 ? 'have' : 'has'} an assignee and will be skipped.
+                                    {bulkConflict.toAssign > 0
+                                        ? ` ${bulkConflict.toAssign} unassigned order${bulkConflict.toAssign !== 1 ? 's' : ''} will be assigned.`
+                                        : ' Nothing to assign.'}
+                                </span>
+                                <div className="ml-auto flex items-center gap-2">
+                                    {bulkConflict.toAssign > 0 && (
+                                        <button
+                                            onClick={() => doBulkAssign(localStorage.getItem('user_id')!)}
+                                            className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1 text-[12px] font-medium text-white transition-colors hover:bg-amber-700"
+                                        >
+                                            Proceed
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setBulkConflict(null)}
+                                        className="flex items-center gap-1 text-[11px] text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="max-w-full overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
@@ -1605,4 +1748,71 @@ export default function RmoManagement({
             </div>
         </div>
     );
+}
+
+/** Password gate shown before the public RMO page when a password is set. */
+function RmoLockScreen({ workspace }: { workspace: Workspace }) {
+    const form = useForm({ password: '' });
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(
+            `/public/workspaces/${workspace.slug}/rts/rmo-management/verify-password`,
+            {
+                preserveScroll: true,
+                onError: () => form.reset('password'),
+            },
+        );
+    };
+
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-stone-100 p-4 dark:bg-zinc-950">
+            <div className="w-full max-w-sm rounded-[16px] border border-black/8 bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/8 dark:bg-zinc-900">
+                <div className="mb-4 flex flex-col items-center text-center">
+                    <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <Lock className="h-5 w-5" />
+                    </div>
+                    <h1 className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">
+                        Protected page
+                    </h1>
+                    <p className="mt-1 text-[12px] text-gray-500 dark:text-gray-400">
+                        Enter the password to access {workspace.name}&apos;s RMO
+                        management.
+                    </p>
+                </div>
+
+                <form onSubmit={submit} className="space-y-3">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="rmo-access-password">Password</Label>
+                        <Input
+                            id="rmo-access-password"
+                            type="password"
+                            autoFocus
+                            autoComplete="current-password"
+                            value={form.data.password}
+                            onChange={(e) =>
+                                form.setData('password', e.target.value)
+                            }
+                        />
+                        <InputError message={form.errors.password} />
+                    </div>
+                    <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={form.processing || !form.data.password}
+                    >
+                        {form.processing ? 'Unlocking…' : 'Unlock'}
+                    </Button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+export default function RmoManagementPage(props: Props) {
+    if (props.locked) {
+        return <RmoLockScreen workspace={props.workspace} />;
+    }
+
+    return <RmoManagement {...props} />;
 }

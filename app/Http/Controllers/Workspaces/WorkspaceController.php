@@ -10,6 +10,7 @@ use App\Services\PostHogService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
 class WorkspaceController extends Controller
@@ -94,6 +95,29 @@ class WorkspaceController extends Controller
 
         return redirect()->route('workspaces.show', $workspace->slug)
             ->with('success', 'Workspace updated successfully.');
+    }
+
+    public function updatePublicPassword(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::EditWorkspaceSettings->value, $workspace);
+
+        $validated = $request->validate([
+            // Empty/null clears the password (public pages become open again).
+            'password' => ['nullable', 'string', 'min:4', 'max:255'],
+        ]);
+
+        $workspace->update([
+            'public_password' => filled($validated['password'] ?? null)
+                ? Hash::make($validated['password'])
+                : null,
+        ]);
+
+        return back()->with(
+            'success',
+            filled($validated['password'] ?? null)
+                ? 'Public pages password set.'
+                : 'Public pages password removed.',
+        );
     }
 
     public function destroy(Request $request, Workspace $workspace)

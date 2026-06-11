@@ -41,6 +41,7 @@ export const PERMISSIONS = {
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
     ViewRtsAiChat: 'View RTS AI Chat',
+    ViewRmoManagement: 'View RMO Management',
     ViewParcelJourneyTemplates: 'View Parcel Journey Templates',
     ManageParcelJourneyTemplates: 'Manage Parcel Journey Templates',
 
@@ -48,6 +49,7 @@ export const PERMISSIONS = {
     ViewCsrManagement: 'View CSR Management',
     EditCsrEmployees: 'Edit CSR Employees',
     ViewCsrAnalytics: 'View CSR Analytics',
+    ViewLeaderboards: 'View Leaderboards',
 
     // Inventory
     ViewInventoryItems: 'View Inventory Items',

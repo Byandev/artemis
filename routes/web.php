@@ -8,9 +8,11 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
-Route::get('/leaderboards', function () {
-    return Inertia::render('workspaces/public/leaderboard');
-});
+// Per-workspace public leaderboard (gated by the workspace's public password),
+// matching the public RMO URL pattern. Legacy global /leaderboards still works.
+Route::get('/leaderboards', [\App\Http\Controllers\PublicLeaderboardController::class, 'index'])->name('public.leaderboards');
+Route::get('/public/workspaces/{workspace}/leaderboards', [\App\Http\Controllers\PublicLeaderboardController::class, 'index'])->name('public-page.leaderboards');
+Route::post('/public/workspaces/{workspace}/leaderboards/verify-password', [\App\Http\Controllers\PublicLeaderboardController::class, 'verifyPublicPassword'])->name('public-page.leaderboards.verify-password');
 
 Route::get('/changelog', function () {
     return Inertia::render('workspaces/changelog');

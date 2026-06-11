@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces\RTS;
 
+use App\Enums\Permission;
 use App\Exports\RmoManagementExport;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
@@ -18,8 +19,10 @@ use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\Workspace;
+use App\Support\PublicWorkspaceGate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Pancake\Models\OrderForDelivery;
@@ -45,6 +48,22 @@ class ForDeliveryController extends Controller
         $orderForDelivery->update(['status' => $request->status]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
+    public function publicBulkAssign(Workspace $workspace, Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'userId' => 'required|string',
+        ]);
+
+        $updated = OrderForDelivery::whereIn('id', $request->ids)
+            ->whereDate('delivery_date', today())
+            ->whereNull('assignee_id')
+            ->update(['assignee_id' => $request->userId]);
+
+        return redirect()->back()->with('success', "Assigned {$updated} order(s) successfully.");
     }
 
     public function publicAssignUser(Workspace $workspace, $id, Request $request)
@@ -107,8 +126,29 @@ class ForDeliveryController extends Controller
         return redirect()->back()->with('success', 'Assignee removed successfully');
     }
 
+    public function verifyPublicPassword(Request $request, Workspace $workspace)
+    {
+        $request->validate(['password' => ['required', 'string']]);
+
+        if (! PublicWorkspaceGate::verify($request, $workspace, $request->input('password'))) {
+            throw ValidationException::withMessages([
+                'password' => 'Incorrect password.',
+            ]);
+        }
+
+        return back();
+    }
+
     public function public(Request $request, Workspace $workspace)
     {
+        // Gate behind the workspace's public-pages password if one is set.
+        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
+            return Inertia::render('workspaces/rts/public-pages/rmo-management', [
+                'workspace' => $workspace->only('id', 'name', 'slug'),
+                'locked' => true,
+            ]);
+        }
+
         $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
 
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
@@ -282,6 +322,7 @@ class ForDeliveryController extends Controller
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
+            'locked' => false,
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [

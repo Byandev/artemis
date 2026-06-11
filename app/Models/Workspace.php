@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\MetaAds\Models\User as MetaUser;
@@ -37,6 +38,15 @@ class Workspace extends Model
         'creatives_module_enabled',
         'meta_ads_module_enabled',
         'inventory_sync',
+        'public_password',
+    ];
+
+    protected $hidden = [
+        'public_password',
+    ];
+
+    protected $appends = [
+        'public_password_set',
     ];
 
     protected $casts = [
@@ -56,6 +66,23 @@ class Workspace extends Model
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
     ];
+
+    /**
+     * Whether a public-pages access password is configured (gates the public
+     * RMO management and leaderboard pages). Exposed without leaking the hash.
+     */
+    public function getPublicPasswordSetAttribute(): bool
+    {
+        return ! empty($this->attributes['public_password']);
+    }
+
+    /** Verify a plaintext password against the stored public-pages password. */
+    public function checkPublicPassword(string $password): bool
+    {
+        $hash = $this->attributes['public_password'] ?? null;
+
+        return $hash !== null && Hash::check($password, $hash);
+    }
 
     protected static function boot()
     {
