@@ -41,7 +41,7 @@ class SyncAllCommand extends Command
         $jobs = 0;
 
         foreach ($metaUsers as $user) {
-            SyncMetaAdAccounts::dispatch($user);
+            SyncMetaAdAccounts::dispatch($user)->onQueue('meta-ads');
             $jobs++;
         }
         $this->info("Dispatched {$metaUsers->count()} ad-account syncs.");
@@ -68,7 +68,7 @@ class SyncAllCommand extends Command
                 $chain[] = new SyncInsights($account, $date);
             }
 
-            Bus::chain($chain)->dispatch();
+            Bus::chain($chain)->onQueue('meta-ads')->dispatch();
             $jobs += count($chain);
         }
 

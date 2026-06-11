@@ -20,9 +20,6 @@ class SyncAds implements ShouldQueue
 {
     use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels, SerializesPerAdAccount;
 
-    /** Run on the dedicated Meta Ads Horizon queue (max 3 processes). */
-    public $queue = 'meta-ads';
-
     public int $timeout = 600;
 
     public int $tries = 5;
@@ -122,7 +119,7 @@ class SyncAds implements ShouldQueue
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
             if ($hasNextPage && $afterCursor !== null) {
-                static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp);
+                static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp)->onQueue('meta-ads');
             } else {
                 $run->succeed($count, ['ad_count' => $count]);
             }

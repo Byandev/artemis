@@ -81,7 +81,7 @@ class MetaOAuthController extends Controller
         // Kick off a full backfill for the freshly connected account: fetch ad
         // accounts, then cascade campaigns → ad sets → ads → creatives and the
         // last month of insights for each one.
-        SyncMetaAdAccounts::dispatch($metaUser, cascade: true, insightsDays: 30);
+        SyncMetaAdAccounts::dispatch($metaUser, cascade: true, insightsDays: 30)->onQueue('meta-ads');
 
         return redirect()->route('workspaces.metaads.fb-accounts', $workspace)
             ->with('success', "Connected Meta account: {$metaUser->name}. Syncing ad accounts and the last month of data now.");

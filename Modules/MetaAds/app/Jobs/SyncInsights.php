@@ -18,9 +18,6 @@ class SyncInsights implements ShouldQueue
 {
     use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels, SerializesPerAdAccount;
 
-    /** Run on the dedicated Meta Ads Horizon queue (max 3 processes). */
-    public $queue = 'meta-ads';
-
     public int $timeout = 300;
 
     public int $tries = 3;
@@ -241,7 +238,7 @@ class SyncInsights implements ShouldQueue
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
             if ($hasNextPage && $afterCursor !== null) {
-                static::dispatch($this->adAccount, $this->date, $afterCursor, $count, $run->id);
+                static::dispatch($this->adAccount, $this->date, $afterCursor, $count, $run->id)->onQueue('meta-ads');
             } else {
                 $run->succeed($count, ['insight_row_count' => $count]);
             }

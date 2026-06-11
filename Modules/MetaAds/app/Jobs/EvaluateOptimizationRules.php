@@ -16,9 +16,6 @@ class EvaluateOptimizationRules implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /** Run on the dedicated Meta Ads Horizon queue (max 3 processes). */
-    public $queue = 'meta-ads';
-
     public int $timeout = 600;
 
     public int $tries = 3;
@@ -55,7 +52,7 @@ class EvaluateOptimizationRules implements ShouldQueue
                 $decision['adAccount'],
                 $decision['target'],
                 $decision['snapshot'],
-            );
+            )->onQueue('meta-ads');
         }
     }
 }

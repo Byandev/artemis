@@ -19,9 +19,6 @@ class SyncMetaAdAccounts implements ShouldQueue
 {
     use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels;
 
-    /** Run on the dedicated Meta Ads Horizon queue (max 3 processes). */
-    public $queue = 'meta-ads';
-
     public int $timeout = 300;
 
     public int $tries = 8;
@@ -123,6 +120,7 @@ class SyncMetaAdAccounts implements ShouldQueue
                 // Stagger each account's chain by 3 minutes so we don't slam the
                 // Graph API (and blow the rate cap) when several accounts connect at once.
                 Bus::chain($chain)
+                    ->onQueue('meta-ads')
                     ->delay(Carbon::now()->addMinutes($index * 3))
                     ->dispatch();
             });

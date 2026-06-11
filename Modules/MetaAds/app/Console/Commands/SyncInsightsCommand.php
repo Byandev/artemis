@@ -52,7 +52,7 @@ class SyncInsightsCommand extends Command
         $i = 0;
         foreach ($accounts as $account) {
             foreach ($dates as $date) {
-                SyncInsights::dispatch($account, $date)->delay(now()->addSeconds($i * 10));
+                SyncInsights::dispatch($account, $date)->onQueue('meta-ads')->delay(now()->addSeconds($i * 10));
                 $i++;
             }
         }

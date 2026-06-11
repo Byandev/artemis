@@ -21,9 +21,6 @@ class BackfillInsightsIfActive implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /** Run on the dedicated Meta Ads Horizon queue (max 3 processes). */
-    public $queue = 'meta-ads';
-
     public function __construct(
         public AdAccount $adAccount,
         public int $days,
@@ -42,6 +39,6 @@ class BackfillInsightsIfActive implements ShouldQueue
             $chain[] = new SyncInsights($this->adAccount, $until->copy()->subDays($i)->toDateString());
         }
 
-        Bus::chain($chain)->dispatch();
+        Bus::chain($chain)->onQueue('meta-ads')->dispatch();
     }
 }

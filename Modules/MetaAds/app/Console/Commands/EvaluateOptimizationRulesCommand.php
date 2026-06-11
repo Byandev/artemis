@@ -86,7 +86,7 @@ class EvaluateOptimizationRulesCommand extends Command
                 $decision['adAccount'],
                 $decision['target'],
                 $decision['snapshot'],
-            );
+            )->onQueue('meta-ads');
         }
 
         $this->line('<info>Automatic — dispatched apply jobs:</info>');
