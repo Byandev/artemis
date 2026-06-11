@@ -20,13 +20,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
-import {
-    ListChecks,
-    MoreHorizontal,
-    RefreshCw,
-    Search,
-    Users,
-} from 'lucide-react';
+import { ListChecks, MoreHorizontal, Search, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner'; // Added toast import
 
@@ -161,9 +155,7 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                                       )}
                                       {canRefreshShops && (
                                           <DropdownMenuItem
-                                              onClick={() =>
-                                                  refreshUsers(shop)
-                                              }
+                                              onClick={() => refreshUsers(shop)}
                                               disabled={processing}
                                           >
                                               <Users className="mr-2 h-4 w-4" />

@@ -53,11 +53,7 @@ function formatRelative(ts: string | null) {
     return `${Math.round(diff / 86400)}d ago`;
 }
 
-export default function MetaFbAccounts({
-    workspace,
-    metaUsers,
-    query,
-}: Props) {
+export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
     const connectUrl = `/workspaces/${workspace.slug}/integrations/meta/connect`;
     const indexUrl = `/workspaces/${workspace.slug}/integrations/meta`;
 

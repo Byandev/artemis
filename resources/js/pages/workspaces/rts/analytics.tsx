@@ -17,8 +17,7 @@ import { Head } from '@inertiajs/react';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import moment from 'moment';
-import { useMemo, useState } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import DateOption = flatpickr.Options.DateOption;
 
 interface Props {
