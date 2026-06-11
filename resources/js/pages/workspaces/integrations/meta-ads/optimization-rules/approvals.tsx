@@ -120,7 +120,11 @@ const isBudget = (action: string) =>
 const proposalImpact = (p: OptimizationProposal): number => {
     if (p.action === 'pause') return -(Number(p.target_budget) || 0);
     if (p.action === 'enable') return Number(p.target_budget) || 0;
-    if (isBudget(p.action) && p.current_value !== null && p.new_value !== null) {
+    if (
+        isBudget(p.action) &&
+        p.current_value !== null &&
+        p.new_value !== null
+    ) {
         return Number(p.new_value) - Number(p.current_value);
     }
     return 0;

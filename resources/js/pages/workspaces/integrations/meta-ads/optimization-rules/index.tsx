@@ -127,7 +127,7 @@ export default function OptimizationRulesIndex({
             accessorKey: 'priority',
             header: 'Priority',
             cell: ({ row }) => (
-                <span className="font-mono text-[12px] tabular-nums text-gray-600 dark:text-gray-300">
+                <span className="font-mono text-[12px] text-gray-600 tabular-nums dark:text-gray-300">
                     {row.original.priority}
                 </span>
             ),

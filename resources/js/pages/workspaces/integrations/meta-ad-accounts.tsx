@@ -134,12 +134,17 @@ export default function MetaAdAccounts({
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [showAll, setShowAll] = useState(query?.showAll ?? false);
     const [syncToggles, setSyncToggles] = useState<Record<number, boolean>>(
-        () => Object.fromEntries(adAccounts.data.map((a) => [a.id, a.active_sync])),
+        () =>
+            Object.fromEntries(
+                adAccounts.data.map((a) => [a.id, a.active_sync]),
+            ),
     );
 
     useEffect(() => {
         setSyncToggles(
-            Object.fromEntries(adAccounts.data.map((a) => [a.id, a.active_sync])),
+            Object.fromEntries(
+                adAccounts.data.map((a) => [a.id, a.active_sync]),
+            ),
         );
     }, [adAccounts.data]);
 
@@ -176,7 +181,10 @@ export default function MetaAdAccounts({
     };
 
     useEffect(() => {
-        const t = setTimeout(() => navigate({ page: searchValue ? 1 : (query?.page ?? 1) }), 400);
+        const t = setTimeout(
+            () => navigate({ page: searchValue ? 1 : (query?.page ?? 1) }),
+            400,
+        );
         return () => clearTimeout(t);
     }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -296,7 +304,8 @@ export default function MetaAdAccounts({
                 <SortableHeader column={column} title="Sync" enabled={false} />
             ),
             cell: ({ row }) => {
-                const enabled = syncToggles[row.original.id] ?? row.original.active_sync;
+                const enabled =
+                    syncToggles[row.original.id] ?? row.original.active_sync;
                 return (
                     <button
                         type="button"
@@ -304,7 +313,7 @@ export default function MetaAdAccounts({
                         aria-checked={enabled}
                         onClick={() => toggleSync(row.original)}
                         className={clsx(
-                            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+                            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:outline-none',
                             enabled
                                 ? 'bg-emerald-500'
                                 : 'bg-stone-200 dark:bg-zinc-700',

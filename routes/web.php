@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PublicLeaderboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
@@ -10,9 +11,9 @@ Route::get('/', function () {
 
 // Per-workspace public leaderboard (gated by the workspace's public password),
 // matching the public RMO URL pattern. Legacy global /leaderboards still works.
-Route::get('/leaderboards', [\App\Http\Controllers\PublicLeaderboardController::class, 'index'])->name('public.leaderboards');
-Route::get('/public/workspaces/{workspace}/leaderboards', [\App\Http\Controllers\PublicLeaderboardController::class, 'index'])->name('public-page.leaderboards');
-Route::post('/public/workspaces/{workspace}/leaderboards/verify-password', [\App\Http\Controllers\PublicLeaderboardController::class, 'verifyPublicPassword'])->name('public-page.leaderboards.verify-password');
+Route::get('/leaderboards', [PublicLeaderboardController::class, 'index'])->name('public.leaderboards');
+Route::get('/public/workspaces/{workspace}/leaderboards', [PublicLeaderboardController::class, 'index'])->name('public-page.leaderboards');
+Route::post('/public/workspaces/{workspace}/leaderboards/verify-password', [PublicLeaderboardController::class, 'verifyPublicPassword'])->name('public-page.leaderboards.verify-password');
 
 Route::get('/changelog', function () {
     return Inertia::render('workspaces/changelog');

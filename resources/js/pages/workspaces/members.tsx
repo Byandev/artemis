@@ -545,7 +545,7 @@ export default function WorkspaceMembers({
                                             required
                                         />
                                         {inviteForm.errors.email && (
-                                            <p className="text-destructive text-sm">
+                                            <p className="text-sm text-destructive">
                                                 {inviteForm.errors.email}
                                             </p>
                                         )}
