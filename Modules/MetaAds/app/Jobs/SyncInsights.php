@@ -18,6 +18,9 @@ class SyncInsights implements ShouldQueue
 {
     use Dispatchable, HandlesMetaSyncErrors, InteractsWithQueue, Queueable, SerializesModels, SerializesPerAdAccount;
 
+    /** Run on the dedicated Meta Ads Horizon queue (max 3 processes). */
+    public $queue = 'meta-ads';
+
     public int $timeout = 300;
 
     public int $tries = 3;
