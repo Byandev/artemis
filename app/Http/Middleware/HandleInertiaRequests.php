@@ -167,21 +167,14 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        $disabled = array_values(array_filter([
-            $workspace->finance_module_enabled ? null : 'Finance',
-            $workspace->inventory_module_enabled ? null : 'Inventory',
-            $workspace->products_module_enabled ? null : 'Products',
-            $workspace->teams_module_enabled ? null : 'Teams',
-            $workspace->checklist_module_enabled ? null : 'Checklist',
-            $workspace->csr_module_enabled ? null : 'CSR',
-            $workspace->botcake_module_enabled ? null : 'Botcake',
-            $workspace->meta_ads_module_enabled ? null : 'Meta Ads',
-        ]));
+        $disabled = $workspace->disabledPermissionCategories();
+        $hiddenNames = $workspace->hiddenPermissionNames();
 
         return Role::with('permissions:id,name,category')
             ->find($roleId)
             ?->permissions
-            ->reject(fn ($permission) => in_array($permission->category, $disabled, true))
+            ->reject(fn ($permission) => in_array($permission->category, $disabled, true)
+                || in_array($permission->name, $hiddenNames, true))
             ->pluck('name')
             ->values()
             ->all() ?? [];

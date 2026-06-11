@@ -19,6 +19,7 @@ class VideoEditorDashboardRequest extends FormRequest
         $workspace = $this->route('workspace');
 
         return $workspace instanceof Workspace
+            && $workspace->video_editor_dashboard_module_enabled
             && $this->user()->can(Permission::ViewVideoEditorDashboard->value, $workspace);
     }
 

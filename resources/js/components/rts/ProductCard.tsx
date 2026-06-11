@@ -65,9 +65,6 @@ export default function ProductCard({
                 cell: ({ row }) =>
                     row.original.item_name ? (
                         row.original.item_name
-                            ?.split(' ')
-                            .map((word) => word[0])
-                            .join('')
                     ) : (
                         <span className="text-gray-400">Unknown</span>
                     ),
