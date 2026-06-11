@@ -131,6 +131,16 @@ enum Permission: string
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
 
+    // Meta Ads
+    case ViewMetaAds = 'View Meta Ads';
+    case ConnectFbAccount = 'Connect FB Account';
+    case ViewAdAccounts = 'View Ad Accounts';
+    case ManageMetaAdsAccounts = 'Manage Meta Ads Accounts';
+    case ViewOptimizationRules = 'View Optimization Rules';
+    case ManageOptimizationRules = 'Manage Optimization Rules';
+    case ApproveOptimizationRules = 'Approve Optimization Rules';
+    case ViewOptimizationLogs = 'View Optimization Logs';
+
     public function category(): string
     {
         return match ($this) {
@@ -242,6 +252,15 @@ enum Permission: string
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',
+
+            self::ViewMetaAds,
+            self::ConnectFbAccount,
+            self::ViewAdAccounts,
+            self::ManageMetaAdsAccounts,
+            self::ViewOptimizationRules,
+            self::ManageOptimizationRules,
+            self::ApproveOptimizationRules,
+            self::ViewOptimizationLogs => 'Meta Ads',
         };
     }
 }
