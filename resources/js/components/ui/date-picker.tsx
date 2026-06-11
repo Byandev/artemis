@@ -13,12 +13,13 @@ type PropsType = {
     defaultDate?: DateOption;
     label?: string;
     placeholder?: string;
+    fullWidth?: boolean;
 };
 
 const fmt     = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtYear = (d: Date) => d.getFullYear().toString();
 
-export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder }: PropsType) {
+export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth }: PropsType) {
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -64,12 +65,12 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
     const sameYear = hasEnd && fmtYear(selectedDates[0]) === fmtYear(selectedDates[1]);
 
     return (
-        <div>
+        <div className={fullWidth ? 'w-full' : undefined}>
             {label && <Label htmlFor={id}>{label}</Label>}
 
             <div
                 onClick={() => fpRef.current?.open()}
-                className="relative inline-flex shrink-0 min-w-max items-center h-9 rounded-[10px] border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-black/14 dark:hover:border-white/14 transition-all duration-150 cursor-pointer select-none"
+                className={`relative items-center h-9 rounded-[10px] border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-black/14 dark:hover:border-white/14 transition-all duration-150 cursor-pointer select-none ${fullWidth ? 'flex w-full' : 'inline-flex shrink-0 min-w-max'}`}
             >
                 {/* Hidden input flatpickr binds to */}
                 <input

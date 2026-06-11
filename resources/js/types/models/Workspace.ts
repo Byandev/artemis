@@ -17,6 +17,9 @@ export interface Workspace {
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
     botcake_module_enabled: boolean;
+    creatives_module_enabled: boolean;
+    /** Whether a public-pages access password is configured. */
+    public_password_set?: boolean;
     created_at: string;
     updated_at: string;
 

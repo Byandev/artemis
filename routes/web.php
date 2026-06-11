@@ -8,9 +8,11 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
-Route::get('/leaderboards', function () {
-    return Inertia::render('workspaces/public/leaderboard');
-});
+// Per-workspace public leaderboard (gated by the workspace's public password),
+// matching the public RMO URL pattern. Legacy global /leaderboards still works.
+Route::get('/leaderboards', [\App\Http\Controllers\PublicLeaderboardController::class, 'index'])->name('public.leaderboards');
+Route::get('/public/workspaces/{workspace}/leaderboards', [\App\Http\Controllers\PublicLeaderboardController::class, 'index'])->name('public-page.leaderboards');
+Route::post('/public/workspaces/{workspace}/leaderboards/verify-password', [\App\Http\Controllers\PublicLeaderboardController::class, 'verifyPublicPassword'])->name('public-page.leaderboards.verify-password');
 
 Route::get('/changelog', function () {
     return Inertia::render('workspaces/changelog');
@@ -85,16 +87,21 @@ Route::middleware(['auth'])->group(function () {
             ?? $user->workspaces()->first();
 
         if ($workspace) {
-            if ($user->isCsrOf($workspace)) {
-                return redirect()->route('workspaces.csr.dashboard', $workspace->slug);
+            // Send the user to the highest-priority dashboard they can access
+            // (Main → Sales & Marketing → Video Editor → CSR); if none, fall
+            // back to their profile settings.
+            $target = $user->defaultDashboardRouteName($workspace);
+
+            if ($target === null) {
+                return redirect()->route('profile.edit', $workspace->slug);
             }
 
-            // Require at least one connected page before reaching the dashboard.
-            if (! $workspace->pages()->exists()) {
+            // The Main dashboard needs at least one connected page; onboard first.
+            if ($target === 'workspace.dashboard' && ! $workspace->pages()->exists()) {
                 return redirect()->route('workspace.onboarding', $workspace->slug);
             }
 
-            return redirect()->route('workspace.dashboard', $workspace->slug);
+            return redirect()->route($target, $workspace->slug);
         }
 
         return redirect()->route('workspaces.setup');

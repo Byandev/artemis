@@ -45,6 +45,8 @@ enum Permission: string
 
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
+    case ViewRtsAiChat = 'View RTS AI Chat';
+    case ViewRmoManagement = 'View RMO Management';
     case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
@@ -52,6 +54,7 @@ enum Permission: string
     case ViewCsrManagement = 'View CSR Management';
     case EditCsrEmployees = 'Edit CSR Employees';
     case ViewCsrAnalytics = 'View CSR Analytics';
+    case ViewLeaderboards = 'View Leaderboards';
 
     // Inventory
     case ViewInventoryItems = 'View Inventory Items';
@@ -103,6 +106,20 @@ enum Permission: string
     case EditPageDailyBudgetRecords = 'Edit Page Daily Budget Records';
     case DeletePageDailyBudgetRecords = 'Delete Page Daily Budget Records';
 
+    // Creatives
+    case ViewCreatives = 'View Creatives';
+    case CreateCreatives = 'Create Creatives';
+    case EditCreatives = 'Edit Creatives';
+    case DeleteCreatives = 'Delete Creatives';
+    case ReviewCreatives = 'Review Creatives';
+    case UpdateCreativeStatus = 'Update Creative Status';
+
+    // Dashboards
+    case ViewMainDashboard = 'View Main Dashboard';
+    case ViewSalesMarketingDashboard = 'View Sales & Marketing Dashboard';
+    case ViewVideoEditorDashboard = 'View Video Editor Dashboard';
+    case ViewCsrDashboard = 'View CSR Dashboard';
+
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
@@ -144,12 +161,15 @@ enum Permission: string
             self::ManageSchedule => 'Teams',
 
             self::ViewRtsAnalytics,
+            self::ViewRtsAiChat,
+            self::ViewRmoManagement,
             self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
             self::ViewCsrManagement,
             self::EditCsrEmployees,
-            self::ViewCsrAnalytics => 'CSR',
+            self::ViewCsrAnalytics,
+            self::ViewLeaderboards => 'CSR',
 
             self::ViewInventoryItems,
             self::CreateInventoryItems,
@@ -186,6 +206,13 @@ enum Permission: string
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
 
+            self::ViewCreatives,
+            self::CreateCreatives,
+            self::EditCreatives,
+            self::DeleteCreatives,
+            self::ReviewCreatives,
+            self::UpdateCreativeStatus => 'Creatives',
+
             self::ViewBotcakeSequences,
             self::ViewBotcakeSequenceMessages,
             self::ViewBotcakeFlows => 'Botcake',
@@ -194,6 +221,11 @@ enum Permission: string
             self::CreatePageDailyBudgetRecords,
             self::EditPageDailyBudgetRecords,
             self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
+
+            self::ViewMainDashboard,
+            self::ViewSalesMarketingDashboard,
+            self::ViewVideoEditorDashboard,
+            self::ViewCsrDashboard => 'Dashboards',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',

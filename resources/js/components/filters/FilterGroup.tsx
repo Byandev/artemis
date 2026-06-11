@@ -88,7 +88,9 @@ export function FilterGroup<T>({
                 <div className="max-h-44 overflow-y-auto">
                     {filtered.length === 0 ? (
                         <p className="px-2 py-3 text-center text-[11px] text-gray-400 dark:text-gray-600">
-                            No results for "{search}"
+                            {options.length === 0
+                                ? `No ${name.toLowerCase()}s available`
+                                : `No results for "${search}"`}
                         </p>
                     ) : (
                         filtered.map((item) => {

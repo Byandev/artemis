@@ -1,4 +1,5 @@
 import Filters, { FilterValue } from '@/components/filters/Filters';
+import InputError from '@/components/input-error';
 import {
     authParcelStatusConfig,
     orderStatusConfig,
@@ -16,6 +17,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Tooltip,
     TooltipContent,
@@ -32,7 +35,7 @@ import {
 } from '@/types/models/Pancake/OrderForDelivery';
 import { User } from '@/types/models/Pancake/User';
 import { Workspace } from '@/types/models/Workspace';
-import { router, usePage } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import {
@@ -41,6 +44,7 @@ import {
     ChevronUp,
     ClipboardCopy,
     Download,
+    Lock,
     MapPin,
     Pencil,
     Phone,
@@ -74,6 +78,8 @@ const EXPORT_COLUMNS = [
 const ALL_COLUMN_KEYS = EXPORT_COLUMNS.map((c) => c.key);
 
 interface Props {
+    /** When true, the page is password-gated and data props are omitted. */
+    locked?: boolean;
     orders: PaginatedData<OrderForDelivery>;
     workspace: Workspace;
     query?: {
@@ -318,7 +324,7 @@ function CallLogBadge({
     );
 }
 
-export default function RmoManagement({
+function RmoManagement({
     orders,
     workspace,
     query,
@@ -1809,4 +1815,71 @@ export default function RmoManagement({
             </div>
         </div>
     );
+}
+
+/** Password gate shown before the public RMO page when a password is set. */
+function RmoLockScreen({ workspace }: { workspace: Workspace }) {
+    const form = useForm({ password: '' });
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(
+            `/public/workspaces/${workspace.slug}/rts/rmo-management/verify-password`,
+            {
+                preserveScroll: true,
+                onError: () => form.reset('password'),
+            },
+        );
+    };
+
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-stone-100 p-4 dark:bg-zinc-950">
+            <div className="w-full max-w-sm rounded-[16px] border border-black/8 bg-white p-6 shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/8 dark:bg-zinc-900">
+                <div className="mb-4 flex flex-col items-center text-center">
+                    <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <Lock className="h-5 w-5" />
+                    </div>
+                    <h1 className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">
+                        Protected page
+                    </h1>
+                    <p className="mt-1 text-[12px] text-gray-500 dark:text-gray-400">
+                        Enter the password to access {workspace.name}&apos;s RMO
+                        management.
+                    </p>
+                </div>
+
+                <form onSubmit={submit} className="space-y-3">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="rmo-access-password">Password</Label>
+                        <Input
+                            id="rmo-access-password"
+                            type="password"
+                            autoFocus
+                            autoComplete="current-password"
+                            value={form.data.password}
+                            onChange={(e) =>
+                                form.setData('password', e.target.value)
+                            }
+                        />
+                        <InputError message={form.errors.password} />
+                    </div>
+                    <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={form.processing || !form.data.password}
+                    >
+                        {form.processing ? 'Unlocking…' : 'Unlock'}
+                    </Button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+export default function RmoManagementPage(props: Props) {
+    if (props.locked) {
+        return <RmoLockScreen workspace={props.workspace} />;
+    }
+
+    return <RmoManagement {...props} />;
 }
