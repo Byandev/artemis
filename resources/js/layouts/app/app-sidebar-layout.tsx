@@ -3,6 +3,7 @@ import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import SubscriptionExpiredModal from '@/components/subscription-expired-modal';
+import { Button } from '@/components/ui/button';
 import SyncingDataModal from '@/components/syncing-data-modal';
 import { type PropsWithChildren } from 'react';
 
@@ -18,7 +19,7 @@ export default function AppSidebarLayout({ children }: PropsWithChildren<{}>) {
                 {children}
             </AppContent>
             <SubscriptionExpiredModal />
-            <SyncingDataModal />
+            {/*<SyncingDataModal />*/}
         </AppShell>
     );
 }

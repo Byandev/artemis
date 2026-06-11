@@ -30,7 +30,7 @@ class SyncShopCustomer implements ShouldQueue
             'shop_id' => $this->shop->id,
             'customer_id' => $this->data['customer_id'],
             'name' => $this->data['name'],
-            'fb_id' => $this->data['fb_id'],
+            'fb_id' => $this->data['fb_id'] ?? null,
             'returned_order_count' => $this->data['returned_order_count'],
             'success_order_count' => $this->data['succeed_order_count'],
             'gender' => $this->data['gender'],

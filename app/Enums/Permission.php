@@ -46,6 +46,7 @@ enum Permission: string
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
     case ViewRtsAiChat = 'View RTS AI Chat';
+    case ViewRmoManagement = 'View RMO Management';
     case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
@@ -53,6 +54,7 @@ enum Permission: string
     case ViewCsrManagement = 'View CSR Management';
     case EditCsrEmployees = 'Edit CSR Employees';
     case ViewCsrAnalytics = 'View CSR Analytics';
+    case ViewLeaderboards = 'View Leaderboards';
 
     // Inventory
     case ViewInventoryItems = 'View Inventory Items';
@@ -112,6 +114,13 @@ enum Permission: string
     case ReviewCreatives = 'Review Creatives';
     case UpdateCreativeStatus = 'Update Creative Status';
 
+    // Meta Ads
+    case ViewMetaAds = 'View Meta Ads';
+    case ManageMetaAdsAccounts = 'Manage Meta Ads Accounts';
+    case ViewOptimizationRules = 'View Optimization Rules';
+    case ManageOptimizationRules = 'Manage Optimization Rules';
+    case ApproveOptimizationRules = 'Approve Optimization Rules';
+
     // Dashboards
     case ViewMainDashboard = 'View Main Dashboard';
     case ViewSalesMarketingDashboard = 'View Sales & Marketing Dashboard';
@@ -121,6 +130,16 @@ enum Permission: string
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
+
+    // Meta Ads
+    case ViewMetaAds = 'View Meta Ads';
+    case ConnectFbAccount = 'Connect FB Account';
+    case ViewAdAccounts = 'View Ad Accounts';
+    case ManageMetaAdsAccounts = 'Manage Meta Ads Accounts';
+    case ViewOptimizationRules = 'View Optimization Rules';
+    case ManageOptimizationRules = 'Manage Optimization Rules';
+    case ApproveOptimizationRules = 'Approve Optimization Rules';
+    case ViewOptimizationLogs = 'View Optimization Logs';
 
     public function category(): string
     {
@@ -160,12 +179,14 @@ enum Permission: string
 
             self::ViewRtsAnalytics,
             self::ViewRtsAiChat,
+            self::ViewRmoManagement,
             self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
             self::ViewCsrManagement,
             self::EditCsrEmployees,
-            self::ViewCsrAnalytics => 'CSR',
+            self::ViewCsrAnalytics,
+            self::ViewLeaderboards => 'CSR',
 
             self::ViewInventoryItems,
             self::CreateInventoryItems,
@@ -218,6 +239,12 @@ enum Permission: string
             self::EditPageDailyBudgetRecords,
             self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
 
+            self::ViewMetaAds,
+            self::ManageMetaAdsAccounts,
+            self::ViewOptimizationRules,
+            self::ManageOptimizationRules,
+            self::ApproveOptimizationRules => 'Meta Ads',
+
             self::ViewMainDashboard,
             self::ViewSalesMarketingDashboard,
             self::ViewVideoEditorDashboard,
@@ -225,6 +252,15 @@ enum Permission: string
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys => 'Settings',
+
+            self::ViewMetaAds,
+            self::ConnectFbAccount,
+            self::ViewAdAccounts,
+            self::ManageMetaAdsAccounts,
+            self::ViewOptimizationRules,
+            self::ManageOptimizationRules,
+            self::ApproveOptimizationRules,
+            self::ViewOptimizationLogs => 'Meta Ads',
         };
     }
 }

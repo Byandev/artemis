@@ -175,6 +175,7 @@ class HandleInertiaRequests extends Middleware
             $workspace->checklist_module_enabled ? null : 'Checklist',
             $workspace->csr_module_enabled ? null : 'CSR',
             $workspace->botcake_module_enabled ? null : 'Botcake',
+            $workspace->meta_ads_module_enabled ? null : 'Meta Ads',
         ]));
 
         return Role::with('permissions:id,name,category')
