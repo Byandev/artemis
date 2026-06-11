@@ -24,6 +24,8 @@ class CSRController extends Controller
 
     public function dashboard(Request $request, Workspace $workspace)
     {
+        abort_unless($workspace->csr_dashboard_module_enabled, 404);
+
         // Gate like the other workspace dashboards. CSRs are still let through
         // (they're auto-redirected here and own this personal view), while
         // managers/admins need the explicit permission. Owners and super-admins

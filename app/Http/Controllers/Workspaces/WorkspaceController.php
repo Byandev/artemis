@@ -140,7 +140,7 @@ class WorkspaceController extends Controller
 
         session(['current_workspace_id' => $workspace->id]);
 
-        if ($workspace->csr_module_enabled && $request->user()->isCsrOf($workspace)) {
+        if ($workspace->csr_dashboard_module_enabled && $request->user()->isCsrOf($workspace)) {
             return redirect()->route('workspaces.csr.dashboard', $workspace->slug)
                 ->with('success', "Switched to {$workspace->name}.");
         }

@@ -9,7 +9,7 @@ use Modules\Pancake\Jobs\FetchPageOrders;
 
 class TriggerFetchPageOrders extends Command
 {
-    protected $signature = 'trigger-fetch-page-orders';
+    protected $signature = 'trigger-fetch-page-orders {id? : Sync only this page ID}';
 
     protected $description = 'Sync Pancake page orders. At 9/12/15/18/21 it pulls shipped orders (filter_status[]=2); otherwise it pulls orders updated since orders_last_synced_at.';
 
@@ -21,6 +21,7 @@ class TriggerFetchPageOrders extends Command
             ->whereNotNull('pos_token')
             ->whereNotNull('shop_id')
             ->where('status', 'active')
+            ->when($this->argument('id'), fn ($query, $id) => $query->where('id', $id))
             ->orderBy('created_at', 'asc')
             ->get()
             ->each(function (Page $page) use ($shipped) {

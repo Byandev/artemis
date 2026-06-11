@@ -54,6 +54,9 @@ interface Workspace {
     botcake_module_enabled: boolean;
     creatives_module_enabled: boolean;
     meta_ads_module_enabled: boolean;
+    sales_marketing_dashboard_module_enabled: boolean;
+    video_editor_dashboard_module_enabled: boolean;
+    csr_dashboard_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -71,6 +74,9 @@ const MODULE_FIELDS: Array<{
         | 'botcake_module_enabled'
         | 'creatives_module_enabled'
         | 'meta_ads_module_enabled'
+        | 'sales_marketing_dashboard_module_enabled'
+        | 'video_editor_dashboard_module_enabled'
+        | 'csr_dashboard_module_enabled'
     >;
     label: string;
     description: string;
@@ -129,6 +135,21 @@ const MODULE_FIELDS: Array<{
         key: 'meta_ads_module_enabled',
         label: 'Meta Ads',
         description: 'Ads manager, optimization rules, and approvals',
+    },
+    {
+        key: 'sales_marketing_dashboard_module_enabled',
+        label: 'S&M Dashboard',
+        description: 'Sales & Marketing dashboard',
+    },
+    {
+        key: 'video_editor_dashboard_module_enabled',
+        label: 'Video Editor Dashboard',
+        description: 'Video Editor dashboard',
+    },
+    {
+        key: 'csr_dashboard_module_enabled',
+        label: 'CSR Dashboard',
+        description: 'CSR personal dashboard',
     },
 ];
 
@@ -673,6 +694,11 @@ function ModulesModal({
         botcake_module_enabled: workspace.botcake_module_enabled,
         creatives_module_enabled: workspace.creatives_module_enabled,
         meta_ads_module_enabled: workspace.meta_ads_module_enabled,
+        sales_marketing_dashboard_module_enabled:
+            workspace.sales_marketing_dashboard_module_enabled,
+        video_editor_dashboard_module_enabled:
+            workspace.video_editor_dashboard_module_enabled,
+        csr_dashboard_module_enabled: workspace.csr_dashboard_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

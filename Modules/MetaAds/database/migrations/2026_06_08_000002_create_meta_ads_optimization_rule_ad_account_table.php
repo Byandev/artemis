@@ -13,17 +13,17 @@ return new class extends Migration
             $table->unsignedBigInteger('meta_ads_optimization_rule_id');
             $table->unsignedBigInteger('meta_ads_account_id');
 
+            // Composite primary key doubles as the rule↔account uniqueness
+            // constraint and satisfies MySQL's sql_require_primary_key (enforced
+            // on managed MySQL such as DigitalOcean).
+            $table->primary(['meta_ads_optimization_rule_id', 'meta_ads_account_id']);
+
             // Explicit short names — auto-generated identifiers exceed MySQL's
             // 64-character limit.
             $table->foreign('meta_ads_optimization_rule_id', 'maoraa_rule_id_foreign')
                 ->references('id')->on('meta_ads_optimization_rules')->onDelete('cascade');
             $table->foreign('meta_ads_account_id', 'maoraa_account_id_foreign')
                 ->references('id')->on('meta_ads_accounts')->onDelete('cascade');
-
-            $table->unique(
-                ['meta_ads_optimization_rule_id', 'meta_ads_account_id'],
-                'maoraa_rule_account_unique',
-            );
         });
 
         // Carry any existing single-account assignments into the pivot.

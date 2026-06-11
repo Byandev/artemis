@@ -95,7 +95,7 @@ class AuthenticatedSessionController extends Controller
         $workspace = $user->ownedWorkspaces()->first()
             ?? $user->workspaces()->first();
 
-        if ($workspace && $user->isCsrOf($workspace)) {
+        if ($workspace && $workspace->csr_dashboard_module_enabled && $user->isCsrOf($workspace)) {
             return redirect()->route('workspaces.csr.dashboard', $workspace->slug);
         }
 
