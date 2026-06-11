@@ -132,13 +132,8 @@ enum Permission: string
     case ManageApiKeys = 'Manage API Keys';
 
     // Meta Ads
-    case ViewMetaAds = 'View Meta Ads';
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
-    case ManageMetaAdsAccounts = 'Manage Meta Ads Accounts';
-    case ViewOptimizationRules = 'View Optimization Rules';
-    case ManageOptimizationRules = 'Manage Optimization Rules';
-    case ApproveOptimizationRules = 'Approve Optimization Rules';
     case ViewOptimizationLogs = 'View Optimization Logs';
 
     public function category(): string
@@ -238,12 +233,6 @@ enum Permission: string
             self::CreatePageDailyBudgetRecords,
             self::EditPageDailyBudgetRecords,
             self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
-
-            self::ViewMetaAds,
-            self::ManageMetaAdsAccounts,
-            self::ViewOptimizationRules,
-            self::ManageOptimizationRules,
-            self::ApproveOptimizationRules => 'Meta Ads',
 
             self::ViewMainDashboard,
             self::ViewSalesMarketingDashboard,

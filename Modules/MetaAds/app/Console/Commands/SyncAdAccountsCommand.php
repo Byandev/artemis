@@ -31,7 +31,7 @@ class SyncAdAccountsCommand extends Command
         foreach ($users as $user) {
             $this->info("Dispatching sync for MetaUser #{$user->id} ({$user->name})");
 
-            SyncMetaAdAccounts::dispatch($user);
+            SyncMetaAdAccounts::dispatch($user)->onQueue('meta-ads');
         }
 
         return self::SUCCESS;

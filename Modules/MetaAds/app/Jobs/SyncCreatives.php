@@ -103,7 +103,7 @@ class SyncCreatives implements ShouldQueue
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
             if ($hasNextPage && $afterCursor !== null) {
-                static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp);
+                static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp)->onQueue('meta-ads');
             } else {
                 $run->succeed($count, ['creative_count' => $count]);
             }

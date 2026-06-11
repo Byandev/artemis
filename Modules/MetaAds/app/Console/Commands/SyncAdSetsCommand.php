@@ -33,7 +33,7 @@ class SyncAdSetsCommand extends Command
         foreach ($accounts as $index => $account) {
             $this->info("Dispatching ad sets sync for AdAccount #{$account->id} ({$account->meta_account_id})");
 
-            SyncAdSets::dispatch($account)->delay(now()->addSeconds($index * 10));
+            SyncAdSets::dispatch($account)->onQueue('meta-ads')->delay(now()->addSeconds($index * 10));
         }
 
         return self::SUCCESS;

@@ -104,7 +104,7 @@ class SyncAdSets implements ShouldQueue
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
             if ($afterCursor !== null) {
-                static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp);
+                static::dispatch($this->adAccount, $afterCursor, $count, $run->id, $this->sinceTimestamp)->onQueue('meta-ads');
             } else {
                 $run->succeed($count, ['ad_set_count' => $count]);
             }

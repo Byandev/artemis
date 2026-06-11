@@ -52,7 +52,7 @@ class EvaluateOptimizationRules implements ShouldQueue
                 $decision['adAccount'],
                 $decision['target'],
                 $decision['snapshot'],
-            );
+            )->onQueue('meta-ads');
         }
     }
 }

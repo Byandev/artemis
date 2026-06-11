@@ -302,7 +302,7 @@ class OptimizationRuleController extends Controller
             $target,
             $proposal->conditions_snapshot ?? [],
             $proposal->id,
-        );
+        )->onQueue('meta-ads');
     }
 
     public function rejectProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal): RedirectResponse

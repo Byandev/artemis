@@ -15,7 +15,7 @@ class CaptureBudgetSnapshotsCommand extends Command
     {
         $date = $this->option('date');
 
-        CaptureBudgetSnapshots::dispatch($date);
+        CaptureBudgetSnapshots::dispatch($date)->onQueue('meta-ads');
 
         $this->info('Dispatched budget-snapshot job'.($date ? " for {$date}" : ''));
 

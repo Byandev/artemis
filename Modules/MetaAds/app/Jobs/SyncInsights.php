@@ -238,7 +238,7 @@ class SyncInsights implements ShouldQueue
             $afterCursor = $page['paging']['cursors']['after'] ?? null;
 
             if ($hasNextPage && $afterCursor !== null) {
-                static::dispatch($this->adAccount, $this->date, $afterCursor, $count, $run->id);
+                static::dispatch($this->adAccount, $this->date, $afterCursor, $count, $run->id)->onQueue('meta-ads');
             } else {
                 $run->succeed($count, ['insight_row_count' => $count]);
             }

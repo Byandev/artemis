@@ -19,7 +19,7 @@ class DiscoverSystemAccountsCommand extends Command
             return self::FAILURE;
         }
 
-        DiscoverSystemUserAdAccounts::dispatch();
+        DiscoverSystemUserAdAccounts::dispatch()->onQueue('meta-ads');
         $this->info('Discovery job queued.');
 
         return self::SUCCESS;

@@ -285,6 +285,22 @@ return [
             'timeout' => 120,
             'nice' => 0,
         ],
+        'meta-ads' => [
+            'connection' => 'redis',
+            'queue' => ['meta-ads'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 3,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            // Longest Meta Ads job timeout is 600s (sync jobs); give the worker headroom.
+            'timeout' => 660,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
