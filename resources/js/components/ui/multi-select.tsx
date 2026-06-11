@@ -130,14 +130,14 @@ export function MultiSelect({
         <div className={`relative ${className}`} ref={dropdownRef}>
             {/* Selected items and input */}
             <div
-                className="min-h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 cursor-text"
+                className="min-h-10 cursor-text rounded-[10px] border border-black/8 bg-stone-50 px-2.5 py-1.5 transition-all focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800"
                 onClick={() => setOpen(true)}
             >
                 <div className="flex flex-wrap gap-1 items-center">
                     {selected.map((value) => {
                         const option = options.find(o => o.value === value);
                         return (
-                            <Badge key={value} variant="secondary" className="gap-1">
+                            <Badge key={value} variant="secondary" className="gap-1 font-mono! text-[11px]! font-normal">
                                 {option?.label || value}
                                 <button
                                     type="button"
@@ -159,7 +159,7 @@ export function MultiSelect({
                     })}
                     <input
                         type="text"
-                        className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground min-w-[120px]"
+                        className="flex-1 min-w-[120px] bg-transparent font-mono! text-[13px]! text-gray-800 outline-none placeholder:text-gray-300 dark:text-gray-100 dark:placeholder:text-gray-600"
                         placeholder={selected.length === 0 ? placeholder : 'Search...'}
                         value={search}
                         onChange={(e) => {
@@ -173,24 +173,24 @@ export function MultiSelect({
 
             {/* Dropdown options */}
             {open && (
-                <div className="absolute z-50 w-full mt-1 max-h-60 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-[10px] border border-black/8 bg-white p-1 shadow-lg dark:border-white/8 dark:bg-zinc-800">
                     {filteredOptions.map((option) => {
                         const isSelected = selected.includes(option.value);
                         return (
                             <div
                                 key={option.value}
-                                className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                                className="relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 font-mono! text-[12px]! text-gray-700 outline-none select-none hover:bg-stone-100 dark:text-gray-200 dark:hover:bg-zinc-700"
                                 onClick={() => handleToggle(option.value)}
                             >
-                                <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-input'}`}>
-                                    {isSelected && <Check className="h-3 w-3" />}
+                                <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-300 dark:border-gray-600'}`}>
+                                    {isSelected && <Check className="h-2.5 w-2.5" />}
                                 </span>
                                 {option.label}
                             </div>
                         );
                     })}
                     {filteredOptions.length === 0 && search && (
-                        <div className="p-6 text-center text-sm text-muted-foreground">
+                        <div className="p-6 text-center font-mono! text-[12px]! text-gray-400">
                             No results found.
                         </div>
                     )}

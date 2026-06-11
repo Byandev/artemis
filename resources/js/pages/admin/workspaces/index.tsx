@@ -53,6 +53,7 @@ interface Workspace {
     leaderboard_module_enabled: boolean;
     botcake_module_enabled: boolean;
     creatives_module_enabled: boolean;
+    meta_ads_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -69,6 +70,7 @@ const MODULE_FIELDS: Array<{
         | 'leaderboard_module_enabled'
         | 'botcake_module_enabled'
         | 'creatives_module_enabled'
+        | 'meta_ads_module_enabled'
     >;
     label: string;
     description: string;
@@ -122,6 +124,11 @@ const MODULE_FIELDS: Array<{
         key: 'creatives_module_enabled',
         label: 'Creatives',
         description: 'Creative tracker with review and ads campaign status',
+    },
+    {
+        key: 'meta_ads_module_enabled',
+        label: 'Meta Ads',
+        description: 'Ads manager, optimization rules, and approvals',
     },
 ];
 
@@ -665,6 +672,7 @@ function ModulesModal({
         leaderboard_module_enabled: workspace.leaderboard_module_enabled,
         botcake_module_enabled: workspace.botcake_module_enabled,
         creatives_module_enabled: workspace.creatives_module_enabled,
+        meta_ads_module_enabled: workspace.meta_ads_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

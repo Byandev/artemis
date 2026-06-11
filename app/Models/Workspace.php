@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Inventory\Models\InventoryTransaction;
+use Modules\MetaAds\Models\User as MetaUser;
 
 class Workspace extends Model
 {
@@ -35,6 +36,7 @@ class Workspace extends Model
         'leaderboard_module_enabled',
         'botcake_module_enabled',
         'creatives_module_enabled',
+        'meta_ads_module_enabled',
         'inventory_sync',
         'public_password',
     ];
@@ -60,6 +62,7 @@ class Workspace extends Model
         'leaderboard_module_enabled' => 'boolean',
         'botcake_module_enabled' => 'boolean',
         'creatives_module_enabled' => 'boolean',
+        'meta_ads_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
     ];
@@ -230,9 +233,11 @@ class Workspace extends Model
         return $this->hasMany(ParcelJourneyNotificationTemplate::class);
     }
 
-    public function facebookAccounts(): BelongsToMany
+    public function metaUsers(): BelongsToMany
     {
-        return $this->belongsToMany(FacebookAccount::class, 'workspace_facebook_account');
+        return $this->belongsToMany(MetaUser::class, 'meta_ads_workspace_user', 'workspace_id', 'meta_ads_user_id')
+            ->withPivot('connected_by_user_id')
+            ->withTimestamps();
     }
 
     public function metrics(array $dateRange, array $filter, string $source = 'live'): WorkspaceMetrics
