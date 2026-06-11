@@ -41,8 +41,18 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Status can only be updated for orders scheduled for delivery today.');
+        $deliveryDate = $orderForDelivery->delivery_date
+            ? Carbon::parse($orderForDelivery->delivery_date)
+            : null;
+
+        // Status is editable for today's orders, and also for yesterday's
+        // orders but only when the parcel was delivered.
+        $isToday = $deliveryDate?->isToday() ?? false;
+        $isDeliveredYesterday = ($deliveryDate?->isYesterday() ?? false)
+            && strtolower((string) $orderForDelivery->parcel_status) === 'delivered';
+
+        if (! $isToday && ! $isDeliveredYesterday) {
+            return redirect()->back()->with('error', "Status can only be updated for orders scheduled for delivery today, or yesterday's delivered orders.");
         }
 
         $orderForDelivery->update(['status' => $request->status]);

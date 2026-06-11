@@ -410,8 +410,14 @@ function RmoManagement({
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     })();
+    const yesterdayLocal = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
     const deliveryDate = query?.delivery_date ?? todayLocal;
     const isToday = deliveryDate === todayLocal;
+    const isYesterday = deliveryDate === yesterdayLocal;
 
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
@@ -759,8 +765,12 @@ function RmoManagement({
     const [copiedCustomer, setCopiedCustomer] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
-    const allPageIds = useMemo(() => (orders.data ?? []).map((o) => o.id), [orders.data]);
-    const allSelected = allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
+    const allPageIds = useMemo(
+        () => (orders.data ?? []).map((o) => o.id),
+        [orders.data],
+    );
+    const allSelected =
+        allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
     const someSelected = allPageIds.some((id) => selectedIds.has(id));
 
     const toggleRow = useCallback((id: number) => {
@@ -782,17 +792,32 @@ function RmoManagement({
         });
     }, [allPageIds]);
 
-    const clearSelection = useCallback(() => { setSelectedIds(new Set()); setBulkConflict(null); }, []);
+    const clearSelection = useCallback(() => {
+        setSelectedIds(new Set());
+        setBulkConflict(null);
+    }, []);
 
-    const [bulkConflict, setBulkConflict] = useState<{ already: number; toAssign: number } | null>(null);
+    const [bulkConflict, setBulkConflict] = useState<{
+        already: number;
+        toAssign: number;
+    } | null>(null);
 
-    const doBulkAssign = useCallback((userId: string) => {
-        router.post(
-            `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-assign`,
-            { ids: Array.from(selectedIds), userId },
-            { preserveScroll: true, onSuccess: () => { setSelectedIds(new Set()); setBulkConflict(null); } },
-        );
-    }, [selectedIds, workspace.slug]);
+    const doBulkAssign = useCallback(
+        (userId: string) => {
+            router.post(
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-assign`,
+                { ids: Array.from(selectedIds), userId },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setSelectedIds(new Set());
+                        setBulkConflict(null);
+                    },
+                },
+            );
+        },
+        [selectedIds, workspace.slug],
+    );
 
     const handleBulkAssignToMe = useCallback(() => {
         const userId = localStorage.getItem('user_id');
@@ -800,10 +825,17 @@ function RmoManagement({
             setIsOpen(true);
             return;
         }
-        const selectedOrders = (orders.data ?? []).filter((o) => selectedIds.has(o.id));
-        const alreadyAssigned = selectedOrders.filter((o) => o.assignee != null).length;
+        const selectedOrders = (orders.data ?? []).filter((o) =>
+            selectedIds.has(o.id),
+        );
+        const alreadyAssigned = selectedOrders.filter(
+            (o) => o.assignee != null,
+        ).length;
         if (alreadyAssigned > 0) {
-            setBulkConflict({ already: alreadyAssigned, toAssign: selectedOrders.length - alreadyAssigned });
+            setBulkConflict({
+                already: alreadyAssigned,
+                toAssign: selectedOrders.length - alreadyAssigned,
+            });
             return;
         }
         doBulkAssign(userId);
@@ -849,7 +881,13 @@ function RmoManagement({
                 enableSorting: false,
                 header: () => (
                     <Checkbox
-                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                        checked={
+                            allSelected
+                                ? true
+                                : someSelected
+                                  ? 'indeterminate'
+                                  : false
+                        }
                         onCheckedChange={toggleAll}
                         aria-label="Select all"
                         className="translate-y-px"
@@ -1204,15 +1242,25 @@ function RmoManagement({
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Status" />
                 ),
-                cell: ({ row }) => (
-                    <RmoStatusPicker
-                        currentStatus={row.original.status as OrderStatus}
-                        onChangeStatus={(status) =>
-                            handleChangeStatus(status, row.original.id)
-                        }
-                        disabled={!isToday}
-                    />
-                ),
+                cell: ({ row }) => {
+                    // Status is editable for today's orders, and for yesterday's
+                    // orders only when the parcel was delivered.
+                    const canEditStatus =
+                        isToday ||
+                        (isYesterday &&
+                            row.original.parcel_status?.toLowerCase() ===
+                                'delivered');
+
+                    return (
+                        <RmoStatusPicker
+                            currentStatus={row.original.status as OrderStatus}
+                            onChangeStatus={(status) =>
+                                handleChangeStatus(status, row.original.id)
+                            }
+                            disabled={!canEditStatus}
+                        />
+                    );
+                },
             },
         ],
         [
@@ -1221,6 +1269,7 @@ function RmoManagement({
             handleChangeStatus,
             handleUpdatePhone,
             isToday,
+            isYesterday,
             canEditPhone,
             selectedIds,
             allSelected,
@@ -1669,7 +1718,8 @@ function RmoManagement({
                     <div className="mb-3 space-y-2">
                         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                             <span className="text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
-                                {selectedIds.size} order{selectedIds.size !== 1 ? 's' : ''} selected
+                                {selectedIds.size} order
+                                {selectedIds.size !== 1 ? 's' : ''} selected
                             </span>
                             <div className="h-3.5 w-px bg-emerald-200 dark:bg-emerald-500/30" />
                             <button
@@ -1681,7 +1731,10 @@ function RmoManagement({
                                 Assign to me
                             </button>
                             <button
-                                onClick={() => { clearSelection(); setBulkConflict(null); }}
+                                onClick={() => {
+                                    clearSelection();
+                                    setBulkConflict(null);
+                                }}
                                 className="ml-auto flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
                             >
                                 <X className="h-3.5 w-3.5" />
@@ -1692,7 +1745,15 @@ function RmoManagement({
                         {bulkConflict && (
                             <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 dark:border-amber-500/30 dark:bg-amber-500/10">
                                 <span className="text-[12px] text-amber-700 dark:text-amber-400">
-                                    <span className="font-semibold">{bulkConflict.already}</span> order{bulkConflict.already !== 1 ? 's' : ''} already {bulkConflict.already !== 1 ? 'have' : 'has'} an assignee and will be skipped.
+                                    <span className="font-semibold">
+                                        {bulkConflict.already}
+                                    </span>{' '}
+                                    order{bulkConflict.already !== 1 ? 's' : ''}{' '}
+                                    already{' '}
+                                    {bulkConflict.already !== 1
+                                        ? 'have'
+                                        : 'has'}{' '}
+                                    an assignee and will be skipped.
                                     {bulkConflict.toAssign > 0
                                         ? ` ${bulkConflict.toAssign} unassigned order${bulkConflict.toAssign !== 1 ? 's' : ''} will be assigned.`
                                         : ' Nothing to assign.'}
@@ -1700,7 +1761,13 @@ function RmoManagement({
                                 <div className="ml-auto flex items-center gap-2">
                                     {bulkConflict.toAssign > 0 && (
                                         <button
-                                            onClick={() => doBulkAssign(localStorage.getItem('user_id')!)}
+                                            onClick={() =>
+                                                doBulkAssign(
+                                                    localStorage.getItem(
+                                                        'user_id',
+                                                    )!,
+                                                )
+                                            }
                                             className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1 text-[12px] font-medium text-white transition-colors hover:bg-amber-700"
                                         >
                                             Proceed
