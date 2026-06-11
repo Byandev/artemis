@@ -131,18 +131,21 @@ class OptimizationRuleEvaluator
         $snapshot = [];
 
         foreach ($rule->conditions as $condition) {
-            // "budget" lives on the campaign / ad set itself, not in insights —
-            // and the rule's target_type already picks the right level, so this
-            // works for both campaign and ad set targets. Null when the target
-            // carries no budget (e.g. an ad set under campaign-budget optimization).
-            $actualValue = $condition->metric === 'budget'
-                ? $this->targetBudget($target)
-                : $this->computeMetric(
+            // "budget", "running_days" and "last_modified_in_hours" live on the
+            // campaign / ad set itself, not in insights, so they're read straight
+            // off the target and ignore the time window. Everything else is an
+            // insights metric.
+            $actualValue = match ($condition->metric) {
+                'budget' => $this->targetBudget($target),
+                'running_days' => $this->targetRunningDays($target),
+                'last_modified_in_hours' => $this->targetLastModifiedHours($target),
+                default => $this->computeMetric(
                     $condition->metric,
                     $rule->target_type,
                     $target->id,
                     $condition->time_window,
-                );
+                ),
+            };
 
             $snapshot[] = [
                 'metric' => $condition->metric,
@@ -199,6 +202,43 @@ class OptimizationRuleEvaluator
         $budget = $target->daily_budget ?? $target->lifetime_budget;
 
         return $budget !== null ? (float) $budget : null;
+    }
+
+    /**
+     * Whole days the campaign / ad set has been running, from its start_time
+     * (falling back to created_time). Null when neither is set. e.g. a rule
+     * "running_days >= 3" only fires once the entity has been live 3+ days.
+     */
+    private function targetRunningDays(Campaign|AdSet $target): ?float
+    {
+        $start = $target->start_time ?? $target->created_time;
+
+        if ($start === null) {
+            return null;
+        }
+
+        $start = $start instanceof Carbon ? $start : Carbon::parse($start);
+
+        return (float) $start->startOfDay()->diffInDays(Carbon::now()->startOfDay());
+    }
+
+    /**
+     * Whole hours since the campaign / ad set was last modified on Meta
+     * (`updated_time`, falling back to created_time). Null when neither is set.
+     * Useful as a cooldown, e.g. "last_modified_in_hours >= 24" so a rule won't
+     * touch something that was just changed.
+     */
+    private function targetLastModifiedHours(Campaign|AdSet $target): ?float
+    {
+        $modified = $target->updated_time ?? $target->created_time;
+
+        if ($modified === null) {
+            return null;
+        }
+
+        $modified = $modified instanceof Carbon ? $modified : Carbon::parse($modified);
+
+        return (float) $modified->diffInHours(Carbon::now());
     }
 
     private function allConditionsMet(array $snapshot, string $operator): bool

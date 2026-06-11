@@ -385,9 +385,13 @@ export default function OptimizationApprovals({
                                     : Number(c.actual_value).toLocaleString()}
                                 )
                             </span>
-                            <span className="text-gray-400">
-                                · {titleCase(c.time_window)}
-                            </span>
+                            {c.metric !== 'budget' &&
+                                c.metric !== 'running_days' &&
+                                c.metric !== 'last_modified_in_hours' && (
+                                    <span className="text-gray-400">
+                                        · {titleCase(c.time_window)}
+                                    </span>
+                                )}
                         </span>
                     ))}
                 </div>

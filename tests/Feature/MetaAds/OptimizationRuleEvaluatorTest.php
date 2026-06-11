@@ -88,3 +88,53 @@ it('lets the highest-priority approval rule claim a target so there are no compe
         ->and($proposals[0]->action)->toBe('pause')
         ->and((int) $proposals[0]->meta_ads_optimization_rule_id)->toBe($kill->id);
 });
+
+it('evaluates running_days from the target start time (>= 3 days)', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $account = AdAccount::create(['id' => 340, 'name' => 'A']);
+    Campaign::create(['id' => 420, 'meta_ads_account_id' => 340, 'name' => 'C']);
+    // Running 5 days → matches; running 1 day → doesn't.
+    AdSet::create(['id' => 520, 'meta_ads_account_id' => 340, 'meta_ads_campaign_id' => 420, 'name' => 'Old', 'start_time' => now()->subDays(5)]);
+    AdSet::create(['id' => 521, 'meta_ads_account_id' => 340, 'meta_ads_campaign_id' => 420, 'name' => 'New', 'start_time' => now()->subDay()]);
+
+    $rule = OptimizationRule::create([
+        'workspace_id' => $workspace->id, 'name' => 'Age gate',
+        'target_type' => 'ad_set', 'action' => 'pause',
+        'condition_operator' => 'and', 'execution_mode' => 'approval', 'is_active' => true,
+    ]);
+    OptimizationRuleCondition::create([
+        'meta_ads_optimization_rule_id' => $rule->id,
+        'metric' => 'running_days', 'operator' => '>=', 'value' => 3, 'time_window' => 'today',
+    ]);
+
+    $proposals = (new OptimizationRuleEvaluator)->plan($rule->load('conditions'), $account);
+
+    expect($proposals)->toHaveCount(1)
+        ->and((string) $proposals[0]['target_id'])->toBe('520');
+});
+
+it('evaluates last_modified_in_hours from the target updated_time (>= 24 hours)', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $account = AdAccount::create(['id' => 350, 'name' => 'A']);
+    Campaign::create(['id' => 430, 'meta_ads_account_id' => 350, 'name' => 'C']);
+    // Untouched for 30h → matches; edited 2h ago → still in cooldown.
+    AdSet::create(['id' => 530, 'meta_ads_account_id' => 350, 'meta_ads_campaign_id' => 430, 'name' => 'Stale', 'updated_time' => now()->subHours(30)]);
+    AdSet::create(['id' => 531, 'meta_ads_account_id' => 350, 'meta_ads_campaign_id' => 430, 'name' => 'Fresh', 'updated_time' => now()->subHours(2)]);
+
+    $rule = OptimizationRule::create([
+        'workspace_id' => $workspace->id, 'name' => 'Cooldown',
+        'target_type' => 'ad_set', 'action' => 'pause',
+        'condition_operator' => 'and', 'execution_mode' => 'approval', 'is_active' => true,
+    ]);
+    OptimizationRuleCondition::create([
+        'meta_ads_optimization_rule_id' => $rule->id,
+        'metric' => 'last_modified_in_hours', 'operator' => '>=', 'value' => 24, 'time_window' => 'today',
+    ]);
+
+    $proposals = (new OptimizationRuleEvaluator)->plan($rule->load('conditions'), $account);
+
+    expect($proposals)->toHaveCount(1)
+        ->and((string) $proposals[0]['target_id'])->toBe('530');
+});

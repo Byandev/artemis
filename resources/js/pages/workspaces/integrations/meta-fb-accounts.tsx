@@ -15,13 +15,11 @@ import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import {
-    Database,
     Facebook,
     Mail,
     MoreHorizontal,
     RefreshCw,
     Search,
-    User as UserIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -37,7 +35,6 @@ interface MetaUser {
 interface Props {
     workspace: Workspace;
     metaUsers: PaginatedData<MetaUser>;
-    totalAdAccounts: number;
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -56,38 +53,9 @@ function formatRelative(ts: string | null) {
     return `${Math.round(diff / 86400)}d ago`;
 }
 
-function StatCard({
-    label,
-    value,
-    icon: Icon,
-}: {
-    label: string;
-    value: string | number;
-    icon: typeof UserIcon;
-}) {
-    return (
-        <div className="rounded-[14px] border border-black/6 bg-white p-5 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
-            <div className="flex items-start justify-between">
-                <div>
-                    <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                        {label}
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold tracking-tight text-gray-700 dark:text-gray-200">
-                        {value}
-                    </p>
-                </div>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-stone-100 text-stone-500 dark:bg-zinc-800 dark:text-zinc-400">
-                    <Icon className="h-4 w-4" />
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export default function MetaFbAccounts({
     workspace,
     metaUsers,
-    totalAdAccounts,
     query,
 }: Props) {
     const connectUrl = `/workspaces/${workspace.slug}/integrations/meta/connect`;
@@ -232,13 +200,6 @@ export default function MetaFbAccounts({
         },
     ];
 
-    const lastSynced =
-        metaUsers.data
-            .map((u) => u.last_synced_at)
-            .filter(Boolean)
-            .sort()
-            .reverse()[0] ?? null;
-
     return (
         <AppLayout>
             <Head title="Meta Ads · FB Account" />
@@ -258,24 +219,6 @@ export default function MetaFbAccounts({
                         </a>
                     </Button>
                 </PageHeader>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <StatCard
-                        label="Connected Users"
-                        value={metaUsers.total}
-                        icon={UserIcon}
-                    />
-                    <StatCard
-                        label="Ad Accounts"
-                        value={totalAdAccounts}
-                        icon={Database}
-                    />
-                    <StatCard
-                        label="Last Synced"
-                        value={formatRelative(lastSynced)}
-                        icon={RefreshCw}
-                    />
-                </div>
 
                 <div className="flex items-center gap-2">
                     <div className="relative w-full max-w-xs">

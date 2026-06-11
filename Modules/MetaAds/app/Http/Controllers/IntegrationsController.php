@@ -34,12 +34,9 @@ class IntegrationsController extends Controller
             ->paginate($request->integer('per_page', 15))
             ->withQueryString();
 
-        $totalAdAccounts = AdAccount::forWorkspace($workspace)->distinct()->count('meta_ads_accounts.id');
-
         return Inertia::render('workspaces/integrations/meta-fb-accounts', [
             'workspace' => $workspace,
             'metaUsers' => $metaUsers,
-            'totalAdAccounts' => $totalAdAccounts,
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),

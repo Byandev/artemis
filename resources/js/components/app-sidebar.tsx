@@ -28,6 +28,7 @@ import {
     Database,
     ExternalLink,
     Facebook,
+    History,
     Landmark,
     Layers,
     LayoutDashboard,
@@ -197,12 +198,6 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
-                              title: 'Pages',
-                              href: `/workspaces/${slug}/integrations/meta/pages`,
-                              icon: BookOpenIcon,
-                              permission: PERMISSIONS.ViewMetaAds,
-                          },
-                          {
                               title: 'Ads Manager',
                               href: `/workspaces/${slug}/integrations/meta/ads-manager`,
                               icon: BarChart2,
@@ -219,6 +214,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/integrations/meta/optimization-rules/approvals`,
                               icon: ListChecks,
                               permission: PERMISSIONS.ApproveOptimizationRules,
+                          },
+                          {
+                              title: 'Optimization Logs',
+                              href: `/workspaces/${slug}/integrations/meta/optimization-rules/logs`,
+                              icon: History,
+                              permission: PERMISSIONS.ViewOptimizationRules,
                           },
                           {
                               title: 'Sync Health',

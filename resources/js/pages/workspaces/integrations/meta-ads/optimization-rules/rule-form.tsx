@@ -386,9 +386,18 @@ export default function RuleForm({
                                                 )
                                             }
                                         />
-                                        {condition.metric === 'budget' ? (
+                                        {condition.metric === 'budget' ||
+                                        condition.metric === 'running_days' ||
+                                        condition.metric ===
+                                            'last_modified_in_hours' ? (
                                             <div className="flex h-10 items-center rounded-[10px] border border-dashed border-black/8 bg-stone-50/60 px-3 font-mono! text-[11px]! text-gray-400 dark:border-white/8 dark:bg-zinc-800/60 dark:text-gray-500">
-                                                Current value
+                                                {condition.metric ===
+                                                'running_days'
+                                                    ? 'Days running'
+                                                    : condition.metric ===
+                                                        'last_modified_in_hours'
+                                                      ? 'Hours since edit'
+                                                      : 'Current value'}
                                             </div>
                                         ) : (
                                             <select

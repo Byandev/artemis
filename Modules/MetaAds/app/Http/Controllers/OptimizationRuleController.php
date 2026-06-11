@@ -29,6 +29,8 @@ class OptimizationRuleController extends Controller
      */
     private const METRICS = [
         'budget',
+        'running_days',
+        'last_modified_in_hours',
         'roas', 'cpa', 'cpc', 'ctr', 'cpm', 'cost_per_lead', 'cost_per_messaging_conversation',
         'spend', 'impressions', 'clicks', 'purchases', 'purchase_value', 'leads', 'conversions',
         'messaging_conversations_started',

@@ -50,7 +50,6 @@ use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
-use Modules\MetaAds\Http\Controllers\PagesController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 
@@ -199,9 +198,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ad-accounts', [IntegrationsController::class, 'adAccounts'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ad-accounts');
-    Route::get('/workspaces/{workspace}/integrations/meta/pages', [PagesController::class, 'index'])
-        ->middleware('can:View Meta Ads,workspace')
-        ->name('workspaces.metaads.pages');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager', [AdsManagerController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager');

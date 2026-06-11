@@ -9,14 +9,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import clsx from 'clsx';
 import { omit } from 'lodash';
-import {
-    CheckCircle2,
-    Database,
-    Facebook,
-    RefreshCw,
-    Search,
-    Star,
-} from 'lucide-react';
+import { Facebook, Search, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface AdAccount {
@@ -127,34 +120,6 @@ function formatRelative(ts: string | null) {
     return `${Math.round(diff / 86400)}d ago`;
 }
 
-function StatCard({
-    label,
-    value,
-    icon: Icon,
-}: {
-    label: string;
-    value: string | number;
-    icon: typeof Database;
-}) {
-    return (
-        <div className="rounded-[14px] border border-black/6 bg-white p-5 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
-            <div className="flex items-start justify-between">
-                <div>
-                    <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                        {label}
-                    </p>
-                    <p className="mt-2 text-2xl font-semibold tracking-tight text-gray-700 dark:text-gray-200">
-                        {value}
-                    </p>
-                </div>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-stone-100 text-stone-500 dark:bg-zinc-800 dark:text-zinc-400">
-                    <Icon className="h-4 w-4" />
-                </div>
-            </div>
-        </div>
-    );
-}
-
 export default function MetaAdAccounts({
     workspace,
     adAccounts,
@@ -220,16 +185,6 @@ export default function MetaAdAccounts({
         setShowAll(next);
         navigate({ show_all: next ? 1 : undefined, page: 1 });
     };
-
-    const activeCount = adAccounts.data.filter(
-        (a) => a.account_status === 1,
-    ).length;
-    const lastSynced =
-        adAccounts.data
-            .map((a) => a.last_synced_at)
-            .filter(Boolean)
-            .sort()
-            .reverse()[0] ?? null;
 
     const columns: ColumnDef<AdAccount>[] = [
         {
@@ -376,24 +331,6 @@ export default function MetaAdAccounts({
                     title="Ad Accounts"
                     description="All Meta ad accounts visible through your connected Facebook users."
                 ></PageHeader>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <StatCard
-                        label="Total Ad Accounts"
-                        value={adAccounts.total}
-                        icon={Database}
-                    />
-                    <StatCard
-                        label="Active (this page)"
-                        value={activeCount}
-                        icon={CheckCircle2}
-                    />
-                    <StatCard
-                        label="Last Synced"
-                        value={formatRelative(lastSynced)}
-                        icon={RefreshCw}
-                    />
-                </div>
 
                 <div className="flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
