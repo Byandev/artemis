@@ -293,7 +293,10 @@ class ForDeliveryController extends Controller
         $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
         $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
-        $users = User::get();
+        // Only list CSRs (Pancake users) tied to a shop in this workspace.
+        $users = User::whereHas('shops', function ($query) use ($workspace) {
+            $query->where('shops.workspace_id', $workspace->id);
+        })->get();
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
