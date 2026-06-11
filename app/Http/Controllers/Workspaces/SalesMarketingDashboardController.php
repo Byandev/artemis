@@ -16,6 +16,8 @@ class SalesMarketingDashboardController extends Controller
 
     public function __invoke(Request $request, Workspace $workspace): Response
     {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
         $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
 
         return Inertia::render('workspaces/sales-marketing/dashboard', [

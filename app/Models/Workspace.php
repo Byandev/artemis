@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Permission as PermissionEnum;
 use App\Support\Metrics\MetricRegistry;
 use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -37,6 +38,8 @@ class Workspace extends Model
         'botcake_module_enabled',
         'creatives_module_enabled',
         'meta_ads_module_enabled',
+        'sales_marketing_dashboard_module_enabled',
+        'video_editor_dashboard_module_enabled',
         'inventory_sync',
         'public_password',
     ];
@@ -63,9 +66,50 @@ class Workspace extends Model
         'botcake_module_enabled' => 'boolean',
         'creatives_module_enabled' => 'boolean',
         'meta_ads_module_enabled' => 'boolean',
+        'sales_marketing_dashboard_module_enabled' => 'boolean',
+        'video_editor_dashboard_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
     ];
+
+    /**
+     * Permission categories that should be hidden from the role editor and
+     * stripped from a user's effective permissions when their owning module is
+     * off. Single source of truth shared by the role editor and the Inertia
+     * permission share so the two can't drift.
+     *
+     * @return array<int, string>
+     */
+    public function disabledPermissionCategories(): array
+    {
+        return array_values(array_filter([
+            $this->finance_module_enabled ? null : 'Finance',
+            $this->inventory_module_enabled ? null : 'Inventory',
+            $this->products_module_enabled ? null : 'Products',
+            $this->teams_module_enabled ? null : 'Teams',
+            $this->checklist_module_enabled ? null : 'Checklist',
+            $this->csr_module_enabled ? null : 'CSR',
+            $this->botcake_module_enabled ? null : 'Botcake',
+            $this->meta_ads_module_enabled ? null : 'Meta Ads',
+        ]));
+    }
+
+    /**
+     * Individual permission names that should be hidden from the role editor and
+     * stripped from a user's effective permissions when their owning toggle is
+     * off. Use this for partial-category hides (e.g. the S&M and Video Editor
+     * dashboard toggles each hide one "Dashboards" permission, not the whole
+     * category).
+     *
+     * @return array<int, string>
+     */
+    public function hiddenPermissionNames(): array
+    {
+        return array_values(array_filter([
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDashboard->value,
+            $this->video_editor_dashboard_module_enabled ? null : PermissionEnum::ViewVideoEditorDashboard->value,
+        ]));
+    }
 
     /**
      * Whether a public-pages access password is configured (gates the public

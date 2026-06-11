@@ -23,10 +23,12 @@ class RolePermissionController extends Controller
             403
         );
 
-        $disabled = $this->disabledCategoriesFor($workspace);
+        $disabled = $workspace->disabledPermissionCategories();
+        $hiddenNames = $workspace->hiddenPermissionNames();
 
         $permissions = Permission::orderBy('category')->orderBy('name')
             ->when($disabled, fn ($q) => $q->whereNotIn('category', $disabled))
+            ->when($hiddenNames, fn ($q) => $q->whereNotIn('name', $hiddenNames))
             ->get();
 
         $grouped = $permissions->groupBy('category')->map(function ($items, $category) use ($role) {
@@ -56,12 +58,18 @@ class RolePermissionController extends Controller
             'permission_ids.*' => 'integer|exists:permissions,id',
         ]);
 
-        $disabled = $this->disabledCategoriesFor($workspace);
+        $disabled = $workspace->disabledPermissionCategories();
+        $hiddenNames = $workspace->hiddenPermissionNames();
 
-        // Preserve any already-granted permissions that belong to disabled categories
-        // (the form doesn't show them, so they'd otherwise be wiped on sync).
-        $preservedIds = $disabled
-            ? $role->permissions()->whereIn('category', $disabled)->pluck('permissions.id')->all()
+        // Preserve any already-granted permissions the form doesn't show — those
+        // in a disabled category, or individually hidden (e.g. dashboard module
+        // off) — so they aren't wiped on sync.
+        $preservedIds = ($disabled || $hiddenNames)
+            ? $role->permissions()
+                ->where(fn ($q) => $q
+                    ->whereIn('category', $disabled ?: ['__none__'])
+                    ->orWhereIn('name', $hiddenNames ?: ['__none__']))
+                ->pluck('permissions.id')->all()
             : [];
 
         $role->permissions()->sync(array_values(array_unique(
@@ -69,21 +77,5 @@ class RolePermissionController extends Controller
         )));
 
         return back()->with('success', 'Permissions updated.');
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function disabledCategoriesFor(Workspace $workspace): array
-    {
-        return array_values(array_filter([
-            $workspace->finance_module_enabled ? null : 'Finance',
-            $workspace->inventory_module_enabled ? null : 'Inventory',
-            $workspace->products_module_enabled ? null : 'Products',
-            $workspace->teams_module_enabled ? null : 'Teams',
-            $workspace->checklist_module_enabled ? null : 'Checklist',
-            $workspace->csr_module_enabled ? null : 'CSR',
-            $workspace->botcake_module_enabled ? null : 'Botcake',
-        ]));
     }
 }

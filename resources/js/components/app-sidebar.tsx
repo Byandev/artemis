@@ -74,12 +74,16 @@ export function AppSidebar() {
             icon: LayoutDashboard,
             permission: PERMISSIONS.ViewMainDashboard,
         },
-        {
-            title: 'S&M Dashboard',
-            href: `/workspaces/${slug}/sales-marketing/dashboard`,
-            icon: Megaphone,
-            permission: PERMISSIONS.ViewSalesMarketingDashboard,
-        },
+        ...(currentWorkspace.sales_marketing_dashboard_module_enabled
+            ? [
+                  {
+                      title: 'S&M Dashboard',
+                      href: `/workspaces/${slug}/sales-marketing/dashboard`,
+                      icon: Megaphone,
+                      permission: PERMISSIONS.ViewSalesMarketingDashboard,
+                  },
+              ]
+            : []),
         ...(currentWorkspace.csr_module_enabled
             ? [
                   {
@@ -90,12 +94,16 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        {
-            title: 'Video Editor Dashboard',
-            href: `/workspaces/${slug}/video-editor/dashboard`,
-            icon: Clapperboard,
-            permission: PERMISSIONS.ViewVideoEditorDashboard,
-        },
+        ...(currentWorkspace.video_editor_dashboard_module_enabled
+            ? [
+                  {
+                      title: 'Video Editor Dashboard',
+                      href: `/workspaces/${slug}/video-editor/dashboard`,
+                      icon: Clapperboard,
+                      permission: PERMISSIONS.ViewVideoEditorDashboard,
+                  },
+              ]
+            : []),
         {
             title: 'Shops',
             href: `/workspaces/${slug}/shops`,
@@ -108,12 +116,16 @@ export function AppSidebar() {
             icon: BookOpenIcon,
             permission: PERMISSIONS.ViewPages,
         },
-        {
-            title: 'Products',
-            href: `/workspaces/${slug}/products/list`,
-            icon: Package,
-            permission: PERMISSIONS.ViewProducts,
-        },
+        ...(currentWorkspace.products_module_enabled
+            ? [
+                  {
+                      title: 'Products',
+                      href: `/workspaces/${slug}/products/list`,
+                      icon: Package,
+                      permission: PERMISSIONS.ViewProducts,
+                  },
+              ]
+            : []),
         ...(currentWorkspace.teams_module_enabled
             ? [
                   {
