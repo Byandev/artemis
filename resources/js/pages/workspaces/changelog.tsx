@@ -12,6 +12,21 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.10.1',
+        date: '2026-06-11',
+        sections: [
+            {
+                title: 'Meta Ads — Faster Onboarding & Sync',
+                items: [
+                    'Connecting a Meta (Facebook) account now immediately kicks off a full backfill — it fetches your ad accounts, then cascades campaigns, ad sets, ads, and creatives, plus the last 30 days of insights for each account, so your data is ready shortly after connecting',
+                    'The connect confirmation now tells you the sync is in progress ("Syncing ad accounts and the last month of data now")',
+                    'Smarter insights backfill — ad accounts with no campaigns are skipped entirely, so empty accounts no longer trigger unnecessary insights pulls',
+                    'Meta Ads syncs now run on their own dedicated background workers, keeping them isolated from other jobs for more reliable, predictable data refreshes',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.10.0',
         date: '2026-06-11',
         sections: [
