@@ -21,6 +21,7 @@ export interface Workspace {
     meta_ads_module_enabled: boolean;
     sales_marketing_dashboard_module_enabled: boolean;
     video_editor_dashboard_module_enabled: boolean;
+    csr_dashboard_module_enabled: boolean;
     /** Whether a public-pages access password is configured. */
     public_password_set?: boolean;
     created_at: string;

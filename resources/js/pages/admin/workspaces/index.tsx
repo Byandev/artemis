@@ -56,6 +56,7 @@ interface Workspace {
     meta_ads_module_enabled: boolean;
     sales_marketing_dashboard_module_enabled: boolean;
     video_editor_dashboard_module_enabled: boolean;
+    csr_dashboard_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -75,6 +76,7 @@ const MODULE_FIELDS: Array<{
         | 'meta_ads_module_enabled'
         | 'sales_marketing_dashboard_module_enabled'
         | 'video_editor_dashboard_module_enabled'
+        | 'csr_dashboard_module_enabled'
     >;
     label: string;
     description: string;
@@ -143,6 +145,11 @@ const MODULE_FIELDS: Array<{
         key: 'video_editor_dashboard_module_enabled',
         label: 'Video Editor Dashboard',
         description: 'Video Editor dashboard',
+    },
+    {
+        key: 'csr_dashboard_module_enabled',
+        label: 'CSR Dashboard',
+        description: 'CSR personal dashboard',
     },
 ];
 
@@ -691,6 +698,7 @@ function ModulesModal({
             workspace.sales_marketing_dashboard_module_enabled,
         video_editor_dashboard_module_enabled:
             workspace.video_editor_dashboard_module_enabled,
+        csr_dashboard_module_enabled: workspace.csr_dashboard_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

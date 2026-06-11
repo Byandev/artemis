@@ -40,6 +40,7 @@ class Workspace extends Model
         'meta_ads_module_enabled',
         'sales_marketing_dashboard_module_enabled',
         'video_editor_dashboard_module_enabled',
+        'csr_dashboard_module_enabled',
         'inventory_sync',
         'public_password',
     ];
@@ -68,6 +69,7 @@ class Workspace extends Model
         'meta_ads_module_enabled' => 'boolean',
         'sales_marketing_dashboard_module_enabled' => 'boolean',
         'video_editor_dashboard_module_enabled' => 'boolean',
+        'csr_dashboard_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
     ];
@@ -97,8 +99,8 @@ class Workspace extends Model
     /**
      * Individual permission names that should be hidden from the role editor and
      * stripped from a user's effective permissions when their owning toggle is
-     * off. Use this for partial-category hides (e.g. the S&M and Video Editor
-     * dashboard toggles each hide one "Dashboards" permission, not the whole
+     * off. Use this for partial-category hides (e.g. the S&M, Video Editor, and
+     * CSR dashboard toggles each hide one "Dashboards" permission, not the whole
      * category).
      *
      * @return array<int, string>
@@ -108,6 +110,7 @@ class Workspace extends Model
         return array_values(array_filter([
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDashboard->value,
             $this->video_editor_dashboard_module_enabled ? null : PermissionEnum::ViewVideoEditorDashboard->value,
+            $this->csr_dashboard_module_enabled ? null : PermissionEnum::ViewCsrDashboard->value,
         ]));
     }
 

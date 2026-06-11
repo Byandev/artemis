@@ -84,7 +84,7 @@ export function AppSidebar() {
                   },
               ]
             : []),
-        ...(currentWorkspace.csr_module_enabled
+        ...(currentWorkspace.csr_dashboard_module_enabled
             ? [
                   {
                       title: 'CSR Dashboard',
