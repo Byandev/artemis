@@ -102,23 +102,20 @@ class SyncMetaAdAccounts implements ShouldQueue
      */
     private function cascadeBackfill(array $accountIds): void
     {
-        $until = Carbon::today();
-
         $this->metaUser->adAccounts()
             ->whereIn('meta_ads_accounts.id', $accountIds)
             ->where('active_sync', true)
             ->get()
-            ->each(function (AdAccount $account, int $index) use ($until) {
+            ->each(function (AdAccount $account, int $index) {
                 $chain = [
                     new SyncCampaigns($account),
                     new SyncAdSets($account),
                     new SyncAds($account),
                     new SyncCreatives($account),
+                    // Only backfill insights if, once campaigns are synced, the
+                    // account actually has at least one campaign.
+                    new BackfillInsightsIfActive($account, $this->insightsDays),
                 ];
-
-                for ($i = 0; $i < $this->insightsDays; $i++) {
-                    $chain[] = new SyncInsights($account, $until->copy()->subDays($i)->toDateString());
-                }
 
                 // Stagger each account's chain by 3 minutes so we don't slam the
                 // Graph API (and blow the rate cap) when several accounts connect at once.
