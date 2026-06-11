@@ -184,6 +184,9 @@
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
 
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
     --color-muted: var(--muted);
     --color-muted-foreground: var(--muted-foreground);
 

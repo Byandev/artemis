@@ -1,0 +1,36 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('meta_ads_optimization_rule_conditions', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('meta_ads_optimization_rule_id');
+
+            // Any column from meta_ads_insights or a computed metric (e.g. roas, cpa, ctr, cpm)
+            $table->string('metric');
+            $table->enum('operator', ['>', '<', '>=', '<=', '=']);
+            $table->decimal('value', 20, 4);
+            $table->enum('time_window', ['today', 'yesterday', 'last_3_days', 'last_7_days', 'previous_3_days', 'previous_7_days']);
+
+            $table->timestamps();
+
+            // Explicit short name — the auto-generated one exceeds MySQL's
+            // 64-character identifier limit.
+            $table->foreign('meta_ads_optimization_rule_id', 'maorc_rule_id_foreign')
+                ->references('id')
+                ->on('meta_ads_optimization_rules')
+                ->onDelete('cascade');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('meta_ads_optimization_rule_conditions');
+    }
+};

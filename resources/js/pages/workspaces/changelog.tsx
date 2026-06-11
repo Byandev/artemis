@@ -12,6 +12,128 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.10.1',
+        date: '2026-06-11',
+        sections: [
+            {
+                title: 'Meta Ads — Faster Onboarding & Sync',
+                items: [
+                    'Connecting a Meta (Facebook) account now immediately kicks off a full backfill — it fetches your ad accounts, then cascades campaigns, ad sets, ads, and creatives, plus the last 30 days of insights for each account, so your data is ready shortly after connecting',
+                    'The connect confirmation now tells you the sync is in progress ("Syncing ad accounts and the last month of data now")',
+                    'Smarter insights backfill — ad accounts with no campaigns are skipped entirely, so empty accounts no longer trigger unnecessary insights pulls',
+                    'Meta Ads syncs now run on their own dedicated background workers, keeping them isolated from other jobs for more reliable, predictable data refreshes',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.10.0',
+        date: '2026-06-11',
+        sections: [
+            {
+                title: 'Meta Ads — New Integration',
+                items: [
+                    'Brand-new Meta Ads module replacing the old Ads Manager and Facebook Accounts pages — connect your Meta (Facebook) account via OAuth and sync ad accounts, campaigns, ad sets, ads, creatives, and insights into the workspace',
+                    'Connect and manage Meta ad accounts from the new Integrations area, with per-account sync toggles so you only pull data for the accounts you care about',
+                    'Meta Ads can be enabled per workspace — the module and its nav only appear where it has been turned on',
+                    'Automatic background sync: ad accounts, campaigns, ad sets, and ads refresh every 30 minutes; insights every 15 minutes (last day) and hourly (last 7 days); creatives daily; end-of-day budgets snapshotted nightly to keep history Meta does not retain',
+                ],
+            },
+            {
+                title: 'Meta Ads — Unified Ads Manager',
+                items: [
+                    'Single unified view replacing the old Campaigns / Ad Sets / Ads tabs — pick any combination of ad accounts with a multi-picker and group by Ad Name, Ad, Campaign, Ad Set, or Ad Account',
+                    'Metrics aggregate across all selected accounts; sort by any computed metric, filter on metric thresholds, search, choose visible columns (saved per grouping), and paginate',
+                    'Entities with no insights in the selected date range still appear, and each group shows its ad count (e.g. "4 ads") beneath the name',
+                    'Creative viewer — open any ad to preview its creative (image or video) in a phone-style frame using the live Meta ad preview',
+                    'Click a group row to open a modal listing every ad in that grouping, using the same table and pagination',
+                ],
+            },
+            {
+                title: 'Meta Ads — Optimization Rules',
+                items: [
+                    'Define optimization rules with conditions on spend, ROAS, budget, days running, hours since last edit, and more — scoped to specific ad accounts with a priority order',
+                    'Approval workflow: rules generate proposals (scale, descale, pause, enable) that are reviewed before anything changes — filter proposals by ad account and action, see the time window and date behind every condition, and approve or reject in bulk',
+                    'Net budget impact total shown above the proposals table, respecting the current filters and updating live as you select rows (pause deducts the current budget)',
+                    'Approving a proposal applies the action to Meta automatically; cross-rule priority claiming prevents two rules from acting on the same target, and non-moving budget changes are skipped',
+                    'Optimization logs page records every rule evaluation and applied action',
+                    'Automatic execution mode is temporarily disabled in the form while we monitor the approval flow',
+                ],
+            },
+            {
+                title: 'Meta Ads — Sync Health',
+                items: [
+                    'New Sync Health page surfaces the status of each sync run, so you can confirm data is flowing and spot failures quickly',
+                ],
+            },
+            {
+                title: 'Meta Ads — Permissions',
+                items: [
+                    'Eight new role permissions under the Meta Ads group: View Meta Ads, Connect FB Account, View Ad Accounts, Manage Meta Ads Accounts, View Optimization Rules, Manage Optimization Rules, Approve Optimization Rules, and View Optimization Logs — all assignable from the Roles screen',
+                ],
+            },
+            {
+                title: 'Public Workspace Pages',
+                items: [
+                    'Public-facing workspace pages (such as the Leaderboard) can now be protected with a workspace password',
+                    'Public Leaderboard and RMO Management pages refreshed',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.9.0',
+        date: '2026-06-09',
+        sections: [
+            {
+                title: 'Creatives — Creative Tracker',
+                items: [
+                    'New Creatives module — track ad creatives through a full production pipeline from brief to approval',
+                    'List view with advanced filters (status, type, date range, page, product, assignee), sortable columns, and pagination',
+                    'Create and edit creatives with product association, multiple reviewer assignments, and ads status integration',
+                    'Review workflow — reviewers can add and update review decisions per creative',
+                    'Six new role permissions: View, Create, Edit, Delete, Review, and Update Creative Status — all assignable from the Roles screen',
+                ],
+            },
+            {
+                title: 'Video Editor Dashboard',
+                items: [
+                    'New Video Editor Dashboard at /workspaces/{slug}/video-editor/dashboard — dedicated view for video production teams',
+                    'Sections: KPI cards, pipeline funnel, creatives calendar with independent month navigation, throughput chart, leaderboard, recent activity feed, waiting list, revision list, and work list',
+                    'Multi-select filters for products and editors; progressive loading keeps the page responsive while data loads in the background',
+                    'Gated behind the new View Video Editor Dashboard permission',
+                ],
+            },
+            {
+                title: 'Sales & Marketing Dashboard',
+                items: [
+                    'New Sales & Marketing Dashboard page scaffolded at /workspaces/{slug}/sales-marketing/dashboard — placeholder ready for metrics and charts in the next release',
+                    'Gated behind the new View Sales & Marketing Dashboard permission',
+                ],
+            },
+            {
+                title: 'RTS Analytics — Filter Persistence & AI Chat Gate',
+                items: [
+                    'Date range and filter selections are now persisted to localStorage per workspace — refreshing the page or navigating away and back restores the last-used filter state',
+                    'RTS AI Chat widget is now gated behind a new View RTS AI Chat permission — hidden by default until the permission is granted',
+                ],
+            },
+            {
+                title: 'Bug Fixes',
+                items: [
+                    'CSR Analytics — added RMO percentage column',
+                    'Leaderboard — date filter now correctly refreshes data when the selection changes',
+                    'Workspace list — made scrollable to prevent overflow on workspaces with many entries',
+                    'Teams — fixed permission validation on the Manage Schedule page',
+                    'Members — fixed permission check on the Invite Members action',
+                    'Admin — fixed subscription modal display for expired workspaces',
+                    'Onboarding — added missing skip route so the skip button works correctly',
+                    'Inventory — fixed editing inventory items',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.8.1',
         date: '2026-06-09',
         sections: [

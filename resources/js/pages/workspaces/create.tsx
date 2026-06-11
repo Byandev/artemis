@@ -47,7 +47,7 @@ export default function WorkspaceCreate() {
                             autoFocus
                         />
                         {errors.name && (
-                            <p className="text-destructive text-sm">
+                            <p className="text-sm text-destructive">
                                 {errors.name}
                             </p>
                         )}

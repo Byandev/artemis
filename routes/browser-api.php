@@ -8,6 +8,7 @@ use App\Http\Controllers\API\Workspace\ProductController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
+use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
 Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
@@ -42,6 +43,21 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards'])->name('leaderboards.index');
+
+        Route::prefix('video-editor')->name('video-editor.')->group(function () {
+            Route::get('/kpi/total', [VideoEditorDashboardController::class, 'totalCreatives'])->name('kpi.total');
+            Route::get('/kpi/awaiting-review', [VideoEditorDashboardController::class, 'awaitingReview'])->name('kpi.awaiting-review');
+            Route::get('/kpi/needs-revision', [VideoEditorDashboardController::class, 'needsRevision'])->name('kpi.needs-revision');
+            Route::get('/kpi/approved', [VideoEditorDashboardController::class, 'approved'])->name('kpi.approved');
+            Route::get('/ads', [VideoEditorDashboardController::class, 'ads'])->name('ads');
+            Route::get('/pipeline', [VideoEditorDashboardController::class, 'pipeline'])->name('pipeline');
+            Route::get('/revision-list', [VideoEditorDashboardController::class, 'revisionList'])->name('revision-list');
+            Route::get('/waiting-list', [VideoEditorDashboardController::class, 'waitingList'])->name('waiting-list');
+            Route::get('/throughput', [VideoEditorDashboardController::class, 'throughput'])->name('throughput');
+            Route::get('/leaderboard', [VideoEditorDashboardController::class, 'leaderboard'])->name('leaderboard');
+            Route::get('/recent-activity', [VideoEditorDashboardController::class, 'recentActivity'])->name('recent-activity');
+            Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
+        });
     });
 });
 

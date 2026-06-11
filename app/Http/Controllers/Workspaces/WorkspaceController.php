@@ -4,13 +4,13 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\AdRecord;
 use App\Models\Order;
 use App\Models\Workspace;
 use App\Services\PostHogService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
 class WorkspaceController extends Controller
@@ -97,6 +97,29 @@ class WorkspaceController extends Controller
             ->with('success', 'Workspace updated successfully.');
     }
 
+    public function updatePublicPassword(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::EditWorkspaceSettings->value, $workspace);
+
+        $validated = $request->validate([
+            // Empty/null clears the password (public pages become open again).
+            'password' => ['nullable', 'string', 'min:4', 'max:255'],
+        ]);
+
+        $workspace->update([
+            'public_password' => filled($validated['password'] ?? null)
+                ? Hash::make($validated['password'])
+                : null,
+        ]);
+
+        return back()->with(
+            'success',
+            filled($validated['password'] ?? null)
+                ? 'Public pages password set.'
+                : 'Public pages password removed.',
+        );
+    }
+
     public function destroy(Request $request, Workspace $workspace)
     {
         if (! $request->user()->ownsWorkspace($workspace)) {
@@ -136,8 +159,17 @@ class WorkspaceController extends Controller
             abort(403, 'You do not have access to this workspace.');
         }
 
-        if ($workspace->csr_module_enabled && $request->user()->isCsrOf($workspace)) {
-            return redirect()->route('workspaces.csr.dashboard', $workspace->slug);
+        // Route the user to the highest-priority dashboard they can access
+        // (Main → Sales & Marketing → Video Editor → CSR); if they can access
+        // none of them, send them to their profile settings.
+        $target = $request->user()->defaultDashboardRouteName($workspace);
+
+        if ($target === null) {
+            return redirect()->route('profile.edit', $workspace->slug);
+        }
+
+        if ($target !== 'workspace.dashboard') {
+            return redirect()->route($target, $workspace->slug);
         }
 
         return Inertia::render('workspaces/dashboard/index', [
@@ -190,15 +222,6 @@ class WorkspaceController extends Controller
             ->get()
             ->pluck('total_sales', 'date');
 
-        $adSpendData = AdRecord::ofWorkspace($workspace)
-            ->applyDateFilter($startDate, $endDate, 'date')
-            ->applyEntityFilters($filters)
-            ->selectRaw('date, SUM(spend) as total_spend')
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get()
-            ->pluck('total_spend', 'date');
-
         $rtsData = Order::where('workspace_id', $workspace->id)
             ->whereNotNull('confirmed_at')
             ->applyEntityFilters($filters)
@@ -221,22 +244,19 @@ class WorkspaceController extends Controller
 
         $allDates = collect(array_unique(array_merge(
             $salesData->keys()->toArray(),
-            $adSpendData->keys()->toArray(),
             $rtsData->keys()->toArray()
         )))->sort()->values();
 
-        $chartData = $allDates->map(function ($date) use ($salesData, $adSpendData, $rtsData) {
+        $chartData = $allDates->map(function ($date) use ($salesData, $rtsData) {
             $sales = $salesData->get($date, 0);
-            $spend = $adSpendData->get($date, 0);
             $rtsRecord = $rtsData->get($date);
             $rtsRate = $rtsRecord ? (float) $rtsRecord->rts_rate_percentage : 0.0;
-            $roas = $spend > 0 ? round($sales / $spend, 2) : 0;
 
             return [
                 'date' => $date,
                 'sales' => (float) $sales,
-                'spend' => (float) $spend,
-                'roas' => (float) $roas,
+                'spend' => 0.0,
+                'roas' => 0.0,
                 'rts_rate' => $rtsRate,
             ];
         })->values()->all();

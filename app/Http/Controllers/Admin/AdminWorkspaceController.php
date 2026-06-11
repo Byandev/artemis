@@ -130,6 +130,8 @@ class AdminWorkspaceController extends Controller
             'rmo_module_enabled' => 'required|boolean',
             'leaderboard_module_enabled' => 'required|boolean',
             'botcake_module_enabled' => 'required|boolean',
+            'creatives_module_enabled' => 'required|boolean',
+            'meta_ads_module_enabled' => 'required|boolean',
         ]);
 
         $workspace->update($validated);

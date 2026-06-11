@@ -291,6 +291,17 @@ export default function Analytics({ workspace, query }: Props) {
                     ).toLocaleString(),
             },
             {
+                id: 'rmo_percentage',
+                header: 'RMO %',
+                cell: ({ row }) => {
+                    const called =
+                        Number(row.original.total_rmo_call_attempts) || 0;
+                    const assigned = Number(row.original.total_called) || 0;
+                    if (assigned === 0) return '—';
+                    return `${((called / assigned) * 100).toFixed(2)}%`;
+                },
+            },
+            {
                 accessorKey: 'total_call_time',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="RMO Call Time" />

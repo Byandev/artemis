@@ -16,20 +16,26 @@ import { type NavItem, User as UserType } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Activity,
     ArrowLeftRight,
     BarChart2,
     BookOpenIcon,
     Box,
     Check,
+    Clapperboard,
     ClipboardList,
     Copy,
+    Database,
     ExternalLink,
+    Facebook,
+    History,
     Landmark,
     Layers,
     LayoutDashboard,
     LifeBuoy,
     ListChecks,
     MapPin,
+    Megaphone,
     MessageSquare,
     Package,
     PieChart,
@@ -37,6 +43,8 @@ import {
     Send,
     Shield,
     ShoppingCart,
+    SlidersHorizontal,
+    Sparkles,
     Store,
     Trophy,
     Truck,
@@ -61,9 +69,32 @@ export function AppSidebar() {
 
     const mainNavItems: NavItem[] = [
         {
-            title: 'Dashboard',
+            title: 'Main Dashboard',
             href: dashboardUrl,
             icon: LayoutDashboard,
+            permission: PERMISSIONS.ViewMainDashboard,
+        },
+        {
+            title: 'S&M Dashboard',
+            href: `/workspaces/${slug}/sales-marketing/dashboard`,
+            icon: Megaphone,
+            permission: PERMISSIONS.ViewSalesMarketingDashboard,
+        },
+        ...(currentWorkspace.csr_module_enabled
+            ? [
+                  {
+                      title: 'CSR Dashboard',
+                      href: `/workspaces/${slug}/csr/dashboard`,
+                      icon: User,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
+              ]
+            : []),
+        {
+            title: 'Video Editor Dashboard',
+            href: `/workspaces/${slug}/video-editor/dashboard`,
+            icon: Clapperboard,
+            permission: PERMISSIONS.ViewVideoEditorDashboard,
         },
         {
             title: 'Shops',
@@ -138,6 +169,63 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
                               icon: ClipboardList,
                               permission: PERMISSIONS.ViewBotcakeFlows,
+                          },
+                      ],
+                  },
+              ]
+            : []),
+        ...(currentWorkspace.meta_ads_module_enabled
+            ? [
+                  {
+                      title: 'Meta Ads',
+                      icon: Megaphone,
+                      anyOf: [
+                          PERMISSIONS.ViewMetaAds,
+                          PERMISSIONS.ViewOptimizationRules,
+                          PERMISSIONS.ApproveOptimizationRules,
+                      ],
+                      items: [
+                          {
+                              title: 'FB Account',
+                              href: `/workspaces/${slug}/integrations/meta`,
+                              icon: Facebook,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Ad Accounts',
+                              href: `/workspaces/${slug}/integrations/meta/ad-accounts`,
+                              icon: Database,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Ads Manager',
+                              href: `/workspaces/${slug}/integrations/meta/ads-manager`,
+                              icon: BarChart2,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Optimization Rules',
+                              href: `/workspaces/${slug}/integrations/meta/optimization-rules`,
+                              icon: SlidersHorizontal,
+                              permission: PERMISSIONS.ViewOptimizationRules,
+                          },
+                          {
+                              title: 'Rule Approvals',
+                              href: `/workspaces/${slug}/integrations/meta/optimization-rules/approvals`,
+                              icon: ListChecks,
+                              permission: PERMISSIONS.ApproveOptimizationRules,
+                          },
+                          {
+                              title: 'Optimization Logs',
+                              href: `/workspaces/${slug}/integrations/meta/optimization-rules/logs`,
+                              icon: History,
+                              permission: PERMISSIONS.ViewOptimizationRules,
+                          },
+                          {
+                              title: 'Sync Health',
+                              href: `/workspaces/${slug}/integrations/meta/health`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewMetaAds,
                           },
                       ],
                   },
@@ -225,6 +313,16 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewPurchasedOrders,
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(currentWorkspace.creatives_module_enabled
+            ? [
+                  {
+                      title: 'Creatives',
+                      href: `/workspaces/${slug}/creatives`,
+                      icon: Sparkles,
+                      permission: PERMISSIONS.ViewCreatives,
                   },
               ]
             : []),
@@ -358,7 +456,13 @@ function PublicLinks({
               ]
             : []),
         ...(leaderboardEnabled && canViewLeaderboardLink
-            ? [{ title: 'Leaderboards', href: '/leaderboards', icon: Trophy }]
+            ? [
+                  {
+                      title: 'Leaderboards',
+                      href: `/public/workspaces/${workspaceSlug}/leaderboards`,
+                      icon: Trophy,
+                  },
+              ]
             : []),
     ];
 

@@ -17,7 +17,7 @@ import {
     Settings2,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 interface SubscriptionPlan {
     id: number;
@@ -52,6 +52,8 @@ interface Workspace {
     rmo_module_enabled: boolean;
     leaderboard_module_enabled: boolean;
     botcake_module_enabled: boolean;
+    creatives_module_enabled: boolean;
+    meta_ads_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -67,6 +69,8 @@ const MODULE_FIELDS: Array<{
         | 'rmo_module_enabled'
         | 'leaderboard_module_enabled'
         | 'botcake_module_enabled'
+        | 'creatives_module_enabled'
+        | 'meta_ads_module_enabled'
     >;
     label: string;
     description: string;
@@ -116,6 +120,16 @@ const MODULE_FIELDS: Array<{
         label: 'Botcake',
         description: 'Botcake sequences and flows',
     },
+    {
+        key: 'creatives_module_enabled',
+        label: 'Creatives',
+        description: 'Creative tracker with review and ads campaign status',
+    },
+    {
+        key: 'meta_ads_module_enabled',
+        label: 'Meta Ads',
+        description: 'Ads manager, optimization rules, and approvals',
+    },
 ];
 
 interface Props {
@@ -153,17 +167,22 @@ export default function Index({ workspaces, plans, filters }: Props) {
         null,
     );
 
-    // Auto-open subscription modal for workspaces with past_due or expired status
+    // Auto-open subscription modal for workspaces with past_due or expired
+    // status — but only once, so the admin can still close it without it
+    // immediately reopening.
+    const hasAutoOpened = useRef(false);
     useEffect(() => {
-        if (!editingWorkspace && workspaces.data) {
-            const pastDueOrExpiredWorkspace = workspaces.data.find(
-                (ws) =>
-                    ws.subscription?.status === 'past_due' ||
-                    ws.subscription?.status === 'expired',
-            );
-            if (pastDueOrExpiredWorkspace) {
-                setEditingWorkspace(pastDueOrExpiredWorkspace);
-            }
+        if (hasAutoOpened.current || editingWorkspace || !workspaces.data) {
+            return;
+        }
+        const pastDueOrExpiredWorkspace = workspaces.data.find(
+            (ws) =>
+                ws.subscription?.status === 'past_due' ||
+                ws.subscription?.status === 'expired',
+        );
+        if (pastDueOrExpiredWorkspace) {
+            hasAutoOpened.current = true;
+            setEditingWorkspace(pastDueOrExpiredWorkspace);
         }
     }, [workspaces.data, editingWorkspace]);
 
@@ -652,6 +671,8 @@ function ModulesModal({
         rmo_module_enabled: workspace.rmo_module_enabled,
         leaderboard_module_enabled: workspace.leaderboard_module_enabled,
         botcake_module_enabled: workspace.botcake_module_enabled,
+        creatives_module_enabled: workspace.creatives_module_enabled,
+        meta_ads_module_enabled: workspace.meta_ads_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

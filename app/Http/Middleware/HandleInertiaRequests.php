@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\Role;
-use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\Workspace;
@@ -84,11 +83,7 @@ class HandleInertiaRequests extends Middleware
         if ($currentWorkspace instanceof Workspace && ! app()->isLocal()) {
             $subscription = $currentWorkspace->subscription;
 
-            $isExpired = ! $subscription
-                || $subscription->status === Subscription::STATUS_EXPIRED
-                || $subscription->status === Subscription::STATUS_CANCELED
-                || ($subscription->status === Subscription::STATUS_TRIALING && $subscription->trial_ends_at && $subscription->trial_ends_at->isPast())
-                || ($subscription->status === Subscription::STATUS_ACTIVE && $subscription->current_period_end && $subscription->current_period_end->isPast());
+            $isExpired = ! $subscription || $subscription->isLapsed();
 
             if ($isExpired) {
                 $subscriptionExpired = [
@@ -150,11 +145,6 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        // TEMP: bypass role/permission checks in production while RBAC rollout is still on the test server.
-        if (app()->environment('production')) {
-            return ['*'];
-        }
-
         if ($user->isSuperAdmin()) {
             return ['*'];
         }
@@ -185,6 +175,7 @@ class HandleInertiaRequests extends Middleware
             $workspace->checklist_module_enabled ? null : 'Checklist',
             $workspace->csr_module_enabled ? null : 'CSR',
             $workspace->botcake_module_enabled ? null : 'Botcake',
+            $workspace->meta_ads_module_enabled ? null : 'Meta Ads',
         ]));
 
         return Role::with('permissions:id,name,category')

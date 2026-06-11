@@ -40,6 +40,8 @@ export const PERMISSIONS = {
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
+    ViewRtsAiChat: 'View RTS AI Chat',
+    ViewRmoManagement: 'View RMO Management',
     ViewParcelJourneyTemplates: 'View Parcel Journey Templates',
     ManageParcelJourneyTemplates: 'Manage Parcel Journey Templates',
 
@@ -47,6 +49,7 @@ export const PERMISSIONS = {
     ViewCsrManagement: 'View CSR Management',
     EditCsrEmployees: 'Edit CSR Employees',
     ViewCsrAnalytics: 'View CSR Analytics',
+    ViewLeaderboards: 'View Leaderboards',
 
     // Inventory
     ViewInventoryItems: 'View Inventory Items',
@@ -93,6 +96,27 @@ export const PERMISSIONS = {
     CreatePageDailyBudgetRecords: 'Create Page Daily Budget Records',
     EditPageDailyBudgetRecords: 'Edit Page Daily Budget Records',
     DeletePageDailyBudgetRecords: 'Delete Page Daily Budget Records',
+
+    // Creatives
+    ViewCreatives: 'View Creatives',
+    CreateCreatives: 'Create Creatives',
+    EditCreatives: 'Edit Creatives',
+    DeleteCreatives: 'Delete Creatives',
+    ReviewCreatives: 'Review Creatives',
+    UpdateCreativeStatus: 'Update Creative Status',
+
+    // Meta Ads
+    ViewMetaAds: 'View Meta Ads',
+    ManageMetaAdsAccounts: 'Manage Meta Ads Accounts',
+    ViewOptimizationRules: 'View Optimization Rules',
+    ManageOptimizationRules: 'Manage Optimization Rules',
+    ApproveOptimizationRules: 'Approve Optimization Rules',
+
+    // Dashboards
+    ViewMainDashboard: 'View Main Dashboard',
+    ViewSalesMarketingDashboard: 'View Sales & Marketing Dashboard',
+    ViewVideoEditorDashboard: 'View Video Editor Dashboard',
+    ViewCsrDashboard: 'View CSR Dashboard',
 
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',

@@ -60,7 +60,7 @@ import {
     UserCog,
     UserMinus,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Invitation {
@@ -120,6 +120,11 @@ export default function WorkspaceMembers({
     );
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    // Skip the debounced-search fetch on the initial mount. Because the members
+    // table fetches with preserveState:false, every page/sort/per-page change
+    // remounts this component; without this guard the effect below would re-fire
+    // and overwrite the chosen per_page with the default.
+    const didMountRef = useRef(false);
 
     const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
@@ -265,13 +270,19 @@ export default function WorkspaceMembers({
     };
 
     useEffect(() => {
+        // Only run when the search input actually changes, not on remount.
+        if (!didMountRef.current) {
+            didMountRef.current = true;
+            return;
+        }
+
         const timer = setTimeout(() => {
             router.get(
                 `/workspaces/${workspace.slug}/members`,
                 {
                     sort: query?.sort,
                     page: searchValue ? 1 : (query?.page ?? 1),
-                    per_page: query?.perPage,
+                    per_page: members.per_page,
                     invitation_sort: query?.invitation_sort,
                     invitation_page: query?.invitation_page,
                     'filter[search]': searchValue || undefined,
@@ -534,7 +545,7 @@ export default function WorkspaceMembers({
                                             required
                                         />
                                         {inviteForm.errors.email && (
-                                            <p className="text-destructive text-sm">
+                                            <p className="text-sm text-destructive">
                                                 {inviteForm.errors.email}
                                             </p>
                                         )}

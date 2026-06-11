@@ -1,0 +1,11 @@
+{
+    "name": "MetaAds",
+    "alias": "metaads",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\MetaAds\\Providers\\MetaAdsServiceProvider"
+    ],
+    "files": []
+}
