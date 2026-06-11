@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Modules\MetaAds\Jobs\SyncMetaAdAccounts;
 use Modules\MetaAds\Models\User as MetaUser;
 
 class MetaOAuthController extends Controller
@@ -77,8 +78,13 @@ class MetaOAuthController extends Controller
             $metaUser->id => ['connected_by_user_id' => $request->user()->id],
         ]);
 
+        // Kick off a full backfill for the freshly connected account: fetch ad
+        // accounts, then cascade campaigns → ad sets → ads → creatives and the
+        // last month of insights for each one.
+        SyncMetaAdAccounts::dispatch($metaUser, cascade: true, insightsDays: 30);
+
         return redirect()->route('workspaces.metaads.fb-accounts', $workspace)
-            ->with('success', "Connected Meta account: {$metaUser->name}");
+            ->with('success', "Connected Meta account: {$metaUser->name}. Syncing ad accounts and the last month of data now.");
     }
 
     private function exchangeCode(string $code): array
