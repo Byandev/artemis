@@ -41,6 +41,7 @@ export const PERMISSIONS = {
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
     ViewRtsAiChat: 'View RTS AI Chat',
+    ViewRmoManagement: 'View RMO Management',
     ViewParcelJourneyTemplates: 'View Parcel Journey Templates',
     ManageParcelJourneyTemplates: 'Manage Parcel Journey Templates',
 
@@ -48,6 +49,7 @@ export const PERMISSIONS = {
     ViewCsrManagement: 'View CSR Management',
     EditCsrEmployees: 'Edit CSR Employees',
     ViewCsrAnalytics: 'View CSR Analytics',
+    ViewLeaderboards: 'View Leaderboards',
 
     // Inventory
     ViewInventoryItems: 'View Inventory Items',
@@ -102,6 +104,13 @@ export const PERMISSIONS = {
     DeleteCreatives: 'Delete Creatives',
     ReviewCreatives: 'Review Creatives',
     UpdateCreativeStatus: 'Update Creative Status',
+
+    // Meta Ads
+    ViewMetaAds: 'View Meta Ads',
+    ManageMetaAdsAccounts: 'Manage Meta Ads Accounts',
+    ViewOptimizationRules: 'View Optimization Rules',
+    ManageOptimizationRules: 'Manage Optimization Rules',
+    ApproveOptimizationRules: 'Approve Optimization Rules',
 
     // Dashboards
     ViewMainDashboard: 'View Main Dashboard',

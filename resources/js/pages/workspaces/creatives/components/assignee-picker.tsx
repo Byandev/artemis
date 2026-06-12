@@ -1,5 +1,16 @@
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { Check, UserPlus, X } from 'lucide-react';
 import { useState } from 'react';
 import { Reviewer } from '../types';
@@ -23,7 +34,11 @@ export function AssigneePicker({
     const selected = reviewers.filter((r) => selectedIds.includes(r.id));
 
     const toggle = (id: number) => {
-        onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);
+        onChange(
+            selectedIds.includes(id)
+                ? selectedIds.filter((x) => x !== id)
+                : [...selectedIds, id],
+        );
     };
 
     return (
@@ -35,7 +50,8 @@ export function AssigneePicker({
                 >
                     {selected.length === 0 ? (
                         <span className="inline-flex items-center gap-1.5 font-mono text-[13px] text-gray-400 dark:text-gray-500">
-                            <UserPlus className="h-3.5 w-3.5" /> Assign reviewers
+                            <UserPlus className="h-3.5 w-3.5" /> Assign
+                            reviewers
                         </span>
                     ) : (
                         selected.map((r) => (
@@ -43,7 +59,10 @@ export function AssigneePicker({
                                 key={r.id}
                                 className="inline-flex items-center gap-1 rounded-full bg-blue-500/[0.10] py-0.5 pr-1.5 pl-0.5 font-mono text-[11px] font-medium text-blue-700 dark:bg-blue-500/[0.15] dark:text-blue-300"
                             >
-                                <InitialAvatar name={r.name} className="h-4 w-4 bg-blue-500/20 text-[8px] text-blue-700 dark:text-blue-300" />
+                                <InitialAvatar
+                                    name={r.name}
+                                    className="h-4 w-4 bg-blue-500/20 text-[8px] text-blue-700 dark:text-blue-300"
+                                />
                                 {r.name}
                                 <span
                                     role="button"
@@ -61,11 +80,19 @@ export function AssigneePicker({
                     )}
                 </button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+            <PopoverContent
+                align="start"
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+            >
                 <Command>
-                    <CommandInput placeholder="Search people..." className="font-mono text-[12px]" />
+                    <CommandInput
+                        placeholder="Search people..."
+                        className="font-mono text-[12px]"
+                    />
                     <CommandList>
-                        <CommandEmpty className="py-4 text-center font-mono text-[12px] text-gray-400">No people found.</CommandEmpty>
+                        <CommandEmpty className="py-4 text-center font-mono text-[12px] text-gray-400">
+                            No people found.
+                        </CommandEmpty>
                         <CommandGroup>
                             {reviewers.map((r) => {
                                 const isSelected = selectedIds.includes(r.id);
@@ -76,9 +103,16 @@ export function AssigneePicker({
                                         onSelect={() => toggle(r.id)}
                                         className="flex items-center gap-2 font-mono text-[12px]"
                                     >
-                                        <InitialAvatar name={r.name} className="h-5 w-5 bg-blue-500/[0.12] text-[9px] text-blue-600 dark:text-blue-400" />
-                                        <span className="flex-1 truncate">{r.name}</span>
-                                        {isSelected && <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
+                                        <InitialAvatar
+                                            name={r.name}
+                                            className="h-5 w-5 bg-blue-500/[0.12] text-[9px] text-blue-600 dark:text-blue-400"
+                                        />
+                                        <span className="flex-1 truncate">
+                                            {r.name}
+                                        </span>
+                                        {isSelected && (
+                                            <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                        )}
                                     </CommandItem>
                                 );
                             })}

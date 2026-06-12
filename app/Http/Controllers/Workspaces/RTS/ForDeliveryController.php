@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Workspaces\RTS;
 
+use App\Enums\Permission;
 use App\Exports\RmoManagementExport;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
@@ -18,8 +19,10 @@ use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\Workspace;
+use App\Support\PublicWorkspaceGate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Pancake\Models\OrderForDelivery;
@@ -38,13 +41,39 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Status can only be updated for orders scheduled for delivery today.');
+        $deliveryDate = $orderForDelivery->delivery_date
+            ? Carbon::parse($orderForDelivery->delivery_date)
+            : null;
+
+        // Status is editable for today's orders, and also for yesterday's
+        // orders but only when the parcel was delivered.
+        $isToday = $deliveryDate?->isToday() ?? false;
+        $isDeliveredYesterday = ($deliveryDate?->isYesterday() ?? false)
+            && strtolower((string) $orderForDelivery->parcel_status) === 'delivered';
+
+        if (! $isToday && ! $isDeliveredYesterday) {
+            return redirect()->back()->with('error', "Status can only be updated for orders scheduled for delivery today, or yesterday's delivered orders.");
         }
 
         $orderForDelivery->update(['status' => $request->status]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
+    public function publicBulkAssign(Workspace $workspace, Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'userId' => 'required|string',
+        ]);
+
+        $updated = OrderForDelivery::whereIn('id', $request->ids)
+            ->whereDate('delivery_date', today())
+            ->whereNull('assignee_id')
+            ->update(['assignee_id' => $request->userId]);
+
+        return redirect()->back()->with('success', "Assigned {$updated} order(s) successfully.");
     }
 
     public function publicAssignUser(Workspace $workspace, $id, Request $request)
@@ -107,8 +136,29 @@ class ForDeliveryController extends Controller
         return redirect()->back()->with('success', 'Assignee removed successfully');
     }
 
+    public function verifyPublicPassword(Request $request, Workspace $workspace)
+    {
+        $request->validate(['password' => ['required', 'string']]);
+
+        if (! PublicWorkspaceGate::verify($request, $workspace, $request->input('password'))) {
+            throw ValidationException::withMessages([
+                'password' => 'Incorrect password.',
+            ]);
+        }
+
+        return back();
+    }
+
     public function public(Request $request, Workspace $workspace)
     {
+        // Gate behind the workspace's public-pages password if one is set.
+        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
+            return Inertia::render('workspaces/rts/public-pages/rmo-management', [
+                'workspace' => $workspace->only('id', 'name', 'slug'),
+                'locked' => true,
+            ]);
+        }
+
         $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
 
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
@@ -277,11 +327,15 @@ class ForDeliveryController extends Controller
         $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
         $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
-        $users = User::get();
+        // Only list CSRs (Pancake users) tied to a shop in this workspace.
+        $users = User::whereHas('shops', function ($query) use ($workspace) {
+            $query->where('shops.workspace_id', $workspace->id);
+        })->get();
 
         $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
 
         return Inertia::render('workspaces/rts/public-pages/rmo-management', [
+            'locked' => false,
             'orders' => $items,
             'workspace' => $workspace,
             'query' => [

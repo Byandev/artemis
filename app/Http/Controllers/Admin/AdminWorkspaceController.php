@@ -131,6 +131,10 @@ class AdminWorkspaceController extends Controller
             'leaderboard_module_enabled' => 'required|boolean',
             'botcake_module_enabled' => 'required|boolean',
             'creatives_module_enabled' => 'required|boolean',
+            'meta_ads_module_enabled' => 'required|boolean',
+            'sales_marketing_dashboard_module_enabled' => 'required|boolean',
+            'video_editor_dashboard_module_enabled' => 'required|boolean',
+            'csr_dashboard_module_enabled' => 'required|boolean',
         ]);
 
         $workspace->update($validated);

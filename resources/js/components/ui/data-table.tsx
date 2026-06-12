@@ -3,9 +3,11 @@
 import {
     Column,
     ColumnDef,
+    ColumnOrderState,
     PaginationState,
     RowSelectionState,
     SortingState,
+    VisibilityState,
     flexRender,
     getCoreRowModel,
     getSortedRowModel,
@@ -45,6 +47,10 @@ interface DataTableProps<TData, TValue> {
     onRowSelectionChange?: (selection: RowSelectionState) => void
     getRowId?: (row: TData, index: number) => string
     onRowClick?: (row: TData) => void
+    columnVisibility?: VisibilityState
+    onColumnVisibilityChange?: (state: VisibilityState) => void
+    columnOrder?: ColumnOrderState
+    onColumnOrderChange?: (order: ColumnOrderState) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -57,6 +63,10 @@ export function DataTable<TData, TValue>({
                                              onRowSelectionChange,
                                              getRowId,
                                              onRowClick,
+                                             columnVisibility,
+                                             onColumnVisibilityChange,
+                                             columnOrder,
+                                             onColumnOrderChange,
                                          }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
 
@@ -93,10 +103,24 @@ export function DataTable<TData, TValue>({
                 onRowSelectionChange(next)
             }
             : undefined,
+        onColumnVisibilityChange: onColumnVisibilityChange
+            ? (updater) => {
+                const next = typeof updater === 'function' ? updater(columnVisibility ?? {}) : updater
+                onColumnVisibilityChange(next)
+            }
+            : undefined,
+        onColumnOrderChange: onColumnOrderChange
+            ? (updater) => {
+                const next = typeof updater === 'function' ? updater(columnOrder ?? []) : updater
+                onColumnOrderChange(next)
+            }
+            : undefined,
         state: {
             sorting,
             pagination,
             ...(rowSelection !== undefined ? { rowSelection } : {}),
+            ...(columnVisibility !== undefined ? { columnVisibility } : {}),
+            ...(columnOrder !== undefined ? { columnOrder } : {}),
         },
         manualSorting: true,
     })

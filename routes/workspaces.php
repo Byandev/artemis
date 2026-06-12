@@ -3,17 +3,11 @@
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
-use App\Http\Controllers\Workspaces\AdAccountController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
-use App\Http\Controllers\Workspaces\AdsManager\AdController;
-use App\Http\Controllers\Workspaces\AdsManager\AdSetController;
-use App\Http\Controllers\Workspaces\AdsManager\CampaignController;
-use App\Http\Controllers\Workspaces\AdsManager\OptimizationRuleController;
 use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
-use App\Http\Controllers\Workspaces\FacebookAccountController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
@@ -50,6 +44,13 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
+use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
+use Modules\MetaAds\Http\Controllers\AdsManagerController;
+use Modules\MetaAds\Http\Controllers\IntegrationsController;
+use Modules\MetaAds\Http\Controllers\MetaOAuthController;
+use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
+use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 
 /*
@@ -63,6 +64,8 @@ use Modules\Pancake\Http\Controllers\CourierShipmentController;
 */
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
+Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
+Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
@@ -109,6 +112,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Workspace switching
     Route::post('/workspaces/{workspace}/switch', [WorkspaceController::class, 'switch'])->name('workspaces.switch');
+
+    // Public-pages access password (gates public RMO management & leaderboard)
+    Route::post('/workspaces/{workspace}/public-password', [WorkspaceController::class, 'updatePublicPassword'])->name('workspaces.public-password.update');
 
     // Member management routes
     Route::get('/workspaces/{workspace}/members', [WorkspaceMemberController::class, 'index'])->name('workspaces.members.index');
@@ -191,26 +197,77 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/parcel-journey-notification-templates', [ParcelUpdateNotificationTemplateController::class, 'index'])->name('workspaces.rts.parcel-journey-notification-templates.index');
     Route::put('/workspaces/{workspace}/rts/parcel-journey-notification-templates/{template}', [ParcelUpdateNotificationTemplateController::class, 'update'])->name('workspaces.rts.parcel-journey-notification-templates.update');
 
-    Route::get('/workspaces/{workspace}/facebook-accounts', [FacebookAccountController::class, 'index'])->name('workspaces.facebook-accounts.index');
-    Route::get('/workspaces/{workspace}/ad-accounts', [AdAccountController::class, 'index'])->name('workspaces.ad-accounts.index');
-    Route::post('/workspaces/{workspace}/ad-accounts/{adAccount}/refresh', [AdAccountController::class, 'refresh'])->name('workspaces.ad-accounts.refresh');
+    Route::get('/workspaces/{workspace}/integrations/meta', [IntegrationsController::class, 'fbAccounts'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.fb-accounts');
+    Route::get('/workspaces/{workspace}/integrations/meta/ad-accounts', [IntegrationsController::class, 'adAccounts'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ad-accounts');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager', [AdsManagerController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-manager');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/data', [AdsManagerController::class, 'data'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-manager.data');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/preview', [AdsManagerController::class, 'adPreview'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-manager.preview');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/detail', [AdsManagerController::class, 'adDetail'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-manager.detail');
+    Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.health');
 
-    // Redirect to campaigns by default for navigation item active state
-    Route::get('/workspaces/{workspace}/ads-manager', function (Workspace $workspace) {
-        return redirect()->route('workspaces.ads-manager.campaigns', $workspace);
-    })->name('workspaces.ads-manager');
-    Route::get('/workspaces/{workspace}/ads-manager/campaigns', [CampaignController::class, 'index'])->name('workspaces.ads-manager.campaigns');
-    Route::get('/workspaces/{workspace}/ads-manager/ad-sets', [AdSetController::class, 'index'])->name('workspaces.ads-manager.ad-sets');
-    Route::get('/workspaces/{workspace}/ads-manager/ads', [AdController::class, 'index'])->name('workspaces.ads-manager.ads');
-    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules', [OptimizationRuleController::class, 'page'])->name('workspaces.ads-manager.optimization-rules');
-    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules/create', [OptimizationRuleController::class, 'create'])->name('workspaces.ads-manager.optimization-rules.create');
-    Route::get('/workspaces/{workspace}/ads-manager/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])->name('workspaces.ads-manager.optimization-rules.edit');
-
-    // Optimization Rules API routes
-    Route::post('/workspaces/{workspace}/api/optimization-rules', [OptimizationRuleController::class, 'store'])->name('workspaces.api.optimization-rules.store');
-    Route::get('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'show'])->name('workspaces.api.optimization-rules.show');
-    Route::put('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])->name('workspaces.api.optimization-rules.update');
-    Route::delete('/workspaces/{workspace}/api/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])->name('workspaces.api.optimization-rules.destroy');
+    // Meta Ads optimization rules
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'index'])
+        ->middleware('can:View Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.index');
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/create', [OptimizationRuleController::class, 'create'])
+        ->middleware('can:Manage Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.create');
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals', [OptimizationRuleController::class, 'approvals'])
+        ->middleware('can:Approve Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.approvals');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/bulk-approve', [OptimizationRuleController::class, 'bulkApprove'])
+        ->middleware('can:Approve Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.approvals.bulk-approve');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/bulk-reject', [OptimizationRuleController::class, 'bulkReject'])
+        ->middleware('can:Approve Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.approvals.bulk-reject');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/{proposal}/approve', [OptimizationRuleController::class, 'approveProposal'])
+        ->middleware('can:Approve Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.approvals.approve');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/approvals/{proposal}/reject', [OptimizationRuleController::class, 'rejectProposal'])
+        ->middleware('can:Approve Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.approvals.reject');
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/logs', [OptimizationRuleController::class, 'logs'])
+        ->middleware('can:View Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.logs');
+    Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])
+        ->middleware('can:Manage Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.edit');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'store'])
+        ->middleware('can:Manage Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.store');
+    Route::put('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'update'])
+        ->middleware('can:Manage Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.update');
+    Route::patch('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/toggle', [OptimizationRuleController::class, 'toggle'])
+        ->middleware('can:Manage Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.toggle');
+    Route::delete('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])
+        ->middleware('can:Manage Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.destroy');
+    Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.connect');
+    Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', AdAccountSyncController::class)
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.sync-ad-accounts');
+    Route::patch('/workspaces/{workspace}/integrations/meta/ad-accounts/{adAccount}/toggle-sync', AdAccountToggleSyncController::class)
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.ad-accounts.toggle-sync');
 
     Route::put('/workspaces/{workspace:slug}/employees/{employee}', [CSRController::class, 'update'])->name('employees.update');
     Route::get('/workspaces/{workspace}/csr/dashboard', [CSRController::class, 'dashboard'])->name('workspaces.csr.dashboard');
