@@ -225,26 +225,28 @@ function ReviewComment({
                     </div>
                 ) : (
                     <div className="overflow-hidden rounded-[12px] border border-black/6 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] dark:border-white/6 dark:bg-zinc-800/40 dark:shadow-none">
-                        <div className="flex items-center gap-2 border-b border-black/4 px-3 py-2 dark:border-white/4">
-                            <span className="truncate text-[12px] font-semibold text-gray-800 dark:text-gray-200">
-                                {review.reviewer?.name ?? 'Unknown'}
-                            </span>
+                        <div className="flex items-start gap-2.5 border-b border-black/4 px-3 py-2.5 dark:border-white/4">
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-[12px] font-semibold text-gray-800 dark:text-gray-200">
+                                    {review.reviewer?.name ?? 'Unknown'}
+                                </p>
+                                <time className="font-mono text-[10px] text-gray-400 dark:text-gray-600">
+                                    {review.created_at}
+                                </time>
+                            </div>
                             <ReviewBadge status={review.status} />
-                            <time className="ml-auto shrink-0 font-mono text-[10px] text-gray-400 dark:text-gray-600">
-                                {review.created_at}
-                            </time>
                             {isAuthor && (
                                 <button
                                     onClick={() => setEditing(true)}
                                     title="Edit review"
-                                    className="shrink-0 rounded-md p-1 text-gray-300 transition-colors hover:bg-stone-100 hover:text-gray-600 dark:text-gray-700 dark:hover:bg-zinc-700 dark:hover:text-gray-400"
+                                    className="-mr-1 shrink-0 rounded-md p-1 text-gray-300 transition-colors hover:bg-stone-100 hover:text-gray-600 dark:text-gray-700 dark:hover:bg-zinc-700 dark:hover:text-gray-400"
                                 >
                                     <Pencil className="h-3 w-3" />
                                 </button>
                             )}
                         </div>
                         {review.feedback ? (
-                            <p className="px-3 py-2.5 text-[12px] leading-relaxed text-gray-600 dark:text-gray-400">
+                            <p className="px-3 py-2.5 text-[12px] leading-relaxed break-words text-gray-600 dark:text-gray-400">
                                 {review.feedback}
                             </p>
                         ) : (

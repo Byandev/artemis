@@ -715,7 +715,7 @@ function ModulesModal({
             onClick={onClose}
         >
             <div
-                className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="mb-5 flex items-center justify-between">
@@ -736,11 +736,11 @@ function ModulesModal({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-1">
-                    <div className="-mx-6 divide-y divide-zinc-200 px-6 dark:divide-zinc-800">
+                    <div className="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
                         {MODULE_FIELDS.map((field) => (
                             <label
                                 key={field.key}
-                                className="flex cursor-pointer items-center justify-between gap-4 py-3"
+                                className="flex cursor-pointer items-center justify-between gap-4 border-b border-zinc-100 py-3 dark:border-zinc-800"
                             >
                                 <div className="min-w-0 flex-1">
                                     <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">

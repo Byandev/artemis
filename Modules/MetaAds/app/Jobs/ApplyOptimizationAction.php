@@ -57,6 +57,23 @@ class ApplyOptimizationAction implements ShouldQueue
 
     public function handle(): void
     {
+        // Optimization actions mutate live Meta entities (budgets, pause/enable).
+        // Only ever hit the real Ads API from production — on staging/local this
+        // is a no-op so we can never change a client's live campaigns by mistake.
+        // The target is left unclaimed and proposals stay un-applied.
+        if (! app()->environment('production')) {
+            Log::info('Skipping optimization action outside production', [
+                'environment' => app()->environment(),
+                'rule_id' => $this->rule->id,
+                'target_type' => $this->rule->target_type,
+                'target_id' => $this->target->getKey(),
+                'action' => $this->rule->action,
+                'proposal_id' => $this->proposalId,
+            ]);
+
+            return;
+        }
+
         $claim = $this->claimTarget();
 
         // Another rule already owns this campaign / ad set for this run.
