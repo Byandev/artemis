@@ -26,7 +26,7 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 // ── MetaAds ─────────────────────────────────────────────────────────────
 // Ad accounts rarely change; a light refresh every 30 min keeps new accounts
 // and status changes visible.
-Schedule::command('metaads:sync-ad-accounts')->everyThirtyMinutes()->withoutOverlapping();
+//Schedule::command('metaads:sync-ad-accounts')->everyThirtyMinutes()->withoutOverlapping();
 
 // Entity tree (campaigns → ad sets → ads → creatives) changes when advertisers
 // edit Ads Manager — refresh every 6 hours.
