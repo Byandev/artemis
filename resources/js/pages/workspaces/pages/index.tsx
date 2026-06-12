@@ -505,37 +505,37 @@ const Pages = ({
                         </>
                     )}
                     {canCreatePages && (
-                        <div className="flex flex-col items-end gap-1">
-                            <Button
-                                size="sm"
-                                onClick={handleCreate}
-                                disabled={pageLimitReached}
-                                title={
-                                    pageLimitReached
-                                        ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
-                                        : undefined
-                                }
-                            >
-                                <Plus className="h-4 w-4" />
-                                Add New Page
-                            </Button>
-                            {pageLimit != null && (
-                                <span
-                                    className={clsx(
-                                        'font-mono text-[10px] tracking-wider uppercase',
-                                        pageLimitReached
-                                            ? 'text-amber-600 dark:text-amber-400'
-                                            : 'text-gray-400 dark:text-gray-500',
-                                    )}
-                                >
-                                    {pageCount ?? 0}/{pageLimit} pages used
-                                    {pageLimitReached &&
-                                        ' · upgrade to add more'}
-                                </span>
-                            )}
-                        </div>
+                        <Button
+                            size="sm"
+                            onClick={handleCreate}
+                            disabled={pageLimitReached}
+                            title={
+                                pageLimitReached
+                                    ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
+                                    : undefined
+                            }
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add New Page
+                        </Button>
                     )}
                 </PageHeader>
+
+                {canCreatePages && pageLimit != null && (
+                    <div className="-mt-4 mb-6 flex justify-end">
+                        <span
+                            className={clsx(
+                                'font-mono text-[10px] tracking-wider uppercase',
+                                pageLimitReached
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : 'text-gray-400 dark:text-gray-500',
+                            )}
+                        >
+                            {pageCount ?? 0}/{pageLimit} pages used
+                            {pageLimitReached && ' · upgrade to add more'}
+                        </span>
+                    </div>
+                )}
 
                 <Dialog
                     open={!!budgetPage}

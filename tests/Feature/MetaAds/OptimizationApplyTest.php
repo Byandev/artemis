@@ -71,6 +71,9 @@ it('the apply job pauses the target on Meta and marks the proposal applied', fun
     ['account' => $account, 'campaign' => $campaign, 'rule' => $rule, 'proposal' => $proposal] =
         makeApprovalScenario($workspace, 'approved');
 
+    // The action only ever touches the live Meta API in production.
+    app()->detectEnvironment(fn () => 'production');
+
     Http::fake(['graph.facebook.com/*' => Http::response([], 200)]);
 
     (new ApplyOptimizationAction((string) Str::uuid(), $rule, $account, $campaign, [], $proposal->id))
@@ -83,6 +86,23 @@ it('the apply job pauses the target on Meta and marks the proposal applied', fun
     expect($campaign->fresh()->effective_status)->toBe('PAUSED');
     // ...and the proposal is now applied.
     expect($proposal->fresh()->status)->toBe('applied');
+});
+
+it('the apply job is a no-op outside production', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    ['account' => $account, 'campaign' => $campaign, 'rule' => $rule, 'proposal' => $proposal] =
+        makeApprovalScenario($workspace, 'approved');
+
+    // Default test environment is "testing", not "production".
+    Http::fake(['graph.facebook.com/*' => Http::response([], 200)]);
+
+    (new ApplyOptimizationAction((string) Str::uuid(), $rule, $account, $campaign, [], $proposal->id))
+        ->handle();
+
+    // No call to Meta, the target is untouched, and the proposal stays approved.
+    Http::assertNothingSent();
+    expect($campaign->fresh()->effective_status)->toBe('ACTIVE')
+        ->and($proposal->fresh()->status)->toBe('approved');
 });
 
 it('bulk approve marks all approved and queues an apply job for each', function () {
