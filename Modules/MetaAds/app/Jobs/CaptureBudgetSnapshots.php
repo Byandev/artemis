@@ -31,13 +31,6 @@ class CaptureBudgetSnapshots implements ShouldQueue
     {
         $date = $this->date ?: Carbon::today()->toDateString();
 
-        $run = SyncRun::start(
-            entityType: 'budget_snapshots',
-            scopeType: null,
-            scopeId: null,
-            meta: ['date' => $date],
-        );
-
         try {
             $count = 0;
 
@@ -132,10 +125,7 @@ class CaptureBudgetSnapshots implements ShouldQueue
                     );
                 }
             }
-
-            $run->succeed($count, ['snapshot_count' => $count]);
         } catch (Throwable $e) {
-            $run->fail($e);
             throw $e;
         }
     }
