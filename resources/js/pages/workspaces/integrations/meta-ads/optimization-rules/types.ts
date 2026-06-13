@@ -26,6 +26,8 @@ export interface OptimizationRule {
     is_active: boolean;
     execution_mode: string;
     priority: number;
+    frequency: string;
+    run_at_hour: number | null;
     logs_count: number;
     conditions: RuleCondition[];
 }
@@ -79,6 +81,7 @@ export interface RuleOptions {
     conditionOperators: string[];
     adjustmentTypes: string[];
     executionModes: string[];
+    frequencies: string[];
 }
 
 export const BUDGET_ACTIONS = ['increase_budget', 'decrease_budget'];
@@ -120,6 +123,28 @@ export const metricLabel = (metric: string): string =>
 
 export const executionModeLabel = (mode: string): string =>
     mode === 'automatic' ? 'Automatic' : 'Approval';
+
+export const FREQUENCY_LABELS: Record<string, string> = {
+    hourly: 'Every hour',
+    every_3_hours: 'Every 3 hours',
+    every_6_hours: 'Every 6 hours',
+    every_12_hours: 'Every 12 hours',
+    daily: 'Daily',
+};
+
+export const frequencyLabel = (frequency: string): string =>
+    FREQUENCY_LABELS[frequency] ?? titleCase(frequency);
+
+export const hourLabel = (hour: number): string =>
+    `${String(hour).padStart(2, '0')}:00`;
+
+export const scheduleLabel = (
+    frequency: string,
+    runAtHour: number | null,
+): string =>
+    frequency === 'daily'
+        ? `Daily at ${hourLabel(runAtHour ?? 0)}`
+        : frequencyLabel(frequency);
 
 export const adjustmentTypeLabel = (type: string): string => {
     if (type === 'percentage') return 'Percentage';
