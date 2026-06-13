@@ -34,6 +34,7 @@ import {
     isBudgetAction,
     type OptimizationRule,
     optimizationRulesUrl,
+    scheduleLabel,
     titleCase,
 } from './types';
 
@@ -184,6 +185,18 @@ export default function OptimizationRulesIndex({
                 <Badge variant="outline" className="text-[10px] font-medium">
                     {executionModeLabel(row.original.execution_mode)}
                 </Badge>
+            ),
+        },
+        {
+            id: 'schedule',
+            header: 'Schedule',
+            cell: ({ row }) => (
+                <span className="text-gray-500 dark:text-gray-400">
+                    {scheduleLabel(
+                        row.original.frequency,
+                        row.original.run_at_hour,
+                    )}
+                </span>
             ),
         },
         {

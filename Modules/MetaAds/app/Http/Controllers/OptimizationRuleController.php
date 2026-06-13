@@ -44,6 +44,8 @@ class OptimizationRuleController extends Controller
 
     private const BUDGET_ACTIONS = ['increase_budget', 'decrease_budget'];
 
+    private const FREQUENCIES = ['hourly', 'every_3_hours', 'every_6_hours', 'every_12_hours', 'daily'];
+
     public function index(Request $request, Workspace $workspace): Response
     {
         $perPage = (int) $request->integer('per_page', 15);
@@ -448,6 +450,7 @@ class OptimizationRuleController extends Controller
             // 'automatic' is shown but disabled in the form while we monitor
             // proposals first; validateRule() rejects it for now too.
             'executionModes' => ['approval', 'automatic'],
+            'frequencies' => self::FREQUENCIES,
         ];
     }
 
@@ -479,6 +482,8 @@ class OptimizationRuleController extends Controller
             // 'automatic' disabled for now — see options(). Only approval allowed.
             'execution_mode' => ['required', Rule::in(['approval'])],
             'priority' => ['nullable', 'integer', 'min:0'],
+            'frequency' => ['required', Rule::in(self::FREQUENCIES)],
+            'run_at_hour' => ['nullable', 'integer', 'between:0,23'],
             'conditions' => ['required', 'array', 'min:1'],
             'conditions.*.metric' => ['required', Rule::in(self::METRICS)],
             'conditions.*.operator' => ['required', Rule::in(self::OPERATORS)],
@@ -515,6 +520,9 @@ class OptimizationRuleController extends Controller
             'is_active' => $data['is_active'] ?? true,
             'execution_mode' => $data['execution_mode'],
             'priority' => $data['priority'] ?? 0,
+            'frequency' => $data['frequency'],
+            // run_at_hour only applies to the daily schedule.
+            'run_at_hour' => $data['frequency'] === 'daily' ? ($data['run_at_hour'] ?? 0) : null,
         ];
     }
 

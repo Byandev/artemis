@@ -26,7 +26,7 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 // ── MetaAds ─────────────────────────────────────────────────────────────
 // Ad accounts rarely change; a light refresh every 30 min keeps new accounts
 // and status changes visible.
-//Schedule::command('metaads:sync-ad-accounts')->everyThirtyMinutes()->withoutOverlapping();
+// Schedule::command('metaads:sync-ad-accounts')->everyThirtyMinutes()->withoutOverlapping();
 
 // Entity tree (campaigns → ad sets → ads → creatives) changes when advertisers
 // edit Ads Manager — refresh every 6 hours.
@@ -48,9 +48,9 @@ Schedule::command('meta-ads:sync-insights --days=1')->everyTwoHours()->withoutOv
 // final budget state.
 Schedule::command('metaads:capture-budgets')->everyFourHours()->withoutOverlapping();
 
-// Evaluate optimization rules once a day and report which campaigns/ad sets
-// would be affected. Currently a dry run — it does not apply any changes.
-Schedule::command('meta-ads:evaluate-optimization-rules')->dailyAt('03:00')->withoutOverlapping();
+// Runs hourly; each optimization rule is evaluated only when its own
+// user-configured schedule (frequency / run-at hour) is due.
+Schedule::command('meta-ads:evaluate-optimization-rules')->hourly()->withoutOverlapping();
 
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();
