@@ -9,6 +9,8 @@ import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { type ReactNode } from 'react';
 import {
     adjustmentTypeLabel,
+    frequencyLabel,
+    hourLabel,
     isBudgetAction,
     metricLabel,
     optimizationRulesUrl,
@@ -41,6 +43,8 @@ interface FormShape {
     is_active: boolean;
     execution_mode: string;
     priority: string;
+    frequency: string;
+    run_at_hour: number;
     conditions: RuleCondition[];
 }
 
@@ -119,6 +123,8 @@ export default function RuleForm({
                 ? rule.execution_mode
                 : options.executionModes[0],
         priority: rule?.priority != null ? String(rule.priority) : '0',
+        frequency: rule?.frequency ?? 'daily',
+        run_at_hour: rule?.run_at_hour ?? 9,
         conditions: rule?.conditions?.map((c) => ({
             metric: c.metric,
             operator: c.operator,
@@ -654,6 +660,60 @@ export default function RuleForm({
                                 />
                             </div>
                         </div>
+                    </div>
+
+                    {/* Schedule */}
+                    <div className={sectionClass}>
+                        <p className={sectionLabelClass}>Schedule</p>
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <Field
+                                label="Run frequency"
+                                error={errors.frequency}
+                            >
+                                <select
+                                    className={inputClass}
+                                    value={data.frequency}
+                                    onChange={(e) =>
+                                        setData('frequency', e.target.value)
+                                    }
+                                >
+                                    {options.frequencies.map((f) => (
+                                        <option key={f} value={f}>
+                                            {frequencyLabel(f)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </Field>
+
+                            {data.frequency === 'daily' && (
+                                <Field
+                                    label="Run at"
+                                    error={errors.run_at_hour}
+                                >
+                                    <select
+                                        className={inputClass}
+                                        value={String(data.run_at_hour)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'run_at_hour',
+                                                Number(e.target.value),
+                                            )
+                                        }
+                                    >
+                                        {Array.from({ length: 24 }, (_, h) => (
+                                            <option key={h} value={h}>
+                                                {hourLabel(h)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </Field>
+                            )}
+                        </div>
+                        <p className="mt-3 font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                            Schedules align to the clock — e.g. “Every 3 hours”
+                            runs at 00:00, 03:00, 06:00 … Times use the server
+                            timezone.
+                        </p>
                     </div>
 
                     {/* Footer */}

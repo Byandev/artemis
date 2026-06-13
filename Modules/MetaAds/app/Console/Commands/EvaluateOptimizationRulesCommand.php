@@ -18,6 +18,8 @@ class EvaluateOptimizationRulesCommand extends Command
 
     public function handle(OptimizationRuleEvaluator $evaluator): int
     {
+        $now = now();
+
         $rules = OptimizationRule::query()
             ->where('is_active', true)
             ->with(['adAccounts', 'conditions'])
@@ -33,6 +35,16 @@ class EvaluateOptimizationRulesCommand extends Command
             return self::SUCCESS;
         }
 
+        // Each rule runs on its own user-chosen schedule; only evaluate the ones
+        // that are due this hour.
+        $rules = $rules->filter(fn (OptimizationRule $rule) => $rule->isDue($now))->values();
+
+        if ($rules->isEmpty()) {
+            $this->info('No optimization rules are due to run.');
+
+            return self::SUCCESS;
+        }
+
         [$automatic, $approval] = $rules->partition(
             fn (OptimizationRule $rule) => $rule->execution_mode === 'automatic',
         );
@@ -43,6 +55,9 @@ class EvaluateOptimizationRulesCommand extends Command
 
         $dispatched = $this->applyAutomatic($evaluator, $automatic, $runId);
         $proposed = $this->proposeForApproval($evaluator, $approval);
+
+        // Record that these rules ran so their next due time advances.
+        OptimizationRule::whereIn('id', $rules->pluck('id'))->update(['last_evaluated_at' => $now]);
 
         $this->newLine();
         $this->info(sprintf(

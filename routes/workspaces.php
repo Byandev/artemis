@@ -263,6 +263,9 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/toggle', [OptimizationRuleController::class, 'toggle'])
         ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.toggle');
+    Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/run', [OptimizationRuleController::class, 'runNow'])
+        ->middleware('can:Manage Optimization Rules,workspace')
+        ->name('workspaces.metaads.optimization-rules.run');
     Route::delete('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])
         ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.destroy');
