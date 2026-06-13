@@ -41,7 +41,7 @@ Schedule::command('meta-ads:sync-creatives')->everySixHours()->withoutOverlappin
 //  • every 2h    — refresh today (the live row updates throughout the day).
 Schedule::command('meta-ads:sync-insights --days=3')->dailyAt('00:30')->withoutOverlapping();
 Schedule::command('meta-ads:sync-insights --days=1 --until=yesterday')->everySixHours()->withoutOverlapping();
-Schedule::command('meta-ads:sync-insights --days=1')->everyThreeHours()->withoutOverlapping();
+Schedule::command('meta-ads:sync-insights --days=1')->everyTwoHours()->withoutOverlapping();
 
 // Snapshot end-of-day budgets so we have history Meta doesn't keep. Runs at
 // 23:55 server time, after the 23:30 entity sync has captured the day's

@@ -2,40 +2,32 @@
 
 use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
-use Modules\MetaAds\Jobs\CaptureBudgetSnapshots;
-use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
-use Modules\MetaAds\Models\Creative;
+
+function captureBudgets(string $date): void
+{
+    test()->artisan('metaads:capture-budgets', ['--date' => $date])->assertSuccessful();
+}
 
 /**
- * Wire one ad → creative (pointing at $pageId) → ad set (with the given budgets)
- * so the per-page rollup has something to sum. A Pancake page's id IS the FB
+ * Seed an ad set tagged with the given page so the per-page rollup has a budget
+ * to sum. Ad sets carry meta_page_id directly, and a Pancake page's id IS the FB
  * page id, so $pageId doubles as both.
  */
 function seedPageAdSet(int $pageId, ?float $daily, ?float $lifetime = null): void
 {
     $account = AdAccount::firstOrCreate(['id' => 555], ['name' => 'Acct']);
     $campaign = Campaign::create(['id' => $pageId * 10 + 1, 'meta_ads_account_id' => $account->id, 'name' => 'C', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE']);
-    $adSet = AdSet::create([
+    AdSet::create([
         'id' => $pageId * 10 + 2,
         'meta_ads_account_id' => $account->id,
         'meta_ads_campaign_id' => $campaign->id,
+        'meta_page_id' => $pageId,
         'name' => 'AS',
         'daily_budget' => $daily,
         'lifetime_budget' => $lifetime,
-        'status' => 'ACTIVE',
-        'effective_status' => 'ACTIVE',
-    ]);
-    $creative = Creative::create(['id' => $pageId * 10 + 3, 'meta_ads_account_id' => $account->id, 'meta_page_id' => $pageId]);
-    Ad::create([
-        'id' => $pageId * 10 + 4,
-        'meta_ads_account_id' => $account->id,
-        'meta_ads_campaign_id' => $campaign->id,
-        'meta_ads_set_id' => $adSet->id,
-        'meta_ads_creative_id' => $creative->id,
-        'name' => 'Ad',
         'status' => 'ACTIVE',
         'effective_status' => 'ACTIVE',
     ]);
@@ -47,7 +39,7 @@ it('writes the page daily budget record from the summed daily budget', function 
 
     seedPageAdSet($page->id, daily: 500.00);
 
-    (new CaptureBudgetSnapshots('2026-06-13'))->handle();
+    captureBudgets('2026-06-13');
 
     $record = PageDailyBudgetRecord::where('page_id', $page->id)->where('date', '2026-06-13')->first();
 
@@ -62,7 +54,7 @@ it('writes a zero page daily budget record for lifetime-only budgets', function 
 
     seedPageAdSet($page->id, daily: null, lifetime: 9000.00);
 
-    (new CaptureBudgetSnapshots('2026-06-13'))->handle();
+    captureBudgets('2026-06-13');
 
     $record = PageDailyBudgetRecord::where('page_id', $page->id)->where('date', '2026-06-13')->first();
 
@@ -75,7 +67,7 @@ it('skips pages that do not exist locally', function () {
     // meta_page_id with no matching local Page row.
     seedPageAdSet(999000111, daily: 300.00);
 
-    (new CaptureBudgetSnapshots('2026-06-13'))->handle();
+    captureBudgets('2026-06-13');
 
     expect(PageDailyBudgetRecord::count())->toBe(0);
 });

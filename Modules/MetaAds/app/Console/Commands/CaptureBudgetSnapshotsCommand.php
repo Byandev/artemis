@@ -2,22 +2,55 @@
 
 namespace Modules\MetaAds\Console\Commands;
 
+use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use Illuminate\Console\Command;
-use Modules\MetaAds\Jobs\CaptureBudgetSnapshots;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CaptureBudgetSnapshotsCommand extends Command
 {
     protected $signature = 'metaads:capture-budgets {--date= : Snapshot date (YYYY-MM-DD, defaults to today)}';
 
-    protected $description = 'Snapshot today\'s ad-set and campaign budgets from local DB so we have history Meta does not keep.';
+    protected $description = 'Roll up active ad-set budgets per page into page_daily_budget_records.';
 
     public function handle(): int
     {
-        $date = $this->option('date');
+        $date = $this->option('date') ?: Carbon::today()->toDateString();
 
-        CaptureBudgetSnapshots::dispatch($date)->onQueue('meta-ads');
+        // Per-page rollup: ad sets already carry meta_page_id, so sum their
+        // daily/lifetime budgets grouped straight by page — no need to walk
+        // ads → creatives.
+        $pageBudgets = DB::table('meta_ads_sets')
+            ->whereNotNull('meta_page_id')
+            ->where('effective_status', 'ACTIVE')
+            ->groupBy('meta_page_id')
+            ->selectRaw('meta_page_id, SUM(daily_budget) AS daily_budget, SUM(lifetime_budget) AS lifetime_budget')
+            ->get();
 
-        $this->info('Dispatched budget-snapshot job'.($date ? " for {$date}" : ''));
+        $count = 0;
+
+        foreach ($pageBudgets as $row) {
+            // A Pancake page's id is the FB page id (== meta_page_id), so it maps
+            // straight to a local Page. Record the summed *daily* budget even when
+            // it's 0 (e.g. lifetime-budget-only pages).
+            if (($page = Page::find((int) $row->meta_page_id)) === null) {
+                continue;
+            }
+
+            PageDailyBudgetRecord::updateOrCreate(
+                [
+                    'workspace_id' => $page->workspace_id,
+                    'page_id' => $page->id,
+                    'date' => $date,
+                ],
+                ['budget' => $row->daily_budget ?? 0],
+            );
+
+            $count++;
+        }
+
+        $this->info("Captured page daily budgets for {$count} page(s) on {$date}.");
 
         return self::SUCCESS;
     }
