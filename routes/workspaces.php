@@ -9,6 +9,7 @@ use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\OnboardingController;
+use App\Http\Controllers\Workspaces\PageAccessController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
@@ -122,6 +123,12 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace:slug}/members/{user}', [WorkspaceMemberController::class, 'updateMember'])->name('workspaces.members.update');
     Route::delete('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'destroy'])->name('workspaces.members.destroy');
     Route::post('/workspaces/{workspace}/members/{user}/reset-password', [WorkspaceMemberController::class, 'generatePasswordReset'])->name('workspaces.members.reset-password');
+
+    // Page-access control (which pages each member / team may see)
+    Route::get('/workspaces/{workspace}/access/users/{user}', [PageAccessController::class, 'editUser'])->name('workspaces.access.users.edit');
+    Route::put('/workspaces/{workspace}/access/users/{user}', [PageAccessController::class, 'updateUser'])->name('workspaces.access.users.update');
+    Route::get('/workspaces/{workspace}/access/teams/{team}', [PageAccessController::class, 'editTeam'])->name('workspaces.access.teams.edit');
+    Route::put('/workspaces/{workspace}/access/teams/{team}', [PageAccessController::class, 'updateTeam'])->name('workspaces.access.teams.update');
 
     // API Keys
     Route::get('/workspaces/{workspace}/api-keys', [WorkspaceApiKeyController::class, 'index'])->name('workspaces.api-keys.index');

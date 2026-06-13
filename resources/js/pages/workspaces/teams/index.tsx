@@ -18,7 +18,14 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Calendar, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import {
+    Calendar,
+    Lock,
+    MoreHorizontal,
+    Pencil,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface Team {
@@ -155,6 +162,16 @@ export default function TeamsIndex({
                                               >
                                                   <Pencil />
                                                   Edit
+                                              </DropdownMenuItem>
+                                          )}
+                                          {canEditTeams && (
+                                              <DropdownMenuItem asChild>
+                                                  <Link
+                                                      href={`/workspaces/${workspace.slug}/access/teams/${team.id}`}
+                                                  >
+                                                      <Lock />
+                                                      Manage Access
+                                                  </Link>
                                               </DropdownMenuItem>
                                           )}
                                           {canEditTeams && canDeleteTeams && (

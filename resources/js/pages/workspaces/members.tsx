@@ -53,6 +53,7 @@ import { omit } from 'lodash';
 import {
     KeyRound,
     Link,
+    Lock,
     MoreHorizontal,
     Search,
     Send,
@@ -370,6 +371,18 @@ export default function WorkspaceMembers({
                                           >
                                               <UserCog className="mr-2 h-4 w-4" />
                                               Change Role
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditMembers && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  router.get(
+                                                      `/workspaces/${workspace.slug}/access/users/${member.id}`,
+                                                  )
+                                              }
+                                          >
+                                              <Lock className="mr-2 h-4 w-4" />
+                                              Manage Access
                                           </DropdownMenuItem>
                                       )}
                                       {canResetPassword && (
