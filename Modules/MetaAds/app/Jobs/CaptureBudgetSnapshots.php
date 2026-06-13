@@ -90,38 +90,29 @@ class CaptureBudgetSnapshots implements ShouldQueue
                     }
                 });
 
-            // Per-page rollup: for each FB page, sum daily/lifetime budgets of
-            // distinct ad-sets that have at least one ad pointing to that page.
-            // Path: Ad → Creative.meta_page_id; Ad.meta_ads_set_id → AdSet.budget.
-            $pageAdSets = DB::table('meta_ads_ads as a')
-                ->join('meta_ads_creatives as c', 'c.id', '=', 'a.meta_ads_creative_id')
-                ->whereNotNull('c.meta_page_id')
-                ->select('c.meta_page_id', 'a.meta_ads_set_id')
-                ->distinct()
-                ->get()
-                ->groupBy('meta_page_id');
+            // Per-page rollup: ad sets already carry meta_page_id, so sum their
+            // daily/lifetime budgets grouped straight by page — no need to walk
+            // ads → creatives.
+            $pageBudgets = DB::table('meta_ads_sets')
+                ->whereNotNull('meta_page_id')
+                ->groupBy('meta_page_id')
+                ->selectRaw('meta_page_id, SUM(daily_budget) AS daily_budget, SUM(lifetime_budget) AS lifetime_budget')
+                ->get();
 
-            foreach ($pageAdSets as $pageId => $rows) {
-                $adSetIds = $rows->pluck('meta_ads_set_id')->all();
-
-                $sums = DB::table('meta_ads_sets')
-                    ->whereIn('id', $adSetIds)
-                    ->selectRaw('SUM(daily_budget) AS daily_budget, SUM(lifetime_budget) AS lifetime_budget')
-                    ->first();
-
-                if (! $sums || (! $sums->daily_budget && ! $sums->lifetime_budget)) {
+            foreach ($pageBudgets as $row) {
+                if (! $row->daily_budget && ! $row->lifetime_budget) {
                     continue;
                 }
 
                 BudgetSnapshot::updateOrCreate(
                     [
                         'entity_type' => BudgetSnapshot::ENTITY_PAGE,
-                        'entity_id' => (int) $pageId,
+                        'entity_id' => (int) $row->meta_page_id,
                         'date' => $date,
                     ],
                     [
-                        'daily_budget' => $sums->daily_budget,
-                        'lifetime_budget' => $sums->lifetime_budget,
+                        'daily_budget' => $row->daily_budget,
+                        'lifetime_budget' => $row->lifetime_budget,
                     ],
                 );
                 $count++;
@@ -130,14 +121,14 @@ class CaptureBudgetSnapshots implements ShouldQueue
                 // page_daily_budget_records. A Pancake page's id is the FB page id
                 // (== meta_page_id), so it maps straight to a local Page. Record it
                 // even when the daily budget is 0 (e.g. lifetime-budget-only pages).
-                if (($page = Page::find((int) $pageId)) !== null) {
+                if (($page = Page::find((int) $row->meta_page_id)) !== null) {
                     PageDailyBudgetRecord::updateOrCreate(
                         [
                             'workspace_id' => $page->workspace_id,
                             'page_id' => $page->id,
                             'date' => $date,
                         ],
-                        ['budget' => $sums->daily_budget ?? 0],
+                        ['budget' => $row->daily_budget ?? 0],
                     );
                 }
             }
