@@ -2,10 +2,14 @@
 
 use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
-use Modules\MetaAds\Jobs\CaptureBudgetSnapshots;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
+
+function captureBudgets(string $date): void
+{
+    test()->artisan('metaads:capture-budgets', ['--date' => $date])->assertSuccessful();
+}
 
 /**
  * Seed an ad set tagged with the given page so the per-page rollup has a budget
@@ -35,7 +39,7 @@ it('writes the page daily budget record from the summed daily budget', function 
 
     seedPageAdSet($page->id, daily: 500.00);
 
-    (new CaptureBudgetSnapshots('2026-06-13'))->handle();
+    captureBudgets('2026-06-13');
 
     $record = PageDailyBudgetRecord::where('page_id', $page->id)->where('date', '2026-06-13')->first();
 
@@ -50,7 +54,7 @@ it('writes a zero page daily budget record for lifetime-only budgets', function 
 
     seedPageAdSet($page->id, daily: null, lifetime: 9000.00);
 
-    (new CaptureBudgetSnapshots('2026-06-13'))->handle();
+    captureBudgets('2026-06-13');
 
     $record = PageDailyBudgetRecord::where('page_id', $page->id)->where('date', '2026-06-13')->first();
 
@@ -63,7 +67,7 @@ it('skips pages that do not exist locally', function () {
     // meta_page_id with no matching local Page row.
     seedPageAdSet(999000111, daily: 300.00);
 
-    (new CaptureBudgetSnapshots('2026-06-13'))->handle();
+    captureBudgets('2026-06-13');
 
     expect(PageDailyBudgetRecord::count())->toBe(0);
 });
