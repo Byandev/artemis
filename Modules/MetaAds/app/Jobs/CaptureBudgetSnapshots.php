@@ -2,6 +2,8 @@
 
 namespace Modules\MetaAds\Jobs;
 
+use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -123,6 +125,21 @@ class CaptureBudgetSnapshots implements ShouldQueue
                     ],
                 );
                 $count++;
+
+                // Mirror the page's summed *daily* budget into the workspace-facing
+                // page_daily_budget_records. A Pancake page's id is the FB page id
+                // (== meta_page_id), so it maps straight to a local Page. Record it
+                // even when the daily budget is 0 (e.g. lifetime-budget-only pages).
+                if (($page = Page::find((int) $pageId)) !== null) {
+                    PageDailyBudgetRecord::updateOrCreate(
+                        [
+                            'workspace_id' => $page->workspace_id,
+                            'page_id' => $page->id,
+                            'date' => $date,
+                        ],
+                        ['budget' => $sums->daily_budget ?? 0],
+                    );
+                }
             }
 
             $run->succeed($count, ['snapshot_count' => $count]);
