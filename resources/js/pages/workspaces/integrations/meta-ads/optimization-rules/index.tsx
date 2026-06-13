@@ -21,7 +21,9 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import {
     History,
+    Loader2,
     Pencil,
+    Play,
     Plus,
     SlidersHorizontal,
     Trash2,
@@ -61,6 +63,7 @@ export default function OptimizationRulesIndex({
     const [deleteTarget, setDeleteTarget] = useState<OptimizationRule | null>(
         null,
     );
+    const [runningId, setRunningId] = useState<number | null>(null);
 
     const indexUrl = optimizationRulesUrl(workspace.slug);
     const breadcrumbs: BreadcrumbItem[] = [
@@ -89,6 +92,18 @@ export default function OptimizationRulesIndex({
             {},
             { preserveScroll: true },
         );
+
+    const runNow = (rule: OptimizationRule) => {
+        setRunningId(rule.id);
+        router.post(
+            `${indexUrl}/${rule.id}/run`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setRunningId(null),
+            },
+        );
+    };
 
     const confirmDelete = () => {
         if (!deleteTarget) return;
@@ -229,6 +244,19 @@ export default function OptimizationRulesIndex({
             header: '',
             cell: ({ row }) => (
                 <div className="flex justify-end gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Run now"
+                        disabled={runningId === row.original.id}
+                        onClick={() => runNow(row.original)}
+                    >
+                        {runningId === row.original.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                        ) : (
+                            <Play className="h-4 w-4 text-gray-400 hover:text-emerald-500" />
+                        )}
+                    </Button>
                     <Button variant="ghost" size="icon" asChild>
                         <Link href={`${indexUrl}/${row.original.id}/edit`}>
                             <Pencil className="h-4 w-4" />
