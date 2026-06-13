@@ -34,55 +34,6 @@ class CaptureBudgetSnapshots implements ShouldQueue
         try {
             $count = 0;
 
-            // Ad sets — only those with a budget set (CBO ad sets inherit from
-            // campaign and have null budget; skip those, the campaign row covers them).
-            AdSet::query()
-                ->whereNotNull('daily_budget')
-                ->orWhereNotNull('lifetime_budget')
-                ->chunkById(500, function ($adSets) use ($date, &$count) {
-                    foreach ($adSets as $adSet) {
-                        BudgetSnapshot::updateOrCreate(
-                            [
-                                'entity_type' => BudgetSnapshot::ENTITY_AD_SET,
-                                'entity_id' => $adSet->id,
-                                'date' => $date,
-                            ],
-                            [
-                                'daily_budget' => $adSet->daily_budget,
-                                'lifetime_budget' => $adSet->lifetime_budget,
-                                'bid_strategy' => $adSet->bid_strategy,
-                                'status' => $adSet->status,
-                                'effective_status' => $adSet->effective_status,
-                            ],
-                        );
-                        $count++;
-                    }
-                });
-
-            // Campaigns with CBO (budget at campaign level).
-            Campaign::query()
-                ->whereNotNull('daily_budget')
-                ->orWhereNotNull('lifetime_budget')
-                ->chunkById(500, function ($campaigns) use ($date, &$count) {
-                    foreach ($campaigns as $campaign) {
-                        BudgetSnapshot::updateOrCreate(
-                            [
-                                'entity_type' => BudgetSnapshot::ENTITY_CAMPAIGN,
-                                'entity_id' => $campaign->id,
-                                'date' => $date,
-                            ],
-                            [
-                                'daily_budget' => $campaign->daily_budget,
-                                'lifetime_budget' => $campaign->lifetime_budget,
-                                'bid_strategy' => $campaign->bid_strategy,
-                                'status' => $campaign->status,
-                                'effective_status' => $campaign->effective_status,
-                            ],
-                        );
-                        $count++;
-                    }
-                });
-
             // Per-page rollup: ad sets already carry meta_page_id, so sum their
             // daily/lifetime budgets grouped straight by page — no need to walk
             // ads → creatives.
