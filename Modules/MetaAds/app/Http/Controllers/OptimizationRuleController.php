@@ -408,6 +408,92 @@ class OptimizationRuleController extends Controller
         return back();
     }
 
+    /**
+     * Evaluate a single rule right now, regardless of its schedule. Approval
+     * rules refresh their pending proposals; automatic rules dispatch their
+     * apply jobs. Either way, last_evaluated_at advances.
+     */
+    public function runNow(Workspace $workspace, OptimizationRule $optimizationRule, OptimizationRuleEvaluator $evaluator): RedirectResponse
+    {
+        $this->authorizeRule($workspace, $optimizationRule);
+
+        if (! $optimizationRule->is_active) {
+            return back()->with('error', 'Activate the rule before running it.');
+        }
+
+        $optimizationRule->load(['adAccounts', 'conditions']);
+
+        if ($optimizationRule->adAccounts->isEmpty()) {
+            return back()->with('error', 'This rule has no ad accounts to evaluate.');
+        }
+
+        if ($optimizationRule->execution_mode === 'automatic') {
+            $runId = (string) Str::uuid();
+            $decisions = $evaluator->planRun([$optimizationRule]);
+
+            foreach ($decisions as $decision) {
+                ApplyOptimizationAction::dispatch(
+                    $runId,
+                    $decision['rule'],
+                    $decision['adAccount'],
+                    $decision['target'],
+                    $decision['snapshot'],
+                )->onQueue('meta-ads');
+            }
+
+            $message = count($decisions).' change(s) dispatched.';
+        } else {
+            $created = $this->refreshProposals($optimizationRule, $evaluator);
+            $message = $created.' proposal(s) generated for review.';
+        }
+
+        $optimizationRule->update(['last_evaluated_at' => now()]);
+
+        return back()->with('success', "Rule evaluated. {$message}");
+    }
+
+    /**
+     * Replace an approval rule's pending proposals with a fresh evaluation,
+     * deduping targets across the rule's ad accounts. Returns the count created.
+     */
+    private function refreshProposals(OptimizationRule $rule, OptimizationRuleEvaluator $evaluator): int
+    {
+        OptimizationProposal::where('meta_ads_optimization_rule_id', $rule->id)
+            ->where('status', 'pending')
+            ->delete();
+
+        $created = 0;
+        $claimed = [];
+
+        foreach ($rule->adAccounts as $account) {
+            foreach ($evaluator->plan($rule, $account) as $proposal) {
+                $key = $proposal['target_type'].':'.$proposal['target_id'];
+                if (isset($claimed[$key])) {
+                    continue;
+                }
+                $claimed[$key] = true;
+
+                OptimizationProposal::create([
+                    'workspace_id' => $rule->workspace_id,
+                    'meta_ads_optimization_rule_id' => $rule->id,
+                    'meta_ads_account_id' => $account->id,
+                    'target_type' => $proposal['target_type'],
+                    'target_id' => $proposal['target_id'],
+                    'target_name' => $proposal['target_name'],
+                    'action' => $proposal['action'],
+                    'current_value' => $proposal['current_value'],
+                    'new_value' => $proposal['new_value'],
+                    'conditions_snapshot' => $proposal['conditions_snapshot'],
+                    'status' => 'pending',
+                ]);
+
+                $created++;
+            }
+        }
+
+        return $created;
+    }
+
     public function destroy(Workspace $workspace, OptimizationRule $optimizationRule): RedirectResponse
     {
         $this->authorizeRule($workspace, $optimizationRule);
