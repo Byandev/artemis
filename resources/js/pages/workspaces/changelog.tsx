@@ -12,6 +12,21 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.10.2',
+        date: '2026-06-13',
+        sections: [
+            {
+                title: 'Meta Ads — Optimization Rule Scheduling',
+                items: [
+                    'Each optimization rule now has its own schedule — choose how often it runs: hourly, every 3 hours, every 6 hours, every 12 hours, or daily (with an optional hour-of-day for daily rules)',
+                    'The evaluator now runs every hour and only processes a rule when it is actually due, so different rules can run at different cadences instead of all once a day',
+                    'New "Run now" action on the Optimization Rules list — evaluate a single rule on demand without waiting for its next scheduled run (requires Manage Optimization Rules)',
+                    "The rules list shows each rule's schedule, and the last time it was evaluated is tracked per rule",
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.10.1',
         date: '2026-06-11',
         sections: [
