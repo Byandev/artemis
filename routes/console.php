@@ -46,7 +46,7 @@ Schedule::command('meta-ads:sync-insights --days=1')->everyTwoHours()->withoutOv
 // Snapshot end-of-day budgets so we have history Meta doesn't keep. Runs at
 // 23:55 server time, after the 23:30 entity sync has captured the day's
 // final budget state.
-Schedule::command('metaads:capture-budgets')->dailyAt('23:55')->withoutOverlapping();
+Schedule::command('metaads:capture-budgets')->everyFourHours()->withoutOverlapping();
 
 // Evaluate optimization rules once a day and report which campaigns/ad sets
 // would be affected. Currently a dry run — it does not apply any changes.

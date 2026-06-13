@@ -33,7 +33,7 @@ class SyncCreativesCommand extends Command
         foreach ($accounts as $index => $account) {
             $this->info("Dispatching creatives sync for AdAccount #{$account->id}");
 
-            SyncCreatives::dispatch($account)->onQueue('meta-ads')->delay(now()->addSeconds($index * 10));
+            SyncCreatives::dispatch($account)->onQueue('meta-ads')->delay(now()->addSeconds($index * 60));
         }
 
         return self::SUCCESS;
