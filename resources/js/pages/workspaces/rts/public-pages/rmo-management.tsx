@@ -934,14 +934,14 @@ function RmoManagement({
                                         key={i}
                                         className="text-[12px] leading-snug font-medium text-gray-800 dark:text-gray-200"
                                     >
-                                        ITEM #####
+                                        {item.name}
                                     </p>
                                 ))}
                             </div>
                             <div className="flex items-center gap-2">
                                 {trackingCode && (
                                     <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                                        JNT###########
+                                        {trackingCode}
                                     </span>
                                 )}
                             </div>
