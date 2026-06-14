@@ -12,6 +12,8 @@ class UpsertOrderAction
 
     public function execute(Workspace $workspace, array $order): Order
     {
+        $divisor = $this->amountDivisor($order['order_currency'] ?? null);
+
         return Order::updateOrCreate(
             [
                 'order_number' => $order['id'],
@@ -22,9 +24,9 @@ class UpsertOrderAction
                 'page_id' => $order['page_id'],
                 'status' => $order['status'],
                 'status_name' => $order['status_name'],
-                'total_amount' => $order['total_price'],
-                'discount' => $order['total_discount'] ?? 0,
-                'final_amount' => $order['total_price_after_sub_discount'],
+                'total_amount' => $order['total_price'] / $divisor,
+                'discount' => ($order['total_discount'] ?? 0) / $divisor,
+                'final_amount' => $order['total_price_after_sub_discount'] / $divisor,
                 'ad_id' => $order['ad_id'] ?: null,
                 'fb_id' => $order['conversation_id'],
                 'customer_id' => $order['customer']['customer_id'] ?? null,
@@ -35,5 +37,22 @@ class UpsertOrderAction
                 ...$this->timestampResolver->resolve($order),
             ]
         );
+    }
+
+    /**
+     * Pancake sometimes reports amounts in a scaled currency where the trailing
+     * number is the scale factor (e.g. "PHP100" means values are multiplied by
+     * 100). Return the divisor needed to normalise them back to the base
+     * currency: "PHP" => 1, "PHP100" => 100.
+     */
+    private function amountDivisor(?string $currency): int
+    {
+        if ($currency === null) {
+            return 1;
+        }
+
+        preg_match('/(\d+)$/', $currency, $matches);
+
+        return isset($matches[1]) ? max((int) $matches[1], 1) : 1;
     }
 }
