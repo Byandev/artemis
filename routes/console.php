@@ -33,7 +33,7 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 Schedule::command('meta-ads:sync-campaigns')->everySixHours()->withoutOverlapping();
 Schedule::command('meta-ads:sync-ad-sets')->everySixHours()->withoutOverlapping();
 Schedule::command('meta-ads:sync-ads')->everySixHours()->withoutOverlapping();
-Schedule::command('meta-ads:sync-creatives')->everySixHours()->withoutOverlapping();
+Schedule::command('meta-ads:sync-creatives')->daily()->withoutOverlapping();
 
 // Insights, narrowing the window as numbers settle:
 //  • 00:30 daily — re-pull the last 3 days to absorb late-attributed conversions.
@@ -41,7 +41,7 @@ Schedule::command('meta-ads:sync-creatives')->everySixHours()->withoutOverlappin
 //  • every 2h    — refresh today (the live row updates throughout the day).
 Schedule::command('meta-ads:sync-insights --days=3')->dailyAt('00:30')->withoutOverlapping();
 Schedule::command('meta-ads:sync-insights --days=1 --until=yesterday')->everySixHours()->withoutOverlapping();
-Schedule::command('meta-ads:sync-insights --days=1')->everyTwoHours()->withoutOverlapping();
+Schedule::command('meta-ads:sync-insights --days=1')->hourlyAt(30)->withoutOverlapping();
 
 // Snapshot end-of-day budgets so we have history Meta doesn't keep. Runs at
 // 23:55 server time, after the 23:30 entity sync has captured the day's
