@@ -1,3 +1,4 @@
+import AskRtsWidget, { RtsData } from '@/components/ai/AskRtsWidget';
 import PageHeader from '@/components/common/PageHeader';
 import Filters, { FilterValue } from '@/components/filters/Filters';
 import AdCard from '@/components/rts/AdCard';
@@ -88,6 +89,19 @@ export default function Analytics({ workspace }: Props) {
     const [dateRange, setDateRange] = useState(initialState.dateRange);
     const [filter, setFilter] = useState<FilterValue>(initialState.filter);
 
+    // Collect each card's loaded rows so the Ask RTS Data widget (FAB) can
+    // pass them to the AI for analysis.
+    const [rtsData, setRtsData] = useState<RtsData>({
+        price: [],
+        products: [],
+        riders: [],
+        customerRisk: [],
+        provinces: [],
+        orderFrequency: [],
+    });
+    const setRtsDataField = (field: keyof RtsData) => (data: object[]) =>
+        setRtsData((prev) => ({ ...prev, [field]: data }));
+
     // Persist to localStorage so a refresh restores the current filters.
     useEffect(() => {
         try {
@@ -143,6 +157,7 @@ export default function Analytics({ workspace }: Props) {
                     <PriceCard
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
+                        onDataLoaded={setRtsDataField('price')}
                     />
                     <DeliveryAttemptsCard
                         workspaceSlug={workspace.slug}
@@ -153,14 +168,17 @@ export default function Analytics({ workspace }: Props) {
                 <CxRtsCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setRtsDataField('customerRisk')}
                 />
                 <ProductCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setRtsDataField('products')}
                 />
                 <RiderCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setRtsDataField('riders')}
                 />
                 <ConfirmedByCard
                     workspaceSlug={workspace.slug}
@@ -173,12 +191,19 @@ export default function Analytics({ workspace }: Props) {
                 <OrderFrequencyCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setRtsDataField('orderFrequency')}
                 />
                 <LocationCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setRtsDataField('provinces')}
                 />
             </div>
+            <AskRtsWidget
+                workspace={workspace}
+                dateRange={dateRange}
+                data={rtsData}
+            />
         </AppLayout>
     );
 }
