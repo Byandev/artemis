@@ -1255,12 +1255,16 @@ function RmoManagement({
                 ),
                 cell: ({ row }) => {
                     // Status is editable for today's orders, and for yesterday's
-                    // orders only when the parcel was delivered.
+                    // orders only when the parcel was returned, returning, or
+                    // delivered.
+                    const yesterdayParcelStatus =
+                        row.original.parcel_status?.toLowerCase();
                     const canEditStatus =
                         isToday ||
                         (isYesterday &&
-                            row.original.parcel_status?.toLowerCase() ===
-                                'delivered');
+                            (yesterdayParcelStatus === 'returned' ||
+                                yesterdayParcelStatus === 'returning' ||
+                                yesterdayParcelStatus === 'delivered'));
 
                     return (
                         <RmoStatusPicker
