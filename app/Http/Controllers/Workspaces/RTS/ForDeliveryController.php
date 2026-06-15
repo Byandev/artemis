@@ -68,9 +68,17 @@ class ForDeliveryController extends Controller
             'userId' => 'required|string',
         ]);
 
+        // Assignable for today's orders, and for yesterday's orders only when
+        // the parcel was delivered or returned.
         $updated = OrderForDelivery::whereIn('id', $request->ids)
-            ->whereDate('delivery_date', today())
             ->whereNull('assignee_id')
+            ->where(function ($query) {
+                $query->whereDate('delivery_date', today())
+                    ->orWhere(function ($q) {
+                        $q->whereDate('delivery_date', today()->subDay())
+                            ->whereIn('parcel_status', ['delivered', 'returned']);
+                    });
+            })
             ->update(['assignee_id' => $request->userId]);
 
         return redirect()->back()->with('success', "Assigned {$updated} order(s) successfully.");
@@ -84,8 +92,8 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
+        if (! $this->canEditAssignee($orderForDelivery)) {
+            return redirect()->back()->with('error', "Assignee can only be updated for orders scheduled for delivery today, or yesterday's delivered or returned orders.");
         }
 
         if (! $request->userId) {
@@ -127,13 +135,31 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
+        if (! $this->canEditAssignee($orderForDelivery)) {
+            return redirect()->back()->with('error', "Assignee can only be removed for orders scheduled for delivery today, or yesterday's delivered or returned orders.");
         }
 
         $orderForDelivery->update(['assignee_id' => null]);
 
         return redirect()->back()->with('success', 'Assignee removed successfully');
+    }
+
+    /**
+     * Assignee is editable for today's orders, and for yesterday's orders
+     * only when the parcel was delivered or returned.
+     */
+    private function canEditAssignee(OrderForDelivery $orderForDelivery): bool
+    {
+        $deliveryDate = $orderForDelivery->delivery_date
+            ? Carbon::parse($orderForDelivery->delivery_date)
+            : null;
+
+        if ($deliveryDate?->isToday() ?? false) {
+            return true;
+        }
+
+        return ($deliveryDate?->isYesterday() ?? false)
+            && in_array(strtolower((string) $orderForDelivery->parcel_status), ['delivered', 'returned'], true);
     }
 
     public function verifyPublicPassword(Request $request, Workspace $workspace)
