@@ -189,6 +189,37 @@ it('includes an ad count per group, except when grouping by ad id', function () 
     expect($ads[0])->not->toHaveKey('ads_count');
 });
 
+it('returns campaign / ad set budgets for those groupings and sorts by them', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    // Account A's campaign runs on a daily budget; Account B's on a lifetime one.
+    Campaign::whereKey(1000)->update(['daily_budget' => 500.00, 'lifetime_budget' => null]);
+    Campaign::whereKey(2000)->update(['daily_budget' => null, 'lifetime_budget' => 9000.00]);
+    AdSet::whereKey(1001)->update(['daily_budget' => 250.00]);
+
+    // Budgets surface when grouping by campaign...
+    $campaigns = collect($this->getJson(dataUrl($workspace, ['group_by' => 'campaign']))
+        ->assertOk()->json('rows.data'))->keyBy('name');
+    expect((float) $campaigns['Campaign 1000']['daily_budget'])->toBe(500.0)
+        ->and((float) $campaigns['Campaign 2000']['lifetime_budget'])->toBe(9000.0);
+
+    // ...and when grouping by ad set.
+    $sets = collect($this->getJson(dataUrl($workspace, ['group_by' => 'ad_set']))
+        ->assertOk()->json('rows.data'))->keyBy('name');
+    expect((float) $sets['Ad Set 1000']['daily_budget'])->toBe(250.0);
+
+    // But not when grouping by ad (the ad entity carries no budget column).
+    $ads = $this->getJson(dataUrl($workspace, ['group_by' => 'ad']))->assertOk()->json('rows.data');
+    expect($ads[0])->not->toHaveKey('daily_budget');
+
+    // Budget sorts server-side: descending daily_budget puts the 500-budget
+    // campaign ahead of the one with no daily budget.
+    $sorted = $this->getJson(dataUrl($workspace, ['group_by' => 'campaign', 'sort' => '-daily_budget']))
+        ->assertOk()->json('rows.data');
+    expect($sorted[0]['name'])->toBe('Campaign 1000');
+});
+
 it('returns the meta ad-preview iframe src for an ad', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsManager($workspace); // ad 1002 belongs to account 101
