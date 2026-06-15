@@ -36,12 +36,15 @@ import {
 import moment from 'moment';
 import { ReactNode, useEffect, useState } from 'react';
 import {
+    BUDGET_OPTIONS,
+    BudgetFields,
     ColumnVisibilityMenu,
     INSIGHTS_OPTIONS,
     InsightFilterBuilder,
     InsightsMetrics,
     MetricFilter,
     StatusLabel,
+    buildBudgetColumns,
     buildInsightsColumns,
     deserializeMetricFilters,
     serializeMetricFilters,
@@ -69,7 +72,7 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
     account: false,
 };
 
-interface Row extends InsightsMetrics {
+interface Row extends InsightsMetrics, BudgetFields {
     // Meta ad/campaign/ad-set ids are bigints beyond JS's safe-integer range,
     // so the server sends them as strings — never coerce back to a number.
     id: string;
@@ -160,9 +163,13 @@ function GridTable({
     const showThumbnail = groupBy === 'ad';
     const showStatus = HAS_STATUS[groupBy];
     const showAdsCount = groupBy !== 'ad';
+    // Budgets live on the campaign / ad set entity, so they're only meaningful
+    // (and only selected by the server) when grouping by one of those.
+    const showBudget = groupBy === 'campaign' || groupBy === 'ad_set';
 
     const COLUMN_OPTIONS = [
         { id: 'name', label: groupLabel, category: 'General', required: true },
+        ...(showBudget ? BUDGET_OPTIONS : []),
         ...INSIGHTS_OPTIONS,
     ];
     const {
@@ -248,6 +255,7 @@ function GridTable({
                 </div>
             ),
         },
+        ...(showBudget ? buildBudgetColumns<Row>() : []),
         ...buildInsightsColumns<Row>(),
     ];
 

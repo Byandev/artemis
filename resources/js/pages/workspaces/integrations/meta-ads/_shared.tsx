@@ -1034,6 +1034,36 @@ export function buildInsightsColumns<
     });
 }
 
+/* ───────────────────── budget columns ───────────────────── */
+/**
+ * Entity-level budgets. Only meaningful when each row is a single campaign or
+ * ad set (group_by=campaign / ad_set), so these columns are surfaced to the
+ * grid + column picker only for those groupings.
+ */
+export interface BudgetFields {
+    daily_budget?: number | string | null;
+    lifetime_budget?: number | string | null;
+}
+
+export const BUDGET_OPTIONS: ColumnOption[] = [
+    { id: 'daily_budget', label: 'Daily Budget', category: 'Budget' },
+    { id: 'lifetime_budget', label: 'Lifetime Budget', category: 'Budget' },
+];
+
+/** Build the Daily/Lifetime budget ColumnDef[]. Row type must extend BudgetFields. */
+export function buildBudgetColumns<T extends BudgetFields>(): ColumnDef<T>[] {
+    return BUDGET_OPTIONS.map((opt) => ({
+        id: opt.id,
+        accessorKey: opt.id,
+        enableSorting: true,
+        header: ({ column }) => (
+            <SortableHeader column={column} title={opt.label} />
+        ),
+        cell: ({ row }) =>
+            numCell(Number(row.original[opt.id as keyof T] ?? 0), moneyFmt),
+    })) as ColumnDef<T>[];
+}
+
 export interface ColumnPreset {
     id: string;
     name: string;

@@ -307,15 +307,21 @@ class AdsManagerController extends Controller
                     'meta_ads_campaigns.name',
                     'meta_ads_campaigns.status',
                     'meta_ads_campaigns.effective_status',
+                    'meta_ads_campaigns.daily_budget',
+                    'meta_ads_campaigns.lifetime_budget',
                 ],
                 'groupBy' => [
                     'meta_ads_campaigns.id',
                     'meta_ads_campaigns.name',
                     'meta_ads_campaigns.status',
                     'meta_ads_campaigns.effective_status',
+                    'meta_ads_campaigns.daily_budget',
+                    'meta_ads_campaigns.lifetime_budget',
                 ],
                 'search' => 'meta_ads_campaigns.name',
                 'adsCount' => ['key' => 'meta_ads_campaign_id', 'joinOn' => 'meta_ads_campaigns.id'],
+                // Entity-level budgets, only meaningful when each row is one campaign.
+                'budgetSorts' => ['daily_budget', 'lifetime_budget'],
             ],
             'ad_set' => [
                 'model' => AdSet::class,
@@ -327,15 +333,21 @@ class AdsManagerController extends Controller
                     'meta_ads_sets.name',
                     'meta_ads_sets.status',
                     'meta_ads_sets.effective_status',
+                    'meta_ads_sets.daily_budget',
+                    'meta_ads_sets.lifetime_budget',
                 ],
                 'groupBy' => [
                     'meta_ads_sets.id',
                     'meta_ads_sets.name',
                     'meta_ads_sets.status',
                     'meta_ads_sets.effective_status',
+                    'meta_ads_sets.daily_budget',
+                    'meta_ads_sets.lifetime_budget',
                 ],
                 'search' => 'meta_ads_sets.name',
                 'adsCount' => ['key' => 'meta_ads_set_id', 'joinOn' => 'meta_ads_sets.id'],
+                // Entity-level budgets, only meaningful when each row is one ad set.
+                'budgetSorts' => ['daily_budget', 'lifetime_budget'],
             ],
             'account' => [
                 'model' => AdAccount::class,
@@ -401,7 +413,7 @@ class AdsManagerController extends Controller
             ->allowedFilters([
                 AllowedFilter::partial('search', $config['search']),
             ])
-            ->allowedSorts($this->allowedSorts($hasAdsCount))
+            ->allowedSorts($this->allowedSorts($hasAdsCount, $config['budgetSorts'] ?? []))
             ->defaultSort('-spend')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
@@ -441,9 +453,9 @@ class AdsManagerController extends Controller
      * by its SUM()-based SQL expression via orderByRaw so derived columns like
      * CTR / ROAS / CPC sort server-side too).
      */
-    private function allowedSorts(bool $hasAdsCount = false): array
+    private function allowedSorts(bool $hasAdsCount = false, array $budgetSorts = []): array
     {
-        $sorts = array_merge(['name'], self::INSIGHTS_METRICS);
+        $sorts = array_merge(['name'], self::INSIGHTS_METRICS, $budgetSorts);
 
         if ($hasAdsCount) {
             $sorts[] = 'ads_count';
