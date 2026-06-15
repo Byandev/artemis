@@ -359,10 +359,16 @@ class OptimizationRuleEvaluator
         $adjustment = (float) $rule->adjustment_value;
 
         // Resolve the absolute amount to add/remove. Percentage adjustments can
-        // be capped by max_adjustment_amount; "specific amount" is the delta itself.
+        // be floored by min_adjustment_amount and capped by max_adjustment_amount
+        // (e.g. "increase by 10%, but at least ₱100 and at most ₱500"); "specific
+        // amount" is the delta itself. The floor is applied before the cap so a
+        // configured cap always wins when the two would conflict.
         if ($rule->adjustment_type === 'percentage') {
             $delta = $currentBudget * ($adjustment / 100);
 
+            if ($rule->min_adjustment_amount !== null) {
+                $delta = max($delta, (float) $rule->min_adjustment_amount);
+            }
             if ($rule->max_adjustment_amount !== null) {
                 $delta = min($delta, (float) $rule->max_adjustment_amount);
             }
