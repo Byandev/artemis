@@ -21,6 +21,7 @@ export interface OptimizationRule {
     adjustment_type: string | null;
     adjustment_value: string | null;
     max_adjustment_amount: string | null;
+    min_adjustment_amount: string | null;
     budget_min: string | null;
     budget_max: string | null;
     is_active: boolean;

@@ -38,6 +38,7 @@ interface FormShape {
     adjustment_type: string;
     adjustment_value: string;
     max_adjustment_amount: string;
+    min_adjustment_amount: string;
     budget_min: string;
     budget_max: string;
     is_active: boolean;
@@ -113,6 +114,7 @@ export default function RuleForm({
         adjustment_type: rule?.adjustment_type ?? options.adjustmentTypes[0],
         adjustment_value: rule?.adjustment_value ?? '',
         max_adjustment_amount: rule?.max_adjustment_amount ?? '',
+        min_adjustment_amount: rule?.min_adjustment_amount ?? '',
         budget_min: rule?.budget_min ?? '',
         budget_max: rule?.budget_max ?? '',
         is_active: rule?.is_active ?? true,
@@ -173,6 +175,11 @@ export default function RuleForm({
                 isBudgetAction(payload.action) &&
                 payload.adjustment_type === 'percentage'
                     ? payload.max_adjustment_amount
+                    : null,
+            min_adjustment_amount:
+                isBudgetAction(payload.action) &&
+                payload.adjustment_type === 'percentage'
+                    ? payload.min_adjustment_amount
                     : null,
             budget_min: isBudgetAction(payload.action)
                 ? payload.budget_min
@@ -549,6 +556,34 @@ export default function RuleForm({
                                                 onChange={(e) =>
                                                     setData(
                                                         'max_adjustment_amount',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                    )}
+
+                                    {isPercentage && (
+                                        <Field
+                                            label={
+                                                data.action ===
+                                                'decrease_budget'
+                                                    ? 'Min Decrease Amount'
+                                                    : 'Min Increase Amount'
+                                            }
+                                            error={errors.min_adjustment_amount}
+                                        >
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                className={inputClass}
+                                                placeholder="No minimum"
+                                                value={
+                                                    data.min_adjustment_amount
+                                                }
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'min_adjustment_amount',
                                                         e.target.value,
                                                     )
                                                 }

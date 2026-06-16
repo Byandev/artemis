@@ -46,6 +46,37 @@ it('skips a decrease that the budget floor would clamp into an increase', functi
         ->and((float) $proposals[0]['new_value'])->toBe(100.0);
 });
 
+it('floors a percentage increase to the minimum increase amount', function () {
+    // 10% of 500 = 50, but the rule guarantees an increase of at least 100.
+    $rule = new OptimizationRule([
+        'action' => 'increase_budget',
+        'adjustment_type' => 'percentage',
+        'adjustment_value' => 10,
+        'min_adjustment_amount' => 100,
+    ]);
+
+    expect(OptimizationRuleEvaluator::computeNewBudget($rule, 500.0))->toBe(600.0);
+
+    // When the percentage already clears the floor, the floor is a no-op:
+    // 10% of 2000 = 200 (>= 100) → 2200.
+    expect(OptimizationRuleEvaluator::computeNewBudget($rule, 2000.0))->toBe(2200.0);
+});
+
+it('applies the max cap after the min floor when both are set', function () {
+    // Floor 100, cap 150: 10% of 500 = 50 → floored to 100 (within cap) → 600.
+    // 10% of 3000 = 300 → floored stays 300, then capped to 150 → 3150.
+    $rule = new OptimizationRule([
+        'action' => 'increase_budget',
+        'adjustment_type' => 'percentage',
+        'adjustment_value' => 10,
+        'min_adjustment_amount' => 100,
+        'max_adjustment_amount' => 150,
+    ]);
+
+    expect(OptimizationRuleEvaluator::computeNewBudget($rule, 500.0))->toBe(600.0)
+        ->and(OptimizationRuleEvaluator::computeNewBudget($rule, 3000.0))->toBe(3150.0);
+});
+
 it('lets the highest-priority approval rule claim a target so there are no competing proposals', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
 

@@ -1215,7 +1215,8 @@ function RmoManagement({
                         isToday ||
                         (isYesterday &&
                             (parcelStatus === 'delivered' ||
-                                parcelStatus === 'returned'));
+                                parcelStatus === 'returned' ||
+                                parcelStatus === 'returning'));
 
                     if (!assignee) {
                         return (
