@@ -2,11 +2,14 @@
 
 namespace Modules\MetaAds\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -19,6 +22,7 @@ use Modules\MetaAds\Models\OptimizationProposal;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Models\OptimizationRuleLog;
 use Modules\MetaAds\Services\OptimizationRuleEvaluator;
+use Modules\MetaAds\Support\AdAccountAccess;
 
 class OptimizationRuleController extends Controller
 {
@@ -50,7 +54,16 @@ class OptimizationRuleController extends Controller
     {
         $perPage = (int) $request->integer('per_page', 15);
 
+        $user = $request->user();
+        $viewable = AdAccountAccess::viewableIds($user, $workspace);
+        $manageable = AdAccountAccess::manageableIds($user, $workspace);
+        $canManageRole = $user->hasPermission(Permission::ManageOptimizationRules, $workspace);
+
         $rules = OptimizationRule::where('workspace_id', $workspace->id)
+            ->when($viewable !== null, fn ($q) => $q->whereHas(
+                'adAccounts',
+                fn ($a) => $a->whereIn('meta_ads_accounts.id', $viewable),
+            ))
             ->with(['conditions', 'adAccounts:id,name'])
             ->withCount('logs')
             ->orderByDesc('priority')
@@ -58,9 +71,23 @@ class OptimizationRuleController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        // Per-row manage flag: the role grants the ability, the per-account
+        // grants decide which rules it applies to (every account on the rule
+        // must be manageable).
+        $rules->getCollection()->transform(function (OptimizationRule $rule) use ($canManageRole, $manageable) {
+            $rule->can_manage = $canManageRole
+                && ($manageable === null
+                    || $rule->adAccounts->every(fn ($a) => in_array((string) $a->id, $manageable, true)));
+
+            return $rule;
+        });
+
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/index', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'rules' => $rules,
+            // Hide "create" when the role can't manage, or the member is scoped
+            // to zero manageable accounts.
+            'canManageRules' => $canManageRole && ($manageable === null || count($manageable) > 0),
             'query' => [
                 'page' => $request->integer('page', 1),
                 'perPage' => $perPage,
@@ -68,15 +95,15 @@ class OptimizationRuleController extends Controller
         ]);
     }
 
-    public function create(Workspace $workspace): Response
+    public function create(Request $request, Workspace $workspace): Response
     {
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/create', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
-            'options' => $this->options($workspace),
+            'options' => $this->options($workspace, $request->user()),
         ]);
     }
 
-    public function edit(Workspace $workspace, OptimizationRule $optimizationRule): Response
+    public function edit(Request $request, Workspace $workspace, OptimizationRule $optimizationRule): Response
     {
         $this->authorizeRule($workspace, $optimizationRule);
 
@@ -90,7 +117,7 @@ class OptimizationRuleController extends Controller
                 ->pluck('id')
                 ->map(fn ($id) => (string) $id)
                 ->values(),
-            'options' => $this->options($workspace),
+            'options' => $this->options($workspace, $request->user()),
         ]);
     }
 
@@ -100,8 +127,13 @@ class OptimizationRuleController extends Controller
         $accountIds = array_values(array_filter((array) $request->input('ad_account_id', []), fn ($v) => $v !== '' && $v !== null));
         $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
 
+        // Scope every derived query (list, filter options, budget impact) to the
+        // accounts this member may manage. null = unrestricted.
+        $manageable = AdAccountAccess::manageableIds($request->user(), $workspace);
+
         $pending = OptimizationProposal::where('workspace_id', $workspace->id)
-            ->where('status', 'pending');
+            ->where('status', 'pending')
+            ->when($manageable !== null, fn ($q) => $q->whereIn('meta_ads_account_id', $manageable));
 
         $proposals = (clone $pending)
             ->when($accountIds, fn ($q) => $q->whereIn('meta_ads_account_id', $accountIds))
@@ -339,9 +371,12 @@ class OptimizationRuleController extends Controller
             'ids.*' => ['integer'],
         ])['ids'];
 
+        $manageable = AdAccountAccess::manageableIds($request->user(), $workspace);
+
         $proposals = OptimizationProposal::where('workspace_id', $workspace->id)
             ->where('status', 'pending')
             ->whereIn('id', $ids)
+            ->when($manageable !== null, fn ($q) => $q->whereIn('meta_ads_account_id', $manageable))
             ->get();
 
         foreach ($proposals as $proposal) {
@@ -362,6 +397,10 @@ class OptimizationRuleController extends Controller
     private function reviewProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal, string $status): void
     {
         abort_unless($proposal->workspace_id === $workspace->id, 404);
+        abort_unless(
+            AdAccountAccess::canManage($request->user(), $workspace, $proposal->meta_ads_account_id),
+            403,
+        );
         abort_unless($proposal->status === 'pending', 422, 'This proposal has already been reviewed.');
 
         $proposal->update([
@@ -507,6 +546,18 @@ class OptimizationRuleController extends Controller
     private function authorizeRule(Workspace $workspace, OptimizationRule $rule): void
     {
         abort_unless($rule->workspace_id === $workspace->id, 404);
+
+        // Managing a rule requires manage access to every account it targets, so
+        // a scoped member can't act on a rule that also touches accounts they
+        // don't control.
+        $accountIds = DB::table('meta_ads_optimization_rule_ad_account')
+            ->where('meta_ads_optimization_rule_id', $rule->id)
+            ->pluck('meta_ads_account_id');
+
+        abort_unless(
+            AdAccountAccess::canManageAll(request()->user(), $workspace, $accountIds),
+            403,
+        );
     }
 
     /**
@@ -514,11 +565,14 @@ class OptimizationRuleController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function options(Workspace $workspace): array
+    private function options(Workspace $workspace, User $user): array
     {
+        $manageable = AdAccountAccess::manageableIds($user, $workspace);
+
         return [
             'adAccounts' => AdAccount::forWorkspace($workspace)
                 ->where('active_sync', true)
+                ->when($manageable !== null, fn ($q) => $q->whereIn('id', $manageable))
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn (AdAccount $account) => [
@@ -547,15 +601,20 @@ class OptimizationRuleController extends Controller
     {
         $isBudgetAction = fn () => in_array($request->input('action'), self::BUDGET_ACTIONS, true);
 
-        $workspaceAccountIds = AdAccount::forWorkspace($workspace)
-            ->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
+        // A scoped member can only attach accounts they manage; everyone else
+        // may use any account in the workspace.
+        $manageable = AdAccountAccess::manageableIds($request->user(), $workspace);
+        $allowedAccountIds = $manageable !== null
+            ? $manageable
+            : AdAccount::forWorkspace($workspace)
+                ->pluck('id')
+                ->map(fn ($id) => (string) $id)
+                ->all();
 
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'meta_ads_account_ids' => ['required', 'array', 'min:1'],
-            'meta_ads_account_ids.*' => [Rule::in($workspaceAccountIds)],
+            'meta_ads_account_ids.*' => [Rule::in($allowedAccountIds)],
             'target_type' => ['required', Rule::in(['campaign', 'ad_set'])],
             'condition_operator' => ['required', Rule::in(['and', 'or'])],
             'action' => ['required', Rule::in(self::ACTIONS)],

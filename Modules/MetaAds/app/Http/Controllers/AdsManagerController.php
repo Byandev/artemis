@@ -14,6 +14,7 @@ use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
+use Modules\MetaAds\Support\AdAccountAccess;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -35,7 +36,11 @@ class AdsManagerController extends Controller
             ->map(fn ($id) => (string) $id);
         $selectedAccountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
 
+        // Restrict the account selector to the member's viewable accounts.
+        $viewable = AdAccountAccess::viewableIds($request->user(), $workspace);
+
         $accounts = AdAccount::forWorkspace($workspace)
+            ->when($viewable !== null, fn ($q) => $q->whereIn('meta_ads_accounts.id', $viewable))
             ->select('meta_ads_accounts.id', 'meta_ads_accounts.name')
             ->orderBy('meta_ads_accounts.name')
             ->get()
@@ -618,10 +623,20 @@ class AdsManagerController extends Controller
 
     private function accountIdsForWorkspace(Workspace $workspace)
     {
-        return DB::table('meta_ads_user_account')
+        $ids = DB::table('meta_ads_user_account')
             ->join('meta_ads_workspace_user', 'meta_ads_workspace_user.meta_ads_user_id', '=', 'meta_ads_user_account.meta_ads_user_id')
             ->where('meta_ads_workspace_user.workspace_id', $workspace->id)
             ->pluck('meta_ads_user_account.meta_ads_account_id');
+
+        // Every grid/preview/detail query flows through here, so scoping a
+        // member's viewable accounts in one place covers the whole Ads Manager.
+        $viewable = AdAccountAccess::viewableIds(request()->user(), $workspace);
+
+        if ($viewable !== null) {
+            $ids = $ids->filter(fn ($id) => in_array((string) $id, $viewable, true))->values();
+        }
+
+        return $ids;
     }
 
     /**

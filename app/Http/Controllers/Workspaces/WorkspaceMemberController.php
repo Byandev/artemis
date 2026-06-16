@@ -11,8 +11,11 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\MetaAds\Models\AdAccount;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -75,6 +78,31 @@ class WorkspaceMemberController extends Controller
 
                 return $user;
             });
+
+        // Ad accounts available in this workspace + each listed member's current
+        // per-account grants ({ accountId: 'view'|'manage' }). Drives the
+        // "Ad Account Access" dialog; empty when the workspace has no accounts.
+        $adAccounts = AdAccount::forWorkspace($workspace)
+            ->where('active_sync', true)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (AdAccount $account) => ['id' => (string) $account->id, 'name' => $account->name])
+            ->values();
+
+        $accessByUser = DB::table('meta_ads_account_access')
+            ->where('workspace_id', $workspace->id)
+            ->whereIn('user_id', $members->getCollection()->pluck('id'))
+            ->get(['user_id', 'meta_ads_account_id', 'access_level'])
+            ->groupBy('user_id');
+
+        $members->getCollection()->transform(function ($user) use ($accessByUser) {
+            $user->ad_account_access = ($accessByUser[$user->id] ?? collect())
+                ->mapWithKeys(fn ($row) => [(string) $row->meta_ads_account_id => $row->access_level])
+                ->all();
+
+            return $user;
+        });
+
         // Get pending invitations with pagination — uses invitation_sort / invitation_page params
         $invitationRequest = $request->duplicate(
             query: array_merge($request->query(), $request->has('invitation_sort') ? ['sort' => $request->input('invitation_sort')] : [])
@@ -102,6 +130,7 @@ class WorkspaceMemberController extends Controller
             'pendingInvitations' => $pendingInvitations,
             'isAdmin' => $request->user()->isAdminOf($workspace),
             'roles' => Role::where('workspace_id', $workspace->id)->get(),
+            'adAccounts' => $adAccounts,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'invitation_sort' => $request->input('invitation_sort'),
@@ -144,6 +173,62 @@ class WorkspaceMemberController extends Controller
         $workspace->updateMemberRole($user, $validated['role_id']);
 
         return back()->with('success', 'Member role updated successfully.');
+    }
+
+    /**
+     * Replace a member's per-ad-account access grants for this workspace.
+     *
+     * An empty payload clears all grants, returning the member to full
+     * (unrestricted) access. Each grant is `view` (read-only) or `manage`
+     * (create/edit optimization rules + approve/reject proposals for it).
+     */
+    public function updateAdAccountAccess(Request $request, Workspace $workspace, User $user)
+    {
+        $this->authorize(Permission::EditMembers->value, $workspace);
+
+        if ($workspace->isOwner($user)) {
+            return back()->withErrors(['error' => 'Cannot change the workspace owner\'s access.']);
+        }
+
+        abort_unless($user->isMemberOf($workspace), 404);
+
+        $allowedAccountIds = AdAccount::forWorkspace($workspace)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        $validated = $request->validate([
+            'access' => ['present', 'array'],
+            'access.*.meta_ads_account_id' => ['required', Rule::in($allowedAccountIds)],
+            'access.*.level' => ['required', Rule::in(['view', 'manage'])],
+        ]);
+
+        DB::transaction(function () use ($workspace, $user, $validated) {
+            DB::table('meta_ads_account_access')
+                ->where('workspace_id', $workspace->id)
+                ->where('user_id', $user->id)
+                ->delete();
+
+            $rows = collect($validated['access'])
+                // Last entry wins if an account appears more than once.
+                ->keyBy('meta_ads_account_id')
+                ->map(fn ($row) => [
+                    'workspace_id' => $workspace->id,
+                    'user_id' => $user->id,
+                    'meta_ads_account_id' => $row['meta_ads_account_id'],
+                    'access_level' => $row['level'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+                ->values()
+                ->all();
+
+            if ($rows !== []) {
+                DB::table('meta_ads_account_access')->insert($rows);
+            }
+        });
+
+        return back()->with('success', 'Ad account access updated.');
     }
 
     public function destroy(Request $request, Workspace $workspace, User $user)

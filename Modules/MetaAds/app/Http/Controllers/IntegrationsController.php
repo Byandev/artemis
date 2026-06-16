@@ -9,6 +9,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\User as MetaUser;
+use Modules\MetaAds\Support\AdAccountAccess;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -54,7 +55,11 @@ class IntegrationsController extends Controller
 
         $showAll = $request->boolean('show_all');
 
+        // Members scoped to specific accounts only see those; null = unrestricted.
+        $viewable = AdAccountAccess::viewableIds($request->user(), $workspace);
+
         $base = AdAccount::forWorkspace($workspace)
+            ->when($viewable !== null, fn ($q) => $q->whereIn('id', $viewable))
             ->with(['metaUsers' => function ($q) use ($workspace) {
                 $q->whereHas('workspaces', fn ($w) => $w->where('workspaces.id', $workspace->id))
                     ->select('meta_ads_users.id', 'meta_ads_users.name');

@@ -31,6 +31,10 @@ export interface OptimizationRule {
     run_at_hour: number | null;
     logs_count: number;
     conditions: RuleCondition[];
+    // Whether the current user may edit/run/delete this rule (role permission +
+    // manage access to every ad account the rule targets). Defaults to true for
+    // unrestricted users / pages that don't supply it.
+    can_manage?: boolean;
 }
 
 export interface ConditionSnapshot {

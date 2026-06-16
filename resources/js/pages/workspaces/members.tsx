@@ -56,6 +56,7 @@ import {
     MoreHorizontal,
     Search,
     Send,
+    ShieldCheck,
     Trash2,
     UserCog,
     UserMinus,
@@ -74,10 +75,24 @@ interface Invitation {
     };
 }
 
+type AdAccountAccessLevel = 'view' | 'manage';
+type AdAccountAccessChoice = 'none' | AdAccountAccessLevel;
+
+interface AdAccountOption {
+    id: string;
+    name: string;
+}
+
+// The members list attaches each member's current per-account grants.
+type MemberWithAccess = User & {
+    ad_account_access?: Record<string, AdAccountAccessLevel>;
+};
+
 interface Props {
     workspace: Workspace;
     members: PaginatedData<User>;
     roles: Role[];
+    adAccounts: AdAccountOption[];
     pendingInvitations: PaginatedData<Invitation>;
     isAdmin: boolean;
     query?: {
@@ -99,6 +114,7 @@ export default function WorkspaceMembers({
     isAdmin,
     query,
     roles,
+    adAccounts,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
     const isOwner = auth?.user?.id === workspace.owner_id;
@@ -131,6 +147,12 @@ export default function WorkspaceMembers({
     const [memberToUpdateRole, setMemberToUpdateRole] = useState<User | null>(
         null,
     );
+    const [memberToManageAccess, setMemberToManageAccess] =
+        useState<MemberWithAccess | null>(null);
+    const [accessDraft, setAccessDraft] = useState<
+        Record<string, AdAccountAccessChoice>
+    >({});
+    const [savingAccess, setSavingAccess] = useState(false);
     const [invitationToRevoke, setInvitationToRevoke] =
         useState<Invitation | null>(null);
     const [copiedMemberId, setCopiedMemberId] = useState<number | null>(null);
@@ -184,6 +206,45 @@ export default function WorkspaceMembers({
                     setMemberToUpdateRole(null);
                     updateRoleForm.reset();
                 },
+            },
+        );
+    };
+
+    const openAccessDialog = (member: MemberWithAccess) => {
+        const current = member.ad_account_access ?? {};
+        const draft: Record<string, AdAccountAccessChoice> = {};
+        adAccounts.forEach((account) => {
+            draft[account.id] = current[account.id] ?? 'none';
+        });
+        setAccessDraft(draft);
+        setMemberToManageAccess(member);
+    };
+
+    const handleSaveAccess = () => {
+        if (!memberToManageAccess) return;
+
+        if (!canEditMembers) {
+            showNoPermissionToast();
+            setMemberToManageAccess(null);
+            return;
+        }
+
+        const access = Object.entries(accessDraft)
+            .filter(([, level]) => level !== 'none')
+            .map(([meta_ads_account_id, level]) => ({
+                meta_ads_account_id,
+                level,
+            }));
+
+        setSavingAccess(true);
+        router.put(
+            `/workspaces/${workspace.slug}/members/${memberToManageAccess.id}/ad-account-access`,
+            { access },
+            {
+                preserveScroll: true,
+                onSuccess: () => setMemberToManageAccess(null),
+                onError: () => showNoPermissionToast(),
+                onFinish: () => setSavingAccess(false),
             },
         );
     };
@@ -372,6 +433,19 @@ export default function WorkspaceMembers({
                                               Change Role
                                           </DropdownMenuItem>
                                       )}
+                                      {canEditMembers &&
+                                          adAccounts.length > 0 && (
+                                              <DropdownMenuItem
+                                                  onClick={() =>
+                                                      openAccessDialog(
+                                                          member as MemberWithAccess,
+                                                      )
+                                                  }
+                                              >
+                                                  <ShieldCheck className="mr-2 h-4 w-4" />
+                                                  Ad Account Access
+                                              </DropdownMenuItem>
+                                          )}
                                       {canResetPassword && (
                                           <DropdownMenuItem
                                               onClick={() =>
@@ -882,6 +956,101 @@ export default function WorkspaceMembers({
                             </button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Ad Account Access Dialog */}
+            <Dialog
+                open={!!memberToManageAccess}
+                onOpenChange={(open) => {
+                    if (!open) setMemberToManageAccess(null);
+                }}
+            >
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
+                    <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
+                        <DialogHeader>
+                            <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                                Ad Account Access
+                            </DialogTitle>
+                            <DialogDescription className="text-[12px] text-gray-500 dark:text-gray-400">
+                                Limit which ad accounts{' '}
+                                <span className="font-medium text-gray-700 dark:text-gray-200">
+                                    {memberToManageAccess?.name}
+                                </span>{' '}
+                                can reach.{' '}
+                                <span className="font-medium">Manage</span> also
+                                lets them create/edit optimization rules and
+                                approve proposals for that account. Leave every
+                                account on “No access” to keep full access to all
+                                accounts.
+                            </DialogDescription>
+                        </DialogHeader>
+                    </div>
+
+                    <div className="max-h-[55vh] space-y-2 overflow-y-auto px-5 py-4">
+                        {adAccounts.map((account) => (
+                            <div
+                                key={account.id}
+                                className="flex items-center gap-3 rounded-[10px] border border-black/6 bg-stone-50 px-3 py-2 dark:border-white/6 dark:bg-zinc-800"
+                            >
+                                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-gray-800 dark:text-gray-100">
+                                    {account.name}
+                                </span>
+                                <Select
+                                    value={accessDraft[account.id] ?? 'none'}
+                                    onValueChange={(value) =>
+                                        setAccessDraft((draft) => ({
+                                            ...draft,
+                                            [account.id]:
+                                                value as AdAccountAccessChoice,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger className="h-9 w-36 shrink-0 rounded-[10px] border border-black/8 bg-white px-3 font-mono! text-[12px]! text-gray-800 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-100">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem
+                                            value="none"
+                                            className="font-mono text-[12px]"
+                                        >
+                                            No access
+                                        </SelectItem>
+                                        <SelectItem
+                                            value="view"
+                                            className="font-mono text-[12px]"
+                                        >
+                                            View
+                                        </SelectItem>
+                                        <SelectItem
+                                            value="manage"
+                                            className="font-mono text-[12px]"
+                                        >
+                                            Manage
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 border-t border-black/6 px-5 py-3 dark:border-white/6">
+                        <button
+                            type="button"
+                            onClick={() => setMemberToManageAccess(null)}
+                            className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            disabled={savingAccess}
+                            onClick={handleSaveAccess}
+                            className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                            {savingAccess ? 'Saving…' : 'Save Changes'}
+                        </button>
+                    </div>
                 </DialogContent>
             </Dialog>
 

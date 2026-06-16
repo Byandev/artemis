@@ -10,6 +10,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\SyncRun;
+use Modules\MetaAds\Support\AdAccountAccess;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -19,7 +20,11 @@ class SyncHealthController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
+        // Members scoped to specific accounts only see those.
+        $viewable = AdAccountAccess::viewableIds($request->user(), $workspace);
+
         $accounts = AdAccount::forWorkspace($workspace)
+            ->when($viewable !== null, fn ($q) => $q->whereIn('id', $viewable))
             ->where('active_sync', true)
             ->select('id', 'name', 'business_name', 'last_synced_at')
             ->orderBy('name')

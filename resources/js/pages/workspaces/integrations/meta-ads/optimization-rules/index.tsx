@@ -43,6 +43,8 @@ import {
 interface Props {
     workspace: { id: number; name: string; slug: string };
     rules: PaginatedData<OptimizationRule>;
+    // False when the user has no manageable ad accounts (view-only access).
+    canManageRules?: boolean;
     query?: { page?: number | string; perPage?: number | string };
 }
 
@@ -58,6 +60,7 @@ function actionSummary(rule: OptimizationRule): string {
 export default function OptimizationRulesIndex({
     workspace,
     rules,
+    canManageRules = true,
     query,
 }: Props) {
     const [deleteTarget, setDeleteTarget] = useState<OptimizationRule | null>(
@@ -129,12 +132,18 @@ export default function OptimizationRulesIndex({
                                     : 'bg-gray-300 dark:bg-gray-600',
                             )}
                         />
-                        <Link
-                            href={`${indexUrl}/${rule.id}/edit`}
-                            className="truncate font-medium text-gray-800 hover:underline dark:text-gray-100"
-                        >
-                            {rule.name}
-                        </Link>
+                        {rule.can_manage !== false ? (
+                            <Link
+                                href={`${indexUrl}/${rule.id}/edit`}
+                                className="truncate font-medium text-gray-800 hover:underline dark:text-gray-100"
+                            >
+                                {rule.name}
+                            </Link>
+                        ) : (
+                            <span className="truncate font-medium text-gray-800 dark:text-gray-100">
+                                {rule.name}
+                            </span>
+                        )}
                     </div>
                 );
             },
@@ -232,45 +241,57 @@ export default function OptimizationRulesIndex({
         {
             id: 'active',
             header: 'Active',
-            cell: ({ row }) => (
-                <Switch
-                    checked={row.original.is_active}
-                    onCheckedChange={() => toggle(row.original)}
-                />
-            ),
+            cell: ({ row }) =>
+                row.original.can_manage !== false ? (
+                    <Switch
+                        checked={row.original.is_active}
+                        onCheckedChange={() => toggle(row.original)}
+                    />
+                ) : (
+                    <Badge variant="outline" className="text-[10px] font-medium">
+                        {row.original.is_active ? 'Active' : 'Paused'}
+                    </Badge>
+                ),
         },
         {
             id: 'actions',
             header: '',
-            cell: ({ row }) => (
-                <div className="flex justify-end gap-1">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Run now"
-                        disabled={runningId === row.original.id}
-                        onClick={() => runNow(row.original)}
-                    >
-                        {runningId === row.original.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                        ) : (
-                            <Play className="h-4 w-4 text-gray-400 hover:text-emerald-500" />
-                        )}
-                    </Button>
-                    <Button variant="ghost" size="icon" asChild>
-                        <Link href={`${indexUrl}/${row.original.id}/edit`}>
-                            <Pencil className="h-4 w-4" />
-                        </Link>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteTarget(row.original)}
-                    >
-                        <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
-                    </Button>
-                </div>
-            ),
+            cell: ({ row }) =>
+                row.original.can_manage !== false ? (
+                    <div className="flex justify-end gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Run now"
+                            disabled={runningId === row.original.id}
+                            onClick={() => runNow(row.original)}
+                        >
+                            {runningId === row.original.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                            ) : (
+                                <Play className="h-4 w-4 text-gray-400 hover:text-emerald-500" />
+                            )}
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                            <Link href={`${indexUrl}/${row.original.id}/edit`}>
+                                <Pencil className="h-4 w-4" />
+                            </Link>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteTarget(row.original)}
+                        >
+                            <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="flex justify-end pr-2">
+                        <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                            View only
+                        </span>
+                    </div>
+                ),
         },
     ];
 
@@ -292,12 +313,14 @@ export default function OptimizationRulesIndex({
                     <Button variant="outline" size="sm" asChild>
                         <Link href={`${indexUrl}/approvals`}>Approvals</Link>
                     </Button>
-                    <Button size="sm" asChild>
-                        <Link href={`${indexUrl}/create`}>
-                            <Plus className="mr-1 h-4 w-4" />
-                            New Rule
-                        </Link>
-                    </Button>
+                    {canManageRules && (
+                        <Button size="sm" asChild>
+                            <Link href={`${indexUrl}/create`}>
+                                <Plus className="mr-1 h-4 w-4" />
+                                New Rule
+                            </Link>
+                        </Button>
+                    )}
                 </PageHeader>
 
                 {rules.total === 0 ? (
@@ -312,12 +335,14 @@ export default function OptimizationRulesIndex({
                             Create a rule to automate budget and status changes
                             across your campaigns and ad sets.
                         </p>
-                        <Button asChild className="mt-5" size="sm">
-                            <Link href={`${indexUrl}/create`}>
-                                <Plus className="mr-1 h-4 w-4" />
-                                Create your first rule
-                            </Link>
-                        </Button>
+                        {canManageRules && (
+                            <Button asChild className="mt-5" size="sm">
+                                <Link href={`${indexUrl}/create`}>
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Create your first rule
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 ) : (
                     <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
