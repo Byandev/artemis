@@ -76,7 +76,7 @@ class ForDeliveryController extends Controller
                 $query->whereDate('delivery_date', today())
                     ->orWhere(function ($q) {
                         $q->whereDate('delivery_date', today()->subDay())
-                            ->whereIn('parcel_status', ['delivered', 'returned']);
+                            ->whereIn('parcel_status', ['delivered', 'returned', 'returning']);
                     });
             })
             ->update(['assignee_id' => $request->userId]);
@@ -159,7 +159,7 @@ class ForDeliveryController extends Controller
         }
 
         return ($deliveryDate?->isYesterday() ?? false)
-            && in_array(strtolower((string) $orderForDelivery->parcel_status), ['delivered', 'returned'], true);
+            && in_array(strtolower((string) $orderForDelivery->parcel_status), ['delivered', 'returned', 'returning'], true);
     }
 
     public function verifyPublicPassword(Request $request, Workspace $workspace)
