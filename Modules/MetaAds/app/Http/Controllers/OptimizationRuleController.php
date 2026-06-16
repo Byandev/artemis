@@ -562,6 +562,13 @@ class OptimizationRuleController extends Controller
             'adjustment_type' => [Rule::requiredIf($isBudgetAction), 'nullable', Rule::in(['percentage', 'fixed'])],
             'adjustment_value' => [Rule::requiredIf($isBudgetAction), 'nullable', 'numeric', 'min:0'],
             'max_adjustment_amount' => ['nullable', 'numeric', 'min:0'],
+            // Floor for a percentage adjustment. Only constrain it against the
+            // cap when a cap is actually set — an empty max would otherwise be
+            // read as 0 and reject any positive minimum.
+            'min_adjustment_amount' => array_values(array_filter([
+                'nullable', 'numeric', 'min:0',
+                $request->filled('max_adjustment_amount') ? 'lte:max_adjustment_amount' : null,
+            ])),
             'budget_min' => ['nullable', 'numeric', 'min:0'],
             'budget_max' => ['nullable', 'numeric', 'min:0', 'gte:budget_min'],
             'is_active' => ['boolean'],
@@ -597,9 +604,12 @@ class OptimizationRuleController extends Controller
             'action' => $data['action'],
             'adjustment_type' => $isBudgetAction ? $data['adjustment_type'] : null,
             'adjustment_value' => $isBudgetAction ? $data['adjustment_value'] : null,
-            // Only a percentage adjustment can be capped.
+            // Only a percentage adjustment can be capped or floored.
             'max_adjustment_amount' => $isBudgetAction && ($data['adjustment_type'] ?? null) === 'percentage'
                 ? ($data['max_adjustment_amount'] ?? null)
+                : null,
+            'min_adjustment_amount' => $isBudgetAction && ($data['adjustment_type'] ?? null) === 'percentage'
+                ? ($data['min_adjustment_amount'] ?? null)
                 : null,
             'budget_min' => $isBudgetAction ? ($data['budget_min'] ?? null) : null,
             'budget_max' => $isBudgetAction ? ($data['budget_max'] ?? null) : null,

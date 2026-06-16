@@ -18,6 +18,7 @@ class OptimizationRule extends Model
     protected $casts = [
         'adjustment_value' => 'decimal:4',
         'max_adjustment_amount' => 'decimal:4',
+        'min_adjustment_amount' => 'decimal:4',
         'budget_min' => 'decimal:4',
         'budget_max' => 'decimal:4',
         'is_active' => 'boolean',
