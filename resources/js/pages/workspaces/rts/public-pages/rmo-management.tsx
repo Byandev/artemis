@@ -1206,11 +1206,23 @@ function RmoManagement({
                     const assignee = row.original.assignee;
                     const id = row.original.id;
 
+                    // Assignee is editable for today's orders, and for
+                    // yesterday's orders only when the parcel was delivered or
+                    // returned.
+                    const parcelStatus =
+                        row.original.parcel_status?.toLowerCase();
+                    const canEditAssignee =
+                        isToday ||
+                        (isYesterday &&
+                            (parcelStatus === 'delivered' ||
+                                parcelStatus === 'returned' ||
+                                parcelStatus === 'returning'));
+
                     if (!assignee) {
                         return (
                             <button
                                 onClick={() => handleAssignToMe(id)}
-                                disabled={!isToday}
+                                disabled={!canEditAssignee}
                                 className="flex items-center gap-1.5 rounded-lg border border-dashed border-black/10 px-2.5 py-1 text-[11px] font-medium text-gray-400 transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-black/10 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:border-white/10 dark:text-gray-500 dark:hover:border-emerald-500/40 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400 dark:disabled:hover:border-white/10 dark:disabled:hover:bg-transparent dark:disabled:hover:text-gray-500"
                             >
                                 <UserPlus className="h-3 w-3" />
@@ -1224,7 +1236,7 @@ function RmoManagement({
                             <span className="text-[12px] text-gray-700 dark:text-gray-300">
                                 {assignee.name}
                             </span>
-                            {isToday && (
+                            {canEditAssignee && (
                                 <button
                                     onClick={() => handleRemoveAssignee(id)}
                                     className="invisible flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-300 transition-colors group-hover:visible hover:bg-red-50 hover:text-red-400 dark:text-gray-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
@@ -1244,12 +1256,16 @@ function RmoManagement({
                 ),
                 cell: ({ row }) => {
                     // Status is editable for today's orders, and for yesterday's
-                    // orders only when the parcel was delivered.
+                    // orders only when the parcel was returned, returning, or
+                    // delivered.
+                    const yesterdayParcelStatus =
+                        row.original.parcel_status?.toLowerCase();
                     const canEditStatus =
                         isToday ||
                         (isYesterday &&
-                            row.original.parcel_status?.toLowerCase() ===
-                                'delivered');
+                            (yesterdayParcelStatus === 'returned' ||
+                                yesterdayParcelStatus === 'returning' ||
+                                yesterdayParcelStatus === 'delivered'));
 
                     return (
                         <RmoStatusPicker

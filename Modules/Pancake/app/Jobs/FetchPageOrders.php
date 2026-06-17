@@ -28,7 +28,11 @@ class FetchPageOrders implements ShouldQueue
 
         $pancake = new Pancake($this->page->shop_id, $this->page->pos_token);
 
-        $params = "&page_size=100&page_number=$page_number&order_sources[]=-1&order_sources[]={$this->page->id}&updateStatus=updated_at&extra_fields[]=return_rate";
+        $params = "&page_size=100&page_number=$page_number&updateStatus=updated_at&extra_fields[]=return_rate";
+
+        if (!$this->page->is_single_page) {
+            $params .= "&order_sources[]=-1&order_sources[]={$this->page->id}";
+        }
 
         if ($this->shipped) {
             $params .= '&filter_status[]=2';
@@ -43,6 +47,9 @@ class FetchPageOrders implements ShouldQueue
         $data = $response['data'];
 
         foreach ($data as $i => $order) {
+            if (!$order['page_id'] && $this->page->is_single_page) {
+                $order['page_id'] = $this->page->id;
+            }
             dispatch(new SyncOrder($this->page->workspace, $this->page, $order))->delay(now()->addSeconds($i))->onQueue('pancake');
         }
 

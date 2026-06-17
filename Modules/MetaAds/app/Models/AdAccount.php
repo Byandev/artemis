@@ -19,6 +19,9 @@ class AdAccount extends Model
     protected $guarded = [];
 
     protected $casts = [
+        // Facebook ad-account IDs are bigints that exceed JS Number.MAX_SAFE_INTEGER.
+        // Cast to string so JSON keeps them exact for the frontend (keys/toggle-sync).
+        'id' => 'string',
         'last_synced_at' => 'datetime',
         'uses_system_user' => 'boolean',
         'active_sync' => 'boolean',

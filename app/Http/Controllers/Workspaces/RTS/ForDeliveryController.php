@@ -68,9 +68,17 @@ class ForDeliveryController extends Controller
             'userId' => 'required|string',
         ]);
 
+        // Assignable for today's orders, and for yesterday's orders only when
+        // the parcel was delivered or returned.
         $updated = OrderForDelivery::whereIn('id', $request->ids)
-            ->whereDate('delivery_date', today())
             ->whereNull('assignee_id')
+            ->where(function ($query) {
+                $query->whereDate('delivery_date', today())
+                    ->orWhere(function ($q) {
+                        $q->whereDate('delivery_date', today()->subDay())
+                            ->whereIn('parcel_status', ['delivered', 'returned', 'returning']);
+                    });
+            })
             ->update(['assignee_id' => $request->userId]);
 
         return redirect()->back()->with('success', "Assigned {$updated} order(s) successfully.");
@@ -84,8 +92,8 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Assignee can only be updated for orders scheduled for delivery today.');
+        if (! $this->canEditAssignee($orderForDelivery)) {
+            return redirect()->back()->with('error', "Assignee can only be updated for orders scheduled for delivery today, or yesterday's delivered or returned orders.");
         }
 
         if (! $request->userId) {
@@ -127,13 +135,31 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $orderForDelivery->delivery_date || ! Carbon::parse($orderForDelivery->delivery_date)->isToday()) {
-            return redirect()->back()->with('error', 'Assignee can only be removed for orders scheduled for delivery today.');
+        if (! $this->canEditAssignee($orderForDelivery)) {
+            return redirect()->back()->with('error', "Assignee can only be removed for orders scheduled for delivery today, or yesterday's delivered or returned orders.");
         }
 
         $orderForDelivery->update(['assignee_id' => null]);
 
         return redirect()->back()->with('success', 'Assignee removed successfully');
+    }
+
+    /**
+     * Assignee is editable for today's orders, and for yesterday's orders
+     * only when the parcel was delivered or returned.
+     */
+    private function canEditAssignee(OrderForDelivery $orderForDelivery): bool
+    {
+        $deliveryDate = $orderForDelivery->delivery_date
+            ? Carbon::parse($orderForDelivery->delivery_date)
+            : null;
+
+        if ($deliveryDate?->isToday() ?? false) {
+            return true;
+        }
+
+        return ($deliveryDate?->isYesterday() ?? false)
+            && in_array(strtolower((string) $orderForDelivery->parcel_status), ['delivered', 'returned', 'returning'], true);
     }
 
     public function verifyPublicPassword(Request $request, Workspace $workspace)
@@ -151,8 +177,12 @@ class ForDeliveryController extends Controller
 
     public function public(Request $request, Workspace $workspace)
     {
+        // Super admins can view any RMO page and skip the public-pages password gate.
+        $user = $request->user();
+        $isSuperAdmin = $user && $user->isSuperAdmin();
+
         // Gate behind the workspace's public-pages password if one is set.
-        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
+        if (! $isSuperAdmin && ! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
             return Inertia::render('workspaces/rts/public-pages/rmo-management', [
                 'workspace' => $workspace->only('id', 'name', 'slug'),
                 'locked' => true,

@@ -1,5 +1,12 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -16,7 +23,7 @@ import {
     Database,
     XCircle,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 interface EntityCell {
     entity_type: string;
@@ -50,11 +57,17 @@ interface RecentRun {
     error_message: string | null;
 }
 
+interface MetaUserOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     workspace: Workspace;
     summary: AccountSummary[];
     recent: PaginatedData<RecentRun>;
     entityTypes: string[];
+    metaUsers: MetaUserOption[];
     failedLast24h: number;
     totalRuns24h: number;
     successRuns24h: number;
@@ -67,7 +80,12 @@ interface Props {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
-        filter?: { status?: string; entity_type?: string; scope_id?: string };
+        filter?: {
+            status?: string;
+            entity_type?: string;
+            scope_id?: string;
+            meta_user?: string;
+        };
     };
 }
 
@@ -210,6 +228,7 @@ export default function MetaHealthDashboard({
     summary,
     recent,
     entityTypes,
+    metaUsers,
     failedLast24h,
     totalRuns24h,
     successRuns24h,
@@ -222,6 +241,33 @@ export default function MetaHealthDashboard({
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
     );
+    const [metaUserId, setMetaUserId] = useState(
+        query?.filter?.meta_user ?? '',
+    );
+
+    const navigate = (overrides: Record<string, unknown> = {}) => {
+        router.get(
+            indexUrl,
+            {
+                sort: query?.sort,
+                'filter[meta_user]': metaUserId || undefined,
+                page: 1,
+                per_page: query?.perPage ?? recent.per_page,
+                ...overrides,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+            },
+        );
+    };
+
+    const handleMetaUserChange = (value: string) => {
+        const next = value === 'all' ? '' : value;
+        setMetaUserId(next);
+        navigate({ 'filter[meta_user]': next || undefined, page: 1 });
+    };
     const successRate24h =
         totalRuns24h > 0
             ? Math.round((successRuns24h / totalRuns24h) * 100)
@@ -415,6 +461,25 @@ export default function MetaHealthDashboard({
                     description="Monitor sync status, throughput, and failures across every connected ad account."
                 ></PageHeader>
 
+                <div className="flex items-center gap-2">
+                    <Select
+                        value={metaUserId || 'all'}
+                        onValueChange={handleMetaUserChange}
+                    >
+                        <SelectTrigger className="h-9 w-[200px] font-mono text-[11px]">
+                            <SelectValue placeholder="All Meta users" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Meta users</SelectItem>
+                            {metaUsers.map((u) => (
+                                <SelectItem key={u.id} value={String(u.id)}>
+                                    {u.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard
                         label="Connected Accounts"
@@ -496,22 +561,14 @@ export default function MetaHealthDashboard({
                             initialSorting={initialSorting}
                             meta={{ ...omit(recent, ['data']) }}
                             onFetch={(params) => {
-                                router.get(
-                                    indexUrl,
-                                    {
-                                        sort: params?.sort,
-                                        page: params?.page ?? 1,
-                                        per_page:
-                                            params?.per_page ??
-                                            query?.perPage ??
-                                            recent.per_page,
-                                    },
-                                    {
-                                        preserveState: true,
-                                        replace: true,
-                                        preserveScroll: true,
-                                    },
-                                );
+                                navigate({
+                                    sort: params?.sort,
+                                    page: params?.page ?? 1,
+                                    per_page:
+                                        params?.per_page ??
+                                        query?.perPage ??
+                                        recent.per_page,
+                                });
                             }}
                         />
                     </div>
