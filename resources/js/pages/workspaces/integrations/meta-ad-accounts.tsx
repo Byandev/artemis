@@ -1,5 +1,12 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -25,14 +32,20 @@ interface AdAccount {
     meta_users?: { id: number; name: string }[];
 }
 
+interface MetaUserOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     workspace: Workspace;
     adAccounts: PaginatedData<AdAccount>;
+    metaUsers: MetaUserOption[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
-        filter?: { search?: string };
+        filter?: { search?: string; meta_user?: string };
         showAll?: boolean;
     };
 }
@@ -123,6 +136,7 @@ function formatRelative(ts: string | null) {
 export default function MetaAdAccounts({
     workspace,
     adAccounts,
+    metaUsers,
     query,
 }: Props) {
     const indexUrl = `/workspaces/${workspace.slug}/integrations/meta/ad-accounts`;
@@ -132,6 +146,9 @@ export default function MetaAdAccounts({
         [query?.sort],
     );
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [metaUserId, setMetaUserId] = useState(
+        query?.filter?.meta_user ?? '',
+    );
     const [showAll, setShowAll] = useState(query?.showAll ?? false);
     const [syncToggles, setSyncToggles] = useState<Record<number, boolean>>(
         () =>
@@ -166,6 +183,7 @@ export default function MetaAdAccounts({
             {
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
+                'filter[meta_user]': metaUserId || undefined,
                 show_all: showAll ? 1 : undefined,
                 page: 1,
                 per_page: query?.perPage ?? adAccounts.per_page,
@@ -192,6 +210,12 @@ export default function MetaAdAccounts({
         const next = !showAll;
         setShowAll(next);
         navigate({ show_all: next ? 1 : undefined, page: 1 });
+    };
+
+    const handleMetaUserChange = (value: string) => {
+        const next = value === 'all' ? '' : value;
+        setMetaUserId(next);
+        navigate({ 'filter[meta_user]': next || undefined, page: 1 });
     };
 
     const columns: ColumnDef<AdAccount>[] = [
@@ -352,6 +376,23 @@ export default function MetaAdAccounts({
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                         />
                     </div>
+
+                    <Select
+                        value={metaUserId || 'all'}
+                        onValueChange={handleMetaUserChange}
+                    >
+                        <SelectTrigger className="h-9 w-[200px] font-mono text-[11px]">
+                            <SelectValue placeholder="All Meta users" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Meta users</SelectItem>
+                            {metaUsers.map((u) => (
+                                <SelectItem key={u.id} value={String(u.id)}>
+                                    {u.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
                     <button
                         type="button"
