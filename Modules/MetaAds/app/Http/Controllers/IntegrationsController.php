@@ -23,7 +23,7 @@ class IntegrationsController extends Controller
 
         $base = MetaUser::query()
             ->whereHas('workspaces', fn ($q) => $q->where('workspaces.id', $workspace->id))
-            ->withCount('adAccounts');
+            ->withCount(['adAccounts as ad_accounts_count' => fn ($q) => $q->where('meta_ads_accounts.active_sync', true)]);
 
         $metaUsers = QueryBuilder::for($base)
             ->allowedFilters([
