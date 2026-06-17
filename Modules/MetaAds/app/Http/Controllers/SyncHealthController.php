@@ -102,6 +102,9 @@ class SyncHealthController extends Controller
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('entity_type'),
                 AllowedFilter::exact('scope_id'),
+                // Account-level filter applied above via $metaUserId; accepted
+                // here as a no-op so QueryBuilder doesn't reject the param.
+                AllowedFilter::callback('meta_user', fn () => null),
             ])
             ->allowedSorts(['started_at', 'finished_at', 'records_synced', 'entity_type', 'status'])
             ->defaultSort('-started_at')
