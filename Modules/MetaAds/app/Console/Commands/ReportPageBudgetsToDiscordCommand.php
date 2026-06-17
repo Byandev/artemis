@@ -55,9 +55,10 @@ class ReportPageBudgetsToDiscordCommand extends Command
     }
 
     /**
-     * Build the Discord embed body: pages grouped by workspace, each showing
-     * today's budget and the difference vs yesterday, with a workspace total —
-     * mirroring the Ad Spent Tracker. Capped to Discord's 4096-char limit.
+     * Build the Discord embed body: one monospace table per workspace showing
+     * each page's budget today and the difference vs yesterday, with a total
+     * row — mirroring the Ad Spent Tracker. Wrapped in code fences so Discord
+     * renders it as an aligned table. Capped to Discord's 4096-char limit.
      *
      * @param  Collection<int, PageDailyBudgetRecord>  $records
      */
@@ -67,11 +68,10 @@ class ReportPageBudgetsToDiscordCommand extends Command
             return "No page budgets were recorded for {$today}.";
         }
 
-        $lines = [];
+        $blocks = [];
 
         foreach ($records->groupBy('workspace_id') as $group) {
             $workspaceName = $group->first()->workspace?->name ?? 'Unknown workspace';
-            $lines[] = "**{$workspaceName}**";
 
             // Roll each page into today/yesterday totals so we can show the delta.
             $pages = [];
@@ -91,41 +91,105 @@ class ReportPageBudgetsToDiscordCommand extends Command
                 }
             }
 
+            $rows = [];
             $totalToday = 0.0;
             $totalYesterday = 0.0;
 
             foreach (collect($pages)->sortByDesc('today') as $page) {
-                $diff = $page['today'] - $page['yesterday'];
                 $totalToday += $page['today'];
                 $totalYesterday += $page['yesterday'];
 
-                $budget = number_format($page['today'], 2);
-                $lines[] = "• {$page['name']} — {$budget}  ({$this->formatDelta($diff)})";
+                $rows[] = [
+                    'name' => $page['name'],
+                    'today' => number_format($page['today'], 2),
+                    'diff' => $this->formatDelta($page['today'] - $page['yesterday']),
+                ];
             }
 
-            $total = number_format($totalToday, 2);
-            $totalDiff = $this->formatDelta($totalToday - $totalYesterday);
-            $lines[] = "_Total: {$total}  ({$totalDiff} vs yesterday)_";
-            $lines[] = '';
+            $totalRow = [
+                'name' => 'Total',
+                'today' => number_format($totalToday, 2),
+                'diff' => $this->formatDelta($totalToday - $totalYesterday),
+            ];
+
+            $blocks[] = "**{$workspaceName}**\n```\n".$this->renderTable($rows, $totalRow)."\n```";
         }
 
-        $body = trim(implode("\n", $lines));
+        $body = trim(implode("\n", $blocks));
 
         return mb_strlen($body) > 4096 ? mb_substr($body, 0, 4093).'...' : $body;
     }
 
     /**
-     * Format a budget delta with a direction arrow, e.g. "🔺 +120.00".
+     * Render an aligned fixed-width table: Page | Today | Diff, plus a total row.
+     *
+     * @param  array<int, array{name: string, today: string, diff: string}>  $rows
+     * @param  array{name: string, today: string, diff: string}  $totalRow
+     */
+    private function renderTable(array $rows, array $totalRow): string
+    {
+        $maxName = 22;
+        $all = array_merge($rows, [$totalRow]);
+
+        $nameW = mb_strlen('Page');
+        $todayW = mb_strlen('Today');
+        $diffW = mb_strlen('Diff');
+
+        foreach ($all as $r) {
+            $nameW = max($nameW, mb_strlen($this->truncate($r['name'], $maxName)));
+            $todayW = max($todayW, mb_strlen($r['today']));
+            $diffW = max($diffW, mb_strlen($r['diff']));
+        }
+
+        $line = fn (string $name, string $today, string $diff): string => $this->pad($this->truncate($name, $maxName), $nameW, false)
+            .'  '.$this->pad($today, $todayW, true)
+            .'  '.$this->pad($diff, $diffW, true);
+
+        $sep = str_repeat('-', $nameW + $todayW + $diffW + 4);
+
+        $out = [$line('Page', 'Today', 'Diff'), $sep];
+        foreach ($rows as $r) {
+            $out[] = $line($r['name'], $r['today'], $r['diff']);
+        }
+        $out[] = $sep;
+        $out[] = $line($totalRow['name'], $totalRow['today'], $totalRow['diff']);
+
+        return implode("\n", $out);
+    }
+
+    /**
+     * Format a budget delta as a signed amount, e.g. "+120.00" / "-50.00".
+     * Plain ASCII so columns stay aligned inside the monospace code block.
      */
     private function formatDelta(float $diff): string
     {
         if (abs($diff) < 0.005) {
-            return '➖ 0.00';
+            return '0.00';
         }
 
-        $arrow = $diff > 0 ? '🔺' : '🔻';
-        $sign = $diff > 0 ? '+' : '−';
+        return ($diff > 0 ? '+' : '-').number_format(abs($diff), 2);
+    }
 
-        return $arrow.' '.$sign.number_format(abs($diff), 2);
+    /**
+     * Pad a string to the given display width (multibyte-safe), left or right.
+     */
+    private function pad(string $value, int $width, bool $alignRight): string
+    {
+        $gap = $width - mb_strlen($value);
+        if ($gap <= 0) {
+            return $value;
+        }
+
+        $padding = str_repeat(' ', $gap);
+
+        return $alignRight ? $padding.$value : $value.$padding;
+    }
+
+    /**
+     * Truncate an over-long name with an ellipsis, keeping a fixed display width.
+     */
+    private function truncate(string $value, int $max): string
+    {
+        return mb_strlen($value) > $max ? mb_substr($value, 0, $max - 1).'…' : $value;
     }
 }
