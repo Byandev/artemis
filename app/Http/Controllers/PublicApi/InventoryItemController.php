@@ -20,7 +20,7 @@ class InventoryItemController extends Controller
             ->get()
             ->map(fn ($item) => [
                 'inventory_item_id' => $item->id,
-                'sales_keywords' => $item->sales_keywords,
+                'sales_keywords' => $item->salesKeywordsList(),
                 'transaction_keywords' => $item->transaction_keywords,
             ]);
 

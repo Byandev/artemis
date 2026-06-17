@@ -33,12 +33,8 @@ interface Item {
     product?: { id: number; name: string };
     remaining_qty: number | null;
     unfulfilled: number | null;
-    current_stocks: number | null;
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
-    remaining_after_fulfillment: number | null;
-    days_it_can_last: number | null;
-    po_needed: number | null;
 }
 
 interface Props {
@@ -189,25 +185,6 @@ export default function ItemIndex({
             ),
         },
         {
-            accessorKey: 'current_stocks',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="Current Stocks"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => (
-                <div className="text-center">
-                    <MetricCell
-                        value={row.original.current_stocks}
-                        color="text-emerald-600 dark:text-emerald-400"
-                    />
-                </div>
-            ),
-        },
-        {
             accessorKey: 'remaining_qty',
             enableSorting: true,
             header: ({ column }) => (
@@ -263,83 +240,6 @@ export default function ItemIndex({
                     />
                 </div>
             ),
-        },
-        {
-            accessorKey: 'remaining_after_fulfillment',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="Remaining After Fulfillment"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => {
-                const v = row.original.remaining_after_fulfillment;
-                const color =
-                    v != null && v < 0
-                        ? 'text-red-500 dark:text-red-400'
-                        : 'text-gray-700 dark:text-gray-300';
-                return (
-                    <div className="text-center">
-                        <MetricCell value={v} color={color} />
-                    </div>
-                );
-            },
-        },
-        {
-            accessorKey: 'days_it_can_last',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="Days It Can Last"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => {
-                const v = row.original.days_it_can_last;
-                const color =
-                    v == null
-                        ? ''
-                        : v < 3
-                          ? 'text-red-500 dark:text-red-400'
-                          : v < 7
-                            ? 'text-amber-500 dark:text-amber-400'
-                            : 'text-emerald-600 dark:text-emerald-400';
-                return (
-                    <div className="text-center">
-                        <span
-                            className={`font-mono text-[12px] font-medium ${color}`}
-                        >
-                            {v == null ? '—' : `${num(v, 1)} days`}
-                        </span>
-                    </div>
-                );
-            },
-        },
-        {
-            accessorKey: 'po_needed',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="PO Needed"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => {
-                const v = row.original.po_needed;
-                const color =
-                    v != null && v > 0
-                        ? 'text-amber-500 dark:text-amber-400'
-                        : 'text-gray-400 dark:text-gray-500';
-                return (
-                    <div className="text-center">
-                        <MetricCell value={v} color={color} />
-                    </div>
-                );
-            },
         },
         ...(canUseItemActions
             ? [
