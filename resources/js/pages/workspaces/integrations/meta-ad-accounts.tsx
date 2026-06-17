@@ -20,7 +20,7 @@ import { Facebook, Search, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface AdAccount {
-    id: number;
+    id: string;
     name: string;
     business_name: string | null;
     currency: string | null;
@@ -29,11 +29,11 @@ interface AdAccount {
     last_synced_at: string | null;
     uses_system_user: boolean;
     active_sync: boolean;
-    meta_users?: { id: number; name: string }[];
+    meta_users?: { id: string; name: string }[];
 }
 
 interface MetaUserOption {
-    id: number;
+    id: string;
     name: string;
 }
 
@@ -150,7 +150,7 @@ export default function MetaAdAccounts({
         query?.filter?.meta_user ?? '',
     );
     const [showAll, setShowAll] = useState(query?.showAll ?? false);
-    const [syncToggles, setSyncToggles] = useState<Record<number, boolean>>(
+    const [syncToggles, setSyncToggles] = useState<Record<string, boolean>>(
         () =>
             Object.fromEntries(
                 adAccounts.data.map((a) => [a.id, a.active_sync]),
