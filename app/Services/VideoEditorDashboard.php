@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use App\Support\VideoEditor\DashboardFilters;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -282,9 +283,15 @@ class VideoEditorDashboard
     {
         ['from' => $from, 'to' => $to] = $filters->dateBounds();
 
+        $user = auth()->user();
+
         return CreativeReview::query()
             ->whereHas('creative', fn (Builder $q) => $q
                 ->where('workspace_id', $workspace->id)
+                ->when(
+                    $user && TeamVisibility::shouldScope($user, $workspace),
+                    fn (Builder $q) => $q->whereHas('product.pages', fn (Builder $p) => $p->visibleTo($user, $workspace)),
+                )
                 ->whereBetween('creative_date', [$from, $to])
                 ->when($filters->userIds, fn (Builder $q) => $q->whereIn('creator_id', $filters->userIds)))
             ->with(['reviewer:id,name', 'creative:id,name'])
@@ -310,8 +317,14 @@ class VideoEditorDashboard
     {
         ['from' => $from, 'to' => $to] = $filters->dateBounds();
 
+        $user = auth()->user();
+
         return Creative::query()
             ->where('workspace_id', $workspace->id)
+            ->when(
+                $user && TeamVisibility::shouldScope($user, $workspace),
+                fn (Builder $q) => $q->whereHas('product.pages', fn (Builder $p) => $p->visibleTo($user, $workspace)),
+            )
             ->whereBetween('creative_date', [$from, $to])
             ->when($filters->productIds, fn (Builder $q) => $q->whereIn('product_id', $filters->productIds))
             ->when($filters->formats, fn (Builder $q) => $q->whereIn('format', $filters->formats));

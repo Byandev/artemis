@@ -178,11 +178,16 @@ class OptimizationRuleController extends Controller
 
         $user = $request->user();
 
+        // History reflects actions taken on accounts — limit it to the accounts
+        // the user can *manage*, not merely view.
+        $manageableAccountIds = TeamVisibility::manageableAccountIds($user, $workspace);
+        $manageScope = fn ($q) => $q->whereHas(
+            'rule.adAccounts',
+            fn ($a) => $a->whereIn('meta_ads_accounts.id', $manageableAccountIds),
+        );
+
         $logs = OptimizationRuleLog::where('workspace_id', $workspace->id)
-            ->when(
-                TeamVisibility::shouldScope($user, $workspace),
-                fn ($q) => $q->whereHas('rule.adAccounts', fn ($a) => $a->visibleTo($user, $workspace)),
-            )
+            ->when($manageableAccountIds !== null, $manageScope)
             ->when($ruleIds, fn ($q) => $q->whereIn('meta_ads_optimization_rule_id', $ruleIds))
             ->when($actions, fn ($q) => $q->whereIn('action_taken', $actions))
             ->with('rule:id,name')
@@ -194,6 +199,7 @@ class OptimizationRuleController extends Controller
         // logged history in this workspace, so the dropdowns never list a value
         // with zero matching rows.
         $loggedRuleIds = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->when($manageableAccountIds !== null, $manageScope)
             ->distinct()
             ->pluck('meta_ads_optimization_rule_id');
 
@@ -204,6 +210,7 @@ class OptimizationRuleController extends Controller
             ->values();
 
         $filterActions = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->when($manageableAccountIds !== null, $manageScope)
             ->distinct()
             ->orderBy('action_taken')
             ->pluck('action_taken')
