@@ -38,6 +38,9 @@ return [
     'n8n' => [
         'webhook_url' => env('N8N_WEBHOOK_URL'),
         'inventory_webhook_url' => env('N8N_INVENTORY_WEBHOOK_URL'),
+        // Public URL n8n calls back to with synced ERP data. Defaults to APP_URL
+        // so a self-hosted/local n8n can reach the app without a tunnel.
+        'inventory_sync_callback_url' => env('N8N_INVENTORY_SYNC_CALLBACK_URL'),
     ],
 
     'discord' => [

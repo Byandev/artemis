@@ -36,6 +36,7 @@ class AdsManagerController extends Controller
         $selectedAccountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
 
         $accounts = AdAccount::forWorkspace($workspace)
+            ->where('meta_ads_accounts.active_sync', true)
             ->select('meta_ads_accounts.id', 'meta_ads_accounts.name')
             ->orderBy('meta_ads_accounts.name')
             ->get()
@@ -307,12 +308,16 @@ class AdsManagerController extends Controller
                     'meta_ads_campaigns.name',
                     'meta_ads_campaigns.status',
                     'meta_ads_campaigns.effective_status',
+                    'meta_ads_campaigns.daily_budget',
+                    'meta_ads_campaigns.lifetime_budget',
                 ],
                 'groupBy' => [
                     'meta_ads_campaigns.id',
                     'meta_ads_campaigns.name',
                     'meta_ads_campaigns.status',
                     'meta_ads_campaigns.effective_status',
+                    'meta_ads_campaigns.daily_budget',
+                    'meta_ads_campaigns.lifetime_budget',
                 ],
                 'search' => 'meta_ads_campaigns.name',
                 'adsCount' => ['key' => 'meta_ads_campaign_id', 'joinOn' => 'meta_ads_campaigns.id'],
@@ -327,12 +332,16 @@ class AdsManagerController extends Controller
                     'meta_ads_sets.name',
                     'meta_ads_sets.status',
                     'meta_ads_sets.effective_status',
+                    'meta_ads_sets.daily_budget',
+                    'meta_ads_sets.lifetime_budget',
                 ],
                 'groupBy' => [
                     'meta_ads_sets.id',
                     'meta_ads_sets.name',
                     'meta_ads_sets.status',
                     'meta_ads_sets.effective_status',
+                    'meta_ads_sets.daily_budget',
+                    'meta_ads_sets.lifetime_budget',
                 ],
                 'search' => 'meta_ads_sets.name',
                 'adsCount' => ['key' => 'meta_ads_set_id', 'joinOn' => 'meta_ads_sets.id'],
@@ -620,7 +629,9 @@ class AdsManagerController extends Controller
     {
         return DB::table('meta_ads_user_account')
             ->join('meta_ads_workspace_user', 'meta_ads_workspace_user.meta_ads_user_id', '=', 'meta_ads_user_account.meta_ads_user_id')
+            ->join('meta_ads_accounts', 'meta_ads_accounts.id', '=', 'meta_ads_user_account.meta_ads_account_id')
             ->where('meta_ads_workspace_user.workspace_id', $workspace->id)
+            ->where('meta_ads_accounts.active_sync', true)
             ->pluck('meta_ads_user_account.meta_ads_account_id');
     }
 

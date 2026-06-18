@@ -10,6 +10,13 @@ Artisan::command('inspire', function () {
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
 Schedule::command('trigger-fetch-page-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
+
+// Fetch ERP data for inventory items with sales keywords. Jobs are queued with a
+// staggered delay (the command's --delay default) so the n8n webhook isn't hit all
+// at once. Runs three times a day: 9am, 12nn, 5pm.
+Schedule::command('trigger-fetch-erp-inventory')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('trigger-fetch-erp-inventory')->dailyAt('12:00')->withoutOverlapping();
+Schedule::command('trigger-fetch-erp-inventory')->dailyAt('17:00')->withoutOverlapping();
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
@@ -54,6 +61,9 @@ Schedule::command('meta-ads:evaluate-optimization-rules')->hourly()->withoutOver
 
 // Post the day's per-page ad budgets to Discord every morning (08:00 app tz).
 Schedule::command('metaads:report-page-budgets')->dailyAt('08:00');
+
+// Post the day's per-user (page owner) ad budgets to Discord every morning.
+Schedule::command('metaads:report-user-budgets')->dailyAt('08:00');
 
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();

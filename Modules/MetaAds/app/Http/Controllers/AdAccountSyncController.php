@@ -16,7 +16,7 @@ class AdAccountSyncController extends Controller
         abort_unless($request->user()->isMemberOf($workspace), 403);
         abort_unless($workspace->metaUsers()->whereKey($metaUser->id)->exists(), 404);
 
-        SyncMetaAdAccounts::dispatch($metaUser)->onQueue('meta-ads');
+        SyncMetaAdAccounts::dispatch($metaUser, cascade: true, insightsDays: 30)->onQueue('meta-ads');
 
         return back()->with('success', "Sync queued for {$metaUser->name}");
     }

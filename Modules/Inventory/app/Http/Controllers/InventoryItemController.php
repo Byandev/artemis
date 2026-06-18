@@ -10,7 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
-use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -23,7 +22,10 @@ class InventoryItemController extends Controller
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        $currentStocksSql = '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
+        $currentStocksSql = $workspace->inventory_sync
+            ? '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)'
+            : 'inventory_items.remaining_qty';
+
         $waitingStocksSql = '(SELECT SUM(count) FROM inventory_purchased_order_items WHERE inventory_item_id = inventory_items.id AND EXISTS (SELECT * FROM inventory_purchased_orders WHERE inventory_purchased_order_items.inventory_purchased_order_id = inventory_purchased_orders.id AND status = 6))';
         $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
         $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
@@ -34,14 +36,7 @@ class InventoryItemController extends Controller
             ->select('inventory_items.*')
             ->with(['product'])
             ->withSum('waitingForDeliveryItems as waiting_for_delivery_stocks', 'count')
-            ->addSelect([
-                'current_stocks' => InventoryTransaction::select('remaining_qty')
-                    ->whereColumn('inventory_item_id', 'inventory_items.id')
-                    ->orderByDesc('date')
-                    ->orderByDesc('id')
-                    ->limit(1),
-            ])
-
+            ->selectRaw("$currentStocksSql as current_stocks")
             ->selectRaw("$remainingAfterFulfillmentSql as remaining_after_fulfillment")
             ->selectRaw("$poNeededSql as po_needed")
             ->selectRaw("$daysItCanLastSql as days_it_can_last")
@@ -96,22 +91,25 @@ class InventoryItemController extends Controller
         $request->validate([
             'product_id' => 'required|exists:products,id',
             'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
-            'sales_keywords' => 'nullable|string',
+            'sales_keywords' => 'nullable|array',
+            'sales_keywords.*' => 'string|max:255',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
+            'remaining_qty' => 'nullable|integer',
         ]);
 
         InventoryItem::create([
             'workspace_id' => $workspace->id,
             'product_id' => $request->product_id,
             'sku' => $request->sku,
-            'sales_keywords' => $request->sales_keywords,
+            'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
             'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
+            'remaining_qty' => $request->remaining_qty,
         ]);
 
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
@@ -132,24 +130,48 @@ class InventoryItemController extends Controller
                     ->where('workspace_id', $workspace->id)
                     ->ignore($item->id),
             ],
-            'sales_keywords' => 'nullable|string',
+            'sales_keywords' => 'nullable|array',
+            'sales_keywords.*' => 'string|max:255',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
+            'remaining_qty' => 'nullable|integer',
         ]);
         $item->update([
             'product_id' => $request->product_id,
             'sku' => $request->sku,
-            'sales_keywords' => $request->sales_keywords,
+            'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
             'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
+            'remaining_qty' => $request->remaining_qty,
         ]);
 
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');
+    }
+
+    /**
+     * Split a comma-separated keyword string into a clean array:
+     * trim, drop blanks, de-duplicate.
+     *
+     * @param  mixed  $keywords
+     * @return string[]
+     */
+    private function normalizeKeywords($keywords): array
+    {
+        $list = is_array($keywords)
+            ? $keywords
+            : preg_split('/[,\n]+/', (string) $keywords);
+
+        return collect($list)
+            ->map(fn ($keyword) => trim((string) $keyword))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function destroy(Workspace $workspace, InventoryItem $item)

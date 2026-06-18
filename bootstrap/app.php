@@ -25,6 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Honor X-Forwarded-* headers so redirects/URL generation use the correct
+        // scheme + host when the app is served behind a proxy/tunnel (Expose, ngrok,
+        // Cloudflare Tunnel). Without this, sharing the site produces redirect loops.
+        $middleware->trustProxies(at: '*');
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
         $middleware->redirectGuestsTo(fn (Request $request) => route('login'));
 
@@ -41,6 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => CheckAdmin::class,
             'api.key' => AuthenticateApiKey::class,
         ]);
+
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthorizationException|HttpExceptionInterface $exception, Request $request) {

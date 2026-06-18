@@ -7,6 +7,7 @@ use Modules\MetaAds\Console\Commands\CaptureBudgetSnapshotsCommand;
 use Modules\MetaAds\Console\Commands\DiscoverSystemAccountsCommand;
 use Modules\MetaAds\Console\Commands\EvaluateOptimizationRulesCommand;
 use Modules\MetaAds\Console\Commands\ReportPageBudgetsToDiscordCommand;
+use Modules\MetaAds\Console\Commands\ReportUserBudgetsToDiscordCommand;
 use Modules\MetaAds\Console\Commands\SyncAdAccountsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdsCommand;
 use Modules\MetaAds\Console\Commands\SyncAdSetsCommand;
@@ -45,6 +46,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         DiscoverSystemAccountsCommand::class,
         EvaluateOptimizationRulesCommand::class,
         ReportPageBudgetsToDiscordCommand::class,
+        ReportUserBudgetsToDiscordCommand::class,
     ];
 
     /**
