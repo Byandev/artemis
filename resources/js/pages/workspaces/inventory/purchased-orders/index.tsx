@@ -116,6 +116,22 @@ export default function PurchasedOrderIndex({
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
 
+    // Re-fetch when the tab/window regains focus so PO status changes made
+    // elsewhere (e.g. PO Monitoring) show up without a manual refresh.
+    useEffect(() => {
+        const refresh = () => {
+            if (document.visibilityState === 'visible') {
+                router.reload({ only: ['orders', 'totals'] });
+            }
+        };
+        window.addEventListener('focus', refresh);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            window.removeEventListener('focus', refresh);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, []);
+
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [dateRange, setDateRange] = useState<string[]>(() => [
         query?.filter?.start_date ?? '',

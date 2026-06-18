@@ -7,6 +7,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
@@ -115,6 +116,52 @@ class PurchaseOrderMonitoringController extends Controller
         ]);
 
         return back()->with('success', 'Expected delivery date updated.');
+    }
+
+    public function updateStatus(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
+    {
+        $this->authorize('Edit Purchased Orders', $workspace);
+        abort_unless($purchasedOrder->workspace_id === $workspace->id, 404);
+
+        $validated = $request->validate([
+            'status' => ['required', 'integer', Rule::in(array_keys(PurchasedOrder::STATUSES))],
+        ]);
+
+        $purchasedOrder->update(['status' => $validated['status']]);
+
+        return back()->with('success', 'Status updated.');
+    }
+
+    public function updateDeliveryStatus(Request $request, Workspace $workspace, PurchasedOrderItem $purchasedOrderItem)
+    {
+        $this->authorize('Edit Purchased Orders', $workspace);
+        $this->ensureItemBelongsToWorkspace($purchasedOrderItem, $workspace);
+
+        $validated = $request->validate([
+            'delivery_status' => ['nullable', Rule::in(['ontime', 'delayed'])],
+        ]);
+
+        $purchasedOrderItem->update([
+            'delivery_status' => $validated['delivery_status'] ?? null,
+        ]);
+
+        return back()->with('success', 'Delivery status updated.');
+    }
+
+    public function updateRemarks(Request $request, Workspace $workspace, PurchasedOrderItem $purchasedOrderItem)
+    {
+        $this->authorize('Edit Purchased Orders', $workspace);
+        $this->ensureItemBelongsToWorkspace($purchasedOrderItem, $workspace);
+
+        $validated = $request->validate([
+            'remarks' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $purchasedOrderItem->update([
+            'remarks' => $validated['remarks'] ?? null,
+        ]);
+
+        return back()->with('success', 'Remarks updated.');
     }
 
     /** Purchase order items belonging to the given workspace. */

@@ -43,8 +43,8 @@ use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceCo
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
-use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
@@ -337,6 +337,9 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'updateDelivery'])->name('deliveries.update');
         Route::delete('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'destroyDelivery'])->name('deliveries.destroy');
         Route::put('/items/{purchasedOrderItem}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('items.expected-delivery');
+        Route::put('/orders/{purchasedOrder}/status', [PurchaseOrderMonitoringController::class, 'updateStatus'])->name('orders.status');
+        Route::put('/items/{purchasedOrderItem}/delivery-status', [PurchaseOrderMonitoringController::class, 'updateDeliveryStatus'])->name('items.delivery-status');
+        Route::put('/items/{purchasedOrderItem}/remarks', [PurchaseOrderMonitoringController::class, 'updateRemarks'])->name('items.remarks');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {

@@ -63,6 +63,7 @@ class TriggerFetchERPPurchaseOrders extends Command
                 'workspace_id' => $item->workspace_id,
                 'workspace_api_key' => $apiKey->reveal(),
                 'inventory_item_id' => $item->id,
+                'transaction_keywords' => $item->transaction_keywords,
                 'webhook_url' => $callbackUrl,
             ];
 

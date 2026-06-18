@@ -18,6 +18,8 @@ class PurchasedOrderItem extends Model
         'amount',
         'total_amount',
         'expected_delivery_date',
+        'delivery_status',
+        'remarks',
     ];
 
     protected $casts = [
@@ -152,9 +154,13 @@ class PurchasedOrderItem extends Model
         return 'partial';
     }
 
-    /** ontime | delayed | null (no expected date set). */
+    /** ontime | delayed | null (no expected date set). Manual override wins. */
     public function getDeliveryTimelinessAttribute(): ?string
     {
+        if (in_array($this->delivery_status, ['ontime', 'delayed'], true)) {
+            return $this->delivery_status;
+        }
+
         $expected = $this->expected_delivery_date;
 
         if (! $expected) {

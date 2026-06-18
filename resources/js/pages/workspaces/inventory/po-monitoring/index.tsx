@@ -13,8 +13,23 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import DatePicker from '@/components/ui/date-picker';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import Pagination from '@/components/ui/pagination';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -25,6 +40,7 @@ import {
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
@@ -34,6 +50,7 @@ import { debounce } from 'lodash';
 import {
     AlertTriangle,
     CalendarClock,
+    Check,
     ChevronDown,
     ChevronRight,
     Hourglass,
@@ -65,6 +82,7 @@ interface Delivery {
 }
 
 interface PurchasedOrderRef {
+    id: number;
     issue_date: string;
     cust_po_no: string | null;
     control_no: string | null;
@@ -80,6 +98,7 @@ interface MonitoringItem {
     balance: number;
     fulfillment_status: 'waiting' | 'partial' | 'delivered';
     delivery_timeliness: 'ontime' | 'delayed' | null;
+    remarks: string | null;
     purchased_order?: PurchasedOrderRef;
     inventory_item?: { sku: string; product?: { name: string } };
     deliveries: Delivery[];
@@ -114,20 +133,78 @@ interface Props {
     };
 }
 
-const FULFILLMENT: Record<string, { label: string; color: string }> = {
-    waiting: {
-        label: 'Waiting',
-        color: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
+interface PillOption {
+    value: string;
+    label: string;
+    dot: string;
+    pill: string;
+}
+
+const PO_STATUS_OPTIONS: PillOption[] = [
+    {
+        value: '1',
+        label: 'For Approval',
+        dot: 'bg-amber-400',
+        pill: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
     },
-    partial: {
-        label: 'Partial',
-        color: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-400',
+    {
+        value: '2',
+        label: 'Approved',
+        dot: 'bg-blue-500',
+        pill: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
     },
-    delivered: {
+    {
+        value: '3',
+        label: 'To Pay',
+        dot: 'bg-orange-400',
+        pill: 'bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400',
+    },
+    {
+        value: '4',
+        label: 'Paid',
+        dot: 'bg-teal-500',
+        pill: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400',
+    },
+    {
+        value: '5',
+        label: 'For Purchase',
+        dot: 'bg-purple-400',
+        pill: 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400',
+    },
+    {
+        value: '6',
+        label: 'Waiting For Delivery',
+        dot: 'bg-cyan-500',
+        pill: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-400',
+    },
+    {
+        value: '7',
         label: 'Delivered',
-        color: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
+        dot: 'bg-emerald-500',
+        pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
     },
-};
+    {
+        value: '8',
+        label: 'Cancelled',
+        dot: 'bg-gray-400',
+        pill: 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
+    },
+];
+
+const DELIVERY_STATUS_OPTIONS: PillOption[] = [
+    {
+        value: 'ontime',
+        label: 'On time',
+        dot: 'bg-emerald-500',
+        pill: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+    },
+    {
+        value: 'delayed',
+        label: 'Delayed',
+        dot: 'bg-red-500',
+        pill: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400',
+    },
+];
 
 const fmtDate = (d: string | null) => (d ? d.slice(0, 10) : '—');
 
@@ -251,6 +328,49 @@ export default function PoMonitoringIndex({
                 preserveState: true,
                 onSuccess: () => toast.success('Expected delivery updated'),
                 onError: () => toast.error('Could not update expected date'),
+            },
+        );
+    };
+
+    const setStatus = (item: MonitoringItem, status: number) => {
+        if (!item.purchased_order) return;
+        router.put(
+            `${baseUrl}/orders/${item.purchased_order.id}/status`,
+            { status },
+            {
+                preserveScroll: true,
+                preserveState: false,
+                onSuccess: () => toast.success('PO status updated'),
+                onError: () => toast.error('Could not update PO status'),
+            },
+        );
+    };
+
+    const setDeliveryStatus = (
+        item: MonitoringItem,
+        status: 'ontime' | 'delayed',
+    ) => {
+        router.put(
+            `${baseUrl}/items/${item.id}/delivery-status`,
+            { delivery_status: status },
+            {
+                preserveScroll: true,
+                preserveState: false,
+                onSuccess: () => toast.success('Delivery status updated'),
+                onError: () => toast.error('Could not update delivery status'),
+            },
+        );
+    };
+
+    const setRemarks = (item: MonitoringItem, remarks: string) => {
+        router.put(
+            `${baseUrl}/items/${item.id}/remarks`,
+            { remarks },
+            {
+                preserveScroll: true,
+                preserveState: false,
+                onSuccess: () => toast.success('Remarks updated'),
+                onError: () => toast.error('Could not update remarks'),
             },
         );
     };
@@ -451,6 +571,7 @@ export default function PoMonitoringIndex({
                                         'Status',
                                         'Expected',
                                         'Delivery',
+                                        'Remarks',
                                     ].map((h) => (
                                         <th
                                             key={h}
@@ -470,7 +591,7 @@ export default function PoMonitoringIndex({
                                 {rows.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={canManage ? 11 : 10}
+                                            colSpan={canManage ? 12 : 11}
                                             className="py-16 text-center"
                                         >
                                             <div className="flex flex-col items-center gap-3">
@@ -487,10 +608,6 @@ export default function PoMonitoringIndex({
                                 ) : (
                                     rows.map((item) => {
                                         const isOpen = expanded.has(item.id);
-                                        const f =
-                                            FULFILLMENT[
-                                                item.fulfillment_status
-                                            ];
                                         const itemName =
                                             item.inventory_item?.product
                                                 ?.name ??
@@ -501,7 +618,6 @@ export default function PoMonitoringIndex({
                                                 key={item.id}
                                                 item={item}
                                                 isOpen={isOpen}
-                                                fulfillment={f}
                                                 itemName={itemName}
                                                 canManage={canManage}
                                                 onToggle={() =>
@@ -521,6 +637,18 @@ export default function PoMonitoringIndex({
                                                 }
                                                 onSetExpected={(date) =>
                                                     setExpectedDate(item, date)
+                                                }
+                                                onSetStatus={(status) =>
+                                                    setStatus(item, status)
+                                                }
+                                                onSetDeliveryStatus={(status) =>
+                                                    setDeliveryStatus(
+                                                        item,
+                                                        status,
+                                                    )
+                                                }
+                                                onSetRemarks={(remarks) =>
+                                                    setRemarks(item, remarks)
                                                 }
                                             />
                                         );
@@ -636,7 +764,6 @@ export default function PoMonitoringIndex({
 interface ItemRowProps {
     item: MonitoringItem;
     isOpen: boolean;
-    fulfillment: { label: string; color: string };
     itemName: string;
     canManage: boolean;
     onToggle: () => void;
@@ -644,12 +771,14 @@ interface ItemRowProps {
     onEditDelivery: (d: DeliveryTarget) => void;
     onDeleteDelivery: (d: Delivery) => void;
     onSetExpected: (date: string | null) => void;
+    onSetStatus: (status: number) => void;
+    onSetDeliveryStatus: (status: 'ontime' | 'delayed') => void;
+    onSetRemarks: (remarks: string) => void;
 }
 
 function ItemRow({
     item,
     isOpen,
-    fulfillment,
     itemName,
     canManage,
     onToggle,
@@ -657,8 +786,11 @@ function ItemRow({
     onEditDelivery,
     onDeleteDelivery,
     onSetExpected,
+    onSetStatus,
+    onSetDeliveryStatus,
+    onSetRemarks,
 }: ItemRowProps) {
-    const colSpan = canManage ? 11 : 10;
+    const colSpan = canManage ? 12 : 11;
     const po = item.purchased_order;
     const poNumber = po?.cust_po_no || po?.control_no || po?.delivery_no || '—';
 
@@ -728,11 +860,12 @@ function ItemRow({
                     </span>
                 </td>
                 <td className="px-4 py-3 align-middle">
-                    <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${fulfillment.color}`}
-                    >
-                        {fulfillment.label}
-                    </span>
+                    <StatusPill
+                        value={po ? String(po.status) : null}
+                        options={PO_STATUS_OPTIONS}
+                        disabled={!canManage || !po}
+                        onChange={(v) => onSetStatus(Number(v))}
+                    />
                 </td>
                 <td className="px-4 py-3 align-middle">
                     {canManage ? (
@@ -752,36 +885,22 @@ function ItemRow({
                     )}
                 </td>
                 <td className="px-4 py-3 align-middle">
-                    {(() => {
-                        const t = item.delivery_timeliness;
-                        const badge =
-                            t === 'ontime'
-                                ? {
-                                      label: 'On time',
-                                      color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
-                                  }
-                                : t === 'delayed'
-                                  ? {
-                                        label: 'Delayed',
-                                        color: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
-                                    }
-                                  : {
-                                        label: 'No due date',
-                                        color: 'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
-                                    };
-                        return (
-                            <span
-                                title={
-                                    t
-                                        ? undefined
-                                        : 'Set an expected delivery date to track timeliness'
-                                }
-                                className={`inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${badge.color}`}
-                            >
-                                {badge.label}
-                            </span>
-                        );
-                    })()}
+                    <StatusPill
+                        value={item.delivery_timeliness}
+                        options={DELIVERY_STATUS_OPTIONS}
+                        placeholder="No due date"
+                        disabled={!canManage}
+                        onChange={(v) =>
+                            onSetDeliveryStatus(v as 'ontime' | 'delayed')
+                        }
+                    />
+                </td>
+                <td className="px-4 py-3 align-middle">
+                    <RemarksCell
+                        value={item.remarks}
+                        disabled={!canManage}
+                        onSave={onSetRemarks}
+                    />
                 </td>
                 {canManage && (
                     <td className="px-4 py-3 text-center align-middle">
@@ -947,5 +1066,174 @@ function ExpectedDateCell({ itemId, value, onChange }: ExpectedDateCellProps) {
                 }}
             />
         </div>
+    );
+}
+
+interface StatusPillProps {
+    value: string | null;
+    options: PillOption[];
+    placeholder?: string;
+    disabled?: boolean;
+    onChange: (value: string) => void;
+}
+
+function StatusPill({
+    value,
+    options,
+    placeholder = 'Not set',
+    disabled = false,
+    onChange,
+}: StatusPillProps) {
+    const current = options.find((o) => o.value === value);
+    const pill =
+        current?.pill ??
+        'bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400';
+    const dot = current?.dot ?? 'bg-gray-400';
+    const label = current?.label ?? placeholder;
+
+    if (disabled) {
+        return (
+            <span
+                className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
+                    pill,
+                )}
+            >
+                <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`}
+                />
+                <span className="max-w-[140px] truncate">{label}</span>
+            </span>
+        );
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger
+                className={cn(
+                    'group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all outline-none hover:opacity-80',
+                    pill,
+                )}
+            >
+                <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`}
+                />
+                <span className="max-w-[140px] truncate">{label}</span>
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-52 overflow-hidden p-1">
+                <p className="px-2 pt-1 pb-1.5 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                    Change status
+                </p>
+                <div className="max-h-72 overflow-y-auto">
+                    {options.map((o) => {
+                        const isActive = o.value === value;
+                        return (
+                            <DropdownMenuItem
+                                key={o.value}
+                                onClick={() => {
+                                    if (!isActive) onChange(o.value);
+                                }}
+                                className={cn(
+                                    'flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px]',
+                                    isActive
+                                        ? 'bg-gray-50 dark:bg-zinc-800'
+                                        : 'text-gray-600 dark:text-gray-400',
+                                )}
+                            >
+                                <span
+                                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${o.dot}`}
+                                />
+                                <span className="flex-1">{o.label}</span>
+                                {isActive && (
+                                    <Check className="h-3 w-3 text-emerald-500" />
+                                )}
+                            </DropdownMenuItem>
+                        );
+                    })}
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+interface RemarksCellProps {
+    value: string | null;
+    disabled?: boolean;
+    onSave: (remarks: string) => void;
+}
+
+function RemarksCell({ value, disabled = false, onSave }: RemarksCellProps) {
+    const [open, setOpen] = useState(false);
+    const [draft, setDraft] = useState(value ?? '');
+
+    useEffect(() => {
+        setDraft(value ?? '');
+    }, [value]);
+
+    const save = () => {
+        if ((draft ?? '').trim() !== (value ?? '')) onSave(draft.trim());
+        setOpen(false);
+    };
+
+    if (disabled) {
+        return (
+            <span className="block max-w-[200px] truncate font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                {value || '—'}
+            </span>
+        );
+    }
+
+    return (
+        <>
+            <button
+                onClick={() => setOpen(true)}
+                title={value || 'Add remarks'}
+                className={cn(
+                    'block max-w-[200px] truncate rounded-md px-1.5 py-1 text-left font-mono text-[11px] transition-colors hover:bg-stone-100 dark:hover:bg-zinc-800',
+                    value
+                        ? 'text-gray-600 dark:text-gray-400'
+                        : 'text-gray-400 italic dark:text-gray-600',
+                )}
+            >
+                {value || 'Add remarks'}
+            </button>
+
+            <Dialog
+                open={open}
+                onOpenChange={(o) => {
+                    if (!o) setDraft(value ?? '');
+                    setOpen(o);
+                }}
+            >
+                <DialogContent className="max-w-[440px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-[15px] font-semibold">
+                            Remarks
+                        </DialogTitle>
+                    </DialogHeader>
+                    <Textarea
+                        autoFocus
+                        rows={5}
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        placeholder="Add remarks…"
+                        className="text-[13px]"
+                    />
+                    <DialogFooter className="mt-2 gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setDraft(value ?? '');
+                                setOpen(false);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={save}>Save</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

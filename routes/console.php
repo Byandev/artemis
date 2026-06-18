@@ -10,6 +10,11 @@ Artisan::command('inspire', function () {
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
 Schedule::command('trigger-fetch-page-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
+
+// Fetch ERP purchase orders for inventory items. Runs three times a day: 9am, 12nn, 5pm.
+Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('12:00')->withoutOverlapping();
+Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('17:00')->withoutOverlapping();
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
