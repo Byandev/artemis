@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Workspaces\Product;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -13,20 +14,17 @@ class AnalyticsController extends Controller
 {
     public function index(Workspace $workspace, Request $request)
     {
-        $scalingProductCount = Product::where('workspace_id', $workspace->id)
-            ->where('status', 'Scaling')
-            ->count();
+        $user = $request->user();
+        $scoped = fn () => Product::where('workspace_id', $workspace->id)
+            ->when(
+                TeamVisibility::shouldScope($user, $workspace),
+                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
+            );
 
-        $testingProductCount = Product::where('workspace_id', $workspace->id)
-            ->where('status', 'Testing')
-            ->count();
-
-        $inactiveProductCount = Product::where('workspace_id', $workspace->id)
-            ->where('status', 'Inactive')
-            ->count();
-
-        $totalProductCount = Product::where('workspace_id', $workspace->id)
-            ->count();
+        $scalingProductCount = $scoped()->where('status', 'Scaling')->count();
+        $testingProductCount = $scoped()->where('status', 'Testing')->count();
+        $inactiveProductCount = $scoped()->where('status', 'Inactive')->count();
+        $totalProductCount = $scoped()->count();
 
         return Inertia::render('workspaces/products/analytics', [
             'workspace' => $workspace,
@@ -44,7 +42,12 @@ class AnalyticsController extends Controller
         $allowedMetrics = ['advertising_sales', 'ad_spent', 'sales', 'roas', 'rts'];
         $requestedMetrics = array_filter(explode(',', $request->input('metric', '')));
 
-        $query = Product::ofWorkspace($workspace)->select('products.*');
+        $query = Product::ofWorkspace($workspace)
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+            )
+            ->select('products.*');
 
         // Apply each requested metric scope
         foreach ($requestedMetrics as $metric) {
