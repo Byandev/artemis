@@ -107,8 +107,17 @@ class OptimizationRuleController extends Controller
         $accountIds = array_values(array_filter((array) $request->input('ad_account_id', []), fn ($v) => $v !== '' && $v !== null));
         $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
 
+        $user = $request->user();
+
         $pending = OptimizationProposal::where('workspace_id', $workspace->id)
-            ->where('status', 'pending');
+            ->where('status', 'pending')
+            ->when(
+                ! TeamVisibility::isUnrestricted($user, $workspace),
+                fn ($q) => $q->whereIn(
+                    'meta_ads_account_id',
+                    AdAccount::forWorkspace($workspace)->visibleTo($user, $workspace)->select('id'),
+                ),
+            );
 
         $proposals = (clone $pending)
             ->when($accountIds, fn ($q) => $q->whereIn('meta_ads_account_id', $accountIds))
@@ -167,7 +176,13 @@ class OptimizationRuleController extends Controller
         $ruleIds = array_values(array_filter((array) $request->input('rule_id', []), fn ($v) => $v !== '' && $v !== null));
         $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
 
+        $user = $request->user();
+
         $logs = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->when(
+                ! TeamVisibility::isUnrestricted($user, $workspace),
+                fn ($q) => $q->whereHas('rule.adAccounts', fn ($a) => $a->visibleTo($user, $workspace)),
+            )
             ->when($ruleIds, fn ($q) => $q->whereIn('meta_ads_optimization_rule_id', $ruleIds))
             ->when($actions, fn ($q) => $q->whereIn('action_taken', $actions))
             ->with('rule:id,name')

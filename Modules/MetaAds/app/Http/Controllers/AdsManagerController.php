@@ -71,7 +71,7 @@ class AdsManagerController extends Controller
 
         [$since, $until] = $this->resolveDateRange($request);
 
-        $allAccountIds = $this->accountIdsForWorkspace($workspace)->map(fn ($id) => (string) $id);
+        $allAccountIds = $this->accountIdsForWorkspace($workspace, $request->user())->map(fn ($id) => (string) $id);
         $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
         $metricFilters = $this->parseMetricFilters($request);
 
@@ -128,7 +128,7 @@ class AdsManagerController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
-        $accountIds = $this->accountIdsForWorkspace($workspace);
+        $accountIds = $this->accountIdsForWorkspace($workspace, $request->user());
         $adModel = Ad::whereIn('meta_ads_account_id', $accountIds)->findOrFail($ad);
         $account = AdAccount::findOrFail($adModel->meta_ads_account_id);
 
@@ -145,7 +145,7 @@ class AdsManagerController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
-        $accountIds = $this->accountIdsForWorkspace($workspace);
+        $accountIds = $this->accountIdsForWorkspace($workspace, $request->user());
 
         $row = Ad::query()
             ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds)

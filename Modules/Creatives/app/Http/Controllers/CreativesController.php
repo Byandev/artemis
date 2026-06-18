@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,10 @@ class CreativesController extends Controller
 
         $creatives = QueryBuilder::for(
             Creative::where('workspace_id', $workspace->id)
+                ->when(
+                    ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                    fn ($q) => $q->whereHas('product.pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+                )
                 ->with([
                     'creator:id,name',
                     'approvedBy:id,name',
