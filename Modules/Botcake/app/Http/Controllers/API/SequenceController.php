@@ -3,6 +3,7 @@
 namespace Modules\Botcake\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Support\TeamVisibility;
 use Illuminate\Http\Request;
 use Modules\Botcake\Http\Sorts\Sequence\SuccessRateSort;
 use Modules\Botcake\Http\Sorts\Sequence\TotalPhoneNumberSort;
@@ -15,7 +16,12 @@ class SequenceController extends Controller
 {
     public function index(Request $request)
     {
-        return QueryBuilder::for(Sequence::class)
+        return QueryBuilder::for(
+            Sequence::query()->when(
+                TeamVisibility::shouldScope($request->user(), $request->workspace),
+                fn ($q) => $q->whereHas('page', fn ($p) => $p->visibleTo($request->user(), $request->workspace)),
+            )
+        )
             ->allowedIncludes('page')
             ->whereHas('page', function ($query) use ($request) {
                 $query->where('workspace_id', $request->workspace->id);

@@ -226,6 +226,7 @@ class WorkspaceController extends Controller
         ];
 
         $salesData = Order::where('workspace_id', $workspace->id)
+            ->visibleTo($request->user(), $workspace)
             ->whereNotNull('confirmed_at')
             ->applyEntityFilters($filters)
             ->applyDateFilter($startDate, $endDate, 'confirmed_at')
@@ -236,6 +237,7 @@ class WorkspaceController extends Controller
             ->pluck('total_sales', 'date');
 
         $rtsData = Order::where('workspace_id', $workspace->id)
+            ->visibleTo($request->user(), $workspace)
             ->whereNotNull('confirmed_at')
             ->applyEntityFilters($filters)
             ->applyDateFilter($startDate, $endDate, 'confirmed_at')
