@@ -14,6 +14,7 @@ use App\Queries\RtsOrderFrequencyQuery;
 use App\Queries\RtsOrderItemQuery;
 use App\Queries\RtsPriceQuery;
 use App\Queries\RtsRiderQuery;
+use App\Support\TeamVisibility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -30,9 +31,21 @@ class AnalyticController extends Controller
 
         return Inertia::render('workspaces/rts/analytics', [
             'workspace' => $workspace->loadMissing([
-                'shops' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
-                'pages' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
-                'teams' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name'),
+                'shops' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name')
+                    ->when(
+                        TeamVisibility::shouldScope(request()->user(), $workspace),
+                        fn ($s) => $s->whereHas('pages', fn ($p) => $p->visibleTo(request()->user(), $workspace)),
+                    ),
+                'pages' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name')
+                    ->when(
+                        TeamVisibility::shouldScope(request()->user(), $workspace),
+                        fn ($p) => $p->visibleTo(request()->user(), $workspace),
+                    ),
+                'teams' => fn ($q) => $q->select('id', 'name', 'workspace_id')->orderBy('name')
+                    ->when(
+                        ! TeamVisibility::isUnrestricted(request()->user(), $workspace),
+                        fn ($t) => $t->whereHas('members', fn ($m) => $m->where('users.id', request()->user()->id)),
+                    ),
                 'pageOwners:id,name',
             ]),
         ]);

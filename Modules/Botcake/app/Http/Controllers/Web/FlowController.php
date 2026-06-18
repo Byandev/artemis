@@ -97,14 +97,26 @@ class FlowController extends Controller
 
         return Inertia::render('workspaces/botcake/flows', [
             'workspace' => $workspace->loadMissing([
-                'shops' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'shops' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            TeamVisibility::shouldScope($request->user(), $workspace),
+                            fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+                        );
                 },
-                'pages' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'pages' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            TeamVisibility::shouldScope($request->user(), $workspace),
+                            fn ($q) => $q->visibleTo($request->user(), $workspace),
+                        );
                 },
-                'teams' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'teams' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                            fn ($q) => $q->whereHas('members', fn ($m) => $m->where('users.id', $request->user()->id)),
+                        );
                 },
                 'pageOwners:id,name',
             ]),
