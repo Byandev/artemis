@@ -143,6 +143,18 @@ class WorkspaceMemberController extends Controller
 
         $workspace->updateMemberRole($user, $validated['role_id']);
 
+        // Guardrail: a scoped role (one without "View All Workspace Data") sees only
+        // its team's data, so a member on no team would see nothing. Warn, don't block.
+        $roleHasBypass = Role::where('id', $validated['role_id'])
+            ->whereHas('permissions', fn ($q) => $q->where('name', Permission::ViewAllWorkspaceData->value))
+            ->exists();
+
+        $onTeam = $user->teams()->where('teams.workspace_id', $workspace->id)->exists();
+
+        if (! $roleHasBypass && ! $onTeam) {
+            return back()->with('warning', 'Member role updated. This role only sees its team\'s data, but this member is not on any team yet — they will see no pages, orders or metrics until you add them to a team.');
+        }
+
         return back()->with('success', 'Member role updated successfully.');
     }
 

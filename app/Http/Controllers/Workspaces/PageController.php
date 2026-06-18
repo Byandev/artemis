@@ -64,6 +64,7 @@ class PageController extends Controller
             });
 
         $baseQuery = Page::where('pages.workspace_id', $workspace->id)
+            ->visibleTo($request->user(), $workspace)
             ->select('pages.*')
             ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count');
 
@@ -81,7 +82,7 @@ class PageController extends Controller
                 'parcel_journey_enabled',
                 AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
-            ->with(['shop', 'owner', 'latestBudget'])
+            ->with(['shop', 'owner', 'latestBudget', 'teams:id,name'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
@@ -107,7 +108,7 @@ class PageController extends Controller
 
         $filename = "pages-{$workspace->slug}-".now()->format('Y-m-d-His').'.xlsx';
 
-        return Excel::download(new PageExport($workspace), $filename);
+        return Excel::download(new PageExport($workspace, $request->user()), $filename);
     }
 
     public function import(Request $request, Workspace $workspace)

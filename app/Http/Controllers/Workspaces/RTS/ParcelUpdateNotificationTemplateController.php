@@ -121,6 +121,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
             ->groupBy('po.page_id');
 
         $pageQuery = Page::where('pages.workspace_id', $workspace->id)
+            ->visibleTo(request()->user(), $workspace)
             ->leftJoinSub($logsAgg, 'logs_agg', 'logs_agg.page_id', '=', 'pages.id')
             ->leftJoinSub($notifAgg, 'notif_agg', 'notif_agg.page_id', '=', 'pages.id')
             ->selectRaw('

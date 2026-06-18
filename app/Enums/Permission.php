@@ -136,6 +136,9 @@ enum Permission: string
     case ViewAdAccounts = 'View Ad Accounts';
     case ViewOptimizationLogs = 'View Optimization Logs';
 
+    // Data Access
+    case ViewAllWorkspaceData = 'View All Workspace Data';
+
     public function category(): string
     {
         return match ($this) {
@@ -250,6 +253,8 @@ enum Permission: string
             self::ManageOptimizationRules,
             self::ApproveOptimizationRules,
             self::ViewOptimizationLogs => 'Meta Ads',
+
+            self::ViewAllWorkspaceData => 'Data Access',
         };
     }
 }

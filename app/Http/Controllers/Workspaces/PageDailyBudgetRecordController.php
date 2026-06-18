@@ -21,7 +21,10 @@ class PageDailyBudgetRecordController extends Controller
     {
         $this->authorize(Permission::ViewPageDailyBudgetRecords->value, $workspace);
 
-        $records = QueryBuilder::for(PageDailyBudgetRecord::where('workspace_id', $workspace->id))
+        $records = QueryBuilder::for(
+            PageDailyBudgetRecord::where('workspace_id', $workspace->id)
+                ->whereHas('page', fn ($q) => $q->visibleTo($request->user(), $workspace))
+        )
             ->with('page')
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -43,6 +46,7 @@ class PageDailyBudgetRecordController extends Controller
             ->withQueryString();
 
         $pages = Page::ofWorkspace($workspace)
+            ->visibleTo($request->user(), $workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
