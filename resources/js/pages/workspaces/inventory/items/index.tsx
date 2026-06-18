@@ -37,6 +37,8 @@ interface Item {
     three_days_average: number | null;
     remaining_after_fulfillment: number | null;
     days_it_can_last: number | null;
+    po_needed: number | null;
+    current_stocks: number | null;
 }
 
 interface Props {
@@ -199,7 +201,7 @@ export default function ItemIndex({
             cell: ({ row }) => (
                 <div className="text-center">
                     <MetricCell
-                        value={row.original.remaining_qty}
+                        value={row.original.current_stocks}
                         color="text-violet-600 dark:text-violet-400"
                     />
                 </div>
@@ -281,6 +283,29 @@ export default function ItemIndex({
                     />
                 </div>
             ),
+        },
+        {
+            accessorKey: 'po_needed',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="PO Needed"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => {
+                const v = row.original.po_needed;
+                const color =
+                    v != null && v > 0
+                        ? 'text-amber-500 dark:text-amber-400'
+                        : 'text-gray-400 dark:text-gray-500';
+                return (
+                    <div className="text-center">
+                        <MetricCell value={v} color={color} />
+                    </div>
+                );
+            },
         },
         ...(canUseItemActions
             ? [
