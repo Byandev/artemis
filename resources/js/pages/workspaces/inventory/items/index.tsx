@@ -35,6 +35,8 @@ interface Item {
     unfulfilled: number | null;
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
+    remaining_after_fulfillment: number | null;
+    days_it_can_last: number | null;
 }
 
 interface Props {
@@ -185,6 +187,25 @@ export default function ItemIndex({
             ),
         },
         {
+            accessorKey: 'remaining_after_fulfillment',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Remaining After Fulfillment"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.remaining_after_fulfillment}
+                        color="text-amber-600 dark:text-amber-400"
+                    />
+                </div>
+            ),
+        },
+        {
             accessorKey: 'remaining_qty',
             enableSorting: true,
             header: ({ column }) => (
@@ -237,6 +258,26 @@ export default function ItemIndex({
                     <MetricCell
                         value={row.original.three_days_average}
                         decimals={1}
+                    />
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'days_it_can_last',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Days It Can Last"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.days_it_can_last}
+                        decimals={1}
+                        color="text-emerald-600 dark:text-emerald-400"
                     />
                 </div>
             ),
