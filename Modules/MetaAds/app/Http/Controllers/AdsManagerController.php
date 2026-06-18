@@ -36,6 +36,7 @@ class AdsManagerController extends Controller
         $selectedAccountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
 
         $accounts = AdAccount::forWorkspace($workspace)
+            ->where('meta_ads_accounts.active_sync', true)
             ->select('meta_ads_accounts.id', 'meta_ads_accounts.name')
             ->orderBy('meta_ads_accounts.name')
             ->get()
@@ -628,7 +629,9 @@ class AdsManagerController extends Controller
     {
         return DB::table('meta_ads_user_account')
             ->join('meta_ads_workspace_user', 'meta_ads_workspace_user.meta_ads_user_id', '=', 'meta_ads_user_account.meta_ads_user_id')
+            ->join('meta_ads_accounts', 'meta_ads_accounts.id', '=', 'meta_ads_user_account.meta_ads_account_id')
             ->where('meta_ads_workspace_user.workspace_id', $workspace->id)
+            ->where('meta_ads_accounts.active_sync', true)
             ->pluck('meta_ads_user_account.meta_ads_account_id');
     }
 
