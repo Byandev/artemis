@@ -33,12 +33,12 @@ interface Item {
     product?: { id: number; name: string };
     remaining_qty: number | null;
     unfulfilled: number | null;
-    current_stocks: number | null;
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
     remaining_after_fulfillment: number | null;
     days_it_can_last: number | null;
     po_needed: number | null;
+    current_stocks: number | null;
 }
 
 interface Props {
@@ -194,25 +194,6 @@ export default function ItemIndex({
             header: ({ column }) => (
                 <SortableHeader
                     column={column}
-                    title="Current Stocks"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => (
-                <div className="text-center">
-                    <MetricCell
-                        value={row.original.current_stocks}
-                        color="text-emerald-600 dark:text-emerald-400"
-                    />
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'remaining_qty',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
                     title="Remaining Qty"
                     className="justify-center"
                 />
@@ -220,8 +201,27 @@ export default function ItemIndex({
             cell: ({ row }) => (
                 <div className="text-center">
                     <MetricCell
-                        value={row.original.remaining_qty}
+                        value={row.original.current_stocks}
                         color="text-violet-600 dark:text-violet-400"
+                    />
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'remaining_after_fulfillment',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Remaining After Fulfillment"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.remaining_after_fulfillment}
+                        color="text-amber-600 dark:text-amber-400"
                     />
                 </div>
             ),
@@ -265,29 +265,6 @@ export default function ItemIndex({
             ),
         },
         {
-            accessorKey: 'remaining_after_fulfillment',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="Remaining After Fulfillment"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => {
-                const v = row.original.remaining_after_fulfillment;
-                const color =
-                    v != null && v < 0
-                        ? 'text-red-500 dark:text-red-400'
-                        : 'text-gray-700 dark:text-gray-300';
-                return (
-                    <div className="text-center">
-                        <MetricCell value={v} color={color} />
-                    </div>
-                );
-            },
-        },
-        {
             accessorKey: 'days_it_can_last',
             enableSorting: true,
             header: ({ column }) => (
@@ -297,26 +274,15 @@ export default function ItemIndex({
                     className="justify-center"
                 />
             ),
-            cell: ({ row }) => {
-                const v = row.original.days_it_can_last;
-                const color =
-                    v == null
-                        ? ''
-                        : v < 3
-                          ? 'text-red-500 dark:text-red-400'
-                          : v < 7
-                            ? 'text-amber-500 dark:text-amber-400'
-                            : 'text-emerald-600 dark:text-emerald-400';
-                return (
-                    <div className="text-center">
-                        <span
-                            className={`font-mono text-[12px] font-medium ${color}`}
-                        >
-                            {v == null ? '—' : `${num(v, 1)} days`}
-                        </span>
-                    </div>
-                );
-            },
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.days_it_can_last}
+                        decimals={1}
+                        color="text-emerald-600 dark:text-emerald-400"
+                    />
+                </div>
+            ),
         },
         {
             accessorKey: 'po_needed',
