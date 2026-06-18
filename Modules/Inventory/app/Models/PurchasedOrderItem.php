@@ -75,11 +75,12 @@ class PurchasedOrderItem extends Model
             ->where('count', '<=', $this->deliveredQtySubquery());
     }
 
-    /** Has an expected date and is behind it (outstanding past due, or last drop landed late). */
+    /** Has an expected date, at least one delivery, and is behind it (outstanding past due, or last drop landed late). */
     public function scopeDelayed(Builder $query): Builder
     {
         return $query
             ->whereNotNull('expected_delivery_date')
+            ->whereHas('deliveries')
             ->where(function (Builder $outer) {
                 $outer
                     ->where(function (Builder $outstanding) {
@@ -95,11 +96,12 @@ class PurchasedOrderItem extends Model
             });
     }
 
-    /** Has an expected date and is not delayed. */
+    /** Has an expected date, at least one delivery, and is not delayed. */
     public function scopeOnSchedule(Builder $query): Builder
     {
         return $query
             ->whereNotNull('expected_delivery_date')
+            ->whereHas('deliveries')
             ->whereNot(fn (Builder $q) => $q->delayed());
     }
 
@@ -154,9 +156,14 @@ class PurchasedOrderItem extends Model
         return 'partial';
     }
 
-    /** ontime | delayed | null (no expected date set). Manual override wins. */
+    /** ontime | delayed | null. Null until something is delivered; manual override wins thereafter. */
     public function getDeliveryTimelinessAttribute(): ?string
     {
+        // Nothing delivered yet — timeliness is undefined until the first delivery lands.
+        if ($this->fulfillment_status === 'waiting') {
+            return null;
+        }
+
         if (in_array($this->delivery_status, ['ontime', 'delayed'], true)) {
             return $this->delivery_status;
         }

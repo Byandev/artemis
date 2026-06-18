@@ -191,6 +191,9 @@ const PO_STATUS_OPTIONS: PillOption[] = [
     },
 ];
 
+/** PO Status value for "Delivered" — delivery timeliness is only editable at this stage. */
+const PO_STATUS_DELIVERED = 7;
+
 const DELIVERY_STATUS_OPTIONS: PillOption[] = [
     {
         value: 'ontime',
@@ -885,15 +888,21 @@ function ItemRow({
                     )}
                 </td>
                 <td className="px-4 py-3 align-middle">
-                    <StatusPill
-                        value={item.delivery_timeliness}
-                        options={DELIVERY_STATUS_OPTIONS}
-                        placeholder="No due date"
-                        disabled={!canManage}
-                        onChange={(v) =>
-                            onSetDeliveryStatus(v as 'ontime' | 'delayed')
-                        }
-                    />
+                    {po?.status === PO_STATUS_DELIVERED ? (
+                        <StatusPill
+                            value={item.delivery_timeliness}
+                            options={DELIVERY_STATUS_OPTIONS}
+                            placeholder="Set status"
+                            disabled={!canManage}
+                            onChange={(v) =>
+                                onSetDeliveryStatus(v as 'ontime' | 'delayed')
+                            }
+                        />
+                    ) : (
+                        <span className="font-mono text-[11px] text-gray-400 dark:text-gray-600">
+                            —
+                        </span>
+                    )}
                 </td>
                 <td className="px-4 py-3 align-middle">
                     <RemarksCell
