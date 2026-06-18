@@ -40,4 +40,8 @@ return [
         'inventory_webhook_url' => env('N8N_INVENTORY_WEBHOOK_URL'),
     ],
 
+    'discord' => [
+        'webhook_url' => env('DISCORD_WEBHOOK_URL'),
+    ],
+
 ];

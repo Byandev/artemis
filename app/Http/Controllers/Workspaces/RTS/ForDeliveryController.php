@@ -177,8 +177,12 @@ class ForDeliveryController extends Controller
 
     public function public(Request $request, Workspace $workspace)
     {
+        // Super admins can view any RMO page and skip the public-pages password gate.
+        $user = $request->user();
+        $isSuperAdmin = $user && $user->isSuperAdmin();
+
         // Gate behind the workspace's public-pages password if one is set.
-        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
+        if (! $isSuperAdmin && ! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
             return Inertia::render('workspaces/rts/public-pages/rmo-management', [
                 'workspace' => $workspace->only('id', 'name', 'slug'),
                 'locked' => true,

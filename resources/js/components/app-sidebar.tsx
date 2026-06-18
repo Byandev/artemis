@@ -216,6 +216,12 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
+                              title: 'Ad Spent Tracker',
+                              href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
+                              icon: Wallet,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
                               title: 'Optimization Rules',
                               href: `/workspaces/${slug}/integrations/meta/optimization-rules`,
                               icon: SlidersHorizontal,

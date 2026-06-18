@@ -16,6 +16,9 @@ class User extends Model
     protected $guarded = [];
 
     protected $casts = [
+        // Facebook user IDs are bigints that exceed JS Number.MAX_SAFE_INTEGER.
+        // Cast to string so JSON keeps them exact for the frontend (filters/keys).
+        'id' => 'string',
         'access_token' => 'encrypted',
         'token_expires_at' => 'datetime',
         'last_synced_at' => 'datetime',
