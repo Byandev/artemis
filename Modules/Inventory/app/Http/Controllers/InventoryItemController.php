@@ -10,7 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Inventory\Models\InventoryItem;
-use Modules\Inventory\Models\InventoryTransaction;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -23,7 +22,10 @@ class InventoryItemController extends Controller
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        $currentStocksSql = '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
+        $currentStocksSql = $workspace->inventory_sync
+            ? '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)'
+            : 'inventory_items.remaining_qty';
+
         $waitingStocksSql = '(SELECT SUM(count) FROM inventory_purchased_order_items WHERE inventory_item_id = inventory_items.id AND EXISTS (SELECT * FROM inventory_purchased_orders WHERE inventory_purchased_order_items.inventory_purchased_order_id = inventory_purchased_orders.id AND status = 6))';
         $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
         $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
@@ -34,14 +36,7 @@ class InventoryItemController extends Controller
             ->select('inventory_items.*')
             ->with(['product'])
             ->withSum('waitingForDeliveryItems as waiting_for_delivery_stocks', 'count')
-            ->addSelect([
-                'current_stocks' => InventoryTransaction::select('remaining_qty')
-                    ->whereColumn('inventory_item_id', 'inventory_items.id')
-                    ->orderByDesc('date')
-                    ->orderByDesc('id')
-                    ->limit(1),
-            ])
-
+            ->selectRaw("$currentStocksSql as current_stocks")
             ->selectRaw("$remainingAfterFulfillmentSql as remaining_after_fulfillment")
             ->selectRaw("$poNeededSql as po_needed")
             ->selectRaw("$daysItCanLastSql as days_it_can_last")
