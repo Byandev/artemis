@@ -52,6 +52,9 @@ Schedule::command('metaads:capture-budgets')->everyFourHours()->withoutOverlappi
 // user-configured schedule (frequency / run-at hour) is due.
 Schedule::command('meta-ads:evaluate-optimization-rules')->hourly()->withoutOverlapping();
 
+// Post the day's per-page ad budgets to Discord every morning (08:00 app tz).
+Schedule::command('metaads:report-page-budgets')->dailyAt('08:00');
+
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();
 // Schedule::command('analytics:rollup --date="2 days ago"')->dailyAt('02:00')->withoutOverlapping();

@@ -216,7 +216,7 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
-                              title: 'Ad Spent Budget Tracker',
+                              title: 'Ad Spent Tracker',
                               href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
                               icon: Wallet,
                               permission: PERMISSIONS.ViewMetaAds,

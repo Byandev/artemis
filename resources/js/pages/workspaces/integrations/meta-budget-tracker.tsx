@@ -5,7 +5,16 @@ import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
+import {
+    ArrowDownRight,
+    ArrowUpRight,
+    CalendarDays,
+    Minus,
+    TrendingDown,
+    TrendingUp,
+    Wallet,
+    type LucideIcon,
+} from 'lucide-react';
 
 interface BudgetRow {
     id: string;
@@ -89,6 +98,44 @@ function DifferenceCell({ row }: { row: BudgetRow }) {
     );
 }
 
+function StatCard({
+    title,
+    value,
+    icon: Icon,
+    valueClass = 'text-gray-900 dark:text-gray-100',
+    suffix,
+}: {
+    title: string;
+    value: string;
+    icon: LucideIcon;
+    valueClass?: string;
+    suffix?: string;
+}) {
+    return (
+        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
+            <div className="mb-2 flex items-center gap-2">
+                <Icon className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                    {title}
+                </span>
+            </div>
+            <span
+                className={cn(
+                    'font-mono text-[22px] font-semibold tracking-tight tabular-nums',
+                    valueClass,
+                )}
+            >
+                {value}
+            </span>
+            {suffix && (
+                <span className="ml-1.5 text-[12px] font-medium text-gray-400 tabular-nums dark:text-gray-500">
+                    {suffix}
+                </span>
+            )}
+        </div>
+    );
+}
+
 function budgetColumns(label: string): ColumnDef<BudgetRow>[] {
     return [
         {
@@ -156,6 +203,17 @@ export default function MetaBudgetTracker({
     perProduct,
     perUser,
 }: Props) {
+    const totals = perPage.reduce(
+        (acc, r) => ({
+            today: acc.today + r.today,
+            yesterday: acc.yesterday + r.yesterday,
+        }),
+        { today: 0, yesterday: 0 },
+    );
+    const net = totals.today - totals.yesterday;
+    const netPct = pctChange(totals.today, totals.yesterday);
+    const NetIcon = net > 0 ? TrendingUp : net < 0 ? TrendingDown : Minus;
+
     return (
         <AppLayout>
             <Head title="Meta Ads · Ad Spent Budget Tracker" />
@@ -165,6 +223,36 @@ export default function MetaBudgetTracker({
                     title="Ad Spent Budget Tracker"
                     description={`Page daily budget — today (${formatDateLabel(dates.today)}) vs yesterday (${formatDateLabel(dates.yesterday)}).`}
                 />
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <StatCard
+                        title="Total Budget Today"
+                        value={peso(totals.today)}
+                        icon={Wallet}
+                    />
+                    <StatCard
+                        title="Total Budget Yesterday"
+                        value={peso(totals.yesterday)}
+                        icon={CalendarDays}
+                    />
+                    <StatCard
+                        title="Net Change"
+                        value={`${net >= 0 ? '+' : '-'}${peso(Math.abs(net))}`}
+                        icon={NetIcon}
+                        valueClass={
+                            net > 0
+                                ? 'text-brand-600 dark:text-brand-400'
+                                : net < 0
+                                  ? 'text-red-600 dark:text-red-400'
+                                  : 'text-gray-900 dark:text-gray-100'
+                        }
+                        suffix={
+                            netPct !== null
+                                ? `${netPct > 0 ? '+' : ''}${netPct.toFixed(0)}%`
+                                : undefined
+                        }
+                    />
+                </div>
 
                 <Tabs defaultValue="page" className="gap-4">
                     <TabsList>
