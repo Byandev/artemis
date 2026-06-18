@@ -55,7 +55,7 @@ class OptimizationRuleController extends Controller
 
         $rules = OptimizationRule::where('workspace_id', $workspace->id)
             ->when(
-                ! TeamVisibility::isUnrestricted($user, $workspace),
+                TeamVisibility::shouldScope($user, $workspace),
                 fn ($q) => $q->whereHas('adAccounts', fn ($a) => $a->visibleTo($user, $workspace)),
             )
             ->with(['conditions', 'adAccounts:id,name'])
@@ -112,7 +112,7 @@ class OptimizationRuleController extends Controller
         $pending = OptimizationProposal::where('workspace_id', $workspace->id)
             ->where('status', 'pending')
             ->when(
-                ! TeamVisibility::isUnrestricted($user, $workspace),
+                TeamVisibility::shouldScope($user, $workspace),
                 fn ($q) => $q->whereIn(
                     'meta_ads_account_id',
                     AdAccount::forWorkspace($workspace)->visibleTo($user, $workspace)->select('id'),
@@ -180,7 +180,7 @@ class OptimizationRuleController extends Controller
 
         $logs = OptimizationRuleLog::where('workspace_id', $workspace->id)
             ->when(
-                ! TeamVisibility::isUnrestricted($user, $workspace),
+                TeamVisibility::shouldScope($user, $workspace),
                 fn ($q) => $q->whereHas('rule.adAccounts', fn ($a) => $a->visibleTo($user, $workspace)),
             )
             ->when($ruleIds, fn ($q) => $q->whereIn('meta_ads_optimization_rule_id', $ruleIds))

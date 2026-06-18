@@ -34,7 +34,7 @@ class CreativesController extends Controller
         $creatives = QueryBuilder::for(
             Creative::where('workspace_id', $workspace->id)
                 ->when(
-                    ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                    TeamVisibility::shouldScope($request->user(), $workspace),
                     fn ($q) => $q->whereHas('product.pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
                 )
                 ->with([

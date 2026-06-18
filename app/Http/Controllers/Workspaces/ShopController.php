@@ -46,7 +46,7 @@ class ShopController extends Controller
 
         $baseQuery = Shop::where('shops.workspace_id', $workspace->id)
             ->when(
-                ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                TeamVisibility::shouldScope($request->user(), $workspace),
                 fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
             )
             ->select('shops.*')

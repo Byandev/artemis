@@ -34,7 +34,7 @@ class BudgetTrackerController extends Controller
         $records = PageDailyBudgetRecord::query()
             ->where('workspace_id', $workspace->id)
             ->when(
-                ! TeamVisibility::isUnrestricted($user, $workspace),
+                TeamVisibility::shouldScope($user, $workspace),
                 fn ($q) => $q->whereHas('page', fn ($p) => $p->visibleTo($user, $workspace)),
             )
             ->whereIn('date', [$today, $yesterday])

@@ -28,7 +28,7 @@ class ProductController extends Controller
         $products = QueryBuilder::for(
             Product::ofWorkspace($workspace)
                 ->when(
-                    ! TeamVisibility::isUnrestricted($user, $workspace),
+                    TeamVisibility::shouldScope($user, $workspace),
                     fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
                 )
         )

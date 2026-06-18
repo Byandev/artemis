@@ -32,7 +32,7 @@ class CourierShipmentController extends Controller
 
         $base = CourierShipment::where('workspace_id', $workspace->id)
             ->when(
-                ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                TeamVisibility::shouldScope($request->user(), $workspace),
                 fn ($q) => $q->whereHas('pancakeOrder', fn ($o) => $o->visibleTo($request->user(), $workspace)),
             );
 

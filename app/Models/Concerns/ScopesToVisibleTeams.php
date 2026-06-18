@@ -26,12 +26,14 @@ trait ScopesToVisibleTeams
 
     public function scopeVisibleTo(Builder $query, User $user, Workspace $workspace): Builder
     {
-        if (TeamVisibility::isUnrestricted($user, $workspace)) {
+        $teamIds = TeamVisibility::scopeTeamIds($user, $workspace);
+
+        // null -> unrestricted with no "viewing as team" selected: see everything.
+        if ($teamIds === null) {
             return $query;
         }
 
-        $teamIds = TeamVisibility::teamIdsFor($user, $workspace);
-
+        // Scoped user with no team -> nothing (fail-closed).
         if (empty($teamIds)) {
             return $query->whereRaw('1 = 0');
         }

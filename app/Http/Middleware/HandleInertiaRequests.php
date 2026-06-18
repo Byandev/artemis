@@ -6,6 +6,7 @@ use App\Models\Role;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -65,6 +66,13 @@ class HandleInertiaRequests extends Middleware
                 : false,
         ];
 
+        // "Viewing as team" switcher context.
+        $teamScope = ($user && $workspaceModel) ? [
+            'activeTeamId' => TeamVisibility::activeTeamId($user, $workspaceModel),
+            'teams' => TeamVisibility::selectableTeams($user, $workspaceModel),
+            'canViewAll' => TeamVisibility::isUnrestricted($user, $workspaceModel),
+        ] : null;
+
         // Show syncing modal when any page has no orders_last_synced_at
         $syncingData = null;
         if ($currentWorkspace instanceof Workspace && $currentWorkspace->pages()->exists()) {
@@ -111,6 +119,7 @@ class HandleInertiaRequests extends Middleware
                 ]) : null,
             ],
             'workspaces' => $workspaces,
+            'teamScope' => $teamScope,
 
             'currentWorkspace' => $workspaceModel ? array_merge($workspaceModel->toArray(), [
 

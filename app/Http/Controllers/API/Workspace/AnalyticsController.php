@@ -151,7 +151,7 @@ class AnalyticsController extends Controller
         $filter = $request->array('filter', []);
         $user = $request->user();
 
-        if (! $user || TeamVisibility::isUnrestricted($user, $workspace)) {
+        if (! $user || ! TeamVisibility::shouldScope($user, $workspace)) {
             return $filter;
         }
 

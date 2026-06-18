@@ -26,7 +26,7 @@ class FlowController extends Controller
         $base = Flow::query()
             ->whereHas('page', fn ($query) => $query->where('workspace_id', $workspace->id))
             ->when(
-                ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                TeamVisibility::shouldScope($request->user(), $workspace),
                 fn ($q) => $q->whereHas('page', fn ($p) => $p->visibleTo($request->user(), $workspace)),
             )
             ->with('page:id,name');

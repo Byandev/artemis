@@ -147,3 +147,66 @@ it('grants ad-account management only with a manage-tier team link', function ()
     $manager = scopedMember($workspace, [$teamManage]);
     expect(TeamVisibility::canManageAdAccount($manager, $account, $workspace))->toBeTrue();
 });
+
+it('narrows an unrestricted manager to the active team when one is selected', function () {
+    $workspace = Workspace::factory()->create();
+    $owner = User::find($workspace->owner_id);
+    $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
+    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
+    $pageA->teams()->attach($teamA);
+    $pageB->teams()->attach($teamB);
+
+    session(['active_team_id' => $teamA->id]);
+
+    $visible = Page::where('workspace_id', $workspace->id)
+        ->visibleTo($owner, $workspace)
+        ->pluck('id')
+        ->all();
+
+    expect($visible)->toContain($pageA->id)->not->toContain($pageB->id);
+});
+
+it('narrows a multi-team scoped user to the active team', function () {
+    $workspace = Workspace::factory()->create();
+    $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
+    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
+    $pageA->teams()->attach($teamA);
+    $pageB->teams()->attach($teamB);
+
+    $user = scopedMember($workspace, [$teamA, $teamB]);
+
+    session(['active_team_id' => $teamA->id]);
+
+    $visible = Page::where('workspace_id', $workspace->id)
+        ->visibleTo($user, $workspace)
+        ->pluck('id')
+        ->all();
+
+    expect($visible)->toContain($pageA->id)->not->toContain($pageB->id);
+});
+
+it('ignores an active team the user does not belong to', function () {
+    $workspace = Workspace::factory()->create();
+    $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
+    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
+    $pageA->teams()->attach($teamA);
+    $pageB->teams()->attach($teamB);
+
+    $user = scopedMember($workspace, [$teamA]); // only team A
+
+    session(['active_team_id' => $teamB->id]); // a team they're not in
+
+    $visible = Page::where('workspace_id', $workspace->id)
+        ->visibleTo($user, $workspace)
+        ->pluck('id')
+        ->all();
+
+    // Falls back to their own teams' union (team A), ignoring the invalid choice.
+    expect($visible)->toContain($pageA->id)->not->toContain($pageB->id);
+});
