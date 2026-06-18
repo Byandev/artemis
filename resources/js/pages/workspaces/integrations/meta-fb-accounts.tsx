@@ -24,7 +24,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 
 interface MetaUser {
-    id: number;
+    id: string;
     name: string;
     email: string | null;
     token_expires_at: string | null;
@@ -84,7 +84,7 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
         return () => clearTimeout(t);
     }, [searchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const sync = (metaUserId: number) => {
+    const sync = (metaUserId: string) => {
         router.post(
             `${indexUrl}/users/${metaUserId}/sync-ad-accounts`,
             {},
