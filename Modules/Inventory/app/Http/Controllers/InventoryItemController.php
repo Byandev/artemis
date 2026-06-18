@@ -96,22 +96,25 @@ class InventoryItemController extends Controller
         $request->validate([
             'product_id' => 'required|exists:products,id',
             'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
-            'sales_keywords' => 'nullable|string',
+            'sales_keywords' => 'nullable|array',
+            'sales_keywords.*' => 'string|max:255',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
+            'remaining_qty' => 'nullable|integer',
         ]);
 
         InventoryItem::create([
             'workspace_id' => $workspace->id,
             'product_id' => $request->product_id,
             'sku' => $request->sku,
-            'sales_keywords' => $request->sales_keywords,
+            'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
             'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
+            'remaining_qty' => $request->remaining_qty,
         ]);
 
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
@@ -132,24 +135,48 @@ class InventoryItemController extends Controller
                     ->where('workspace_id', $workspace->id)
                     ->ignore($item->id),
             ],
-            'sales_keywords' => 'nullable|string',
+            'sales_keywords' => 'nullable|array',
+            'sales_keywords.*' => 'string|max:255',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
+            'remaining_qty' => 'nullable|integer',
         ]);
         $item->update([
             'product_id' => $request->product_id,
             'sku' => $request->sku,
-            'sales_keywords' => $request->sales_keywords,
+            'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
             'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
+            'remaining_qty' => $request->remaining_qty,
         ]);
 
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');
+    }
+
+    /**
+     * Split a comma-separated keyword string into a clean array:
+     * trim, drop blanks, de-duplicate.
+     *
+     * @param  mixed  $keywords
+     * @return string[]
+     */
+    private function normalizeKeywords($keywords): array
+    {
+        $list = is_array($keywords)
+            ? $keywords
+            : preg_split('/[,\n]+/', (string) $keywords);
+
+        return collect($list)
+            ->map(fn ($keyword) => trim((string) $keyword))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function destroy(Workspace $workspace, InventoryItem $item)
