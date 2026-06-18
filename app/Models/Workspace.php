@@ -43,14 +43,18 @@ class Workspace extends Model
         'csr_dashboard_module_enabled',
         'inventory_sync',
         'public_password',
+        'erp_email',
+        'erp_password',
     ];
 
     protected $hidden = [
         'public_password',
+        'erp_password',
     ];
 
     protected $appends = [
         'public_password_set',
+        'erp_password_set',
     ];
 
     protected $casts = [
@@ -72,6 +76,8 @@ class Workspace extends Model
         'csr_dashboard_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
+        // Reversible encryption so the automation pipeline can read it back.
+        'erp_password' => 'encrypted',
     ];
 
     /**
@@ -121,6 +127,15 @@ class Workspace extends Model
     public function getPublicPasswordSetAttribute(): bool
     {
         return ! empty($this->attributes['public_password']);
+    }
+
+    /**
+     * Whether ERP automation credentials are configured. Exposed to the client
+     * without leaking the encrypted password itself.
+     */
+    public function getErpPasswordSetAttribute(): bool
+    {
+        return ! empty($this->attributes['erp_password']);
     }
 
     /** Verify a plaintext password against the stored public-pages password. */

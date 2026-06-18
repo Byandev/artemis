@@ -1,5 +1,6 @@
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { NavUser } from '@/components/nav-user';
+import SettingsButton from '@/components/settings-button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import WorkspaceSwitcher from './workspace-switcher';
 
@@ -13,8 +14,9 @@ export function AppSidebarHeader() {
                 </div>
 
                 <div className="ml-auto flex min-w-0 items-center gap-1.5">
-                    <div className="hidden sm:flex">
+                    <div className="hidden items-center gap-1.5 sm:flex">
                         <AppearanceToggleDropdown />
+                        <SettingsButton />
                     </div>
                     <NavUser />
                 </div>

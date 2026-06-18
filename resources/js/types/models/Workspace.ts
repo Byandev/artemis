@@ -24,6 +24,10 @@ export interface Workspace {
     csr_dashboard_module_enabled: boolean;
     /** Whether a public-pages access password is configured. */
     public_password_set?: boolean;
+    /** ERP automation email consumed by the n8n integration. */
+    erp_email?: string | null;
+    /** Whether an ERP automation password is stored (never the value itself). */
+    erp_password_set?: boolean;
     created_at: string;
     updated_at: string;
 
