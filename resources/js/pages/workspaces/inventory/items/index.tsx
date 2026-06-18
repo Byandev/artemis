@@ -187,6 +187,25 @@ export default function ItemIndex({
             ),
         },
         {
+            accessorKey: 'current_stocks',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Remaining Qty"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.remaining_qty}
+                        color="text-violet-600 dark:text-violet-400"
+                    />
+                </div>
+            ),
+        },
+        {
             accessorKey: 'remaining_after_fulfillment',
             enableSorting: true,
             header: ({ column }) => (
@@ -201,25 +220,6 @@ export default function ItemIndex({
                     <MetricCell
                         value={row.original.remaining_after_fulfillment}
                         color="text-amber-600 dark:text-amber-400"
-                    />
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'remaining_qty',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="Remaining Qty"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => (
-                <div className="text-center">
-                    <MetricCell
-                        value={row.original.remaining_qty}
-                        color="text-violet-600 dark:text-violet-400"
                     />
                 </div>
             ),
