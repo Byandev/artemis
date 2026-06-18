@@ -18,7 +18,15 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Calendar, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import {
+    Calendar,
+    LayoutGrid,
+    Megaphone,
+    MoreHorizontal,
+    Pencil,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface Team {
@@ -144,6 +152,26 @@ export default function TeamsIndex({
                                                   >
                                                       <Calendar />
                                                       Schedule
+                                                  </Link>
+                                              </DropdownMenuItem>
+                                          )}
+                                          {canEditTeams && (
+                                              <DropdownMenuItem asChild>
+                                                  <Link
+                                                      href={`/workspaces/${workspace.slug}/teams/${team.id}/pages`}
+                                                  >
+                                                      <LayoutGrid />
+                                                      Pages
+                                                  </Link>
+                                              </DropdownMenuItem>
+                                          )}
+                                          {canEditTeams && (
+                                              <DropdownMenuItem asChild>
+                                                  <Link
+                                                      href={`/workspaces/${workspace.slug}/teams/${team.id}/ad-accounts`}
+                                                  >
+                                                      <Megaphone />
+                                                      Ad Accounts
                                                   </Link>
                                               </DropdownMenuItem>
                                           )}

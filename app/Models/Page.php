@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Page extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, ScopesToVisibleTeams, SoftDeletes;
 
     public $guarded = [];
 
@@ -87,6 +88,15 @@ class Page extends Model
     public function customerServiceRepresentatives(): BelongsToMany
     {
         return $this->belongsToMany(CustomerServiceRepresentative::class, 'page_customer_service_representative');
+    }
+
+    /**
+     * Teams this page belongs to. Drives team-level visibility — a user sees a
+     * page if they share any team with it.
+     */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_page')->withTimestamps();
     }
 
     public function latestBudget(): HasOne

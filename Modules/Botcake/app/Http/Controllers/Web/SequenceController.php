@@ -5,6 +5,7 @@ namespace Modules\Botcake\Http\Controllers\Web;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -28,6 +29,10 @@ class SequenceController extends Controller
 
         $base = Sequence::query()
             ->whereHas('page', fn ($query) => $query->where('workspace_id', $workspace->id))
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->whereHas('page', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+            )
             ->with('page:id,name');
 
         if ($mode === 'historical') {

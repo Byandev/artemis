@@ -24,6 +24,7 @@ class SyncHealthController extends Controller
 
         $accounts = AdAccount::forWorkspace($workspace)
             ->where('active_sync', true)
+            ->visibleTo($request->user(), $workspace)
             ->when($metaUserId, fn ($q) => $q->whereHas('metaUsers', fn ($u) => $u->where('meta_ads_users.id', $metaUserId)))
             ->select('id', 'name', 'business_name', 'last_synced_at')
             ->orderBy('name')
