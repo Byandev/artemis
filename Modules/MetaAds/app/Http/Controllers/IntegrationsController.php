@@ -55,6 +55,7 @@ class IntegrationsController extends Controller
         $showAll = $request->boolean('show_all');
 
         $base = AdAccount::forWorkspace($workspace)
+            ->visibleTo($request->user(), $workspace)
             ->with(['metaUsers' => function ($q) use ($workspace) {
                 $q->whereHas('workspaces', fn ($w) => $w->where('workspaces.id', $workspace->id))
                     ->select('meta_ads_users.id', 'meta_ads_users.name');

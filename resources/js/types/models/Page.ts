@@ -26,6 +26,7 @@ export interface Page {
     shop?: Shop;
     owner?: User;
     product?: Product;
+    teams?: { id: number; name: string }[];
     latest_budget?: {
         budget: number | string | null;
         date: string;

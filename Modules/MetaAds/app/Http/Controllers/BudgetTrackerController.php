@@ -7,6 +7,7 @@ use App\Models\PageDailyBudgetRecord;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -28,8 +29,14 @@ class BudgetTrackerController extends Controller
 
         // Only two days of page budgets for one workspace — small enough to
         // pull and aggregate in PHP rather than three separate group-by queries.
+        $user = $request->user();
+
         $records = PageDailyBudgetRecord::query()
             ->where('workspace_id', $workspace->id)
+            ->when(
+                TeamVisibility::shouldScope($user, $workspace),
+                fn ($q) => $q->whereHas('page', fn ($p) => $p->visibleTo($user, $workspace)),
+            )
             ->whereIn('date', [$today, $yesterday])
             ->with(['page' => fn ($q) => $q->withTrashed()->select('id', 'name', 'product_id', 'owner_id')])
             ->get(['id', 'page_id', 'date', 'budget']);

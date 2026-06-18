@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;
 use App\Services\PostHogService;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -22,7 +23,15 @@ class TeamController extends Controller
     {
         $this->authorize(Permission::ViewTeams->value, $workspace);
 
-        $teams = QueryBuilder::for(Team::ofWorkspace($workspace)->withCount('members')->with(['members:id,name,email']))
+        $teams = QueryBuilder::for(
+            Team::ofWorkspace($workspace)
+                ->when(
+                    ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                    fn ($q) => $q->whereHas('members', fn ($m) => $m->where('users.id', $request->user()->id)),
+                )
+                ->withCount('members')
+                ->with(['members:id,name,email'])
+        )
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
             ])

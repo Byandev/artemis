@@ -2,6 +2,8 @@
 
 namespace Modules\MetaAds\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
+use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +14,8 @@ use RuntimeException;
 
 class AdAccount extends Model
 {
+    use ScopesToVisibleTeams;
+
     protected $table = 'meta_ads_accounts';
 
     public $incrementing = false;
@@ -55,6 +59,17 @@ class AdAccount extends Model
     {
         return $this->belongsToMany(User::class, 'meta_ads_user_account', 'meta_ads_account_id', 'meta_ads_user_id')
             ->withPivot('permitted_tasks')
+            ->withTimestamps();
+    }
+
+    /**
+     * Teams this ad account is assigned to. The pivot's access_level (view|manage)
+     * determines whether a team's members may change the account or only view it.
+     */
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class, 'team_ad_account', 'meta_ads_account_id', 'team_id')
+            ->withPivot('access_level')
             ->withTimestamps();
     }
 

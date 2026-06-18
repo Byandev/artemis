@@ -3,6 +3,7 @@
 namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,12 +32,13 @@ class AdsManagerController extends Controller
 
         [$since, $until] = $this->resolveDateRange($request);
 
-        $allAccountIds = $this->accountIdsForWorkspace($workspace)
+        $allAccountIds = $this->accountIdsForWorkspace($workspace, $request->user())
             ->map(fn ($id) => (string) $id);
         $selectedAccountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
 
         $accounts = AdAccount::forWorkspace($workspace)
             ->where('meta_ads_accounts.active_sync', true)
+            ->visibleTo($request->user(), $workspace)
             ->select('meta_ads_accounts.id', 'meta_ads_accounts.name')
             ->orderBy('meta_ads_accounts.name')
             ->get()
@@ -69,7 +71,7 @@ class AdsManagerController extends Controller
 
         [$since, $until] = $this->resolveDateRange($request);
 
-        $allAccountIds = $this->accountIdsForWorkspace($workspace)->map(fn ($id) => (string) $id);
+        $allAccountIds = $this->accountIdsForWorkspace($workspace, $request->user())->map(fn ($id) => (string) $id);
         $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
         $metricFilters = $this->parseMetricFilters($request);
 
@@ -126,7 +128,7 @@ class AdsManagerController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
-        $accountIds = $this->accountIdsForWorkspace($workspace);
+        $accountIds = $this->accountIdsForWorkspace($workspace, $request->user());
         $adModel = Ad::whereIn('meta_ads_account_id', $accountIds)->findOrFail($ad);
         $account = AdAccount::findOrFail($adModel->meta_ads_account_id);
 
@@ -143,7 +145,7 @@ class AdsManagerController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
-        $accountIds = $this->accountIdsForWorkspace($workspace);
+        $accountIds = $this->accountIdsForWorkspace($workspace, $request->user());
 
         $row = Ad::query()
             ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds)
@@ -625,14 +627,12 @@ class AdsManagerController extends Controller
         }
     }
 
-    private function accountIdsForWorkspace(Workspace $workspace)
+    private function accountIdsForWorkspace(Workspace $workspace, ?User $user = null)
     {
-        return DB::table('meta_ads_user_account')
-            ->join('meta_ads_workspace_user', 'meta_ads_workspace_user.meta_ads_user_id', '=', 'meta_ads_user_account.meta_ads_user_id')
-            ->join('meta_ads_accounts', 'meta_ads_accounts.id', '=', 'meta_ads_user_account.meta_ads_account_id')
-            ->where('meta_ads_workspace_user.workspace_id', $workspace->id)
+        return AdAccount::forWorkspace($workspace)
             ->where('meta_ads_accounts.active_sync', true)
-            ->pluck('meta_ads_user_account.meta_ads_account_id');
+            ->when($user, fn ($q) => $q->visibleTo($user, $workspace))
+            ->pluck('meta_ads_accounts.id');
     }
 
     /**

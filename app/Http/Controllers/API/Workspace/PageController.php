@@ -12,8 +12,10 @@ class PageController extends Controller
 {
     public function index(Workspace $workspace)
     {
-        return QueryBuilder::for(Page::class)
-            ->where('workspace_id', $workspace->id)
+        return QueryBuilder::for(
+            Page::where('workspace_id', $workspace->id)
+                ->visibleTo(auth()->user(), $workspace)
+        )
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
             ])
