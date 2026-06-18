@@ -43,6 +43,7 @@ use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceCo
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
+use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
@@ -328,6 +329,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
         Route::put('/{purchasedOrder}', [PurchasedOrderController::class, 'update'])->name('update');
         Route::delete('/{purchasedOrder}', [PurchasedOrderController::class, 'destroy'])->name('destroy');
+    });
+
+    Route::prefix('/workspaces/{workspace}/inventory/po-monitoring')->name('workspaces.inventory.po-monitoring.')->group(function () {
+        Route::get('/', [PurchaseOrderMonitoringController::class, 'index'])->name('index');
+        Route::post('/items/{purchasedOrderItem}/deliveries', [PurchaseOrderMonitoringController::class, 'storeDelivery'])->name('deliveries.store');
+        Route::put('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'updateDelivery'])->name('deliveries.update');
+        Route::delete('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'destroyDelivery'])->name('deliveries.destroy');
+        Route::put('/items/{purchasedOrderItem}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('items.expected-delivery');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
