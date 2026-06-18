@@ -8,6 +8,7 @@ use App\Http\Sorts\ParcelJourneyNotification\PageNameSort;
 use App\Http\Sorts\ParcelJourneyNotification\ProductNameSort;
 use App\Models\ParcelJourneyNotification;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -24,6 +25,10 @@ class ParcelUpdateNotificationController extends Controller
                 ->whereHas('order', function ($query) use ($workspace) {
                     $query->where('workspace_id', $workspace->id);
                 })
+                ->when(
+                    TeamVisibility::shouldScope($request->user(), $workspace),
+                    fn ($q) => $q->whereHas('order', fn ($o) => $o->visibleTo($request->user(), $workspace)),
+                )
         )
             ->with(['order.page.product'])
             ->allowedFilters([

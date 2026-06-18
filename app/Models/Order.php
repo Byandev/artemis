@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,11 +11,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
-    use HasFactory;
+    use HasFactory, ScopesToVisibleTeams;
 
     protected $table = 'pancake_orders';
 
     protected $guarded = [];
+
+    protected function visibilityTeamRelation(): string
+    {
+        return 'page.teams';
+    }
 
     public function shippingAddress(): HasOne|Order
     {

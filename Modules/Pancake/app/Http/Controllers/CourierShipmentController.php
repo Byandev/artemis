@@ -5,6 +5,7 @@ namespace Modules\Pancake\Http\Controllers;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -29,7 +30,11 @@ class CourierShipmentController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewCourierShipments->value, $workspace);
 
-        $base = CourierShipment::where('workspace_id', $workspace->id);
+        $base = CourierShipment::where('workspace_id', $workspace->id)
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->whereHas('pancakeOrder', fn ($o) => $o->visibleTo($request->user(), $workspace)),
+            );
 
         $shipments = QueryBuilder::for(clone $base)
             ->with([

@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Page;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -40,12 +41,13 @@ class PageExport implements FromCollection, WithHeadings, WithMapping
         'is_sync_logic_updated',
     ];
 
-    public function __construct(private Workspace $workspace) {}
+    public function __construct(private Workspace $workspace, private ?User $user = null) {}
 
     public function collection(): Collection
     {
         return $this->workspace
             ->pages()
+            ->when($this->user, fn ($q) => $q->visibleTo($this->user, $this->workspace))
             ->withTrashed()
             ->orderBy('id')
             ->get(array_merge(self::COLUMNS, ['owner_id']));

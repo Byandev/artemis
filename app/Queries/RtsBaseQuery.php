@@ -31,6 +31,7 @@ abstract class RtsBaseQuery
     ) {
         $this->query = Order::query();
         $this->applyWorkspaceFilter();
+        $this->applyVisibilityFilter();
         $this->applyStatusFilter();
         $this->applyDateFilter();
         $this->applyEntityFilters();
@@ -39,6 +40,18 @@ abstract class RtsBaseQuery
     private function applyWorkspaceFilter(): void
     {
         $this->query->where('pancake_orders.workspace_id', $this->workspace->id);
+    }
+
+    /**
+     * Limit to orders whose page belongs to a team the user is in. Unrestricted
+     * users (owner/super-admin/"View All Workspace Data") are unaffected. Skipped
+     * when there is no authenticated user (machine/CLI contexts see everything).
+     */
+    private function applyVisibilityFilter(): void
+    {
+        if ($user = $this->request->user()) {
+            $this->query->visibleTo($user, $this->workspace);
+        }
     }
 
     /**
