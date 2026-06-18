@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Workspace;
 use App\Services\PostHogService;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -174,14 +175,26 @@ class WorkspaceController extends Controller
 
         return Inertia::render('workspaces/dashboard/index', [
             'workspace' => $workspace->loadMissing([
-                'shops' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'shops' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            TeamVisibility::shouldScope($request->user(), $workspace),
+                            fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+                        );
                 },
-                'pages' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'pages' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            TeamVisibility::shouldScope($request->user(), $workspace),
+                            fn ($q) => $q->visibleTo($request->user(), $workspace),
+                        );
                 },
-                'teams' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'teams' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                            fn ($q) => $q->whereHas('members', fn ($m) => $m->where('users.id', $request->user()->id)),
+                        );
                 },
                 'pageOwners:id,name',
             ]),
