@@ -20,12 +20,15 @@ class CaptureBudgetSnapshotsCommand extends Command
 
         // Per-page rollup: ad sets already carry meta_page_id, so sum their
         // daily/lifetime budgets grouped straight by page — no need to walk
-        // ads → creatives.
+        // ads → creatives. Only count ad sets whose ad account still has sync
+        // enabled, so paused/disconnected accounts don't inflate the snapshot.
         $pageBudgets = DB::table('meta_ads_sets')
-            ->whereNotNull('meta_page_id')
-            ->where('effective_status', 'ACTIVE')
-            ->groupBy('meta_page_id')
-            ->selectRaw('meta_page_id, SUM(daily_budget) AS daily_budget, SUM(lifetime_budget) AS lifetime_budget')
+            ->join('meta_ads_accounts', 'meta_ads_accounts.id', '=', 'meta_ads_sets.meta_ads_account_id')
+            ->where('meta_ads_accounts.active_sync', true)
+            ->whereNotNull('meta_ads_sets.meta_page_id')
+            ->where('meta_ads_sets.effective_status', 'ACTIVE')
+            ->groupBy('meta_ads_sets.meta_page_id')
+            ->selectRaw('meta_ads_sets.meta_page_id AS meta_page_id, SUM(meta_ads_sets.daily_budget) AS daily_budget, SUM(meta_ads_sets.lifetime_budget) AS lifetime_budget')
             ->get();
 
         $count = 0;
