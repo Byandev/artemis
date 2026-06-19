@@ -12,6 +12,37 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.11.0',
+        date: '2026-06-18',
+        sections: [
+            {
+                title: 'Team-Level Data Access',
+                items: [
+                    "Data can now be scoped to teams — once a team owns pages or ad accounts, its members see only that team's records across pages, orders, products, shops, budgets, RTS analytics, creatives, the video-editor dashboard, Botcake sequences/flows/messages, and Meta ad performance",
+                    "New \"View All Workspace Data\" permission sets the boundary: owners, super admins, and anyone with this permission see everything; remove it from a role (e.g. CSR) to limit that role to its teams' data",
+                    'Safe rollout — on release every existing role keeps full visibility, so nothing changes until you deliberately scope a role; a backfill command seeds team ownership from existing page owners',
+                    "Fails closed — a scoped member who isn't on any team sees nothing until they're added to one, and you're warned if you assign such a role to a teamless member",
+                ],
+            },
+            {
+                title: 'Teams — Data Assignment',
+                items: [
+                    'New per-team screens (from the Teams list) to choose which pages and ad accounts a team owns',
+                    "Ad accounts have two access tiers per team — View (see the account's data) or Manage; Manage is required to change budgets or statuses and to approve optimization proposals, and the Optimization History shows only the accounts you can manage",
+                    'Pages and ad accounts can belong to multiple teams, and a member can be on multiple teams — they see the combined data of all their teams',
+                    'The Pages list now shows each page\'s teams; the ad-account assignment screen lists only synced accounts and shows the Facebook user who connected each',
+                ],
+            },
+            {
+                title: '"Viewing as Team" Switcher',
+                items: [
+                    'New team switcher in the top bar, beside the workspace switcher — pick a team to focus the whole app on just that team\'s data, or "All teams" to see everything you can access',
+                    'Useful for managers drilling into one team at a time; your choice sticks as you navigate and is reflected in the page URL',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.10.2',
         date: '2026-06-13',
         sections: [
