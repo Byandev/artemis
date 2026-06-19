@@ -63,6 +63,10 @@ class HandleInertiaRequests extends Middleware
                 || $user->isAdminOf($currentWorkspace)
                 || $user->hasWorkspaceRole($currentWorkspace, 'admin')
                 : false,
+            // Workspace activity log is admin/owner-only (matches ActivityLogController).
+            'viewActivityLogs' => $user && $currentWorkspace instanceof Workspace
+                ? $user->isAdminOf($currentWorkspace)
+                : false,
         ];
 
         // Show syncing modal when any page has no orders_last_synced_at
