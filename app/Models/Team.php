@@ -16,6 +16,7 @@ class Team extends Model
     protected $fillable = [
         'workspace_id',
         'name',
+        'discord_webhook_url',
     ];
 
     /**
