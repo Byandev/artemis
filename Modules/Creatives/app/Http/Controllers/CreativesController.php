@@ -126,6 +126,7 @@ class CreativesController extends Controller
         return Inertia::render('workspaces/creatives/create', [
             'workspace' => $workspace,
             'products' => $this->products($workspace),
+            'reviewers' => $this->reviewers($workspace),
         ]);
     }
 
@@ -134,12 +135,35 @@ class CreativesController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::CreateCreatives->value, $workspace);
 
-        // New creatives always start as pending ads / for-approval (DB defaults).
-        Creative::create([
-            ...$request->validated(),
+        $data = $request->validated();
+
+        // assigned_reviewer_ids lives in a pivot table, not on the creatives row.
+        $reviewerIds = $data['assigned_reviewer_ids'] ?? [];
+        unset($data['assigned_reviewer_ids']);
+
+        // Setting a non-default ads / final status at creation is gated by the
+        // status permission, mirroring updates. Untouched fields fall back to
+        // the DB defaults (pending ads / for-approval).
+        $changesStatus = (($data['ads_status'] ?? 'pending') !== 'pending')
+            || (($data['final_status'] ?? 'for_approval') !== 'for_approval');
+
+        if ($changesStatus) {
+            $this->authorize(Permission::UpdateCreativeStatus->value, $workspace);
+        }
+
+        // Stamp approved_at / approved_by when a creative is created already approved.
+        if (($data['final_status'] ?? null) === 'approved') {
+            $data['approved_at'] = now();
+            $data['approved_by'] = $request->user()->id;
+        }
+
+        $creative = Creative::create([
+            ...$data,
             'workspace_id' => $workspace->id,
             'creator_id' => $request->user()->id,
         ]);
+
+        $creative->assignedReviewers()->sync($reviewerIds);
 
         return redirect()
             ->route('workspaces.creatives.index', $workspace)
