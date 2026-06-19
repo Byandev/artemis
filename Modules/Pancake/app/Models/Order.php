@@ -2,6 +2,7 @@
 
 namespace Modules\Pancake\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Page;
 use App\Models\ParcelJourney;
 use App\Models\ShippingAddress;
@@ -12,9 +13,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Order extends Model
 {
+    use ScopesToVisibleTeams;
+
     protected $guarded = [];
 
     protected $table = 'pancake_orders';
+
+    protected function visibilityTeamRelation(): string
+    {
+        return 'page.teams';
+    }
 
     protected $casts = [
         'status' => 'integer',

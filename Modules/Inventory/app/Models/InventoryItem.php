@@ -24,6 +24,20 @@ class InventoryItem extends Model
         'remaining_qty',
     ];
 
+    /**
+     * Sales keywords stored as a comma-separated string, exposed as a clean array.
+     *
+     * @return string[]
+     */
+    public function salesKeywordsList(): array
+    {
+        return collect(preg_split('/[,\n]+/', (string) $this->sales_keywords))
+            ->map(fn ($keyword) => trim($keyword))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);

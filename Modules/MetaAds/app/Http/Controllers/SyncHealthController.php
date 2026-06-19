@@ -10,6 +10,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\SyncRun;
+use Modules\MetaAds\Models\User as MetaUser;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -19,8 +20,12 @@ class SyncHealthController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
+        $metaUserId = data_get($request->input('filter', []), 'meta_user');
+
         $accounts = AdAccount::forWorkspace($workspace)
             ->where('active_sync', true)
+            ->visibleTo($request->user(), $workspace)
+            ->when($metaUserId, fn ($q) => $q->whereHas('metaUsers', fn ($u) => $u->where('meta_ads_users.id', $metaUserId)))
             ->select('id', 'name', 'business_name', 'last_synced_at')
             ->orderBy('name')
             ->get();
@@ -98,6 +103,9 @@ class SyncHealthController extends Controller
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('entity_type'),
                 AllowedFilter::exact('scope_id'),
+                // Account-level filter applied above via $metaUserId; accepted
+                // here as a no-op so QueryBuilder doesn't reject the param.
+                AllowedFilter::callback('meta_user', fn () => null),
             ])
             ->allowedSorts(['started_at', 'finished_at', 'records_synced', 'entity_type', 'status'])
             ->defaultSort('-started_at')
@@ -151,9 +159,15 @@ class SyncHealthController extends Controller
             ->latest('started_at')
             ->first(['entity_type', 'scope_id', 'started_at']);
 
+        $metaUsers = MetaUser::query()
+            ->whereHas('workspaces', fn ($q) => $q->where('workspaces.id', $workspace->id))
+            ->orderBy('name')
+            ->get(['meta_ads_users.id', 'meta_ads_users.name']);
+
         return Inertia::render('workspaces/integrations/meta-health', [
             'workspace' => $workspace,
             'summary' => $summary,
+            'metaUsers' => $metaUsers,
             'recent' => $recent,
             'entityTypes' => $entityTypes,
             'failedLast24h' => $failedLast24h,

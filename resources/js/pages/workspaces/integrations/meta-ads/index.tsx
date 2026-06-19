@@ -44,6 +44,7 @@ import {
     StatusLabel,
     buildInsightsColumns,
     deserializeMetricFilters,
+    formatBudget,
     serializeMetricFilters,
     useColumnPresets,
 } from './_shared';
@@ -81,6 +82,10 @@ interface Row extends InsightsMetrics {
     video_id?: number | string | null;
     media_type?: 'video' | 'image' | null;
     ads_count?: number;
+    // Present only when grouping by campaign / ad set (the budget lives on the
+    // entity, not the insights aggregate). Bigint-safe so kept as string|number.
+    daily_budget?: number | string | null;
+    lifetime_budget?: number | string | null;
 }
 
 /**
@@ -160,9 +165,18 @@ function GridTable({
     const showThumbnail = groupBy === 'ad';
     const showStatus = HAS_STATUS[groupBy];
     const showAdsCount = groupBy !== 'ad';
+    // Budget lives on the campaign / ad-set entity (daily or lifetime), so it's
+    // only meaningful — and only sent by the server — for those two dimensions.
+    const showBudget = groupBy === 'campaign' || groupBy === 'ad_set';
 
     const COLUMN_OPTIONS = [
         { id: 'name', label: groupLabel, category: 'General', required: true },
+        ...(showStatus
+            ? [{ id: 'status', label: 'Status', category: 'General' }]
+            : []),
+        ...(showBudget
+            ? [{ id: 'budget', label: 'Budget', category: 'General' }]
+            : []),
         ...INSIGHTS_OPTIONS,
     ];
     const {
@@ -229,15 +243,6 @@ function GridTable({
                         <span className="block truncate text-[12px] font-medium text-gray-700 dark:text-gray-300">
                             {row.original.name ?? '—'}
                         </span>
-                        {showStatus && (
-                            <StatusLabel
-                                status={
-                                    row.original.effective_status ??
-                                    row.original.status ??
-                                    null
-                                }
-                            />
-                        )}
                         {showAdsCount && row.original.ads_count != null && (
                             <span className="block font-mono text-[10px] text-gray-400 dark:text-gray-500">
                                 {row.original.ads_count}{' '}
@@ -248,6 +253,57 @@ function GridTable({
                 </div>
             ),
         },
+        ...(showStatus
+            ? [
+                  {
+                      id: 'status',
+                      enableSorting: false,
+                      header: () => (
+                          <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                              Status
+                          </span>
+                      ),
+                      cell: ({ row }: { row: { original: Row } }) => (
+                          <StatusLabel
+                              status={
+                                  row.original.effective_status ??
+                                  row.original.status ??
+                                  null
+                              }
+                          />
+                      ),
+                  } as ColumnDef<Row>,
+              ]
+            : []),
+        ...(showBudget
+            ? [
+                  {
+                      id: 'budget',
+                      enableSorting: false,
+                      header: () => (
+                          <span className="text-right font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                              Budget
+                          </span>
+                      ),
+                      cell: ({ row }: { row: { original: Row } }) => {
+                          const b = formatBudget(
+                              row.original.daily_budget ?? null,
+                              row.original.lifetime_budget ?? null,
+                          );
+                          return (
+                              <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                                  {b.value}
+                                  {b.label && (
+                                      <span className="block text-[10px] text-gray-400 dark:text-gray-500">
+                                          {b.label}
+                                      </span>
+                                  )}
+                              </div>
+                          );
+                      },
+                  } as ColumnDef<Row>,
+              ]
+            : []),
         ...buildInsightsColumns<Row>(),
     ];
 

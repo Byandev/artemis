@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,6 +31,10 @@ class VideoEditorDashboardController extends Controller
             'currentUserId' => $request->user()->id,
             'products' => Product::query()
                 ->where('workspace_id', $workspace->id)
+                ->when(
+                    TeamVisibility::shouldScope($request->user(), $workspace),
+                    fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+                )
                 ->orderBy('title')
                 ->get(['id', 'title']),
             'editors' => $this->creativeUsers($workspace, $request->user()),
@@ -57,6 +62,14 @@ class VideoEditorDashboardController extends Controller
                     ->orWhere('users.id', $workspace->owner_id)
                     ->orWhere('users.id', $currentUser->id);
             })
+            ->when(
+                TeamVisibility::shouldScope($currentUser, $workspace),
+                fn ($q) => $q->whereIn('users.id', function ($sub) use ($currentUser, $workspace) {
+                    $sub->select('user_id')
+                        ->from('team_user')
+                        ->whereIn('team_id', TeamVisibility::scopeTeamIds($currentUser, $workspace) ?? []);
+                }),
+            )
             ->orderBy('users.name')
             ->get(['users.id', 'users.name'])
             ->unique('id')

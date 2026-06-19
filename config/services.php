@@ -44,4 +44,8 @@ return [
         'inventory_sync_callback_url' => env('N8N_INVENTORY_SYNC_CALLBACK_URL'),
     ],
 
+    'discord' => [
+        'webhook_url' => env('DISCORD_WEBHOOK_URL'),
+    ],
+
 ];

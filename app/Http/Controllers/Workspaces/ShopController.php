@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Models\Shop;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,10 @@ class ShopController extends Controller
             });
 
         $baseQuery = Shop::where('shops.workspace_id', $workspace->id)
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+            )
             ->select('shops.*')
             ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count');
 

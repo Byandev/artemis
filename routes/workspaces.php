@@ -22,7 +22,9 @@ use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateControll
 use App\Http\Controllers\Workspaces\SalesMarketingDashboardController;
 use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
+use App\Http\Controllers\Workspaces\TeamAdAccountController;
 use App\Http\Controllers\Workspaces\TeamController;
+use App\Http\Controllers\Workspaces\TeamPageController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
 use App\Http\Controllers\Workspaces\VideoEditorDashboardController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
@@ -48,6 +50,7 @@ use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
+use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
@@ -219,6 +222,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.health');
+    Route::get('/workspaces/{workspace}/integrations/meta/budget-tracker', [BudgetTrackerController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.budget-tracker');
 
     // Meta Ads optimization rules
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'index'])
@@ -303,6 +309,12 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'destroy'])->name('workspaces.teams.destroy');
     Route::get('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'index'])->name('workspaces.teams.schedule');
     Route::put('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'update'])->name('workspaces.teams.schedule.update');
+
+    // Team data-access assignment (team-level visibility)
+    Route::get('/workspaces/{workspace}/teams/{team}/pages', [TeamPageController::class, 'index'])->name('workspaces.teams.pages.index');
+    Route::put('/workspaces/{workspace}/teams/{team}/pages', [TeamPageController::class, 'update'])->name('workspaces.teams.pages.update');
+    Route::get('/workspaces/{workspace}/teams/{team}/ad-accounts', [TeamAdAccountController::class, 'index'])->name('workspaces.teams.ad-accounts.index');
+    Route::put('/workspaces/{workspace}/teams/{team}/ad-accounts', [TeamAdAccountController::class, 'update'])->name('workspaces.teams.ad-accounts.update');
 
     Route::get('/workspaces/{workspace}/botcake', function (Workspace $workspace) {
         return redirect()->route('workspaces.botcake.sequences.index', $workspace);
