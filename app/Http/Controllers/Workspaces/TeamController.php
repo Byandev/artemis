@@ -71,6 +71,7 @@ class TeamController extends Controller
                     return $query->where('workspace_id', $workspace->id);
                 }),
             ],
+            'discord_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
             'members' => ['array'],
             'members.*' => ['exists:users,id'],
         ]);
@@ -78,6 +79,7 @@ class TeamController extends Controller
         $team = Team::create([
             'workspace_id' => $workspace->id,
             'name' => $validated['name'],
+            'discord_webhook_url' => $validated['discord_webhook_url'] ?? null,
         ]);
 
         if (! empty($validated['members'])) {
@@ -108,12 +110,14 @@ class TeamController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'discord_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
             'members' => ['array'],
             'members.*' => ['exists:users,id'],
         ]);
 
         $team->update([
             'name' => $validated['name'],
+            'discord_webhook_url' => $validated['discord_webhook_url'] ?? null,
         ]);
 
         $validMemberIds = $workspace->users()
