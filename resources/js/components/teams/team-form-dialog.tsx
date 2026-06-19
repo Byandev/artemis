@@ -21,6 +21,7 @@ interface User {
 interface Team {
     id: number;
     name: string;
+    discord_webhook_url?: string | null;
     members: User[];
 }
 
@@ -43,6 +44,7 @@ export function TeamFormDialog({
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
         name: '',
+        discord_webhook_url: '',
         members: [] as number[],
     });
 
@@ -50,6 +52,7 @@ export function TeamFormDialog({
         if (team) {
             setData({
                 name: team.name,
+                discord_webhook_url: team.discord_webhook_url ?? '',
                 members: team.members.map((m) => m.id),
             });
         } else {
@@ -124,6 +127,34 @@ export function TeamFormDialog({
                             {errors.name && (
                                 <p className="font-mono text-[11px] text-red-500">
                                     {errors.name}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Discord Webhook (optional) */}
+                        <div className="space-y-1.5">
+                            <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                Discord Webhook URL
+                            </label>
+                            <input
+                                type="url"
+                                placeholder="https://discord.com/api/webhooks/..."
+                                value={data.discord_webhook_url}
+                                onChange={(e) =>
+                                    setData(
+                                        'discord_webhook_url',
+                                        e.target.value,
+                                    )
+                                }
+                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
+                            />
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                The team's daily ad-budget summary is posted here
+                                each morning.
+                            </p>
+                            {errors.discord_webhook_url && (
+                                <p className="font-mono text-[11px] text-red-500">
+                                    {errors.discord_webhook_url}
                                 </p>
                             )}
                         </div>
