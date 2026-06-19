@@ -66,19 +66,19 @@ export default function ErpCredentials({ workspace }: { workspace: Workspace }) 
                         {({ processing, recentlySuccessful, errors }) => (
                             <>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="erp_email">ERP email</Label>
+                                    <Label htmlFor="erp_username">ERP username</Label>
                                     <Input
-                                        id="erp_email"
-                                        type="email"
-                                        name="erp_email"
+                                        id="erp_username"
+                                        type="text"
+                                        name="erp_username"
                                         className="mt-1 block w-full"
-                                        defaultValue={workspace.erp_email ?? ''}
+                                        defaultValue={workspace.erp_username ?? ''}
                                         autoComplete="off"
-                                        placeholder="integration@your-erp.com"
+                                        placeholder="integration-account"
                                     />
                                     <InputError
                                         className="mt-1"
-                                        message={errors.erp_email}
+                                        message={errors.erp_username}
                                     />
                                 </div>
 

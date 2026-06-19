@@ -21,7 +21,7 @@ class ErpCredentialUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'erp_email' => ['nullable', 'email', 'max:255'],
+            'erp_username' => ['nullable', 'string', 'max:255'],
             // Optional on update so the saved password is left untouched when blank.
             'erp_password' => ['nullable', 'string', 'min:6', 'max:255'],
         ];
@@ -30,7 +30,7 @@ class ErpCredentialUpdateRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'erp_email' => 'ERP email',
+            'erp_username' => 'ERP username',
             'erp_password' => 'ERP password',
         ];
     }

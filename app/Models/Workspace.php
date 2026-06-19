@@ -43,7 +43,7 @@ class Workspace extends Model
         'csr_dashboard_module_enabled',
         'inventory_sync',
         'public_password',
-        'erp_email',
+        'erp_username',
         'erp_password',
     ];
 

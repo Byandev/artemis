@@ -22,7 +22,7 @@ class ErpCredentialController extends Controller
 
         return Inertia::render('settings/erp-credentials', [
             // Hidden/append casts ensure the encrypted password never leaves the
-            // server — only `erp_email` and `erp_password_set` are serialized.
+            // server — only `erp_username` and `erp_password_set` are serialized.
             'workspace' => $workspace,
         ]);
     }
@@ -36,7 +36,7 @@ class ErpCredentialController extends Controller
 
         $validated = $request->validated();
 
-        $workspace->erp_email = $validated['erp_email'] ?? null;
+        $workspace->erp_username = $validated['erp_username'] ?? null;
 
         // Only overwrite the stored password when a new one was supplied; an
         // empty field leaves the existing credential in place.
@@ -51,7 +51,7 @@ class ErpCredentialController extends Controller
     }
 
     /**
-     * Clear the stored ERP password without touching the email.
+     * Clear the stored ERP password without touching the username.
      */
     public function destroy(Request $request, Workspace $workspace): RedirectResponse
     {
