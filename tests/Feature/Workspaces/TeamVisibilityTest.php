@@ -210,3 +210,27 @@ it('ignores an active team the user does not belong to', function () {
     // Falls back to their own teams' union (team A), ignoring the invalid choice.
     expect($visible)->toContain($pageA->id)->not->toContain($pageB->id);
 });
+
+it('manageableAccountIds returns only manage-tier accounts for a scoped user', function () {
+    $workspace = Workspace::factory()->create();
+    $teamView = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamManage = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    $viewAccount = AdAccount::create(['id' => 111, 'name' => 'View Acct']);
+    $manageAccount = AdAccount::create(['id' => 222, 'name' => 'Manage Acct']);
+    $viewAccount->teams()->attach($teamView->id, ['access_level' => 'view']);
+    $manageAccount->teams()->attach($teamManage->id, ['access_level' => 'manage']);
+
+    $user = scopedMember($workspace, [$teamView, $teamManage]);
+
+    $ids = array_map('intval', TeamVisibility::manageableAccountIds($user, $workspace));
+
+    expect($ids)->toContain(222)->not->toContain(111);
+});
+
+it('manageableAccountIds is null for an unrestricted user', function () {
+    $workspace = Workspace::factory()->create();
+    $owner = User::find($workspace->owner_id);
+
+    expect(TeamVisibility::manageableAccountIds($owner, $workspace))->toBeNull();
+});

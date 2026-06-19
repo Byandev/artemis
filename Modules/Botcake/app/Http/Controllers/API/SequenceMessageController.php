@@ -3,6 +3,7 @@
 namespace Modules\Botcake\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Support\TeamVisibility;
 use Illuminate\Http\Request;
 use Modules\Botcake\Http\Sorts\SequenceMessage\SuccessRateSort;
 use Modules\Botcake\Models\SequenceMessage;
@@ -13,7 +14,12 @@ class SequenceMessageController extends Controller
 {
     public function index(Request $request)
     {
-        return QueryBuilder::for(SequenceMessage::class)
+        return QueryBuilder::for(
+            SequenceMessage::query()->when(
+                TeamVisibility::shouldScope($request->user(), $request->workspace),
+                fn ($q) => $q->whereHas('sequence.page', fn ($p) => $p->visibleTo($request->user(), $request->workspace)),
+            )
+        )
             ->select('botcake_sequence_messages.*')
             ->allowedIncludes(['sequence', 'sequence.page'])
             ->whereHas('sequence.page', function ($query) use ($request) {

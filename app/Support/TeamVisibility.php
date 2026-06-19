@@ -168,4 +168,42 @@ class TeamVisibility
             ->wherePivot('access_level', 'manage')
             ->exists();
     }
+
+    /**
+     * Ad account ids the user may *manage* (budget/status/approve), honoring the
+     * "viewing as team" filter. Null means "all" (unrestricted with no active
+     * team selected); an empty array means "none" (fail-closed). Used by
+     * manage-only screens such as the optimization history.
+     *
+     * @return array<int, int|string>|null
+     */
+    public static function manageableAccountIds(User $user, Workspace $workspace): ?array
+    {
+        $activeTeamId = self::activeTeamId($user, $workspace);
+        $unrestricted = self::isUnrestricted($user, $workspace);
+
+        if ($unrestricted && $activeTeamId === null) {
+            return null;
+        }
+
+        $query = AdAccount::query();
+
+        if ($unrestricted) {
+            // A manager manages every account; honor the active-team view filter.
+            $query->whereHas('teams', fn ($q) => $q->where('teams.id', $activeTeamId));
+        } else {
+            $teamIds = $activeTeamId !== null ? [$activeTeamId] : self::teamIdsFor($user, $workspace);
+
+            if (empty($teamIds)) {
+                return [];
+            }
+
+            // wherePivot() only works on the relation itself; inside whereHas the
+            // pivot table is joined, so constrain its column directly.
+            $query->whereHas('teams', fn ($q) => $q->whereIn('teams.id', $teamIds)
+                ->where('team_ad_account.access_level', 'manage'));
+        }
+
+        return $query->pluck('id')->all();
+    }
 }

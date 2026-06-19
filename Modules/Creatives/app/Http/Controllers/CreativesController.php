@@ -294,7 +294,13 @@ class CreativesController extends Controller
      */
     private function products(Workspace $workspace)
     {
+        $user = request()->user();
+
         return Product::where('workspace_id', $workspace->id)
+            ->when(
+                TeamVisibility::shouldScope($user, $workspace),
+                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
+            )
             ->select('id', 'title')
             ->orderBy('title')
             ->get();
