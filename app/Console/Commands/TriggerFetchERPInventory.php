@@ -63,6 +63,9 @@ class TriggerFetchERPInventory extends Command
             $data = [
                 'workspace_id' => $item->workspace_id,
                 'workspace_api_key' => $apiKey->reveal(),
+                // ERP login the n8n pipeline authenticates with (password decrypted).
+                'erp_username' => $item->workspace->erp_username,
+                'erp_password' => $item->workspace->erp_password,
                 'inventory_item_id' => $item->id,
                 'sales_keywords' => $item->salesKeywordsList(),
                 'transaction_keywords' => $item->transaction_keywords,
