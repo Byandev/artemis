@@ -330,12 +330,6 @@ export function AppSidebar() {
                               icon: ShoppingCart,
                               permission: PERMISSIONS.ViewPurchasedOrders,
                           },
-                          {
-                              title: 'PO Monitoring',
-                              href: `/workspaces/${slug}/inventory/po-monitoring`,
-                              icon: Truck,
-                              permission: PERMISSIONS.ViewPurchasedOrders,
-                          },
                       ],
                   },
               ]
