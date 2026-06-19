@@ -237,6 +237,12 @@ class CreativesController extends Controller
         $this->guard($request, $workspace, $creative);
         $this->authorize(Permission::ReviewCreatives->value, $workspace);
 
+        // Having the permission is not enough — only reviewers assigned to this
+        // specific creative may review it.
+        if (! $creative->assignedReviewers()->whereKey($request->user()->id)->exists()) {
+            abort(403, 'You are not an assigned reviewer for this creative.');
+        }
+
         CreativeReview::create([
             'creative_id' => $creative->id,
             'reviewer_id' => $request->user()->id,
