@@ -1,0 +1,11 @@
+{
+    "name": "GencysERP",
+    "alias": "gencyserp",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\GencysERP\\Providers\\GencysERPServiceProvider"
+    ],
+    "files": []
+}

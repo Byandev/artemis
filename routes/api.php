@@ -11,6 +11,7 @@ use App\Http\Controllers\PublicApi\RmoOrderV2Controller;
 use App\Http\Controllers\PublicApi\ShopController;
 use App\Http\Controllers\PublicApi\ShopScanReturnController;
 use App\Http\Controllers\PublicApi\UserController;
+use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', HealthController::class)->name('health');
@@ -32,6 +33,12 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::get('/inventory-items/keywords', [InventoryItemController::class, 'keywords'])->name('inventory-items.keywords');
     Route::post('/inventory-items/sync', [InventoryItemController::class, 'sync'])->name('inventory-items.sync');
 });
+
+// GencysERP daily sales tracker callback. n8n posts the scraped rows here and
+// authenticates with the api_key embedded in the body (not a header), so this
+// sits outside the api.key middleware group.
+Route::post('v1/public/gencys/daily-sales-tracker', [DailySalesTrackerController::class, 'store'])
+    ->name('api.v1.public.gencys.daily-sales-tracker.store');
 
 // v2 — new mobile app (login with users.id, filter by assignee_user_id)
 Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' => ['api.key']], function () {

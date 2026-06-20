@@ -334,6 +334,23 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        ...(currentWorkspace.gencys_module_enabled
+            ? [
+                  {
+                      title: 'Gencys ERP',
+                      icon: Activity,
+                      anyOf: [PERMISSIONS.ViewDailySalesTracker],
+                      items: [
+                          {
+                              title: 'Daily Sales Tracker',
+                              href: `/workspaces/${slug}/gencys/daily-sales-tracker`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewDailySalesTracker,
+                          },
+                      ],
+                  },
+              ]
+            : []),
         ...(currentWorkspace.creatives_module_enabled
             ? [
                   {

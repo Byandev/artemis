@@ -38,6 +38,7 @@ class Workspace extends Model
         'botcake_module_enabled',
         'creatives_module_enabled',
         'meta_ads_module_enabled',
+        'gencys_module_enabled',
         'sales_marketing_dashboard_module_enabled',
         'video_editor_dashboard_module_enabled',
         'csr_dashboard_module_enabled',
@@ -71,6 +72,7 @@ class Workspace extends Model
         'botcake_module_enabled' => 'boolean',
         'creatives_module_enabled' => 'boolean',
         'meta_ads_module_enabled' => 'boolean',
+        'gencys_module_enabled' => 'boolean',
         'sales_marketing_dashboard_module_enabled' => 'boolean',
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
@@ -99,6 +101,7 @@ class Workspace extends Model
             $this->csr_module_enabled ? null : 'CSR',
             $this->botcake_module_enabled ? null : 'Botcake',
             $this->meta_ads_module_enabled ? null : 'Meta Ads',
+            $this->gencys_module_enabled ? null : 'Gencys ERP',
         ]));
     }
 

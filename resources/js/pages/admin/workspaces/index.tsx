@@ -54,6 +54,7 @@ interface Workspace {
     botcake_module_enabled: boolean;
     creatives_module_enabled: boolean;
     meta_ads_module_enabled: boolean;
+    gencys_module_enabled: boolean;
     sales_marketing_dashboard_module_enabled: boolean;
     video_editor_dashboard_module_enabled: boolean;
     csr_dashboard_module_enabled: boolean;
@@ -74,6 +75,7 @@ const MODULE_FIELDS: Array<{
         | 'botcake_module_enabled'
         | 'creatives_module_enabled'
         | 'meta_ads_module_enabled'
+        | 'gencys_module_enabled'
         | 'sales_marketing_dashboard_module_enabled'
         | 'video_editor_dashboard_module_enabled'
         | 'csr_dashboard_module_enabled'
@@ -135,6 +137,11 @@ const MODULE_FIELDS: Array<{
         key: 'meta_ads_module_enabled',
         label: 'Meta Ads',
         description: 'Ads manager, optimization rules, and approvals',
+    },
+    {
+        key: 'gencys_module_enabled',
+        label: 'Gencys ERP',
+        description: 'Gencys ERP daily sales tracker',
     },
     {
         key: 'sales_marketing_dashboard_module_enabled',
@@ -694,6 +701,7 @@ function ModulesModal({
         botcake_module_enabled: workspace.botcake_module_enabled,
         creatives_module_enabled: workspace.creatives_module_enabled,
         meta_ads_module_enabled: workspace.meta_ads_module_enabled,
+        gencys_module_enabled: workspace.gencys_module_enabled,
         sales_marketing_dashboard_module_enabled:
             workspace.sales_marketing_dashboard_module_enabled,
         video_editor_dashboard_module_enabled:

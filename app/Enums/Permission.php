@@ -70,6 +70,9 @@ enum Permission: string
     case EditPurchasedOrders = 'Edit Purchased Orders';
     case DeletePurchasedOrders = 'Delete Purchased Orders';
 
+    // Gencys ERP
+    case ViewDailySalesTracker = 'View Daily Sales Tracker';
+
     // Checklist
     case ViewChecklist = 'View Checklist';
     case CreateChecklist = 'Create Checklist';
@@ -195,6 +198,8 @@ enum Permission: string
             self::CreatePurchasedOrders,
             self::EditPurchasedOrders,
             self::DeletePurchasedOrders => 'Inventory',
+
+            self::ViewDailySalesTracker => 'Gencys ERP',
 
             self::ViewChecklist,
             self::CreateChecklist,
