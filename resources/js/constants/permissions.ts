@@ -40,6 +40,7 @@ export const PERMISSIONS = {
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
+    ViewPageRoasTracker: 'View Page ROAS Tracker',
     ViewRtsAiChat: 'View RTS AI Chat',
     ViewRmoManagement: 'View RMO Management',
     ViewParcelJourneyTemplates: 'View Parcel Journey Templates',

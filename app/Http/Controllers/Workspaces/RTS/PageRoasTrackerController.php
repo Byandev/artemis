@@ -17,7 +17,7 @@ class PageRoasTrackerController extends Controller
 
     public function __invoke(Request $request, Workspace $workspace): Response
     {
-        $this->authorize(Permission::ViewRtsAnalytics->value, $workspace);
+        $this->authorize(Permission::ViewPageRoasTracker->value, $workspace);
 
         return Inertia::render('workspaces/rts/page-roas-tracker', [
             'workspace' => $workspace->only('id', 'name', 'slug'),

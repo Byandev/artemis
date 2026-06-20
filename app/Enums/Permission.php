@@ -45,6 +45,7 @@ enum Permission: string
 
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
+    case ViewPageRoasTracker = 'View Page ROAS Tracker';
     case ViewRtsAiChat = 'View RTS AI Chat';
     case ViewRmoManagement = 'View RMO Management';
     case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
@@ -176,6 +177,7 @@ enum Permission: string
             self::ManageSchedule => 'Teams',
 
             self::ViewRtsAnalytics,
+            self::ViewPageRoasTracker,
             self::ViewRtsAiChat,
             self::ViewRmoManagement,
             self::ViewParcelJourneyTemplates,

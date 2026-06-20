@@ -278,6 +278,7 @@ export function AppSidebar() {
             icon: RotateCcw,
             anyOf: [
                 PERMISSIONS.ViewRtsAnalytics,
+                PERMISSIONS.ViewPageRoasTracker,
                 PERMISSIONS.ViewParcelJourneyTemplates,
                 PERMISSIONS.ManageParcelJourneyTemplates,
             ],
@@ -292,7 +293,7 @@ export function AppSidebar() {
                     title: 'Page ROAS Tracker',
                     href: `/workspaces/${slug}/rts/page-roas-tracker`,
                     icon: PieChart,
-                    permission: PERMISSIONS.ViewRtsAnalytics,
+                    permission: PERMISSIONS.ViewPageRoasTracker,
                 },
                 {
                     title: 'Parcel Journey',
