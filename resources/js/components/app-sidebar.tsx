@@ -12,7 +12,7 @@ import {
 import { PERMISSIONS } from '@/constants/permissions';
 import { useAnyPermission } from '@/hooks/use-permission';
 import { dashboard } from '@/routes';
-import { type NavItem, User as UserType } from '@/types';
+import { type NavItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, usePage } from '@inertiajs/react';
 import {
@@ -32,7 +32,6 @@ import {
     Landmark,
     Layers,
     LayoutDashboard,
-    LifeBuoy,
     ListChecks,
     MapPin,
     Megaphone,
@@ -56,9 +55,8 @@ import { useState } from 'react';
 import AppLogo from './app-logo';
 
 export function AppSidebar() {
-    const { currentWorkspace, auth } = usePage().props as unknown as {
+    const { currentWorkspace } = usePage().props as unknown as {
         currentWorkspace: Workspace;
-        auth?: { user: UserType };
     };
 
     const slug = currentWorkspace?.slug ?? '';
@@ -291,6 +289,12 @@ export function AppSidebar() {
                     permission: PERMISSIONS.ViewRtsAnalytics,
                 },
                 {
+                    title: 'Page ROAS Tracker',
+                    href: `/workspaces/${slug}/rts/page-roas-tracker`,
+                    icon: PieChart,
+                    permission: PERMISSIONS.ViewRtsAnalytics,
+                },
+                {
                     title: 'Parcel Journey',
                     href: `/workspaces/${slug}/rts/parcel-journeys`,
                     icon: MapPin,
@@ -390,24 +394,6 @@ export function AppSidebar() {
                   },
               ]
             : []),
-    ];
-
-    const adminNavItems: NavItem[] = auth?.user?.can?.viewAnySupportTickets
-        ? [
-              {
-                  title: 'Support Tickets',
-                  href: `/workspaces/${slug}/admin/support-tickets`,
-                  icon: LifeBuoy,
-              },
-          ]
-        : [];
-
-    const supportNavItems: NavItem[] = [
-        {
-            title: 'Customer Support',
-            href: `/workspaces/${slug}/support`,
-            icon: LifeBuoy,
-        },
     ];
 
     return (
