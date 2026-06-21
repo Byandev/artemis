@@ -19,44 +19,60 @@ class DailySalesTrackerController extends Controller
     private const SORTABLE = [
         'order_date' => 'order_date',
         'csr' => 'csr',
+        'verifier_name' => 'verifier_name',
+        'upsell_by' => 'upsell_by',
+        'contact' => 'contact',
+        'order_details' => 'order_details',
         'total_qty' => 'total_qty',
-        'total_cog' => 'total_cog',
-        'shipped_out_date' => 'shipped_out_date',
         'page' => 'page',
+        'platform' => 'platform',
+        'tracking_number' => 'tracking_number',
+        'parcel_status' => 'parcel_status',
+        'order_status' => 'order_status',
+        'encoded_date' => 'encoded_date',
+        'parcel_updated_date' => 'parcel_updated_date',
+        'shipped_out_date' => 'shipped_out_date',
+        'date_added' => 'date_added',
+        'price_upsell' => 'price_upsell',
+        'intern_brands_name' => 'intern_brands_name',
+        'total_cog' => 'total_cog',
     ];
 
     public function index(Request $request, Workspace $workspace): Response
     {
         $this->authorize('View Daily Sales Tracker', $workspace);
 
-        $query = $this->filtered($request, $workspace);
-
+        // Each stat is its own query off a fresh filtered builder.
         $summary = [
-            'total_orders' => (clone $query)->count(),
-            'total_qty' => (int) (clone $query)->sum('total_qty'),
-            'total_cog' => (float) (clone $query)->sum('total_cog'),
-            'total_upsell' => (float) (clone $query)->sum('price_upsell'),
+            'total_orders' => $this->filtered($request, $workspace)->count(),
+            'total_qty' => (int) $this->filtered($request, $workspace)->sum('total_qty'),
+            'total_cog' => (float) $this->filtered($request, $workspace)->sum('total_cog'),
+            'total_upsell' => (float) $this->filtered($request, $workspace)->sum('price_upsell'),
         ];
 
         [$sortColumn, $sortDir, $sortParam] = $this->resolveSort($request);
 
-        $orders = $query
+        $orders = $this->filtered($request, $workspace)
             ->orderBy($sortColumn, $sortDir)
             ->orderBy('id', 'desc')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
 
-        $csrs = GencysDailySalesOrder::where('workspace_id', $workspace->id)
-            ->whereNotNull('csr')
+        $distinct = fn (string $column) => GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->whereNotNull($column)
+            ->where($column, '!=', '')
             ->distinct()
-            ->orderBy('csr')
-            ->pluck('csr');
+            ->orderBy($column)
+            ->pluck($column);
 
         return Inertia::render('workspaces/gencys/daily-sales-tracker/index', [
             'workspace' => $workspace,
             'orders' => $orders,
             'summary' => $summary,
-            'csrs' => $csrs,
+            'csrs' => $distinct('csr'),
+            'platforms' => $distinct('platform'),
+            'parcelStatuses' => $distinct('parcel_status'),
+            'orderStatuses' => $distinct('order_status'),
             'query' => [
                 'sort' => $sortParam,
                 'perPage' => $request->input('per_page', $request->input('perPage')),
@@ -86,8 +102,16 @@ class DailySalesTrackerController extends Controller
             $query->whereDate('order_date', '<=', $end);
         }
 
-        if ($csr = $request->input('filter.csr')) {
-            $query->where('csr', $csr);
+        // Multi-select filters: accept an array (whereIn) or a single value.
+        foreach (['csr', 'platform', 'parcel_status', 'order_status'] as $column) {
+            $values = array_values(array_filter(
+                (array) $request->input("filter.{$column}", []),
+                fn ($v) => $v !== null && $v !== '',
+            ));
+
+            if (! empty($values)) {
+                $query->whereIn($column, $values);
+            }
         }
 
         return $query;

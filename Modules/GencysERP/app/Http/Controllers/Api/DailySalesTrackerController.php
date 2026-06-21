@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 
 /**
@@ -24,10 +25,17 @@ class DailySalesTrackerController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
+        // Inspect exactly what n8n sends. Remove once the flow is verified.
+        Log::info('Gencys daily sales tracker request', [
+            'method' => $request->method(),
+            'ip' => $request->ip(),
+            'content_type' => $request->header('Content-Type'),
+            'headers' => $request->headers->all(),
+            'body' => $request->all(),
+            'raw' => $request->getContent(),
+        ]);
 
         $payload = $request->all();
-
-
 
         // Accept either a single entry object or n8n's list of entries.
         $entries = array_is_list($payload) ? $payload : [$payload];
@@ -50,7 +58,10 @@ class DailySalesTrackerController extends Controller
             $apiKey->update(['last_used_at' => now()]);
             $workspace = $apiKey->workspace;
 
-            foreach (Arr::get($entry, 'orders', []) as $order) {
+            // n8n sends the rows under "purchase_orders"; older payloads used "orders".
+            $rows = Arr::get($entry, 'purchase_orders', Arr::get($entry, 'orders', []));
+
+            foreach ($rows as $order) {
                 $tracking = $this->str($order['Tracking Number'] ?? null);
 
                 $attributes = [

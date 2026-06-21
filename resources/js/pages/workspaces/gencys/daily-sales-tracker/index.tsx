@@ -1,5 +1,13 @@
 import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import Pagination from '@/components/ui/pagination';
 import {
     Select,
@@ -17,8 +25,8 @@ import flatpickr from 'flatpickr';
 import { debounce } from 'lodash';
 import {
     ChevronDown,
-    ChevronRight,
     Coins,
+    Columns3,
     Package,
     PackageCheck,
     Search,
@@ -33,6 +41,7 @@ import {
     useState,
     type ReactNode,
 } from 'react';
+import DailySalesFilters from './daily-sales-filters';
 import DateOption = flatpickr.Options.DateOption;
 
 interface Order {
@@ -71,6 +80,9 @@ interface Props {
     orders: PaginatedData<Order>;
     summary: Summary;
     csrs: string[];
+    platforms: string[];
+    parcelStatuses: string[];
+    orderStatuses: string[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -79,7 +91,10 @@ interface Props {
             search?: string;
             start_date?: string;
             end_date?: string;
-            csr?: string;
+            csr?: string[];
+            platform?: string[];
+            parcel_status?: string[];
+            order_status?: string[];
         };
     };
 }
@@ -109,11 +124,203 @@ function statusPill(status: string | null): string {
     return 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400';
 }
 
+const StatusPill = ({ value }: { value: string | null }) =>
+    value ? (
+        <span
+            className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium whitespace-nowrap',
+                statusPill(value),
+            )}
+        >
+            <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+            {value}
+        </span>
+    ) : (
+        <span className="text-gray-400">—</span>
+    );
+
+interface ColumnDef {
+    key: string;
+    label: string;
+    sortable: boolean;
+    align?: 'left' | 'right';
+    defaultVisible?: boolean;
+    render: (o: Order) => ReactNode;
+}
+
+const baseCell =
+    'px-4 py-3 align-middle font-mono text-[11px] text-gray-600 dark:text-gray-400';
+
+const COLUMNS: ColumnDef[] = [
+    {
+        key: 'order_date',
+        label: 'Order Date',
+        sortable: true,
+        render: (o) => fmtDateTime(o.order_date),
+    },
+    {
+        key: 'csr',
+        label: 'CSR',
+        sortable: true,
+        render: (o) => (
+            <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                {o.csr || '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'verifier_name',
+        label: 'Verifier',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.verifier_name || '—',
+    },
+    {
+        key: 'upsell_by',
+        label: 'Upsell By',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.upsell_by || '—',
+    },
+    {
+        key: 'contact',
+        label: 'Contact',
+        sortable: true,
+        render: (o) => o.contact || '—',
+    },
+    {
+        key: 'order_details',
+        label: 'Order',
+        sortable: true,
+        render: (o) => (
+            <span className="block max-w-[260px] truncate text-[12px] text-gray-700 dark:text-gray-300">
+                {o.order_details || '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'total_qty',
+        label: 'Qty',
+        sortable: true,
+        align: 'right',
+        render: (o) => (
+            <span className="text-[12px] text-gray-700 dark:text-gray-300">
+                {o.total_qty?.toLocaleString() ?? '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'page',
+        label: 'Page',
+        sortable: true,
+        render: (o) => (
+            <span className="block max-w-[180px] truncate">
+                {o.page || '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'platform',
+        label: 'Platform',
+        sortable: true,
+        render: (o) => o.platform || '—',
+    },
+    {
+        key: 'tracking_number',
+        label: 'Tracking No.',
+        sortable: true,
+        render: (o) => o.tracking_number || '—',
+    },
+    {
+        key: 'parcel_status',
+        label: 'Parcel Status',
+        sortable: true,
+        render: (o) => <StatusPill value={o.parcel_status} />,
+    },
+    {
+        key: 'order_status',
+        label: 'Order Status',
+        sortable: true,
+        render: (o) => <StatusPill value={o.order_status} />,
+    },
+    {
+        key: 'encoded_date',
+        label: 'Encoded',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => fmtDateTime(o.encoded_date),
+    },
+    {
+        key: 'parcel_updated_date',
+        label: 'Parcel Updated',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => fmtDateTime(o.parcel_updated_date),
+    },
+    {
+        key: 'shipped_out_date',
+        label: 'Shipped',
+        sortable: true,
+        render: (o) => fmtDate(o.shipped_out_date),
+    },
+    {
+        key: 'date_added',
+        label: 'Date Added',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => fmtDateTime(o.date_added),
+    },
+    {
+        key: 'price_upsell',
+        label: 'Upsell ₱',
+        sortable: true,
+        align: 'right',
+        defaultVisible: false,
+        render: (o) => (o.price_upsell ? peso(o.price_upsell) : '—'),
+    },
+    {
+        key: 'intern_brands_name',
+        label: 'Intern & Brands',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.intern_brands_name || '—',
+    },
+    {
+        key: 'total_cog',
+        label: 'COG',
+        sortable: true,
+        align: 'right',
+        render: (o) => (
+            <span className="text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
+                {peso(o.total_cog)}
+            </span>
+        ),
+    },
+];
+
+const STORAGE_KEY = 'gencys-dst-visible-columns';
+
+function loadVisible(): Record<string, boolean> {
+    const defaults = Object.fromEntries(
+        COLUMNS.map((c) => [c.key, c.defaultVisible !== false]),
+    );
+    if (typeof window === 'undefined') return defaults;
+    try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+        return { ...defaults, ...saved };
+    } catch {
+        return defaults;
+    }
+}
+
 export default function DailySalesTrackerIndex({
     workspace,
     orders,
     summary,
     csrs,
+    platforms,
+    parcelStatuses,
+    orderStatuses,
     query,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/gencys/daily-sales-tracker`;
@@ -123,16 +330,46 @@ export default function DailySalesTrackerIndex({
         query?.filter?.start_date ?? '',
         query?.filter?.end_date ?? '',
     ]);
-    const [csrFilter, setCsrFilter] = useState(query?.filter?.csr ?? '');
-    const [expanded, setExpanded] = useState<Set<number>>(new Set());
+    const [csrFilter, setCsrFilter] = useState<string[]>(
+        query?.filter?.csr ?? [],
+    );
+    const [platformFilter, setPlatformFilter] = useState<string[]>(
+        query?.filter?.platform ?? [],
+    );
+    const [parcelStatusFilter, setParcelStatusFilter] = useState<string[]>(
+        query?.filter?.parcel_status ?? [],
+    );
+    const [orderStatusFilter, setOrderStatusFilter] = useState<string[]>(
+        query?.filter?.order_status ?? [],
+    );
+    const [visible, setVisible] =
+        useState<Record<string, boolean>>(loadVisible);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(visible));
+        } catch {
+            /* ignore quota / private-mode errors */
+        }
+    }, [visible]);
+
+    const visibleColumns = useMemo(
+        () => COLUMNS.filter((c) => visible[c.key] !== false),
+        [visible],
+    );
 
     const sort = parseSort(query?.sort);
 
-    const buildFilter = (search: string, range: string[], csr: string) => ({
-        search: search || undefined,
-        start_date: range[0] || undefined,
-        end_date: range[1] || undefined,
-        csr: csr || undefined,
+    const arr = (v: string[]) => (v.length ? v : undefined);
+
+    const buildFilter = () => ({
+        search: searchValue || undefined,
+        start_date: dateRange[0] || undefined,
+        end_date: dateRange[1] || undefined,
+        csr: arr(csrFilter),
+        platform: arr(platformFilter),
+        parcel_status: arr(parcelStatusFilter),
+        order_status: arr(orderStatusFilter),
     });
 
     const fetchData = useCallback(
@@ -141,7 +378,7 @@ export default function DailySalesTrackerIndex({
                 baseUrl,
                 {
                     sort: overrides?.sort ?? query?.sort,
-                    filter: buildFilter(searchValue, dateRange, csrFilter),
+                    filter: buildFilter(),
                     page: overrides?.page ?? 1,
                     per_page:
                         overrides?.per_page ??
@@ -156,6 +393,7 @@ export default function DailySalesTrackerIndex({
                 },
             );
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         [
             baseUrl,
             query?.sort,
@@ -164,6 +402,9 @@ export default function DailySalesTrackerIndex({
             searchValue,
             dateRange,
             csrFilter,
+            platformFilter,
+            parcelStatusFilter,
+            orderStatusFilter,
         ],
     );
 
@@ -173,33 +414,34 @@ export default function DailySalesTrackerIndex({
     );
 
     useEffect(() => {
-        const changed =
-            searchValue !== (query?.filter?.search ?? '') ||
-            (dateRange[0] || undefined) !==
-                (query?.filter?.start_date ?? undefined) ||
-            (dateRange[1] || undefined) !==
-                (query?.filter?.end_date ?? undefined) ||
-            csrFilter !== (query?.filter?.csr ?? '');
-        if (changed) debouncedFetch();
+        const f = query?.filter ?? {};
+        const serverSig = JSON.stringify({
+            search: f.search || undefined,
+            start_date: f.start_date || undefined,
+            end_date: f.end_date || undefined,
+            csr: arr(f.csr ?? []),
+            platform: arr(f.platform ?? []),
+            parcel_status: arr(f.parcel_status ?? []),
+            order_status: arr(f.order_status ?? []),
+        });
+        if (JSON.stringify(buildFilter()) !== serverSig) debouncedFetch();
         return () => debouncedFetch.cancel();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchValue, dateRange, csrFilter]);
+    }, [
+        searchValue,
+        dateRange,
+        csrFilter,
+        platformFilter,
+        parcelStatusFilter,
+        orderStatusFilter,
+    ]);
 
     const toggleSort = (field: string) => {
         const desc = sort.field === field ? !sort.desc : false;
         fetchData({ sort: `${desc ? '-' : ''}${field}` });
     };
 
-    const toggleExpand = (id: number) =>
-        setExpanded((prev) => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-
     const rows = orders.data ?? [];
-    const colSpan = 12;
 
     const summaryCards: {
         label: string;
@@ -261,12 +503,12 @@ export default function DailySalesTrackerIndex({
                     ))}
                 </div>
 
-                <div className="mb-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center">
-                    <div className="relative w-full max-w-xs">
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                    <div className="relative w-full sm:w-64">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
-                            placeholder="Search CSR, contact, tracking, page…"
+                            placeholder="Search CSR, contact, tracking…"
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                             aria-label="Search daily sales orders"
@@ -292,33 +534,62 @@ export default function DailySalesTrackerIndex({
                             }
                         }}
                     />
-                    <Select
-                        value={csrFilter || 'all'}
-                        onValueChange={(v) =>
-                            setCsrFilter(v === 'all' ? '' : v)
-                        }
-                    >
-                        <SelectTrigger className="h-9 w-[180px] rounded-[10px] border border-black/6 bg-stone-100 px-3 font-mono! text-[12px]! dark:border-white/6 dark:bg-zinc-800">
-                            <SelectValue placeholder="All CSRs" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                value="all"
-                                className="font-mono! text-[12px]!"
+
+                    <div className="flex items-center gap-2 sm:ml-auto">
+                        <DailySalesFilters
+                            value={{
+                                csr: csrFilter,
+                                platform: platformFilter,
+                                parcel_status: parcelStatusFilter,
+                                order_status: orderStatusFilter,
+                            }}
+                            csrs={csrs}
+                            platforms={platforms}
+                            parcelStatuses={parcelStatuses}
+                            orderStatuses={orderStatuses}
+                            onApply={(v) => {
+                                setCsrFilter(v.csr);
+                                setPlatformFilter(v.platform);
+                                setParcelStatusFilter(v.parcel_status);
+                                setOrderStatusFilter(v.order_status);
+                            }}
+                        />
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="flex h-9 items-center gap-1.5 rounded-[10px] border border-black/8 bg-white px-3 font-mono text-[12px] text-gray-700 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:border-black/14 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-200 dark:shadow-none dark:hover:border-white/14">
+                                    <Columns3 className="h-3.5 w-3.5" />
+                                    Columns
+                                    <ChevronDown className="h-3 w-3 opacity-50" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="end"
+                                className="max-h-[60vh] w-52 overflow-y-auto"
                             >
-                                All CSRs
-                            </SelectItem>
-                            {csrs.map((c) => (
-                                <SelectItem
-                                    key={c}
-                                    value={c}
-                                    className="font-mono! text-[12px]!"
-                                >
-                                    {c}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                                <DropdownMenuLabel className="font-mono text-[10px] tracking-wider uppercase">
+                                    Toggle columns
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {COLUMNS.map((c) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={c.key}
+                                        checked={visible[c.key] !== false}
+                                        onCheckedChange={(checked) =>
+                                            setVisible((prev) => ({
+                                                ...prev,
+                                                [c.key]: !!checked,
+                                            }))
+                                        }
+                                        onSelect={(e) => e.preventDefault()}
+                                        className="font-mono text-[12px]"
+                                    >
+                                        {c.label}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </div>
 
                 <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -326,55 +597,29 @@ export default function DailySalesTrackerIndex({
                         <table className="w-full border-collapse">
                             <thead>
                                 <tr className="border-b border-black/6 dark:border-white/6">
-                                    <th className="w-8 px-2 py-2.5" />
-                                    <SortHeader
-                                        label="Order Date"
-                                        field="order_date"
-                                        sort={sort}
-                                        onSort={toggleSort}
-                                    />
-                                    <SortHeader
-                                        label="CSR"
-                                        field="csr"
-                                        sort={sort}
-                                        onSort={toggleSort}
-                                    />
-                                    <Th>Contact</Th>
-                                    <Th>Order</Th>
-                                    <SortHeader
-                                        label="Qty"
-                                        field="total_qty"
-                                        sort={sort}
-                                        onSort={toggleSort}
-                                    />
-                                    <SortHeader
-                                        label="Page"
-                                        field="page"
-                                        sort={sort}
-                                        onSort={toggleSort}
-                                    />
-                                    <Th>Tracking No.</Th>
-                                    <Th>Parcel Status</Th>
-                                    <Th>Order Status</Th>
-                                    <SortHeader
-                                        label="Shipped"
-                                        field="shipped_out_date"
-                                        sort={sort}
-                                        onSort={toggleSort}
-                                    />
-                                    <SortHeader
-                                        label="COG"
-                                        field="total_cog"
-                                        sort={sort}
-                                        onSort={toggleSort}
-                                    />
+                                    {visibleColumns.map((c) =>
+                                        c.sortable ? (
+                                            <SortHeader
+                                                key={c.key}
+                                                label={c.label}
+                                                field={c.key}
+                                                align={c.align}
+                                                sort={sort}
+                                                onSort={toggleSort}
+                                            />
+                                        ) : (
+                                            <Th key={c.key} align={c.align}>
+                                                {c.label}
+                                            </Th>
+                                        ),
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
                                 {rows.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={colSpan}
+                                            colSpan={visibleColumns.length || 1}
                                             className="py-16 text-center"
                                         >
                                             <div className="flex flex-col items-center gap-3">
@@ -389,15 +634,23 @@ export default function DailySalesTrackerIndex({
                                     </tr>
                                 ) : (
                                     rows.map((order) => (
-                                        <OrderRow
+                                        <tr
                                             key={order.id}
-                                            order={order}
-                                            isOpen={expanded.has(order.id)}
-                                            colSpan={colSpan}
-                                            onToggle={() =>
-                                                toggleExpand(order.id)
-                                            }
-                                        />
+                                            className="border-b border-black/6 transition-colors hover:bg-emerald-500/3 dark:border-white/6"
+                                        >
+                                            {visibleColumns.map((c) => (
+                                                <td
+                                                    key={c.key}
+                                                    className={cn(
+                                                        baseCell,
+                                                        c.align === 'right' &&
+                                                            'text-right',
+                                                    )}
+                                                >
+                                                    {c.render(order)}
+                                                </td>
+                                            ))}
+                                        </tr>
                                     ))
                                 )}
                             </tbody>
@@ -454,9 +707,20 @@ export default function DailySalesTrackerIndex({
     );
 }
 
-function Th({ children }: { children: ReactNode }) {
+function Th({
+    children,
+    align,
+}: {
+    children: ReactNode;
+    align?: 'left' | 'right';
+}) {
     return (
-        <th className="px-4 py-2.5 text-left font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase dark:text-gray-600">
+        <th
+            className={cn(
+                'px-4 py-2.5 font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase dark:text-gray-600',
+                align === 'right' ? 'text-right' : 'text-left',
+            )}
+        >
             {children}
         </th>
     );
@@ -465,17 +729,26 @@ function Th({ children }: { children: ReactNode }) {
 interface SortHeaderProps {
     label: string;
     field: string;
+    align?: 'left' | 'right';
     sort: { field: string; desc: boolean };
     onSort: (field: string) => void;
 }
 
-function SortHeader({ label, field, sort, onSort }: SortHeaderProps) {
+function SortHeader({ label, field, align, sort, onSort }: SortHeaderProps) {
     const active = sort.field === field;
     return (
-        <th className="px-4 py-2.5 text-left">
+        <th
+            className={cn(
+                'px-4 py-2.5',
+                align === 'right' ? 'text-right' : 'text-left',
+            )}
+        >
             <button
                 onClick={() => onSort(field)}
-                className="group inline-flex items-center gap-1 font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase transition-colors hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
+                className={cn(
+                    'group inline-flex items-center gap-1 font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase transition-colors hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400',
+                    align === 'right' && 'flex-row-reverse',
+                )}
             >
                 {label}
                 <ChevronDown
@@ -487,132 +760,5 @@ function SortHeader({ label, field, sort, onSort }: SortHeaderProps) {
                 />
             </button>
         </th>
-    );
-}
-
-interface OrderRowProps {
-    order: Order;
-    isOpen: boolean;
-    colSpan: number;
-    onToggle: () => void;
-}
-
-function OrderRow({ order, isOpen, colSpan, onToggle }: OrderRowProps) {
-    const detail: { label: string; value: ReactNode }[] = [
-        { label: 'Platform', value: order.platform || '—' },
-        { label: 'Verifier', value: order.verifier_name || '—' },
-        { label: 'Upsell By', value: order.upsell_by || '—' },
-        {
-            label: 'Upsell Price',
-            value: order.price_upsell ? peso(order.price_upsell) : '—',
-        },
-        { label: 'Encoded Date', value: fmtDateTime(order.encoded_date) },
-        {
-            label: 'Parcel Updated',
-            value: fmtDateTime(order.parcel_updated_date),
-        },
-        { label: 'Date Added', value: fmtDateTime(order.date_added) },
-        { label: 'Intern & Brands', value: order.intern_brands_name || '—' },
-    ];
-
-    return (
-        <>
-            <tr className="border-b border-black/6 transition-colors hover:bg-emerald-500/3 dark:border-white/6">
-                <td className="px-2 py-3 align-middle">
-                    <button
-                        onClick={onToggle}
-                        aria-expanded={isOpen}
-                        aria-label={
-                            isOpen ? 'Collapse detail' : 'Expand detail'
-                        }
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-stone-100 hover:text-gray-600 dark:hover:bg-zinc-800"
-                    >
-                        {isOpen ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                        ) : (
-                            <ChevronRight className="h-3.5 w-3.5" />
-                        )}
-                    </button>
-                </td>
-                <td className="px-4 py-3 align-middle font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {fmtDateTime(order.order_date)}
-                </td>
-                <td className="px-4 py-3 align-middle text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                    {order.csr || '—'}
-                </td>
-                <td className="px-4 py-3 align-middle font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {order.contact || '—'}
-                </td>
-                <td className="max-w-[260px] px-4 py-3 align-middle">
-                    <span className="block truncate text-[12px] text-gray-700 dark:text-gray-300">
-                        {order.order_details || '—'}
-                    </span>
-                </td>
-                <td className="px-4 py-3 text-right align-middle font-mono text-[12px] text-gray-700 dark:text-gray-300">
-                    {order.total_qty?.toLocaleString() ?? '—'}
-                </td>
-                <td className="max-w-[180px] px-4 py-3 align-middle">
-                    <span className="block truncate font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                        {order.page || '—'}
-                    </span>
-                </td>
-                <td className="px-4 py-3 align-middle font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {order.tracking_number || '—'}
-                </td>
-                <td className="px-4 py-3 align-middle">
-                    {order.parcel_status ? (
-                        <span
-                            className={cn(
-                                'inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium',
-                                statusPill(order.parcel_status),
-                            )}
-                        >
-                            {order.parcel_status}
-                        </span>
-                    ) : (
-                        <span className="text-gray-400">—</span>
-                    )}
-                </td>
-                <td className="px-4 py-3 align-middle">
-                    {order.order_status ? (
-                        <span
-                            className={cn(
-                                'inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-medium',
-                                statusPill(order.order_status),
-                            )}
-                        >
-                            {order.order_status}
-                        </span>
-                    ) : (
-                        <span className="text-gray-400">—</span>
-                    )}
-                </td>
-                <td className="px-4 py-3 align-middle font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {fmtDate(order.shipped_out_date)}
-                </td>
-                <td className="px-4 py-3 text-right align-middle font-mono text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
-                    {peso(order.total_cog)}
-                </td>
-            </tr>
-
-            {isOpen && (
-                <tr className="bg-stone-50/60 dark:bg-zinc-950/40">
-                    <td colSpan={colSpan} className="px-4 py-4">
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-[12px] border border-black/6 bg-white p-4 sm:grid-cols-4 dark:border-white/6 dark:bg-zinc-900">
-                            {detail.map((d) => (
-                                <div key={d.label}>
-                                    <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                        {d.label}
-                                    </p>
-                                    <p className="mt-0.5 font-mono text-[12px] text-gray-700 dark:text-gray-300">
-                                        {d.value}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </td>
-                </tr>
-            )}
-        </>
     );
 }
