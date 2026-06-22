@@ -12,15 +12,15 @@ use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\MetaAds\Models\AdAccount;
-use Modules\MetaAds\Models\AdSet;
+use Modules\MetaAds\Models\Campaign;
 
 class AdsCalendarController extends Controller
 {
     /**
-     * Ads Calendar — a month grid showing how many ad sets were created on each
-     * day, broken down per Facebook page. Ad sets carry the FB page id in
-     * meta_page_id, and a Pancake page's primary key IS that FB page id, so we
-     * join straight to `pages` for a human-readable page name.
+     * Ads Calendar — a month grid showing how many campaigns were created on each
+     * day, broken down per Facebook page. Campaigns carry no page of their own,
+     * so the page is derived from their ad sets' meta_page_id; a Pancake page's
+     * primary key IS that FB page id, so we join straight to `pages` for the name.
      */
     public function index(Request $request, Workspace $workspace): Response
     {
@@ -47,7 +47,7 @@ class AdsCalendarController extends Controller
 
         $rows = $accountIds->isEmpty()
             ? collect()
-            : $this->dailyCountsPerPage($accountIds->all(), $start, $end, $selectedPages);
+            : $this->dailyCampaignCountsPerPage($accountIds->all(), $start, $end, $selectedPages);
 
         return Inertia::render('workspaces/integrations/meta-ads/calendar', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
@@ -65,17 +65,20 @@ class AdsCalendarController extends Controller
     }
 
     /**
-     * One row per (day, page) with the number of ad sets created. The page name
-     * is resolved via the pages table (LEFT JOIN so ad sets without a known page
-     * still surface under an "Unassigned page" bucket).
+     * One row per (day, page) with the number of distinct campaigns created. The
+     * day is the campaign's created date; the page is derived from the campaign's
+     * ad sets (LEFT JOIN so a campaign with no ad set / no known page still
+     * surfaces under "Unassigned"). A campaign whose ad sets span several pages is
+     * counted once per page (COUNT DISTINCT dedupes within a page bucket).
      */
-    private function dailyCountsPerPage(array $accountIds, Carbon $start, Carbon $end, array $selectedPages = [])
+    private function dailyCampaignCountsPerPage(array $accountIds, Carbon $start, Carbon $end, array $selectedPages = [])
     {
-        return AdSet::query()
+        return Campaign::query()
+            ->leftJoin('meta_ads_sets', 'meta_ads_sets.meta_ads_campaign_id', '=', 'meta_ads_campaigns.id')
             ->leftJoin('pages', 'pages.id', '=', 'meta_ads_sets.meta_page_id')
-            ->whereIn('meta_ads_sets.meta_ads_account_id', $accountIds)
-            ->whereNotNull('meta_ads_sets.created_time')
-            ->whereBetween('meta_ads_sets.created_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->whereIn('meta_ads_campaigns.meta_ads_account_id', $accountIds)
+            ->whereNotNull('meta_ads_campaigns.created_time')
+            ->whereBetween('meta_ads_campaigns.created_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
             ->when(! empty($selectedPages), function ($q) use ($selectedPages) {
                 $ids = array_values(array_filter($selectedPages, fn ($p) => $p !== 'none'));
                 $includeUnassigned = in_array('none', $selectedPages, true);
@@ -89,21 +92,21 @@ class AdsCalendarController extends Controller
                     }
                 });
             })
-            ->groupBy(DB::raw('DATE(meta_ads_sets.created_time)'), 'meta_ads_sets.meta_page_id', 'pages.name')
-            ->orderBy(DB::raw('DATE(meta_ads_sets.created_time)'))
+            ->groupBy(DB::raw('DATE(meta_ads_campaigns.created_time)'), 'meta_ads_sets.meta_page_id', 'pages.name')
+            ->orderBy(DB::raw('DATE(meta_ads_campaigns.created_time)'))
             ->get([
-                DB::raw('DATE(meta_ads_sets.created_time) AS day'),
+                DB::raw('DATE(meta_ads_campaigns.created_time) AS day'),
                 'meta_ads_sets.meta_page_id',
                 'pages.name AS page_name',
-                DB::raw('COUNT(*) AS total'),
+                DB::raw('COUNT(DISTINCT meta_ads_campaigns.id) AS total'),
             ]);
     }
 
     /**
      * Filter options: every page in the workspace the user is allowed to see —
-     * the canonical, month-stable list (pages with no ad sets are still listed).
+     * the canonical, month-stable list (pages with no campaigns are still listed).
      * An "Unassigned" bucket (keyed `none`) is appended only when the visible
-     * month actually contains ad sets that carry no page.
+     * month actually contains campaigns with no resolvable page.
      *
      * @return array<int, array{id: string, name: string}>
      */
@@ -120,7 +123,7 @@ class AdsCalendarController extends Controller
             ])
             ->all();
 
-        if (! empty($accountIds) && $this->hasUnassignedAdSets($accountIds, $start, $end)) {
+        if (! empty($accountIds) && $this->hasUnassignedCampaigns($accountIds, $start, $end)) {
             $options[] = ['id' => 'none', 'name' => 'Unassigned page'];
         }
 
@@ -128,22 +131,24 @@ class AdsCalendarController extends Controller
     }
 
     /**
-     * Whether the month has any ad sets with no page (meta_page_id NULL) within
-     * the visible accounts — drives whether the "Unassigned" filter is offered.
+     * Whether the month has any campaign with no resolvable page — i.e. it has no
+     * ad set, or an ad set with a NULL meta_page_id — within the visible accounts.
+     * Drives whether the "Unassigned" filter option is offered.
      */
-    private function hasUnassignedAdSets(array $accountIds, Carbon $start, Carbon $end): bool
+    private function hasUnassignedCampaigns(array $accountIds, Carbon $start, Carbon $end): bool
     {
-        return AdSet::query()
-            ->whereIn('meta_ads_sets.meta_ads_account_id', $accountIds)
-            ->whereNotNull('meta_ads_sets.created_time')
-            ->whereBetween('meta_ads_sets.created_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+        return Campaign::query()
+            ->leftJoin('meta_ads_sets', 'meta_ads_sets.meta_ads_campaign_id', '=', 'meta_ads_campaigns.id')
+            ->whereIn('meta_ads_campaigns.meta_ads_account_id', $accountIds)
+            ->whereNotNull('meta_ads_campaigns.created_time')
+            ->whereBetween('meta_ads_campaigns.created_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
             ->whereNull('meta_ads_sets.meta_page_id')
             ->exists();
     }
 
     /**
      * Calendar payload keyed by `Y-m-d`, each day holding its grand total and a
-     * per-page breakdown sorted by volume. Days with no ad sets are omitted (the
+     * per-page breakdown sorted by volume. Days with no campaigns are omitted (the
      * frontend renders the full grid and treats missing keys as empty).
      *
      * @return array<string, array{total: int, pages: array<int, array{id: string, name: string, count: int}>}>
