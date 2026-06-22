@@ -4,14 +4,16 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import { CreativeForm } from './components/creative-form';
-import { Product } from './types';
+import { Product, Reviewer } from './types';
 
 export default function CreativeCreate({
     workspace,
     products,
+    reviewers,
 }: {
     workspace: Workspace;
     products: Product[];
+    reviewers: Reviewer[];
 }) {
     const baseUrl = `/workspaces/${workspace.slug}/creatives`;
 
@@ -30,7 +32,11 @@ export default function CreativeCreate({
                         <ArrowLeft className="h-3.5 w-3.5" /> Back to Creatives
                     </button>
                 </PageHeader>
-                <CreativeForm workspace={workspace} products={products} />
+                <CreativeForm
+                    workspace={workspace}
+                    products={products}
+                    reviewers={reviewers}
+                />
             </div>
         </AppLayout>
     );

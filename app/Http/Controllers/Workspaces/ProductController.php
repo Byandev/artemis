@@ -8,6 +8,7 @@ use App\Models\Page;
 use App\Models\Product;
 use App\Models\Workspace;
 use App\Services\PostHogService;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -22,7 +23,15 @@ class ProductController extends Controller
     {
         $this->authorize(Permission::ViewProducts->value, $workspace);
 
-        $products = QueryBuilder::for(Product::ofWorkspace($workspace))
+        $user = $request->user();
+
+        $products = QueryBuilder::for(
+            Product::ofWorkspace($workspace)
+                ->when(
+                    TeamVisibility::shouldScope($user, $workspace),
+                    fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($user, $workspace)),
+                )
+        )
             ->with('owner')
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -69,6 +78,7 @@ class ProductController extends Controller
     {
         $this->authorize(Permission::CreateProducts->value, $workspace);
         $pages = Page::ofWorkspace($workspace)
+            ->visibleTo(auth()->user(), $workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
@@ -133,6 +143,7 @@ class ProductController extends Controller
     {
         $this->authorize(Permission::EditProducts->value, $workspace);
         $pages = Page::ofWorkspace($workspace)
+            ->visibleTo(auth()->user(), $workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();

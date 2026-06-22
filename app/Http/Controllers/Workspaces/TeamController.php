@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;
 use App\Services\PostHogService;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -22,7 +23,15 @@ class TeamController extends Controller
     {
         $this->authorize(Permission::ViewTeams->value, $workspace);
 
-        $teams = QueryBuilder::for(Team::ofWorkspace($workspace)->withCount('members')->with(['members:id,name,email']))
+        $teams = QueryBuilder::for(
+            Team::ofWorkspace($workspace)
+                ->when(
+                    ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                    fn ($q) => $q->whereHas('members', fn ($m) => $m->where('users.id', $request->user()->id)),
+                )
+                ->withCount('members')
+                ->with(['members:id,name,email'])
+        )
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
             ])
@@ -62,6 +71,7 @@ class TeamController extends Controller
                     return $query->where('workspace_id', $workspace->id);
                 }),
             ],
+            'discord_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
             'members' => ['array'],
             'members.*' => ['exists:users,id'],
         ]);
@@ -69,6 +79,7 @@ class TeamController extends Controller
         $team = Team::create([
             'workspace_id' => $workspace->id,
             'name' => $validated['name'],
+            'discord_webhook_url' => $validated['discord_webhook_url'] ?? null,
         ]);
 
         if (! empty($validated['members'])) {
@@ -99,12 +110,14 @@ class TeamController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'discord_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
             'members' => ['array'],
             'members.*' => ['exists:users,id'],
         ]);
 
         $team->update([
             'name' => $validated['name'],
+            'discord_webhook_url' => $validated['discord_webhook_url'] ?? null,
         ]);
 
         $validMemberIds = $workspace->users()

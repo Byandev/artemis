@@ -4,6 +4,7 @@ namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -50,7 +51,13 @@ class OptimizationRuleController extends Controller
     {
         $perPage = (int) $request->integer('per_page', 15);
 
+        $user = $request->user();
+
         $rules = OptimizationRule::where('workspace_id', $workspace->id)
+            ->when(
+                TeamVisibility::shouldScope($user, $workspace),
+                fn ($q) => $q->whereHas('adAccounts', fn ($a) => $a->visibleTo($user, $workspace)),
+            )
             ->with(['conditions', 'adAccounts:id,name'])
             ->withCount('logs')
             ->orderByDesc('priority')
@@ -100,8 +107,17 @@ class OptimizationRuleController extends Controller
         $accountIds = array_values(array_filter((array) $request->input('ad_account_id', []), fn ($v) => $v !== '' && $v !== null));
         $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
 
+        $user = $request->user();
+
         $pending = OptimizationProposal::where('workspace_id', $workspace->id)
-            ->where('status', 'pending');
+            ->where('status', 'pending')
+            ->when(
+                TeamVisibility::shouldScope($user, $workspace),
+                fn ($q) => $q->whereIn(
+                    'meta_ads_account_id',
+                    AdAccount::forWorkspace($workspace)->visibleTo($user, $workspace)->select('id'),
+                ),
+            );
 
         $proposals = (clone $pending)
             ->when($accountIds, fn ($q) => $q->whereIn('meta_ads_account_id', $accountIds))
@@ -160,7 +176,24 @@ class OptimizationRuleController extends Controller
         $ruleIds = array_values(array_filter((array) $request->input('rule_id', []), fn ($v) => $v !== '' && $v !== null));
         $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
 
+        $user = $request->user();
+
+        // History reflects actions taken on accounts — limit it to the accounts
+        // the user can *manage*, not merely view. A log has no account column, so
+        // scope by the actual target's (campaign / ad set) account rather than the
+        // rule's accounts (a rule can span manageable and non-manageable accounts).
+        $manageableAccountIds = TeamVisibility::manageableAccountIds($user, $workspace);
+        $manageScope = function ($query) use ($manageableAccountIds) {
+            $query->where(function ($q) use ($manageableAccountIds) {
+                $q->where(fn ($q) => $q->where('target_type', 'campaign')
+                    ->whereIn('target_id', Campaign::whereIn('meta_ads_account_id', $manageableAccountIds)->select('id')))
+                    ->orWhere(fn ($q) => $q->where('target_type', 'ad_set')
+                        ->whereIn('target_id', AdSet::whereIn('meta_ads_account_id', $manageableAccountIds)->select('id')));
+            });
+        };
+
         $logs = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->when($manageableAccountIds !== null, $manageScope)
             ->when($ruleIds, fn ($q) => $q->whereIn('meta_ads_optimization_rule_id', $ruleIds))
             ->when($actions, fn ($q) => $q->whereIn('action_taken', $actions))
             ->with('rule:id,name')
@@ -172,6 +205,7 @@ class OptimizationRuleController extends Controller
         // logged history in this workspace, so the dropdowns never list a value
         // with zero matching rows.
         $loggedRuleIds = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->when($manageableAccountIds !== null, $manageScope)
             ->distinct()
             ->pluck('meta_ads_optimization_rule_id');
 
@@ -182,6 +216,7 @@ class OptimizationRuleController extends Controller
             ->values();
 
         $filterActions = OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->when($manageableAccountIds !== null, $manageScope)
             ->distinct()
             ->orderBy('action_taken')
             ->pluck('action_taken')
@@ -271,6 +306,8 @@ class OptimizationRuleController extends Controller
 
     public function approveProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal): RedirectResponse
     {
+        $this->ensureCanManageAccount($request, $workspace, $proposal->meta_ads_account_id);
+
         $this->reviewProposal($request, $workspace, $proposal, 'approved');
         $this->applyProposal($proposal);
 
@@ -344,6 +381,13 @@ class OptimizationRuleController extends Controller
             ->whereIn('id', $ids)
             ->get();
 
+        // Approving applies real changes — drop accounts the user can't manage.
+        if ($status === 'approved') {
+            $proposals = $proposals->filter(
+                fn ($proposal) => $this->canManageAccount($request, $workspace, $proposal->meta_ads_account_id)
+            );
+        }
+
         foreach ($proposals as $proposal) {
             $proposal->update([
                 'status' => $status,
@@ -357,6 +401,37 @@ class OptimizationRuleController extends Controller
         }
 
         return $proposals->count();
+    }
+
+    /**
+     * Whether the user may change the given ad account — manage-tier team link or
+     * unrestricted. Approving a proposal applies a real change to the account, so
+     * it requires manage access on top of the "Approve Optimization Rules" verb.
+     */
+    private function canManageAccount(Request $request, Workspace $workspace, int|string|null $accountId): bool
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if (TeamVisibility::isUnrestricted($user, $workspace)) {
+            return true;
+        }
+
+        $account = $accountId !== null ? AdAccount::find($accountId) : null;
+
+        return $account !== null && TeamVisibility::canManageAdAccount($user, $account, $workspace);
+    }
+
+    private function ensureCanManageAccount(Request $request, Workspace $workspace, int|string|null $accountId): void
+    {
+        abort_unless(
+            $this->canManageAccount($request, $workspace, $accountId),
+            403,
+            'You do not have manage access to this ad account.',
+        );
     }
 
     private function reviewProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal, string $status): void
@@ -519,6 +594,7 @@ class OptimizationRuleController extends Controller
         return [
             'adAccounts' => AdAccount::forWorkspace($workspace)
                 ->where('active_sync', true)
+                ->visibleTo(request()->user(), $workspace)
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn (AdAccount $account) => [

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\MetaAds\Models\AdAccount;
 
 class Team extends Model
 {
@@ -15,6 +16,7 @@ class Team extends Model
     protected $fillable = [
         'workspace_id',
         'name',
+        'discord_webhook_url',
     ];
 
     /**
@@ -31,6 +33,28 @@ class Team extends Model
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'team_user');
+    }
+
+    /**
+     * Pages assigned to this team (team-level data ownership).
+     */
+    public function pages(): BelongsToMany
+    {
+        return $this->belongsToMany(Page::class, 'team_page')->withTimestamps();
+    }
+
+    /**
+     * Ad accounts assigned to this team. The pivot's access_level (view|manage)
+     * controls whether members may only see the account or also change it.
+     */
+    public function adAccounts(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            AdAccount::class,
+            'team_ad_account',
+            'team_id',
+            'meta_ads_account_id',
+        )->withPivot('access_level')->withTimestamps();
     }
 
     /**

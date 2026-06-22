@@ -5,6 +5,7 @@ namespace Modules\Botcake\Http\Controllers\Web;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -24,6 +25,10 @@ class FlowController extends Controller
 
         $base = Flow::query()
             ->whereHas('page', fn ($query) => $query->where('workspace_id', $workspace->id))
+            ->when(
+                TeamVisibility::shouldScope($request->user(), $workspace),
+                fn ($q) => $q->whereHas('page', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+            )
             ->with('page:id,name');
 
         if ($mode === 'historical') {
@@ -92,14 +97,26 @@ class FlowController extends Controller
 
         return Inertia::render('workspaces/botcake/flows', [
             'workspace' => $workspace->loadMissing([
-                'shops' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'shops' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            TeamVisibility::shouldScope($request->user(), $workspace),
+                            fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
+                        );
                 },
-                'pages' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'pages' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            TeamVisibility::shouldScope($request->user(), $workspace),
+                            fn ($q) => $q->visibleTo($request->user(), $workspace),
+                        );
                 },
-                'teams' => function ($query) {
-                    $query->select('id', 'name', 'workspace_id')->orderBy('name');
+                'teams' => function ($query) use ($request, $workspace) {
+                    $query->select('id', 'name', 'workspace_id')->orderBy('name')
+                        ->when(
+                            ! TeamVisibility::isUnrestricted($request->user(), $workspace),
+                            fn ($q) => $q->whereHas('members', fn ($m) => $m->where('users.id', $request->user()->id)),
+                        );
                 },
                 'pageOwners:id,name',
             ]),
