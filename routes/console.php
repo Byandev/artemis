@@ -32,6 +32,9 @@ Schedule::command('trigger-fetch-shops-users')->daily(7);
 // Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('12:00');
 // Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('15:00');
 
+// GencysERP daily sales tracker — enable once the n8n flow + callback are ready.
+// Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('06:00')->withoutOverlapping();
+
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 
