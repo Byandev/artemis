@@ -1,3 +1,4 @@
+import AskRtsWidget from '@/components/ai/AskRtsWidget';
 import PageHeader from '@/components/common/PageHeader';
 import Filters, { FilterValue } from '@/components/filters/Filters';
 import AdCard from '@/components/rts/AdCard';
@@ -88,6 +89,14 @@ export default function Analytics({ workspace }: Props) {
     const [dateRange, setDateRange] = useState(initialState.dateRange);
     const [filter, setFilter] = useState<FilterValue>(initialState.filter);
 
+    // Card data collected for the "Ask RTS Data" AI widget (FAB).
+    const [priceData, setPriceData] = useState<object[]>([]);
+    const [productData, setProductData] = useState<object[]>([]);
+    const [riderData, setRiderData] = useState<object[]>([]);
+    const [customerRiskData, setCustomerRiskData] = useState<object[]>([]);
+    const [provinceData, setProvinceData] = useState<object[]>([]);
+    const [orderFrequencyData, setOrderFrequencyData] = useState<object[]>([]);
+
     // Persist to localStorage so a refresh restores the current filters.
     useEffect(() => {
         try {
@@ -104,8 +113,8 @@ export default function Analytics({ workspace }: Props) {
         () => ({
             startDate: dateRange[0],
             endDate: dateRange[1],
-            pageIds: filter.pageIds,
-            shopIds: filter.shopIds,
+            pageIds: filter.pageIds.map(Number),
+            shopIds: filter.shopIds.map(Number),
         }),
         [dateRange, filter],
     );
@@ -143,6 +152,7 @@ export default function Analytics({ workspace }: Props) {
                     <PriceCard
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
+                        onDataLoaded={setPriceData}
                     />
                     <DeliveryAttemptsCard
                         workspaceSlug={workspace.slug}
@@ -153,14 +163,17 @@ export default function Analytics({ workspace }: Props) {
                 <CxRtsCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setCustomerRiskData}
                 />
                 <ProductCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setProductData}
                 />
                 <RiderCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setRiderData}
                 />
                 <ConfirmedByCard
                     workspaceSlug={workspace.slug}
@@ -173,12 +186,27 @@ export default function Analytics({ workspace }: Props) {
                 <OrderFrequencyCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setOrderFrequencyData}
                 />
                 <LocationCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
+                    onDataLoaded={setProvinceData}
                 />
             </div>
+
+            <AskRtsWidget
+                workspace={workspace}
+                dateRange={dateRange}
+                data={{
+                    price: priceData,
+                    products: productData,
+                    riders: riderData,
+                    customerRisk: customerRiskData,
+                    provinces: provinceData,
+                    orderFrequency: orderFrequencyData,
+                }}
+            />
         </AppLayout>
     );
 }
