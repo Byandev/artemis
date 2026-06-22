@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use App\Providers\ActivityLogServiceProvider;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
@@ -61,15 +62,21 @@ class ActivityLogObserver
         $base = class_basename($model);
         $action = Str::snake($base).'.'.$verb;
         $label = Str::headline($base);
+        $name = $this->displayName($model);
+
+        // Prefer a human-readable name ("Role \"Manager\" created") and fall back
+        // to the primary key when the model has no name-like attribute.
+        $subject = $name !== null ? "\"{$name}\"" : "#{$model->getKey()}";
 
         $builder = Activity::build()
             ->category(LogCategory::Data)
             ->action($action)
             ->status(LogStatus::Success)
-            ->message("{$label} #{$model->getKey()} {$verb}")
+            ->message("{$label} {$subject} {$verb}")
             ->metadata(array_filter([
                 'model' => $model::class,
                 'id' => $model->getKey(),
+                'name' => $name,
                 'changed' => $changed ?: null,
             ]));
 
@@ -84,5 +91,31 @@ class ActivityLogObserver
         }
 
         $builder->save();
+
+        // Tell the catch-all LogRequestActivity middleware that this request's
+        // state change already has a dedicated, richer entry, so it can skip
+        // writing a duplicate. Harmless in console/queue context (no middleware
+        // reads the flag there).
+        if (! App::runningInConsole()) {
+            request()->attributes->set('activity_logged', true);
+        }
+    }
+
+    /**
+     * Best-effort human-readable name for the record, used to make log messages
+     * read "Role \"Manager\" created" instead of "Role #5 created". Returns null
+     * when the model has no recognisable name-like attribute.
+     */
+    private function displayName(Model $model): ?string
+    {
+        foreach (['name', 'title', 'label', 'display_name', 'email', 'slug'] as $key) {
+            $value = $model->getAttribute($key);
+
+            if (is_scalar($value) && (string) $value !== '') {
+                return Str::limit((string) $value, 100, '');
+            }
+        }
+
+        return null;
     }
 }

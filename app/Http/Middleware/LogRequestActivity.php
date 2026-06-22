@@ -67,6 +67,12 @@ class LogRequestActivity
 
     private function record(Request $request, Response $response): void
     {
+        // The ActivityLogObserver already wrote a dedicated (richer) entry for
+        // this request's state change — don't duplicate it with a catch-all row.
+        if ($request->attributes->get('activity_logged')) {
+            return;
+        }
+
         $status = $response->getStatusCode();
         $route = $request->route();
         $action = $route?->getName() ?? $route?->getActionName() ?? $request->method();
