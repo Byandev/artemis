@@ -77,8 +77,8 @@ class AdsCalendarController extends Controller
             ->leftJoin('meta_ads_sets', 'meta_ads_sets.meta_ads_campaign_id', '=', 'meta_ads_campaigns.id')
             ->leftJoin('pages', 'pages.id', '=', 'meta_ads_sets.meta_page_id')
             ->whereIn('meta_ads_campaigns.meta_ads_account_id', $accountIds)
-            ->whereNotNull('meta_ads_campaigns.created_time')
-            ->whereBetween('meta_ads_campaigns.created_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->whereNotNull('meta_ads_campaigns.start_time')
+            ->whereBetween('meta_ads_campaigns.start_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
             ->when(! empty($selectedPages), function ($q) use ($selectedPages) {
                 $ids = array_values(array_filter($selectedPages, fn ($p) => $p !== 'none'));
                 $includeUnassigned = in_array('none', $selectedPages, true);
@@ -92,10 +92,10 @@ class AdsCalendarController extends Controller
                     }
                 });
             })
-            ->groupBy(DB::raw('DATE(meta_ads_campaigns.created_time)'), 'meta_ads_sets.meta_page_id', 'pages.name')
-            ->orderBy(DB::raw('DATE(meta_ads_campaigns.created_time)'))
+            ->groupBy(DB::raw('DATE(meta_ads_campaigns.start_time)'), 'meta_ads_sets.meta_page_id', 'pages.name')
+            ->orderBy(DB::raw('DATE(meta_ads_campaigns.start_time)'))
             ->get([
-                DB::raw('DATE(meta_ads_campaigns.created_time) AS day'),
+                DB::raw('DATE(meta_ads_campaigns.start_time) AS day'),
                 'meta_ads_sets.meta_page_id',
                 'pages.name AS page_name',
                 DB::raw('COUNT(DISTINCT meta_ads_campaigns.id) AS total'),
@@ -140,8 +140,8 @@ class AdsCalendarController extends Controller
         return Campaign::query()
             ->leftJoin('meta_ads_sets', 'meta_ads_sets.meta_ads_campaign_id', '=', 'meta_ads_campaigns.id')
             ->whereIn('meta_ads_campaigns.meta_ads_account_id', $accountIds)
-            ->whereNotNull('meta_ads_campaigns.created_time')
-            ->whereBetween('meta_ads_campaigns.created_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->whereNotNull('meta_ads_campaigns.start_time')
+            ->whereBetween('meta_ads_campaigns.start_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
             ->whereNull('meta_ads_sets.meta_page_id')
             ->exists();
     }
