@@ -132,7 +132,7 @@ export default function AdsCalendar({
             <div className="w-full space-y-6 p-4 md:p-6">
                 <PageHeader
                     title="Ads Calendar"
-                    description="Ad sets created each day, broken down per Facebook page."
+                    description="Campaigns created each day, broken down per Facebook page."
                 />
 
                 {/* Page filter + month navigation */}
@@ -257,7 +257,7 @@ export default function AdsCalendar({
                 {pageTotals.length > 0 && (
                     <div className="rounded-xl border border-black/6 bg-white p-4 dark:border-white/8 dark:bg-zinc-900">
                         <p className="mb-3 text-[11px] font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
-                            Ad sets by page · {monthLabel}
+                            Campaigns by page · {monthLabel}
                         </p>
                         <div className="flex flex-wrap gap-x-6 gap-y-2">
                             {pageTotals.map((p) => (
