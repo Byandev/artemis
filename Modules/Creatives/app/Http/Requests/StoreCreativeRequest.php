@@ -18,14 +18,14 @@ class StoreCreativeRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'creative_date' => ['required', 'date'],
             'format' => ['required', Rule::in(['video', 'image'])],
-            'product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'product_id' => ['required', 'integer', 'exists:products,id'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'script' => ['nullable', 'string'],
+            'script' => ['required', 'string'],
             // Media is a plain text link (e.g. Google Drive), not an uploaded image.
-            'picture_url' => ['nullable', 'string', 'max:2048'],
+            'picture_url' => ['required', 'string', 'max:2048'],
             'reference_link' => ['nullable', 'string', 'max:2048'],
-            'caption' => ['nullable', 'string', 'max:5000'],
-            'headline' => ['nullable', 'string', 'max:255'],
+            'caption' => ['required', 'string', 'max:5000'],
+            'headline' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
     }

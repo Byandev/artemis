@@ -22,16 +22,16 @@ class UpdateCreativeRequest extends FormRequest
             'assigned_reviewer_ids' => ['sometimes', 'nullable', 'array'],
             'assigned_reviewer_ids.*' => ['integer', 'exists:users,id'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'script' => ['nullable', 'string'],
+            'script' => ['sometimes', 'required', 'string'],
             // Media is a plain text link (e.g. Google Drive), not an uploaded image.
-            'picture_url' => ['nullable', 'string', 'max:2048'],
+            'picture_url' => ['sometimes', 'required', 'string', 'max:2048'],
             'reference_link' => ['nullable', 'string', 'max:2048'],
             'ads_status' => ['nullable', Rule::in(['pending', 'running', 'kill', 'scale'])],
             'ads_manager_link' => ['nullable', 'string', 'max:2048'],
             'ads_remarks' => ['nullable', 'string', 'max:2000'],
             'final_status' => ['sometimes', Rule::in(['for_approval', 'approved', 'for_revision'])],
-            'caption' => ['nullable', 'string', 'max:5000'],
-            'headline' => ['nullable', 'string', 'max:255'],
+            'caption' => ['sometimes', 'required', 'string', 'max:5000'],
+            'headline' => ['sometimes', 'required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
     }
