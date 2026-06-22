@@ -5,6 +5,7 @@ import {
     OrderFrequencyRow,
     RefreshButton,
     RtsCell,
+    RtsEmptyState,
     RtsQueryParams,
     ViewMode,
     ViewToggle,
@@ -74,6 +75,8 @@ export default function OrderFrequencyCard({
                     <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">
                         Loading…
                     </div>
+                ) : rows.length === 0 ? (
+                    <RtsEmptyState />
                 ) : view === 'chart' ? (
                     <RtsBreakdownChart
                         rows={rows.map((r) => ({

@@ -106,6 +106,7 @@ export default function Analytics({ workspace }: Props) {
             endDate: dateRange[1],
             pageIds: filter.pageIds,
             shopIds: filter.shopIds,
+            teamIds: filter.teamIds,
         }),
         [dateRange, filter],
     );
