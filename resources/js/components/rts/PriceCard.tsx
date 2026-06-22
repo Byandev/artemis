@@ -6,6 +6,7 @@ import {
     PriceRow,
     RefreshButton,
     RtsCell,
+    RtsEmptyState,
     RtsQueryParams,
     ViewMode,
     ViewToggle,
@@ -75,6 +76,8 @@ export default function PriceCard({
                     <div className="flex h-24 items-center justify-center text-[13px] text-gray-400">
                         Loading…
                     </div>
+                ) : price.length === 0 ? (
+                    <RtsEmptyState />
                 ) : view === 'chart' ? (
                     <RtsBreakdownChart
                         rows={price.map((r) => ({

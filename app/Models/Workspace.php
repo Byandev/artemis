@@ -149,6 +149,19 @@ class Workspace extends Model
         return $hash !== null && Hash::check($password, $hash);
     }
 
+    /**
+     * A stable fingerprint of the current public-pages password hash, or null
+     * when no password is set. Used to bind a session "unlocked" marker to the
+     * exact password in effect, so changing/removing/re-adding the password
+     * invalidates any prior unlock (bcrypt re-salts on every set).
+     */
+    public function publicPasswordFingerprint(): ?string
+    {
+        $hash = $this->attributes['public_password'] ?? null;
+
+        return $hash ? sha1($hash) : null;
+    }
+
     protected static function boot()
     {
         parent::boot();
