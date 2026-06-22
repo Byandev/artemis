@@ -53,6 +53,18 @@ class Workspace extends Model
         'public_password_set',
     ];
 
+    /**
+     * Default module toggles for newly created workspaces. Products, Teams, and
+     * Botcake are enabled out of the box; the admin can still override any of
+     * these (or toggle the others) per workspace. Existing workspaces keep
+     * whatever values they already have in the database.
+     */
+    protected $attributes = [
+        'products_module_enabled' => true,
+        'teams_module_enabled' => true,
+        'botcake_module_enabled' => true,
+    ];
+
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -93,6 +105,7 @@ class Workspace extends Model
             $this->csr_module_enabled ? null : 'CSR',
             $this->botcake_module_enabled ? null : 'Botcake',
             $this->meta_ads_module_enabled ? null : 'Meta Ads',
+            $this->creatives_module_enabled ? null : 'Creatives',
         ]));
     }
 
@@ -159,6 +172,15 @@ class Workspace extends Model
                     'default_metrics' => $defaults,
                 ]
             );
+
+            // Seed a default "Owner" role granting every permission, so a new
+            // workspace always has a full-access role to assign to members.
+            $ownerRole = $workspace->roles()->firstOrCreate(
+                ['name' => 'Owner'],
+                ['description' => 'Full access to all features and settings.']
+            );
+
+            $ownerRole->permissions()->sync(Permission::pluck('id'));
         });
     }
 
