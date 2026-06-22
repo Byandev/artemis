@@ -22,7 +22,7 @@ class UpdateCreativeRequest extends FormRequest
             'assigned_reviewer_ids' => ['sometimes', 'nullable', 'array'],
             'assigned_reviewer_ids.*' => ['integer', 'exists:users,id'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'script' => ['sometimes', 'required', 'string'],
+            'script' => ['sometimes', 'nullable', 'string'],
             // Media is a plain text link (e.g. Google Drive), not an uploaded image.
             'picture_url' => ['sometimes', 'required', 'string', 'max:2048'],
             'reference_link' => ['nullable', 'string', 'max:2048'],

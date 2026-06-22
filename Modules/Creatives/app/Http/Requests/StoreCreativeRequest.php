@@ -20,7 +20,7 @@ class StoreCreativeRequest extends FormRequest
             'format' => ['required', Rule::in(['video', 'image'])],
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'description' => ['nullable', 'string', 'max:5000'],
-            'script' => ['required', 'string'],
+            'script' => ['nullable', 'string'],
             // Media is a plain text link (e.g. Google Drive), not an uploaded image.
             'picture_url' => ['required', 'string', 'max:2048'],
             'reference_link' => ['nullable', 'string', 'max:2048'],
