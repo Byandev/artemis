@@ -6,6 +6,7 @@ use App\Http\Controllers\PublicApi\CsrDailyRecordController;
 use App\Http\Controllers\PublicApi\HealthController;
 use App\Http\Controllers\PublicApi\InventoryItemController;
 use App\Http\Controllers\PublicApi\PageController;
+use App\Http\Controllers\PublicApi\PurchaseOrderController;
 use App\Http\Controllers\PublicApi\RmoOrderController;
 use App\Http\Controllers\PublicApi\RmoOrderV2Controller;
 use App\Http\Controllers\PublicApi\ShopController;
@@ -31,6 +32,8 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
 
     Route::get('/inventory-items/keywords', [InventoryItemController::class, 'keywords'])->name('inventory-items.keywords');
     Route::post('/inventory-items/sync', [InventoryItemController::class, 'sync'])->name('inventory-items.sync');
+
+    Route::post('/purchase-orders/sync', [PurchaseOrderController::class, 'sync'])->name('purchase-orders.sync');
 });
 
 // v2 — new mobile app (login with users.id, filter by assignee_user_id)
