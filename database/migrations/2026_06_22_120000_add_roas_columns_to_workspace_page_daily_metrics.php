@@ -14,15 +14,13 @@ return new class extends Migration
             // tracked_orders / tracked_sales: the tracker's default ("confirmed")
             // orders and sales, so ROAS = tracked_sales / ad_spend is derivable.
             $table->decimal('ad_spend', 14, 2)->default(0)->after('returned_amount');
-            $table->unsignedInteger('tracked_orders')->default(0)->after('ad_spend');
-            $table->decimal('tracked_sales', 14, 2)->default(0)->after('tracked_orders');
         });
     }
 
     public function down(): void
     {
         Schema::table('workspace_page_daily_metrics', function (Blueprint $table) {
-            $table->dropColumn(['ad_spend', 'tracked_orders', 'tracked_sales']);
+            $table->dropColumn(['ad_spend']);
         });
     }
 };

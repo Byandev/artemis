@@ -84,11 +84,10 @@ class PageDailyMetricsBuilder
         $metrics = [
             'confirmed_count' => (int) ($row->confirmed_count ?? 0),
             'confirmed_amount' => (float) ($row->confirmed_amount ?? 0),
-            // Page ROAS tracker values: ad spend + the tracker's default
-            // ("confirmed") orders/sales, so ROAS is reconstructable from the row.
+            // Page ROAS tracker values. The tracker's "orders"/"sales" are the
+            // confirmed_count / confirmed_amount above, so we only store ad spend
+            // and derive ROAS = confirmed_amount / ad_spend.
             'ad_spend' => $adSpend,
-            'tracked_orders' => (int) ($row->confirmed_count ?? 0),
-            'tracked_sales' => (float) ($row->confirmed_amount ?? 0),
             'roas' => $adSpend > 0 ? round(((float) ($row->confirmed_amount ?? 0)) / $adSpend, 2) : 0.0,
             'shipped_count' => (int) ($row->shipped_count ?? 0),
             'shipped_amount' => (float) ($row->shipped_amount ?? 0),
