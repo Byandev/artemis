@@ -27,11 +27,16 @@ class PublicWorkspaceGate
      */
     public static function isUnlocked(Request $request, Workspace $workspace, ?Permission $permission = null): bool
     {
-        if (! $workspace->public_password_set) {
+        $fingerprint = $workspace->publicPasswordFingerprint();
+
+        if ($fingerprint === null) {
             return false;
         }
 
-        return (bool) $request->session()->get(self::sessionKey($workspace));
+        // Unlocked only when the session was verified against the *current*
+        // password. If the password was changed/removed/re-added, the stored
+        // fingerprint no longer matches and the gate locks again.
+        return $request->session()->get(self::sessionKey($workspace)) === $fingerprint;
     }
 
     /** Check the password and, on success, mark the session as verified. */
@@ -41,7 +46,7 @@ class PublicWorkspaceGate
             return false;
         }
 
-        $request->session()->put(self::sessionKey($workspace), true);
+        $request->session()->put(self::sessionKey($workspace), $workspace->publicPasswordFingerprint());
 
         return true;
     }
