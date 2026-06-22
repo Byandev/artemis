@@ -72,9 +72,24 @@ class PageDailyMetricsBuilder
             ))
             ->first();
 
+        // Meta-reported ad spend rolled up to the page for the day (insights are
+        // keyed by ad set, whose meta_page_id equals the local Page id). Mirrors
+        // App\Queries\PageRoasTrackerQuery::adSpend() so saved ROAS matches the tracker.
+        $adSpend = (float) DB::table('meta_ads_insights')
+            ->join('meta_ads_sets as s', 's.id', '=', 'meta_ads_insights.meta_ads_set_id')
+            ->where('s.meta_page_id', $pageId)
+            ->whereBetween('meta_ads_insights.date', [$date, $date])
+            ->sum('meta_ads_insights.spend');
+
         $metrics = [
             'confirmed_count' => (int) ($row->confirmed_count ?? 0),
             'confirmed_amount' => (float) ($row->confirmed_amount ?? 0),
+            // Page ROAS tracker values: ad spend + the tracker's default
+            // ("confirmed") orders/sales, so ROAS is reconstructable from the row.
+            'ad_spend' => $adSpend,
+            'tracked_orders' => (int) ($row->confirmed_count ?? 0),
+            'tracked_sales' => (float) ($row->confirmed_amount ?? 0),
+            'roas' => $adSpend > 0 ? round(((float) ($row->confirmed_amount ?? 0)) / $adSpend, 2) : 0.0,
             'shipped_count' => (int) ($row->shipped_count ?? 0),
             'shipped_amount' => (float) ($row->shipped_amount ?? 0),
             'delivered_count' => (int) ($row->delivered_count ?? 0),

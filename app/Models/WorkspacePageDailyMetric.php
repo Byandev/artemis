@@ -25,6 +25,10 @@ class WorkspacePageDailyMetric extends Model
         'delivered_amount',
         'entered_returning_amount',
         'returned_amount',
+        'ad_spend',
+        'tracked_orders',
+        'tracked_sales',
+        'roas',
         'sum_days_confirmed_to_shipped',
         'count_confirmed_to_shipped',
         'sum_days_confirmed_to_first_attempt',
@@ -50,5 +54,9 @@ class WorkspacePageDailyMetric extends Model
         'delivered_amount' => 'decimal:2',
         'entered_returning_amount' => 'decimal:2',
         'returned_amount' => 'decimal:2',
+        'ad_spend' => 'decimal:2',
+        'tracked_orders' => 'integer',
+        'tracked_sales' => 'decimal:2',
+        'roas' => 'decimal:2',
     ];
 }
