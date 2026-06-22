@@ -49,6 +49,7 @@ use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
+use Modules\MetaAds\Http\Controllers\AdsCalendarController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
@@ -219,6 +220,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/detail', [AdsManagerController::class, 'adDetail'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.detail');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-calendar', [AdsCalendarController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-calendar');
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.health');
