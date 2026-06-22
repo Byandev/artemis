@@ -23,16 +23,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import flatpickr from 'flatpickr';
 import { debounce } from 'lodash';
-import {
-    ChevronDown,
-    Coins,
-    Columns3,
-    Package,
-    PackageCheck,
-    Search,
-    TrendingUp,
-    Truck,
-} from 'lucide-react';
+import { ChevronDown, Columns3, Search, Truck } from 'lucide-react';
 import moment from 'moment';
 import {
     useCallback,
@@ -68,17 +59,9 @@ interface Order {
     total_cog: string | null;
 }
 
-interface Summary {
-    total_orders: number;
-    total_qty: number;
-    total_cog: number;
-    total_upsell: number;
-}
-
 interface Props {
     workspace: Workspace;
     orders: PaginatedData<Order>;
-    summary: Summary;
     csrs: string[];
     platforms: string[];
     parcelStatuses: string[];
@@ -316,7 +299,6 @@ function loadVisible(): Record<string, boolean> {
 export default function DailySalesTrackerIndex({
     workspace,
     orders,
-    summary,
     csrs,
     platforms,
     parcelStatuses,
@@ -389,7 +371,7 @@ export default function DailySalesTrackerIndex({
                     preserveState: true,
                     replace: true,
                     preserveScroll: true,
-                    only: ['orders', 'summary', 'query'],
+                    only: ['orders', 'query'],
                 },
             );
         },
@@ -443,65 +425,14 @@ export default function DailySalesTrackerIndex({
 
     const rows = orders.data ?? [];
 
-    const summaryCards: {
-        label: string;
-        value: string;
-        accent: string;
-        icon: ReactNode;
-    }[] = [
-        {
-            label: 'Total Orders',
-            value: summary.total_orders.toLocaleString(),
-            accent: 'text-gray-800 dark:text-gray-100',
-            icon: <Package className="h-4 w-4 text-gray-400" />,
-        },
-        {
-            label: 'Total Qty',
-            value: summary.total_qty.toLocaleString(),
-            accent: 'text-sky-600 dark:text-sky-400',
-            icon: <PackageCheck className="h-4 w-4 text-sky-500" />,
-        },
-        {
-            label: 'Total COG',
-            value: peso(summary.total_cog),
-            accent: 'text-emerald-600 dark:text-emerald-400',
-            icon: <Coins className="h-4 w-4 text-emerald-500" />,
-        },
-        {
-            label: 'Total Upsell',
-            value: peso(summary.total_upsell),
-            accent: 'text-purple-600 dark:text-purple-400',
-            icon: <TrendingUp className="h-4 w-4 text-purple-500" />,
-        },
-    ];
-
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Daily Sales Tracker`} />
+            <Head title={`${workspace.name} - Gencys Order`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Daily Sales Tracker"
+                    title="Gencys Order"
                     description="Daily sales orders synced from Gencys ERP."
                 />
-
-                <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    {summaryCards.map((card) => (
-                        <div
-                            key={card.label}
-                            className="rounded-[14px] border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900"
-                        >
-                            <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                {card.icon}
-                                <span>{card.label}</span>
-                            </div>
-                            <div
-                                className={`mt-2 font-mono text-[20px] font-semibold ${card.accent}`}
-                            >
-                                {card.value}
-                            </div>
-                        </div>
-                    ))}
-                </div>
 
                 <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <div className="relative w-full sm:w-64">

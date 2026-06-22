@@ -42,14 +42,6 @@ class DailySalesTrackerController extends Controller
     {
         $this->authorize('View Daily Sales Tracker', $workspace);
 
-        // Each stat is its own query off a fresh filtered builder.
-        $summary = [
-            'total_orders' => $this->filtered($request, $workspace)->count(),
-            'total_qty' => (int) $this->filtered($request, $workspace)->sum('total_qty'),
-            'total_cog' => (float) $this->filtered($request, $workspace)->sum('total_cog'),
-            'total_upsell' => (float) $this->filtered($request, $workspace)->sum('price_upsell'),
-        ];
-
         [$sortColumn, $sortDir, $sortParam] = $this->resolveSort($request);
 
         $orders = $this->filtered($request, $workspace)
@@ -68,7 +60,6 @@ class DailySalesTrackerController extends Controller
         return Inertia::render('workspaces/gencys/daily-sales-tracker/index', [
             'workspace' => $workspace,
             'orders' => $orders,
-            'summary' => $summary,
             'csrs' => $distinct('csr'),
             'platforms' => $distinct('platform'),
             'parcelStatuses' => $distinct('parcel_status'),
