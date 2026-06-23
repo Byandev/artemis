@@ -994,6 +994,28 @@ export const INSIGHTS_OPTIONS: ColumnOption[] = METRIC_SPECS.map((m) => ({
     hiddenByDefault: m.hiddenByDefault,
 }));
 
+/** Human label for a metric id (falls back to the id itself). */
+export function metricLabel(id: string): string {
+    return METRIC_SPECS.find((m) => m.id === id)?.label ?? id;
+}
+
+/**
+ * Format a single metric for a row, reusing the same compute + formatter the
+ * Ads Manager table uses — so a metric reads identically in the report Gallery
+ * cards and the grid. Direct columns read off the row; computed metrics derive
+ * from it.
+ */
+export function formatMetricValue(row: InsightsMetrics, id: string): string {
+    const spec = METRIC_SPECS.find((m) => m.id === id);
+    if (!spec) return '—';
+
+    const value = spec.compute
+        ? spec.compute(row)
+        : Number(row[spec.field as keyof InsightsMetrics] ?? 0);
+
+    return (spec.formatter ?? intFmt)(value as number);
+}
+
 function numCell(value: number, formatter: Formatter = intFmt) {
     return (
         <span className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">

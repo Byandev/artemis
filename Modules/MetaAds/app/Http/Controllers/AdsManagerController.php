@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -15,6 +16,7 @@ use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
+use Modules\MetaAds\Models\CustomBreakdown;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -77,6 +79,18 @@ class AdsManagerController extends Controller
 
         $scopeBy = (string) $request->query('scope_by', '');
         $scopeValue = (string) $request->query('scope', '');
+
+        // Custom breakdown: group ads into the saved, rule-defined buckets
+        // instead of a fixed dimension. Encoded as `group_by=custom:{id}`.
+        $groupByRaw = (string) $request->query('group_by', '');
+        if ($scopeBy === '' && str_starts_with($groupByRaw, 'custom:')) {
+            $breakdownId = (int) substr($groupByRaw, 7);
+            $rows = $this->aggregateCustomBreakdown(
+                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters
+            );
+
+            return response()->json(['rows' => $rows]);
+        }
 
         if ($scopeBy !== '') {
             $groupBy = 'ad';
@@ -226,6 +240,19 @@ class AdsManagerController extends Controller
         $value = (string) $request->query('group_by', 'ad_name');
 
         return in_array($value, self::GROUP_BY_KEYS, true) ? $value : 'ad_name';
+    }
+
+    /**
+     * Operator for the breakdown-name filter. Defaults to `contains` so the
+     * existing grid keeps its partial-match behaviour.
+     */
+    private const NAME_OPS = ['is', 'is_not', 'contains', 'not_contains'];
+
+    private function resolveNameOp(Request $request): string
+    {
+        $value = (string) $request->query('name_op', 'contains');
+
+        return in_array($value, self::NAME_OPS, true) ? $value : 'contains';
     }
 
     /**
@@ -408,9 +435,27 @@ class AdsManagerController extends Controller
 
         $this->applyMetricFilters($base, $metricFilters);
 
+        // The breakdown-name filter. Defaults to a partial "contains" match (the
+        // existing grid behaviour); the report builder can pass name_op to switch
+        // to is / is not / does-not-contain — matching the SuperAds filter bar.
+        $nameOp = $this->resolveNameOp($request);
+        $searchColumn = $config['search'];
+
         $rows = QueryBuilder::for($base)
             ->allowedFilters([
-                AllowedFilter::partial('search', $config['search']),
+                AllowedFilter::callback('search', function ($query, $value) use ($searchColumn, $nameOp) {
+                    $value = trim((string) $value);
+                    if ($value === '') {
+                        return;
+                    }
+
+                    match ($nameOp) {
+                        'is' => $query->where($searchColumn, '=', $value),
+                        'is_not' => $query->where($searchColumn, '!=', $value),
+                        'not_contains' => $query->where($searchColumn, 'not like', '%'.$value.'%'),
+                        default => $query->where($searchColumn, 'like', '%'.$value.'%'),
+                    };
+                }),
             ])
             ->allowedSorts($this->allowedSorts($hasAdsCount))
             ->defaultSort('-spend')
@@ -433,6 +478,123 @@ class AdsManagerController extends Controller
         });
 
         return $rows->toArray();
+    }
+
+    /**
+     * Group ads into a custom breakdown's named, rule-defined buckets. Each row
+     * is one group; ads matching no group are excluded. The bucketing is a CASE
+     * expression over the ad name, and metrics aggregate exactly like the fixed
+     * dimensions (LEFT JOINed insights, summed per group).
+     */
+    private function aggregateCustomBreakdown(
+        Request $request,
+        Workspace $workspace,
+        $accountIds,
+        string $since,
+        string $until,
+        int $breakdownId,
+        array $metricFilters = []
+    ): array {
+        $breakdown = CustomBreakdown::where('workspace_id', $workspace->id)->findOrFail($breakdownId);
+
+        $case = $this->customBreakdownCaseSql($breakdown->groups ?? []);
+        if ($case === null) {
+            $perPage = $request->integer('per_page', 25);
+
+            return (new LengthAwarePaginator([], 0, $perPage, 1))->toArray();
+        }
+
+        $insights = $this->insightsSubquery('meta_ads_ad_id', $since, $until);
+
+        $base = Ad::query()
+            ->leftJoinSub($insights, 'i', 'i.meta_ads_ad_id', '=', 'meta_ads_ads.id')
+            ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds)
+            ->whereRaw("({$case}) IS NOT NULL")
+            ->select(array_merge(
+                [
+                    DB::raw("({$case}) AS name"),
+                    DB::raw('COUNT(DISTINCT meta_ads_ads.id) AS ads_count'),
+                ],
+                $this->metricSelects(),
+            ))
+            ->groupBy(DB::raw($case));
+
+        $this->applyMetricFilters($base, $metricFilters);
+
+        $rows = QueryBuilder::for($base)
+            ->allowedSorts($this->allowedSorts(true))
+            ->defaultSort('-spend')
+            ->paginate($request->integer('per_page', 25))
+            ->withQueryString();
+
+        // Each row is a group; key it by its (unique) name for the frontend.
+        $rows->getCollection()->transform(function ($row) {
+            $row->id = (string) ($row->name ?? '');
+
+            return $row;
+        });
+
+        return $rows->toArray();
+    }
+
+    /**
+     * Build the CASE expression that buckets an ad into the first matching
+     * group. Values are quoted via PDO (these are workspace-defined rules, not
+     * request input), so no bindings are threaded through the grouped query.
+     */
+    private function customBreakdownCaseSql(array $groups): ?string
+    {
+        $pdo = DB::connection()->getPdo();
+        $whens = [];
+
+        foreach ($groups as $group) {
+            $name = $group['name'] ?? null;
+            if (! is_string($name) || $name === '') {
+                continue;
+            }
+
+            $conds = [];
+            foreach ($group['rules'] ?? [] as $rule) {
+                $frag = $this->customRuleSql($rule, $pdo);
+                if ($frag !== null) {
+                    $conds[] = $frag;
+                }
+            }
+
+            if (empty($conds)) {
+                continue;
+            }
+
+            $joiner = (($group['match'] ?? 'all') === 'any') ? ' OR ' : ' AND ';
+            $whens[] = 'WHEN ('.implode($joiner, $conds).') THEN '.$pdo->quote($name);
+        }
+
+        return empty($whens) ? null : 'CASE '.implode(' ', $whens).' END';
+    }
+
+    /** A single name rule → safe SQL fragment, or null when invalid. */
+    private function customRuleSql(array $rule, \PDO $pdo): ?string
+    {
+        if (($rule['field'] ?? null) !== 'name') {
+            return null;
+        }
+
+        $value = $rule['value'] ?? null;
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        $col = 'meta_ads_ads.name';
+        $eq = $pdo->quote($value);
+        $like = $pdo->quote('%'.$value.'%');
+
+        return match ($rule['op'] ?? null) {
+            'is' => "{$col} = {$eq}",
+            'is_not' => "{$col} <> {$eq}",
+            'contains' => "{$col} LIKE {$like}",
+            'not_contains' => "{$col} NOT LIKE {$like}",
+            default => null,
+        };
     }
 
     /**

@@ -216,6 +216,12 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
+                              title: 'Reports',
+                              href: `/workspaces/${slug}/integrations/meta/reports`,
+                              icon: PieChart,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
                               title: 'Ad Spent Tracker',
                               href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
                               icon: Wallet,
