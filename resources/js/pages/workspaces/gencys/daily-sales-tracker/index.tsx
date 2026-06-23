@@ -35,6 +35,12 @@ import {
 import DailySalesFilters from './daily-sales-filters';
 import DateOption = flatpickr.Options.DateOption;
 
+interface OrderItem {
+    id: number;
+    quantity: number | null;
+    sku: string | null;
+}
+
 interface Order {
     id: number;
     order_no: string | null;
@@ -44,6 +50,7 @@ interface Order {
     upsell_by: string | null;
     contact: string | null;
     order_details: string | null;
+    items?: OrderItem[];
     total_qty: number | null;
     page: string | null;
     platform: string | null;
@@ -175,11 +182,28 @@ const COLUMNS: ColumnDef[] = [
         key: 'order_details',
         label: 'Order',
         sortable: true,
-        render: (o) => (
-            <span className="block max-w-[260px] truncate text-[12px] text-gray-700 dark:text-gray-300">
-                {o.order_details || '—'}
-            </span>
-        ),
+        render: (o) =>
+            o.items && o.items.length > 0 ? (
+                <div className="flex max-w-[280px] flex-col gap-0.5">
+                    {o.items.map((item) => (
+                        <div
+                            key={item.id}
+                            className="flex items-baseline gap-1.5 text-[12px] text-gray-700 dark:text-gray-300"
+                        >
+                            <span className="shrink-0 font-semibold text-emerald-700 dark:text-emerald-400">
+                                {item.quantity ?? '—'}×
+                            </span>
+                            <span className="truncate" title={item.sku ?? ''}>
+                                {item.sku || '—'}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <span className="block max-w-[260px] truncate text-[12px] text-gray-700 dark:text-gray-300">
+                    {o.order_details || '—'}
+                </span>
+            ),
     },
     {
         key: 'total_qty',

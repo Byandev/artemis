@@ -5,6 +5,7 @@ namespace Modules\GencysERP\Models;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GencysDailySalesOrder extends Model
 {
@@ -48,5 +49,10 @@ class GencysDailySalesOrder extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(GencysDailySalesOrderItem::class, 'order_id');
     }
 }
