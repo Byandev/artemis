@@ -97,51 +97,93 @@ class CSRController extends Controller
             : CarbonImmutable::now()->toDateString();
 
         $type = strtolower((string) $request->input('type', 'pos'));
-        $drClass = $type === 'erp' ? PancakeUserErpDailyReport::class : PancakeUserPosDailyReport::class;
+        $isErp = $type === 'erp';
+        $drClass = $isErp ? PancakeUserErpDailyReport::class : PancakeUserPosDailyReport::class;
 
-        $drSub = fn () => $drClass::query()
-            ->forWorkspaceRange($workspace->id, $from, $to)
-            ->whereColumn('pancake_user_id', 'pancake_users.id');
+        // Per-CSR sales/delivery rollup for the selected period (POS or ERP).
+        $drSummary = $drClass::query()
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_orders)   as total_orders,
+                SUM(total_sales)    as total_sales,
+                SUM(delivered)      as total_delivered,
+                SUM(`returning`)    as total_returning
+            ');
 
-        $rmoSub = fn () => PancakeUserRmoDailyReport::query()
-            ->forWorkspaceRange($workspace->id, $from, $to)
-            ->whereColumn('pancake_user_id', 'pancake_users.id');
+        // RMO calling activity is tracked separately from the sales reports.
+        $rmoSummary = PancakeUserRmoDailyReport::query()
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->groupBy('pancake_user_id')
+            ->selectRaw('
+                pancake_user_id,
+                SUM(total_called)             as total_called,
+                SUM(total_call_time)          as total_call_time,
+                SUM(total_rmo_call_attempts)  as total_rmo_call_attempts,
+                SUM(total_confirmed)          as total_confirmed
+            ');
 
-        $query = PancakeUser::query()
-            ->select([
-                'pancake_users.id as pancake_user_id',
-                'pancake_users.name as csr_name',
-            ])
+        $base = PancakeUser::query()
             ->whereHas('shops', function ($query) use ($workspace) {
                 $query->where('workspace_id', $workspace->id);
-            })
-            ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_orders), 0)'), 'total_orders')
-            ->selectSub($drSub()->selectRaw('COALESCE(SUM(total_sales), 0)'), 'total_sales')
-            ->selectSub($drSub()->selectRaw('COALESCE(SUM(delivered), 0)'), 'delivered')
-            ->selectSub($drSub()->selectRaw('COALESCE(SUM(`returning`), 0)'), 'returning_count')
-            ->selectSub($rmoSub()->selectRaw('COALESCE(SUM(total_called), 0)'), 'total_called')
-            ->selectSub($rmoSub()->selectRaw('COALESCE(SUM(total_call_time), 0)'), 'total_call_time')
-            ->selectSub(
-                $drSub()->selectRaw('
-                    CASE
-                        WHEN COALESCE(SUM(delivered), 0) + COALESCE(SUM(`returning`), 0) > 0
-                        THEN ROUND((COALESCE(SUM(`returning`), 0) / (COALESCE(SUM(delivered), 0) + COALESCE(SUM(`returning`), 0))) * 100, 2)
-                        ELSE 0
-                    END
-                '),
-                'rts_rate'
-            );
+            });
 
-        $records = QueryBuilder::for($query)
+        $records = QueryBuilder::for($base)
+            ->leftJoinSub($drSummary, 'dr', 'dr.pancake_user_id', '=', 'pancake_users.id')
+            ->leftJoinSub($rmoSummary, 'rmo', 'rmo.pancake_user_id', '=', 'pancake_users.id')
+            ->select('pancake_users.*')
+            ->selectRaw('COALESCE(dr.total_orders, 0)              as total_orders')
+            ->selectRaw('COALESCE(dr.total_sales, 0)               as total_sales')
+            ->selectRaw('COALESCE(dr.total_delivered, 0)           as total_delivered')
+            ->selectRaw('COALESCE(dr.total_returning, 0)           as total_returning')
+            ->selectRaw('COALESCE(rmo.total_called, 0)             as total_called')
+            ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
+            ->selectRaw('COALESCE(rmo.total_confirmed, 0)          as total_confirmed')
+            ->selectRaw('
+                CASE
+                    WHEN (COALESCE(dr.total_returning, 0) + COALESCE(dr.total_delivered, 0)) > 0
+                    THEN ROUND(
+                        COALESCE(dr.total_returning, 0)
+                        / (COALESCE(dr.total_returning, 0) + COALESCE(dr.total_delivered, 0))
+                        * 100, 2
+                    )
+                    ELSE 0
+                END as rts_rate
+            ')
+            // RMO % = RMO assigned over RMO confirmed. Mirrors the frontend
+            // computation so the column is sortable server-side.
+            ->selectRaw('
+                CASE
+                    WHEN COALESCE(rmo.total_confirmed, 0) > 0
+                    THEN ROUND(
+                        COALESCE(rmo.total_called, 0)
+                        / COALESCE(rmo.total_confirmed, 0)
+                        * 100, 2
+                    )
+                    ELSE 0
+                END as rmo_percentage
+            ')
             ->allowedSorts([
-                AllowedSort::field('csr_name'),
-                AllowedSort::field('total_orders'),
-                AllowedSort::field('total_sales'),
-                AllowedSort::field('delivered'),
-                AllowedSort::field('returning_count'),
-                AllowedSort::field('rts_rate'),
-                AllowedSort::field('total_called'),
-                AllowedSort::field('total_call_time'),
+                AllowedSort::field('name', 'pancake_users.name'),
+                'total_orders',
+                'total_sales',
+                'total_delivered',
+                'total_returning',
+                'total_called',
+                'total_call_time',
+                'total_rmo_call_attempts',
+                'total_confirmed',
+                'rts_rate',
+                'rmo_percentage',
+            ])
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where('pancake_users.name', 'like', "%{$value}%");
+                }),
             ])
             ->defaultSort('-total_sales')
             ->paginate($request->integer('per_page', 10))
@@ -151,8 +193,13 @@ class CSRController extends Controller
             'workspace' => $workspace,
             'records' => $records,
             'query' => [
-                ...$request->only(['sort', 'per_page', 'page']),
-                'filter' => $request->input('filter', []),
+                'from' => $from,
+                'to' => $to,
+                'type' => $isErp ? 'erp' : 'pos',
+                'sort' => $request->input('sort', '-total_sales'),
+                'page' => $request->integer('page', 1),
+                'per_page' => $request->integer('per_page', 10),
+                'search' => data_get($request->input('filter', []), 'search'),
             ],
         ]);
     }
