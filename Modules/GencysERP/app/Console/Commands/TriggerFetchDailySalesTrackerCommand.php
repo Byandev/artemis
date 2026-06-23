@@ -69,7 +69,11 @@ class TriggerFetchDailySalesTrackerCommand extends Command
             ? "Sending {$workspaces->count()} workspace(s) synchronously for date: {$date}"
             : "Dispatching {$workspaces->count()} workspace(s) with {$delay}s delay between jobs for date: {$date}");
 
-        $callbackUrl = 'https://stretchy-wanetta-unwinning.ngrok-free.dev/api/v1/public/gencys/daily-sales-tracker';
+        // URL n8n posts the fetched daily-sales rows back to. Configurable so it can
+        // point at a reachable host (local n8n, staging, tunnel) instead of being
+        // hardcoded. Defaults to APP_URL when N8N_GENCYS_DAILY_SALES_CALLBACK_URL isn't set.
+        $callbackBase = rtrim(config('services.n8n.gencys_daily_sales_callback_url') ?: config('app.url'), '/');
+        $callbackUrl = "{$callbackBase}/api/v1/public/gencys/daily-sales-tracker";
 
         $dispatched = 0;
         $skipped = 0;
