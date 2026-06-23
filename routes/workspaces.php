@@ -43,9 +43,11 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
+use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
+use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
@@ -340,6 +342,22 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{purchasedOrder}/edit', [PurchasedOrderController::class, 'edit'])->name('edit');
         Route::put('/{purchasedOrder}', [PurchasedOrderController::class, 'update'])->name('update');
         Route::delete('/{purchasedOrder}', [PurchasedOrderController::class, 'destroy'])->name('destroy');
+    });
+
+    // PO monitoring is merged into the purchased-orders page (no standalone page);
+    // these remain as the mutation endpoints the expanded PO rows call into.
+    // Delivery timeliness is derived/read-only, so it has no update route.
+    Route::prefix('/workspaces/{workspace}/inventory/po-monitoring')->name('workspaces.inventory.po-monitoring.')->group(function () {
+        Route::post('/items/{purchasedOrderItem}/deliveries', [PurchaseOrderMonitoringController::class, 'storeDelivery'])->name('deliveries.store');
+        Route::put('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'updateDelivery'])->name('deliveries.update');
+        Route::delete('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'destroyDelivery'])->name('deliveries.destroy');
+        Route::put('/items/{purchasedOrderItem}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('items.expected-delivery');
+        Route::put('/orders/{purchasedOrder}/status', [PurchaseOrderMonitoringController::class, 'updateStatus'])->name('orders.status');
+        Route::put('/items/{purchasedOrderItem}/remarks', [PurchaseOrderMonitoringController::class, 'updateRemarks'])->name('items.remarks');
+    });
+
+    Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
+        Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {

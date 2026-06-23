@@ -11,6 +11,11 @@ Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
 Schedule::command('trigger-fetch-page-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
+// Fetch ERP purchase orders for inventory items. Runs three times a day: 9am, 12nn, 5pm.
+Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('12:00')->withoutOverlapping();
+Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('17:00')->withoutOverlapping();
+
 // Fetch ERP data for inventory items with sales keywords. Jobs are queued with a
 // staggered delay (the command's --delay default) so the n8n webhook isn't hit all
 // at once. Runs three times a day: 9am, 12nn, 5pm.
@@ -26,6 +31,9 @@ Schedule::command('trigger-fetch-shops-users')->daily(7);
 // Schedule::command('trigger-fetch-csr-erp-dail-records --date="5 days ago"')->dailyAt('05:00');
 // Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('12:00');
 // Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('15:00');
+
+// GencysERP daily sales tracker — enable once the n8n flow + callback are ready.
+// Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('06:00')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');

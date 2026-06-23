@@ -38,19 +38,24 @@ class Workspace extends Model
         'botcake_module_enabled',
         'creatives_module_enabled',
         'meta_ads_module_enabled',
+        'gencys_module_enabled',
         'sales_marketing_dashboard_module_enabled',
         'video_editor_dashboard_module_enabled',
         'csr_dashboard_module_enabled',
         'inventory_sync',
         'public_password',
+        'erp_username',
+        'erp_password',
     ];
 
     protected $hidden = [
         'public_password',
+        'erp_password',
     ];
 
     protected $appends = [
         'public_password_set',
+        'erp_password_set',
     ];
 
     protected $casts = [
@@ -67,11 +72,14 @@ class Workspace extends Model
         'botcake_module_enabled' => 'boolean',
         'creatives_module_enabled' => 'boolean',
         'meta_ads_module_enabled' => 'boolean',
+        'gencys_module_enabled' => 'boolean',
         'sales_marketing_dashboard_module_enabled' => 'boolean',
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_pages' => 'integer',
+        // Reversible encryption so the automation pipeline can read it back.
+        'erp_password' => 'encrypted',
     ];
 
     /**
@@ -93,6 +101,7 @@ class Workspace extends Model
             $this->csr_module_enabled ? null : 'CSR',
             $this->botcake_module_enabled ? null : 'Botcake',
             $this->meta_ads_module_enabled ? null : 'Meta Ads',
+            $this->gencys_module_enabled ? null : 'Gencys ERP',
         ]));
     }
 
@@ -123,12 +132,34 @@ class Workspace extends Model
         return ! empty($this->attributes['public_password']);
     }
 
+    /**
+     * Whether ERP automation credentials are configured. Exposed to the client
+     * without leaking the encrypted password itself.
+     */
+    public function getErpPasswordSetAttribute(): bool
+    {
+        return ! empty($this->attributes['erp_password']);
+    }
+
     /** Verify a plaintext password against the stored public-pages password. */
     public function checkPublicPassword(string $password): bool
     {
         $hash = $this->attributes['public_password'] ?? null;
 
         return $hash !== null && Hash::check($password, $hash);
+    }
+
+    /**
+     * A stable fingerprint of the current public-pages password hash, or null
+     * when no password is set. Used to bind a session "unlocked" marker to the
+     * exact password in effect, so changing/removing/re-adding the password
+     * invalidates any prior unlock (bcrypt re-salts on every set).
+     */
+    public function publicPasswordFingerprint(): ?string
+    {
+        $hash = $this->attributes['public_password'] ?? null;
+
+        return $hash ? sha1($hash) : null;
     }
 
     protected static function boot()
