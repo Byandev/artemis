@@ -176,6 +176,7 @@ const MODULE_GROUPS: {
             'products_module_enabled',
             'inventory_module_enabled',
             'finance_module_enabled',
+            'gencys_module_enabled',
             'checklist_module_enabled',
         ],
     },
