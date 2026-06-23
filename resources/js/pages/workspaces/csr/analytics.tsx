@@ -5,12 +5,11 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import axios from 'axios';
-import { format, subDays } from 'date-fns';
-import { debounce, omit } from 'lodash';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { format, parseISO, subDays } from 'date-fns';
+import { omit } from 'lodash';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface CsrRecord {
     id: number;
@@ -25,6 +24,7 @@ interface CsrRecord {
     total_call_time: number;
     total_rmo_call_attempts: number;
     total_confirmed: number;
+    rmo_percentage: number;
     total_delivered: number;
     total_returning: number;
 }
@@ -37,6 +37,7 @@ interface Props {
         from?: string | null;
         to?: string | null;
         page?: number | string;
+        per_page?: number | string;
         type?: 'erp' | 'pos' | null;
         search?: string | null;
     };
@@ -56,71 +57,64 @@ const formatCallTime = (seconds: number) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 };
-export default function Analytics({ workspace, query }: Props) {
+export default function Analytics({ workspace, records, query }: Props) {
     const today = new Date();
-    const initialType = query?.type === 'erp' ? 'erp' : 'pos';
-    const [range, setRange] = useState<{ from: Date; to: Date }>({
-        from: subDays(today, 6),
-        to: today,
-    });
-    const [paginatedRecords, setPaginatedRecords] =
-        useState<PaginatedData<CsrRecord> | null>(null);
-    const [currentType, setCurrentType] = useState(initialType);
-    const [sort, setSort] = useState('-total_sales');
-    const [page, setPage] = useState(1);
-    const [perPage, setPerPage] = useState(10);
+    const currentType = query?.type === 'erp' ? 'erp' : 'pos';
+    const currentSort = query?.sort ?? '-total_sales';
+    const range = {
+        from: query?.from ? parseISO(query.from) : subDays(today, 6),
+        to: query?.to ? parseISO(query.to) : today,
+    };
     const [searchInput, setSearchInput] = useState(query?.search ?? '');
-    const [search, setSearch] = useState(query?.search ?? '');
-
-    const debouncedSetSearch = useCallback(
-        debounce((value: string) => setSearch(value), 400),
-        [],
-    );
-
-    useEffect(() => {
-        debouncedSetSearch(searchInput);
-        return () => debouncedSetSearch.cancel();
-    }, [searchInput, debouncedSetSearch]);
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
 
-    useEffect(() => {
-        setPage(1);
-    }, [range?.from, range?.to, currentType, search]);
+    // Single entry point for every filter/sort/page change: re-request the
+    // Inertia page (controller already returns `records`) with the merged
+    // params and only swap the data props. No API access.
+    const navigate = (overrides: Record<string, string | number | undefined>) =>
+        router.get(
+            `/workspaces/${workspace.slug}/csr/analytics`,
+            {
+                type: currentType,
+                from: fromStr,
+                to: toStr,
+                sort: currentSort,
+                'filter[search]': searchInput || undefined,
+                page: query?.page ?? 1,
+                per_page: query?.per_page ?? records.per_page,
+                ...overrides,
+            },
+            {
+                only: ['records', 'query'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
 
+    // Debounced search — skip the initial mount so we don't refetch on load.
+    const isFirstRender = useRef(true);
     useEffect(() => {
-        const controller = new AbortController();
-        axios
-            .get(`/api/workspaces/${workspace.slug}/csrs/daily-records`, {
-                params: {
-                    from: fromStr,
-                    to: toStr,
-                    type: currentType,
-                    sort,
-                    page,
-                    per_page: perPage,
-                    'filter[search]': search || undefined,
-                },
-                signal: controller.signal,
-            })
-            .then((res) => setPaginatedRecords(res.data))
-            .catch((err) => {
-                if (!axios.isCancel(err)) console.error(err);
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+        const timer = setTimeout(() => {
+            navigate({
+                'filter[search]': searchInput || undefined,
+                page: 1,
             });
-        return () => controller.abort();
-    }, [
-        workspace.slug,
-        fromStr,
-        toStr,
-        currentType,
-        sort,
-        page,
-        perPage,
-        search,
-    ]);
+        }, 400);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchInput]);
 
-    const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
+    const initialSorting = useMemo(
+        () => toFrontendSort(currentSort),
+        [currentSort],
+    );
 
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
@@ -199,14 +193,15 @@ export default function Analytics({ workspace, query }: Props) {
                     ).toLocaleString(),
             },
             {
-                id: 'rmo_percentage',
-                header: 'RMO %',
+                accessorKey: 'rmo_percentage',
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RMO %" />
+                ),
                 cell: ({ row }) => {
-                    const called =
-                        Number(row.original.total_rmo_call_attempts) || 0;
-                    const assigned = Number(row.original.total_called) || 0;
-                    if (assigned === 0) return '—';
-                    return `${((called / assigned) * 100).toFixed(2)}%`;
+                    // RMO % = RMO assigned / RMO confirmed (computed on the backend).
+                    const confirmed = Number(row.original.total_confirmed) || 0;
+                    if (confirmed === 0) return '—';
+                    return `${Number(row.original.rmo_percentage).toFixed(2)}%`;
                 },
             },
             {
@@ -238,18 +233,9 @@ export default function Analytics({ workspace, query }: Props) {
                                 <button
                                     key={value}
                                     disabled={isDisabled}
-                                    onClick={() => {
-                                        setCurrentType(value);
-                                        const url = new URL(
-                                            window.location.href,
-                                        );
-                                        url.searchParams.set('type', value);
-                                        window.history.replaceState(
-                                            {},
-                                            '',
-                                            url.toString(),
-                                        );
-                                    }}
+                                    onClick={() =>
+                                        navigate({ type: value, page: 1 })
+                                    }
                                     className={`rounded-lg px-3 py-1.5 text-[12px]! font-medium transition-colors ${
                                         isActive
                                             ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-600 dark:text-white'
@@ -267,9 +253,10 @@ export default function Analytics({ workspace, query }: Props) {
                         defaultDate={[range.from, range.to] as never}
                         onChange={(dates) => {
                             if (dates.length === 2) {
-                                setRange({
-                                    from: dates[0] as Date,
-                                    to: dates[1] as Date,
+                                navigate({
+                                    from: format(dates[0] as Date, 'yyyy-MM-dd'),
+                                    to: format(dates[1] as Date, 'yyyy-MM-dd'),
+                                    page: 1,
                                 });
                             }
                         }}
@@ -321,27 +308,28 @@ export default function Analytics({ workspace, query }: Props) {
 
                 <div className="mt-2 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
-                        key={sort}
+                        key={currentSort}
                         columns={columns}
-                        data={paginatedRecords?.data ?? []}
+                        data={records.data ?? []}
                         initialSorting={initialSorting}
-                        meta={
-                            paginatedRecords
-                                ? omit(paginatedRecords, ['data'])
-                                : undefined
-                        }
+                        meta={omit(records, ['data'])}
                         onFetch={(params) => {
+                            const overrides: Record<
+                                string,
+                                string | number | undefined
+                            > = {};
                             if (params?.sort !== undefined) {
-                                setSort(params.sort as string);
-                                setPage(1);
+                                overrides.sort = params.sort as string;
+                                overrides.page = 1;
                             }
                             if (params?.per_page !== undefined) {
-                                setPerPage(params.per_page as number);
-                                setPage(1);
+                                overrides.per_page = params.per_page as number;
+                                overrides.page = 1;
                             }
                             if (params?.page !== undefined) {
-                                setPage(params.page as number);
+                                overrides.page = params.page as number;
                             }
+                            navigate(overrides);
                         }}
                     />
                 </div>
