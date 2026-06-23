@@ -19,6 +19,7 @@ use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\OptimizationProposal;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Models\OptimizationRuleLog;
+use Modules\MetaAds\Models\OptimizationRun;
 use Modules\MetaAds\Services\OptimizationRuleEvaluator;
 
 class OptimizationRuleController extends Controller
@@ -68,11 +69,43 @@ class OptimizationRuleController extends Controller
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/index', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'rules' => $rules,
+            // Latest evaluate run for this workspace, so the page can show which
+            // step it's on (and poll while it's still running).
+            'currentRun' => $this->latestRun($workspace),
             'query' => [
                 'page' => $request->integer('page', 1),
                 'perPage' => $perPage,
             ],
         ]);
+    }
+
+    /**
+     * The most recent optimization run for the workspace, shaped for the
+     * progress panel. Null when the workspace has never been evaluated.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function latestRun(Workspace $workspace): ?array
+    {
+        $run = OptimizationRun::where('workspace_id', $workspace->id)
+            ->latest('started_at')
+            ->first();
+
+        if (! $run) {
+            return null;
+        }
+
+        return [
+            'id' => $run->id,
+            'status' => $run->status,
+            'current_step' => $run->current_step,
+            'steps' => $run->steps ?? [],
+            'total_rules' => $run->total_rules,
+            'total_accounts' => $run->total_accounts,
+            'error_message' => $run->error_message,
+            'started_at' => optional($run->started_at)->toIso8601String(),
+            'finished_at' => optional($run->finished_at)->toIso8601String(),
+        ];
     }
 
     public function create(Workspace $workspace): Response

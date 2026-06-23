@@ -1,11 +1,19 @@
 <?php
 
+use Illuminate\Support\Facades\Bus;
+use Modules\MetaAds\Jobs\EvaluateDueOptimizationRules;
+use Modules\MetaAds\Jobs\MarkOptimizationRunStep;
+use Modules\MetaAds\Jobs\SyncAds;
+use Modules\MetaAds\Jobs\SyncAdSets;
+use Modules\MetaAds\Jobs\SyncCampaigns;
+use Modules\MetaAds\Jobs\SyncInsights;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
 use Modules\MetaAds\Models\Campaign;
 use Modules\MetaAds\Models\OptimizationProposal;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Models\OptimizationRuleCondition;
+use Modules\MetaAds\Models\OptimizationRun;
 use Modules\MetaAds\Services\OptimizationRuleEvaluator;
 
 it('skips a decrease that the budget floor would clamp into an increase', function () {
@@ -91,6 +99,8 @@ it('lets the highest-priority approval rule claim a target so there are no compe
             'condition_operator' => 'and',
             'execution_mode' => 'approval',
             'is_active' => true,
+            // Always due, so the command path is deterministic regardless of hour.
+            'frequency' => 'hourly',
         ], $attrs));
         $rule->adAccounts()->attach($account->id);
         OptimizationRuleCondition::create(array_merge(
@@ -111,7 +121,7 @@ it('lets the highest-priority approval rule claim a target so there are no compe
         ['metric' => 'budget', 'operator' => '<=', 'value' => 1000],
     );
 
-    $this->artisan('meta-ads:evaluate-optimization-rules')->assertSuccessful();
+    $this->artisan('meta-ads:evaluate-optimization-rules', ['--skip-sync' => true])->assertSuccessful();
 
     // Only the higher-priority Kill rule owns ad set 510 — no decrease proposal.
     $proposals = OptimizationProposal::where('target_id', 510)->get();
@@ -168,4 +178,159 @@ it('evaluates last_modified_in_hours from the target updated_time (>= 24 hours)'
 
     expect($proposals)->toHaveCount(1)
         ->and((string) $proposals[0]['target_id'])->toBe('530');
+});
+
+it('syncs today before evaluating: chains entity + insights sync, then the evaluation last', function () {
+    Bus::fake();
+
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $account = AdAccount::create(['id' => 360, 'name' => 'Acct']);
+    Campaign::create(['id' => 460, 'meta_ads_account_id' => 360, 'name' => 'C']);
+
+    $rule = OptimizationRule::create([
+        'workspace_id' => $workspace->id, 'name' => 'Refresh then check',
+        'target_type' => 'campaign', 'action' => 'pause',
+        'condition_operator' => 'and', 'execution_mode' => 'approval',
+        'is_active' => true, 'frequency' => 'hourly',
+    ]);
+    $rule->adAccounts()->attach($account->id);
+    OptimizationRuleCondition::create([
+        'meta_ads_optimization_rule_id' => $rule->id,
+        'metric' => 'spend', 'operator' => '>=', 'value' => 0, 'time_window' => 'today',
+    ]);
+
+    $this->artisan('meta-ads:evaluate-optimization-rules')->assertSuccessful();
+
+    // A tracked run is created for the workspace, sitting at the first phase.
+    $run = OptimizationRun::where('workspace_id', $workspace->id)->first();
+    expect($run)->not->toBeNull()
+        ->and($run->status)->toBe('running')
+        ->and($run->current_step)->toBe('ad_accounts')
+        ->and($run->total_accounts)->toBe(1)
+        ->and($run->total_rules)->toBe(1)
+        ->and(collect($run->steps)->pluck('key')->all())->toBe([
+            'ad_accounts', 'campaigns', 'ad_sets', 'ads', 'insights', 'evaluate',
+        ]);
+
+    // Step markers advance the run; the entity + insights sync run between them
+    // and the evaluation runs LAST, on that fresh data. (No SyncMetaAdAccounts
+    // here because the account has no Meta user attached.)
+    Bus::assertChained([
+        MarkOptimizationRunStep::class, // ad_accounts
+        MarkOptimizationRunStep::class, // campaigns
+        SyncCampaigns::class,
+        MarkOptimizationRunStep::class, // ad_sets
+        SyncAdSets::class,
+        MarkOptimizationRunStep::class, // ads
+        SyncAds::class,
+        MarkOptimizationRunStep::class, // insights
+        SyncInsights::class,
+        MarkOptimizationRunStep::class, // evaluate
+        EvaluateDueOptimizationRules::class,
+    ]);
+
+    // Rule is marked handled for this hour so the next tick won't re-queue it.
+    expect($rule->fresh()->last_evaluated_at)->not->toBeNull();
+});
+
+it('does not sync when --skip-sync is given: evaluates immediately but still tracks a run', function () {
+    Bus::fake();
+
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $account = AdAccount::create(['id' => 361, 'name' => 'Acct']);
+    Campaign::create(['id' => 461, 'meta_ads_account_id' => 361, 'name' => 'C']);
+
+    $rule = OptimizationRule::create([
+        'workspace_id' => $workspace->id, 'name' => 'Check only',
+        'target_type' => 'campaign', 'action' => 'pause',
+        'condition_operator' => 'and', 'execution_mode' => 'approval',
+        'is_active' => true, 'frequency' => 'hourly',
+    ]);
+    $rule->adAccounts()->attach($account->id);
+    OptimizationRuleCondition::create([
+        'meta_ads_optimization_rule_id' => $rule->id,
+        'metric' => 'spend', 'operator' => '>=', 'value' => 0, 'time_window' => 'today',
+    ]);
+
+    $this->artisan('meta-ads:evaluate-optimization-rules', ['--skip-sync' => true])->assertSuccessful();
+
+    // No sync jobs queued; the evaluation runs straight on existing data.
+    Bus::assertNotDispatched(SyncCampaigns::class);
+    Bus::assertNotDispatched(SyncInsights::class);
+    Bus::assertDispatched(EvaluateDueOptimizationRules::class);
+
+    // Still tracked as a run, just a single-phase one.
+    $run = OptimizationRun::where('workspace_id', $workspace->id)->first();
+    expect($run)->not->toBeNull()
+        ->and(collect($run->steps)->pluck('key')->all())->toBe(['evaluate']);
+});
+
+it('advances the run when a step marker runs', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $run = OptimizationRun::create([
+        'workspace_id' => $workspace->id,
+        'status' => 'running',
+        'current_step' => 'ad_accounts',
+        'steps' => OptimizationRun::planFor([
+            'ad_accounts', 'campaigns', 'ad_sets', 'ads', 'insights', 'evaluate',
+        ]),
+        'total_rules' => 1,
+        'total_accounts' => 1,
+        'started_at' => now(),
+    ]);
+
+    (new MarkOptimizationRunStep($run->id, 'ads'))->handle();
+
+    expect($run->fresh()->current_step)->toBe('ads');
+});
+
+it('marks the run completed once the evaluation finishes', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $account = AdAccount::create(['id' => 362, 'name' => 'Acct']);
+    Campaign::create(['id' => 462, 'meta_ads_account_id' => 362, 'name' => 'C']);
+
+    $rule = OptimizationRule::create([
+        'workspace_id' => $workspace->id, 'name' => 'Check',
+        'target_type' => 'campaign', 'action' => 'pause',
+        'condition_operator' => 'and', 'execution_mode' => 'approval',
+        'is_active' => true, 'frequency' => 'hourly',
+    ]);
+    $rule->adAccounts()->attach($account->id);
+    OptimizationRuleCondition::create([
+        'meta_ads_optimization_rule_id' => $rule->id,
+        'metric' => 'spend', 'operator' => '>=', 'value' => 0, 'time_window' => 'today',
+    ]);
+
+    // Sync queue runs the dispatched evaluation inline, so the run finishes.
+    $this->artisan('meta-ads:evaluate-optimization-rules', ['--skip-sync' => true])->assertSuccessful();
+
+    $run = OptimizationRun::where('workspace_id', $workspace->id)->first();
+    expect($run->status)->toBe('completed')
+        ->and($run->current_step)->toBeNull()
+        ->and($run->finished_at)->not->toBeNull();
+});
+
+it('keeps the current step when a run fails', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $run = OptimizationRun::create([
+        'workspace_id' => $workspace->id,
+        'status' => 'running',
+        'current_step' => 'insights',
+        'steps' => OptimizationRun::planFor(['ad_accounts', 'insights', 'evaluate']),
+        'total_rules' => 1,
+        'total_accounts' => 1,
+        'started_at' => now(),
+    ]);
+
+    $run->markFailed('boom');
+
+    $run->refresh();
+    expect($run->status)->toBe('failed')
+        ->and($run->current_step)->toBe('insights')
+        ->and($run->error_message)->toBe('boom');
 });

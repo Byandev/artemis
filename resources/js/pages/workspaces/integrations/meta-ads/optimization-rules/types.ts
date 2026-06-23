@@ -72,6 +72,23 @@ export interface OptimizationRuleLog {
     triggered_at: string | null;
 }
 
+export interface OptimizationRunStep {
+    key: string;
+    label: string;
+}
+
+export interface OptimizationRun {
+    id: number;
+    status: 'running' | 'completed' | 'failed';
+    current_step: string | null;
+    steps: OptimizationRunStep[];
+    total_rules: number;
+    total_accounts: number;
+    error_message: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+}
+
 export interface RuleOptions {
     adAccounts: AdAccountOption[];
     metrics: string[];

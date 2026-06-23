@@ -3,22 +3,31 @@
 namespace Modules\MetaAds\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
-use Modules\MetaAds\Jobs\ApplyOptimizationAction;
-use Modules\MetaAds\Models\OptimizationProposal;
+use Illuminate\Support\Facades\Bus;
+use Modules\MetaAds\Jobs\EvaluateDueOptimizationRules;
+use Modules\MetaAds\Jobs\MarkOptimizationRunStep;
+use Modules\MetaAds\Jobs\SyncAds;
+use Modules\MetaAds\Jobs\SyncAdSets;
+use Modules\MetaAds\Jobs\SyncCampaigns;
+use Modules\MetaAds\Jobs\SyncInsights;
+use Modules\MetaAds\Jobs\SyncMetaAdAccounts;
+use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\OptimizationRule;
-use Modules\MetaAds\Services\OptimizationRuleEvaluator;
+use Modules\MetaAds\Models\OptimizationRun;
+use Throwable;
 
 class EvaluateOptimizationRulesCommand extends Command
 {
-    protected $signature = 'meta-ads:evaluate-optimization-rules';
+    protected $signature = 'meta-ads:evaluate-optimization-rules
+        {--skip-sync : Evaluate already-synced data immediately, without first refreshing from Meta}';
 
-    protected $description = 'Evaluate active Meta Ads optimization rules: apply automatic rules (one queued job per entity) and refresh proposals for approval-mode rules.';
+    protected $description = 'Refresh today\'s ad accounts, campaigns, ad sets, ads and insights, then evaluate the due Meta Ads optimization rules on that fresh data.';
 
-    public function handle(OptimizationRuleEvaluator $evaluator): int
+    public function handle(): int
     {
-        $now = now();
+        $now = Carbon::now();
 
         $rules = OptimizationRule::query()
             ->where('is_active', true)
@@ -45,187 +54,153 @@ class EvaluateOptimizationRulesCommand extends Command
             return self::SUCCESS;
         }
 
-        [$automatic, $approval] = $rules->partition(
-            fn (OptimizationRule $rule) => $rule->execution_mode === 'automatic',
-        );
+        $skipSync = (bool) $this->option('skip-sync');
+        $runsQueued = 0;
 
-        // One id for the whole run — the apply jobs use it to claim each target
-        // so no campaign / ad set is changed by more than one rule this run.
-        $runId = (string) Str::uuid();
+        // One tracked run + chain per workspace, so each workspace's progress is
+        // independent and maps onto its own optimization-rules page.
+        foreach ($rules->groupBy('workspace_id') as $workspaceId => $workspaceRules) {
+            $workspaceId = (int) $workspaceId;
+            $ruleIds = $workspaceRules->pluck('id')->all();
 
-        $dispatched = $this->applyAutomatic($evaluator, $automatic, $runId);
-        $proposed = $this->proposeForApproval($evaluator, $approval);
+            if ($skipSync) {
+                $this->queueEvaluationOnly($workspaceId, $ruleIds);
+                $this->markEvaluated($ruleIds, $now);
+                $runsQueued++;
 
-        // Record that these rules ran so their next due time advances.
-        OptimizationRule::whereIn('id', $rules->pluck('id'))->update(['last_evaluated_at' => $now]);
+                continue;
+            }
 
-        $this->newLine();
+            // Only the ad accounts the due rules actually target need refreshing.
+            $adAccounts = $workspaceRules->flatMap->adAccounts->unique('id')->values();
+
+            if ($adAccounts->isEmpty()) {
+                $this->warn("Workspace #{$workspaceId}: due rules have no ad accounts; skipping.");
+
+                continue;
+            }
+
+            $this->queueSyncThenEvaluate($workspaceId, $ruleIds, $adAccounts);
+            $this->markEvaluated($ruleIds, $now);
+            $runsQueued++;
+        }
+
+        if ($runsQueued === 0) {
+            $this->warn('Nothing queued — due rules had no ad accounts to sync.');
+
+            return self::SUCCESS;
+        }
+
         $this->info(sprintf(
-            'Done. %d automatic change(s) dispatched · %d proposal(s) queued for approval.',
-            $dispatched,
-            $proposed,
+            "Queued %d optimization run(s)%s. Track each run's step on its workspace's optimization-rules page.",
+            $runsQueued,
+            $skipSync ? ' (sync skipped)' : '',
         ));
 
         return self::SUCCESS;
     }
 
     /**
-     * Automatic rules apply unattended: one queued job per affected campaign /
-     * ad set, deduped so each entity is changed at most once this run.
+     * Pure-evaluation path: skip the sync and check whatever is already in the
+     * database (used by tests and for re-checking without a refresh). Still
+     * tracked as a run so it shows up in progress, just with a single phase.
      *
-     * @param  Collection<int, OptimizationRule>  $rules
-     * @return int number of apply jobs dispatched
+     * @param  array<int, int>  $ruleIds
      */
-    private function applyAutomatic(OptimizationRuleEvaluator $evaluator, Collection $rules, string $runId): int
+    private function queueEvaluationOnly(int $workspaceId, array $ruleIds): void
     {
-        $rules = $rules->filter(fn (OptimizationRule $rule) => $rule->adAccounts->isNotEmpty());
+        $run = OptimizationRun::create([
+            'workspace_id' => $workspaceId,
+            'status' => OptimizationRun::STATUS_RUNNING,
+            'current_step' => OptimizationRun::STEP_EVALUATE,
+            'steps' => OptimizationRun::planFor([OptimizationRun::STEP_EVALUATE]),
+            'total_rules' => count($ruleIds),
+            'total_accounts' => 0,
+            'started_at' => Carbon::now(),
+        ]);
 
-        if ($rules->isEmpty()) {
-            return 0;
-        }
-
-        $decisions = $evaluator->planRun($rules);
-
-        $this->newLine();
-
-        if (empty($decisions)) {
-            $this->line('<comment>Automatic:</comment> no campaigns/ad sets matched.');
-
-            return 0;
-        }
-
-        foreach ($decisions as $decision) {
-            ApplyOptimizationAction::dispatch(
-                $runId,
-                $decision['rule'],
-                $decision['adAccount'],
-                $decision['target'],
-                $decision['snapshot'],
-            )->onQueue('meta-ads');
-        }
-
-        $this->line('<info>Automatic — dispatched apply jobs:</info>');
-        $this->table(
-            ['Rule', 'Type', 'ID', 'Name', 'Action'],
-            array_map(fn (array $d) => [
-                sprintf('%s (#%d)', $d['rule']->name, $d['rule']->id),
-                $d['rule']->target_type,
-                (string) $d['target']->getKey(),
-                Str::limit($d['target']->name ?? '—', 40),
-                $d['rule']->action,
-            ], $decisions),
-        );
-
-        return count($decisions);
+        EvaluateDueOptimizationRules::dispatch($ruleIds, $run->id)->onQueue('meta-ads');
     }
 
     /**
-     * Approval rules never apply automatically — they refresh their pending
-     * proposals for a human to review. Decided proposals (approved / rejected /
-     * applied) are kept as history.
+     * Full path: refresh today's data, then evaluate. Built as one chain so the
+     * steps run strictly in order and the evaluation always runs LAST.
      *
-     * @param  Collection<int, OptimizationRule>  $rules
-     * @return int number of proposals created
+     * @param  array<int, int>  $ruleIds
+     * @param  Collection<int, AdAccount>  $adAccounts
      */
-    private function proposeForApproval(OptimizationRuleEvaluator $evaluator, Collection $rules): int
+    private function queueSyncThenEvaluate(int $workspaceId, array $ruleIds, Collection $adAccounts): void
     {
-        $created = 0;
+        $today = Carbon::today()->toDateString();
 
-        // Each campaign / ad set is owned by the highest-priority rule that
-        // matches it this run ($rules is pre-sorted by priority desc), so a
-        // target never gets competing proposals — the same single-owner
-        // behaviour automatic rules already get via planRun().
-        $claimed = [];
+        $run = OptimizationRun::create([
+            'workspace_id' => $workspaceId,
+            'status' => OptimizationRun::STATUS_RUNNING,
+            'current_step' => OptimizationRun::STEP_AD_ACCOUNTS,
+            'steps' => OptimizationRun::planFor([
+                OptimizationRun::STEP_AD_ACCOUNTS,
+                OptimizationRun::STEP_CAMPAIGNS,
+                OptimizationRun::STEP_AD_SETS,
+                OptimizationRun::STEP_ADS,
+                OptimizationRun::STEP_INSIGHTS,
+                OptimizationRun::STEP_EVALUATE,
+            ]),
+            'total_rules' => count($ruleIds),
+            'total_accounts' => $adAccounts->count(),
+            'started_at' => Carbon::now(),
+        ]);
 
-        foreach ($rules as $rule) {
-            if ($rule->adAccounts->isEmpty()) {
-                $this->warn("Rule #{$rule->id} \"{$rule->name}\" has no ad accounts; skipping.");
+        $runId = $run->id;
 
-                continue;
-            }
+        // Phase-grouped chain: a marker advances the run onto each phase, then
+        // that phase's jobs run for every account before the next marker.
+        //   per MetaUser: refresh the ad account list
+        //   per account:  campaigns -> ad sets -> ads -> today's insights
+        //   finally:      evaluate the due rules (marks the run complete)
+        $chain = [new MarkOptimizationRunStep($runId, OptimizationRun::STEP_AD_ACCOUNTS)];
 
-            OptimizationProposal::where('meta_ads_optimization_rule_id', $rule->id)
-                ->where('status', 'pending')
-                ->delete();
-
-            foreach ($rule->adAccounts as $account) {
-                // Drop targets a higher-priority rule already claimed this run.
-                $proposals = array_values(array_filter(
-                    $evaluator->plan($rule, $account),
-                    function (array $proposal) use (&$claimed) {
-                        $key = $proposal['target_type'].':'.$proposal['target_id'];
-                        if (isset($claimed[$key])) {
-                            return false;
-                        }
-                        $claimed[$key] = true;
-
-                        return true;
-                    },
-                ));
-
-                foreach ($proposals as $proposal) {
-                    OptimizationProposal::create([
-                        'workspace_id' => $rule->workspace_id,
-                        'meta_ads_optimization_rule_id' => $rule->id,
-                        'meta_ads_account_id' => $account->id,
-                        'target_type' => $proposal['target_type'],
-                        'target_id' => $proposal['target_id'],
-                        'target_name' => $proposal['target_name'],
-                        'action' => $proposal['action'],
-                        'current_value' => $proposal['current_value'],
-                        'new_value' => $proposal['new_value'],
-                        'conditions_snapshot' => $proposal['conditions_snapshot'],
-                        'status' => 'pending',
-                    ]);
-
-                    $created++;
-                }
-
-                $this->newLine();
-                $this->line(sprintf(
-                    '<info>%s</info> (#%d) · %s · APPROVAL',
-                    $rule->name,
-                    $rule->id,
-                    $account->name,
-                ));
-
-                if (empty($proposals)) {
-                    $this->line('  No campaigns/ad sets matched.');
-
-                    continue;
-                }
-
-                $this->table(
-                    ['Type', 'ID', 'Name', 'Action', 'Budget (current → new)'],
-                    array_map(fn (array $p) => [
-                        $p['target_type'],
-                        $p['target_id'],
-                        Str::limit($p['target_name'] ?? '—', 40),
-                        $p['action'],
-                        $this->formatBudgetChange($p),
-                    ], $proposals),
-                );
-            }
+        foreach ($adAccounts->flatMap->metaUsers->unique('id') as $metaUser) {
+            $chain[] = new SyncMetaAdAccounts($metaUser);
         }
 
-        return $created;
+        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_CAMPAIGNS);
+        foreach ($adAccounts as $account) {
+            $chain[] = new SyncCampaigns($account);
+        }
+
+        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_AD_SETS);
+        foreach ($adAccounts as $account) {
+            $chain[] = new SyncAdSets($account);
+        }
+
+        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_ADS);
+        foreach ($adAccounts as $account) {
+            $chain[] = new SyncAds($account);
+        }
+
+        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_INSIGHTS);
+        foreach ($adAccounts as $account) {
+            $chain[] = new SyncInsights($account, $today);
+        }
+
+        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_EVALUATE);
+        $chain[] = new EvaluateDueOptimizationRules($ruleIds, $runId);
+
+        Bus::chain($chain)
+            ->onQueue('meta-ads')
+            // Any permanently-failed sync stops the chain — surface it on the run
+            // so the panel shows which phase broke instead of spinning forever.
+            ->catch(function (Throwable $e) use ($runId) {
+                OptimizationRun::find($runId)?->markFailed($e->getMessage());
+            })
+            ->dispatch();
     }
 
     /**
-     * @param  array<string, mixed>  $proposal
+     * @param  array<int, int>  $ruleIds
      */
-    private function formatBudgetChange(array $proposal): string
+    private function markEvaluated(array $ruleIds, Carbon $at): void
     {
-        if (! in_array($proposal['action'], ['increase_budget', 'decrease_budget'], true)) {
-            return '—';
-        }
-
-        if ($proposal['current_value'] === null || $proposal['new_value'] === null) {
-            return 'n/a (no budget set)';
-        }
-
-        return number_format((float) $proposal['current_value'], 2)
-            .' → '
-            .number_format((float) $proposal['new_value'], 2);
+        OptimizationRule::whereIn('id', $ruleIds)->update(['last_evaluated_at' => $at]);
     }
 }
