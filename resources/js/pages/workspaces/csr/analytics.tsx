@@ -13,8 +13,8 @@ import { debounce, omit } from 'lodash';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface CsrRecord {
-    csr_id: number;
-    csr_name: string;
+    id: number;
+    name: string;
     pancake_user_id: string;
     total_orders: number;
     total_sales: number;
@@ -25,6 +25,8 @@ interface CsrRecord {
     total_call_time: number;
     total_rmo_call_attempts: number;
     total_confirmed: number;
+    total_delivered: number;
+    total_returning: number;
 }
 
 interface Props {
@@ -54,62 +56,6 @@ const formatCallTime = (seconds: number) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 };
-
-function useStatCard(
-    workspace: Workspace,
-    endpoint: string,
-    from: string,
-    to: string,
-    type: string,
-) {
-    const [value, setValue] = useState<number | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        setLoading(true);
-        axios
-            .get(`/api/workspaces/${workspace.slug}/csrs/stats/${endpoint}`, {
-                params: { from, to, type },
-                signal: controller.signal,
-            })
-            .then((res) => setValue(Number(res.data?.value ?? 0)))
-            .catch((err) => {
-                if (!axios.isCancel(err)) console.error(err);
-            })
-            .finally(() => setLoading(false));
-        return () => controller.abort();
-    }, [workspace.slug, endpoint, from, to, type]);
-
-    return { value, loading };
-}
-
-interface StatCardProps {
-    title: string;
-    value: number | null;
-    loading: boolean;
-    format?: (n: number) => string;
-}
-
-function StatCard({ title, value, loading, format: fmt }: StatCardProps) {
-    return (
-        <div className="rounded-xl border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
-            <p className="text-[11px] font-medium tracking-wider text-zinc-400 uppercase dark:text-zinc-500">
-                {title}
-            </p>
-            {loading ? (
-                <div className="mt-2 h-7 w-24 animate-pulse rounded bg-zinc-100 dark:bg-zinc-800" />
-            ) : (
-                <p className="mt-1 text-xl font-semibold text-zinc-900 tabular-nums dark:text-white">
-                    {fmt
-                        ? fmt(value ?? 0)
-                        : Number(value ?? 0).toLocaleString()}
-                </p>
-            )}
-        </div>
-    );
-}
-
 export default function Analytics({ workspace, query }: Props) {
     const today = new Date();
     const initialType = query?.type === 'erp' ? 'erp' : 'pos';
@@ -138,49 +84,6 @@ export default function Analytics({ workspace, query }: Props) {
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
-
-    const salesStat = useStatCard(
-        workspace,
-        'total-sales',
-        fromStr,
-        toStr,
-        currentType,
-    );
-    const ordersStat = useStatCard(
-        workspace,
-        'total-orders',
-        fromStr,
-        toStr,
-        currentType,
-    );
-    const deliveredStat = useStatCard(
-        workspace,
-        'total-delivered',
-        fromStr,
-        toStr,
-        currentType,
-    );
-    const returningStat = useStatCard(
-        workspace,
-        'total-returning',
-        fromStr,
-        toStr,
-        currentType,
-    );
-    const rtsStat = useStatCard(
-        workspace,
-        'total-rts',
-        fromStr,
-        toStr,
-        currentType,
-    );
-    const rmoCalledStat = useStatCard(
-        workspace,
-        'total-rmo-called',
-        fromStr,
-        toStr,
-        currentType,
-    );
 
     useEffect(() => {
         setPage(1);
@@ -222,14 +125,14 @@ export default function Analytics({ workspace, query }: Props) {
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
             {
-                accessorKey: 'csr_name',
+                accessorKey: 'name',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="CSR" />
                 ),
                 // Fall back to the pancake_user_id when the user has no synced
                 // name (e.g. assignees not yet pulled into pancake_users).
                 cell: ({ row }) =>
-                    row.original.csr_name || row.original.pancake_user_id,
+                    row.original.name,
                 size: 220,
             },
             {
