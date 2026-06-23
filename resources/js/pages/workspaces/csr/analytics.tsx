@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 interface CsrRecord {
     csr_id: number;
     csr_name: string;
+    pancake_user_id: string;
     total_orders: number;
     total_sales: number;
     delivered: number;
@@ -221,10 +222,14 @@ export default function Analytics({ workspace, query }: Props) {
     const columns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
             {
-                accessorKey: 'name',
+                accessorKey: 'csr_name',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="CSR" />
                 ),
+                // Fall back to the pancake_user_id when the user has no synced
+                // name (e.g. assignees not yet pulled into pancake_users).
+                cell: ({ row }) =>
+                    row.original.csr_name || row.original.pancake_user_id,
                 size: 220,
             },
             {
