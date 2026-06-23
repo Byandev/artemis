@@ -79,6 +79,8 @@ export interface OptimizationRunStep {
 
 export interface OptimizationRun {
     id: number;
+    rule_id: number | null;
+    rule_name: string | null;
     status: 'running' | 'completed' | 'failed';
     current_step: string | null;
     steps: OptimizationRunStep[];

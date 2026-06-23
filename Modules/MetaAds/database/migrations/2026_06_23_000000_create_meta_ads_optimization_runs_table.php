@@ -11,6 +11,9 @@ return new class extends Migration
         Schema::create('meta_ads_optimization_runs', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('workspace_id');
+            // Each run tracks one rule end-to-end (sync its accounts, then
+            // evaluate just that rule). Nullable so a run can outlive its rule.
+            $table->unsignedBigInteger('meta_ads_optimization_rule_id')->nullable();
             $table->string('status', 16)->default('running');
             // The phase currently executing (null once the run finishes ok).
             $table->string('current_step', 32)->nullable();
@@ -24,6 +27,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['workspace_id', 'status']);
+            // Explicit short name — the auto-generated one exceeds MySQL's 64-char limit.
+            $table->index(['meta_ads_optimization_rule_id', 'id'], 'opt_runs_rule_idx');
             $table->index('started_at');
         });
     }

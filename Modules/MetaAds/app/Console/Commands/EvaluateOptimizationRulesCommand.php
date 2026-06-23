@@ -13,7 +13,6 @@ use Modules\MetaAds\Jobs\SyncAdSets;
 use Modules\MetaAds\Jobs\SyncCampaigns;
 use Modules\MetaAds\Jobs\SyncInsights;
 use Modules\MetaAds\Jobs\SyncMetaAdAccounts;
-use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\OptimizationRule;
 use Modules\MetaAds\Models\OptimizationRun;
 use Throwable;
@@ -32,8 +31,6 @@ class EvaluateOptimizationRulesCommand extends Command
         $rules = OptimizationRule::query()
             ->where('is_active', true)
             ->with(['adAccounts', 'conditions'])
-            // When two rules contest a target, the higher priority claims it;
-            // ties fall back to the older rule for a deterministic result.
             ->orderByDesc('priority')
             ->orderBy('id')
             ->get();
@@ -57,32 +54,14 @@ class EvaluateOptimizationRulesCommand extends Command
         $skipSync = (bool) $this->option('skip-sync');
         $runsQueued = 0;
 
-        // One tracked run + chain per workspace, so each workspace's progress is
-        // independent and maps onto its own optimization-rules page.
-        foreach ($rules->groupBy('workspace_id') as $workspaceId => $workspaceRules) {
-            $workspaceId = (int) $workspaceId;
-            $ruleIds = $workspaceRules->pluck('id')->all();
-
-            if ($skipSync) {
-                $this->queueEvaluationOnly($workspaceId, $ruleIds);
-                $this->markEvaluated($ruleIds, $now);
-                $runsQueued++;
-
-                continue;
-            }
-
-            // Only the ad accounts the due rules actually target need refreshing.
-            $adAccounts = $workspaceRules->flatMap->adAccounts->unique('id')->values();
-
-            if ($adAccounts->isEmpty()) {
-                $this->warn("Workspace #{$workspaceId}: due rules have no ad accounts; skipping.");
-
-                continue;
-            }
-
-            $this->queueSyncThenEvaluate($workspaceId, $ruleIds, $adAccounts);
-            $this->markEvaluated($ruleIds, $now);
-            $runsQueued++;
+        // Group by workspace so each workspace's sync is isolated (a failure in
+        // one doesn't stop the others). Within a workspace every rule is still
+        // tracked + evaluated independently, but the sync is shared: each ad
+        // account is refreshed only once even when several rules use it.
+        foreach ($rules->groupBy('workspace_id') as $workspaceRules) {
+            $runsQueued += $skipSync
+                ? $this->queueEvaluationOnly($workspaceRules, $now)
+                : $this->queueSyncThenEvaluate($workspaceRules, $now);
         }
 
         if ($runsQueued === 0) {
@@ -92,7 +71,7 @@ class EvaluateOptimizationRulesCommand extends Command
         }
 
         $this->info(sprintf(
-            "Queued %d optimization run(s)%s. Track each run's step on its workspace's optimization-rules page.",
+            'Queued %d independent rule run(s)%s. Track each rule on its optimization-rules page.',
             $runsQueued,
             $skipSync ? ' (sync skipped)' : '',
         ));
@@ -102,105 +81,136 @@ class EvaluateOptimizationRulesCommand extends Command
 
     /**
      * Pure-evaluation path: skip the sync and check whatever is already in the
-     * database (used by tests and for re-checking without a refresh). Still
-     * tracked as a run so it shows up in progress, just with a single phase.
+     * database (used by tests and for re-checking without a refresh). Each rule
+     * is still its own single-phase run.
      *
-     * @param  array<int, int>  $ruleIds
+     * @param  Collection<int, OptimizationRule>  $rules
+     * @return int number of runs queued
      */
-    private function queueEvaluationOnly(int $workspaceId, array $ruleIds): void
+    private function queueEvaluationOnly(Collection $rules, Carbon $now): int
     {
-        $run = OptimizationRun::create([
-            'workspace_id' => $workspaceId,
-            'status' => OptimizationRun::STATUS_RUNNING,
-            'current_step' => OptimizationRun::STEP_EVALUATE,
-            'steps' => OptimizationRun::planFor([OptimizationRun::STEP_EVALUATE]),
-            'total_rules' => count($ruleIds),
-            'total_accounts' => 0,
-            'started_at' => Carbon::now(),
-        ]);
+        foreach ($rules as $rule) {
+            $run = $this->createRun($rule, [OptimizationRun::STEP_EVALUATE], 0);
 
-        EvaluateDueOptimizationRules::dispatch($ruleIds, $run->id)->onQueue('meta-ads');
+            EvaluateDueOptimizationRules::dispatch([$rule->id], $run->id)->onQueue('meta-ads');
+            $this->markEvaluated($rule, $now);
+        }
+
+        return $rules->count();
     }
 
     /**
-     * Full path: refresh today's data, then evaluate. Built as one chain so the
-     * steps run strictly in order and the evaluation always runs LAST.
+     * Full path for one workspace: refresh each distinct ad account ONCE, then
+     * evaluate every rule on that fresh data. Each rule gets its own tracked run,
+     * but they share the single sync pass so a shared account isn't re-synced.
      *
-     * @param  array<int, int>  $ruleIds
-     * @param  Collection<int, AdAccount>  $adAccounts
+     * @param  Collection<int, OptimizationRule>  $rules
+     * @return int number of runs queued
      */
-    private function queueSyncThenEvaluate(int $workspaceId, array $ruleIds, Collection $adAccounts): void
+    private function queueSyncThenEvaluate(Collection $rules, Carbon $now): int
     {
-        $today = Carbon::today()->toDateString();
+        // Rules with no ad accounts have nothing to sync or evaluate.
+        $rules->filter(fn (OptimizationRule $rule) => $rule->adAccounts->isEmpty())
+            ->each(fn (OptimizationRule $rule) => $this->warn("Rule #{$rule->id} \"{$rule->name}\" has no ad accounts; skipping."));
 
-        $run = OptimizationRun::create([
-            'workspace_id' => $workspaceId,
-            'status' => OptimizationRun::STATUS_RUNNING,
-            'current_step' => OptimizationRun::STEP_AD_ACCOUNTS,
-            'steps' => OptimizationRun::planFor([
+        $rules = $rules->filter(fn (OptimizationRule $rule) => $rule->adAccounts->isNotEmpty())->values();
+
+        if ($rules->isEmpty()) {
+            return 0;
+        }
+
+        // The distinct accounts across every rule — synced once, shared by all.
+        $accounts = $rules->flatMap->adAccounts->unique('id')->values();
+
+        // One run per rule; all advance together through the shared sync phases.
+        $runIdByRuleId = [];
+        foreach ($rules as $rule) {
+            $runIdByRuleId[$rule->id] = $this->createRun($rule, [
                 OptimizationRun::STEP_AD_ACCOUNTS,
                 OptimizationRun::STEP_CAMPAIGNS,
                 OptimizationRun::STEP_AD_SETS,
                 OptimizationRun::STEP_ADS,
                 OptimizationRun::STEP_INSIGHTS,
                 OptimizationRun::STEP_EVALUATE,
-            ]),
-            'total_rules' => count($ruleIds),
-            'total_accounts' => $adAccounts->count(),
-            'started_at' => Carbon::now(),
-        ]);
+            ], $rule->adAccounts->count())->id;
+        }
 
-        $runId = $run->id;
+        $runIds = array_values($runIdByRuleId);
+        $today = Carbon::today()->toDateString();
 
-        // Phase-grouped chain: a marker advances the run onto each phase, then
-        // that phase's jobs run for every account before the next marker.
-        //   per MetaUser: refresh the ad account list
-        //   per account:  campaigns -> ad sets -> ads -> today's insights
-        //   finally:      evaluate the due rules (marks the run complete)
-        $chain = [new MarkOptimizationRunStep($runId, OptimizationRun::STEP_AD_ACCOUNTS)];
+        // Phase-grouped chain: a marker advances ALL the runs onto each phase,
+        // then that phase's jobs run once per distinct account before the next
+        // marker. Finally each rule is evaluated into its own run.
+        $chain = [new MarkOptimizationRunStep($runIds, OptimizationRun::STEP_AD_ACCOUNTS)];
 
-        foreach ($adAccounts->flatMap->metaUsers->unique('id') as $metaUser) {
+        foreach ($accounts->flatMap->metaUsers->unique('id') as $metaUser) {
             $chain[] = new SyncMetaAdAccounts($metaUser);
         }
 
-        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_CAMPAIGNS);
-        foreach ($adAccounts as $account) {
+        $chain[] = new MarkOptimizationRunStep($runIds, OptimizationRun::STEP_CAMPAIGNS);
+        foreach ($accounts as $account) {
             $chain[] = new SyncCampaigns($account);
         }
 
-        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_AD_SETS);
-        foreach ($adAccounts as $account) {
+        $chain[] = new MarkOptimizationRunStep($runIds, OptimizationRun::STEP_AD_SETS);
+        foreach ($accounts as $account) {
             $chain[] = new SyncAdSets($account);
         }
 
-        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_ADS);
-        foreach ($adAccounts as $account) {
+        $chain[] = new MarkOptimizationRunStep($runIds, OptimizationRun::STEP_ADS);
+        foreach ($accounts as $account) {
             $chain[] = new SyncAds($account);
         }
 
-        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_INSIGHTS);
-        foreach ($adAccounts as $account) {
+        $chain[] = new MarkOptimizationRunStep($runIds, OptimizationRun::STEP_INSIGHTS);
+        foreach ($accounts as $account) {
             $chain[] = new SyncInsights($account, $today);
         }
 
-        $chain[] = new MarkOptimizationRunStep($runId, OptimizationRun::STEP_EVALUATE);
-        $chain[] = new EvaluateDueOptimizationRules($ruleIds, $runId);
+        $chain[] = new MarkOptimizationRunStep($runIds, OptimizationRun::STEP_EVALUATE);
+        foreach ($rules as $rule) {
+            $chain[] = new EvaluateDueOptimizationRules([$rule->id], $runIdByRuleId[$rule->id]);
+        }
 
         Bus::chain($chain)
             ->onQueue('meta-ads')
-            // Any permanently-failed sync stops the chain — surface it on the run
-            // so the panel shows which phase broke instead of spinning forever.
-            ->catch(function (Throwable $e) use ($runId) {
-                OptimizationRun::find($runId)?->markFailed($e->getMessage());
+            // A permanently-failed sync stops the chain — fail every run still in
+            // flight so their panels show the break instead of spinning forever.
+            ->catch(function (Throwable $e) use ($runIds) {
+                OptimizationRun::whereIn('id', $runIds)
+                    ->where('status', OptimizationRun::STATUS_RUNNING)
+                    ->update([
+                        'status' => OptimizationRun::STATUS_FAILED,
+                        'finished_at' => now(),
+                        'error_message' => $e->getMessage(),
+                    ]);
             })
             ->dispatch();
+
+        $rules->each(fn (OptimizationRule $rule) => $this->markEvaluated($rule, $now));
+
+        return $rules->count();
     }
 
     /**
-     * @param  array<int, int>  $ruleIds
+     * @param  array<int, string>  $stepKeys
      */
-    private function markEvaluated(array $ruleIds, Carbon $at): void
+    private function createRun(OptimizationRule $rule, array $stepKeys, int $totalAccounts): OptimizationRun
     {
-        OptimizationRule::whereIn('id', $ruleIds)->update(['last_evaluated_at' => $at]);
+        return OptimizationRun::create([
+            'workspace_id' => $rule->workspace_id,
+            'meta_ads_optimization_rule_id' => $rule->id,
+            'status' => OptimizationRun::STATUS_RUNNING,
+            'current_step' => $stepKeys[0],
+            'steps' => OptimizationRun::planFor($stepKeys),
+            'total_rules' => 1,
+            'total_accounts' => $totalAccounts,
+            'started_at' => Carbon::now(),
+        ]);
+    }
+
+    private function markEvaluated(OptimizationRule $rule, Carbon $at): void
+    {
+        $rule->forceFill(['last_evaluated_at' => $at])->save();
     }
 }

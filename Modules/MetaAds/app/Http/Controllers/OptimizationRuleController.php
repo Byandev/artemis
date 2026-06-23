@@ -69,9 +69,9 @@ class OptimizationRuleController extends Controller
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/index', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'rules' => $rules,
-            // Latest evaluate run for this workspace, so the page can show which
-            // step it's on (and poll while it's still running).
-            'currentRun' => $this->latestRun($workspace),
+            // Latest run per rule (running, or recently finished), so each rule
+            // shows its own step progress — polled while any is still running.
+            'currentRuns' => $this->currentRuns($workspace, $user),
             'query' => [
                 'page' => $request->integer('page', 1),
                 'perPage' => $perPage,
@@ -80,32 +80,53 @@ class OptimizationRuleController extends Controller
     }
 
     /**
-     * The most recent optimization run for the workspace, shaped for the
-     * progress panel. Null when the workspace has never been evaluated.
+     * Latest run per rule for the workspace — only those still running or
+     * finished within the recent window, and only for rules the user can see.
      *
-     * @return array<string, mixed>|null
+     * @return array<int, array<string, mixed>>
      */
-    private function latestRun(Workspace $workspace): ?array
+    private function currentRuns(Workspace $workspace, $user): array
     {
-        $run = OptimizationRun::where('workspace_id', $workspace->id)
-            ->latest('started_at')
-            ->first();
+        $visibleRuleIds = OptimizationRule::where('workspace_id', $workspace->id)
+            ->when(
+                TeamVisibility::shouldScope($user, $workspace),
+                fn ($q) => $q->whereHas('adAccounts', fn ($a) => $a->visibleTo($user, $workspace)),
+            )
+            ->pluck('id');
 
-        if (! $run) {
-            return null;
+        if ($visibleRuleIds->isEmpty()) {
+            return [];
         }
 
-        return [
-            'id' => $run->id,
-            'status' => $run->status,
-            'current_step' => $run->current_step,
-            'steps' => $run->steps ?? [],
-            'total_rules' => $run->total_rules,
-            'total_accounts' => $run->total_accounts,
-            'error_message' => $run->error_message,
-            'started_at' => optional($run->started_at)->toIso8601String(),
-            'finished_at' => optional($run->finished_at)->toIso8601String(),
-        ];
+        return OptimizationRun::query()
+            ->whereIn('meta_ads_optimization_rule_id', $visibleRuleIds)
+            // Newest run per rule only.
+            ->whereIn('id', function ($q) use ($visibleRuleIds) {
+                $q->from('meta_ads_optimization_runs')
+                    ->selectRaw('MAX(id)')
+                    ->whereIn('meta_ads_optimization_rule_id', $visibleRuleIds)
+                    ->groupBy('meta_ads_optimization_rule_id');
+            })
+            // Keep the panel relevant: in-flight, or finished in the last 6h.
+            ->where(fn ($q) => $q->where('status', OptimizationRun::STATUS_RUNNING)
+                ->orWhere('started_at', '>=', now()->subHours(6)))
+            ->with('rule:id,name')
+            ->latest('started_at')
+            ->get()
+            ->map(fn (OptimizationRun $run) => [
+                'id' => $run->id,
+                'rule_id' => $run->meta_ads_optimization_rule_id,
+                'rule_name' => $run->rule?->name,
+                'status' => $run->status,
+                'current_step' => $run->current_step,
+                'steps' => $run->steps ?? [],
+                'total_rules' => $run->total_rules,
+                'total_accounts' => $run->total_accounts,
+                'error_message' => $run->error_message,
+                'started_at' => optional($run->started_at)->toIso8601String(),
+                'finished_at' => optional($run->finished_at)->toIso8601String(),
+            ])
+            ->all();
     }
 
     public function create(Workspace $workspace): Response

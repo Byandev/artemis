@@ -12,8 +12,9 @@ use Modules\MetaAds\Models\OptimizationRun;
 /**
  * Lightweight marker interleaved into the evaluate chain: when it runs, the
  * previous phase's jobs have finished and the next phase is about to start, so
- * it simply advances the run onto $step. Kept separate from the (shared) sync
- * jobs so those stay free of run-tracking concerns.
+ * it advances every run sharing this chain onto $step. One marker drives many
+ * runs because several rules can share a single deduplicated sync pass. Kept
+ * separate from the (shared) sync jobs so those stay free of run-tracking.
  */
 class MarkOptimizationRunStep implements ShouldQueue
 {
@@ -21,13 +22,19 @@ class MarkOptimizationRunStep implements ShouldQueue
 
     public int $tries = 1;
 
+    /**
+     * @param  array<int, int>  $optimizationRunIds  every run advanced by this chain
+     */
     public function __construct(
-        public int $optimizationRunId,
+        public array $optimizationRunIds,
         public string $step,
     ) {}
 
     public function handle(): void
     {
-        OptimizationRun::find($this->optimizationRunId)?->markStep($this->step);
+        OptimizationRun::whereIn('id', $this->optimizationRunIds)
+            ->get()
+            ->each
+            ->markStep($this->step);
     }
 }

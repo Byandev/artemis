@@ -68,19 +68,8 @@ function StepIcon({ state }: { state: StepState }) {
     }
 }
 
-export default function RunProgressPanel({ run }: { run: OptimizationRun }) {
-    // Poll while the run is still moving so the steps update live. Inertia's
-    // partial reload re-runs only the `currentRun` prop, not the whole page.
-    useEffect(() => {
-        if (run.status !== 'running') return;
-
-        const interval = setInterval(() => {
-            router.reload({ only: ['currentRun'] });
-        }, 3000);
-
-        return () => clearInterval(interval);
-    }, [run.status]);
-
+/** Presentational panel for a single rule's run. */
+export function RunProgressPanel({ run }: { run: OptimizationRun }) {
     const badge = STATUS_BADGE[run.status];
     const currentIndex = run.steps.findIndex((s) => s.key === run.current_step);
 
@@ -91,25 +80,27 @@ export default function RunProgressPanel({ run }: { run: OptimizationRun }) {
     const summary = [
         startedAgo ? `started ${startedAgo}` : null,
         `${run.total_accounts} account${run.total_accounts === 1 ? '' : 's'}`,
-        `${run.total_rules} rule${run.total_rules === 1 ? '' : 's'}`,
     ]
         .filter(Boolean)
         .join(' · ');
 
     return (
-        <div className="mb-5 overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+        <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
             <div className="flex items-center justify-between border-b border-black/5 px-4 py-3 dark:border-white/5">
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                        Latest run
+                <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        {run.rule_name ?? 'Rule run'}
                     </span>
-                    <span className="font-mono text-[11px] text-gray-400">
+                    <span className="shrink-0 font-mono text-[11px] text-gray-400">
                         #{run.id}
                     </span>
                 </div>
                 <Badge
                     variant="outline"
-                    className={cn('gap-1.5 text-[11px]', badge.className)}
+                    className={cn(
+                        'shrink-0 gap-1.5 text-[11px]',
+                        badge.className,
+                    )}
                 >
                     <span
                         className={cn(
@@ -164,6 +155,34 @@ export default function RunProgressPanel({ run }: { run: OptimizationRun }) {
                     </p>
                 )}
             </div>
+        </div>
+    );
+}
+
+/**
+ * Renders one panel per rule's latest run, and polls the page (just the
+ * `currentRuns` prop) while any of them is still running so the steps stay live.
+ */
+export default function RunProgressList({ runs }: { runs: OptimizationRun[] }) {
+    const anyRunning = runs.some((r) => r.status === 'running');
+
+    useEffect(() => {
+        if (!anyRunning) return;
+
+        const interval = setInterval(() => {
+            router.reload({ only: ['currentRuns'] });
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [anyRunning]);
+
+    if (runs.length === 0) return null;
+
+    return (
+        <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {runs.map((run) => (
+                <RunProgressPanel key={run.id} run={run} />
+            ))}
         </div>
     );
 }

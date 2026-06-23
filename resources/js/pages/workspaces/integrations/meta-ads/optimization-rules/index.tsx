@@ -30,7 +30,7 @@ import {
     Zap,
 } from 'lucide-react';
 import { useState } from 'react';
-import RunProgressPanel from './run-progress-panel';
+import RunProgressList from './run-progress-panel';
 import {
     actionBadgeClass,
     executionModeLabel,
@@ -45,7 +45,7 @@ import {
 interface Props {
     workspace: { id: number; name: string; slug: string };
     rules: PaginatedData<OptimizationRule>;
-    currentRun?: OptimizationRun | null;
+    currentRuns?: OptimizationRun[];
     query?: { page?: number | string; perPage?: number | string };
 }
 
@@ -61,7 +61,7 @@ function actionSummary(rule: OptimizationRule): string {
 export default function OptimizationRulesIndex({
     workspace,
     rules,
-    currentRun,
+    currentRuns,
     query,
 }: Props) {
     const [deleteTarget, setDeleteTarget] = useState<OptimizationRule | null>(
@@ -304,7 +304,9 @@ export default function OptimizationRulesIndex({
                     </Button>
                 </PageHeader>
 
-                {currentRun && <RunProgressPanel run={currentRun} />}
+                {currentRuns && currentRuns.length > 0 && (
+                    <RunProgressList runs={currentRuns} />
+                )}
 
                 {rules.total === 0 ? (
                     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-black/10 py-20 text-center dark:border-white/10">

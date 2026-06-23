@@ -85,7 +85,7 @@ it('applies the max cap after the min floor when both are set', function () {
         ->and(OptimizationRuleEvaluator::computeNewBudget($rule, 3000.0))->toBe(3150.0);
 });
 
-it('lets the highest-priority approval rule claim a target so there are no competing proposals', function () {
+it('evaluates each rule independently: both rules get their own run and propose for the same target', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
 
     $account = AdAccount::create(['id' => 310, 'name' => 'Acct']);
@@ -111,23 +111,28 @@ it('lets the highest-priority approval rule claim a target so there are no compe
         return $rule;
     };
 
-    // Both rules match the ad set (budget 100 <= 1000); pause has higher priority.
+    // Both rules match the ad set (budget 100 <= 1000).
     $kill = $makeRule(
         ['name' => 'Kill', 'action' => 'pause', 'priority' => 5],
         ['metric' => 'budget', 'operator' => '<=', 'value' => 1000],
     );
-    $makeRule(
+    $descale = $makeRule(
         ['name' => 'Descale', 'action' => 'decrease_budget', 'priority' => 1, 'adjustment_type' => 'percentage', 'adjustment_value' => 50],
         ['metric' => 'budget', 'operator' => '<=', 'value' => 1000],
     );
 
     $this->artisan('meta-ads:evaluate-optimization-rules', ['--skip-sync' => true])->assertSuccessful();
 
-    // Only the higher-priority Kill rule owns ad set 510 — no decrease proposal.
+    // Rules now run independently — each owns its own evaluation, so BOTH
+    // propose for ad set 510 (no cross-rule priority claiming any more).
     $proposals = OptimizationProposal::where('target_id', 510)->get();
-    expect($proposals)->toHaveCount(1)
-        ->and($proposals[0]->action)->toBe('pause')
-        ->and((int) $proposals[0]->meta_ads_optimization_rule_id)->toBe($kill->id);
+    expect($proposals)->toHaveCount(2)
+        ->and($proposals->pluck('action')->sort()->values()->all())
+        ->toBe(['decrease_budget', 'pause']);
+
+    // And each rule gets its own tracked run.
+    expect(OptimizationRun::whereIn('meta_ads_optimization_rule_id', [$kill->id, $descale->id])->count())
+        ->toBe(2);
 });
 
 it('evaluates running_days from the target start time (>= 3 days)', function () {
@@ -202,13 +207,13 @@ it('syncs today before evaluating: chains entity + insights sync, then the evalu
 
     $this->artisan('meta-ads:evaluate-optimization-rules')->assertSuccessful();
 
-    // A tracked run is created for the workspace, sitting at the first phase.
-    $run = OptimizationRun::where('workspace_id', $workspace->id)->first();
+    // A tracked run is created for THIS rule, sitting at the first phase.
+    $run = OptimizationRun::where('meta_ads_optimization_rule_id', $rule->id)->first();
     expect($run)->not->toBeNull()
+        ->and($run->workspace_id)->toBe($workspace->id)
         ->and($run->status)->toBe('running')
         ->and($run->current_step)->toBe('ad_accounts')
         ->and($run->total_accounts)->toBe(1)
-        ->and($run->total_rules)->toBe(1)
         ->and(collect($run->steps)->pluck('key')->all())->toBe([
             'ad_accounts', 'campaigns', 'ad_sets', 'ads', 'insights', 'evaluate',
         ]);
@@ -261,8 +266,8 @@ it('does not sync when --skip-sync is given: evaluates immediately but still tra
     Bus::assertNotDispatched(SyncInsights::class);
     Bus::assertDispatched(EvaluateDueOptimizationRules::class);
 
-    // Still tracked as a run, just a single-phase one.
-    $run = OptimizationRun::where('workspace_id', $workspace->id)->first();
+    // Still tracked as a run for this rule, just a single-phase one.
+    $run = OptimizationRun::where('meta_ads_optimization_rule_id', $rule->id)->first();
     expect($run)->not->toBeNull()
         ->and(collect($run->steps)->pluck('key')->all())->toBe(['evaluate']);
 });
@@ -282,9 +287,60 @@ it('advances the run when a step marker runs', function () {
         'started_at' => now(),
     ]);
 
-    (new MarkOptimizationRunStep($run->id, 'ads'))->handle();
+    (new MarkOptimizationRunStep([$run->id], 'ads'))->handle();
 
     expect($run->fresh()->current_step)->toBe('ads');
+});
+
+it('syncs a shared ad account only once for multiple rules, but tracks each rule', function () {
+    Bus::fake();
+
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    // One account, used by two different rules.
+    $account = AdAccount::create(['id' => 370, 'name' => 'Shared']);
+    Campaign::create(['id' => 470, 'meta_ads_account_id' => 370, 'name' => 'C']);
+
+    $makeRule = function (string $name) use ($workspace, $account) {
+        $rule = OptimizationRule::create([
+            'workspace_id' => $workspace->id, 'name' => $name,
+            'target_type' => 'campaign', 'action' => 'pause',
+            'condition_operator' => 'and', 'execution_mode' => 'approval',
+            'is_active' => true, 'frequency' => 'hourly',
+        ]);
+        $rule->adAccounts()->attach($account->id);
+        OptimizationRuleCondition::create([
+            'meta_ads_optimization_rule_id' => $rule->id,
+            'metric' => 'spend', 'operator' => '>=', 'value' => 0, 'time_window' => 'today',
+        ]);
+
+        return $rule;
+    };
+
+    $makeRule('Rule A');
+    $makeRule('Rule B');
+
+    $this->artisan('meta-ads:evaluate-optimization-rules')->assertSuccessful();
+
+    // The shared account is synced ONCE per phase (one SyncCampaigns, etc.), and
+    // each rule is evaluated into its own run at the end.
+    Bus::assertChained([
+        MarkOptimizationRunStep::class,        // ad_accounts
+        MarkOptimizationRunStep::class,        // campaigns
+        SyncCampaigns::class,                  // account 370 — once
+        MarkOptimizationRunStep::class,        // ad_sets
+        SyncAdSets::class,
+        MarkOptimizationRunStep::class,        // ads
+        SyncAds::class,
+        MarkOptimizationRunStep::class,        // insights
+        SyncInsights::class,
+        MarkOptimizationRunStep::class,        // evaluate
+        EvaluateDueOptimizationRules::class,   // rule A
+        EvaluateDueOptimizationRules::class,   // rule B
+    ]);
+
+    // Two independent runs — one per rule.
+    expect(OptimizationRun::count())->toBe(2);
 });
 
 it('marks the run completed once the evaluation finishes', function () {

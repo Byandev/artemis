@@ -64,6 +64,11 @@ class OptimizationRun extends Model
         return $this->belongsTo(Workspace::class);
     }
 
+    public function rule(): BelongsTo
+    {
+        return $this->belongsTo(OptimizationRule::class, 'meta_ads_optimization_rule_id');
+    }
+
     /**
      * Build the ordered step plan ([{key, label}, ...]) for the given keys.
      *
