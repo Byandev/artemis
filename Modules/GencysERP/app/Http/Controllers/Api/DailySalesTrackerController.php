@@ -96,8 +96,15 @@ class DailySalesTrackerController extends Controller
                     );
                     $record->wasRecentlyCreated ? $created++ : $updated++;
                 } else {
-                    GencysDailySalesOrder::create(['workspace_id' => $workspace->id] + $attributes);
+                    $record = GencysDailySalesOrder::create(['workspace_id' => $workspace->id] + $attributes);
                     $created++;
+                }
+
+                // Replace the parsed line items so re-syncs stay idempotent.
+                $record->items()->delete();
+                $items = $this->parseOrderItems($attributes['order_details']);
+                if (! empty($items)) {
+                    $record->items()->createMany($items);
                 }
             }
         }
@@ -108,6 +115,49 @@ class DailySalesTrackerController extends Controller
             'skipped' => $skipped,
             'errors' => $errors,
         ], empty($errors) ? 200 : 207);
+    }
+
+    /**
+     * Split the raw "Order" string into line items. The string is a comma-separated
+     * list, and each item is split on its first "x" into a quantity and an sku, e.g.
+     *
+     *   "1x2X MAGNERVE,1x1X HIKARIJOINT THERAPY"
+     *     => [ ['quantity' => 1, 'sku' => '2X MAGNERVE'],
+     *          ['quantity' => 1, 'sku' => '1X HIKARIJOINT THERAPY'] ]
+     *
+     * We split on the FIRST "x" only because skus themselves often contain "X"
+     * (e.g. "2X MAGNERVE"). Items that don't match keep a null quantity.
+     *
+     * @return array<int, array{quantity: ?int, sku: ?string}>
+     */
+    private function parseOrderItems(?string $order): array
+    {
+        $order = is_string($order) ? trim($order) : null;
+
+        if (! $order) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach (explode(',', $order) as $piece) {
+            $piece = trim($piece);
+
+            if ($piece === '') {
+                continue;
+            }
+
+            if (preg_match('/^(\d+)\s*x\s*(.+)$/i', $piece, $matches)) {
+                $items[] = [
+                    'quantity' => (int) $matches[1],
+                    'sku' => trim($matches[2]),
+                ];
+            } else {
+                $items[] = ['quantity' => null, 'sku' => $piece];
+            }
+        }
+
+        return $items;
     }
 
     /** Trim to a non-empty string, or null. */
