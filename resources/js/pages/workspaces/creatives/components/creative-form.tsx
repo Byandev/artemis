@@ -112,7 +112,7 @@ export function CreativeForm({
                                 onChange={(e) =>
                                     setData('name', e.target.value)
                                 }
-                                placeholder="e.g. Summer Sale Hook"
+                                placeholder="Unique: Example: MM-DD-YYYY-PRODUCT-EDITOR_NAME-AD_NAME"
                             />
                             {errors.name && <p className={fe}>{errors.name}</p>}
                         </div>
