@@ -1016,6 +1016,43 @@ export function formatMetricValue(row: InsightsMetrics, id: string): string {
     return (spec.formatter ?? intFmt)(value as number);
 }
 
+/**
+ * The raw numeric value of a metric for a row — same compute the formatter uses,
+ * but unformatted. Charts need numbers, not the display strings.
+ */
+export function metricValue(row: InsightsMetrics, id: string): number {
+    const spec = METRIC_SPECS.find((m) => m.id === id);
+    if (!spec) return 0;
+
+    const value = spec.compute
+        ? spec.compute(row)
+        : Number(row[spec.field as keyof InsightsMetrics] ?? 0);
+
+    return isFinite(value as number) ? (value as number) : 0;
+}
+
+/**
+ * Format an already-computed numeric value with a metric's display formatter.
+ * Used by charts/tooltips where only the raw number (not the source row) is
+ * available, so currency/percent metrics still read correctly.
+ */
+export function formatMetricNumber(id: string, value: number): string {
+    const spec = METRIC_SPECS.find((m) => m.id === id);
+
+    return (spec?.formatter ?? intFmt)(value);
+}
+
+/**
+ * Ratio-style metrics (percentages and small decimals like ROAS / Frequency)
+ * read on a different scale than counts/spend, so charts plot them on a
+ * secondary axis. True when the metric formats as a percent or plain decimal.
+ */
+export function metricIsRatio(id: string): boolean {
+    const spec = METRIC_SPECS.find((m) => m.id === id);
+
+    return spec?.formatter === pctFmt || spec?.formatter === decimalFmt;
+}
+
 function numCell(value: number, formatter: Formatter = intFmt) {
     return (
         <span className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">

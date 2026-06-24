@@ -132,6 +132,9 @@ class AdsManagerController extends Controller
      */
     private const MEDIA_TYPE_SQL = "CASE WHEN meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL THEN 'video' ELSE 'image' END";
 
+    /** Same split as MEDIA_TYPE_SQL, but with the human label used as a group name. */
+    private const AD_TYPE_LABEL_SQL = "CASE WHEN meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL THEN 'Video' ELSE 'Image' END";
+
     /**
      * Returns Meta's signed ad-preview iframe src for a single ad. The raw video
      * source is permission-restricted, so this iframe is how video creatives are
@@ -233,7 +236,7 @@ class AdsManagerController extends Controller
      * Allowed group-by dimensions. Keys are the public `group_by` values; the
      * default is `ad_name`.
      */
-    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account'];
+    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type'];
 
     private function resolveGroupBy(Request $request): string
     {
@@ -390,6 +393,21 @@ class AdsManagerController extends Controller
                 ],
                 'search' => 'meta_ads_accounts.name',
                 'adsCount' => ['key' => 'meta_ads_account_id', 'joinOn' => 'meta_ads_accounts.id'],
+            ],
+            // Buckets ads into Video / Image by their creative's media type.
+            'ad_type' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q->leftJoin('meta_ads_creatives', 'meta_ads_creatives.id', '=', 'meta_ads_ads.meta_ads_creative_id'),
+                'selects' => [
+                    DB::raw('MIN(meta_ads_ads.id) AS id'),
+                    DB::raw(self::AD_TYPE_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => [DB::raw(self::AD_TYPE_LABEL_SQL)],
+                'search' => 'meta_ads_ads.name',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
         };
     }

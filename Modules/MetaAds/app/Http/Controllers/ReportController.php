@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\MetaAds\Models\AdAccount;
+use Modules\MetaAds\Models\CustomBreakdown;
 use Modules\MetaAds\Models\Report;
 
 /**
@@ -66,6 +67,11 @@ class ReportController extends Controller
             'workspace' => $workspace,
             'report' => $report->only(['id', 'name', 'description', 'kind', 'config']),
             'accounts' => $this->accountsForWorkspace($request, $workspace),
+            'customBreakdowns' => CustomBreakdown::where('workspace_id', $workspace->id)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($b) => ['id' => (string) $b->id, 'name' => $b->name])
+                ->all(),
         ]);
     }
 

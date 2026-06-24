@@ -2,14 +2,61 @@ import type { InsightsMetrics } from '../_shared';
 
 export type ReportKind = 'top_performers' | 'custom_groups' | 'categorization';
 
-export type GroupByKey = 'ad' | 'ad_name' | 'campaign' | 'ad_set' | 'account';
+export type GroupByKey =
+    | 'ad'
+    | 'ad_name'
+    | 'campaign'
+    | 'ad_set'
+    | 'account'
+    | 'ad_type';
+
+/** A saved custom breakdown is referenced as `custom:{id}` in group_by. */
+export type CustomBreakdownRef = `custom:${number}`;
+
+export type BreakdownValue = GroupByKey | CustomBreakdownRef;
 
 export type NameFilterOp = 'is' | 'is_not' | 'contains' | 'not_contains';
 
-export type ReportFilter = {
+/** Numeric (HAVING) operators the data engine accepts for metric filters. */
+export type MetricFilterOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'range';
+
+export type NameFilter = {
     field: 'name';
     op: NameFilterOp;
     value: string;
+};
+
+export type MetricFilter = {
+    field: string; // a metric id, e.g. 'spend', 'roas'
+    op: MetricFilterOp;
+    value: number;
+    value2?: number; // upper bound for 'range'
+};
+
+export type ReportFilter = NameFilter | MetricFilter;
+
+export const isNameFilter = (f: ReportFilter): f is NameFilter =>
+    f.field === 'name';
+
+export const METRIC_OP_LABELS: Record<MetricFilterOp, string> = {
+    gt: 'greater than',
+    gte: 'greater or equal',
+    lt: 'less than',
+    lte: 'less or equal',
+    eq: 'equals',
+    range: 'between',
+};
+
+/** How the report's rows are visualised. */
+export type ChartStyle = 'gallery' | 'bar' | 'stacked_bar' | 'line' | 'area';
+
+/** Presentation-only settings for the gallery / chart (persisted in config). */
+export type ReportView = {
+    /** Gallery card size: 1 (small) → 3 (large), maps to grid columns. */
+    cardSize: number;
+    hideThumbnails: boolean;
+    /** How many rows to render in the gallery / chart. */
+    itemsLoaded: number;
 };
 
 // `type` (not `interface`) so the object satisfies Inertia's FormDataConvertible
@@ -18,10 +65,47 @@ export type ReportConfig = {
     accounts: string[];
     since: string;
     until: string;
-    group_by: GroupByKey;
+    group_by: BreakdownValue;
     metrics: string[];
     sort: string;
     filters: ReportFilter[];
+    chart: ChartStyle;
+    view: ReportView;
+};
+
+/** A saved custom breakdown, as passed to the report builder. */
+export interface CustomBreakdownItem {
+    id: string;
+    name: string;
+}
+
+/** Human label for a group_by value, resolving custom breakdowns by id. */
+export function breakdownLabel(
+    value: BreakdownValue,
+    customBreakdowns: CustomBreakdownItem[] = [],
+): string {
+    if (value.startsWith('custom:')) {
+        const id = value.slice('custom:'.length);
+        return (
+            customBreakdowns.find((b) => b.id === id)?.name ??
+            'Custom breakdown'
+        );
+    }
+    return GROUP_BY_LABELS[value as GroupByKey] ?? value;
+}
+
+export const CHART_LABELS: Record<ChartStyle, string> = {
+    gallery: 'Gallery',
+    bar: 'Bar',
+    stacked_bar: 'Stacked Bar',
+    line: 'Line',
+    area: 'Area',
+};
+
+export const DEFAULT_VIEW: ReportView = {
+    cardSize: 2,
+    hideThumbnails: false,
+    itemsLoaded: 12,
 };
 
 export interface ReportListItem {
@@ -59,7 +143,27 @@ export const GROUP_BY_LABELS: Record<GroupByKey, string> = {
     campaign: 'Campaign',
     ad_set: 'Ad set',
     account: 'Account',
+    ad_type: 'Ad type',
 };
+
+/**
+ * Breakdown picker options, grouped by category like the SuperAds "Add
+ * breakdown" menu. Only dimensions the data engine can group by are listed.
+ */
+export interface BreakdownOption {
+    key: GroupByKey;
+    label: string;
+    category: string;
+}
+
+export const BREAKDOWN_OPTIONS: BreakdownOption[] = [
+    { key: 'ad', label: 'Ad / Creative', category: 'Channel breakdowns' },
+    { key: 'ad_name', label: 'Ad name', category: 'Channel breakdowns' },
+    { key: 'ad_set', label: 'Adset name', category: 'Channel breakdowns' },
+    { key: 'campaign', label: 'Campaign name', category: 'Channel breakdowns' },
+    { key: 'account', label: 'Account name', category: 'Channel breakdowns' },
+    { key: 'ad_type', label: 'Ad type', category: 'Channel breakdowns' },
+];
 
 export const NAME_OP_LABELS: Record<NameFilterOp, string> = {
     is: 'is',
@@ -113,6 +217,8 @@ export function defaultConfig(
         metrics: ['spend', 'clicks', 'impressions'],
         sort: '-spend',
         filters: [],
+        chart: 'gallery',
+        view: { ...DEFAULT_VIEW },
     };
 
     // "Compare custom groups" defaults to a campaign breakdown; the named

@@ -50,11 +50,7 @@ const CHOICES: Choice[] = [
     },
 ];
 
-export default function CreateReportModal({
-    open,
-    onOpenChange,
-    slug,
-}: Props) {
+export default function CreateReportModal({ open, onOpenChange, slug }: Props) {
     const [creating, setCreating] = useState(false);
 
     const choose = (choice: Choice) => {
