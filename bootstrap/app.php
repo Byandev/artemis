@@ -6,6 +6,7 @@ use App\Http\Middleware\CheckSubscription;
 use App\Http\Middleware\CheckWorkspace;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\LogRequestActivity;
 use App\Http\Middleware\SetSentryContext;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
@@ -38,6 +39,8 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             SetSentryContext::class,
+            // Catch-all audit log for every state-changing web request.
+            LogRequestActivity::class,
         ]);
 
         $middleware->alias([

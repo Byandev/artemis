@@ -40,6 +40,7 @@ import {
     Package,
     PieChart,
     RotateCcw,
+    ScrollText,
     Send,
     Shield,
     ShoppingCart,
@@ -404,6 +405,15 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceRemittances,
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(auth?.user?.can?.viewActivityLogs
+            ? [
+                  {
+                      title: 'Activity Logs',
+                      href: `/workspaces/${slug}/activity-logs`,
+                      icon: ScrollText,
                   },
               ]
             : []),

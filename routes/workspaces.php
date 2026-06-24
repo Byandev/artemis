@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
+use App\Http\Controllers\Workspaces\ActivityLogController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
 use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\ChecklistController;
@@ -101,6 +103,9 @@ Route::middleware(['auth'])->group(function () {
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
     Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
+
+    // Workspace activity log (audit trail) — gated to workspace admins in the controller.
+    Route::get('/workspaces/{workspace}/activity-logs', [ActivityLogController::class, 'index'])->name('workspace.activity-logs.index');
 
     // Role-specific dashboards (scaffold — gated by granular permissions)
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard', SalesMarketingDashboardController::class)->name('workspaces.sales-marketing.dashboard');
@@ -453,6 +458,10 @@ Route::middleware(['auth', 'verified', 'admin'])
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');
+
+        // Global, cross-workspace activity log.
+        Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])
+            ->name('activity-logs.index');
         Route::patch('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'update'])
             ->name('support-tickets.update');
 
