@@ -35,6 +35,12 @@ Schedule::command('trigger-fetch-shops-users')->daily(7);
 // GencysERP daily sales tracker — enable once the n8n flow + callback are ready.
 // Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('06:00')->withoutOverlapping();
 
+// GencysERP unit codes — enable once the n8n flow + callback are ready.
+// Schedule::command('gencys-erp:trigger-fetch-unit-code')->dailyAt('06:00')->withoutOverlapping();
+
+// GencysERP unit code inventories — enable once the n8n flow + callback are ready.
+// Schedule::command('gencys-erp:trigger-fetch-unit-code-inventory')->dailyAt('06:30')->withoutOverlapping();
+
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 
