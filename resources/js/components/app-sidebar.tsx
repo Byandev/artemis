@@ -21,6 +21,7 @@ import {
     BarChart2,
     BookOpenIcon,
     Box,
+    CalendarDays,
     Check,
     Clapperboard,
     ClipboardList,
@@ -213,6 +214,12 @@ export function AppSidebar() {
                               title: 'Ads Manager',
                               href: `/workspaces/${slug}/integrations/meta/ads-manager`,
                               icon: BarChart2,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Ads Calendar',
+                              href: `/workspaces/${slug}/integrations/meta/ads-calendar`,
+                              icon: CalendarDays,
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {

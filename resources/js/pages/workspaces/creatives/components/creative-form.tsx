@@ -112,7 +112,7 @@ export function CreativeForm({
                                 onChange={(e) =>
                                     setData('name', e.target.value)
                                 }
-                                placeholder="e.g. Summer Sale Hook"
+                                placeholder="Unique: Example: MM-DD-YYYY-PRODUCT-EDITOR_NAME-AD_NAME"
                             />
                             {errors.name && <p className={fe}>{errors.name}</p>}
                         </div>
@@ -185,6 +185,9 @@ export function CreativeForm({
                                 }
                                 placeholder="Ad headline text"
                             />
+                            {errors.headline && (
+                                <p className={fe}>{errors.headline}</p>
+                            )}
                         </div>
                         <div className="col-span-2 space-y-1.5">
                             <label className={fl}>Product</label>
@@ -221,6 +224,9 @@ export function CreativeForm({
                                 }
                                 placeholder="Brief overview"
                             />
+                            {errors.description && (
+                                <p className={fe}>{errors.description}</p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <label htmlFor="cf-script" className={fl}>
@@ -236,6 +242,9 @@ export function CreativeForm({
                                 }
                                 placeholder="Full script or content outline"
                             />
+                            {errors.script && (
+                                <p className={fe}>{errors.script}</p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <label htmlFor="cf-caption" className={fl}>
@@ -251,6 +260,9 @@ export function CreativeForm({
                                 }
                                 placeholder="Ad copy / post caption"
                             />
+                            {errors.caption && (
+                                <p className={fe}>{errors.caption}</p>
+                            )}
                         </div>
                     </div>
                 </section>
@@ -368,6 +380,11 @@ export function CreativeForm({
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    {errors.ads_status && (
+                                        <p className={fe}>
+                                            {errors.ads_status}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className={fl}>Final Status</label>
@@ -407,6 +424,11 @@ export function CreativeForm({
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    {errors.final_status && (
+                                        <p className={fe}>
+                                            {errors.final_status}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="space-y-1.5">
@@ -445,6 +467,9 @@ export function CreativeForm({
                                     }
                                     placeholder="Campaign notes, budget info, targeting details..."
                                 />
+                                {errors.ads_remarks && (
+                                    <p className={fe}>{errors.ads_remarks}</p>
+                                )}
                             </div>
                         </div>
                     </section>
@@ -461,6 +486,7 @@ export function CreativeForm({
                         onChange={(e) => setData('notes', e.target.value)}
                         placeholder="Internal notes visible only to your team"
                     />
+                    {errors.notes && <p className={fe}>{errors.notes}</p>}
                 </section>
             </div>
 
