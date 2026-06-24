@@ -111,9 +111,17 @@ class UnitCodeController extends Controller
         return ($value === null || $value === '') ? null : (int) $value;
     }
 
-    /** Parse "42.00" → 42.00, "" → null. */
+    /** Parse "42.00" → 42.00, "1,888.00" → 1888.00, "" → null. */
     private function decimalOrNull(mixed $value): ?float
     {
-        return ($value === null || $value === '') ? null : (float) $value;
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        // Strip thousand separators / currency symbols so "1,888.00" doesn't get
+        // truncated to 1.0 by PHP's float cast (which stops at the first comma).
+        $clean = is_string($value) ? preg_replace('/[^0-9.\-]/', '', $value) : $value;
+
+        return ($clean === '' || $clean === null) ? null : (float) $clean;
     }
 }

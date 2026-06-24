@@ -38,7 +38,7 @@ class UnitCodeInventoryController extends Controller
         // Accept either a single entry object or n8n's list of entries.
         $entries = array_is_list($payload) ? $payload : [$payload];
 
-        $updated = 0;
+        $processed = 0;
         $itemsSaved = 0;
         $skipped = 0;
         $errors = [];
@@ -85,12 +85,14 @@ class UnitCodeInventoryController extends Controller
             }
 
             $unitCode->items()->createMany($rows);
-            $updated++;
+            $processed++;
             $itemsSaved += count($rows);
         }
 
         return response()->json([
-            'unit_codes_updated' => $updated,
+            // Number of unit codes whose items were refreshed (the unit code
+            // record itself is not modified here).
+            'unit_codes_processed' => $processed,
             'items_saved' => $itemsSaved,
             'skipped' => $skipped,
             'errors' => $errors,
@@ -160,9 +162,17 @@ class UnitCodeInventoryController extends Controller
         return ($value === null || $value === '') ? null : (int) $value;
     }
 
-    /** Parse "42.00" → 42.00, "" → null. */
+    /** Parse "42.00" → 42.00, "1,888.00" → 1888.00, "" → null. */
     private function decimalOrNull(mixed $value): ?float
     {
-        return ($value === null || $value === '') ? null : (float) $value;
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        // Strip thousand separators / currency symbols so "1,888.00" doesn't get
+        // truncated to 1.0 by PHP's float cast (which stops at the first comma).
+        $clean = is_string($value) ? preg_replace('/[^0-9.\-]/', '', $value) : $value;
+
+        return ($clean === '' || $clean === null) ? null : (float) $clean;
     }
 }
