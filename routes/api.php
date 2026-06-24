@@ -13,6 +13,8 @@ use App\Http\Controllers\PublicApi\ShopController;
 use App\Http\Controllers\PublicApi\ShopScanReturnController;
 use App\Http\Controllers\PublicApi\UserController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
+use Modules\GencysERP\Http\Controllers\Api\UnitCodeController as GencysUnitCodeApiController;
+use Modules\GencysERP\Http\Controllers\Api\UnitCodeInventoryController as GencysUnitCodeInventoryApiController;
 
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', HealthController::class)->name('health');
@@ -42,6 +44,18 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
 // sits outside the api.key middleware group.
 Route::post('v1/public/gencys/daily-sales-tracker', [DailySalesTrackerController::class, 'store'])
     ->name('api.v1.public.gencys.daily-sales-tracker.store');
+
+// GencysERP unit codes callback. n8n posts the scraped unit codes here and
+// authenticates with the api_key embedded in the body (not a header), so this
+// sits outside the api.key middleware group.
+Route::post('v1/public/gencys/unit-codes', [GencysUnitCodeApiController::class, 'store'])
+    ->name('api.v1.public.gencys.unit-codes.store');
+
+// GencysERP unit code inventories callback. n8n posts the scraped inventory
+// items for a unit code here and authenticates with the api_key embedded in the
+// body (not a header), so this sits outside the api.key middleware group.
+Route::post('v1/public/gencys/unit-code-inventories', [GencysUnitCodeInventoryApiController::class, 'store'])
+    ->name('api.v1.public.gencys.unit-code-inventories.store');
 
 // v2 — new mobile app (login with users.id, filter by assignee_user_id)
 Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' => ['api.key']], function () {

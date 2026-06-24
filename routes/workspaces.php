@@ -46,6 +46,7 @@ use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesContro
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
+use Modules\GencysERP\Http\Controllers\Web\UnitCodeController as GencysUnitCodeController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
@@ -363,6 +364,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
         Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
+        Route::get('/unit-codes', [GencysUnitCodeController::class, 'index'])->name('unit-codes.index');
+        Route::post('/unit-codes', [GencysUnitCodeController::class, 'store'])->name('unit-codes.store');
+        Route::put('/unit-codes/{unitCode}', [GencysUnitCodeController::class, 'update'])->name('unit-codes.update');
+        Route::delete('/unit-codes/{unitCode}', [GencysUnitCodeController::class, 'destroy'])->name('unit-codes.destroy');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
