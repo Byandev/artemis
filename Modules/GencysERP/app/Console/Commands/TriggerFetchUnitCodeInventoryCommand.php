@@ -15,6 +15,7 @@ class TriggerFetchUnitCodeInventoryCommand extends Command
      */
     protected $signature = 'gencys-erp:trigger-fetch-unit-code-inventory
         {--delay=30}
+        {--limit= : Max number of unit codes to dispatch (for testing)}
         {--unit-code= : Only dispatch for this unit code id (for testing)}
         {--sync : POST to n8n immediately instead of queueing on the erp worker}';
 
@@ -50,6 +51,7 @@ class TriggerFetchUnitCodeInventoryCommand extends Command
                 ->whereHas('apiKeys'))
             ->with('workspace.apiKeys')
             ->when($this->option('unit-code'), fn ($q) => $q->where('id', (int) $this->option('unit-code')))
+            ->when($this->option('limit'), fn ($q) => $q->limit((int) $this->option('limit')))
             ->orderBy('id')
             ->get();
 
@@ -96,6 +98,12 @@ class TriggerFetchUnitCodeInventoryCommand extends Command
             ];
 
             if ($sync) {
+                // Throttle: space sync calls by --delay seconds so n8n's browser
+                // automation isn't hit with hundreds of requests at once (429).
+                if ($dispatched > 0 && $delay > 0) {
+                    sleep($delay);
+                }
+
                 // Run inline so the webhook fires immediately — no erp worker needed.
                 FetchUnitCodeInventoryJob::dispatchSync($webhookUrl, $data);
                 $this->info("Sent for unit code {$unitCode->id}");
