@@ -62,9 +62,8 @@ class TriggerFetchUnitCodeInventoryCommand extends Command
         // URL n8n posts the fetched inventory items back to. Configurable so it can
         // point at a reachable host (local n8n, staging, tunnel) instead of being
         // hardcoded. Defaults to APP_URL when N8N_GENCYS_UNIT_CODE_INVENTORY_CALLBACK_URL isn't set.
-        //        $callbackBase = rtrim(config('services.n8n.gencys_unit_code_inventory_callback_url') ?: config('app.url'), '/');
-        //        $callbackUrl = "{$callbackBase}/api/v1/public/gencys/unit-code-inventories";
-        $callbackUrl = 'https://stretchy-wanetta-unwinning.ngrok-free.dev/api/v1/public/gencys/unit-code-inventories';
+        $callbackBase = rtrim(config('services.n8n.gencys_unit_code_inventory_callback_url') ?: config('app.url'), '/');
+        $callbackUrl = "{$callbackBase}/api/v1/public/gencys/unit-code-inventories";
 
         $this->info($sync
             ? "Sending {$unitCodes->count()} unit code(s) synchronously"

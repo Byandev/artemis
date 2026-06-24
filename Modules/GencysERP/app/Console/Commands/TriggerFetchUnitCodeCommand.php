@@ -61,10 +61,8 @@ class TriggerFetchUnitCodeCommand extends Command
         // URL n8n posts the fetched unit codes back to. Configurable so it can
         // point at a reachable host (local n8n, staging, tunnel) instead of being
         // hardcoded. Defaults to APP_URL when N8N_GENCYS_UNIT_CODE_CALLBACK_URL isn't set.
-        //        $callbackBase = rtrim(config('services.n8n.gencys_unit_code_callback_url') ?: config('app.url'), '/');
-        //        $callbackUrl = "{$callbackBase}/api/v1/public/gencys/unit-codes";
-        $callbackUrl = 'https://stretchy-wanetta-unwinning.ngrok-free.dev/api/v1/public/gencys/unit-codes';
-
+        $callbackBase = rtrim(config('services.n8n.gencys_unit_code_callback_url') ?: config('app.url'), '/');
+        $callbackUrl = "{$callbackBase}/api/v1/public/gencys/unit-codes";
         $dispatched = 0;
         $skipped = 0;
 
