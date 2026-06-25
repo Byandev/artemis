@@ -218,6 +218,9 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
+                              title: 'Reports',
+                              href: `/workspaces/${slug}/integrations/meta/reports`,
+                              icon: PieChart,
                               title: 'Ads Calendar',
                               href: `/workspaces/${slug}/integrations/meta/ads-calendar`,
                               icon: CalendarDays,

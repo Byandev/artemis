@@ -56,9 +56,11 @@ use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsCalendarController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
+use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
+use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 
@@ -290,6 +292,45 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/workspaces/{workspace}/integrations/meta/ad-accounts/{adAccount}/toggle-sync', AdAccountToggleSyncController::class)
         ->middleware('can:Manage Meta Ads Accounts,workspace')
         ->name('workspaces.metaads.ad-accounts.toggle-sync');
+
+    // Meta Ads saved reports (SuperAds-style report builder)
+    Route::get('/workspaces/{workspace}/integrations/meta/reports', [ReportController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.reports.index');
+    Route::post('/workspaces/{workspace}/integrations/meta/reports', [ReportController::class, 'store'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.reports.store');
+    Route::get('/workspaces/{workspace}/integrations/meta/reports/{report}', [ReportController::class, 'show'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.reports.show');
+    Route::patch('/workspaces/{workspace}/integrations/meta/reports/{report}', [ReportController::class, 'update'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.reports.update');
+    Route::delete('/workspaces/{workspace}/integrations/meta/reports/{report}', [ReportController::class, 'destroy'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.reports.destroy');
+    Route::post('/workspaces/{workspace}/integrations/meta/reports/{report}/restore', [ReportController::class, 'restore'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->withTrashed()
+        ->name('workspaces.metaads.reports.restore');
+    Route::delete('/workspaces/{workspace}/integrations/meta/reports/{report}/force', [ReportController::class, 'forceDestroy'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->withTrashed()
+        ->name('workspaces.metaads.reports.force-destroy');
+
+    // Reusable custom breakdowns (named rule-based ad groups) — JSON CRUD
+    Route::get('/workspaces/{workspace}/integrations/meta/custom-breakdowns', [CustomBreakdownController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.custom-breakdowns.index');
+    Route::post('/workspaces/{workspace}/integrations/meta/custom-breakdowns', [CustomBreakdownController::class, 'store'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.custom-breakdowns.store');
+    Route::patch('/workspaces/{workspace}/integrations/meta/custom-breakdowns/{customBreakdown}', [CustomBreakdownController::class, 'update'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.custom-breakdowns.update');
+    Route::delete('/workspaces/{workspace}/integrations/meta/custom-breakdowns/{customBreakdown}', [CustomBreakdownController::class, 'destroy'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.custom-breakdowns.destroy');
 
     Route::put('/workspaces/{workspace:slug}/employees/{employee}', [CSRController::class, 'update'])->name('employees.update');
     Route::get('/workspaces/{workspace}/csr/dashboard', [CSRController::class, 'dashboard'])->name('workspaces.csr.dashboard');
