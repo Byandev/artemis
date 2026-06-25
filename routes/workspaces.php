@@ -336,6 +336,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
+        Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });

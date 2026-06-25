@@ -55,6 +55,7 @@ interface Workspace {
     creatives_module_enabled: boolean;
     meta_ads_module_enabled: boolean;
     gencys_module_enabled: boolean;
+    is_gencys_partner: boolean;
     sales_marketing_dashboard_module_enabled: boolean;
     video_editor_dashboard_module_enabled: boolean;
     csr_dashboard_module_enabled: boolean;
@@ -76,6 +77,7 @@ const MODULE_FIELDS: Array<{
         | 'creatives_module_enabled'
         | 'meta_ads_module_enabled'
         | 'gencys_module_enabled'
+        | 'is_gencys_partner'
         | 'sales_marketing_dashboard_module_enabled'
         | 'video_editor_dashboard_module_enabled'
         | 'csr_dashboard_module_enabled'
@@ -144,6 +146,11 @@ const MODULE_FIELDS: Array<{
         description: 'Gencys ERP daily sales tracker',
     },
     {
+        key: 'is_gencys_partner',
+        label: 'Gencys Partner',
+        description: 'Enable syncing inventory from Gencys',
+    },
+    {
         key: 'sales_marketing_dashboard_module_enabled',
         label: 'S&M Dashboard',
         description: 'Sales & Marketing dashboard',
@@ -177,6 +184,7 @@ const MODULE_GROUPS: {
             'inventory_module_enabled',
             'finance_module_enabled',
             'gencys_module_enabled',
+            'is_gencys_partner',
             'checklist_module_enabled',
         ],
     },
@@ -756,6 +764,7 @@ function ModulesModal({
         creatives_module_enabled: workspace.creatives_module_enabled,
         meta_ads_module_enabled: workspace.meta_ads_module_enabled,
         gencys_module_enabled: workspace.gencys_module_enabled,
+        is_gencys_partner: workspace.is_gencys_partner,
         sales_marketing_dashboard_module_enabled:
             workspace.sales_marketing_dashboard_module_enabled,
         video_editor_dashboard_module_enabled:
