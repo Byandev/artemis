@@ -64,6 +64,10 @@ class HandleInertiaRequests extends Middleware
                 || $user->isAdminOf($currentWorkspace)
                 || $user->hasWorkspaceRole($currentWorkspace, 'admin')
                 : false,
+            // Workspace activity log is admin/owner-only (matches ActivityLogController).
+            'viewActivityLogs' => $user && $currentWorkspace instanceof Workspace
+                ? $user->isAdminOf($currentWorkspace)
+                : false,
         ];
 
         // "Viewing as team" switcher context.

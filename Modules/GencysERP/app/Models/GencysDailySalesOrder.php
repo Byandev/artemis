@@ -5,12 +5,18 @@ namespace Modules\GencysERP\Models;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GencysDailySalesOrder extends Model
 {
     protected $table = 'gencys_daily_sales_orders';
 
+    // `id` holds Gencys' own order id (sent as "id" in the payload), so it is
+    // assigned explicitly rather than auto-incremented.
+    public $incrementing = false;
+
     protected $fillable = [
+        'id',
         'workspace_id',
         'order_no',
         'order_date',
@@ -48,5 +54,10 @@ class GencysDailySalesOrder extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(GencysDailySalesOrderItem::class, 'order_id');
     }
 }

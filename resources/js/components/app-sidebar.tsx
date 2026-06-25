@@ -41,6 +41,7 @@ import {
     Package,
     PieChart,
     RotateCcw,
+    ScrollText,
     Send,
     Shield,
     ShoppingCart,
@@ -217,6 +218,9 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
+                              title: 'Reports',
+                              href: `/workspaces/${slug}/integrations/meta/reports`,
+                              icon: PieChart,
                               title: 'Ads Calendar',
                               href: `/workspaces/${slug}/integrations/meta/ads-calendar`,
                               icon: CalendarDays,
@@ -346,13 +350,19 @@ export function AppSidebar() {
                   {
                       title: 'Gencys ERP',
                       icon: Activity,
-                      anyOf: [PERMISSIONS.ViewDailySalesTracker],
+                      anyOf: [PERMISSIONS.ViewDailySalesTracker, PERMISSIONS.ViewUnitCode],
                       items: [
                           {
                               title: 'Daily Sales Tracker',
                               href: `/workspaces/${slug}/gencys/daily-sales-tracker`,
                               icon: Activity,
                               permission: PERMISSIONS.ViewDailySalesTracker,
+                          },
+                          {
+                              title: 'Unit Code',
+                              href: `/workspaces/${slug}/gencys/unit-codes`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewUnitCode,
                           },
                       ],
                   },
@@ -411,6 +421,15 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceRemittances,
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(auth?.user?.can?.viewActivityLogs
+            ? [
+                  {
+                      title: 'Activity Logs',
+                      href: `/workspaces/${slug}/activity-logs`,
+                      icon: ScrollText,
                   },
               ]
             : []),

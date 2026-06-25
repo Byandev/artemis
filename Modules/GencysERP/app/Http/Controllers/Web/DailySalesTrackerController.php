@@ -45,6 +45,7 @@ class DailySalesTrackerController extends Controller
         [$sortColumn, $sortDir, $sortParam] = $this->resolveSort($request);
 
         $orders = $this->filtered($request, $workspace)
+            ->with('items:id,order_id,quantity,sku')
             ->orderBy($sortColumn, $sortDir)
             ->orderBy('id', 'desc')
             ->paginate($request->integer('per_page', 25))
