@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\MetaAds\Models\User as MetaUser;
 
@@ -39,6 +40,7 @@ class Workspace extends Model
         'creatives_module_enabled',
         'meta_ads_module_enabled',
         'gencys_module_enabled',
+        'is_gencys_partner',
         'sales_marketing_dashboard_module_enabled',
         'video_editor_dashboard_module_enabled',
         'csr_dashboard_module_enabled',
@@ -73,6 +75,7 @@ class Workspace extends Model
         'creatives_module_enabled' => 'boolean',
         'meta_ads_module_enabled' => 'boolean',
         'gencys_module_enabled' => 'boolean',
+        'is_gencys_partner' => 'boolean',
         'sales_marketing_dashboard_module_enabled' => 'boolean',
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
@@ -437,5 +440,10 @@ class Workspace extends Model
     public function hasReachedPageLimit(): bool
     {
         return $this->pageLimitInfo()['reached'];
+    }
+
+    public function inventoryItems(): HasMany|Workspace
+    {
+        return $this->hasMany(InventoryItem::class);
     }
 }

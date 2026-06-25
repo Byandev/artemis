@@ -19,7 +19,8 @@ use Modules\GencysERP\Models\GencysDailySalesOrder;
  *       "orders": [ { "Order Date": "…", "CSR": "…", … }, … ] } ]
  *
  * Each entry is authenticated by its own `api_key` (n8n puts it in the body),
- * and the orders are upserted per workspace keyed on the tracking number.
+ * and the orders are upserted keyed on Gencys' own order `id`, which is stored
+ * as the row's primary key.
  */
 class DailySalesTrackerController extends Controller
 {
@@ -62,6 +63,9 @@ class DailySalesTrackerController extends Controller
             $rows = Arr::get($entry, 'purchase_orders', Arr::get($entry, 'orders', []));
 
             foreach ($rows as $order) {
+                // Gencys' own order id ("id" in the payload). It's the stable
+                // upsert key — assigned at order creation and never changes.
+                $orderId = $this->intOrNull($order['id'] ?? null);
                 $tracking = $this->str($order['Tracking Number'] ?? null);
 
                 $attributes = [
@@ -87,17 +91,25 @@ class DailySalesTrackerController extends Controller
                     'total_cog' => $this->decimalOrNull($order['Total COG'] ?? null),
                 ];
 
-                // Upsert on tracking number when present; otherwise insert (a null
-                // tracking number can't be a stable key).
-                if ($tracking !== null) {
-                    $record = GencysDailySalesOrder::updateOrCreate(
-                        ['workspace_id' => $workspace->id, 'tracking_number' => $tracking],
-                        $attributes,
-                    );
-                    $record->wasRecentlyCreated ? $created++ : $updated++;
-                } else {
-                    GencysDailySalesOrder::create(['workspace_id' => $workspace->id] + $attributes);
-                    $created++;
+                // Upsert on the Gencys order id. Rows without one have no stable
+                // key, so they're skipped rather than inserted with a bogus id.
+                if ($orderId === null) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $record = GencysDailySalesOrder::updateOrCreate(
+                    ['id' => $orderId],
+                    ['workspace_id' => $workspace->id] + $attributes,
+                );
+                $record->wasRecentlyCreated ? $created++ : $updated++;
+
+                // Replace the parsed line items so re-syncs stay idempotent.
+                $record->items()->delete();
+                $items = $this->parseOrderItems($attributes['order_details']);
+                if (! empty($items)) {
+                    $record->items()->createMany($items);
                 }
             }
         }
@@ -108,6 +120,49 @@ class DailySalesTrackerController extends Controller
             'skipped' => $skipped,
             'errors' => $errors,
         ], empty($errors) ? 200 : 207);
+    }
+
+    /**
+     * Split the raw "Order" string into line items. The string is a comma-separated
+     * list, and each item is split on its first "x" into a quantity and an sku, e.g.
+     *
+     *   "1x2X MAGNERVE,1x1X HIKARIJOINT THERAPY"
+     *     => [ ['quantity' => 1, 'sku' => '2X MAGNERVE'],
+     *          ['quantity' => 1, 'sku' => '1X HIKARIJOINT THERAPY'] ]
+     *
+     * We split on the FIRST "x" only because skus themselves often contain "X"
+     * (e.g. "2X MAGNERVE"). Items that don't match keep a null quantity.
+     *
+     * @return array<int, array{quantity: ?int, sku: ?string}>
+     */
+    private function parseOrderItems(?string $order): array
+    {
+        $order = is_string($order) ? trim($order) : null;
+
+        if (! $order) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach (explode(',', $order) as $piece) {
+            $piece = trim($piece);
+
+            if ($piece === '') {
+                continue;
+            }
+
+            if (preg_match('/^(\d+)\s*x\s*(.+)$/i', $piece, $matches)) {
+                $items[] = [
+                    'quantity' => (int) $matches[1],
+                    'sku' => trim($matches[2]),
+                ];
+            } else {
+                $items[] = ['quantity' => null, 'sku' => $piece];
+            }
+        }
+
+        return $items;
     }
 
     /** Trim to a non-empty string, or null. */

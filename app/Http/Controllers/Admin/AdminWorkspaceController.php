@@ -133,6 +133,7 @@ class AdminWorkspaceController extends Controller
             'creatives_module_enabled' => 'required|boolean',
             'meta_ads_module_enabled' => 'required|boolean',
             'gencys_module_enabled' => 'required|boolean',
+            'is_gencys_partner' => 'required|boolean',
             'sales_marketing_dashboard_module_enabled' => 'required|boolean',
             'video_editor_dashboard_module_enabled' => 'required|boolean',
             'csr_dashboard_module_enabled' => 'required|boolean',

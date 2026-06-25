@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
+use App\Http\Controllers\Workspaces\ActivityLogController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
 use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\ChecklistController;
@@ -44,12 +46,14 @@ use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesContro
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
+use Modules\GencysERP\Http\Controllers\Web\UnitCodeController as GencysUnitCodeController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
+use Modules\MetaAds\Http\Controllers\AdsCalendarController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
 use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
@@ -94,6 +98,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
         Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
         Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
+        Route::patch('/inventory/transactions/{transaction}/remaining-qty', [InventoryTransactionController::class, 'updateRemainingQty'])->name('inventory.transactions.remaining-qty');
         Route::delete('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
 
@@ -103,6 +108,9 @@ Route::middleware(['auth'])->group(function () {
     // Workspace dashboard
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
     Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
+
+    // Workspace activity log (audit trail) — gated to workspace admins in the controller.
+    Route::get('/workspaces/{workspace}/activity-logs', [ActivityLogController::class, 'index'])->name('workspace.activity-logs.index');
 
     // Role-specific dashboards (scaffold — gated by granular permissions)
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard', SalesMarketingDashboardController::class)->name('workspaces.sales-marketing.dashboard');
@@ -222,6 +230,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/detail', [AdsManagerController::class, 'adDetail'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.detail');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-calendar', [AdsCalendarController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-calendar');
     Route::get('/workspaces/{workspace}/integrations/meta/health', [SyncHealthController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.health');
@@ -367,6 +378,8 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
+        Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
+        Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
@@ -399,6 +412,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
         Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
+        Route::get('/unit-codes', [GencysUnitCodeController::class, 'index'])->name('unit-codes.index');
+        Route::post('/unit-codes', [GencysUnitCodeController::class, 'store'])->name('unit-codes.store');
+        Route::put('/unit-codes/{unitCode}', [GencysUnitCodeController::class, 'update'])->name('unit-codes.update');
+        Route::delete('/unit-codes/{unitCode}', [GencysUnitCodeController::class, 'destroy'])->name('unit-codes.destroy');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
@@ -494,6 +511,10 @@ Route::middleware(['auth', 'verified', 'admin'])
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');
+
+        // Global, cross-workspace activity log.
+        Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])
+            ->name('activity-logs.index');
         Route::patch('/support-tickets/{ticket}', [AdminSupportTicketController::class, 'update'])
             ->name('support-tickets.update');
 
