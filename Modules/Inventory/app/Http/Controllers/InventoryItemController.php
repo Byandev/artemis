@@ -23,7 +23,7 @@ class InventoryItemController extends Controller
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        $currentStocksSql = $workspace->inventory_sync
+        $currentStocksSql = $workspace->inventory_sync || true
             ? '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)'
             : 'inventory_items.remaining_qty';
 
