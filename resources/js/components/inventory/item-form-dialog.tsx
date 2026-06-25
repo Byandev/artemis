@@ -6,6 +6,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
@@ -16,6 +17,7 @@ import { toast } from 'sonner';
 interface InventoryItem {
     id: number;
     sku: string;
+    is_active: boolean;
     product_id: number | null;
     sales_keywords: string;
     transaction_keywords: string;
@@ -55,6 +57,7 @@ export function ItemFormDialog({
             id: '',
             product_id: '',
             sku: '',
+            is_active: true,
             lead_time: '',
             unfulfilled_count: '',
             three_days_average: '',
@@ -70,6 +73,7 @@ export function ItemFormDialog({
                     id: item.id?.toString() ?? '',
                     product_id: item.product_id?.toString() ?? '',
                     sku: item.sku,
+                    is_active: item.is_active ?? true,
                     lead_time: item.lead_time?.toString() ?? '0',
                     unfulfilled_count:
                         item.unfulfilled_count?.toString() ?? '0',
@@ -158,6 +162,23 @@ export function ItemFormDialog({
                                     {errors.sku}
                                 </p>
                             )}
+                        </div>
+                        {/* Status */}
+                        <div className="flex items-center justify-between rounded-[10px] border border-black/8 bg-stone-50 px-3 py-2.5 dark:border-white/8 dark:bg-zinc-800">
+                            <div className="space-y-0.5">
+                                <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                    Status
+                                </label>
+                                <p className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                                    {data.is_active ? 'Active' : 'Inactive'}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={data.is_active}
+                                onCheckedChange={(checked) =>
+                                    setData('is_active', checked)
+                                }
+                            />
                         </div>
                         {/* Lead Time */}
                         <div className="space-y-1.5">
@@ -445,4 +466,3 @@ function KeywordsInput({
         </div>
     );
 }
-
