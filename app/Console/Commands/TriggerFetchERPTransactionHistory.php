@@ -88,11 +88,11 @@ class TriggerFetchERPTransactionHistory extends Command
                         'items' => $chunk->map(fn ($item) => [
                             'id' => $item->id,
                             'keyword' => $item->sku,
-                        ])->toArray(),
+                        ])->values()->toArray(),
                     ];
 
                     $offset = $dispatched * $delay;
-
+                    
                     dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data))
                         ->delay(now()->addSeconds($offset));
                 });
