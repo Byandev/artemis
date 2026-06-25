@@ -101,9 +101,11 @@ class InventoryItemController extends Controller
         $created = 0;
 
         foreach ($codes as $code) {
-            $item = InventoryItem::firstOrCreate(
+            // Match on (workspace_id, sku); don't touch product_id on existing
+            // items so a manually linked product survives re-syncs. New items get
+            // a null product_id from the column default.
+            $item = InventoryItem::updateOrCreate(
                 ['workspace_id' => $workspace->id, 'sku' => $code],
-                ['product_id' => null],
             );
 
             if ($item->wasRecentlyCreated) {
