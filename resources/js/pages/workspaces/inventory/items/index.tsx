@@ -89,6 +89,7 @@ export default function ItemIndex({
     );
 
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [syncingGencys, setSyncingGencys] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
@@ -372,14 +373,39 @@ export default function ItemIndex({
                     title="Inventory Items"
                     description="Manage your inventory items and stock levels."
                 >
-                    {canCreateItems && (
-                        <button
-                            onClick={() => setCreateDialogOpen(true)}
-                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                        >
-                            Add Item Record
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {canCreateItems && workspace.is_gencys_partner && (
+                            <button
+                                onClick={() =>
+                                    router.post(
+                                        `${baseUrl}/sync-gencys`,
+                                        {},
+                                        {
+                                            preserveScroll: true,
+                                            onStart: () =>
+                                                setSyncingGencys(true),
+                                            onFinish: () =>
+                                                setSyncingGencys(false),
+                                        },
+                                    )
+                                }
+                                disabled={syncingGencys}
+                                className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                            >
+                                {syncingGencys
+                                    ? 'Syncing…'
+                                    : 'Sync from Gencys'}
+                            </button>
+                        )}
+                        {canCreateItems && (
+                            <button
+                                onClick={() => setCreateDialogOpen(true)}
+                                className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                            >
+                                Add Item Record
+                            </button>
+                        )}
+                    </div>
                 </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">

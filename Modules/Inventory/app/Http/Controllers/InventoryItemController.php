@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\GencysERP\Models\GencysUnitCodeInventoryItem;
 use Modules\Inventory\Models\InventoryItem;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -82,6 +83,37 @@ class InventoryItemController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    public function syncFromGencys(Workspace $workspace)
+    {
+        $this->authorize('Create Inventory Items', $workspace);
+
+        abort_unless($workspace->is_gencys_partner, 403);
+
+        $codes = GencysUnitCodeInventoryItem::query()
+            ->whereHas('unitCode', fn ($q) => $q->where('workspace_id', $workspace->id))
+            ->whereNotNull('inventory_item_code')
+            ->where('inventory_item_code', '!=', '')
+            ->distinct()
+            ->pluck('inventory_item_code');
+
+        $created = 0;
+
+        foreach ($codes as $code) {
+            $item = InventoryItem::firstOrCreate(
+                ['workspace_id' => $workspace->id, 'sku' => $code],
+                ['product_id' => null],
+            );
+
+            if ($item->wasRecentlyCreated) {
+                $created++;
+            }
+        }
+
+        return redirect()
+            ->route('workspaces.inventory.item.index', $workspace->slug)
+            ->with('success', "Synced {$created} new inventory item(s) from Gencys.");
     }
 
     public function store(Request $request, Workspace $workspace)

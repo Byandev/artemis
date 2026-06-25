@@ -20,6 +20,7 @@ export interface Workspace {
     creatives_module_enabled: boolean;
     meta_ads_module_enabled: boolean;
     gencys_module_enabled: boolean;
+    is_gencys_partner: boolean;
     sales_marketing_dashboard_module_enabled: boolean;
     video_editor_dashboard_module_enabled: boolean;
     csr_dashboard_module_enabled: boolean;
