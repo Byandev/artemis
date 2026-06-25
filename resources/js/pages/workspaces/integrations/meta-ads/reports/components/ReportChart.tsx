@@ -26,6 +26,10 @@ type ChartPoint = Record<string, number | string>;
 const ADS_KEY = '__ads';
 const THUMB_KEY = '__thumb';
 
+// Like SuperAds, the hover card always surfaces these core metrics even when
+// they aren't plotted as bars, so the user reads the full picture on hover.
+const TOOLTIP_CORE = ['spend', 'purchases', 'impressions'];
+
 /** Pretty date range for the tooltip header, e.g. "Apr 1 – 23, 2026". */
 function formatRange(since: string, until: string): string {
     try {
@@ -87,15 +91,18 @@ function AvatarBadge({ thumb, size = 22 }: { thumb?: string; size?: number }) {
 
 /**
  * SuperAds-style hover card: avatar + item name + ads count + date range, then
- * every plotted metric with its series color, value, and share of the total
- * across the visible groups.
+ * the full metric list for the hovered group. Every metric is read straight off
+ * the data point, so metrics that aren't plotted as bars (e.g. Impressions,
+ * Purchases) still show their value. Plotted metrics carry their series colour;
+ * the rest get a muted dot.
  */
 function ChartTooltip({
     active,
     payload,
     label,
     range,
-    totals,
+    metrics,
+    colors,
 }: {
     active?: boolean;
     payload?: {
@@ -106,13 +113,15 @@ function ChartTooltip({
     }[];
     label?: string;
     range: string;
-    totals: Record<string, number>;
+    metrics: string[];
+    colors: Record<string, string>;
 }) {
     if (!active || !payload?.length) return null;
 
     const point = payload[0]?.payload;
-    const ads = point?.[ADS_KEY] as number | undefined;
-    const thumb = point?.[THUMB_KEY] as string | undefined;
+    if (!point) return null;
+    const ads = point[ADS_KEY] as number | undefined;
+    const thumb = point[THUMB_KEY] as string | undefined;
 
     return (
         <div className="min-w-[240px] rounded-[10px] border border-black/8 bg-white px-3 py-2.5 text-xs shadow-lg dark:border-white/10 dark:bg-zinc-900">
@@ -139,33 +148,23 @@ function ChartTooltip({
                 </div>
             </div>
             <ul className="space-y-1">
-                {payload.map((p) => {
-                    const total = totals[p.name] ?? 0;
-                    const share =
-                        !metricIsRatio(p.name) && total > 0
-                            ? `${Math.round((p.value / total) * 100)}%`
-                            : null;
+                {metrics.map((m) => {
+                    const value = Number(point[m] ?? 0);
+                    const dot = colors[m] ?? 'var(--muted-foreground)';
                     return (
                         <li
-                            key={p.name}
+                            key={m}
                             className="flex items-center justify-between gap-4"
                         >
                             <span className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
                                 <span
                                     className="h-2 w-2 rounded-full"
-                                    style={{ background: p.color }}
+                                    style={{ background: dot }}
                                 />
-                                {metricLabel(p.name)}
+                                {metricLabel(m)}
                             </span>
-                            <span className="flex items-center gap-1.5">
-                                {share && (
-                                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                                        {share}
-                                    </span>
-                                )}
-                                <span className="font-mono text-gray-800 tabular-nums dark:text-gray-100">
-                                    {formatMetricNumber(p.name, p.value)}
-                                </span>
+                            <span className="font-mono text-gray-800 tabular-nums dark:text-gray-100">
+                                {formatMetricNumber(m, value)}
                             </span>
                         </li>
                     );
@@ -239,22 +238,30 @@ export function ReportChart({
     if (rightIds.length === series.length) rightIds = [];
     const axisOf = (m: string) => (rightIds.includes(m) ? 'right' : 'left');
 
+    // The hover card lists the plotted series first, then any core metrics that
+    // aren't already plotted, so values like Impressions/Purchases always show.
+    const tooltipMetrics = [
+        ...series,
+        ...TOOLTIP_CORE.filter((m) => !series.includes(m)),
+    ];
+
+    // Plotted metrics keep their series colour in the tooltip; the rest fall back
+    // to a muted dot (handled in ChartTooltip).
+    const colors: Record<string, string> = {};
+    series.forEach((m, i) => {
+        colors[m] = chartColor(i);
+    });
+
     const chartData: ChartPoint[] = rows.map((r) => {
         const point: ChartPoint = {
             name: r.name || '—',
             [ADS_KEY]: r.ads_count ?? 0,
             [THUMB_KEY]: r.thumbnail_url || r.image_url || '',
         };
-        series.forEach((m) => {
+        tooltipMetrics.forEach((m) => {
             point[m] = metricValue(r, m);
         });
         return point;
-    });
-
-    // Per-metric totals across the visible groups → "share of total" in tooltip.
-    const totals: Record<string, number> = {};
-    series.forEach((m) => {
-        totals[m] = chartData.reduce((s, p) => s + (Number(p[m]) || 0), 0);
     });
 
     const range = formatRange(since, until);
@@ -264,41 +271,64 @@ export function ReportChart({
     };
     const TickComp = makeTick(rows);
 
-    const common = (
-        <>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis
-                dataKey="name"
-                interval={0}
-                height={84}
-                tickLine={false}
-                stroke="var(--border)"
-                tick={<TickComp />}
+    // NB: this must be an array, not a React Fragment. Recharts locates its
+    // sub-components (Tooltip, Legend, axes) via React.Children, which iterates
+    // arrays but does NOT descend into a Fragment — wrapping these in <>…</>
+    // silently drops the tooltip/legend/axis label.
+    const common = [
+        <CartesianGrid
+            key="grid"
+            strokeDasharray="3 3"
+            stroke="var(--border)"
+        />,
+        <XAxis
+            key="x"
+            dataKey="name"
+            interval={0}
+            height={84}
+            tickLine={false}
+            stroke="var(--border)"
+            tick={<TickComp />}
+        />,
+        <YAxis key="y-left" yAxisId="left" {...axis} width={56} />,
+        rightIds.length > 0 ? (
+            <YAxis
+                key="y-right"
+                yAxisId="right"
+                orientation="right"
+                {...axis}
+                width={48}
+                label={{
+                    value: rightIds.map(metricLabel).join(', '),
+                    position: 'top',
+                    offset: 12,
+                    fontSize: 11,
+                    fill: 'var(--muted-foreground)',
+                }}
             />
-            <YAxis yAxisId="left" {...axis} width={56} />
-            {rightIds.length > 0 && (
-                <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    {...axis}
-                    width={48}
+        ) : null,
+        <Tooltip
+            key="tooltip"
+            content={
+                <ChartTooltip
+                    range={range}
+                    metrics={tooltipMetrics}
+                    colors={colors}
                 />
+            }
+            cursor={{ fill: 'var(--muted-foreground)', opacity: 0.08 }}
+        />,
+        <Legend
+            key="legend"
+            formatter={(v: string) => (
+                <span style={{ color: 'var(--muted-foreground)' }}>
+                    {metricLabel(v)}
+                    {rightIds.includes(v) ? ' ↗' : ''}
+                </span>
             )}
-            <Tooltip
-                content={<ChartTooltip range={range} totals={totals} />}
-                cursor={{ fill: 'var(--muted-foreground)', opacity: 0.08 }}
-            />
-            <Legend
-                formatter={(v: string) => (
-                    <span style={{ color: 'var(--muted-foreground)' }}>
-                        {metricLabel(v)}
-                        {rightIds.includes(v) ? ' ↗' : ''}
-                    </span>
-                )}
-                wrapperStyle={{ fontSize: 12 }}
-            />
-        </>
-    );
+            wrapperStyle={{ fontSize: 12 }}
+        />,
+    ];
 
     return (
         <div className="rounded-2xl border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">

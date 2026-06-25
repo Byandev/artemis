@@ -24,14 +24,10 @@ class ReportController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
-        $reports = Report::query()
-            ->where('workspace_id', $workspace->id)
-            ->orderByDesc('updated_at')
-            ->get(['id', 'name', 'description', 'kind', 'updated_at']);
-
         return Inertia::render('workspaces/integrations/meta-ads/reports/index', [
             'workspace' => $workspace,
-            'reports' => $reports,
+            'reports' => $this->activeReports($workspace),
+            'archivedReports' => $this->archivedReports($workspace),
         ]);
     }
 
@@ -66,6 +62,9 @@ class ReportController extends Controller
         return Inertia::render('workspaces/integrations/meta-ads/reports/show', [
             'workspace' => $workspace,
             'report' => $report->only(['id', 'name', 'description', 'kind', 'config']),
+            // Full lists for the sidebar so users can switch / manage reports without leaving.
+            'reports' => $this->activeReports($workspace),
+            'archivedReports' => $this->archivedReports($workspace),
             'accounts' => $this->accountsForWorkspace($request, $workspace),
             'customBreakdowns' => CustomBreakdown::where('workspace_id', $workspace->id)
                 ->orderBy('name')
@@ -91,6 +90,7 @@ class ReportController extends Controller
         return back();
     }
 
+    /** Archive a report (soft delete) — recoverable from the archive view. */
     public function destroy(Request $request, Workspace $workspace, Report $report): RedirectResponse
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
@@ -99,6 +99,49 @@ class ReportController extends Controller
         $report->delete();
 
         return redirect()->route('workspaces.metaads.reports.index', [$workspace]);
+    }
+
+    /** Restore an archived report back to the active list. */
+    public function restore(Request $request, Workspace $workspace, Report $report): RedirectResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+        abort_unless($report->workspace_id === $workspace->id, 404);
+
+        $report->restore();
+
+        return back();
+    }
+
+    /** Permanently delete an archived report. */
+    public function forceDestroy(Request $request, Workspace $workspace, Report $report): RedirectResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+        abort_unless($report->workspace_id === $workspace->id, 404);
+
+        $report->forceDelete();
+
+        return back();
+    }
+
+    /**
+     * Active (non-archived) reports for the sidebar list.
+     */
+    private function activeReports(Workspace $workspace)
+    {
+        return Report::where('workspace_id', $workspace->id)
+            ->orderByDesc('updated_at')
+            ->get(['id', 'name', 'description', 'kind', 'updated_at']);
+    }
+
+    /**
+     * Archived (soft-deleted) reports for the archive view.
+     */
+    private function archivedReports(Workspace $workspace)
+    {
+        return Report::onlyTrashed()
+            ->where('workspace_id', $workspace->id)
+            ->orderByDesc('deleted_at')
+            ->get(['id', 'name', 'description', 'kind', 'updated_at']);
     }
 
     /**

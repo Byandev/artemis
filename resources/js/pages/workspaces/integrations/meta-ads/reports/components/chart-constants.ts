@@ -4,8 +4,9 @@
  */
 
 // Gallery card size → grid columns. Bigger card size = fewer, larger columns.
+// The default (2) tops out at a 4-up grid on wide screens.
 export const GALLERY_GRID: Record<number, string> = {
-    1: 'grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6',
+    1: 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4',
     2: 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4',
     3: 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3',
 };

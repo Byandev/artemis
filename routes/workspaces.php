@@ -52,9 +52,9 @@ use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
+use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
-use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
 use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
@@ -298,6 +298,14 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/integrations/meta/reports/{report}', [ReportController::class, 'destroy'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.reports.destroy');
+    Route::post('/workspaces/{workspace}/integrations/meta/reports/{report}/restore', [ReportController::class, 'restore'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->withTrashed()
+        ->name('workspaces.metaads.reports.restore');
+    Route::delete('/workspaces/{workspace}/integrations/meta/reports/{report}/force', [ReportController::class, 'forceDestroy'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->withTrashed()
+        ->name('workspaces.metaads.reports.force-destroy');
 
     // Reusable custom breakdowns (named rule-based ad groups) — JSON CRUD
     Route::get('/workspaces/{workspace}/integrations/meta/custom-breakdowns', [CustomBreakdownController::class, 'index'])

@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * A saved Ads Manager "report" — a named, reusable configuration (accounts,
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Report extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'meta_ads_reports';
 
     protected $guarded = [];

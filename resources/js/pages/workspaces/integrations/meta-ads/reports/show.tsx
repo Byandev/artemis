@@ -17,6 +17,7 @@ import { FiltersBar } from './components/FiltersBar';
 import { GalleryCard, GallerySkeleton } from './components/GalleryCard';
 import { MetricPicker } from './components/MetricPicker';
 import { ReportChart } from './components/ReportChart';
+import { ReportsSidebar } from './components/ReportsSidebar';
 import { ReportTable } from './components/ReportTable';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SortControl } from './components/SortControl';
@@ -26,8 +27,10 @@ import {
     type CustomBreakdownItem,
     DEFAULT_VIEW,
     isNameFilter,
+    isoDaysAgo,
     type MetricFilter,
     type ReportConfig,
+    type ReportListItem,
     type ReportRecord,
     type ReportRow,
     reportsUrl,
@@ -36,6 +39,8 @@ import {
 interface Props {
     workspace: { id: number; name: string; slug: string };
     report: ReportRecord;
+    reports: ReportListItem[];
+    archivedReports: ReportListItem[];
     accounts: { id: string; name: string }[];
     customBreakdowns?: CustomBreakdownItem[];
 }
@@ -43,6 +48,8 @@ interface Props {
 export default function ReportShow({
     workspace,
     report,
+    reports,
+    archivedReports,
     accounts,
     customBreakdowns = [],
 }: Props) {
@@ -159,211 +166,261 @@ export default function ReportShow({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${report.name} · Report`} />
 
-            <div className="p-4 sm:p-6">
-                {/* Header: title + save/discard */}
-                <div className="mb-4 flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                        <input
-                            value={name}
-                            onChange={(e) => {
-                                setName(e.target.value);
-                                setDirty(true);
-                            }}
-                            className="w-full bg-transparent text-2xl font-semibold tracking-tight text-gray-900 outline-none focus:ring-0 dark:text-gray-50"
-                            placeholder="Untitled report"
-                        />
-                        <input
-                            value={description}
-                            onChange={(e) => {
-                                setDescription(e.target.value);
-                                setDirty(true);
-                            }}
-                            className="mt-1 w-full bg-transparent text-sm text-gray-500 outline-none focus:ring-0 dark:text-gray-400"
-                            placeholder="Add description..."
-                        />
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.visit(baseUrl)}
-                        >
-                            Discard
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={save}
-                            disabled={saving || !dirty}
-                        >
-                            {saving ? 'Saving…' : 'Save report'}
-                        </Button>
-                    </div>
-                </div>
+            <div className="flex h-[calc(100dvh-5rem)] overflow-hidden">
+                <ReportsSidebar
+                    reports={reports}
+                    archivedReports={archivedReports}
+                    activeId={report.id}
+                    baseUrl={baseUrl}
+                />
 
-                {/* Filter / config bar */}
-                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-black/6 bg-white/70 p-2 dark:border-white/6 dark:bg-zinc-900/70">
-                    <MultiSelect
-                        options={accounts.map((a) => ({
-                            value: a.id,
-                            label: a.name,
-                        }))}
-                        selected={config.accounts}
-                        onChange={(accs) => patch({ accounts: accs })}
-                        placeholder="All accounts"
-                        compact
-                        className="min-w-[180px]"
-                    />
-
-                    <DatePicker
-                        id={`report-${report.id}-range`}
-                        mode="range"
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                patch({
-                                    since: moment(dates[0]).format(
-                                        'YYYY-MM-DD',
-                                    ),
-                                    until: moment(dates[1]).format(
-                                        'YYYY-MM-DD',
-                                    ),
-                                });
-                            }
-                        }}
-                        defaultDate={[config.since, config.until] as never}
-                    />
-
-                    <BreakdownControl
-                        value={config.group_by}
-                        customBreakdowns={customBreakdowns}
-                        onChange={(group_by) => patch({ group_by })}
-                    />
-
-                    <FiltersBar
-                        filters={config.filters}
-                        onChange={(filters) => patch({ filters })}
-                    />
-                </div>
-
-                {/* Metrics + sort bar */}
-                <div className="mb-4 flex flex-wrap items-center gap-2">
-                    {config.metrics.map((id) => (
-                        <span
-                            key={id}
-                            className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 py-1 pr-1 pl-2.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
-                        >
-                            {metricLabel(id)}
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    patch({
-                                        metrics: config.metrics.filter(
-                                            (m) => m !== id,
-                                        ),
-                                    })
-                                }
-                                className="rounded-full p-0.5 hover:bg-emerald-500/20"
-                            >
-                                <X className="h-3 w-3" />
-                            </button>
-                        </span>
-                    ))}
-
-                    <MetricPicker
-                        selected={config.metrics}
-                        onChange={(metrics) => patch({ metrics })}
-                    />
-
-                    <div className="ml-auto flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            <span>Sort by</span>
-                            <SortControl
-                                sort={config.sort}
-                                metrics={config.metrics}
-                                onChange={(sort) => patch({ sort })}
+                {/* Report preview / builder — scrolls independently of the sidebar */}
+                <div className="custom-scrollbar min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                    {/* Header: title + save/discard */}
+                    <div className="mb-4 flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                            <input
+                                value={name}
+                                onChange={(e) => {
+                                    setName(e.target.value);
+                                    setDirty(true);
+                                }}
+                                className="w-full bg-transparent text-2xl font-semibold tracking-tight text-gray-900 outline-none focus:ring-0 dark:text-gray-50"
+                                placeholder="Untitled report"
+                            />
+                            <input
+                                value={description}
+                                onChange={(e) => {
+                                    setDescription(e.target.value);
+                                    setDirty(true);
+                                }}
+                                className="mt-1 w-full bg-transparent text-sm text-gray-500 outline-none focus:ring-0 dark:text-gray-400"
+                                placeholder="Add description..."
                             />
                         </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.visit(baseUrl)}
+                            >
+                                Discard
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={save}
+                                disabled={saving || !dirty}
+                            >
+                                {saving ? 'Saving…' : 'Save report'}
+                            </Button>
+                        </div>
+                    </div>
 
-                        {config.chart === 'gallery' && (
-                            <SettingsPanel
-                                view={config.view}
-                                onChange={(view) => patch({ view })}
-                            />
-                        )}
+                    {/* Filter / config bar */}
+                    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-black/6 bg-white/70 p-2 dark:border-white/6 dark:bg-zinc-900/70">
+                        <MultiSelect
+                            options={accounts.map((a) => ({
+                                value: a.id,
+                                label: a.name,
+                            }))}
+                            selected={config.accounts}
+                            onChange={(accs) => patch({ accounts: accs })}
+                            placeholder="All accounts"
+                            compact
+                            className="min-w-[180px]"
+                        />
 
-                        <ChartStyleControl
-                            value={config.chart}
-                            onChange={(chart) => patch({ chart })}
+                        {/* Quick date presets (Meta convention: ranges end yesterday). */}
+                        <div className="inline-flex items-center overflow-hidden rounded-[10px] border border-black/8 dark:border-white/8">
+                            {(
+                                [
+                                    { label: 'Yesterday', since: 1, until: 1 },
+                                    {
+                                        label: 'Last 7 days',
+                                        since: 7,
+                                        until: 1,
+                                    },
+                                    {
+                                        label: 'Last 30 days',
+                                        since: 30,
+                                        until: 1,
+                                    },
+                                ] as const
+                            ).map((p) => {
+                                const active =
+                                    config.since === isoDaysAgo(p.since) &&
+                                    config.until === isoDaysAgo(p.until);
+                                return (
+                                    <button
+                                        key={p.label}
+                                        onClick={() =>
+                                            patch({
+                                                since: isoDaysAgo(p.since),
+                                                until: isoDaysAgo(p.until),
+                                            })
+                                        }
+                                        className={`h-9 border-r border-black/8 px-3 text-xs font-medium transition-colors last:border-r-0 dark:border-white/8 ${
+                                            active
+                                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                                : 'text-gray-500 hover:bg-stone-50 dark:text-gray-400 dark:hover:bg-zinc-800'
+                                        }`}
+                                    >
+                                        {p.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <DatePicker
+                            id={`report-${report.id}-range`}
+                            mode="range"
+                            onChange={(dates) => {
+                                if (dates.length === 2) {
+                                    patch({
+                                        since: moment(dates[0]).format(
+                                            'YYYY-MM-DD',
+                                        ),
+                                        until: moment(dates[1]).format(
+                                            'YYYY-MM-DD',
+                                        ),
+                                    });
+                                }
+                            }}
+                            defaultDate={[config.since, config.until] as never}
+                        />
+
+                        <BreakdownControl
+                            value={config.group_by}
+                            customBreakdowns={customBreakdowns}
+                            onChange={(group_by) => patch({ group_by })}
+                        />
+
+                        <FiltersBar
+                            filters={config.filters}
+                            onChange={(filters) => patch({ filters })}
                         />
                     </div>
-                </div>
 
-                {/* Results: chart/gallery + the breakdown table beneath it */}
-                {loading ? (
-                    config.chart === 'gallery' ? (
-                        <GallerySkeleton />
-                    ) : (
-                        <Skeleton className="h-[420px] w-full rounded-2xl" />
-                    )
-                ) : data.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-black/10 py-20 text-center text-sm text-gray-400 dark:border-white/10 dark:text-gray-500">
-                        No results for this configuration.
-                    </div>
-                ) : (
-                    <>
-                        {config.chart === 'gallery' ? (
-                            <div
-                                className={
-                                    GALLERY_GRID[config.view.cardSize] ??
-                                    GALLERY_GRID[2]
-                                }
+                    {/* Metrics + sort bar */}
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
+                        {config.metrics.map((id) => (
+                            <span
+                                key={id}
+                                className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 py-1 pr-1 pl-2.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
                             >
-                                {visibleData.map((row) => (
-                                    <GalleryCard
-                                        key={row.id}
-                                        row={row}
-                                        metrics={config.metrics}
-                                        showThumbnail={
-                                            showThumbnail &&
-                                            !config.view.hideThumbnails
-                                        }
-                                        onPreview={
-                                            showThumbnail
-                                                ? () => setPreviewAd(row)
-                                                : undefined
-                                        }
-                                    />
-                                ))}
+                                {metricLabel(id)}
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        patch({
+                                            metrics: config.metrics.filter(
+                                                (m) => m !== id,
+                                            ),
+                                        })
+                                    }
+                                    className="rounded-full p-0.5 hover:bg-emerald-500/20"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </span>
+                        ))}
+
+                        <MetricPicker
+                            selected={config.metrics}
+                            onChange={(metrics) => patch({ metrics })}
+                        />
+
+                        <div className="ml-auto flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                <span>Sort by</span>
+                                <SortControl
+                                    sort={config.sort}
+                                    metrics={config.metrics}
+                                    onChange={(sort) => patch({ sort })}
+                                />
                             </div>
+
+                            {config.chart === 'gallery' && (
+                                <SettingsPanel
+                                    view={config.view}
+                                    onChange={(view) => patch({ view })}
+                                />
+                            )}
+
+                            <ChartStyleControl
+                                value={config.chart}
+                                onChange={(chart) => patch({ chart })}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Results: chart/gallery + the breakdown table beneath it */}
+                    {loading ? (
+                        config.chart === 'gallery' ? (
+                            <GallerySkeleton />
                         ) : (
-                            <ReportChart
-                                chart={config.chart}
+                            <Skeleton className="h-[420px] w-full rounded-2xl" />
+                        )
+                    ) : data.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-black/10 py-20 text-center text-sm text-gray-400 dark:border-white/10 dark:text-gray-500">
+                            No results for this configuration.
+                        </div>
+                    ) : (
+                        <>
+                            {config.chart === 'gallery' ? (
+                                <div
+                                    className={
+                                        GALLERY_GRID[config.view.cardSize] ??
+                                        GALLERY_GRID[2]
+                                    }
+                                >
+                                    {visibleData.map((row) => (
+                                        <GalleryCard
+                                            key={row.id}
+                                            row={row}
+                                            metrics={config.metrics}
+                                            showThumbnail={
+                                                showThumbnail &&
+                                                !config.view.hideThumbnails
+                                            }
+                                            onPreview={
+                                                showThumbnail
+                                                    ? () => setPreviewAd(row)
+                                                    : undefined
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <ReportChart
+                                    chart={config.chart}
+                                    rows={visibleData}
+                                    metrics={config.metrics}
+                                    since={config.since}
+                                    until={config.until}
+                                />
+                            )}
+
+                            <ReportTable
                                 rows={visibleData}
                                 metrics={config.metrics}
-                                since={config.since}
-                                until={config.until}
+                                sort={config.sort}
+                                onSort={(sort) => patch({ sort })}
+                                showThumbnail={showThumbnail}
+                                label={breakdownLabel(
+                                    config.group_by,
+                                    customBreakdowns,
+                                )}
+                                onRowClick={
+                                    showThumbnail
+                                        ? (row) => setPreviewAd(row)
+                                        : undefined
+                                }
                             />
-                        )}
-
-                        <ReportTable
-                            rows={visibleData}
-                            metrics={config.metrics}
-                            sort={config.sort}
-                            onSort={(sort) => patch({ sort })}
-                            showThumbnail={showThumbnail}
-                            label={breakdownLabel(
-                                config.group_by,
-                                customBreakdowns,
-                            )}
-                            onRowClick={
-                                showThumbnail
-                                    ? (row) => setPreviewAd(row)
-                                    : undefined
-                            }
-                        />
-                    </>
-                )}
+                        </>
+                    )}
+                </div>
             </div>
-
             <CreativePreviewSheet
                 slug={workspace.slug}
                 ad={previewAd}

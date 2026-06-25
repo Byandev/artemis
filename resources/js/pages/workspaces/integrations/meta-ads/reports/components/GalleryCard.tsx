@@ -15,7 +15,9 @@ export function GalleryCard({
     showThumbnail: boolean;
     onPreview?: () => void;
 }) {
-    const thumb = row.thumbnail_url || row.image_url || null;
+    // Prefer the full-resolution creative image; fall back to Meta's small
+    // auto-generated thumbnail (the only image videos expose).
+    const thumb = row.image_url || row.thumbnail_url || null;
 
     return (
         <div className="flex flex-col overflow-hidden rounded-xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
