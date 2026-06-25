@@ -81,6 +81,9 @@ class TriggerFetchCsrErpDailRecords extends Command
                 $data = [
                     'workspace_id' => $workspace->id,
                     'workspace_api_key' => $apiKey->reveal(),
+                    // ERP login the n8n pipeline authenticates with (password decrypted).
+                    'erp_username' => $workspace->erp_username,
+                    'erp_password' => $workspace->erp_password,
                     'csr_id' => $pancakeUser->id,
                     'csr_name' => $pancakeUser->name,
                     'date' => $date,

@@ -65,6 +65,13 @@ export const PERMISSIONS = {
     EditPurchasedOrders: 'Edit Purchased Orders',
     DeletePurchasedOrders: 'Delete Purchased Orders',
 
+    // Gencys ERP
+    ViewDailySalesTracker: 'View Daily Sales Tracker',
+    ViewUnitCode: 'View Unit Code',
+    CreateUnitCode: 'Create Unit Code',
+    EditUnitCode: 'Edit Unit Code',
+    DeleteUnitCode: 'Delete Unit Code',
+
     // Checklist
     ViewChecklist: 'View Checklist',
     CreateChecklist: 'Create Checklist',

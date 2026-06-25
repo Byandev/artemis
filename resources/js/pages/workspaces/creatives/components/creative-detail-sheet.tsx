@@ -284,6 +284,15 @@ function ReviewsTab({
         [creative.reviews],
     );
 
+    // Only reviewers assigned to this specific creative may submit a review,
+    // even if they hold the Review Creatives permission.
+    const canSubmitReview = useMemo(
+        () =>
+            canReview &&
+            creative.assigned_reviewers.some((r) => r.id === currentUserId),
+        [canReview, creative.assigned_reviewers, currentUserId],
+    );
+
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         post(`/workspaces/${workspace.slug}/creatives/${creative.id}/reviews`, {
@@ -333,7 +342,7 @@ function ReviewsTab({
                         <p className="mt-2 font-mono text-[11px] text-gray-400 dark:text-gray-600">
                             No reviews yet
                         </p>
-                        {canReview && (
+                        {canSubmitReview && (
                             <p className="mt-0.5 font-mono text-[10px] text-gray-300 dark:text-gray-700">
                                 Be the first to leave feedback.
                             </p>
@@ -356,7 +365,7 @@ function ReviewsTab({
             </div>
 
             {/* Add review — collapsed into a button until clicked */}
-            {canReview &&
+            {canSubmitReview &&
                 (showForm ? (
                     <div className="overflow-hidden rounded-[14px] border border-black/6 bg-stone-50/60 dark:border-white/6 dark:bg-zinc-800/30">
                         <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/6">

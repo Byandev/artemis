@@ -38,9 +38,32 @@ return [
     'n8n' => [
         'webhook_url' => env('N8N_WEBHOOK_URL'),
         'inventory_webhook_url' => env('N8N_INVENTORY_WEBHOOK_URL'),
+        'purchase_order_webhook_url' => env('N8N_PURCHASE_ORDER_WEBHOOK_URL'),
+        'transaction_history_webhook_url' => env('N8N_TRANSACTION_HISTORY_WEBHOOK_URL'),
         // Public URL n8n calls back to with synced ERP data. Defaults to APP_URL
         // so a self-hosted/local n8n can reach the app without a tunnel.
         'inventory_sync_callback_url' => env('N8N_INVENTORY_SYNC_CALLBACK_URL'),
+
+        // Gencys ERP daily sales tracker: the n8n flow that logs into Gencys ERP
+        // and fetches the daily sales tracker. Falls back to the generic webhook
+        // when a dedicated one isn't configured.
+        'gencys_daily_sales_webhook_url' => env('N8N_GENCYS_DAILY_SALES_WEBHOOK_URL'),
+        // Where n8n posts the fetched daily-sales rows back to. Defaults to APP_URL.
+        'gencys_daily_sales_callback_url' => env('N8N_GENCYS_DAILY_SALES_CALLBACK_URL'),
+
+        // Gencys ERP unit codes: the n8n flow that logs into Gencys ERP and
+        // fetches unit codes. Falls back to the generic webhook when a dedicated
+        // one isn't configured.
+        'gencys_unit_code_webhook_url' => env('N8N_GENCYS_UNIT_CODE_WEBHOOK_URL'),
+        // Where n8n posts the fetched unit codes back to. Defaults to APP_URL.
+        'gencys_unit_code_callback_url' => env('N8N_GENCYS_UNIT_CODE_CALLBACK_URL'),
+
+        // Gencys ERP unit code inventories: the n8n flow that fetches the
+        // inventory items for a single unit code. Falls back to the generic
+        // webhook when a dedicated one isn't configured.
+        'gencys_unit_code_inventory_webhook_url' => env('N8N_GENCYS_UNIT_CODE_INVENTORY_WEBHOOK_URL'),
+        // Where n8n posts the fetched inventory items back to. Defaults to APP_URL.
+        'gencys_unit_code_inventory_callback_url' => env('N8N_GENCYS_UNIT_CODE_INVENTORY_CALLBACK_URL'),
     ],
 
     'discord' => [

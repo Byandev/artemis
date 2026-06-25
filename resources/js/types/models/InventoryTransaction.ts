@@ -4,6 +4,7 @@ export interface InventoryTransaction {
     inventory_item?: {
         id: number;
         sku: string;
+        remaining_qty: number | null;
         product?: {
             id: number;
             name: string;
@@ -18,4 +19,5 @@ export interface InventoryTransaction {
     rts_bad: number;
     lost: number;
     remaining_qty: number;
+    inventory_remaining_stock: number | null;
 }

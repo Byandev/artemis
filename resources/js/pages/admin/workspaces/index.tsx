@@ -54,6 +54,8 @@ interface Workspace {
     botcake_module_enabled: boolean;
     creatives_module_enabled: boolean;
     meta_ads_module_enabled: boolean;
+    gencys_module_enabled: boolean;
+    is_gencys_partner: boolean;
     sales_marketing_dashboard_module_enabled: boolean;
     video_editor_dashboard_module_enabled: boolean;
     csr_dashboard_module_enabled: boolean;
@@ -74,6 +76,8 @@ const MODULE_FIELDS: Array<{
         | 'botcake_module_enabled'
         | 'creatives_module_enabled'
         | 'meta_ads_module_enabled'
+        | 'gencys_module_enabled'
+        | 'is_gencys_partner'
         | 'sales_marketing_dashboard_module_enabled'
         | 'video_editor_dashboard_module_enabled'
         | 'csr_dashboard_module_enabled'
@@ -137,6 +141,16 @@ const MODULE_FIELDS: Array<{
         description: 'Ads manager, optimization rules, and approvals',
     },
     {
+        key: 'gencys_module_enabled',
+        label: 'Gencys ERP',
+        description: 'Gencys ERP daily sales tracker',
+    },
+    {
+        key: 'is_gencys_partner',
+        label: 'Gencys Partner',
+        description: 'Enable syncing inventory from Gencys',
+    },
+    {
         key: 'sales_marketing_dashboard_module_enabled',
         label: 'S&M Dashboard',
         description: 'Sales & Marketing dashboard',
@@ -152,6 +166,61 @@ const MODULE_FIELDS: Array<{
         description: 'CSR personal dashboard',
     },
 ];
+
+type ModuleKey = (typeof MODULE_FIELDS)[number]['key'];
+
+// Logical groupings for the admin "Toggle Modules" modal, so related features
+// read as sections instead of one long flat list.
+const MODULE_GROUPS: {
+    title: string;
+    description: string;
+    keys: ModuleKey[];
+}[] = [
+    {
+        title: 'Catalog & Operations',
+        description: 'Products, stock, finance, and daily ops',
+        keys: [
+            'products_module_enabled',
+            'inventory_module_enabled',
+            'finance_module_enabled',
+            'gencys_module_enabled',
+            'is_gencys_partner',
+            'checklist_module_enabled',
+        ],
+    },
+    {
+        title: 'Team & CSR',
+        description: 'People, assignments, and customer service',
+        keys: ['teams_module_enabled', 'csr_module_enabled'],
+    },
+    {
+        title: 'Marketing & Ads',
+        description: 'Ad management, creatives, and messaging',
+        keys: [
+            'meta_ads_module_enabled',
+            'creatives_module_enabled',
+            'botcake_module_enabled',
+        ],
+    },
+    {
+        title: 'Dashboards',
+        description: 'Role-specific analytics dashboards',
+        keys: [
+            'sales_marketing_dashboard_module_enabled',
+            'video_editor_dashboard_module_enabled',
+            'csr_dashboard_module_enabled',
+        ],
+    },
+    {
+        title: 'Public Pages',
+        description: 'Externally shareable links',
+        keys: ['rmo_module_enabled', 'leaderboard_module_enabled'],
+    },
+];
+
+const MODULE_BY_KEY = Object.fromEntries(
+    MODULE_FIELDS.map((f) => [f.key, f]),
+) as Record<ModuleKey, (typeof MODULE_FIELDS)[number]>;
 
 interface Props {
     workspaces: PaginatedData<Workspace>;
@@ -694,6 +763,8 @@ function ModulesModal({
         botcake_module_enabled: workspace.botcake_module_enabled,
         creatives_module_enabled: workspace.creatives_module_enabled,
         meta_ads_module_enabled: workspace.meta_ads_module_enabled,
+        gencys_module_enabled: workspace.gencys_module_enabled,
+        is_gencys_partner: workspace.is_gencys_partner,
         sales_marketing_dashboard_module_enabled:
             workspace.sales_marketing_dashboard_module_enabled,
         video_editor_dashboard_module_enabled:
@@ -709,23 +780,32 @@ function ModulesModal({
         });
     }
 
+    const enabledTotal = MODULE_FIELDS.filter((f) => data[f.key]).length;
+
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
             onClick={onClose}
         >
             <div
-                className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-zinc-900"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="mb-5 flex items-center justify-between">
-                    <div>
-                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                            Toggle Modules
-                        </h3>
-                        <p className="text-sm text-zinc-500">
-                            {workspace.name}
-                        </p>
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                            <Boxes className="h-4 w-4" />
+                        </div>
+                        <div>
+                            <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                                Toggle Modules
+                            </h3>
+                            <p className="text-xs text-zinc-500">
+                                {workspace.name} · {enabledTotal} of{' '}
+                                {MODULE_FIELDS.length} enabled
+                            </p>
+                        </div>
                     </div>
                     <button
                         onClick={onClose}
@@ -735,47 +815,86 @@ function ModulesModal({
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-1">
-                    <div className="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
-                        {MODULE_FIELDS.map((field) => (
-                            <label
-                                key={field.key}
-                                className="flex cursor-pointer items-center justify-between gap-4 border-b border-zinc-100 py-3 dark:border-zinc-800"
-                            >
-                                <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                        {field.label}
+                <form
+                    onSubmit={handleSubmit}
+                    className="flex min-h-0 flex-1 flex-col"
+                >
+                    {/* Scrollable grouped body */}
+                    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
+                        {MODULE_GROUPS.map((group) => {
+                            const groupEnabled = group.keys.filter(
+                                (k) => data[k],
+                            ).length;
+                            return (
+                                <section key={group.title}>
+                                    <div className="mb-2.5 flex items-end justify-between">
+                                        <div>
+                                            <h4 className="text-[11px] font-semibold tracking-wider text-zinc-500 uppercase dark:text-zinc-400">
+                                                {group.title}
+                                            </h4>
+                                            <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                                                {group.description}
+                                            </p>
+                                        </div>
+                                        <span className="font-mono text-[10px] text-zinc-400 dark:text-zinc-500">
+                                            {groupEnabled}/{group.keys.length}
+                                        </span>
                                     </div>
-                                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                                        {field.description}
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                        {group.keys.map((key) => {
+                                            const field = MODULE_BY_KEY[key];
+                                            return (
+                                                <label
+                                                    key={key}
+                                                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors ${
+                                                        data[key]
+                                                            ? 'bg-brand-50/50 dark:bg-brand-500/5'
+                                                            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                                                    }`}
+                                                >
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                                            {field.label}
+                                                        </div>
+                                                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                                            {field.description}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        role="switch"
+                                                        aria-checked={data[key]}
+                                                        onClick={() =>
+                                                            setData(
+                                                                key,
+                                                                !data[key],
+                                                            )
+                                                        }
+                                                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                                                            data[key]
+                                                                ? 'bg-brand-600'
+                                                                : 'bg-zinc-200 dark:bg-zinc-700'
+                                                        }`}
+                                                    >
+                                                        <span
+                                                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                                                                data[key]
+                                                                    ? 'translate-x-5'
+                                                                    : 'translate-x-1'
+                                                            }`}
+                                                        />
+                                                    </button>
+                                                </label>
+                                            );
+                                        })}
                                     </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={data[field.key]}
-                                    onClick={() =>
-                                        setData(field.key, !data[field.key])
-                                    }
-                                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                                        data[field.key]
-                                            ? 'bg-brand-600'
-                                            : 'bg-zinc-200 dark:bg-zinc-700'
-                                    }`}
-                                >
-                                    <span
-                                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                                            data[field.key]
-                                                ? 'translate-x-5'
-                                                : 'translate-x-1'
-                                        }`}
-                                    />
-                                </button>
-                            </label>
-                        ))}
+                                </section>
+                            );
+                        })}
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-4">
+                    {/* Sticky footer */}
+                    <div className="flex justify-end gap-2 border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
                         <button
                             type="button"
                             onClick={onClose}

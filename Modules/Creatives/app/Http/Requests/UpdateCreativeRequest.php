@@ -2,8 +2,10 @@
 
 namespace Modules\Creatives\Http\Requests;
 
+use App\Models\Workspace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Modules\Creatives\Models\Creative;
 
 class UpdateCreativeRequest extends FormRequest
 {
@@ -14,15 +16,22 @@ class UpdateCreativeRequest extends FormRequest
 
     public function rules(): array
     {
-        // Name and picture URL must be unique within the workspace, ignoring
-        // the creative currently being edited.
-        $workspaceId = $this->route('workspace')->id;
-        $creativeId = $this->route('creative')->id;
+        $workspace = $this->route('workspace');
+        $workspaceId = $workspace instanceof Workspace ? $workspace->getKey() : $workspace;
+
+        $creative = $this->route('creative');
+        $creativeId = $creative instanceof Creative ? $creative->getKey() : $creative;
 
         return [
             'name' => [
-                'sometimes', 'required', 'string', 'max:255',
-                Rule::unique('creatives', 'name')->where('workspace_id', $workspaceId)->ignore($creativeId),
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                // Unique per workspace, ignoring the creative being updated.
+                Rule::unique('creatives', 'name')
+                    ->where('workspace_id', $workspaceId)
+                    ->ignore($creativeId),
             ],
             'creative_date' => ['sometimes', 'required', 'date'],
             'format' => ['sometimes', 'required', Rule::in(['video', 'image'])],
