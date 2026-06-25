@@ -16,10 +16,12 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import { PaginatedData } from '@/types';
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
@@ -42,16 +44,7 @@ interface InventoryItem {
 }
 
 interface Props {
-    inventory: {
-        data: InventoryTransaction[];
-        total: number;
-        from: number;
-        to: number;
-        links: any[];
-        last_page: number;
-        current_page: number;
-        per_page: number;
-    };
+    inventory: PaginatedData<InventoryTransaction>;
     workspace: Workspace;
     items?: InventoryItem[];
     query?: {
@@ -59,7 +52,98 @@ interface Props {
         page?: number | string;
         perPage?: number | string;
         filter?: { search?: string; start_date?: string; end_date?: string };
+        summarize?: boolean;
     };
+}
+
+// A table row is either a real transaction or a summed-per-item synthetic row
+// (transaction_count is only set on the summarized rows).
+type TableRow = InventoryTransaction & { transaction_count?: number };
+
+const sumCell = (value: number) => (
+    <div className="flex h-10 items-center justify-center">
+        <p className="text-[12px] font-medium text-gray-600 dark:text-gray-300">
+            {value || 0}
+        </p>
+    </div>
+);
+
+// Inline-editable remaining qty. Saves to its own transaction row.
+function RemainingQtyCell({
+    transaction,
+    workspace,
+    canEdit,
+}: {
+    transaction: InventoryTransaction;
+    workspace: Workspace;
+    canEdit: boolean;
+}) {
+    const [value, setValue] = useState(
+        transaction.remaining_qty?.toString() ?? '',
+    );
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        setValue(transaction.remaining_qty?.toString() ?? '');
+    }, [transaction.remaining_qty]);
+
+    const save = () => {
+        const original = transaction.remaining_qty?.toString() ?? '';
+        if (value === original || value === '') {
+            setValue(original);
+            return;
+        }
+
+        setSaving(true);
+        router.patch(
+            `/workspaces/${workspace.slug}/inventory/transactions/${transaction.id}/remaining-qty`,
+            { remaining_qty: parseInt(value, 10) },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['inventory'],
+                onSuccess: () => toast.success('Remaining quantity updated'),
+                onError: () => {
+                    toast.error('Failed to update remaining quantity');
+                    setValue(original);
+                },
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    const isNegative = parseInt(value, 10) < 0;
+
+    if (!canEdit) {
+        return (
+            <div className="flex h-10 items-center justify-center">
+                <p
+                    className={`text-[12px] font-bold ${isNegative ? 'text-red-500' : 'text-emerald-600'}`}
+                >
+                    {transaction.remaining_qty ?? 0}
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex h-10 items-center justify-center">
+            <input
+                type="number"
+                value={value}
+                disabled={saving}
+                onChange={(e) => setValue(e.target.value)}
+                onBlur={save}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        (e.target as HTMLInputElement).blur();
+                    }
+                }}
+                className={`h-7 w-20 rounded-md border border-black/8 bg-stone-50 px-2 text-center font-mono! text-[12px]! font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 ${isNegative ? 'text-red-500' : 'text-emerald-600'}`}
+            />
+        </div>
+    );
 }
 
 export default function Index({
@@ -82,6 +166,8 @@ export default function Index({
         InventoryTransaction | undefined
     >(undefined);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    // Summary view is computed in the backend; this reflects the server's state.
+    const summarize = !!query?.summarize;
     const canCreateTransactionLogs = usePermission(
         PERMISSIONS.CreateTransactionLogs,
     );
@@ -93,6 +179,8 @@ export default function Index({
     );
     const canManageTransactionLogs =
         canEditTransactionLogs || canDeleteTransactionLogs;
+
+    const data = useMemo(() => inventory.data || [], [inventory.data]);
 
     const buildFilter = (search: string, range: string[]) => ({
         search: search || undefined,
@@ -116,6 +204,7 @@ export default function Index({
                     page: 1,
                     sort: query?.sort,
                     per_page: query?.perPage ?? inventory.per_page,
+                    summarize: summarize ? 1 : undefined,
                 },
                 {
                     preserveState: true,
@@ -127,6 +216,24 @@ export default function Index({
         }, 500);
         return () => clearTimeout(timer);
     }, [searchQuery, dateRange]);
+
+    const toggleSummarize = (value: boolean) => {
+        router.get(
+            `/workspaces/${workspace.slug}/inventory/transactions`,
+            {
+                summarize: value ? 1 : undefined,
+                filter: buildFilter(searchQuery, dateRange),
+                page: 1,
+                per_page: query?.perPage ?? inventory.per_page,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['inventory', 'query'],
+            },
+        );
+    };
 
     const handleEdit = (item: InventoryTransaction) => {
         setSelectedInventory(item);
@@ -153,7 +260,7 @@ export default function Index({
         );
     };
 
-    const columns = useMemo<ColumnDef<InventoryTransaction>[]>(
+    const columns = useMemo<ColumnDef<TableRow>[]>(
         () =>
             [
                 {
@@ -320,15 +427,30 @@ export default function Index({
                     header: ({ column }) => (
                         <SortableHeader
                             column={column}
-                            title="Remaining Quantity"
+                            title="Remaining Qty (Manual)"
+                        />
+                    ),
+                    cell: ({ row }) => (
+                        <RemainingQtyCell
+                            transaction={row.original}
+                            workspace={workspace}
+                            canEdit={canEditTransactionLogs}
+                        />
+                    ),
+                },
+                {
+                    accessorKey: 'inventory_remaining_stock',
+                    enableSorting: true,
+                    header: ({ column }) => (
+                        <SortableHeader
+                            column={column}
+                            title="Inventory Stock (ERP)"
                         />
                     ),
                     cell: ({ row }) => (
                         <div className="flex h-10 items-center justify-center">
-                            <p
-                                className={`text-[12px] font-bold ${row.original.remaining_qty < 0 ? 'text-red-500' : 'text-emerald-600'}`}
-                            >
-                                {row.original.remaining_qty ?? 0}
+                            <p className="text-[12px] font-medium text-gray-600 dark:text-gray-300">
+                                {row.original.inventory_remaining_stock ?? '—'}
                             </p>
                         </div>
                     ),
@@ -389,8 +511,156 @@ export default function Index({
             canDeleteTransactionLogs,
             canEditTransactionLogs,
             canManageTransactionLogs,
+            workspace,
         ],
     );
+
+    // Columns for the summarized (one row per item per date) view.
+    const summaryColumns = useMemo<ColumnDef<TableRow>[]>(
+        () => [
+            {
+                id: 'inventory_item',
+                enableSorting: false,
+                header: () => (
+                    <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        Inventory Item
+                    </div>
+                ),
+                cell: ({ row }) => {
+                    const item = row.original.inventory_item;
+                    return (
+                        <div className="flex h-10 items-center">
+                            {item ? (
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">
+                                        {item.sku}
+                                    </span>
+                                    {item.product && (
+                                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                            {item.product.name}
+                                        </span>
+                                    )}
+                                    <span className="text-[9px] text-gray-300 dark:text-gray-600">
+                                        {row.original.transaction_count} txns
+                                    </span>
+                                </div>
+                            ) : (
+                                <span className="text-[12px] text-gray-400">
+                                    —
+                                </span>
+                            )}
+                        </div>
+                    );
+                },
+            },
+            {
+                accessorKey: 'date',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Date" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                            {row.original.date
+                                ? moment(row.original.date).format(
+                                      'DD MMM YYYY',
+                                  )
+                                : '—'}
+                        </span>
+                    </div>
+                ),
+            },
+            {
+                id: 'po_qty_in',
+                enableSorting: false,
+                header: () => (
+                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        PO Quantity In
+                    </div>
+                ),
+                cell: ({ row }) => sumCell(row.original.po_qty_in),
+            },
+            {
+                id: 'po_qty_out',
+                enableSorting: false,
+                header: () => (
+                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        PO Quantity Out
+                    </div>
+                ),
+                cell: ({ row }) => sumCell(row.original.po_qty_out),
+            },
+            {
+                id: 'rts_goods_in',
+                enableSorting: false,
+                header: () => (
+                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        RTS Goods In
+                    </div>
+                ),
+                cell: ({ row }) => sumCell(row.original.rts_goods_in),
+            },
+            {
+                id: 'rts_goods_out',
+                enableSorting: false,
+                header: () => (
+                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        RTS Goods Out
+                    </div>
+                ),
+                cell: ({ row }) => sumCell(row.original.rts_goods_out),
+            },
+            {
+                id: 'rts_bad',
+                enableSorting: false,
+                header: () => (
+                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        RTS Bad
+                    </div>
+                ),
+                cell: ({ row }) => sumCell(row.original.rts_bad),
+            },
+            {
+                id: 'lost',
+                enableSorting: false,
+                header: () => (
+                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        Lost
+                    </div>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] text-orange-500 dark:text-orange-400">
+                            {row.original.lost || 0}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                id: 'inventory_remaining_stock',
+                enableSorting: false,
+                header: () => (
+                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        Inventory Stock (ERP)
+                    </div>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] font-medium text-gray-600 dark:text-gray-300">
+                            {row.original.inventory_remaining_stock ?? '—'}
+                        </p>
+                    </div>
+                ),
+            },
+        ],
+        [],
+    );
+
+    const activeColumns = summarize ? summaryColumns : columns;
+    // The backend returns per-transaction rows normally, or summed-per-item rows when
+    // summarize is on — so the table data is whatever the server sent either way.
+    const activeData = data as TableRow[];
 
     return (
         <AppLayout>
@@ -472,7 +742,7 @@ export default function Index({
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Search Inventory Reference No...."
+                            placeholder="Search by reference, SKU or product..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono! text-[12px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
@@ -498,12 +768,21 @@ export default function Index({
                             }
                         }}
                     />
+                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/8 bg-white px-3.5 md:ml-auto dark:border-white/8 dark:bg-zinc-800">
+                        <span className="font-mono! text-[12px]! font-medium text-gray-600 dark:text-gray-300">
+                            Summarize
+                        </span>
+                        <Switch
+                            checked={summarize}
+                            onCheckedChange={toggleSummarize}
+                        />
+                    </label>
                 </div>
 
                 <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
-                        columns={columns}
-                        data={inventory.data || []}
+                        columns={activeColumns}
+                        data={activeData}
                         enableInternalPagination={false}
                         initialSorting={initialSorting}
                         meta={{ ...omit(inventory, ['data']) }}
@@ -518,6 +797,7 @@ export default function Index({
                                         params?.per_page ??
                                         query?.perPage ??
                                         inventory.per_page,
+                                    summarize: summarize ? 1 : undefined,
                                 },
                                 {
                                     preserveState: true,

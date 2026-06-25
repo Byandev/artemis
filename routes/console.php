@@ -22,6 +22,12 @@ Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('17:00')->withou
 Schedule::command('trigger-fetch-erp-inventory')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('trigger-fetch-erp-inventory')->dailyAt('12:00')->withoutOverlapping();
 Schedule::command('trigger-fetch-erp-inventory')->dailyAt('17:00')->withoutOverlapping();
+
+// Fetch ERP transaction history for inventory items with transaction keywords. Jobs
+// are queued with a staggered delay so the n8n webhook isn't hit all at once. Runs
+// once a day at 8am.
+Schedule::command('trigger-fetch-erp-transaction-history')->dailyAt('08:00')->withoutOverlapping();
+
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 

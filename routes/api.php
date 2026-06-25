@@ -11,6 +11,7 @@ use App\Http\Controllers\PublicApi\RmoOrderController;
 use App\Http\Controllers\PublicApi\RmoOrderV2Controller;
 use App\Http\Controllers\PublicApi\ShopController;
 use App\Http\Controllers\PublicApi\ShopScanReturnController;
+use App\Http\Controllers\PublicApi\TransactionHistoryController;
 use App\Http\Controllers\PublicApi\UserController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Api\UnitCodeController as GencysUnitCodeApiController;
@@ -37,6 +38,8 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::post('/inventory-items/sync', [InventoryItemController::class, 'sync'])->name('inventory-items.sync');
 
     Route::post('/purchase-orders/sync', [PurchaseOrderController::class, 'sync'])->name('purchase-orders.sync');
+
+    Route::post('/transaction-history/sync', [TransactionHistoryController::class, 'sync'])->name('transaction-history.sync');
 });
 
 // GencysERP daily sales tracker callback. n8n posts the scraped rows here and
