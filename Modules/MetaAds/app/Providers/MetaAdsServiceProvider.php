@@ -5,6 +5,7 @@ namespace Modules\MetaAds\Providers;
 use Illuminate\Console\Scheduling\Schedule;
 use Modules\MetaAds\Console\Commands\CaptureBudgetSnapshotsCommand;
 use Modules\MetaAds\Console\Commands\DiscoverSystemAccountsCommand;
+use Modules\MetaAds\Console\Commands\EvaluateEntityMonitorCommand;
 use Modules\MetaAds\Console\Commands\EvaluateOptimizationRulesCommand;
 use Modules\MetaAds\Console\Commands\ReportPageBudgetsToDiscordCommand;
 use Modules\MetaAds\Console\Commands\ReportTeamBudgetsToDiscordCommand;
@@ -46,6 +47,7 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         CaptureBudgetSnapshotsCommand::class,
         DiscoverSystemAccountsCommand::class,
         EvaluateOptimizationRulesCommand::class,
+        EvaluateEntityMonitorCommand::class,
         ReportPageBudgetsToDiscordCommand::class,
         ReportUserBudgetsToDiscordCommand::class,
         ReportTeamBudgetsToDiscordCommand::class,

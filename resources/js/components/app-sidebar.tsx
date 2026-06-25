@@ -217,6 +217,12 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
+                              title: 'Entity Monitor',
+                              href: `/workspaces/${slug}/integrations/meta/entity-monitor`,
+                              icon: Trophy,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
                               title: 'Ads Calendar',
                               href: `/workspaces/${slug}/integrations/meta/ads-calendar`,
                               icon: CalendarDays,

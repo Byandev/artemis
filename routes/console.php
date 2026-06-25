@@ -59,6 +59,10 @@ Schedule::command('metaads:capture-budgets')->everyFourHours()->withoutOverlappi
 // user-configured schedule (frequency / run-at hour) is due.
 Schedule::command('meta-ads:evaluate-optimization-rules')->hourly()->withoutOverlapping();
 
+// Entity monitor: once a day (after the 00:30 insights re-pull settles), record
+// each in-test entity's suggested status + reason as that day's history row.
+Schedule::command('meta-ads:evaluate-entity-monitor')->dailyAt('01:00')->withoutOverlapping();
+
 // Post the day's per-page ad budgets to Discord every morning (08:00 app tz).
 Schedule::command('metaads:report-page-budgets')->dailyAt('08:00');
 

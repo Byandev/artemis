@@ -51,6 +51,7 @@ use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsCalendarController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
+use Modules\MetaAds\Http\Controllers\EntityMonitorController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
@@ -272,6 +273,20 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}', [OptimizationRuleController::class, 'destroy'])
         ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.destroy');
+
+    // Meta Ads entity monitor (creative testing — is this entity winning?)
+    Route::get('/workspaces/{workspace}/integrations/meta/entity-monitor', [EntityMonitorController::class, 'index'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.entity-monitor.index');
+    Route::get('/workspaces/{workspace}/integrations/meta/entity-monitor/data', [EntityMonitorController::class, 'data'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.entity-monitor.data');
+    Route::post('/workspaces/{workspace}/integrations/meta/entity-monitor/status', [EntityMonitorController::class, 'setStatus'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.entity-monitor.status');
+    Route::post('/workspaces/{workspace}/integrations/meta/entity-monitor/rules', [EntityMonitorController::class, 'updateRules'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.entity-monitor.rules');
     Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])
         ->middleware('can:Manage Meta Ads Accounts,workspace')
         ->name('workspaces.metaads.connect');
