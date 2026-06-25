@@ -97,10 +97,9 @@ export default function ItemIndex({
     const [editingItem, setEditingItem] = useState<Item | null>(null);
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    // Default to active-only; only an explicit `all` shows inactive items too.
     const [activeOnly, setActiveOnly] = useState(
-        query?.filter?.is_active === '1' ||
-            query?.filter?.is_active === 1 ||
-            query?.filter?.is_active === true,
+        query?.filter?.is_active !== 'all',
     );
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkProcessing, setBulkProcessing] = useState(false);
@@ -125,7 +124,7 @@ export default function ItemIndex({
                 {
                     sort: query?.sort,
                     'filter[search]': search || undefined,
-                    'filter[is_active]': activeOnly ? 1 : undefined,
+                    'filter[is_active]': activeOnly ? 1 : 'all',
                     page: 1,
                     per_page: query?.perPage ?? items.per_page,
                 },
@@ -147,7 +146,7 @@ export default function ItemIndex({
             {
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
-                'filter[is_active]': checked ? 1 : undefined,
+                'filter[is_active]': checked ? 1 : 'all',
                 page: 1,
                 per_page: query?.perPage ?? items.per_page,
             },
@@ -589,9 +588,7 @@ export default function ItemIndex({
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
-                                    'filter[is_active]': activeOnly
-                                        ? 1
-                                        : undefined,
+                                    'filter[is_active]': activeOnly ? 1 : 'all',
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??

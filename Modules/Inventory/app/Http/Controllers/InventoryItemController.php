@@ -32,7 +32,19 @@ class InventoryItemController extends Controller
         $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
-        $items = QueryBuilder::for(InventoryItem::where('inventory_items.workspace_id', $workspace->id))
+        // The list defaults to active items only. `filter[is_active]=all` shows every
+        // item; an explicit 0/1 narrows to inactive/active.
+        $isActiveFilter = $request->input('filter.is_active');
+
+        $base = InventoryItem::where('inventory_items.workspace_id', $workspace->id);
+
+        if ($isActiveFilter === null) {
+            $base->where('inventory_items.is_active', true);
+        } elseif ($isActiveFilter !== 'all') {
+            $base->where('inventory_items.is_active', filter_var($isActiveFilter, FILTER_VALIDATE_BOOLEAN));
+        }
+
+        $items = QueryBuilder::for($base)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
@@ -47,7 +59,6 @@ class InventoryItemController extends Controller
                     $query->where('sku', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('product_id'),
-                AllowedFilter::exact('is_active'),
             ])
             ->allowedSorts([
                 'id',
@@ -150,7 +161,8 @@ class InventoryItemController extends Controller
             'remaining_qty' => $request->remaining_qty,
         ]);
 
-        return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
+        // back() keeps the list's current filters/sort/page (they live in the URL).
+        return redirect()->back()
             ->with('success', 'Items record created successfully.');
     }
 
@@ -189,7 +201,7 @@ class InventoryItemController extends Controller
             'remaining_qty' => $request->remaining_qty,
         ]);
 
-        return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
+        return redirect()->back()
             ->with('success', 'Inventory Items record updated.');
     }
 
@@ -212,7 +224,7 @@ class InventoryItemController extends Controller
 
         $status = $validated['is_active'] ? 'activated' : 'deactivated';
 
-        return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
+        return redirect()->back()
             ->with('success', "{$updated} inventory item(s) {$status}.");
     }
 
@@ -243,6 +255,7 @@ class InventoryItemController extends Controller
 
         $item->delete();
 
-        return redirect()->route('workspaces.inventory.item.index', $workspace->slug);
+        return redirect()->back()
+            ->with('success', 'Inventory Items record deleted.');
     }
 }
