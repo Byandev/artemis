@@ -125,7 +125,7 @@ class InventoryItemController extends Controller
         $this->authorize('Create Inventory Items', $workspace);
 
         $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'nullable|exists:products,id',
             'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
             'is_active' => 'nullable|boolean',
             'sales_keywords' => 'nullable|array',
@@ -139,7 +139,7 @@ class InventoryItemController extends Controller
 
         InventoryItem::create([
             'workspace_id' => $workspace->id,
-            'product_id' => $request->product_id,
+            'product_id' => $request->product_id ?: null,
             'sku' => $request->sku,
             'is_active' => $request->boolean('is_active', true),
             'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
@@ -159,7 +159,7 @@ class InventoryItemController extends Controller
         $this->authorize('Edit Inventory Items', $workspace);
 
         $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'nullable|exists:products,id',
             'sku' => [
                 'required',
                 'string',
@@ -178,7 +178,7 @@ class InventoryItemController extends Controller
             'remaining_qty' => 'nullable|integer',
         ]);
         $item->update([
-            'product_id' => $request->product_id,
+            'product_id' => $request->product_id ?: null,
             'sku' => $request->sku,
             'is_active' => $request->boolean('is_active', true),
             'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),

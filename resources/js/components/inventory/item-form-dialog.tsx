@@ -276,7 +276,9 @@ export function ItemFormDialog({
                         <div className="space-y-1.5">
                             <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                 Select Product{' '}
-                                <span className="text-red-400">*</span>
+                                <span className="text-gray-300 normal-case dark:text-gray-600">
+                                    (optional)
+                                </span>
                             </label>
                             <select
                                 value={data.product_id}
