@@ -47,11 +47,13 @@ class InventoryItemController extends Controller
                     $query->where('sku', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('product_id'),
+                AllowedFilter::exact('is_active'),
             ])
             ->allowedSorts([
                 'id',
                 'product_id',
                 'sku',
+                'is_active',
                 AllowedSort::field('product_name', 'products.name'),
                 'lead_time',
                 'unfulfilled_count',
@@ -125,6 +127,7 @@ class InventoryItemController extends Controller
         $request->validate([
             'product_id' => 'required|exists:products,id',
             'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
+            'is_active' => 'nullable|boolean',
             'sales_keywords' => 'nullable|array',
             'sales_keywords.*' => 'string|max:255',
             'transaction_keywords' => 'nullable|string',
@@ -138,6 +141,7 @@ class InventoryItemController extends Controller
             'workspace_id' => $workspace->id,
             'product_id' => $request->product_id,
             'sku' => $request->sku,
+            'is_active' => $request->boolean('is_active', true),
             'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
             'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
@@ -164,6 +168,7 @@ class InventoryItemController extends Controller
                     ->where('workspace_id', $workspace->id)
                     ->ignore($item->id),
             ],
+            'is_active' => 'nullable|boolean',
             'sales_keywords' => 'nullable|array',
             'sales_keywords.*' => 'string|max:255',
             'transaction_keywords' => 'nullable|string',
@@ -175,6 +180,7 @@ class InventoryItemController extends Controller
         $item->update([
             'product_id' => $request->product_id,
             'sku' => $request->sku,
+            'is_active' => $request->boolean('is_active', true),
             'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
             'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
@@ -185,6 +191,29 @@ class InventoryItemController extends Controller
 
         return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
             ->with('success', 'Inventory Items record updated.');
+    }
+
+    /**
+     * Activate or deactivate multiple inventory items at once.
+     */
+    public function bulkUpdateStatus(Request $request, Workspace $workspace)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'is_active' => 'required|boolean',
+        ]);
+
+        $updated = InventoryItem::where('workspace_id', $workspace->id)
+            ->whereIn('id', $validated['ids'])
+            ->update(['is_active' => $validated['is_active']]);
+
+        $status = $validated['is_active'] ? 'activated' : 'deactivated';
+
+        return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
+            ->with('success', "{$updated} inventory item(s) {$status}.");
     }
 
     /**

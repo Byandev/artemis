@@ -337,6 +337,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
         Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
+        Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });

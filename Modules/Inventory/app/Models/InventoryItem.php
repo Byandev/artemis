@@ -16,12 +16,17 @@ class InventoryItem extends Model
         'workspace_id',
         'product_id',
         'sku',
+        'is_active',
         'sales_keywords',
         'transaction_keywords',
         'lead_time',
         'unfulfilled_count',
         'three_days_average',
         'remaining_qty',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     /**
