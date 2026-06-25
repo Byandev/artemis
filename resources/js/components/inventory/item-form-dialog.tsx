@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 interface InventoryItem {
     id: number;
     sku: string;
-    product_id: number;
+    product_id: number | null;
     sales_keywords: string;
     transaction_keywords: string;
     lead_time: number;
@@ -67,8 +67,8 @@ export function ItemFormDialog({
         if (open) {
             if (item) {
                 setData({
-                    id: item.id.toString(),
-                    product_id: item.product_id.toString(),
+                    id: item.id?.toString() ?? '',
+                    product_id: item.product_id?.toString() ?? '',
                     sku: item.sku,
                     lead_time: item.lead_time?.toString() ?? '0',
                     unfulfilled_count:
