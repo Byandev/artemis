@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\MetaAds\Models\User as MetaUser;
 
@@ -439,5 +440,10 @@ class Workspace extends Model
     public function hasReachedPageLimit(): bool
     {
         return $this->pageLimitInfo()['reached'];
+    }
+
+    public function inventoryItems(): HasMany|Workspace
+    {
+        return $this->hasMany(InventoryItem::class);
     }
 }
