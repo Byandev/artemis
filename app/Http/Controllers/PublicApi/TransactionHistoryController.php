@@ -3,56 +3,70 @@
 namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\SyncErpTransactionHistory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Inventory\Models\InventoryItem;
+use Modules\Inventory\Models\InventoryTransaction;
 
 class TransactionHistoryController extends Controller
 {
     /**
-     * Receive ERP transaction history synced back by n8n.
+     * Receive ERP transaction history synced back by n8n for a single inventory item.
      *
-     * The payload can be large (the full ERP history for a workspace), so the rows are
-     * handed to a queued job and the request returns immediately — matching each row's
-     * "Items" product name to an inventory item happens off the request.
+     * The trigger dispatches one n8n call per inventory item, so each callback is scoped
+     * to one item via the route: `/inventory-items/{inventoryItem}/transactions/sync`. The
+     * body holds the rows, each upserted by (inventory_item_id, unique_key).
      *
-     * Expected payload (raw ERP columns, one object per transaction):
+     * Each row:
      * {
-     *   "transactions": [
-     *     {
-     *       "No": "278",
-     *       "Transaction Date": "June 24, 2026",
-     *       "Items": "Anti-Stroke Cooling Patch",
-     *       "Type": "OUT",
-     *       "Remaining Qty": "2259",
-     *       "qty_in": "0",
-     *       "qty_out": "15",
-     *       "rts_goods_in": "0",
-     *       "rts_goods_out": "11",
-     *       "In - Damage (RTS)": "0"
-     *     }
-     *   ]
+     *   "date": "2026-06-24",
+     *   "unique_key": "June 24, 2026|Rigor Esperanzate|Pikutin Harabas 2.0|OUT|1|0|0|1221",
+     *   "po_qty_in": "0",
+     *   "po_qty_out": "1",
+     *   "rts_goods_in": "0",
+     *   "rts_goods_out": "0",
+     *   "rts_bad": "0",
+     *   "inventory_remaining_stock": "1221"
      * }
      */
-    public function sync(Request $request): JsonResponse
+    public function sync(Request $request, InventoryItem $inventoryItem): JsonResponse
     {
-        $workspace = $request->attributes->get('workspace');
+        $rows = $request->array('transactions', []);
 
-        $request->validate([
-            'transactions' => ['present', 'array'],
-            'transactions.*.No' => ['required'],
-            'transactions.*.Items' => ['required', 'string'],
-        ]);
+        $saved = 0;
 
-        $rows = $request->input('transactions', []);
+        foreach ($rows as $row) {
+            $uniqueKey = $row['unique_key'] ?? null;
 
-        // Process in-request so the data is saved instantly and the response reflects
-        // the real result (no queue worker required).
-        SyncErpTransactionHistory::dispatchSync($workspace->id, $rows);
+            if (! $uniqueKey) {
+                continue;
+            }
+
+            InventoryTransaction::updateOrCreate(
+                [
+                    'inventory_item_id' => $inventoryItem->id,
+                    'ref_no' => $uniqueKey,
+                ],
+                [
+                    'workspace_id' => $inventoryItem->workspace_id,
+                    'date' => $row['date'] ?? null,
+                    'po_qty_in' => (int) ($row['po_qty_in'] ?? 0),
+                    'po_qty_out' => (int) ($row['po_qty_out'] ?? 0),
+                    'rts_goods_in' => (int) ($row['rts_goods_in'] ?? 0),
+                    'rts_goods_out' => (int) ($row['rts_goods_out'] ?? 0),
+                    'rts_bad' => (int) ($row['rts_bad'] ?? 0),
+                    'inventory_remaining_stock' => (float) ($row['inventory_remaining_stock'] ?? 0),
+                ],
+            );
+
+            $saved++;
+        }
 
         return response()->json([
             'data' => [
+                'inventory_item_id' => $inventoryItem->id,
                 'transactions_received' => count($rows),
+                'transactions_saved' => $saved,
                 'status' => 'synced',
             ],
         ]);

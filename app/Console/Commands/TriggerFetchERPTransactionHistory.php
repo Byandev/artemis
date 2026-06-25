@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Jobs\FetchInventoryItemTransactionHistory;
-use App\Jobs\TriggerFetchTransactionHistoryRecord;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -42,15 +41,16 @@ class TriggerFetchERPTransactionHistory extends Command
             ->where('erp_username', '!=', '')
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
-            ->with(['apiKeys', 'inventoryItems'])
+            ->with(['apiKeys', 'inventoryItems' => function ($query)  {
+                $query->where('is_active', true);
+            }])
             ->get();
 
         $dispatched = 0;
 
         foreach ($workspaces as $workspace) {
             foreach ($workspace->inventoryItems as $item) {
-                $callbackBase = rtrim(config('services.n8n.inventory_sync_callback_url') ?: config('app.url'), '/');
-                $callbackUrl = "{$callbackBase}/api/v1/public/transaction-history/sync";
+                $callbackUrl = config('app.url')."/api/v1/public/inventory-items/$item->id/transactions/sync";
 
                 $apiKey = $workspace->apiKeys->first();
 
