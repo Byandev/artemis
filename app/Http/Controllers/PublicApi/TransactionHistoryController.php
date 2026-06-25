@@ -36,18 +36,10 @@ class TransactionHistoryController extends Controller
         $saved = 0;
 
         foreach ($rows as $row) {
-            $uniqueKey = $row['unique_key'] ?? null;
-
-            if (! $uniqueKey) {
-                continue;
-            }
-
-            InventoryTransaction::updateOrCreate(
+            $item = InventoryTransaction::firstOrCreate(
                 [
                     'inventory_item_id' => $inventoryItem->id,
-                    'ref_no' => $uniqueKey,
-                ],
-                [
+                    'ref_no' => $row['ref_no'],
                     'workspace_id' => $inventoryItem->workspace_id,
                     'date' => $row['date'] ?? null,
                     'po_qty_in' => (int) ($row['po_qty_in'] ?? 0),
@@ -58,6 +50,10 @@ class TransactionHistoryController extends Controller
                     'inventory_remaining_stock' => (float) ($row['inventory_remaining_stock'] ?? 0),
                 ],
             );
+
+            if (!$item->remaining_qty) {
+                $item->update(['remaining_qty' => $item->inventory_remaining_stock]);
+            }
 
             $saved++;
         }
