@@ -114,6 +114,7 @@ export const PERMISSIONS = {
 
     // Meta Ads
     ViewMetaAds: 'View Meta Ads',
+    ConnectFbAccount: 'Connect FB Account',
     ViewAdAccounts: 'View Ad Accounts',
     ManageMetaAdsAccounts: 'Manage Meta Ads Accounts',
     ViewOptimizationRules: 'View Optimization Rules',

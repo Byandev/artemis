@@ -57,6 +57,7 @@ function formatRelative(ts: string | null) {
 
 export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
     const canManageMetaAds = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
+    const canConnectFbAccount = usePermission(PERMISSIONS.ConnectFbAccount);
     const connectUrl = `/workspaces/${workspace.slug}/integrations/meta/connect`;
     const indexUrl = `/workspaces/${workspace.slug}/integrations/meta`;
 
@@ -208,7 +209,7 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
                     title="FB Account"
                     description="Facebook users that have authorized this workspace to access their ad accounts."
                 >
-                    {canManageMetaAds && (
+                    {canConnectFbAccount && (
                         <Button
                             asChild
                             className="bg-emerald-600 text-white hover:bg-emerald-700"
