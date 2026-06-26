@@ -8,7 +8,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
-Schedule::command('trigger-fetch-page-orders')->hourly();
+Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
 //// Fetch ERP purchase orders for inventory items. Runs three times a day: 9am, 12nn, 5pm.

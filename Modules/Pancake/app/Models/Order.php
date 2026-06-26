@@ -26,6 +26,7 @@ class Order extends Model
 
     protected $casts = [
         'status' => 'integer',
+        'order_source' => 'integer',
     ];
 
     public function shippingAddress(): HasOne|\App\Models\Order
