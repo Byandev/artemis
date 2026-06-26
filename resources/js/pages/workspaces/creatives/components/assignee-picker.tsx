@@ -1,24 +1,19 @@
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
-import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { Check, UserPlus, X } from 'lucide-react';
-import { useState } from 'react';
+import { Check, Search, UserPlus, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Reviewer } from '../types';
 import { InitialAvatar } from './atoms';
 
 /**
  * ClickUp-style multi-assignee picker. Shows the currently assigned reviewers as
  * overlapping avatar chips and opens a searchable, toggleable people list.
+ *
+ * Uses a plain filterable button list (instead of cmdk) so list items are
+ * reliably clickable inside the Popover.
  */
 export function AssigneePicker({
     reviewers,
@@ -30,8 +25,15 @@ export function AssigneePicker({
     onChange: (ids: number[]) => void;
 }) {
     const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
 
     const selected = reviewers.filter((r) => selectedIds.includes(r.id));
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return reviewers;
+        return reviewers.filter((r) => r.name.toLowerCase().includes(q));
+    }, [reviewers, search]);
 
     const toggle = (id: number) => {
         onChange(
@@ -42,7 +44,13 @@ export function AssigneePicker({
     };
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover
+            open={open}
+            onOpenChange={(o) => {
+                setOpen(o);
+                if (!o) setSearch('');
+            }}
+        >
             <PopoverTrigger asChild>
                 <button
                     type="button"
@@ -84,41 +92,46 @@ export function AssigneePicker({
                 align="start"
                 className="w-[var(--radix-popover-trigger-width)] p-0"
             >
-                <Command>
-                    <CommandInput
+                <div className="flex items-center gap-2 border-b px-3">
+                    <Search className="h-4 w-4 shrink-0 opacity-50" />
+                    <input
+                        autoFocus
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search people..."
-                        className="font-mono text-[12px]"
+                        className="h-10 w-full bg-transparent font-mono text-[12px] outline-none placeholder:text-muted-foreground"
                     />
-                    <CommandList>
-                        <CommandEmpty className="py-4 text-center font-mono text-[12px] text-gray-400">
+                </div>
+                <div className="max-h-[300px] overflow-y-auto p-1">
+                    {filtered.length === 0 ? (
+                        <p className="py-4 text-center font-mono text-[12px] text-gray-400">
                             No people found.
-                        </CommandEmpty>
-                        <CommandGroup>
-                            {reviewers.map((r) => {
-                                const isSelected = selectedIds.includes(r.id);
-                                return (
-                                    <CommandItem
-                                        key={r.id}
-                                        value={r.name}
-                                        onSelect={() => toggle(r.id)}
-                                        className="flex items-center gap-2 font-mono text-[12px]"
-                                    >
-                                        <InitialAvatar
-                                            name={r.name}
-                                            className="h-5 w-5 bg-blue-500/[0.12] text-[9px] text-blue-600 dark:text-blue-400"
-                                        />
-                                        <span className="flex-1 truncate">
-                                            {r.name}
-                                        </span>
-                                        {isSelected && (
-                                            <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                                        )}
-                                    </CommandItem>
-                                );
-                            })}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
+                        </p>
+                    ) : (
+                        filtered.map((r) => {
+                            const isSelected = selectedIds.includes(r.id);
+                            return (
+                                <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() => toggle(r.id)}
+                                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left font-mono text-[12px] outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent"
+                                >
+                                    <InitialAvatar
+                                        name={r.name}
+                                        className="h-5 w-5 bg-blue-500/[0.12] text-[9px] text-blue-600 dark:text-blue-400"
+                                    />
+                                    <span className="flex-1 truncate">
+                                        {r.name}
+                                    </span>
+                                    {isSelected && (
+                                        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                    )}
+                                </button>
+                            );
+                        })
+                    )}
+                </div>
             </PopoverContent>
         </Popover>
     );
