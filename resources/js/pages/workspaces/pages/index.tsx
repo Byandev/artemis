@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -55,12 +56,14 @@ import { toast } from 'sonner';
 interface PagesProps {
     workspace: Workspace;
     pages: PaginatedData<Page>;
+    users: { id: number | string; name: string }[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
         filter?: {
             search?: string;
+            owner_id?: string | string[];
         };
     };
     pageLimit?: number | null;
@@ -150,6 +153,7 @@ const currencyFormatter = new Intl.NumberFormat(undefined, {
 const Pages = ({
     pages,
     workspace,
+    users,
     query,
     pageLimit,
     pageCount,
@@ -161,6 +165,15 @@ const Pages = ({
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [selectedOwners, setSelectedOwners] = useState<string[]>(() => {
+        const owner = query?.filter?.owner_id;
+        if (!owner) return [];
+        return Array.isArray(owner) ? owner.map(String) : [String(owner)];
+    });
+    const ownerOptions = useMemo(
+        () => users.map((u) => ({ value: String(u.id), label: u.name })),
+        [users],
+    );
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | null>(null);
     const [budgetPage, setBudgetPage] = useState<Page | null>(null);
@@ -197,12 +210,16 @@ const Pages = ({
 
     useEffect(() => {
         const timer = setTimeout(() => {
+            const hasFilter = !!searchValue || selectedOwners.length > 0;
             router.get(
                 workspaces.pages.index({ workspace }),
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : (query?.page ?? 1),
+                    'filter[owner_id]': selectedOwners.length
+                        ? selectedOwners
+                        : undefined,
+                    page: hasFilter ? 1 : (query?.page ?? 1),
                 },
                 {
                     preserveState: true,
@@ -214,7 +231,7 @@ const Pages = ({
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue]);
+    }, [searchValue, selectedOwners]);
 
     const handleEdit = (page: Page) => {
         router.get(`/workspaces/${workspace.slug}/pages/${page.id}/edit`);
@@ -621,7 +638,7 @@ const Pages = ({
                     </DialogContent>
                 </Dialog>
 
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
@@ -631,6 +648,14 @@ const Pages = ({
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
                     </div>
+                    <MultiSelect
+                        compact
+                        options={ownerOptions}
+                        selected={selectedOwners}
+                        onChange={setSelectedOwners}
+                        placeholder="All owners"
+                        className="w-48"
+                    />
                 </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -641,12 +666,14 @@ const Pages = ({
                         initialSorting={initialSorting}
                         meta={{ ...omit(pages, ['data']) }}
                         onFetch={(params) => {
-                            console.log(params);
                             router.get(
                                 workspaces.pages.index({ workspace }),
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
+                                    'filter[owner_id]': selectedOwners.length
+                                        ? selectedOwners
+                                        : undefined,
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page,
                                 },
