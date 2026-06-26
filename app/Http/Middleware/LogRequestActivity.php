@@ -157,12 +157,22 @@ class LogRequestActivity
 
         $label = Str::headline(str_replace('-', ' ', $key));
 
-        // Restore common acronyms that headline() would have title-cased.
-        return str_ireplace(
-            ['Csr', 'Rts', 'Rmo', 'Erp', 'Api', 'Po'],
-            ['CSR', 'RTS', 'RMO', 'ERP', 'API', 'PO'],
-            $label,
-        );
+        // Restore common acronyms that headline() title-cased — but only when the
+        // acronym is a *whole word*. A substring replace would mangle ordinary
+        // words that merely contain those letters (e.g. "Reports" -> "RePORTS").
+        $acronyms = [
+            'csr' => 'CSR',
+            'rts' => 'RTS',
+            'rmo' => 'RMO',
+            'erp' => 'ERP',
+            'api' => 'API',
+            'po' => 'PO',
+        ];
+
+        return implode(' ', array_map(
+            fn (string $word): string => $acronyms[strtolower($word)] ?? $word,
+            explode(' ', $label),
+        ));
     }
 
     /**
