@@ -50,7 +50,10 @@ class LogRequestActivity
 
     private function shouldLog(Request $request): bool
     {
-        if (! in_array($request->method(), self::LOGGED_METHODS, true)) {
+        // State-changing requests are always audited; exports are GET downloads
+        // (not state changes) but still worth auditing — they pull data out of
+        // the system.
+        if (! in_array($request->method(), self::LOGGED_METHODS, true) && ! $this->isExport($request)) {
             return false;
         }
 
@@ -63,6 +66,18 @@ class LogRequestActivity
         }
 
         return true;
+    }
+
+    /** An export download endpoint (e.g. xlsx/csv), identified by route name / path. */
+    private function isExport(Request $request): bool
+    {
+        if ($request->method() !== 'GET') {
+            return false;
+        }
+
+        $haystack = strtolower($request->route()?->getName().' '.$request->path());
+
+        return str_contains($haystack, 'export');
     }
 
     private function record(Request $request, Response $response): void
@@ -109,7 +124,7 @@ class LogRequestActivity
      */
     private function describe(Request $request, array $attributes): string
     {
-        $verb = match ($request->method()) {
+        $verb = $this->isExport($request) ? 'Exported' : match ($request->method()) {
             'POST' => 'Created',
             'PUT', 'PATCH' => 'Updated',
             'DELETE' => 'Deleted',
