@@ -52,7 +52,6 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/ads', [VideoEditorDashboardController::class, 'ads'])->name('ads');
             Route::get('/pipeline', [VideoEditorDashboardController::class, 'pipeline'])->name('pipeline');
             Route::get('/revision-list', [VideoEditorDashboardController::class, 'revisionList'])->name('revision-list');
-            Route::get('/waiting-list', [VideoEditorDashboardController::class, 'waitingList'])->name('waiting-list');
             Route::get('/throughput', [VideoEditorDashboardController::class, 'throughput'])->name('throughput');
             Route::get('/leaderboard', [VideoEditorDashboardController::class, 'leaderboard'])->name('leaderboard');
             Route::get('/recent-activity', [VideoEditorDashboardController::class, 'recentActivity'])->name('recent-activity');
