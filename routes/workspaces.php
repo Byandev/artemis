@@ -216,7 +216,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.fb-accounts');
     Route::get('/workspaces/{workspace}/integrations/meta/ad-accounts', [IntegrationsController::class, 'adAccounts'])
-        ->middleware('can:View Meta Ads,workspace')
+        ->middleware('can:View Ad Accounts,workspace')
         ->name('workspaces.metaads.ad-accounts');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager', [AdsManagerController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
@@ -263,7 +263,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:Approve Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.approvals.reject');
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/logs', [OptimizationRuleController::class, 'logs'])
-        ->middleware('can:View Optimization Rules,workspace')
+        ->middleware('can:View Optimization Logs,workspace')
         ->name('workspaces.metaads.optimization-rules.logs');
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])
         ->middleware('can:Manage Optimization Rules,workspace')
