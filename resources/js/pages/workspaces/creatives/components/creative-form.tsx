@@ -170,7 +170,8 @@ export function CreativeForm({
                         </div>
                         <div className="space-y-1.5">
                             <label htmlFor="cf-headline" className={fl}>
-                                Headline
+                                Headline{' '}
+                                <span className="text-red-400">*</span>
                             </label>
                             <input
                                 id="cf-headline"
@@ -186,7 +187,10 @@ export function CreativeForm({
                             )}
                         </div>
                         <div className="col-span-2 space-y-1.5">
-                            <label className={fl}>Product</label>
+                            <label className={fl}>
+                                Product{' '}
+                                <span className="text-red-400">*</span>
+                            </label>
                             <ProductPicker
                                 products={products}
                                 value={data.product_id}
@@ -246,7 +250,8 @@ export function CreativeForm({
                         )}
                         <div className="space-y-1.5">
                             <label htmlFor="cf-caption" className={fl}>
-                                Caption
+                                Caption{' '}
+                                <span className="text-red-400">*</span>
                             </label>
                             <textarea
                                 id="cf-caption"
@@ -271,7 +276,8 @@ export function CreativeForm({
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label htmlFor="cf-media" className={fl}>
-                                Media Link
+                                Media Link{' '}
+                                <span className="text-red-400">*</span>
                             </label>
                             <input
                                 id="cf-media"
