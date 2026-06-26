@@ -284,7 +284,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.destroy');
     Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])
-        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->middleware('can:Connect FB Account,workspace')
         ->name('workspaces.metaads.connect');
     Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', AdAccountSyncController::class)
         ->middleware('can:Manage Meta Ads Accounts,workspace')
