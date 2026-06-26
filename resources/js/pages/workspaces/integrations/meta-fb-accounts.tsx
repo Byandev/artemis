@@ -56,6 +56,7 @@ function formatRelative(ts: string | null) {
 }
 
 export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
+    const canManageMetaAds = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
     const canConnectFbAccount = usePermission(PERMISSIONS.ConnectFbAccount);
     const connectUrl = `/workspaces/${workspace.slug}/integrations/meta/connect`;
     const indexUrl = `/workspaces/${workspace.slug}/integrations/meta`;
@@ -236,7 +237,11 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
-                        columns={columns}
+                        columns={
+                            canManageMetaAds
+                                ? columns
+                                : columns.filter((c) => c.id !== 'actions')
+                        }
                         data={metaUsers.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(metaUsers, ['data']) }}

@@ -7,6 +7,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -139,6 +141,7 @@ export default function MetaAdAccounts({
     metaUsers,
     query,
 }: Props) {
+    const canManageMetaAds = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
     const indexUrl = `/workspaces/${workspace.slug}/integrations/meta/ad-accounts`;
 
     const initialSorting = useMemo(
@@ -330,6 +333,29 @@ export default function MetaAdAccounts({
             cell: ({ row }) => {
                 const enabled =
                     syncToggles[row.original.id] ?? row.original.active_sync;
+                // View-only users (no manage permission) see the status, not an actionable toggle.
+                if (!canManageMetaAds) {
+                    return (
+                        <span
+                            className={clsx(
+                                'inline-flex items-center gap-1.5 font-mono text-[11px]',
+                                enabled
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-gray-400 dark:text-gray-600',
+                            )}
+                        >
+                            <span
+                                className={clsx(
+                                    'h-1.5 w-1.5 rounded-full',
+                                    enabled
+                                        ? 'bg-emerald-500'
+                                        : 'bg-stone-300 dark:bg-zinc-600',
+                                )}
+                            />
+                            {enabled ? 'On' : 'Off'}
+                        </span>
+                    );
+                }
                 return (
                     <button
                         type="button"
