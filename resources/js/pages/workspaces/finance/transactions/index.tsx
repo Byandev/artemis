@@ -152,6 +152,11 @@ export default function TransactionsIndex({
         [],
     );
     const handleDateChange = (dates: Date[]) => {
+        if (dates.length === 0) {
+            setDateFrom(undefined);
+            setDateTo(undefined);
+            return;
+        }
         if (dates.length !== 2) return;
         const from = moment(dates[0]).format('YYYY-MM-DD');
         const to = moment(dates[1]).format('YYYY-MM-DD');

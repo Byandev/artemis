@@ -134,6 +134,8 @@ export default function Analytics({ workspace }: Props) {
                                     moment(dates[0]).format('YYYY-MM-DD'),
                                     moment(dates[1]).format('YYYY-MM-DD'),
                                 ]);
+                            } else if (dates.length === 0) {
+                                setDateRange(defaultState().dateRange);
                             }
                         }}
                         defaultDate={dateRange as never as DateOption}

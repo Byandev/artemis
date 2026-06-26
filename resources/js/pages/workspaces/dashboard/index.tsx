@@ -155,11 +155,25 @@ const Dashboard = ({ workspace, metricSettings }: Props) => {
                         id={'dashboard-date-range'}
                         mode={'range'}
                         onChange={(dates) => {
+                            let range: string[] | null = null;
                             if (dates.length === 2) {
-                                const range = [
+                                range = [
                                     moment(dates[0]).format('YYYY-MM-DD'),
                                     moment(dates[1]).format('YYYY-MM-DD'),
                                 ];
+                            } else if (dates.length === 0) {
+                                // Cleared → reset to the default range (start of
+                                // month → yesterday) so the dashboard unfilters.
+                                range = [
+                                    moment()
+                                        .startOf('month')
+                                        .format('YYYY-MM-DD'),
+                                    moment()
+                                        .subtract(1, 'd')
+                                        .format('YYYY-MM-DD'),
+                                ];
+                            }
+                            if (range) {
                                 setDateRange(range);
                                 try {
                                     localStorage.setItem(
