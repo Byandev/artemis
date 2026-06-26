@@ -123,8 +123,8 @@ export function ItemFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-md dark:bg-zinc-900 [&_[data-default-close=true]]:hidden">
-                <div className="relative border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
+            <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden border-none p-0 shadow-2xl sm:max-w-md dark:bg-zinc-900 [&_[data-default-close=true]]:hidden">
+                <div className="relative shrink-0 border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             {isEditing
@@ -143,8 +143,8 @@ export function ItemFormDialog({
                     </DialogClose>
                 </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="space-y-5 px-5 py-4">
+                <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
                         {/* SKU */}
                         <div className="space-y-1.5">
                             <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
@@ -360,7 +360,7 @@ export function ItemFormDialog({
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex items-center justify-end gap-2 border-t border-black/6 bg-stone-50/50 px-5 py-3 dark:border-white/6 dark:bg-white/2">
+                    <div className="flex shrink-0 items-center justify-end gap-2 border-t border-black/6 bg-stone-50/50 px-5 py-3 dark:border-white/6 dark:bg-white/2">
                         <button
                             type="button"
                             onClick={() => onOpenChange(false)}
