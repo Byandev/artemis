@@ -1155,12 +1155,16 @@ export function useColumnPresets(
         lsSet(`${storageKey}:presets`, presets);
     }, [storageKey, presets]);
 
-    const savePreset = (name: string) => {
+    const savePreset = (
+        name: string,
+        presetVisibility: VisibilityState = visibility,
+        presetOrder: string[] = columnOrder,
+    ) => {
         const preset: ColumnPreset = {
             id: crypto.randomUUID(),
             name: name.trim(),
-            visibility: { ...visibility },
-            columnOrder: [...columnOrder],
+            visibility: { ...presetVisibility },
+            columnOrder: [...presetOrder],
         };
         setPresets((prev) => [...prev, preset]);
     };
@@ -1211,7 +1215,11 @@ interface ColumnVisibilityMenuProps {
     columnOrder: string[];
     onColumnOrderChange: (order: string[]) => void;
     presets: ColumnPreset[];
-    onSavePreset: (name: string) => void;
+    onSavePreset: (
+        name: string,
+        visibility: VisibilityState,
+        columnOrder: string[],
+    ) => void;
     onDeletePreset: (id: string) => void;
     onLoadPreset: (preset: ColumnPreset) => void;
     onReset: () => void;
@@ -1274,6 +1282,46 @@ export function ColumnVisibilityMenu({
     };
 
     const selectedCount = options.filter((o) => isChecked(o.id)).length;
+
+    // ── Active preset detection ──
+    // A preset is "active" when its (effective) visibility + column order match a
+    // given state. Derived by comparison so it stays correct without extra state:
+    // editing columns simply stops matching, and the highlight updates live.
+    const normalizeOrder = (order: string[]) => {
+        const valid = order.filter((id) => !!optById[id]);
+        const missing = options
+            .filter((o) => !valid.includes(o.id))
+            .map((o) => o.id);
+        return [...valid, ...missing];
+    };
+    const effectiveVisible = (id: string, visibility: VisibilityState) =>
+        visibility[id] !== undefined
+            ? visibility[id] !== false
+            : !optById[id]?.hiddenByDefault;
+    const presetMatches = (
+        preset: ColumnPreset,
+        visibility: VisibilityState,
+        order: string[],
+    ) => {
+        const sameVisibility = options.every(
+            (o) =>
+                effectiveVisible(o.id, preset.visibility) ===
+                effectiveVisible(o.id, visibility),
+        );
+        if (!sameVisibility) return false;
+        const presetOrder = normalizeOrder(preset.columnOrder);
+        return (
+            presetOrder.length === order.length &&
+            presetOrder.every((id, i) => id === order[i])
+        );
+    };
+    // Highlight against the draft (live, reflects in-dialog edits)…
+    const activeDraftPresetId =
+        presets.find((p) => presetMatches(p, draftVisibility, draftOrder))?.id ??
+        null;
+    // …and against the committed state (for the trigger button label).
+    const activeAppliedPreset =
+        presets.find((p) => presetMatches(p, value, columnOrder)) ?? null;
 
     // Left panel: categories
     const categories = [
@@ -1353,13 +1401,14 @@ export function ColumnVisibilityMenu({
 
     const handleSavePreset = () => {
         if (!presetName.trim()) return;
-        // Save using current draft state
-        onSavePreset(presetName.trim());
-        // Also commit so preset matches what's applied
+        // Save using current draft state (what the user just customized)
+        onSavePreset(presetName.trim(), draftVisibility, draftOrder);
+        // Saving also applies the draft and closes — no separate Apply needed.
         onChange(draftVisibility);
         onColumnOrderChange(draftOrder);
         setPresetName('');
         setSavingPreset(false);
+        setOpen(false);
     };
 
     const handleReset = () => {
@@ -1377,9 +1426,15 @@ export function ColumnVisibilityMenu({
             >
                 <Columns3 className="h-3.5 w-3.5" />
                 Columns
-                <span className="text-gray-400 dark:text-gray-500">
-                    {selectedCount}/{options.length}
-                </span>
+                {activeAppliedPreset ? (
+                    <span className="max-w-[140px] truncate rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-600 dark:text-emerald-400">
+                        {activeAppliedPreset.name}
+                    </span>
+                ) : (
+                    <span className="text-gray-400 dark:text-gray-500">
+                        {selectedCount}/{options.length}
+                    </span>
+                )}
             </Button>
 
             <Dialog open={open} onOpenChange={setOpen}>
@@ -1591,11 +1646,22 @@ export function ColumnVisibilityMenu({
                                         Saved presets
                                     </p>
                                     <div className="flex flex-wrap gap-1">
-                                        {presets.map((p) => (
+                                        {presets.map((p) => {
+                                            const isActive =
+                                                p.id === activeDraftPresetId;
+                                            return (
                                             <div
                                                 key={p.id}
-                                                className="flex items-center gap-0.5 rounded-md border border-black/6 bg-stone-50 py-0.5 pr-1 pl-2 dark:border-white/6 dark:bg-zinc-800"
+                                                className={clsx(
+                                                    'flex items-center gap-0.5 rounded-md border py-0.5 pr-1 pl-2',
+                                                    isActive
+                                                        ? 'border-emerald-500/40 bg-emerald-500/10 dark:border-emerald-500/40 dark:bg-emerald-500/10'
+                                                        : 'border-black/6 bg-stone-50 dark:border-white/6 dark:bg-zinc-800',
+                                                )}
                                             >
+                                                {isActive && (
+                                                    <Check className="h-2.5 w-2.5 shrink-0 text-emerald-500" />
+                                                )}
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -1623,7 +1689,12 @@ export function ColumnVisibilityMenu({
                                                             ...missing,
                                                         ]);
                                                     }}
-                                                    className="text-[11px] text-gray-700 hover:text-emerald-600 dark:text-gray-300 dark:hover:text-emerald-400"
+                                                    className={clsx(
+                                                        'text-[11px]',
+                                                        isActive
+                                                            ? 'font-medium text-emerald-600 dark:text-emerald-400'
+                                                            : 'text-gray-700 hover:text-emerald-600 dark:text-gray-300 dark:hover:text-emerald-400',
+                                                    )}
                                                 >
                                                     {p.name}
                                                 </button>
@@ -1637,7 +1708,8 @@ export function ColumnVisibilityMenu({
                                                     <X className="h-2.5 w-2.5" />
                                                 </button>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
