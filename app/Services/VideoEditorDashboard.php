@@ -118,7 +118,6 @@ class VideoEditorDashboard
         $ads = $this->adsBreakdown($creatives);
 
         return [
-            'waiting' => $status['waiting'],
             'for_approval' => $status['for_approval'],
             'revision' => $status['revision'],
             'approved' => $status['approved'],
@@ -136,20 +135,6 @@ class VideoEditorDashboard
         return $this->editorCreatives($workspace, $filters)
             ->filter(fn (Creative $c) => $this->isNeedsRevision($c))
             ->sortByDesc(fn (Creative $c) => $c->latestReview?->created_at ?? $c->updated_at)
-            ->take(self::LIST_LIMIT)
-            ->map(fn (Creative $c) => $this->workItem($c))
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    public function waitingList(Workspace $workspace, DashboardFilters $filters): array
-    {
-        return $this->editorCreatives($workspace, $filters)
-            ->filter(fn (Creative $c) => $this->isWaiting($c))
-            ->sortByDesc('creative_date')
             ->take(self::LIST_LIMIT)
             ->map(fn (Creative $c) => $this->workItem($c))
             ->values()
