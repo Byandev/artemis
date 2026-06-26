@@ -59,6 +59,9 @@ class InventoryItemController extends Controller
                     $query->where('sku', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('product_id'),
+                // is_active is applied manually to $base above; register it as a
+                // no-op here so QueryBuilder doesn't reject the filter key.
+                AllowedFilter::callback('is_active', function () {}),
             ])
             ->allowedSorts([
                 'id',
