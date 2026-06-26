@@ -242,6 +242,7 @@ export default function OptimizationRulesIndex({
             cell: ({ row }) => (
                 <Switch
                     checked={row.original.is_active}
+                    disabled={!canManageRules}
                     onCheckedChange={() => toggle(row.original)}
                 />
             ),
@@ -249,35 +250,36 @@ export default function OptimizationRulesIndex({
         {
             id: 'actions',
             header: '',
-            cell: ({ row }) => (
-                <div className="flex justify-end gap-1">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Run now"
-                        disabled={runningId === row.original.id}
-                        onClick={() => runNow(row.original)}
-                    >
-                        {runningId === row.original.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                        ) : (
-                            <Play className="h-4 w-4 text-gray-400 hover:text-emerald-500" />
-                        )}
-                    </Button>
-                    <Button variant="ghost" size="icon" asChild>
-                        <Link href={`${indexUrl}/${row.original.id}/edit`}>
-                            <Pencil className="h-4 w-4" />
-                        </Link>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteTarget(row.original)}
-                    >
-                        <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
-                    </Button>
-                </div>
-            ),
+            cell: ({ row }) =>
+                canManageRules ? (
+                    <div className="flex justify-end gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Run now"
+                            disabled={runningId === row.original.id}
+                            onClick={() => runNow(row.original)}
+                        >
+                            {runningId === row.original.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                            ) : (
+                                <Play className="h-4 w-4 text-gray-400 hover:text-emerald-500" />
+                            )}
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                            <Link href={`${indexUrl}/${row.original.id}/edit`}>
+                                <Pencil className="h-4 w-4" />
+                            </Link>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteTarget(row.original)}
+                        >
+                            <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        </Button>
+                    </div>
+                ) : null,
         },
     ];
 
@@ -300,7 +302,9 @@ export default function OptimizationRulesIndex({
                     )}
                     {canApproveRules && (
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={`${indexUrl}/approvals`}>Approvals</Link>
+                            <Link href={`${indexUrl}/approvals`}>
+                                Approvals
+                            </Link>
                         </Button>
                     )}
                     {canManageRules && (

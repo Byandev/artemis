@@ -265,8 +265,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/logs', [OptimizationRuleController::class, 'logs'])
         ->middleware('can:View Optimization Logs,workspace')
         ->name('workspaces.metaads.optimization-rules.logs');
+    // Viewable by "View Optimization Rules" (read-only) or "Manage Optimization
+    // Rules" (editable) — the controller authorizes either; saving stays gated
+    // by Manage on the update route below.
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])
-        ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.edit');
     Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'store'])
         ->middleware('can:Manage Optimization Rules,workspace')
