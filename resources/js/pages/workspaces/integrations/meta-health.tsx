@@ -162,6 +162,31 @@ function formatRelative(ts: string | null) {
     return `${Math.round(diff / 86400)}d ago`;
 }
 
+/**
+ * The "When" column sorts the real `started_at` timestamp, but the column reads
+ * as "how recently" — so product wants its arrows by recency: ascending = most
+ * recent first (secs → days), descending = oldest first (days → secs). That's
+ * the inverse of a raw timestamp sort, so we flip just this column's direction
+ * both when sending the sort to the server and when reading it back into the
+ * arrow state (the function is symmetric, so it serves both directions).
+ */
+function flipWhenSort(sort?: string | number | null): string | undefined {
+    if (typeof sort !== 'string' || sort === '') return undefined;
+
+    const flipped = sort
+        .split(',')
+        .map((raw) => {
+            const part = raw.trim();
+            if (part === 'started_at') return '-started_at';
+            if (part === '-started_at') return 'started_at';
+            return part;
+        })
+        .filter(Boolean)
+        .join(',');
+
+    return flipped || undefined;
+}
+
 function formatDuration(seconds: number | null) {
     if (seconds == null) return '—';
     if (seconds > 60) return `${(seconds / 60).toFixed(2)}m`;
@@ -237,8 +262,10 @@ export default function MetaHealthDashboard({
 }: Props) {
     const indexUrl = `/workspaces/${workspace.slug}/integrations/meta/health`;
 
+    // Reflect the server sort back into the arrow state, inverting the "When"
+    // column so its arrow matches the recency order the user sees.
     const initialSorting = useMemo(
-        () => toFrontendSort(query?.sort ?? null),
+        () => toFrontendSort(flipWhenSort(query?.sort) ?? null),
         [query?.sort],
     );
     const [metaUserId, setMetaUserId] = useState(
@@ -562,7 +589,9 @@ export default function MetaHealthDashboard({
                             meta={{ ...omit(recent, ['data']) }}
                             onFetch={(params) => {
                                 navigate({
-                                    sort: params?.sort,
+                                    // Invert the "When" column so ascending shows
+                                    // the most recent run first (secs → days).
+                                    sort: flipWhenSort(params?.sort),
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??
