@@ -12,6 +12,66 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.12.0',
+        date: '2026-06-26',
+        sections: [
+            {
+                title: 'Gencys ERP — New Integration',
+                items: [
+                    'Brand-new Gencys ERP module — enable it per workspace to pull Gencys data into Artemis: a Daily Sales Tracker (orders with full line-item detail) and a Unit Code catalog with per-code inventory',
+                    'Data is collected by an automated n8n pipeline that scrapes Gencys and posts results back to dedicated callback endpoints, so figures stay fresh without manual exports',
+                    'Inventory items can now sync directly from Gencys unit codes; the module and its nav only appear where Gencys has been turned on',
+                    'Five new role permissions under a Gencys ERP group — View Daily Sales Tracker, View Unit Code, and Create / Edit / Delete Unit Code — all assignable from the Roles screen',
+                ],
+            },
+            {
+                title: 'Meta Ads — Report Builder',
+                items: [
+                    'New saved Reports area under Meta Ads — build reusable reports that explore your top-performing ads and creative across any combination of ad accounts',
+                    'Group rows by Ad, Ad Name, Campaign, Ad Set, Account, or Ad Type — or by your own custom breakdowns (named, rule-based ad groups you define once and reuse)',
+                    'Pick the metrics that matter, filter by name or metric thresholds, sort, and visualise as a creative gallery, bar, stacked bar, line, or area chart — with a creative preview for any ad',
+                    'Reports can be archived and restored, so retiring a report no longer means losing its setup',
+                ],
+            },
+            {
+                title: 'Activity Logs — Audit Trail',
+                items: [
+                    'New Activity Logs page gives workspace admins an audit trail of who did what and when — sign-ins, record changes, permission and security events, integration syncs, and background jobs — with filters and a summary',
+                    'A global, cross-workspace Activity Logs view is available in the admin area for platform-wide oversight',
+                    'Logging runs automatically across requests, model changes, and authentication, capturing both user actions and automated system events',
+                ],
+            },
+            {
+                title: 'Settings — ERP Credentials',
+                items: [
+                    'New Automation Configuration screen under Settings to store the ERP username and password used by the automated sync pipeline',
+                    'Passwords are encrypted and never sent back to the browser — update the username, replace the password, or clear it independently',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Order Monitoring',
+                items: [
+                    'Purchased Orders now track delivery progress inline — expand a PO to record deliveries against each item, set expected delivery dates, add remarks, and update status without leaving the page',
+                    'Delivery timeliness is derived automatically, so you can see at a glance whether items are arriving on schedule',
+                ],
+            },
+            {
+                title: 'Inventory — ERP Sync & Fixes',
+                items: [
+                    'New ERP transaction-history sync (scheduled daily) keeps inventory stock aligned with the ERP via the n8n pipeline — an ERP-provided remaining stock is now tracked alongside the manually adjustable remaining quantity',
+                    'Inventory items can be marked active/inactive with bulk status updates, and the product link is now optional so items without a Pancake product can still be tracked',
+                    'New machine-to-machine API endpoints for purchase-order and transaction-history sync, used by the automation pipeline',
+                ],
+            },
+            {
+                title: 'Creatives',
+                items: [
+                    'Creative names must now be unique within a workspace, preventing accidental duplicates in the tracker',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.11.0',
         date: '2026-06-18',
         sections: [
