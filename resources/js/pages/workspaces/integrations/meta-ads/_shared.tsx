@@ -1323,6 +1323,13 @@ export function ColumnVisibilityMenu({
     const activeAppliedPreset =
         presets.find((p) => presetMatches(p, value, columnOrder)) ?? null;
 
+    // The trigger button reflects the COMMITTED state, not the draft — otherwise
+    // it shows a stale count after Cancel (draft discarded) or Reset (defaults
+    // applied), since the draft only re-syncs when the dialog opens.
+    const appliedCount = options.filter((o) =>
+        effectiveVisible(o.id, value),
+    ).length;
+
     // Left panel: categories
     const categories = [
         'All',
@@ -1432,7 +1439,7 @@ export function ColumnVisibilityMenu({
                     </span>
                 ) : (
                     <span className="text-gray-400 dark:text-gray-500">
-                        {selectedCount}/{options.length}
+                        {appliedCount}/{options.length}
                     </span>
                 )}
             </Button>
