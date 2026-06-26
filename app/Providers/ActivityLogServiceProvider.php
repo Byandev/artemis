@@ -26,6 +26,7 @@ use Modules\Finance\Models\Transaction;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\MetaAds\Models\OptimizationRule;
+use Modules\MetaAds\Models\Report;
 
 /**
  * Central wiring for automatic activity logging:
@@ -58,6 +59,7 @@ class ActivityLogServiceProvider extends ServiceProvider
         Account::class,
         Transaction::class,
         OptimizationRule::class,
+        Report::class,
         Sequence::class,
     ];
 
