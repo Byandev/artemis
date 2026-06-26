@@ -57,7 +57,7 @@ class InventoryTransactionController extends Controller
             ])
             // Group rows by inventory item in the backend (one item's transactions sit
             // together), most recent first within each item.
-            ->defaultSort(['inventory_item_id', '-id']);
+            ->defaultSort(['-date', '-id']);
     }
 
     /**
@@ -105,7 +105,7 @@ class InventoryTransactionController extends Controller
                 'rts_bad',
                 'lost',
             ])
-            ->defaultSort(['inventory_item_id', '-date']);
+            ->defaultSort(['-date']);
     }
 
     public function index(Request $request, Workspace $workspace)
