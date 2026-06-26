@@ -59,7 +59,7 @@ class PurchasedOrderController extends Controller
         // One row per PO item: PO details + item monitoring (deliveries,
         // balance, timeliness) live on the same row; expanding shows the
         // item's delivery attempts.
-        $items = QueryBuilder::for($this->scopedItems($workspace))
+        $itemQuery = QueryBuilder::for($this->scopedItems($workspace))
             ->allowedFilters([
                 AllowedFilter::callback('search', fn (Builder $query, $value) => $this->applyItemSearch($query, $value)),
                 AllowedFilter::callback('start_date', fn (Builder $query, $value) => $query->whereHas('purchasedOrder', fn (Builder $po) => $po->whereDate('issue_date', '>=', $value))),
@@ -71,7 +71,24 @@ class PurchasedOrderController extends Controller
                 AllowedSort::field('count'),
                 'delivered_qty',
             ])
-            ->defaultSort('-po_issue_date')
+            ->defaultSort('-po_issue_date');
+
+        // Footer totals must stay consistent with the table. They sum each parent
+        // PO once, but only across the orders that actually have a matching item
+        // row (respecting the active filters) — so an empty table yields ₱0
+        // instead of showing figures for orders with no visible rows.
+        $matchingOrderIds = (clone $itemQuery)
+            ->reorder()
+            ->distinct()
+            ->pluck('inventory_purchased_order_id');
+
+        $totals = PurchasedOrder::whereIn('id', $matchingOrderIds)
+            ->selectRaw('COALESCE(SUM(delivery_fee), 0) as total_delivery_fee')
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(total_amount - delivery_fee), 0) as total_cogs')
+            ->first();
+
+        $items = $itemQuery
             ->addSelect(['po_issue_date' => PurchasedOrder::select('issue_date')
                 ->whereColumn('id', 'inventory_purchased_order_items.inventory_purchased_order_id')])
             ->withSum('deliveries as delivered_qty', 'qty')
@@ -83,12 +100,6 @@ class PurchasedOrderController extends Controller
             ])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
-
-        $totals = $this->buildQuery($workspace)
-            ->selectRaw('COALESCE(SUM(delivery_fee), 0) as total_delivery_fee')
-            ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
-            ->selectRaw('COALESCE(SUM(total_amount - delivery_fee), 0) as total_cogs')
-            ->first();
 
         return Inertia::render('workspaces/inventory/purchased-orders/index', [
             'workspace' => $workspace,
