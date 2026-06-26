@@ -386,7 +386,7 @@ const Pages = ({
         {
             accessorKey: 'deleted_at',
             header: ({ column }) => (
-                <SortableHeader column={column} title={'Status'} />
+                <SortableHeader column={column} title={'Sync Status'} />
             ),
             cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
