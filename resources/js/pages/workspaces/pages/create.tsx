@@ -33,6 +33,7 @@ export default function Create({ workspace, users }: Props) {
         parcel_journey_custom_field_id: '',
         parcel_journey_flow_id: '',
         parcel_journey_enabled: false as boolean,
+        is_single_page: false as boolean,
         owner_id: '',
         status: 'active' as 'active' | 'inactive',
     });
@@ -198,6 +199,39 @@ export default function Create({ workspace, users }: Props) {
                                     {errors.status && (
                                         <p className={errorClass}>
                                             {errors.status}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className={`${fieldClass} sm:col-span-2`}>
+                                    <div className="flex items-center justify-between rounded-[10px] border border-black/8 bg-stone-50 px-4 py-3 dark:border-white/8 dark:bg-zinc-800">
+                                        <div>
+                                            <p className={labelClass}>
+                                                Single Page Shop
+                                            </p>
+                                            <p className="mt-0.5 font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                                {data.is_single_page
+                                                    ? 'Shop has only this page — pull all of its orders here'
+                                                    : 'Shop has multiple pages — pull only this page’s orders'}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setData(
+                                                    'is_single_page',
+                                                    !data.is_single_page,
+                                                )
+                                            }
+                                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${data.is_single_page ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
+                                        >
+                                            <span
+                                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ${data.is_single_page ? 'translate-x-5' : 'translate-x-0'}`}
+                                            />
+                                        </button>
+                                    </div>
+                                    {errors.is_single_page && (
+                                        <p className={errorClass}>
+                                            {errors.is_single_page}
                                         </p>
                                     )}
                                 </div>

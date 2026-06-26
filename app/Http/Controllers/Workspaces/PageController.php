@@ -213,6 +213,7 @@ class PageController extends Controller
             'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
             'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
             'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? false,
+            'is_single_page' => $validated['is_single_page'] ?? false,
             'status' => $validated['status'] ?? 'active',
         ]);
 
