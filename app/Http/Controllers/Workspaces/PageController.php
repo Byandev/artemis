@@ -71,6 +71,7 @@ class PageController extends Controller
         $pages = QueryBuilder::for($baseQuery)
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
+                AllowedFilter::exact('owner_id', 'pages.owner_id'),
             ])
             ->allowedSorts([
                 'name',
