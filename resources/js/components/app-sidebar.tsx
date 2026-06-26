@@ -502,12 +502,11 @@ function PublicLinks({
     leaderboardEnabled: boolean;
 }) {
     const canViewRmoLink = useAnyPermission([
-        PERMISSIONS.ViewRtsAnalytics,
-        PERMISSIONS.ViewCsrManagement,
+        PERMISSIONS.ViewRmoManagement,
     ]);
-    const canViewLeaderboardLink = useAnyPermission(
-        PERMISSIONS.ViewCsrAnalytics,
-    );
+    const canViewLeaderboardLink = useAnyPermission([
+        PERMISSIONS.ViewLeaderboards,
+    ]);
 
     const links = [
         ...(rmoEnabled && canViewRmoLink
