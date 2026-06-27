@@ -23,7 +23,10 @@ class ParcelJourneyNotifier
 
     public function notify(Order $order, ParcelJourney $parcelJourney): void
     {
-        [, $psid] = explode('_', $order->fb_id);
+        // Webcake orders have no Messenger conversation, so fb_id can be null/blank.
+        // The customer SMS keys off the shipping phone, not the psid, so a missing psid
+        // only means there's no chat recipient — it must not break the SMS path.
+        $psid = $order->fb_id ? (explode('_', $order->fb_id)[1] ?? '') : '';
 
         $data = $this->buildData($order, $parcelJourney);
         $handler = $this->resolveHandler($parcelJourney->status);

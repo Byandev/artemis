@@ -50,7 +50,9 @@ abstract class BaseNotificationHandler implements NotifiesParcelJourney
 
         $chatMessage = $this->renderer->render($this->workspace, 'chat', $activity, 'customer', $data);
 
-        if ($chatMessage !== null) {
+        // Webcake orders have no Messenger conversation (blank psid), so there is no
+        // chat recipient to send to — skip the chat notification entirely for them.
+        if ($chatMessage !== null && $psid !== '') {
             ParcelJourneyNotification::firstOrCreate([
                 'parcel_journey_id' => $parcelJourney->id,
                 'type' => 'chat',

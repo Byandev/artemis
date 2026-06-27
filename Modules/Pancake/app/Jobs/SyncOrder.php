@@ -19,7 +19,7 @@ class SyncOrder implements ShouldQueue
 
     public function __construct(
         public readonly Workspace $workspace,
-        public readonly ?Page $page,
+        public readonly Page $page,
         public readonly array $data,
     ) {}
 
@@ -36,13 +36,7 @@ class SyncOrder implements ShouldQueue
         $syncCustomer->execute($savedOrder, $this->data);
         $syncItems->execute($savedOrder, $this->data);
         $syncAddress->execute($savedOrder, $this->data);
-
-        // Webcake orders have no page, so there is no message template / notifier
-        // context to drive parcel-journey notifications. Persist the order, skip tracking.
-        if ($this->page) {
-            $syncTracking->execute($savedOrder, $this->data, $this->page, $this->workspace);
-        }
-
+        $syncTracking->execute($savedOrder, $this->data, $this->page, $this->workspace);
         $syncPhoneReports->execute($savedOrder, $this->data);
     }
 }

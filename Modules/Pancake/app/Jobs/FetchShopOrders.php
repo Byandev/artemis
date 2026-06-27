@@ -28,11 +28,19 @@ class FetchShopOrders implements ShouldQueue
 
         $this->shop->loadMissing('pages');
 
-        $token = $this->shop->pages->firstWhere(fn ($page) => filled($page->pos_token))?->pos_token;
+        $tokenPage = $this->shop->pages->firstWhere(fn ($page) => filled($page->pos_token));
 
-        if (! $token) {
+        if (! $tokenPage) {
             return;
         }
+
+        $token = $tokenPage->pos_token;
+
+        // Page-less Webcake orders still need a page context so SyncParcelTrackingAction
+        // can fire delivery SMS. Prefer a parcel-journey-enabled page in the shop (only
+        // those actually send); fall back to the token page just to satisfy the
+        // OrderForDelivery FK. SMS templates are workspace-level, so any enabled page works.
+        $fallbackPage = $this->shop->pages->firstWhere('parcel_journey_enabled', true) ?? $tokenPage;
 
         $pancake = new Pancake($this->shop->id, $token);
 
@@ -54,11 +62,11 @@ class FetchShopOrders implements ShouldQueue
 
         foreach ($data as $i => $order) {
             // Match the Pancake order's page_id to a local page in this shop. Webcake
-            // orders have no page_id, so $page stays null and SyncOrder skips parcel
-            // notifications for them while still persisting the order.
-            $page = $order['page_id']
-                ? $this->shop->pages->firstWhere('id', $order['page_id'])
-                : null;
+            // orders have no page_id (and the stored order keeps page_id null, tagged
+            // by order_source = -7), so they use the shop's fallback page purely as the
+            // notifier context that drives delivery SMS.
+            $page = ($order['page_id'] ? $this->shop->pages->firstWhere('id', $order['page_id']) : null)
+                ?? $fallbackPage;
 
             dispatch(new SyncOrder($this->shop->workspace, $page, $order))
                 ->delay(now()->addSeconds($i))
