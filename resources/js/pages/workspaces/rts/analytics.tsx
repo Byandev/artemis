@@ -141,7 +141,7 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <PriceCard
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
@@ -151,6 +151,10 @@ export default function Analytics({ workspace }: Props) {
                         queryParams={queryParams}
                     />
                     <OrderSourceCard
+                        workspaceSlug={workspace.slug}
+                        queryParams={queryParams}
+                    />
+                    <OrderFrequencyCard
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
                     />
@@ -173,10 +177,6 @@ export default function Analytics({ workspace }: Props) {
                     queryParams={queryParams}
                 />
                 <AdCard
-                    workspaceSlug={workspace.slug}
-                    queryParams={queryParams}
-                />
-                <OrderFrequencyCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
                 />
