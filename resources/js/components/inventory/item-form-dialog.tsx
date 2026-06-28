@@ -61,7 +61,6 @@ export function ItemFormDialog({
             lead_time: '',
             unfulfilled_count: '',
             three_days_average: '',
-            remaining_qty: '',
             sales_keywords: [] as string[],
             transaction_keywords: '',
         });
@@ -79,7 +78,6 @@ export function ItemFormDialog({
                         item.unfulfilled_count?.toString() ?? '0',
                     three_days_average:
                         item.three_days_average?.toString() ?? '0',
-                    remaining_qty: item.remaining_qty?.toString() ?? '',
                     sales_keywords: (item.sales_keywords ?? '')
                         .split(',')
                         .map((keyword) => keyword.trim())
@@ -250,28 +248,6 @@ export function ItemFormDialog({
                                 </p>
                             )}
                         </div>
-                        {/* Remaining Qty */}
-                        <div className="space-y-1.5">
-                            <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                Remaining Qty
-                            </label>
-                            <input
-                                type="number"
-                                step="1"
-                                placeholder="0"
-                                value={data.remaining_qty}
-                                onChange={(e) =>
-                                    setData('remaining_qty', e.target.value)
-                                }
-                                className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100"
-                            />
-                            {errors.remaining_qty && (
-                                <p className="mt-1 font-mono text-[11px] text-red-500">
-                                    {errors.remaining_qty}
-                                </p>
-                            )}
-                        </div>
-
                         {/* Product Selector */}
                         <div className="space-y-1.5">
                             <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">

@@ -154,7 +154,6 @@ class InventoryItemController extends Controller
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
-            'remaining_qty' => 'nullable|integer',
         ]);
 
         InventoryItem::create([
@@ -167,7 +166,6 @@ class InventoryItemController extends Controller
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
-            'remaining_qty' => $request->remaining_qty,
         ]);
 
         // back() keeps the list's current filters/sort/page (they live in the URL).
@@ -196,7 +194,6 @@ class InventoryItemController extends Controller
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
-            'remaining_qty' => 'nullable|integer',
         ]);
         $item->update([
             'product_id' => $request->product_id ?: null,
@@ -207,7 +204,6 @@ class InventoryItemController extends Controller
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
-            'remaining_qty' => $request->remaining_qty,
         ]);
 
         return redirect()->back()
