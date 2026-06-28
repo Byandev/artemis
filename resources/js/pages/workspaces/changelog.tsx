@@ -12,6 +12,40 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.13.0',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Webcake Orders Now Captured',
+                items: [
+                    'Order syncing now runs per shop instead of per page, so orders from every source are pulled in — including Webcake orders, which have no page and were previously skipped entirely',
+                    'Each order now records where it came from (e.g. Facebook or Webcake), so its source is visible and filterable across the app',
+                    'Delivery-journey text messages still go out for Webcake orders — they fall back to a shop page for messaging, while the order itself stays correctly marked as page-less',
+                    'The "Single Page Shop" toggle has been removed from the page form — it is no longer needed now that syncing covers the whole shop',
+                ],
+            },
+            {
+                title: 'Shops',
+                items: [
+                    'New "Refresh orders" action on each shop re-pulls the last few months of orders across all sources on demand',
+                    'Shops now show a "Last Sync" column so you can see when each shop last pulled orders',
+                ],
+            },
+            {
+                title: 'Dashboard',
+                items: [
+                    'New "Order Source" filter (Facebook, Webcake) on the dashboard — every metric, breakdown, and per-page/shop/user view respects it',
+                ],
+            },
+            {
+                title: 'RTS Analytics',
+                items: [
+                    'New "By Order Source" breakdown showing RTS rate for Facebook vs Webcake orders, alongside the By Price, By Delivery Attempts, and By Order Frequency cards',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.12.0',
         date: '2026-06-26',
         sections: [
@@ -79,7 +113,7 @@ const changelog: ChangelogEntry[] = [
                 title: 'Team-Level Data Access',
                 items: [
                     "Data can now be scoped to teams — once a team owns pages or ad accounts, its members see only that team's records across pages, orders, products, shops, budgets, RTS analytics, creatives, the video-editor dashboard, Botcake sequences/flows/messages, and Meta ad performance",
-                    "New \"View All Workspace Data\" permission sets the boundary: owners, super admins, and anyone with this permission see everything; remove it from a role (e.g. CSR) to limit that role to its teams' data",
+                    'New "View All Workspace Data" permission sets the boundary: owners, super admins, and anyone with this permission see everything; remove it from a role (e.g. CSR) to limit that role to its teams\' data',
                     'Safe rollout — on release every existing role keeps full visibility, so nothing changes until you deliberately scope a role; a backfill command seeds team ownership from existing page owners',
                     "Fails closed — a scoped member who isn't on any team sees nothing until they're added to one, and you're warned if you assign such a role to a teamless member",
                 ],
@@ -90,7 +124,7 @@ const changelog: ChangelogEntry[] = [
                     'New per-team screens (from the Teams list) to choose which pages and ad accounts a team owns',
                     "Ad accounts have two access tiers per team — View (see the account's data) or Manage; Manage is required to change budgets or statuses and to approve optimization proposals, and the Optimization History shows only the accounts you can manage",
                     'Pages and ad accounts can belong to multiple teams, and a member can be on multiple teams — they see the combined data of all their teams',
-                    'The Pages list now shows each page\'s teams; the ad-account assignment screen lists only synced accounts and shows the Facebook user who connected each',
+                    "The Pages list now shows each page's teams; the ad-account assignment screen lists only synced accounts and shows the Facebook user who connected each",
                 ],
             },
             {
