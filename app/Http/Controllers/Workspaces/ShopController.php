@@ -106,6 +106,8 @@ class ShopController extends Controller
             abort(403);
         }
 
+        $shop->update(['orders_last_synced_at' => null]);
+
         // Pull the last month across all sources (incl. Webcake). The job advances
         // orders_last_synced_at when it finishes, so the hourly sync resumes from here.
         dispatch(new FetchShopOrders($shop, 1, now()->subMonths(3)->unix(), now()->unix()))
