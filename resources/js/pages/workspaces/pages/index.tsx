@@ -477,7 +477,7 @@ const Pages = ({
                                               Update Budget
                                           </DropdownMenuItem>
                                       )}
-                                      {canRefreshPages && (
+                                      {false && (
                                           <DropdownMenuItem
                                               onClick={() => refresh(page)}
                                               disabled={processing}

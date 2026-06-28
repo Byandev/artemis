@@ -38,6 +38,14 @@ export type DeliveryAttemptRow = {
     rts_rate_percentage: number;
 };
 
+export type OrderSourceRow = {
+    order_source_name: string | null;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
 export type CxRtsRow = {
     cx_rts_bucket: string;
     total_orders: number;

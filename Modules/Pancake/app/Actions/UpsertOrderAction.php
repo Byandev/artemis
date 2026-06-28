@@ -21,7 +21,9 @@ class UpsertOrderAction
                 'workspace_id' => $workspace->id,
             ],
             [
-                'page_id' => $order['page_id'],
+                'page_id' => $order['page_id'] ?? null,
+                'order_source' => $order['order_sources'] ?? null,
+                'order_source_name' => $order['order_sources_name'] ?? null,
                 'status' => $order['status'],
                 'status_name' => $order['status_name'],
                 'total_amount' => $order['total_price'] / $divisor,

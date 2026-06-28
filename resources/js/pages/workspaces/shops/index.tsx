@@ -20,7 +20,13 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
-import { ListChecks, MoreHorizontal, Search, Users } from 'lucide-react';
+import {
+    ListChecks,
+    MoreHorizontal,
+    RefreshCw,
+    Search,
+    Users,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner'; // Added toast import
 
@@ -102,6 +108,16 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
         });
     };
 
+    const refreshOrders = (shop: Shop) => {
+        post(workspaces.shops.refreshOrders.url({ workspace, shop }), {
+            onStart: () => toast.info(`Refreshing orders for ${shop.name}...`),
+            onSuccess: () =>
+                toast.success(`${shop.name} orders queued for refresh.`),
+            onError: () =>
+                toast.error(`Failed to refresh orders for ${shop.name}.`),
+        });
+    };
+
     const openChecklist = (shop: Shop) => {
         setSelectedShop(shop);
         setChecklistDrawerOpen(true);
@@ -127,6 +143,20 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                     )}
                 />
             ),
+        },
+        {
+            accessorKey: 'orders_last_synced_at',
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Last Sync'} />
+            ),
+            cell: ({ row }) => {
+                const date = row.original.orders_last_synced_at;
+                return (
+                    <span>
+                        {date ? new Date(date).toLocaleString() : 'Never'}
+                    </span>
+                );
+            },
         },
         ...(canUseShopActions
             ? [
@@ -160,6 +190,17 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                                           >
                                               <Users className="mr-2 h-4 w-4" />
                                               Refresh users
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canRefreshShops && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  refreshOrders(shop)
+                                              }
+                                              disabled={processing}
+                                          >
+                                              <RefreshCw className="mr-2 h-4 w-4" />
+                                              Refresh orders
                                           </DropdownMenuItem>
                                       )}
                                   </DropdownMenuContent>
