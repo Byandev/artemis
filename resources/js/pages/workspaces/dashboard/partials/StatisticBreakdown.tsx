@@ -88,6 +88,9 @@ export function StatisticBreakdown({
                 'filter[page_ids]': filter.pageIds.join(','),
                 'filter[user_ids]': filter.userIds.join(','),
                 'filter[product_ids]': filter.productIds.join(','),
+                'filter[order_source_names]': (
+                    filter.orderSourceNames ?? []
+                ).join(','),
             };
 
             try {

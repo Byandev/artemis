@@ -26,6 +26,10 @@ interface Props {
     };
 }
 
+// Order sources surfaced in the dashboard filter. Static for now — these are the
+// order_source_name values we persist for Facebook (-1) and Webcake (-7) orders.
+const ORDER_SOURCES = ['Facebook', 'Webcake'];
+
 const Dashboard = ({ workspace, metricSettings }: Props) => {
     const STORAGE_KEY = `dashboard_metrics_${workspace.id}`;
     const DATE_RANGE_KEY = `dashboard_date_range_${workspace.id}`;
@@ -53,6 +57,7 @@ const Dashboard = ({ workspace, metricSettings }: Props) => {
             shopIds: [],
             pageIds: [],
             userIds: [],
+            orderSourceNames: [],
         };
     });
 
@@ -140,6 +145,7 @@ const Dashboard = ({ workspace, metricSettings }: Props) => {
                     />
                     <Filters
                         workspace={workspace}
+                        orderSources={ORDER_SOURCES}
                         initialValue={filter}
                         onChange={(value) => {
                             setFilter(value);

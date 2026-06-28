@@ -223,6 +223,7 @@ class WorkspaceController extends Controller
             'product_ids' => $request->query('product_ids'),
             'page_ids' => $request->query('page_ids'),
             'shop_ids' => $request->query('shop_ids'),
+            'order_source_names' => $request->query('order_source_names'),
         ];
 
         $salesData = Order::where('workspace_id', $workspace->id)

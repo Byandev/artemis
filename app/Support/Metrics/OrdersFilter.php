@@ -24,6 +24,11 @@ class OrdersFilter
         $productIds = self::ids($filter, 'product_ids');
         $teamIds = self::ids($filter, 'team_ids');
 
+        // order_source_name lives on the orders table, so apply it before the pages
+        // join (and without forcing one). Webcake orders have a null page_id; an inner
+        // join on pages would drop them, defeating an "order source" filter.
+        self::applySourceNames($query, $filter, $ordersAlias);
+
         if (! $forceJoin && ! $pageIds && ! $shopIds && ! $userIds && ! $productIds && ! $teamIds) {
             return;
         }
@@ -37,7 +42,7 @@ class OrdersFilter
      * Apply page_ids / shop_ids / user_ids / product_ids / team_ids filters when pages is already joined.
      * Filters reference pages.id, pages.shop_id, pages.owner_id, pages.product_id, and team_user→pages.owner_id.
      */
-    public static function applyToJoined(Builder $query, array $filter): void
+    public static function applyToJoined(Builder $query, array $filter, string $ordersAlias = 'po'): void
     {
         self::applyPageColumnFilters(
             $query,
@@ -47,6 +52,21 @@ class OrdersFilter
             self::ids($filter, 'product_ids'),
             self::ids($filter, 'team_ids'),
         );
+
+        self::applySourceNames($query, $filter, $ordersAlias);
+    }
+
+    /**
+     * Filter by order_source_name (e.g. "Facebook", "Webcake"). Applied directly on
+     * the orders table so it works for page-less Webcake orders too.
+     */
+    private static function applySourceNames(Builder $query, array $filter, string $ordersAlias): void
+    {
+        $sourceNames = self::ids($filter, 'order_source_names');
+
+        if ($sourceNames) {
+            $query->whereIn("{$ordersAlias}.order_source_name", $sourceNames);
+        }
     }
 
     private static function applyPageColumnFilters(

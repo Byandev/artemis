@@ -6,6 +6,7 @@ import CxRtsCard from '@/components/rts/CxRtsCard';
 import DeliveryAttemptsCard from '@/components/rts/DeliveryAttemptsCard';
 import LocationCard from '@/components/rts/LocationCard';
 import OrderFrequencyCard from '@/components/rts/OrderFrequencyCard';
+import OrderSourceCard from '@/components/rts/OrderSourceCard';
 import PriceCard from '@/components/rts/PriceCard';
 import ProductCard from '@/components/rts/ProductCard';
 import RiderCard from '@/components/rts/RiderCard';
@@ -140,12 +141,16 @@ export default function Analytics({ workspace }: Props) {
                     />
                 </PageHeader>
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <PriceCard
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
                     />
                     <DeliveryAttemptsCard
+                        workspaceSlug={workspace.slug}
+                        queryParams={queryParams}
+                    />
+                    <OrderSourceCard
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
                     />
