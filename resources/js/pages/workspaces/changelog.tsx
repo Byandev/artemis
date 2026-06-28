@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.13.2',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Fix',
+                items: [
+                    'Shop order syncing now processes every order again — a leftover debug limit that only synced a handful of test orders has been removed, with order dispatches staggered to ease load on Pancake',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.13.1',
         date: '2026-06-28',
         sections: [
