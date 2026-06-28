@@ -23,7 +23,7 @@ class TriggerFetchERPPurchaseOrders extends Command
         $webhookUrl = $this->option('webhook') ?: config('services.n8n.purchase_order_webhook_url');
 
         $this->info($webhookUrl);
-        
+
         if (empty($webhookUrl)) {
             $this->error('n8n purchase order webhook URL is not configured (services.n8n.purchase_order_webhook_url). Pass --webhook= to override.');
 
@@ -108,7 +108,7 @@ class TriggerFetchERPPurchaseOrders extends Command
                     $offset = $dispatched * $delay;
 
                     dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data))
-                        ->delay(now()->addMinutes($offset));
+                        ->delay(now()->addMinutes($offset * 3));
                 });
         }
 
