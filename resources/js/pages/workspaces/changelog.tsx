@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.13.1',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Shops — Fix',
+                items: [
+                    'Refreshing a shop’s orders now resets its "Last Sync" first, so the column reflects the manual re-pull instead of showing a stale timestamp until the sync finishes',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.13.0',
         date: '2026-06-28',
         sections: [
