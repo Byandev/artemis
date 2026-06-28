@@ -6,6 +6,7 @@ use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Page;
 use App\Models\ParcelJourney;
 use App\Models\ShippingAddress;
+use App\Models\Shop;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -26,6 +27,7 @@ class Order extends Model
 
     protected $casts = [
         'status' => 'integer',
+        'order_source' => 'integer',
     ];
 
     public function shippingAddress(): HasOne|\App\Models\Order
@@ -46,6 +48,11 @@ class Order extends Model
     public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
+    }
+
+    public function shop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class);
     }
 
     public function phoneNumberReports(): Order|HasMany

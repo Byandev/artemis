@@ -50,6 +50,7 @@ export default function UserBreakdown({
     const pageIds = filter.pageIds.join(',');
     const userIds = filter.userIds.join(',');
     const productIds = filter.productIds.join(',');
+    const orderSourceNames = (filter.orderSourceNames ?? []).join(',');
 
     const activeMetric = useMemo(
         () => metricConfigs.find((m) => m.key === option),
@@ -96,6 +97,7 @@ export default function UserBreakdown({
                     'filter[page_ids]': pageIds || undefined,
                     'filter[user_ids]': userIds || undefined,
                     'filter[product_ids]': productIds || undefined,
+                    'filter[order_source_names]': orderSourceNames || undefined,
                 },
             })
             .then((response) => {
@@ -127,6 +129,7 @@ export default function UserBreakdown({
         pageIds,
         userIds,
         productIds,
+        orderSourceNames,
         reload,
     ]);
 
