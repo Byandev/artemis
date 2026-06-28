@@ -12,6 +12,18 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.13.3',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Order Refresh Tooling',
+                items: [
+                    'New maintenance command to re-pull a workspace’s shop orders (all sources, incl. Webcake) over a configurable recent window — scopeable to a single shop or page — for backfills and one-off fixes without touching the hourly sync',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.13.2',
         date: '2026-06-28',
         sections: [
