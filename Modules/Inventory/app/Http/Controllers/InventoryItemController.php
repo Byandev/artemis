@@ -27,7 +27,12 @@ class InventoryItemController extends Controller
             ? '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)'
             : 'inventory_items.remaining_qty';
 
-        $waitingStocksSql = '(SELECT SUM(count) FROM inventory_purchased_order_items WHERE inventory_item_id = inventory_items.id AND EXISTS (SELECT * FROM inventory_purchased_orders WHERE inventory_purchased_order_items.inventory_purchased_order_id = inventory_purchased_orders.id AND status = 6))';
+        // "Waiting for delivery" = the quantity still OWED on orders that are
+        // awaiting delivery (status 6) — i.e. the undelivered remainder per item
+        // (ordered count minus what has already been delivered), not the full
+        // ordered count. Fully-delivered lines contribute 0; NULLIF keeps items
+        // with nothing outstanding showing as "—" rather than 0.
+        $waitingStocksSql = '(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status = 6))';
         $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
         $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
@@ -48,7 +53,8 @@ class InventoryItemController extends Controller
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
-            ->withSum('waitingForDeliveryItems as waiting_for_delivery_stocks', 'count')
+            // Undelivered remainder on status-6 orders (see $waitingStocksSql).
+            ->selectRaw("$waitingStocksSql as waiting_for_delivery_stocks")
             ->selectRaw("$currentStocksSql as current_stocks")
             ->selectRaw("$remainingAfterFulfillmentSql as remaining_after_fulfillment")
             ->selectRaw("$poNeededSql as po_needed")
