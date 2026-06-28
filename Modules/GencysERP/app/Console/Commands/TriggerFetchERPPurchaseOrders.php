@@ -96,7 +96,7 @@ class TriggerFetchERPPurchaseOrders extends Command
                         'erp_password' => $workspace->erp_password,
                         'start_date' => $startDateFormatted,
                         'end_date' => $endDateFormatted,
-                        'webhook_url' => "{$callbackBase}/api/v1/public/purchase-orders/sync",
+                        'webhook_url' => "{$callbackBase}/api/v1/public/purchase-orders/bulk-sync",
                         'items' => $chunk->map(fn ($item) => [
                             'id' => $item->id,
                             'keyword' => $item->sku,
@@ -106,7 +106,7 @@ class TriggerFetchERPPurchaseOrders extends Command
                     $offset = $dispatched * $delay;
 
                     dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data))
-                        ->delay(now()->addSeconds($offset));
+                        ->delay(now()->addMinutes($offset));
                 });
         }
 
