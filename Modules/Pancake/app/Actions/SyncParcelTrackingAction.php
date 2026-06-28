@@ -107,7 +107,6 @@ readonly class SyncParcelTrackingAction
                 $order_for_delivery->update([
                     'parcel_status' => $parcel_status,
                 ]);
-
             }
 
             if ($this->isNotifiable($savedOrder, $journey)) {

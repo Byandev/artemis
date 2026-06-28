@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchPageOrders;
+use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;
 
 class OnboardingController extends Controller
@@ -101,6 +102,11 @@ class OnboardingController extends Controller
                 'current_period_start' => Carbon::now(),
                 'current_period_end' => Carbon::now()->addDays($trialDays),
             ]);
+        }
+
+        if ($shop->wasRecentlyCreated) {
+            dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+            dispatch(new FetchShopOrders($shop, 1, \Carbon\Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
         }
 
         // Dispatch fetch jobs

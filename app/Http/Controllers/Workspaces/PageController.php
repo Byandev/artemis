@@ -24,7 +24,9 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Modules\Pancake\Actions\SyncCustomerAction;
 use Modules\Pancake\Jobs\FetchPageOrders;
+use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -199,6 +201,11 @@ class PageController extends Controller
             'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
         ]);
 
+        if ($shop->wasRecentlyCreated) {
+            dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+            dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        }
+
         $page = Page::create([
             'id' => $validated['id'],
             'workspace_id' => $workspace->id,
@@ -216,9 +223,6 @@ class PageController extends Controller
             'is_single_page' => $validated['is_single_page'] ?? false,
             'status' => $validated['status'] ?? 'active',
         ]);
-
-        dispatch(new FetchPageOrders($page, 1, Carbon::now()->subMonth()->unix(), Carbon::now()->unix()))->onQueue('pancake');
-        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
 
         (new PostHogService)->capture((string) $request->user()->id, 'page_connected', [
             'workspace_id' => $workspace->id,

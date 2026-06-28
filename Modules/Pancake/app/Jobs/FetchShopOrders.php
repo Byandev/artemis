@@ -68,9 +68,11 @@ class FetchShopOrders implements ShouldQueue
             $page = ($order['page_id'] ? $this->shop->pages->firstWhere('id', $order['page_id']) : null)
                 ?? $fallbackPage;
 
-            dispatch(new SyncOrder($this->shop->workspace, $page, $order))
-                ->delay(now()->addSeconds($i))
-                ->onQueue('pancake');
+            if (in_array($order['id'], [16993, 16990, 17056, 17048, 17040, 17019])) {
+                dispatch(new SyncOrder($this->shop->workspace, $page, $order))
+//                    ->delay(now()->addSeconds($i))
+                    ->onQueue('pancake');
+            }
         }
 
         if ($totalPages > $this->page_number) {

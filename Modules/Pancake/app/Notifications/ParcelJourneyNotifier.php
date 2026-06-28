@@ -42,10 +42,10 @@ class ParcelJourneyNotifier
         ];
 
         if ($this->page->parcel_journey_enabled) {
-            $order->loadMissing(['shippingAddress', 'page']);
+            $order->loadMissing(['shippingAddress', 'page', 'shop']);
 
             $data = array_merge($data, [
-                'page_name' => $order->page->name,
+                'page_name' => $order->page?->name ?? $order->shop?->name ?? '',
                 'customer_name' => $order->shippingAddress?->full_name,
                 'shipping_address' => $order->shippingAddress?->full_address,
                 'province' => $order->shippingAddress?->province_name,
