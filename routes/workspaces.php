@@ -409,7 +409,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/items/{purchasedOrderItem}/deliveries', [PurchaseOrderMonitoringController::class, 'storeDelivery'])->name('deliveries.store');
         Route::put('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'updateDelivery'])->name('deliveries.update');
         Route::delete('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'destroyDelivery'])->name('deliveries.destroy');
-        Route::put('/items/{purchasedOrderItem}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('items.expected-delivery');
+        Route::put('/orders/{purchasedOrder}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('orders.expected-delivery');
         Route::put('/orders/{purchasedOrder}/status', [PurchaseOrderMonitoringController::class, 'updateStatus'])->name('orders.status');
         Route::put('/items/{purchasedOrderItem}/remarks', [PurchaseOrderMonitoringController::class, 'updateRemarks'])->name('items.remarks');
     });

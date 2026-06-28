@@ -39,6 +39,7 @@ class PurchasedOrderController extends Controller
             ->allowedSorts([
                 'issue_date',
                 'delivery_no',
+                'expected_delivery_date',
                 'cust_po_no',
                 'control_no',
                 'delivery_fee',
@@ -54,7 +55,7 @@ class PurchasedOrderController extends Controller
         $this->authorize('View Purchased Orders', $workspace);
 
         $orders = $this->buildQuery($workspace)
-            ->with(['items.inventoryItem.product'])
+            ->with(['items.inventoryItem.product', 'items.deliveries'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
@@ -106,6 +107,7 @@ class PurchasedOrderController extends Controller
         $request->validate([
             'issue_date' => 'required|date_format:Y-m-d|date',
             'delivery_no' => 'nullable|string|max:255',
+            'expected_delivery_date' => 'nullable|date_format:Y-m-d|date',
             'cust_po_no' => 'nullable|string|max:255',
             'control_no' => 'nullable|string|max:255',
             'delivery_fee' => 'required|numeric|min:0',
@@ -122,6 +124,7 @@ class PurchasedOrderController extends Controller
             'workspace_id' => $workspace->id,
             'issue_date' => $request->issue_date,
             'delivery_no' => $request->delivery_no,
+            'expected_delivery_date' => $request->expected_delivery_date,
             'cust_po_no' => $request->cust_po_no,
             'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
@@ -155,6 +158,7 @@ class PurchasedOrderController extends Controller
         $request->validate([
             'issue_date' => 'required|date_format:Y-m-d|date',
             'delivery_no' => 'nullable|string|max:255',
+            'expected_delivery_date' => 'nullable|date_format:Y-m-d|date',
             'cust_po_no' => 'nullable|string|max:255',
             'control_no' => 'nullable|string|max:255',
             'delivery_fee' => 'required|numeric|min:0',
@@ -170,6 +174,7 @@ class PurchasedOrderController extends Controller
         $purchasedOrder->update([
             'issue_date' => $request->issue_date,
             'delivery_no' => $request->delivery_no,
+            'expected_delivery_date' => $request->expected_delivery_date,
             'cust_po_no' => $request->cust_po_no,
             'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
