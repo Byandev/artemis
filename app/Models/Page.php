@@ -20,6 +20,7 @@ class Page extends Model
 
     protected $casts = [
         'orders_last_synced_at' => 'datetime',
+        'is_single_page' => 'boolean',
     ];
 
     protected $hidden = [];

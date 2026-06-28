@@ -14,6 +14,10 @@ class Shop extends Model
 
     public $guarded = [];
 
+    protected $casts = [
+        'orders_last_synced_at' => 'datetime',
+    ];
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);

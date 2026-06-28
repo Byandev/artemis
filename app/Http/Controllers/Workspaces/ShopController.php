@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -60,6 +61,7 @@ class ShopController extends Controller
                 'name',
                 'created_at',
                 'deleted_at',
+                'orders_last_synced_at',
                 AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
             ->paginate($request->integer('per_page', 10))
@@ -88,6 +90,26 @@ class ShopController extends Controller
         }
 
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+
+        return redirect()->route('workspaces.shops.index', $workspace);
+    }
+
+    public function refreshOrders(Request $request, Workspace $workspace, Shop $shop)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $this->authorize(Permission::RefreshShops->value, $workspace);
+
+        if ($shop->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        // Pull the last month across all sources (incl. Webcake). The job advances
+        // orders_last_synced_at when it finishes, so the hourly sync resumes from here.
+        dispatch(new FetchShopOrders($shop, 1, now()->subMonths(3)->unix(), now()->unix()))
+            ->onQueue('pancake');
 
         return redirect()->route('workspaces.shops.index', $workspace);
     }
