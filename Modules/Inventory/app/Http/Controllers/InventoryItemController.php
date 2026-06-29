@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\GencysERP\Models\GencysUnitCodeInventoryItem;
 use Modules\Inventory\Models\InventoryItem;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -22,20 +23,38 @@ class InventoryItemController extends Controller
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        $currentStocksSql = $workspace->inventory_sync
+        $currentStocksSql = $workspace->inventory_sync || true
             ? '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)'
             : 'inventory_items.remaining_qty';
 
-        $waitingStocksSql = '(SELECT SUM(count) FROM inventory_purchased_order_items WHERE inventory_item_id = inventory_items.id AND EXISTS (SELECT * FROM inventory_purchased_orders WHERE inventory_purchased_order_items.inventory_purchased_order_id = inventory_purchased_orders.id AND status = 6))';
+        // "Waiting for delivery" = the quantity still OWED on orders that are
+        // awaiting delivery (status 6) — i.e. the undelivered remainder per item
+        // (ordered count minus what has already been delivered), not the full
+        // ordered count. Fully-delivered lines contribute 0; NULLIF keeps items
+        // with nothing outstanding showing as "—" rather than 0.
+        $waitingStocksSql = '(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status not in (7,8)))';
         $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
         $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
-        $items = QueryBuilder::for(InventoryItem::where('inventory_items.workspace_id', $workspace->id))
+        // The list defaults to active items only. `filter[is_active]=all` shows every
+        // item; an explicit 0/1 narrows to inactive/active.
+        $isActiveFilter = $request->input('filter.is_active');
+
+        $base = InventoryItem::where('inventory_items.workspace_id', $workspace->id);
+
+        if ($isActiveFilter === null) {
+            $base->where('inventory_items.is_active', true);
+        } elseif ($isActiveFilter !== 'all') {
+            $base->where('inventory_items.is_active', filter_var($isActiveFilter, FILTER_VALIDATE_BOOLEAN));
+        }
+
+        $items = QueryBuilder::for($base)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
-            ->withSum('waitingForDeliveryItems as waiting_for_delivery_stocks', 'count')
+            // Undelivered remainder on status-6 orders (see $waitingStocksSql).
+            ->selectRaw("$waitingStocksSql as waiting_for_delivery_stocks")
             ->selectRaw("$currentStocksSql as current_stocks")
             ->selectRaw("$remainingAfterFulfillmentSql as remaining_after_fulfillment")
             ->selectRaw("$poNeededSql as po_needed")
@@ -46,11 +65,15 @@ class InventoryItemController extends Controller
                     $query->where('sku', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('product_id'),
+                // is_active is applied manually to $base above; register it as a
+                // no-op here so QueryBuilder doesn't reject the filter key.
+                AllowedFilter::callback('is_active', function () {}),
             ])
             ->allowedSorts([
                 'id',
                 'product_id',
                 'sku',
+                'is_active',
                 AllowedSort::field('product_name', 'products.name'),
                 'lead_time',
                 'unfulfilled_count',
@@ -84,35 +107,69 @@ class InventoryItemController extends Controller
         ]);
     }
 
+    public function syncFromGencys(Workspace $workspace)
+    {
+        $this->authorize('Create Inventory Items', $workspace);
+
+        abort_unless($workspace->is_gencys_partner, 403);
+
+        $codes = GencysUnitCodeInventoryItem::query()
+            ->whereHas('unitCode', fn ($q) => $q->where('workspace_id', $workspace->id))
+            ->whereNotNull('inventory_item_code')
+            ->where('inventory_item_code', '!=', '')
+            ->distinct()
+            ->pluck('inventory_item_code');
+
+        $created = 0;
+
+        foreach ($codes as $code) {
+            // Match on (workspace_id, sku); don't touch product_id on existing
+            // items so a manually linked product survives re-syncs. New items get
+            // a null product_id from the column default.
+            $item = InventoryItem::updateOrCreate(
+                ['workspace_id' => $workspace->id, 'sku' => $code],
+            );
+
+            if ($item->wasRecentlyCreated) {
+                $created++;
+            }
+        }
+
+        return redirect()
+            ->route('workspaces.inventory.item.index', $workspace->slug)
+            ->with('success', "Synced {$created} new inventory item(s) from Gencys.");
+    }
+
     public function store(Request $request, Workspace $workspace)
     {
         $this->authorize('Create Inventory Items', $workspace);
 
         $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'nullable|exists:products,id',
             'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
+            'is_active' => 'nullable|boolean',
             'sales_keywords' => 'nullable|array',
             'sales_keywords.*' => 'string|max:255',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
-            'remaining_qty' => 'nullable|integer',
         ]);
 
         InventoryItem::create([
             'workspace_id' => $workspace->id,
-            'product_id' => $request->product_id,
+            'product_id' => $request->product_id ?: null,
             'sku' => $request->sku,
+            'is_active' => $request->boolean('is_active', true),
             'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
             'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
-            'remaining_qty' => $request->remaining_qty,
         ]);
 
-        return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
+        // back() keeps the list's current filters/sort/page (they live in the URL).
+        return redirect()->back()
             ->with('success', 'Items record created successfully.');
     }
 
@@ -121,7 +178,7 @@ class InventoryItemController extends Controller
         $this->authorize('Edit Inventory Items', $workspace);
 
         $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => 'nullable|exists:products,id',
             'sku' => [
                 'required',
                 'string',
@@ -130,27 +187,50 @@ class InventoryItemController extends Controller
                     ->where('workspace_id', $workspace->id)
                     ->ignore($item->id),
             ],
+            'is_active' => 'nullable|boolean',
             'sales_keywords' => 'nullable|array',
             'sales_keywords.*' => 'string|max:255',
             'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
-            'remaining_qty' => 'nullable|integer',
         ]);
         $item->update([
-            'product_id' => $request->product_id,
+            'product_id' => $request->product_id ?: null,
             'sku' => $request->sku,
+            'is_active' => $request->boolean('is_active', true),
             'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
             'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
-            'remaining_qty' => $request->remaining_qty,
         ]);
 
-        return redirect()->route('workspaces.inventory.item.index', $workspace->slug)
+        return redirect()->back()
             ->with('success', 'Inventory Items record updated.');
+    }
+
+    /**
+     * Activate or deactivate multiple inventory items at once.
+     */
+    public function bulkUpdateStatus(Request $request, Workspace $workspace)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'is_active' => 'required|boolean',
+        ]);
+
+        $updated = InventoryItem::where('workspace_id', $workspace->id)
+            ->whereIn('id', $validated['ids'])
+            ->update(['is_active' => $validated['is_active']]);
+
+        $status = $validated['is_active'] ? 'activated' : 'deactivated';
+
+        return redirect()->back()
+            ->with('success', "{$updated} inventory item(s) {$status}.");
     }
 
     /**
@@ -180,6 +260,7 @@ class InventoryItemController extends Controller
 
         $item->delete();
 
-        return redirect()->route('workspaces.inventory.item.index', $workspace->slug);
+        return redirect()->back()
+            ->with('success', 'Inventory Items record deleted.');
     }
 }

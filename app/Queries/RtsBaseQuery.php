@@ -108,5 +108,18 @@ abstract class RtsBaseQuery
         if ($this->request->filled('shop_ids')) {
             $this->query->whereIn('pancake_orders.shop_id', (array) $this->request->input('shop_ids'));
         }
+
+        // Limit to orders whose page belongs to one of the selected teams. A team
+        // with no connected pages therefore matches nothing (fail-closed) rather
+        // than leaving the data unfiltered.
+        if ($this->request->filled('team_ids')) {
+            $teamIds = (array) $this->request->input('team_ids');
+            // pancake_orders carries shop_id directly — scope via the shop's
+            // teams (covers page-less Webcake orders too).
+            $this->query->whereHas(
+                'shop.teams',
+                fn (Builder $q) => $q->whereIn('teams.id', $teamIds),
+            );
+        }
     }
 }

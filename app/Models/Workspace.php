@@ -13,7 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
+use Modules\Inventory\Models\PurchasedOrder;
 use Modules\MetaAds\Models\User as MetaUser;
 
 class Workspace extends Model
@@ -26,7 +28,7 @@ class Workspace extends Model
         'description',
         'owner_id',
         'monthly_order_volume',
-        'max_pages',
+        'max_shops',
         'inventory_module_enabled',
         'finance_module_enabled',
         'products_module_enabled',
@@ -38,19 +40,25 @@ class Workspace extends Model
         'botcake_module_enabled',
         'creatives_module_enabled',
         'meta_ads_module_enabled',
+        'gencys_module_enabled',
+        'is_gencys_partner',
         'sales_marketing_dashboard_module_enabled',
         'video_editor_dashboard_module_enabled',
         'csr_dashboard_module_enabled',
         'inventory_sync',
         'public_password',
+        'erp_username',
+        'erp_password',
     ];
 
     protected $hidden = [
         'public_password',
+        'erp_password',
     ];
 
     protected $appends = [
         'public_password_set',
+        'erp_password_set',
     ];
 
     protected $casts = [
@@ -67,11 +75,15 @@ class Workspace extends Model
         'botcake_module_enabled' => 'boolean',
         'creatives_module_enabled' => 'boolean',
         'meta_ads_module_enabled' => 'boolean',
+        'gencys_module_enabled' => 'boolean',
+        'is_gencys_partner' => 'boolean',
         'sales_marketing_dashboard_module_enabled' => 'boolean',
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
-        'max_pages' => 'integer',
+        'max_shops' => 'integer',
+        // Reversible encryption so the automation pipeline can read it back.
+        'erp_password' => 'encrypted',
     ];
 
     /**
@@ -93,6 +105,7 @@ class Workspace extends Model
             $this->csr_module_enabled ? null : 'CSR',
             $this->botcake_module_enabled ? null : 'Botcake',
             $this->meta_ads_module_enabled ? null : 'Meta Ads',
+            $this->gencys_module_enabled ? null : 'Gencys ERP',
         ]));
     }
 
@@ -123,12 +136,34 @@ class Workspace extends Model
         return ! empty($this->attributes['public_password']);
     }
 
+    /**
+     * Whether ERP automation credentials are configured. Exposed to the client
+     * without leaking the encrypted password itself.
+     */
+    public function getErpPasswordSetAttribute(): bool
+    {
+        return ! empty($this->attributes['erp_password']);
+    }
+
     /** Verify a plaintext password against the stored public-pages password. */
     public function checkPublicPassword(string $password): bool
     {
         $hash = $this->attributes['public_password'] ?? null;
 
         return $hash !== null && Hash::check($password, $hash);
+    }
+
+    /**
+     * A stable fingerprint of the current public-pages password hash, or null
+     * when no password is set. Used to bind a session "unlocked" marker to the
+     * exact password in effect, so changing/removing/re-adding the password
+     * invalidates any prior unlock (bcrypt re-salts on every set).
+     */
+    public function publicPasswordFingerprint(): ?string
+    {
+        $hash = $this->attributes['public_password'] ?? null;
+
+        return $hash ? sha1($hash) : null;
     }
 
     protected static function boot()
@@ -386,15 +421,15 @@ class Workspace extends Model
         ];
     }
 
-    public function pageLimit(): ?int
+    public function shopLimit(): ?int
     {
-        return $this->max_pages ?? $this->subscription?->plan?->page_limit;
+        return $this->max_shops ?? $this->subscription?->plan?->shop_limit;
     }
 
-    public function pageLimitInfo(): array
+    public function shopLimitInfo(): array
     {
-        $limit = $this->pageLimit();
-        $count = $this->pages()->count();
+        $limit = $this->shopLimit();
+        $count = $this->shops()->count();
 
         return [
             'limit' => $limit,
@@ -403,8 +438,23 @@ class Workspace extends Model
         ];
     }
 
-    public function hasReachedPageLimit(): bool
+    public function hasReachedShopLimit(): bool
     {
-        return $this->pageLimitInfo()['reached'];
+        return $this->shopLimitInfo()['reached'];
+    }
+
+    public function inventoryItems(): HasMany|Workspace
+    {
+        return $this->hasMany(InventoryItem::class);
+    }
+
+    public function purchaseOrders(): HasMany|Workspace
+    {
+        return $this->hasMany(PurchasedOrder::class);
+    }
+
+    public function deliveredPurchaseOrders(): HasMany|Workspace
+    {
+        return $this->hasMany(PurchasedOrder::class)->where('status', 7);
     }
 }

@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { Switch } from '@/components/ui/switch';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type PaginatedData } from '@/types';
@@ -64,6 +66,9 @@ export default function OptimizationRulesIndex({
         null,
     );
     const [runningId, setRunningId] = useState<number | null>(null);
+    const canManageRules = usePermission(PERMISSIONS.ManageOptimizationRules);
+    const canApproveRules = usePermission(PERMISSIONS.ApproveOptimizationRules);
+    const canViewLogs = usePermission(PERMISSIONS.ViewOptimizationLogs);
 
     const indexUrl = optimizationRulesUrl(workspace.slug);
     const breadcrumbs: BreadcrumbItem[] = [
@@ -218,7 +223,7 @@ export default function OptimizationRulesIndex({
             accessorKey: 'logs_count',
             header: 'Triggered',
             cell: ({ row }) =>
-                row.original.logs_count > 0 ? (
+                row.original.logs_count > 0 && canViewLogs ? (
                     <Link
                         href={`${indexUrl}/logs?rule_id[]=${row.original.id}`}
                         className="text-emerald-600 hover:underline dark:text-emerald-400"
@@ -226,7 +231,9 @@ export default function OptimizationRulesIndex({
                         {row.original.logs_count}
                     </Link>
                 ) : (
-                    <span className="text-gray-400 dark:text-gray-500">0</span>
+                    <span className="text-gray-400 dark:text-gray-500">
+                        {row.original.logs_count}
+                    </span>
                 ),
         },
         {
@@ -235,6 +242,7 @@ export default function OptimizationRulesIndex({
             cell: ({ row }) => (
                 <Switch
                     checked={row.original.is_active}
+                    disabled={!canManageRules}
                     onCheckedChange={() => toggle(row.original)}
                 />
             ),
@@ -242,35 +250,36 @@ export default function OptimizationRulesIndex({
         {
             id: 'actions',
             header: '',
-            cell: ({ row }) => (
-                <div className="flex justify-end gap-1">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Run now"
-                        disabled={runningId === row.original.id}
-                        onClick={() => runNow(row.original)}
-                    >
-                        {runningId === row.original.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                        ) : (
-                            <Play className="h-4 w-4 text-gray-400 hover:text-emerald-500" />
-                        )}
-                    </Button>
-                    <Button variant="ghost" size="icon" asChild>
-                        <Link href={`${indexUrl}/${row.original.id}/edit`}>
-                            <Pencil className="h-4 w-4" />
-                        </Link>
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteTarget(row.original)}
-                    >
-                        <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
-                    </Button>
-                </div>
-            ),
+            cell: ({ row }) =>
+                canManageRules ? (
+                    <div className="flex justify-end gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Run now"
+                            disabled={runningId === row.original.id}
+                            onClick={() => runNow(row.original)}
+                        >
+                            {runningId === row.original.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                            ) : (
+                                <Play className="h-4 w-4 text-gray-400 hover:text-emerald-500" />
+                            )}
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                            <Link href={`${indexUrl}/${row.original.id}/edit`}>
+                                <Pencil className="h-4 w-4" />
+                            </Link>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteTarget(row.original)}
+                        >
+                            <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                        </Button>
+                    </div>
+                ) : null,
         },
     ];
 
@@ -283,21 +292,29 @@ export default function OptimizationRulesIndex({
                     title="Optimization Rules"
                     description="Automatically pause, enable, or adjust Meta Ads budgets based on performance."
                 >
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href={`${indexUrl}/logs`}>
-                            <History className="mr-1 h-4 w-4" />
-                            History
-                        </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href={`${indexUrl}/approvals`}>Approvals</Link>
-                    </Button>
-                    <Button size="sm" asChild>
-                        <Link href={`${indexUrl}/create`}>
-                            <Plus className="mr-1 h-4 w-4" />
-                            New Rule
-                        </Link>
-                    </Button>
+                    {canViewLogs && (
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={`${indexUrl}/logs`}>
+                                <History className="mr-1 h-4 w-4" />
+                                History
+                            </Link>
+                        </Button>
+                    )}
+                    {canApproveRules && (
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={`${indexUrl}/approvals`}>
+                                Approvals
+                            </Link>
+                        </Button>
+                    )}
+                    {canManageRules && (
+                        <Button size="sm" asChild>
+                            <Link href={`${indexUrl}/create`}>
+                                <Plus className="mr-1 h-4 w-4" />
+                                New Rule
+                            </Link>
+                        </Button>
+                    )}
                 </PageHeader>
 
                 {rules.total === 0 ? (
@@ -312,17 +329,27 @@ export default function OptimizationRulesIndex({
                             Create a rule to automate budget and status changes
                             across your campaigns and ad sets.
                         </p>
-                        <Button asChild className="mt-5" size="sm">
-                            <Link href={`${indexUrl}/create`}>
-                                <Plus className="mr-1 h-4 w-4" />
-                                Create your first rule
-                            </Link>
-                        </Button>
+                        {canManageRules && (
+                            <Button asChild className="mt-5" size="sm">
+                                <Link href={`${indexUrl}/create`}>
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Create your first rule
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 ) : (
                     <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                         <DataTable
-                            columns={columns as ColumnDef<unknown>[]}
+                            columns={
+                                (canManageRules
+                                    ? columns
+                                    : columns.filter(
+                                          (c) =>
+                                              c.id !== 'actions' &&
+                                              c.id !== 'active',
+                                      )) as ColumnDef<unknown>[]
+                            }
                             data={(rules.data ?? []) as unknown[]}
                             meta={omit(rules, ['data'])}
                             onFetch={(params) =>

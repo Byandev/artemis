@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\ErpCredentialController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
@@ -36,4 +37,12 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/workspaces/{workspace}/settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
+
+    // Automation Configuration — ERP credentials consumed by the n8n pipeline.
+    Route::get('/workspaces/{workspace}/settings/erp-credentials', [ErpCredentialController::class, 'edit'])
+        ->name('erp-credentials.edit');
+    Route::put('/workspaces/{workspace}/settings/erp-credentials', [ErpCredentialController::class, 'update'])
+        ->name('erp-credentials.update');
+    Route::delete('/workspaces/{workspace}/settings/erp-credentials', [ErpCredentialController::class, 'destroy'])
+        ->name('erp-credentials.destroy');
 });

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Workspace;
 use App\Policies\MetricSettingPolicy;
+use App\Services\Logging\ActivityLogger;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -18,7 +19,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Single shared activity/system logger instance.
+        $this->app->singleton(ActivityLogger::class);
     }
 
     /**

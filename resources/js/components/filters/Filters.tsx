@@ -1,3 +1,4 @@
+import OrderSourceFilter from '@/components/filters/OrderSourceFilter';
 import PageFilter from '@/components/filters/PageFilter';
 import ShopFilter from '@/components/filters/ShopFilter';
 import TeamFilter from '@/components/filters/TeamFilter';
@@ -17,6 +18,7 @@ export interface FilterValue {
     shopIds: (string | number)[];
     pageIds: (string | number)[];
     userIds: (string | number)[];
+    orderSourceNames?: (string | number)[];
 }
 
 interface Props {
@@ -24,6 +26,9 @@ interface Props {
     onChange: (value: FilterValue) => void;
     initialValue?: FilterValue;
     onClear?: () => void;
+    // Available order source names (e.g. Facebook, Webcake). When provided, an
+    // "Order Source" filter group is shown. Omitted on pages that don't support it.
+    orderSources?: string[];
 }
 
 const INITIAL_FILTER_VALUE: FilterValue = {
@@ -39,6 +44,7 @@ const Filters = ({
     onChange,
     initialValue = INITIAL_FILTER_VALUE,
     onClear,
+    orderSources,
 }: Props) => {
     const [isOpen, setIsOpen] = useState(false);
     const [localValue, setLocalValue] = useState<FilterValue>(initialValue);
@@ -52,7 +58,7 @@ const Filters = ({
     const handleFilterChange = useCallback(
         (type: keyof FilterValue, id: string | number) => {
             setLocalValue((prev) => {
-                const currentArray = prev[type];
+                const currentArray = prev[type] ?? [];
                 const newArray = currentArray.includes(id)
                     ? currentArray.filter((item) => item !== id)
                     : [...currentArray, id];
@@ -195,6 +201,15 @@ const Filters = ({
                         selected={localValue.userIds}
                         onSelect={(id) => handleFilterChange('userIds', id)}
                     />
+                    {orderSources && orderSources.length > 0 && (
+                        <OrderSourceFilter
+                            options={orderSources}
+                            selected={localValue.orderSourceNames ?? []}
+                            onSelect={(id) =>
+                                handleFilterChange('orderSourceNames', id)
+                            }
+                        />
+                    )}
                 </div>
 
                 {/* Footer */}

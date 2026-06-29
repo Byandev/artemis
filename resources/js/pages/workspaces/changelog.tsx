@@ -12,6 +12,176 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.14.0',
+        date: '2026-06-29',
+        sections: [
+            {
+                title: 'Shops — Connect a Shop, Not a Page',
+                items: [
+                    'You now add a Shop instead of adding pages one at a time — enter the Shop ID and POS token in a quick pop-up and every page under that shop is imported and synced automatically',
+                    'New "Refresh page list" action on each shop re-checks the shop and pulls in any newly-created pages, leaving the pages you already have untouched',
+                    'First-time setup is now shop-based too — connect one shop and you are ready to go',
+                ],
+            },
+            {
+                title: 'Plans — Limits Are Now Per Shop',
+                items: [
+                    'Plan limits now count shops instead of pages, matching the new shop-first flow — your plan and the admin screens show how many shops are used and the shop limit',
+                ],
+            },
+            {
+                title: 'Teams — Assign Shops',
+                items: [
+                    'Teams now own shops instead of individual pages — pick the shops a team manages and its members automatically see all the orders, budgets, and metrics for those shops and their pages',
+                ],
+            },
+            {
+                title: 'Pages',
+                items: [
+                    'The POS token now lives on the shop, so it has been removed from the page form — it only needs to be set once per shop',
+                    'The page edit form is simpler: the Shop ID and POS token fields are gone',
+                    'The standalone "Add Page" flow and the per-page "Refresh Orders" action have been retired, since pages now come from — and sync with — their shop',
+                ],
+            },
+            {
+                title: 'Parcel Journey',
+                items: [
+                    'The parcel-journey analytics breakdown is now per shop instead of per page, for a cleaner view of tracked orders and messages sent across each shop',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.3',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Order Refresh Tooling',
+                items: [
+                    'New maintenance command to re-pull a workspace’s shop orders (all sources, incl. Webcake) over a configurable recent window — scopeable to a single shop or page — for backfills and one-off fixes without touching the hourly sync',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.2',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Fix',
+                items: [
+                    'Shop order syncing now processes every order again — a leftover debug limit that only synced a handful of test orders has been removed, with order dispatches staggered to ease load on Pancake',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.1',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Shops — Fix',
+                items: [
+                    'Refreshing a shop’s orders now resets its "Last Sync" first, so the column reflects the manual re-pull instead of showing a stale timestamp until the sync finishes',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.0',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Webcake Orders Now Captured',
+                items: [
+                    'Order syncing now runs per shop instead of per page, so orders from every source are pulled in — including Webcake orders, which have no page and were previously skipped entirely',
+                    'Each order now records where it came from (e.g. Facebook or Webcake), so its source is visible and filterable across the app',
+                    'Delivery-journey text messages still go out for Webcake orders — they fall back to a shop page for messaging, while the order itself stays correctly marked as page-less',
+                    'The "Single Page Shop" toggle has been removed from the page form — it is no longer needed now that syncing covers the whole shop',
+                ],
+            },
+            {
+                title: 'Shops',
+                items: [
+                    'New "Refresh orders" action on each shop re-pulls the last few months of orders across all sources on demand',
+                    'Shops now show a "Last Sync" column so you can see when each shop last pulled orders',
+                ],
+            },
+            {
+                title: 'Dashboard',
+                items: [
+                    'New "Order Source" filter (Facebook, Webcake) on the dashboard — every metric, breakdown, and per-page/shop/user view respects it',
+                ],
+            },
+            {
+                title: 'RTS Analytics',
+                items: [
+                    'New "By Order Source" breakdown showing RTS rate for Facebook vs Webcake orders, alongside the By Price, By Delivery Attempts, and By Order Frequency cards',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.12.0',
+        date: '2026-06-26',
+        sections: [
+            {
+                title: 'Gencys ERP — New Integration',
+                items: [
+                    'Brand-new Gencys ERP module — enable it per workspace to pull Gencys data into Artemis: a Daily Sales Tracker (orders with full line-item detail) and a Unit Code catalog with per-code inventory',
+                    'Data is collected by an automated n8n pipeline that scrapes Gencys and posts results back to dedicated callback endpoints, so figures stay fresh without manual exports',
+                    'Inventory items can now sync directly from Gencys unit codes; the module and its nav only appear where Gencys has been turned on',
+                    'Five new role permissions under a Gencys ERP group — View Daily Sales Tracker, View Unit Code, and Create / Edit / Delete Unit Code — all assignable from the Roles screen',
+                ],
+            },
+            {
+                title: 'Meta Ads — Report Builder',
+                items: [
+                    'New saved Reports area under Meta Ads — build reusable reports that explore your top-performing ads and creative across any combination of ad accounts',
+                    'Group rows by Ad, Ad Name, Campaign, Ad Set, Account, or Ad Type — or by your own custom breakdowns (named, rule-based ad groups you define once and reuse)',
+                    'Pick the metrics that matter, filter by name or metric thresholds, sort, and visualise as a creative gallery, bar, stacked bar, line, or area chart — with a creative preview for any ad',
+                    'Reports can be archived and restored, so retiring a report no longer means losing its setup',
+                ],
+            },
+            {
+                title: 'Activity Logs — Audit Trail',
+                items: [
+                    'New Activity Logs page gives workspace admins an audit trail of who did what and when — sign-ins, record changes, permission and security events, integration syncs, and background jobs — with filters and a summary',
+                    'A global, cross-workspace Activity Logs view is available in the admin area for platform-wide oversight',
+                    'Logging runs automatically across requests, model changes, and authentication, capturing both user actions and automated system events',
+                ],
+            },
+            {
+                title: 'Settings — ERP Credentials',
+                items: [
+                    'New Automation Configuration screen under Settings to store the ERP username and password used by the automated sync pipeline',
+                    'Passwords are encrypted and never sent back to the browser — update the username, replace the password, or clear it independently',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Order Monitoring',
+                items: [
+                    'Purchased Orders now track delivery progress inline — expand a PO to record deliveries against each item, set expected delivery dates, add remarks, and update status without leaving the page',
+                    'Delivery timeliness is derived automatically, so you can see at a glance whether items are arriving on schedule',
+                ],
+            },
+            {
+                title: 'Inventory — ERP Sync & Fixes',
+                items: [
+                    'New ERP transaction-history sync (scheduled daily) keeps inventory stock aligned with the ERP via the n8n pipeline — an ERP-provided remaining stock is now tracked alongside the manually adjustable remaining quantity',
+                    'Inventory items can be marked active/inactive with bulk status updates, and the product link is now optional so items without a Pancake product can still be tracked',
+                    'New machine-to-machine API endpoints for purchase-order and transaction-history sync, used by the automation pipeline',
+                ],
+            },
+            {
+                title: 'Creatives',
+                items: [
+                    'Creative names must now be unique within a workspace, preventing accidental duplicates in the tracker',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.11.0',
         date: '2026-06-18',
         sections: [
@@ -19,7 +189,7 @@ const changelog: ChangelogEntry[] = [
                 title: 'Team-Level Data Access',
                 items: [
                     "Data can now be scoped to teams — once a team owns pages or ad accounts, its members see only that team's records across pages, orders, products, shops, budgets, RTS analytics, creatives, the video-editor dashboard, Botcake sequences/flows/messages, and Meta ad performance",
-                    "New \"View All Workspace Data\" permission sets the boundary: owners, super admins, and anyone with this permission see everything; remove it from a role (e.g. CSR) to limit that role to its teams' data",
+                    'New "View All Workspace Data" permission sets the boundary: owners, super admins, and anyone with this permission see everything; remove it from a role (e.g. CSR) to limit that role to its teams\' data',
                     'Safe rollout — on release every existing role keeps full visibility, so nothing changes until you deliberately scope a role; a backfill command seeds team ownership from existing page owners',
                     "Fails closed — a scoped member who isn't on any team sees nothing until they're added to one, and you're warned if you assign such a role to a teamless member",
                 ],
@@ -30,7 +200,7 @@ const changelog: ChangelogEntry[] = [
                     'New per-team screens (from the Teams list) to choose which pages and ad accounts a team owns',
                     "Ad accounts have two access tiers per team — View (see the account's data) or Manage; Manage is required to change budgets or statuses and to approve optimization proposals, and the Optimization History shows only the accounts you can manage",
                     'Pages and ad accounts can belong to multiple teams, and a member can be on multiple teams — they see the combined data of all their teams',
-                    'The Pages list now shows each page\'s teams; the ad-account assignment screen lists only synced accounts and shows the Facebook user who connected each',
+                    "The Pages list now shows each page's teams; the ad-account assignment screen lists only synced accounts and shows the Facebook user who connected each",
                 ],
             },
             {

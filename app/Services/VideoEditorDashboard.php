@@ -21,13 +21,9 @@ class VideoEditorDashboard
 {
     private const FINAL_APPROVED = 'approved';
 
+    private const FINAL_FOR_APPROVAL = 'for_approval';
+
     private const FINAL_FOR_REVISION = 'for_revision';
-
-    private const REVIEW_REVISION = 'revision';
-
-    private const REVIEW_AWAITING = ['for_approval', 'for_reapproval'];
-
-    private const REVIEW_WAITING = 'waiting_for_submission';
 
     private const ADS_RUNNING = 'running';
 
@@ -122,7 +118,6 @@ class VideoEditorDashboard
         $ads = $this->adsBreakdown($creatives);
 
         return [
-            'waiting' => $status['waiting'],
             'for_approval' => $status['for_approval'],
             'revision' => $status['revision'],
             'approved' => $status['approved'],
@@ -140,20 +135,6 @@ class VideoEditorDashboard
         return $this->editorCreatives($workspace, $filters)
             ->filter(fn (Creative $c) => $this->isNeedsRevision($c))
             ->sortByDesc(fn (Creative $c) => $c->latestReview?->created_at ?? $c->updated_at)
-            ->take(self::LIST_LIMIT)
-            ->map(fn (Creative $c) => $this->workItem($c))
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    public function waitingList(Workspace $workspace, DashboardFilters $filters): array
-    {
-        return $this->editorCreatives($workspace, $filters)
-            ->filter(fn (Creative $c) => $this->isWaiting($c))
-            ->sortByDesc('creative_date')
             ->take(self::LIST_LIMIT)
             ->map(fn (Creative $c) => $this->workItem($c))
             ->values()
@@ -351,17 +332,16 @@ class VideoEditorDashboard
      * revision flag can co-exist with approval), so each is counted on its own.
      *
      * @param  Collection<int, Creative>  $creatives
-     * @return array{waiting: int, for_approval: int, revision: int, approved: int}
+     * @return array{for_approval: int, revision: int, approved: int}
      */
     private function statusBreakdown(Collection $creatives): array
     {
-        $counts = ['waiting' => 0, 'for_approval' => 0, 'revision' => 0, 'approved' => 0];
+        $counts = ['for_approval' => 0, 'revision' => 0, 'approved' => 0];
 
         foreach ($creatives as $c) {
-            $counts['approved'] += $c->final_status === self::FINAL_APPROVED ? 1 : 0;
+            $counts['approved'] += $this->isApproved($c) ? 1 : 0;
             $counts['revision'] += $this->isNeedsRevision($c) ? 1 : 0;
             $counts['for_approval'] += $this->isAwaitingReview($c) ? 1 : 0;
-            $counts['waiting'] += $this->isWaiting($c) ? 1 : 0;
         }
 
         return $counts;
@@ -384,28 +364,31 @@ class VideoEditorDashboard
     }
 
     // ─── Status derivation ───────────────────────────────────────────────────
+    //
+    // The creative's `final_status` (for_approval / approved / for_revision) is
+    // the source of truth and is what the creatives list shows as the status
+    // badge, so the dashboard buckets mirror it exactly. Reviewers only ever
+    // write `revision` / `approved` review rows (never `for_approval`), so a
+    // review row never defines the bucket — `final_status === 'for_approval'`
+    // covers both first-time "for approval" and resubmitted "re-approval".
+
+    private function isApproved(Creative $c): bool
+    {
+        return $c->final_status === self::FINAL_APPROVED;
+    }
 
     private function isNeedsRevision(Creative $c): bool
     {
-        return $c->final_status === self::FINAL_FOR_REVISION
-            || $c->latestReview?->status === self::REVIEW_REVISION;
+        return $c->final_status === self::FINAL_FOR_REVISION;
     }
 
+    /**
+     * Pending a reviewer's decision — covers both first-time "for approval" and
+     * resubmitted "re-approval", regardless of whether a review row exists yet.
+     */
     private function isAwaitingReview(Creative $c): bool
     {
-        return $c->final_status !== self::FINAL_APPROVED
-            && in_array($c->latestReview?->status, self::REVIEW_AWAITING, true);
-    }
-
-    private function isWaiting(Creative $c): bool
-    {
-        if ($c->final_status === self::FINAL_APPROVED) {
-            return false;
-        }
-
-        $status = $c->latestReview?->status;
-
-        return $status === null || $status === self::REVIEW_WAITING;
+        return $c->final_status === self::FINAL_FOR_APPROVAL;
     }
 
     /**

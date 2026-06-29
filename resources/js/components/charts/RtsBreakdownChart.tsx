@@ -1,3 +1,4 @@
+import { RtsEmptyState } from '@/components/rts/rts-shared';
 import { ApexOptions } from 'apexcharts';
 import Chart from 'react-apexcharts';
 
@@ -11,6 +12,10 @@ interface Props {
 }
 
 export default function RtsBreakdownChart({ rows }: Props) {
+    if (rows.length === 0) {
+        return <RtsEmptyState height="h-[280px]" />;
+    }
+
     const categories = rows.map((r) => r.label);
     const rates = rows.map((r) => r.rts_rate_percentage);
 

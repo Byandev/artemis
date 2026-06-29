@@ -3,10 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Shop;
-use Carbon\Carbon;
+use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Modules\Pancake\Jobs\FetchShopUsers;
-use Modules\Pancake\Models\User;
 
 class TriggerFetchShopUsers extends Command
 {
@@ -15,40 +14,49 @@ class TriggerFetchShopUsers extends Command
      *
      * @var string
      */
-    protected $signature = 'trigger-fetch-shops-users';
+    protected $signature = 'trigger-fetch-shops-users {--workspace= : Limit to a single workspace (id or slug)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Dispatch FetchShopUsers jobs for shops that have pages, optionally scoped to one workspace';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        //        $startDate = Carbon::now()->startOfYear()->format('Y-m-d H:i:s');
-        //        $endDate = Carbon::now()->endOfYear()->format('Y-m-d H:i:s');
+        $query = Shop::whereHas('pages');
 
-        //        $users = User::query()
-        //            ->withCount([
-        //                'orders' => function ($query) use ($startDate, $endDate) {
-        //                    $query->whereBetween('confirmed_at', [$startDate, $endDate]);
-        //                }
-        //            ])
-        //            ->withSum([
-        //                'orders as sales' => function ($query) use ($startDate, $endDate) {
-        //                    $query->whereBetween('confirmed_at', [$startDate, $endDate]);
-        //                }
-        //            ], 'final_amount')
-        //            ->orderByDesc('sales')
-        //            ->get();
+        if ($workspace = $this->option('workspace')) {
+            $model = Workspace::query()
+                ->when(
+                    is_numeric($workspace),
+                    fn ($q) => $q->where('id', $workspace),
+                    fn ($q) => $q->where('slug', $workspace),
+                )
+                ->first();
 
-        Shop::whereHas('pages')
-            ->each(function (Shop $shop) {
-                dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-            });
+            if (! $model) {
+                $this->error("Workspace [{$workspace}] not found.");
+
+                return self::FAILURE;
+            }
+
+            $query->where('workspace_id', $model->id);
+        }
+
+        $count = 0;
+
+        $query->each(function (Shop $shop) use (&$count) {
+            dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+            $count++;
+        });
+
+        $this->info("Dispatched FetchShopUsers for {$count} shop(s).");
+
+        return self::SUCCESS;
     }
 }

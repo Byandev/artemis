@@ -4,6 +4,7 @@ use App\Models\Order;
 use App\Models\Page;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shop;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
@@ -29,18 +30,34 @@ function scopedMember(Workspace $workspace, array $teams = []): User
     return $user;
 }
 
+/**
+ * Create a page on a shop assigned to the given teams. Team-level visibility
+ * now flows through the shop (team_shop), so this is how data gets "owned".
+ *
+ * @param  array<int, Team>  $teams
+ */
+function pageForTeams(Workspace $workspace, array $teams): Page
+{
+    $shop = Shop::factory()->forWorkspace($workspace)->create();
+
+    if ($teams) {
+        $shop->teams()->attach(collect($teams)->pluck('id')->all());
+    }
+
+    return Page::factory()->create([
+        'workspace_id' => $workspace->id,
+        'shop_id' => $shop->id,
+    ]);
+}
+
 it('limits a scoped user to pages of the teams they belong to', function () {
     $workspace = Workspace::factory()->create();
     $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
     $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
 
-    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageBoth = Page::factory()->create(['workspace_id' => $workspace->id]);
-
-    $pageA->teams()->attach($teamA);
-    $pageB->teams()->attach($teamB);
-    $pageBoth->teams()->attach([$teamA->id, $teamB->id]);
+    $pageA = pageForTeams($workspace, [$teamA]);
+    $pageB = pageForTeams($workspace, [$teamB]);
+    $pageBoth = pageForTeams($workspace, [$teamA, $teamB]);
 
     $user = scopedMember($workspace, [$teamA]);
 
@@ -59,9 +76,8 @@ it('shows every page to the workspace owner', function () {
     $owner = User::find($workspace->owner_id);
     $team = Team::factory()->create(['workspace_id' => $workspace->id]);
 
-    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA->teams()->attach($team);
+    $pageA = pageForTeams($workspace, [$team]);
+    $pageB = pageForTeams($workspace, []);
 
     $visible = Page::where('workspace_id', $workspace->id)
         ->visibleTo($owner, $workspace)
@@ -79,9 +95,8 @@ it('shows every page to a user with the View All Workspace Data permission', fun
     $user->workspaces()->attach($workspace, ['role_id' => $role->id]);
 
     $team = Team::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA->teams()->attach($team);
+    $pageA = pageForTeams($workspace, [$team]);
+    $pageB = pageForTeams($workspace, []);
 
     $visible = Page::where('workspace_id', $workspace->id)
         ->visibleTo($user, $workspace)
@@ -94,8 +109,7 @@ it('shows every page to a user with the View All Workspace Data permission', fun
 it('shows no pages to a scoped user on no team (fail-closed)', function () {
     $workspace = Workspace::factory()->create();
     $team = Team::factory()->create(['workspace_id' => $workspace->id]);
-    $page = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $page->teams()->attach($team);
+    pageForTeams($workspace, [$team]);
 
     $user = scopedMember($workspace);
 
@@ -111,9 +125,8 @@ it('limits a scoped user to orders of their team pages', function () {
     $workspace = Workspace::factory()->create();
     $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
 
-    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA->teams()->attach($teamA);
+    $pageA = pageForTeams($workspace, [$teamA]);
+    $pageB = pageForTeams($workspace, []);
 
     $orderA = Order::factory()->create(['workspace_id' => $workspace->id, 'page_id' => $pageA->id]);
     $orderB = Order::factory()->create(['workspace_id' => $workspace->id, 'page_id' => $pageB->id]);
@@ -153,10 +166,8 @@ it('narrows an unrestricted manager to the active team when one is selected', fu
     $owner = User::find($workspace->owner_id);
     $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
     $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA->teams()->attach($teamA);
-    $pageB->teams()->attach($teamB);
+    $pageA = pageForTeams($workspace, [$teamA]);
+    $pageB = pageForTeams($workspace, [$teamB]);
 
     session(['active_team_id' => $teamA->id]);
 
@@ -172,10 +183,8 @@ it('narrows a multi-team scoped user to the active team', function () {
     $workspace = Workspace::factory()->create();
     $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
     $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA->teams()->attach($teamA);
-    $pageB->teams()->attach($teamB);
+    $pageA = pageForTeams($workspace, [$teamA]);
+    $pageB = pageForTeams($workspace, [$teamB]);
 
     $user = scopedMember($workspace, [$teamA, $teamB]);
 
@@ -193,10 +202,8 @@ it('ignores an active team the user does not belong to', function () {
     $workspace = Workspace::factory()->create();
     $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
     $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageB = Page::factory()->create(['workspace_id' => $workspace->id]);
-    $pageA->teams()->attach($teamA);
-    $pageB->teams()->attach($teamB);
+    $pageA = pageForTeams($workspace, [$teamA]);
+    $pageB = pageForTeams($workspace, [$teamB]);
 
     $user = scopedMember($workspace, [$teamA]); // only team A
 

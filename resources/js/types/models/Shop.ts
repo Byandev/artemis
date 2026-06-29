@@ -3,7 +3,9 @@ export interface Shop {
     workspace_id: number;
     avatar_url: string;
     name: string;
+    orders_last_synced_at: string | null;
     created_at: string;
     updated_at: string;
     pending_required_checklists_count?: number;
+    teams?: { id: number; name: string }[];
 }

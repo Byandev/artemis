@@ -23,6 +23,7 @@ export const PERMISSIONS = {
 
     // Shops
     ViewShops: 'View Shops',
+    CreateShops: 'Create Shops',
     RefreshShops: 'Refresh Shops',
 
     // Products
@@ -64,6 +65,13 @@ export const PERMISSIONS = {
     CreatePurchasedOrders: 'Create Purchased Orders',
     EditPurchasedOrders: 'Edit Purchased Orders',
     DeletePurchasedOrders: 'Delete Purchased Orders',
+
+    // Gencys ERP
+    ViewDailySalesTracker: 'View Daily Sales Tracker',
+    ViewUnitCode: 'View Unit Code',
+    CreateUnitCode: 'Create Unit Code',
+    EditUnitCode: 'Edit Unit Code',
+    DeleteUnitCode: 'Delete Unit Code',
 
     // Checklist
     ViewChecklist: 'View Checklist',
@@ -107,10 +115,13 @@ export const PERMISSIONS = {
 
     // Meta Ads
     ViewMetaAds: 'View Meta Ads',
+    ConnectFbAccount: 'Connect FB Account',
+    ViewAdAccounts: 'View Ad Accounts',
     ManageMetaAdsAccounts: 'Manage Meta Ads Accounts',
     ViewOptimizationRules: 'View Optimization Rules',
     ManageOptimizationRules: 'Manage Optimization Rules',
     ApproveOptimizationRules: 'Approve Optimization Rules',
+    ViewOptimizationLogs: 'View Optimization Logs',
 
     // Dashboards
     ViewMainDashboard: 'View Main Dashboard',

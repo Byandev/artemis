@@ -4,5 +4,6 @@
     "Inventory": true,
     "Finance": true,
     "MetaAds": true,
-    "Creatives": true
+    "Creatives": true,
+    "GencysERP": true
 }

@@ -37,21 +37,21 @@ class SaveParcelJourneyNotificationLog extends Command
             ->join('orders as o', 'o.id', '=', 'pjn.order_id')
             ->select([
                 DB::raw('DATE(pjn.created_at) as date'),
-                'o.page_id',
+                'o.shop_id',
                 DB::raw('SUM(CASE WHEN pjn.type = "sms" THEN 1 ELSE 0 END) as sms_sent'),
                 DB::raw('SUM(CASE WHEN pjn.type = "chat" THEN 1 ELSE 0 END) as chat_sent'),
                 DB::raw('COUNT(DISTINCT pjn.order_id) as tracked_orders'),
             ])
             ->where('pjn.status', 'sent')
             ->whereBetween('pjn.created_at', [$startDate, $endDate])
-            ->groupBy(DB::raw('DATE(pjn.created_at)'), 'o.page_id')
+            ->groupBy(DB::raw('DATE(pjn.created_at)'), 'o.shop_id')
             ->orderBy('date')
-            ->orderBy('o.page_id')
+            ->orderBy('o.shop_id')
             ->get();
 
         $result->each(function ($item) {
             ParcelJourneyNotificationLog::updateOrCreate([
-                'page_id' => $item->page_id,
+                'shop_id' => $item->shop_id,
                 'date' => $item->date,
             ], [
                 'chat_sent' => $item->chat_sent,

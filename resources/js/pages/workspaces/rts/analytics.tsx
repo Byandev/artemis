@@ -6,6 +6,7 @@ import CxRtsCard from '@/components/rts/CxRtsCard';
 import DeliveryAttemptsCard from '@/components/rts/DeliveryAttemptsCard';
 import LocationCard from '@/components/rts/LocationCard';
 import OrderFrequencyCard from '@/components/rts/OrderFrequencyCard';
+import OrderSourceCard from '@/components/rts/OrderSourceCard';
 import PriceCard from '@/components/rts/PriceCard';
 import ProductCard from '@/components/rts/ProductCard';
 import RiderCard from '@/components/rts/RiderCard';
@@ -106,6 +107,7 @@ export default function Analytics({ workspace }: Props) {
             endDate: dateRange[1],
             pageIds: filter.pageIds,
             shopIds: filter.shopIds,
+            teamIds: filter.teamIds,
         }),
         [dateRange, filter],
     );
@@ -148,6 +150,14 @@ export default function Analytics({ workspace }: Props) {
                         workspaceSlug={workspace.slug}
                         queryParams={queryParams}
                     />
+                    <OrderSourceCard
+                        workspaceSlug={workspace.slug}
+                        queryParams={queryParams}
+                    />
+                    <OrderFrequencyCard
+                        workspaceSlug={workspace.slug}
+                        queryParams={queryParams}
+                    />
                 </div>
 
                 <CxRtsCard
@@ -167,10 +177,6 @@ export default function Analytics({ workspace }: Props) {
                     queryParams={queryParams}
                 />
                 <AdCard
-                    workspaceSlug={workspace.slug}
-                    queryParams={queryParams}
-                />
-                <OrderFrequencyCard
                     workspaceSlug={workspace.slug}
                     queryParams={queryParams}
                 />

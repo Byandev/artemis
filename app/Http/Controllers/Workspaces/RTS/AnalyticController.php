@@ -12,6 +12,7 @@ use App\Queries\RtsDeliveryAttemptsQuery;
 use App\Queries\RtsLocationQuery;
 use App\Queries\RtsOrderFrequencyQuery;
 use App\Queries\RtsOrderItemQuery;
+use App\Queries\RtsOrderSourceQuery;
 use App\Queries\RtsPriceQuery;
 use App\Queries\RtsRiderQuery;
 use App\Support\TeamVisibility;
@@ -85,6 +86,18 @@ class AnalyticController extends Controller
         $key = $this->cacheKey($workspace, 'delivery-attempts', $request);
         $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
             return (new RtsDeliveryAttemptsQuery($workspace, $request))->get();
+        });
+
+        return response()->json($data);
+    }
+
+    public function groupByOrderSource(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewRtsAnalytics->value, $workspace);
+
+        $key = $this->cacheKey($workspace, 'order-source', $request);
+        $data = Cache::remember($key, $this->ttl($request), function () use ($request, $workspace) {
+            return (new RtsOrderSourceQuery($workspace, $request))->get();
         });
 
         return response()->json($data);

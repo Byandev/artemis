@@ -27,7 +27,11 @@ class CallLogV2Controller extends Controller
         $now = now();
 
         $rows = array_map(function ($log) use ($workspace, $request, $now) {
-            $timestamp = Carbon::parse($log['timestamp']);
+            // Normalize to the app timezone (Asia/Singapore) so call_date/call_time
+            // reflect local wall-clock. Without this, a UTC timestamp pushes early
+            // morning calls onto the previous calendar day and they stop matching
+            // the delivery date (e.g. a 7am SGT call → previous-day 23:00 UTC).
+            $timestamp = Carbon::parse($log['timestamp'])->setTimezone(config('app.timezone'));
 
             return [
                 'workspace_id' => $workspace->id,

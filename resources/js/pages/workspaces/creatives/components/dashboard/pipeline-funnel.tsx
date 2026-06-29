@@ -1,7 +1,6 @@
 import { Pipeline } from './types';
 
 const STAGES: { key: keyof Pipeline; label: string; color: string }[] = [
-    { key: 'waiting', label: 'Waiting', color: 'bg-gray-400' },
     { key: 'for_approval', label: 'For Approval', color: 'bg-blue-500' },
     { key: 'revision', label: 'Revision', color: 'bg-amber-500' },
     { key: 'approved', label: 'Approved', color: 'bg-emerald-500' },

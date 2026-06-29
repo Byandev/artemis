@@ -8,15 +8,26 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
-Schedule::command('trigger-fetch-page-orders')->hourly();
+Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
+
+// // Fetch ERP purchase orders for inventory items. Runs three times a day: 9am, 12nn, 5pm.
+// Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('09:00')->withoutOverlapping();
+// Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('12:00')->withoutOverlapping();
+// Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('17:00')->withoutOverlapping();
 
 // Fetch ERP data for inventory items with sales keywords. Jobs are queued with a
 // staggered delay (the command's --delay default) so the n8n webhook isn't hit all
 // at once. Runs three times a day: 9am, 12nn, 5pm.
-Schedule::command('trigger-fetch-erp-inventory')->dailyAt('09:00')->withoutOverlapping();
-Schedule::command('trigger-fetch-erp-inventory')->dailyAt('12:00')->withoutOverlapping();
-Schedule::command('trigger-fetch-erp-inventory')->dailyAt('17:00')->withoutOverlapping();
+// Schedule::command('trigger-fetch-erp-inventory')->dailyAt('09:00')->withoutOverlapping();
+// Schedule::command('trigger-fetch-erp-inventory')->dailyAt('12:00')->withoutOverlapping();
+// Schedule::command('trigger-fetch-erp-inventory')->dailyAt('17:00')->withoutOverlapping();
+
+// Fetch ERP transaction history for inventory items with transaction keywords. Jobs
+// are queued with a staggered delay so the n8n webhook isn't hit all at once. Runs
+// once a day at 8am.
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('08:00')->withoutOverlapping();
+
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
@@ -26,6 +37,15 @@ Schedule::command('trigger-fetch-shops-users')->daily(7);
 // Schedule::command('trigger-fetch-csr-erp-dail-records --date="5 days ago"')->dailyAt('05:00');
 // Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('12:00');
 // Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('15:00');
+
+// GencysERP daily sales tracker — enable once the n8n flow + callback are ready.
+// Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('06:00')->withoutOverlapping();
+
+// GencysERP unit codes — enable once the n8n flow + callback are ready.
+// Schedule::command('gencys-erp:trigger-fetch-unit-code')->dailyAt('06:00')->withoutOverlapping();
+
+// GencysERP unit code inventories — enable once the n8n flow + callback are ready.
+// Schedule::command('gencys-erp:trigger-fetch-unit-code-inventory')->dailyAt('06:30')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');

@@ -108,6 +108,10 @@ const StatisticCard = ({
         () => filter.productIds.join(','),
         [filter.productIds],
     );
+    const orderSourceNames = useMemo(
+        () => (filter.orderSourceNames ?? []).join(','),
+        [filter.orderSourceNames],
+    );
 
     const commonParams = useMemo(
         () => ({
@@ -117,8 +121,17 @@ const StatisticCard = ({
             'filter[page_ids]': pageIds,
             'filter[user_ids]': userIds,
             'filter[product_ids]': productIds,
+            'filter[order_source_names]': orderSourceNames,
         }),
-        [metric, teamIds, shopIds, pageIds, userIds, productIds],
+        [
+            metric,
+            teamIds,
+            shopIds,
+            pageIds,
+            userIds,
+            productIds,
+            orderSourceNames,
+        ],
     );
 
     useEffect(() => {

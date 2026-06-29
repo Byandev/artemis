@@ -1,16 +1,45 @@
-import { BarChart2, RefreshCw, Table } from 'lucide-react';
+import { BarChart2, Inbox, RefreshCw, Table } from 'lucide-react';
 
 export type ViewMode = 'table' | 'chart';
+
+/** Shared empty state for RTS analytics cards when a query returns no rows. */
+export const RtsEmptyState = ({
+    message = 'No data for the selected filters',
+    height = 'h-64',
+}: {
+    message?: string;
+    height?: string;
+}) => (
+    <div
+        className={`flex ${height} flex-col items-center justify-center gap-3`}
+    >
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-stone-100 dark:bg-zinc-800">
+            <Inbox className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+        </div>
+        <p className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-400">
+            {message}
+        </p>
+    </div>
+);
 
 export type RtsQueryParams = {
     startDate: string;
     endDate: string;
-    pageIds: number[];
-    shopIds: number[];
+    pageIds: (string | number)[];
+    shopIds: (string | number)[];
+    teamIds: (string | number)[];
 };
 
 export type DeliveryAttemptRow = {
     delivery_attempts: string | null;
+    total_orders: number;
+    delivered_count: number;
+    returned_count: number;
+    rts_rate_percentage: number;
+};
+
+export type OrderSourceRow = {
+    order_source_name: string | null;
     total_orders: number;
     delivered_count: number;
     returned_count: number;
@@ -174,5 +203,6 @@ export function buildBaseParams(params: RtsQueryParams): URLSearchParams {
     p.append('end_date', params.endDate);
     params.pageIds.forEach((id) => p.append('page_ids[]', String(id)));
     params.shopIds.forEach((id) => p.append('shop_ids[]', String(id)));
+    (params.teamIds ?? []).forEach((id) => p.append('team_ids[]', String(id)));
     return p;
 }

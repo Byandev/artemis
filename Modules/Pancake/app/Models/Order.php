@@ -6,6 +6,7 @@ use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Page;
 use App\Models\ParcelJourney;
 use App\Models\ShippingAddress;
+use App\Models\Shop;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,13 +20,16 @@ class Order extends Model
 
     protected $table = 'pancake_orders';
 
+    // Scope via the order's shop directly (shop_id) rather than through the
+    // page — this also covers page-less Webcake orders (page_id is null).
     protected function visibilityTeamRelation(): string
     {
-        return 'page.teams';
+        return 'shop.teams';
     }
 
     protected $casts = [
         'status' => 'integer',
+        'order_source' => 'integer',
     ];
 
     public function shippingAddress(): HasOne|\App\Models\Order
@@ -46,6 +50,11 @@ class Order extends Model
     public function page(): BelongsTo
     {
         return $this->belongsTo(Page::class);
+    }
+
+    public function shop(): BelongsTo
+    {
+        return $this->belongsTo(Shop::class);
     }
 
     public function phoneNumberReports(): Order|HasMany

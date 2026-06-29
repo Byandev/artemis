@@ -41,6 +41,7 @@ import {
     Package,
     PieChart,
     RotateCcw,
+    ScrollText,
     Send,
     Shield,
     ShoppingCart,
@@ -194,8 +195,10 @@ export function AppSidebar() {
                       icon: Megaphone,
                       anyOf: [
                           PERMISSIONS.ViewMetaAds,
+                          PERMISSIONS.ViewAdAccounts,
                           PERMISSIONS.ViewOptimizationRules,
                           PERMISSIONS.ApproveOptimizationRules,
+                          PERMISSIONS.ViewOptimizationLogs,
                       ],
                       items: [
                           {
@@ -208,12 +211,18 @@ export function AppSidebar() {
                               title: 'Ad Accounts',
                               href: `/workspaces/${slug}/integrations/meta/ad-accounts`,
                               icon: Database,
-                              permission: PERMISSIONS.ViewMetaAds,
+                              permission: PERMISSIONS.ViewAdAccounts,
                           },
                           {
                               title: 'Ads Manager',
                               href: `/workspaces/${slug}/integrations/meta/ads-manager`,
                               icon: BarChart2,
+                              permission: PERMISSIONS.ViewMetaAds,
+                          },
+                          {
+                              title: 'Reports',
+                              href: `/workspaces/${slug}/integrations/meta/reports`,
+                              icon: PieChart,
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
@@ -244,7 +253,7 @@ export function AppSidebar() {
                               title: 'Optimization Logs',
                               href: `/workspaces/${slug}/integrations/meta/optimization-rules/logs`,
                               icon: History,
-                              permission: PERMISSIONS.ViewOptimizationRules,
+                              permission: PERMISSIONS.ViewOptimizationLogs,
                           },
                           {
                               title: 'Sync Health',
@@ -341,6 +350,29 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        ...(currentWorkspace.gencys_module_enabled
+            ? [
+                  {
+                      title: 'Gencys ERP',
+                      icon: Activity,
+                      anyOf: [PERMISSIONS.ViewDailySalesTracker, PERMISSIONS.ViewUnitCode],
+                      items: [
+                          {
+                              title: 'Daily Sales Tracker',
+                              href: `/workspaces/${slug}/gencys/daily-sales-tracker`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewDailySalesTracker,
+                          },
+                          {
+                              title: 'Unit Code',
+                              href: `/workspaces/${slug}/gencys/unit-codes`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewUnitCode,
+                          },
+                      ],
+                  },
+              ]
+            : []),
         ...(currentWorkspace.creatives_module_enabled
             ? [
                   {
@@ -394,6 +426,15 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceRemittances,
                           },
                       ],
+                  },
+              ]
+            : []),
+        ...(auth?.user?.can?.viewActivityLogs
+            ? [
+                  {
+                      title: 'Activity Logs',
+                      href: `/workspaces/${slug}/activity-logs`,
+                      icon: ScrollText,
                   },
               ]
             : []),
@@ -463,12 +504,11 @@ function PublicLinks({
     leaderboardEnabled: boolean;
 }) {
     const canViewRmoLink = useAnyPermission([
-        PERMISSIONS.ViewRtsAnalytics,
-        PERMISSIONS.ViewCsrManagement,
+        PERMISSIONS.ViewRmoManagement,
     ]);
-    const canViewLeaderboardLink = useAnyPermission(
-        PERMISSIONS.ViewCsrAnalytics,
-    );
+    const canViewLeaderboardLink = useAnyPermission([
+        PERMISSIONS.ViewLeaderboards,
+    ]);
 
     const links = [
         ...(rmoEnabled && canViewRmoLink

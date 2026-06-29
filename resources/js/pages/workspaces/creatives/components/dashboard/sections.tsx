@@ -326,54 +326,6 @@ export function RevisionListSection({
     );
 }
 
-/** Waiting-for-submission work list. */
-export function WaitingListSection({
-    workspaceSlug,
-    filters,
-    editUrl,
-}: SectionProps & { editUrl: EditUrl }) {
-    const [data, setData] = useState<WorkItem[] | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        setLoading(true);
-        axios
-            .get<WorkItem[]>(
-                `/api/workspaces/${workspaceSlug}/video-editor/waiting-list`,
-                {
-                    params: sectionParams(filters),
-                    signal: controller.signal,
-                },
-            )
-            .then((res) => setData(res.data))
-            .catch((err) => {
-                if (!axios.isCancel(err)) console.error(err);
-            })
-            .finally(() => setLoading(false));
-        return () => controller.abort();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workspaceSlug, sectionKey(filters)]);
-
-    return (
-        <Panel
-            title="Waiting for Submission"
-            icon={<Clock className="h-3.5 w-3.5 text-gray-400" />}
-            count={data?.length}
-        >
-            {loading || !data ? (
-                <WorkListSkeleton />
-            ) : (
-                <WorkList
-                    items={data}
-                    editUrl={editUrl}
-                    emptyText="No pending submissions."
-                />
-            )}
-        </Panel>
-    );
-}
-
 /** Output-over-time throughput chart with a granularity toggle. */
 export function ThroughputSection({
     workspaceSlug,

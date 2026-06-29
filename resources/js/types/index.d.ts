@@ -50,6 +50,7 @@ export interface User {
     permissions?: (PermissionName | '*')[];
     can?: {
         viewAnySupportTickets?: boolean;
+        viewActivityLogs?: boolean;
         [key: string]: boolean | undefined;
     };
     [key: string]: unknown; // This allows for additional properties...

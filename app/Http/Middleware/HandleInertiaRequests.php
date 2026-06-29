@@ -64,6 +64,10 @@ class HandleInertiaRequests extends Middleware
                 || $user->isAdminOf($currentWorkspace)
                 || $user->hasWorkspaceRole($currentWorkspace, 'admin')
                 : false,
+            // Workspace activity log is admin/owner-only (matches ActivityLogController).
+            'viewActivityLogs' => $user && $currentWorkspace instanceof Workspace
+                ? $user->isAdminOf($currentWorkspace)
+                : false,
         ];
 
         // "Viewing as team" switcher context.
@@ -73,14 +77,14 @@ class HandleInertiaRequests extends Middleware
             'canViewAll' => TeamVisibility::isUnrestricted($user, $workspaceModel),
         ] : null;
 
-        // Show syncing modal when any page has no orders_last_synced_at
+        // Show syncing modal when no shop has finished its first order sync yet
         $syncingData = null;
-        if ($currentWorkspace instanceof Workspace && $currentWorkspace->pages()->exists()) {
-            $hasAnySyncedPage = $currentWorkspace->pages()
+        if ($currentWorkspace instanceof Workspace && $currentWorkspace->shops()->exists()) {
+            $hasAnySyncedShop = $currentWorkspace->shops()
                 ->whereNotNull('orders_last_synced_at')
                 ->exists();
 
-            if (! $hasAnySyncedPage) {
+            if (! $hasAnySyncedShop) {
                 $syncingData = ['workspaceSlug' => $currentWorkspace->slug];
             }
         }

@@ -42,8 +42,6 @@ type FormData = {
     headline: string;
     notes: string;
     ads_status: AdsStatus;
-    ads_manager_link: string;
-    ads_remarks: string;
     final_status: FinalStatus;
 };
 
@@ -77,8 +75,6 @@ export function CreativeForm({
         headline: creative?.headline ?? '',
         notes: creative?.notes ?? '',
         ads_status: creative?.ads_status ?? 'pending',
-        ads_manager_link: creative?.ads_manager_link ?? '',
-        ads_remarks: creative?.ads_remarks ?? '',
         final_status: creative?.final_status ?? 'for_approval',
     });
 
@@ -174,7 +170,8 @@ export function CreativeForm({
                         </div>
                         <div className="space-y-1.5">
                             <label htmlFor="cf-headline" className={fl}>
-                                Headline
+                                Headline{' '}
+                                <span className="text-red-400">*</span>
                             </label>
                             <input
                                 id="cf-headline"
@@ -190,7 +187,10 @@ export function CreativeForm({
                             )}
                         </div>
                         <div className="col-span-2 space-y-1.5">
-                            <label className={fl}>Product</label>
+                            <label className={fl}>
+                                Product{' '}
+                                <span className="text-red-400">*</span>
+                            </label>
                             <ProductPicker
                                 products={products}
                                 value={data.product_id}
@@ -228,27 +228,30 @@ export function CreativeForm({
                                 <p className={fe}>{errors.description}</p>
                             )}
                         </div>
-                        <div className="space-y-1.5">
-                            <label htmlFor="cf-script" className={fl}>
-                                Script
-                            </label>
-                            <textarea
-                                id="cf-script"
-                                className={ft}
-                                rows={4}
-                                value={data.script}
-                                onChange={(e) =>
-                                    setData('script', e.target.value)
-                                }
-                                placeholder="Full script or content outline"
-                            />
-                            {errors.script && (
-                                <p className={fe}>{errors.script}</p>
-                            )}
-                        </div>
+                        {data.format === 'video' && (
+                            <div className="space-y-1.5">
+                                <label htmlFor="cf-script" className={fl}>
+                                    Script
+                                </label>
+                                <textarea
+                                    id="cf-script"
+                                    className={ft}
+                                    rows={4}
+                                    value={data.script}
+                                    onChange={(e) =>
+                                        setData('script', e.target.value)
+                                    }
+                                    placeholder="Full script or content outline"
+                                />
+                                {errors.script && (
+                                    <p className={fe}>{errors.script}</p>
+                                )}
+                            </div>
+                        )}
                         <div className="space-y-1.5">
                             <label htmlFor="cf-caption" className={fl}>
-                                Caption
+                                Caption{' '}
+                                <span className="text-red-400">*</span>
                             </label>
                             <textarea
                                 id="cf-caption"
@@ -273,7 +276,8 @@ export function CreativeForm({
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <label htmlFor="cf-media" className={fl}>
-                                Media Link
+                                Media Link{' '}
+                                <span className="text-red-400">*</span>
                             </label>
                             <input
                                 id="cf-media"
@@ -308,172 +312,110 @@ export function CreativeForm({
                     </div>
                 </section>
 
-                {/* Reviewers — edit only */}
-                {isEdit && (
-                    <section className="space-y-3">
-                        <p className={fl}>Reviewers</p>
+                {/* Reviewers */}
+                <section className="space-y-3">
+                    <p className={fl}>Reviewers</p>
+                    <div className="space-y-1.5">
+                        <label className={fl}>Assigned Reviewers</label>
+                        <AssigneePicker
+                            reviewers={reviewers}
+                            selectedIds={data.assigned_reviewer_ids}
+                            onChange={(ids) =>
+                                setData('assigned_reviewer_ids', ids)
+                            }
+                        />
+                        {errors.assigned_reviewer_ids && (
+                            <p className={fe}>{errors.assigned_reviewer_ids}</p>
+                        )}
+                    </div>
+                </section>
+
+                {/* Campaign */}
+                <section className="space-y-3">
+                    <p className={fl}>Campaign</p>
+                    <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
-                            <label className={fl}>Assigned Reviewers</label>
-                            <AssigneePicker
-                                reviewers={reviewers}
-                                selectedIds={data.assigned_reviewer_ids}
-                                onChange={(ids) =>
-                                    setData('assigned_reviewer_ids', ids)
+                            <label className={fl}>Ads Status</label>
+                            <Select
+                                value={data.ads_status}
+                                onValueChange={(v) =>
+                                    setData('ads_status', v as AdsStatus)
                                 }
-                            />
-                            {errors.assigned_reviewer_ids && (
-                                <p className={fe}>
-                                    {errors.assigned_reviewer_ids}
-                                </p>
+                                disabled={!isEdit || !canUpdateStatus}
+                            >
+                                <SelectTrigger className={selectTrigger}>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        value="pending"
+                                        className="font-mono text-[12px]"
+                                    >
+                                        Pending
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="running"
+                                        className="font-mono text-[12px]"
+                                    >
+                                        Running
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="kill"
+                                        className="font-mono text-[12px]"
+                                    >
+                                        Kill
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="scale"
+                                        className="font-mono text-[12px]"
+                                    >
+                                        Scale
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {errors.ads_status && (
+                                <p className={fe}>{errors.ads_status}</p>
                             )}
                         </div>
-                    </section>
-                )}
-
-                {/* Campaign — edit only */}
-                {isEdit && (
-                    <section className="space-y-3">
-                        <p className={fl}>Campaign</p>
-                        <div className="space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1.5">
-                                    <label className={fl}>Ads Status</label>
-                                    <Select
-                                        value={data.ads_status}
-                                        onValueChange={(v) =>
-                                            setData(
-                                                'ads_status',
-                                                v as AdsStatus,
-                                            )
-                                        }
-                                        disabled={!canUpdateStatus}
+                        <div className="space-y-1.5">
+                            <label className={fl}>Final Status</label>
+                            <Select
+                                value={data.final_status}
+                                onValueChange={(v) =>
+                                    setData('final_status', v as FinalStatus)
+                                }
+                                disabled={!isEdit || !canUpdateStatus}
+                            >
+                                <SelectTrigger className={selectTrigger}>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem
+                                        value="for_approval"
+                                        className="font-mono text-[12px]"
                                     >
-                                        <SelectTrigger
-                                            className={selectTrigger}
-                                        >
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem
-                                                value="pending"
-                                                className="font-mono text-[12px]"
-                                            >
-                                                Pending
-                                            </SelectItem>
-                                            <SelectItem
-                                                value="running"
-                                                className="font-mono text-[12px]"
-                                            >
-                                                Running
-                                            </SelectItem>
-                                            <SelectItem
-                                                value="kill"
-                                                className="font-mono text-[12px]"
-                                            >
-                                                Kill
-                                            </SelectItem>
-                                            <SelectItem
-                                                value="scale"
-                                                className="font-mono text-[12px]"
-                                            >
-                                                Scale
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.ads_status && (
-                                        <p className={fe}>
-                                            {errors.ads_status}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className={fl}>Final Status</label>
-                                    <Select
-                                        value={data.final_status}
-                                        onValueChange={(v) =>
-                                            setData(
-                                                'final_status',
-                                                v as FinalStatus,
-                                            )
-                                        }
-                                        disabled={!canUpdateStatus}
+                                        For Approval
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="approved"
+                                        className="font-mono text-[12px]"
                                     >
-                                        <SelectTrigger
-                                            className={selectTrigger}
-                                        >
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem
-                                                value="for_approval"
-                                                className="font-mono text-[12px]"
-                                            >
-                                                For Approval
-                                            </SelectItem>
-                                            <SelectItem
-                                                value="approved"
-                                                className="font-mono text-[12px]"
-                                            >
-                                                Approved
-                                            </SelectItem>
-                                            <SelectItem
-                                                value="for_revision"
-                                                className="font-mono text-[12px]"
-                                            >
-                                                For Revision
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.final_status && (
-                                        <p className={fe}>
-                                            {errors.final_status}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label htmlFor="cf-ads-manager" className={fl}>
-                                    Ads Manager Link
-                                </label>
-                                <input
-                                    id="cf-ads-manager"
-                                    className={fi}
-                                    value={data.ads_manager_link}
-                                    onChange={(e) =>
-                                        setData(
-                                            'ads_manager_link',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="https://business.facebook.com/adsmanager/..."
-                                />
-                                {errors.ads_manager_link && (
-                                    <p className={fe}>
-                                        {errors.ads_manager_link}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="space-y-1.5">
-                                <label htmlFor="cf-ads-remarks" className={fl}>
-                                    Remarks
-                                </label>
-                                <textarea
-                                    id="cf-ads-remarks"
-                                    className={ft}
-                                    rows={2}
-                                    value={data.ads_remarks}
-                                    onChange={(e) =>
-                                        setData('ads_remarks', e.target.value)
-                                    }
-                                    placeholder="Campaign notes, budget info, targeting details..."
-                                />
-                                {errors.ads_remarks && (
-                                    <p className={fe}>{errors.ads_remarks}</p>
-                                )}
-                            </div>
+                                        Approved
+                                    </SelectItem>
+                                    <SelectItem
+                                        value="for_revision"
+                                        className="font-mono text-[12px]"
+                                    >
+                                        For Revision
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {errors.final_status && (
+                                <p className={fe}>{errors.final_status}</p>
+                            )}
                         </div>
-                    </section>
-                )}
+                    </div>
+                </section>
 
                 {/* Notes */}
                 <section className="space-y-3">

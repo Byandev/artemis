@@ -7,6 +7,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -54,6 +56,8 @@ function formatRelative(ts: string | null) {
 }
 
 export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
+    const canManageMetaAds = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
+    const canConnectFbAccount = usePermission(PERMISSIONS.ConnectFbAccount);
     const connectUrl = `/workspaces/${workspace.slug}/integrations/meta/connect`;
     const indexUrl = `/workspaces/${workspace.slug}/integrations/meta`;
 
@@ -205,15 +209,17 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
                     title="FB Account"
                     description="Facebook users that have authorized this workspace to access their ad accounts."
                 >
-                    <Button
-                        asChild
-                        className="bg-emerald-600 text-white hover:bg-emerald-700"
-                    >
-                        <a className={'font-mono! text-sm'} href={connectUrl}>
-                            <Facebook className="mr-2 h-4 w-4" />
-                            Connect Meta Account
-                        </a>
-                    </Button>
+                    {canConnectFbAccount && (
+                        <Button
+                            asChild
+                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                            <a className={'font-mono! text-sm'} href={connectUrl}>
+                                <Facebook className="mr-2 h-4 w-4" />
+                                Connect Meta Account
+                            </a>
+                        </Button>
+                    )}
                 </PageHeader>
 
                 <div className="flex items-center gap-2">
@@ -231,7 +237,11 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
-                        columns={columns}
+                        columns={
+                            canManageMetaAds
+                                ? columns
+                                : columns.filter((c) => c.id !== 'actions')
+                        }
                         data={metaUsers.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(metaUsers, ['data']) }}
