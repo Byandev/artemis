@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Http;
 use Modules\GencysERP\Jobs\FetchInventoryItemTransactionHistory;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
+use Modules\Inventory\Models\PurchasedOrder;
 
 /** Create an active inventory item in the given workspace. */
 function makeInventoryItem($workspace, string $sku = 'SKU-1'): InventoryItem
@@ -15,7 +16,7 @@ function makeInventoryItem($workspace, string $sku = 'SKU-1'): InventoryItem
     ]);
 }
 
-test('transaction-history callback resolves the item pending run to success', function () {
+test('transaction-history callback resolves the run by the echoed sync_run_id', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
     $item = makeInventoryItem($workspace);
@@ -25,6 +26,7 @@ test('transaction-history callback resolves the item pending run to success', fu
     $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', [
         'items' => [[
             'id' => $item->id,
+            'sync_run_id' => $run->id,
             'transactions' => [
                 ['ref_no' => 'TX-1', 'date' => '2026-06-28', 'po_qty_in' => 5, 'inventory_remaining_stock' => 5],
                 ['ref_no' => 'TX-2', 'date' => '2026-06-28', 'po_qty_out' => 2, 'inventory_remaining_stock' => 3],
@@ -40,7 +42,7 @@ test('transaction-history callback resolves the item pending run to success', fu
         ->and($run->finished_at)->not->toBeNull();
 });
 
-test('purchase-order callback resolves the item pending run to success', function () {
+test('purchase-order callback resolves the run by the echoed sync_run_id and saves the PO', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
     $item = makeInventoryItem($workspace);
@@ -48,25 +50,28 @@ test('purchase-order callback resolves the item pending run to success', functio
     $run = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_PURCHASE_ORDER);
 
     $this->postJson('/api/v1/public/purchase-orders/bulk-sync', [
-        [
-            'control_no' => 'CN-1',
-            'issue_date' => '2026-06-20',
-            'total_amount' => 1000,
-            'status' => 6,
-            'items' => [
-                ['inventory_item_id' => $item->id, 'count' => 10, 'amount' => 100, 'total_amount' => 1000],
-            ],
-            'deliveries' => [],
-        ],
+        'data' => [[
+            'id' => $item->id,
+            'sync_run_id' => $run->id,
+            'purchased_orders' => [[
+                'control_no' => 'CN-1',
+                'issue_date' => '2026-06-20',
+                'total_amount' => 1000,
+                'status' => 6,
+                'items' => [['count' => 10, 'amount' => 100, 'total_amount' => 1000]],
+                'deliveries' => [['qty' => 10, 'created_at' => '2026-06-21 10:00:00']],
+            ]],
+        ]],
     ], ['Authorization' => 'Bearer '.$raw])->assertOk();
 
     $run->refresh();
 
     expect($run->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
-        ->and($run->rows_received)->toBe(1);
+        ->and($run->rows_received)->toBe(1)
+        ->and(PurchasedOrder::where('control_no', 'CN-1')->where('workspace_id', $workspace->id)->exists())->toBeTrue();
 });
 
-test('the callback resolves the exact run id echoed back, not just the latest pending', function () {
+test('the callback resolves the exact run id echoed back, and a replay is idempotent', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
     $item = makeInventoryItem($workspace);
@@ -85,41 +90,32 @@ test('the callback resolves the exact run id echoed back, not just the latest pe
         ]],
     ];
 
-    $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', $payload, [
-        'Authorization' => 'Bearer '.$raw,
-    ])->assertOk();
+    $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', $payload, ['Authorization' => 'Bearer '.$raw])->assertOk();
+    // Replaying hits the same run by id — no duplicate row.
+    $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', $payload, ['Authorization' => 'Bearer '.$raw])->assertOk();
 
     expect($target->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
-        ->and($newer->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
-
-    // A replayed callback hits the same run by id — no duplicate row is created.
-    $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', $payload, [
-        'Authorization' => 'Bearer '.$raw,
-    ])->assertOk();
-
-    expect(GencysSyncRun::where('inventory_item_id', $item->id)->count())->toBe(2);
+        ->and($newer->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING)
+        ->and(GencysSyncRun::where('inventory_item_id', $item->id)->count())->toBe(2);
 });
 
-test('a callback with no outstanding run still records a successful run', function () {
+test('a callback without sync_run_id leaves the run pending', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
     $item = makeInventoryItem($workspace);
 
-    // No pending run created beforehand (e.g. a manual/replayed n8n call).
+    $run = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY);
+
     $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', [
         'items' => [[
             'id' => $item->id,
             'transactions' => [
-                ['ref_no' => 'TX-1', 'date' => '2026-06-28', 'po_qty_in' => 5, 'inventory_remaining_stock' => 5],
+                ['ref_no' => 'TX-1', 'date' => '2026-06-28', 'po_qty_in' => 1, 'inventory_remaining_stock' => 1],
             ],
         ]],
     ], ['Authorization' => 'Bearer '.$raw])->assertOk();
 
-    $run = GencysSyncRun::where('inventory_item_id', $item->id)->first();
-
-    expect($run)->not->toBeNull()
-        ->and($run->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
-        ->and($run->rows_received)->toBe(1);
+    expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
 });
 
 test('stale pending runs are failed by the sweeper, recent ones are left alone', function () {

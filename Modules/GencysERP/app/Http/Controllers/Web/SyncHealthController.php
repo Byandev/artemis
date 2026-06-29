@@ -29,7 +29,7 @@ class SyncHealthController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
-        // Active items are exactly the ones the sync commands fetch.
+        // All active items — used to label recent runs and for the active-items KPI.
         $items = InventoryItem::query()
             ->where('workspace_id', $workspace->id)
             ->where('is_active', true)
@@ -37,30 +37,46 @@ class SyncHealthController extends Controller
             ->orderBy('sku')
             ->get(['id', 'product_id', 'sku']);
 
-        $itemIds = $items->pluck('id')->all();
+        $itemsById = $items->keyBy('id');
 
-        // Latest run per (item, sync_type) for the summary grid.
-        $latest = collect();
+        // Per-item status grid — searchable (SKU / product name) and paginated.
+        $itemSearch = trim((string) $request->input('items_search', ''));
 
-        if (! empty($itemIds)) {
-            $latest = GencysSyncRun::query()
+        $summary = InventoryItem::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('is_active', true)
+            ->when($itemSearch !== '', function ($query) use ($itemSearch) {
+                $query->where(function ($q) use ($itemSearch) {
+                    $q->where('sku', 'like', "%{$itemSearch}%")
+                        ->orWhereHas('product', fn ($p) => $p->where('name', 'like', "%{$itemSearch}%"));
+                });
+            })
+            ->with('product:id,name')
+            ->orderBy('sku')
+            ->paginate($request->integer('items_per_page', 25), ['id', 'product_id', 'sku'], 'items_page')
+            ->withQueryString();
+
+        // Latest run per (item, sync_type), limited to the items on the current page.
+        $pageItemIds = $summary->getCollection()->pluck('id')->all();
+
+        $byItem = collect();
+
+        if (! empty($pageItemIds)) {
+            $byItem = GencysSyncRun::query()
                 ->where('workspace_id', $workspace->id)
-                ->whereIn('inventory_item_id', $itemIds)
-                ->whereIn('id', function ($q) use ($workspace, $itemIds) {
+                ->whereIn('inventory_item_id', $pageItemIds)
+                ->whereIn('id', function ($q) use ($workspace, $pageItemIds) {
                     $q->from('gencys_sync_runs')
                         ->selectRaw('MAX(id)')
                         ->where('workspace_id', $workspace->id)
-                        ->whereIn('inventory_item_id', $itemIds)
+                        ->whereIn('inventory_item_id', $pageItemIds)
                         ->groupBy('inventory_item_id', 'sync_type');
                 })
-                ->get(['inventory_item_id', 'sync_type', 'status', 'rows_received', 'rows_saved', 'started_at', 'finished_at', 'message']);
+                ->get(['inventory_item_id', 'sync_type', 'status', 'rows_received', 'rows_saved', 'started_at', 'finished_at', 'message'])
+                ->groupBy('inventory_item_id');
         }
 
-        $byItem = $latest->groupBy('inventory_item_id');
-
-        $summary = [];
-
-        foreach ($items as $item) {
+        $summary->through(function ($item) use ($byItem) {
             $entries = collect($byItem[$item->id] ?? [])->keyBy('sync_type');
 
             $syncs = [];
@@ -77,7 +93,7 @@ class SyncHealthController extends Controller
                 ];
             }
 
-            $summary[] = [
+            return [
                 'item' => [
                     'id' => (string) $item->id,
                     'sku' => $item->sku,
@@ -85,9 +101,7 @@ class SyncHealthController extends Controller
                 ],
                 'syncs' => $syncs,
             ];
-        }
-
-        $itemsById = $items->keyBy('id');
+        });
 
         // Recent runs — paginated, filterable feed.
         $recent = QueryBuilder::for(
@@ -130,6 +144,7 @@ class SyncHealthController extends Controller
         return Inertia::render('workspaces/inventory/sync-health/index', [
             'workspace' => $workspace,
             'summary' => $summary,
+            'activeItemsCount' => $items->count(),
             'syncTypes' => self::SYNC_TYPES,
             'recent' => $recent,
             'totalRuns24h' => $totalRuns24h,
@@ -145,6 +160,11 @@ class SyncHealthController extends Controller
                 ...$request->only(['sort', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
+            ],
+            'itemsQuery' => [
+                'page' => $request->input('items_page'),
+                'perPage' => $request->input('items_per_page'),
+                'search' => $itemSearch !== '' ? $itemSearch : null,
             ],
         ]);
     }

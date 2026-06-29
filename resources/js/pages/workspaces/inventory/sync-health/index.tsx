@@ -21,9 +21,10 @@ import {
     CheckCircle2,
     Clock,
     Package,
+    Search,
     XCircle,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface SyncCell {
     sync_type: string;
@@ -61,7 +62,8 @@ interface RecentRun {
 
 interface Props {
     workspace: Workspace;
-    summary: ItemSummary[];
+    summary: PaginatedData<ItemSummary>;
+    activeItemsCount: number;
     syncTypes: string[];
     recent: PaginatedData<RecentRun>;
     totalRuns24h: number;
@@ -81,6 +83,11 @@ interface Props {
             status?: string;
             sync_type?: string;
         };
+    };
+    itemsQuery?: {
+        page?: number | string;
+        perPage?: number | string;
+        search?: string | null;
     };
 }
 
@@ -113,12 +120,6 @@ function StatusPill({ status }: { status: string | null }) {
             cls: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400',
             dot: 'bg-red-400',
             label: 'Failed',
-        },
-        skipped: {
-            Icon: AlertTriangle,
-            cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-            dot: 'bg-amber-400',
-            label: 'Skipped',
         },
         pending: {
             Icon: Clock,
@@ -244,6 +245,7 @@ function SyncCellView({ cell }: { cell: SyncCell | undefined }) {
 export default function InventorySyncHealth({
     workspace,
     summary,
+    activeItemsCount,
     syncTypes,
     recent,
     totalRuns24h,
@@ -252,6 +254,7 @@ export default function InventorySyncHealth({
     pendingRuns,
     lastSuccessfulRun,
     query,
+    itemsQuery,
 }: Props) {
     const indexUrl = `/workspaces/${workspace.slug}/inventory/sync-health`;
 
@@ -262,21 +265,62 @@ export default function InventorySyncHealth({
 
     const statusFilter = query?.filter?.status ?? '';
     const typeFilter = query?.filter?.sync_type ?? '';
+    const appliedItemSearch = itemsQuery?.search ?? '';
+    const [itemSearch, setItemSearch] = useState(appliedItemSearch);
 
-    const navigate = (overrides: Record<string, unknown> = {}) => {
+    // Both tables paginate independently off the same URL, so every navigation
+    // carries the other table's current state to keep it from resetting.
+    const recentParams = {
+        sort: query?.sort,
+        'filter[status]': statusFilter || undefined,
+        'filter[sync_type]': typeFilter || undefined,
+        page: recent.current_page,
+        per_page: recent.per_page,
+    };
+    const itemsParams = {
+        items_search: appliedItemSearch || undefined,
+        items_page: summary.current_page,
+        items_per_page: summary.per_page,
+    };
+
+    const navigateRecent = (overrides: Record<string, unknown> = {}) => {
         router.get(
             indexUrl,
+            { ...recentParams, ...itemsParams, ...overrides },
             {
-                sort: query?.sort,
-                'filter[status]': statusFilter || undefined,
-                'filter[sync_type]': typeFilter || undefined,
-                page: 1,
-                per_page: query?.perPage ?? recent.per_page,
-                ...overrides,
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['recent', 'query'],
             },
-            { preserveState: true, replace: true, preserveScroll: true },
         );
     };
+
+    const navigateItems = (overrides: Record<string, unknown> = {}) => {
+        router.get(
+            indexUrl,
+            { ...recentParams, ...itemsParams, ...overrides },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['summary', 'itemsQuery'],
+            },
+        );
+    };
+
+    // Debounced per-item search.
+    useEffect(() => {
+        if (itemSearch === appliedItemSearch) return;
+        const timer = setTimeout(() => {
+            navigateItems({
+                items_search: itemSearch || undefined,
+                items_page: 1,
+            });
+        }, 400);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [itemSearch]);
 
     const successRate24h =
         totalRuns24h > 0
@@ -422,7 +466,11 @@ export default function InventorySyncHealth({
         {
             accessorKey: 'message',
             header: ({ column }) => (
-                <SortableHeader column={column} title="Detail" enabled={false} />
+                <SortableHeader
+                    column={column}
+                    title="Detail"
+                    enabled={false}
+                />
             ),
             cell: ({ row }) =>
                 row.original.message ? (
@@ -451,7 +499,7 @@ export default function InventorySyncHealth({
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard
                         label="Active Items"
-                        value={summary.length}
+                        value={activeItemsCount}
                         icon={Package}
                     />
                     <StatCard
@@ -511,17 +559,42 @@ export default function InventorySyncHealth({
                 )}
 
                 <div>
-                    <div className="mb-3 flex items-center justify-between">
+                    <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <h2 className="font-mono text-[10px] font-medium tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
                             Per-item status
                         </h2>
-                        <span className="font-mono text-[10px] text-gray-300 dark:text-gray-600">
-                            {summary.length} item
-                            {summary.length === 1 ? '' : 's'}
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <div className="relative w-full sm:w-[260px]">
+                                <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by SKU or product..."
+                                    value={itemSearch}
+                                    onChange={(e) =>
+                                        setItemSearch(e.target.value)
+                                    }
+                                    className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono! text-[11px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600"
+                                />
+                            </div>
+                            <span className="font-mono text-[10px] whitespace-nowrap text-gray-300 dark:text-gray-600">
+                                {summary.total} item
+                                {summary.total === 1 ? '' : 's'}
+                            </span>
+                        </div>
                     </div>
                     <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                        <DataTable columns={summaryColumns} data={summary} />
+                        <DataTable
+                            columns={summaryColumns}
+                            data={summary.data || []}
+                            meta={{ ...omit(summary, ['data']) }}
+                            onFetch={(params) =>
+                                navigateItems({
+                                    items_page: params?.page ?? 1,
+                                    items_per_page:
+                                        params?.per_page ?? summary.per_page,
+                                })
+                            }
+                        />
                     </div>
                 </div>
 
@@ -534,7 +607,7 @@ export default function InventorySyncHealth({
                             <Select
                                 value={typeFilter || 'all'}
                                 onValueChange={(v) =>
-                                    navigate({
+                                    navigateRecent({
                                         'filter[sync_type]':
                                             v === 'all' ? undefined : v,
                                         page: 1,
@@ -558,7 +631,7 @@ export default function InventorySyncHealth({
                             <Select
                                 value={statusFilter || 'all'}
                                 onValueChange={(v) =>
-                                    navigate({
+                                    navigateRecent({
                                         'filter[status]':
                                             v === 'all' ? undefined : v,
                                         page: 1,
@@ -572,16 +645,14 @@ export default function InventorySyncHealth({
                                     <SelectItem value="all">
                                         All statuses
                                     </SelectItem>
-                                    {[
-                                        'success',
-                                        'failed',
-                                        'pending',
-                                        'skipped',
-                                    ].map((s) => (
-                                        <SelectItem key={s} value={s}>
-                                            {s[0].toUpperCase() + s.slice(1)}
-                                        </SelectItem>
-                                    ))}
+                                    {['success', 'failed', 'pending'].map(
+                                        (s) => (
+                                            <SelectItem key={s} value={s}>
+                                                {s[0].toUpperCase() +
+                                                    s.slice(1)}
+                                            </SelectItem>
+                                        ),
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -593,7 +664,7 @@ export default function InventorySyncHealth({
                             initialSorting={initialSorting}
                             meta={{ ...omit(recent, ['data']) }}
                             onFetch={(params) => {
-                                navigate({
+                                navigateRecent({
                                     sort: params?.sort,
                                     page: params?.page ?? 1,
                                     per_page:

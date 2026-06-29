@@ -14,9 +14,9 @@ class TransactionHistoryController extends Controller
     /**
      * Receive ERP transaction history synced back by n8n for many inventory items at once.
      *
-     * One call carries many items. The body is a bare JSON array of
-     * { id, transactions: [...] } objects, where `id` is the inventory item id.
-     * Each item is processed exactly like the single-item sync.
+     * The body is { items: [ { id, sync_run_id, transactions: [...] } ] }, where
+     * `id` is the inventory item id and `sync_run_id` is the run we opened on
+     * dispatch and n8n echoes back so we can mark it done.
      */
     public function bulkSync(Request $request): JsonResponse
     {
@@ -52,7 +52,8 @@ class TransactionHistoryController extends Controller
 
             $saved = $this->saveTransactions($item, $rows);
 
-            $this->recordSyncRun($workspace->id, $this->syncRunId($entry), $item->id, count($rows), $saved);
+            // The entry's sync_run_id is the run we opened for this item on dispatch.
+            GencysSyncRun::succeedById($workspace->id, $this->syncRunId($entry), count($rows), $saved);
 
             $results[] = [
                 'inventory_item_id' => $item->id,
@@ -71,34 +72,6 @@ class TransactionHistoryController extends Controller
         $id = $entry['sync_run_id'] ?? $entry['syncRunId'] ?? null;
 
         return ($id === null || $id === '') ? null : (int) $id;
-    }
-
-    /**
-     * Resolve the item's transaction-history sync run as successful. We match the
-     * exact run id n8n echoed back when present, otherwise the item's latest
-     * pending run. If neither exists (a manual or replayed callback), record a
-     * fresh resolved run so the sync still shows up in the Sync Health view.
-     */
-    private function recordSyncRun(int $workspaceId, ?int $syncRunId, int $itemId, int $received, int $saved): void
-    {
-        $run = GencysSyncRun::resolveFor($workspaceId, $syncRunId, $itemId, GencysSyncRun::TYPE_TRANSACTION_HISTORY);
-
-        if ($run) {
-            $run->succeed($received, $saved);
-
-            return;
-        }
-
-        GencysSyncRun::create([
-            'workspace_id' => $workspaceId,
-            'inventory_item_id' => $itemId,
-            'sync_type' => GencysSyncRun::TYPE_TRANSACTION_HISTORY,
-            'status' => GencysSyncRun::STATUS_SUCCESS,
-            'rows_received' => $received,
-            'rows_saved' => $saved,
-            'started_at' => now(),
-            'finished_at' => now(),
-        ]);
     }
 
     /**
