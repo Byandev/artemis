@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Page;
 use App\Models\ParcelJourneyNotification;
 use App\Models\ParcelJourneyNotificationLog;
 use App\Models\ParcelJourneyNotificationTemplate;
+use App\Models\Shop;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -87,7 +87,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
         $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->input('end_date', now()->endOfMonth()->toDateString());
 
-        $logs = ParcelJourneyNotificationLog::whereHas('page', function ($q) use ($workspace) {
+        $logs = ParcelJourneyNotificationLog::whereHas('shop', function ($q) use ($workspace) {
             $q->where('workspace_id', $workspace->id);
         })->whereBetween('date', [$startDate, $endDate]);
 
@@ -110,23 +110,23 @@ class ParcelUpdateNotificationTemplateController extends Controller
 
         $logsAgg = DB::table('parcel_journey_notification_logs as pjnl')
             ->whereBetween('pjnl.date', [$startDate, $endDate])
-            ->selectRaw('pjnl.page_id, MIN(pjnl.date) as first_date, SUM(pjnl.tracked_orders) as tracked_orders, SUM(pjnl.sms_sent) as sms_sent, SUM(pjnl.chat_sent) as chat_sent')
-            ->groupBy('pjnl.page_id');
+            ->selectRaw('pjnl.shop_id, MIN(pjnl.date) as first_date, SUM(pjnl.tracked_orders) as tracked_orders, SUM(pjnl.sms_sent) as sms_sent, SUM(pjnl.chat_sent) as chat_sent')
+            ->groupBy('pjnl.shop_id');
 
         $notifAgg = DB::table('parcel_journey_notifications as pjn')
             ->join('pancake_orders as po', 'po.id', '=', 'pjn.order_id')
             ->whereBetween('pjn.created_at', [$startDate.' 00:00:00', $endDate.' 23:59:59'])
             ->whereIn('pjn.status', ['sent', 'delivered'])
-            ->selectRaw('po.page_id, MIN(DATE(pjn.created_at)) as first_date, COUNT(DISTINCT pjn.order_id) as tracked_orders, SUM(pjn.type = "sms") as sms_sent, SUM(pjn.type = "chat") as chat_sent')
-            ->groupBy('po.page_id');
+            ->selectRaw('po.shop_id, MIN(DATE(pjn.created_at)) as first_date, COUNT(DISTINCT pjn.order_id) as tracked_orders, SUM(pjn.type = "sms") as sms_sent, SUM(pjn.type = "chat") as chat_sent')
+            ->groupBy('po.shop_id');
 
-        $pageQuery = Page::where('pages.workspace_id', $workspace->id)
+        $shopQuery = Shop::where('shops.workspace_id', $workspace->id)
             ->visibleTo(request()->user(), $workspace)
-            ->leftJoinSub($logsAgg, 'logs_agg', 'logs_agg.page_id', '=', 'pages.id')
-            ->leftJoinSub($notifAgg, 'notif_agg', 'notif_agg.page_id', '=', 'pages.id')
+            ->leftJoinSub($logsAgg, 'logs_agg', 'logs_agg.shop_id', '=', 'shops.id')
+            ->leftJoinSub($notifAgg, 'notif_agg', 'notif_agg.shop_id', '=', 'shops.id')
             ->selectRaw('
-                pages.id,
-                pages.name as page_name,
+                shops.id,
+                shops.name as shop_name,
                 CASE
                     WHEN logs_agg.first_date IS NOT NULL AND notif_agg.first_date IS NOT NULL
                         THEN LEAST(logs_agg.first_date, notif_agg.first_date)
@@ -139,9 +139,9 @@ class ParcelUpdateNotificationTemplateController extends Controller
             ')
             ->havingRaw('parcel_journey_started IS NOT NULL OR tracked_orders > 0');
 
-        $pageStats = QueryBuilder::for($pageQuery)
+        $shopStats = QueryBuilder::for($shopQuery)
             ->allowedSorts([
-                AllowedSort::field('page_name'),
+                AllowedSort::field('shop_name'),
                 AllowedSort::field('parcel_journey_started'),
                 AllowedSort::field('tracked_orders'),
                 AllowedSort::field('sms_sent'),
@@ -157,7 +157,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
         return Inertia::render('workspaces/rts/parcel-update-notification-templates', [
             'workspace' => $workspace,
             'templates' => $templates,
-            'pageStats' => $pageStats,
+            'shopStats' => $shopStats,
             'analytics' => [
                 'tracked_orders' => $trackedOrders,
                 'sms_sent' => $smsSent,
