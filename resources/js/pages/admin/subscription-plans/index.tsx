@@ -22,7 +22,7 @@ interface SubscriptionPlan {
     name: string;
     price_php: string;
     order_limit: number | null;
-    page_limit: number | null;
+    shop_limit: number | null;
     data_retention_months: number;
     analytics_tier: string;
     parcel_journey_rate_php: string | null;
@@ -140,9 +140,9 @@ export default function Index({ plans, filters }: Props) {
                             : 'Unlimited orders'}
                     </div>
                     <div>
-                        {row.original.page_limit
-                            ? `${row.original.page_limit} pages`
-                            : 'Unlimited pages'}
+                        {row.original.shop_limit
+                            ? `${row.original.shop_limit} shops`
+                            : 'Unlimited shops'}
                     </div>
                 </div>
             ),

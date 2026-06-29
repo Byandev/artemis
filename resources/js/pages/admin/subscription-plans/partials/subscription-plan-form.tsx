@@ -3,7 +3,7 @@ interface FormData {
     name: string;
     price_php: string;
     order_limit: string;
-    page_limit: string;
+    shop_limit: string;
     data_retention_months: string;
     analytics_tier: string;
     parcel_journey_rate_php: string;
@@ -97,22 +97,22 @@ export default function SubscriptionPlanForm({ data, setData, errors }: Props) {
                 )}
             </div>
 
-            {/* Page Limit */}
+            {/* Shop Limit */}
             <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Page Limit
+                    Shop Limit
                 </label>
                 <input
                     type="number"
                     min="0"
-                    value={data.page_limit}
-                    onChange={(e) => setData('page_limit', e.target.value)}
+                    value={data.shop_limit}
+                    onChange={(e) => setData('shop_limit', e.target.value)}
                     className="mt-1 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-900"
                     placeholder="Leave empty for unlimited"
                 />
-                {errors.page_limit && (
+                {errors.shop_limit && (
                     <p className="mt-1 text-xs text-red-500">
-                        {errors.page_limit}
+                        {errors.shop_limit}
                     </p>
                 )}
             </div>

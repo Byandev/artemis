@@ -26,9 +26,7 @@ class FetchShopUsers implements ShouldQueue
      */
     public function handle(): void
     {
-        $this->shop->loadMissing('pages');
-
-        $pancake = new Pancake($this->shop->id, $this->shop->pages->first()->pos_token);
+        $pancake = new Pancake($this->shop->id, $this->shop->pos_token);
 
         $response = $pancake->listUsers();
 

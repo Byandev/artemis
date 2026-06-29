@@ -28,9 +28,9 @@ interface Analytics {
     total_sent: number;
 }
 
-interface PageStat {
+interface ShopStat {
     id: number;
-    page_name: string;
+    shop_name: string;
     parcel_journey_started: string | null;
     tracked_orders: number;
     sms_sent: number;
@@ -40,7 +40,7 @@ interface PageStat {
 type Props = {
     workspace: Workspace;
     templates: PaginatedData<ParcelJourneyNotificationTemplate>;
-    pageStats: PaginatedData<PageStat>;
+    shopStats: PaginatedData<ShopStat>;
     analytics: Analytics;
     query?: {
         start_date?: string;
@@ -85,7 +85,7 @@ const statCards = (analytics: Analytics) => [
 const ParcelUpdateNotificationTemplates = ({
     workspace,
     templates,
-    pageStats,
+    shopStats,
     analytics,
     query,
 }: Props) => {
@@ -121,7 +121,7 @@ const ParcelUpdateNotificationTemplates = ({
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
-                only: ['analytics', 'pageStats', 'query'],
+                only: ['analytics', 'shopStats', 'query'],
             },
         );
     };
@@ -203,17 +203,17 @@ const ParcelUpdateNotificationTemplates = ({
         [canManageTemplates],
     );
 
-    const pageStatsColumns = useMemo<ColumnDef<PageStat>[]>(
+    const shopStatsColumns = useMemo<ColumnDef<ShopStat>[]>(
         () => [
             {
-                accessorKey: 'page_name',
+                accessorKey: 'shop_name',
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Page" />
+                    <SortableHeader column={column} title="Shop" />
                 ),
                 cell: ({ row }) => (
                     <div>
                         <p className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                            {row.original.page_name}
+                            {row.original.shop_name}
                         </p>
                         <p className="font-mono text-[10px] text-gray-400">
                             ID: {row.original.id}
@@ -313,14 +313,14 @@ const ParcelUpdateNotificationTemplates = ({
                 <div className="mb-6 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
                         <p className="font-mono text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                            Per Page Analytics
+                            Per Shop Analytics
                         </p>
                     </div>
                     <DataTable
-                        columns={pageStatsColumns}
-                        data={pageStats.data ?? []}
+                        columns={shopStatsColumns}
+                        data={shopStats.data ?? []}
                         initialSorting={statsInitialSorting}
-                        meta={omit(pageStats, ['data'])}
+                        meta={omit(shopStats, ['data'])}
                         onFetch={(params) =>
                             router.get(
                                 url,
@@ -330,7 +330,7 @@ const ParcelUpdateNotificationTemplates = ({
                                     per_page_stats:
                                         params?.per_page ??
                                         query?.stats_per_page ??
-                                        pageStats.per_page,
+                                        shopStats.per_page,
                                     start_date: dateRange[0],
                                     end_date: dateRange[1],
                                 },
@@ -338,7 +338,7 @@ const ParcelUpdateNotificationTemplates = ({
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
-                                    only: ['pageStats', 'query'],
+                                    only: ['shopStats', 'query'],
                                 },
                             )
                         }

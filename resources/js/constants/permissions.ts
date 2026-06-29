@@ -23,6 +23,7 @@ export const PERMISSIONS = {
 
     // Shops
     ViewShops: 'View Shops',
+    CreateShops: 'Create Shops',
     RefreshShops: 'Refresh Shops',
 
     // Products
