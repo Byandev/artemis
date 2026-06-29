@@ -37,8 +37,6 @@ import {
     Edit,
     ListChecks,
     MoreHorizontal,
-    Plus,
-    RefreshCw,
     Search,
     Upload,
     Wallet,
@@ -66,9 +64,6 @@ interface PagesProps {
             owner_id?: string | string[];
         };
     };
-    pageLimit?: number | null;
-    pageCount?: number;
-    pageLimitReached?: boolean;
 }
 
 interface PageProps {
@@ -150,15 +145,7 @@ const currencyFormatter = new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 2,
 });
 
-const Pages = ({
-    pages,
-    workspace,
-    users,
-    query,
-    pageLimit,
-    pageCount,
-    pageLimitReached,
-}: PagesProps) => {
+const Pages = ({ pages, workspace, users, query }: PagesProps) => {
     const { flash } = usePage().props as PageProps;
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
@@ -178,7 +165,6 @@ const Pages = ({
     const [selectedPage, setSelectedPage] = useState<Page | null>(null);
     const [budgetPage, setBudgetPage] = useState<Page | null>(null);
 
-    const [processing, setProcessing] = useState(false);
     const budgetForm = useForm({
         budget: '0',
     });
@@ -190,13 +176,9 @@ const Pages = ({
     const canEditPageBudget = usePermission(
         PERMISSIONS.EditPageDailyBudgetRecords,
     );
-    const canRefreshPages = usePermission(PERMISSIONS.RefreshPages);
     const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
     const canUsePageActions =
-        canViewChecklist ||
-        canEditPages ||
-        canRefreshPages ||
-        canEditPageBudget;
+        canViewChecklist || canEditPages || canEditPageBudget;
 
     useEffect(() => {
         if (flash?.success) {
@@ -237,10 +219,6 @@ const Pages = ({
         router.get(`/workspaces/${workspace.slug}/pages/${page.id}/edit`);
     };
 
-    const handleCreate = () => {
-        router.get(`/workspaces/${workspace.slug}/pages/create`);
-    };
-
     const handleExport = () => {
         window.location.href = `/workspaces/${workspace.slug}/pages/export`;
     };
@@ -266,19 +244,6 @@ const Pages = ({
         );
     };
 
-    const refresh = (page: Page) => {
-        setProcessing(true);
-        router.post(
-            workspaces.pages.refresh.url({ workspace, page }),
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => toast.success('Refresh started.'),
-                onError: () => toast.error('Failed to refresh page.'),
-                onFinish: () => setProcessing(false),
-            },
-        );
-    };
 
     const openChecklist = (page: Page) => {
         setSelectedPage(page);
@@ -337,27 +302,6 @@ const Pages = ({
             cell: ({ row }) => row.original.owner?.name || '-',
         },
         {
-            id: 'teams',
-            header: 'Teams',
-            cell: ({ row }) => {
-                const teams = row.original.teams ?? [];
-                if (teams.length === 0)
-                    return <span className="text-gray-400">-</span>;
-                return (
-                    <div className="flex flex-wrap gap-1">
-                        {teams.map((t) => (
-                            <span
-                                key={t.id}
-                                className="inline-flex items-center rounded-full bg-brand-500/10 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:text-brand-400"
-                            >
-                                {t.name}
-                            </span>
-                        ))}
-                    </div>
-                );
-            },
-        },
-        {
             accessorKey: 'latest_budget',
             header: ({ column }) => (
                 <SortableHeader
@@ -383,20 +327,6 @@ const Pages = ({
                             </span>
                         )}
                     </div>
-                );
-            },
-        },
-        {
-            accessorKey: 'orders_last_synced_at',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Last Sync'} />
-            ),
-            cell: ({ row }) => {
-                const date = row.original.orders_last_synced_at;
-                return (
-                    <span>
-                        {date ? new Date(date).toLocaleString() : 'Never'}
-                    </span>
                 );
             },
         },
@@ -477,23 +407,6 @@ const Pages = ({
                                               Update Budget
                                           </DropdownMenuItem>
                                       )}
-                                      {false && (
-                                          <DropdownMenuItem
-                                              onClick={() => refresh(page)}
-                                              disabled={processing}
-                                          >
-                                              <RefreshCw
-                                                  className={
-                                                      processing
-                                                          ? 'animate-spin'
-                                                          : ''
-                                                  }
-                                              />
-                                              {processing
-                                                  ? 'Refreshing…'
-                                                  : 'Refresh Orders'}
-                                          </DropdownMenuItem>
-                                      )}
                                   </DropdownMenuContent>
                               </DropdownMenu>
                           );
@@ -512,68 +425,37 @@ const Pages = ({
                     description="Manage your shop pages and their connected stores"
                     stackActionsOnMobile
                 >
-                    {canViewPages && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleExport}
-                        >
-                            <Download className="h-4 w-4" />
-                            Export
-                        </Button>
-                    )}
-                    {canCreatePages && (
-                        <>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".xlsx,.xls,.csv"
-                                className="hidden"
-                                onChange={handleImportFile}
-                            />
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={importing}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <Upload className="h-4 w-4" />
-                                {importing ? 'Importing…' : 'Import'}
-                            </Button>
-                        </>
-                    )}
-                    {canCreatePages && (
-                        <Button
-                            size="sm"
-                            onClick={handleCreate}
-                            disabled={pageLimitReached}
-                            title={
-                                pageLimitReached
-                                    ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
-                                    : undefined
-                            }
-                        >
-                            <Plus className="h-4 w-4" />
-                            Add New Page
-                        </Button>
-                    )}
+                    {/*{canViewPages && (*/}
+                    {/*    <Button*/}
+                    {/*        size="sm"*/}
+                    {/*        variant="outline"*/}
+                    {/*        onClick={handleExport}*/}
+                    {/*    >*/}
+                    {/*        <Download className="h-4 w-4" />*/}
+                    {/*        Export*/}
+                    {/*    </Button>*/}
+                    {/*)}*/}
+                    {/*{canCreatePages && (*/}
+                    {/*    <>*/}
+                    {/*        <input*/}
+                    {/*            ref={fileInputRef}*/}
+                    {/*            type="file"*/}
+                    {/*            accept=".xlsx,.xls,.csv"*/}
+                    {/*            className="hidden"*/}
+                    {/*            onChange={handleImportFile}*/}
+                    {/*        />*/}
+                    {/*        <Button*/}
+                    {/*            size="sm"*/}
+                    {/*            variant="outline"*/}
+                    {/*            disabled={importing}*/}
+                    {/*            onClick={() => fileInputRef.current?.click()}*/}
+                    {/*        >*/}
+                    {/*            <Upload className="h-4 w-4" />*/}
+                    {/*            {importing ? 'Importing…' : 'Import'}*/}
+                    {/*        </Button>*/}
+                    {/*    </>*/}
+                    {/*)}*/}
                 </PageHeader>
-
-                {canCreatePages && pageLimit != null && (
-                    <div className="-mt-4 mb-6 flex justify-end">
-                        <span
-                            className={clsx(
-                                'font-mono text-[10px] tracking-wider uppercase',
-                                pageLimitReached
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-gray-400 dark:text-gray-500',
-                            )}
-                        >
-                            {pageCount ?? 0}/{pageLimit} pages used
-                            {pageLimitReached && ' · upgrade to add more'}
-                        </span>
-                    </div>
-                )}
 
                 <Dialog
                     open={!!budgetPage}

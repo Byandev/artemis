@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Workspaces;
 use App\Enums\Permission;
 use App\Exports\PageExport;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Workspaces\StorePageRequest;
 use App\Http\Requests\Workspaces\UpdatePageRequest;
 use App\Http\Sorts\Page\OwnerNameSort;
 use App\Http\Sorts\Page\ShopNameSort;
@@ -13,20 +12,13 @@ use App\Http\Sorts\PendingRequiredChecklistsSort;
 use App\Imports\PageImport;
 use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
-use App\Models\Shop;
 use App\Models\Workspace;
-use App\Services\PostHogService;
-use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Pancake\Jobs\FetchPageOrders;
-use Modules\Pancake\Jobs\FetchShopOrders;
-use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -34,17 +26,6 @@ use Spatie\QueryBuilder\QueryBuilder;
 class PageController extends Controller
 {
     use AuthorizesRequests;
-
-    private function assertPageLimitNotReached(Workspace $workspace): void
-    {
-        $info = $workspace->pageLimitInfo();
-
-        if ($info['reached']) {
-            throw ValidationException::withMessages([
-                'page_limit' => "You've reached your plan's page limit ({$info['limit']}). Upgrade your plan to add more pages.",
-            ]);
-        }
-    }
 
     public function index(Request $request, Workspace $workspace)
     {
@@ -84,11 +65,9 @@ class PageController extends Controller
                 'parcel_journey_enabled',
                 AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
-            ->with(['shop', 'owner', 'latestBudget', 'teams:id,name'])
+            ->with(['shop.teams:id,name', 'owner', 'latestBudget'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
-
-        $pageLimitInfo = $workspace->pageLimitInfo();
 
         return Inertia::render('workspaces/pages/index', [
             'pages' => $pages,
@@ -98,9 +77,6 @@ class PageController extends Controller
                 'filter' => $request->input('filter', []),
             ],
             'users' => $workspace->users()->get(['users.id', 'users.name']),
-            'pageLimit' => $pageLimitInfo['limit'],
-            'pageCount' => $pageLimitInfo['count'],
-            'pageLimitReached' => $pageLimitInfo['reached'],
         ]);
     }
 
@@ -143,23 +119,6 @@ class PageController extends Controller
             ));
     }
 
-    public function create(Request $request, Workspace $workspace)
-    {
-        $this->authorize(Permission::EditPages->value, $workspace);
-
-        $info = $workspace->pageLimitInfo();
-        if ($info['reached']) {
-            return redirect()
-                ->route('workspaces.pages.index', $workspace)
-                ->with('error', "You've reached your plan's page limit ({$info['limit']}). Upgrade your plan to add more pages.");
-        }
-
-        return Inertia::render('workspaces/pages/create', [
-            'workspace' => $workspace,
-            'users' => $workspace->users()->get(['users.id', 'users.name']),
-        ]);
-    }
-
     public function edit(Request $request, Workspace $workspace, Page $page)
     {
         $this->authorize(Permission::EditPages->value, $workspace);
@@ -169,70 +128,6 @@ class PageController extends Controller
             'page' => $page,
             'users' => $workspace->users()->get(['users.id', 'users.name']),
         ]);
-    }
-
-    public function store(StorePageRequest $request, Workspace $workspace)
-    {
-        $this->authorize(Permission::EditPages->value, $workspace);
-
-        $this->assertPageLimitNotReached($workspace);
-
-        $validated = $request->validated();
-        $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
-            'api_key' => $validated['pos_token'],
-        ]);
-
-        if ($response->failed()) {
-            throw ValidationException::withMessages(['pos_token' => 'Invalid API Key.']);
-        }
-
-        $resJson = $response->json();
-        $pageData = collect($resJson['shop']['pages'])->firstWhere('id', $validated['id']);
-
-        if (! $pageData) {
-            throw ValidationException::withMessages(['id' => 'Page not found']);
-        }
-
-        $shop = Shop::firstOrCreate([
-            'id' => $validated['shop_id'],
-            'workspace_id' => $workspace->id,
-        ], [
-            'name' => $resJson['shop']['name'],
-            'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
-        ]);
-
-        if ($shop->wasRecentlyCreated) {
-            dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-            dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
-        }
-
-        $page = Page::create([
-            'id' => $validated['id'],
-            'workspace_id' => $workspace->id,
-            'owner_id' => $request->user()->id,
-            'shop_id' => $validated['shop_id'],
-            'name' => $validated['name'],
-            'pos_token' => $validated['pos_token'] ?? null,
-            'botcake_token' => $validated['botcake_token'] ?? null,
-            'pancake_token' => $validated['pancake_token'] ?? null,
-            'infotxt_token' => $validated['infotxt_token'] ?? null,
-            'infotxt_user_id' => $validated['infotxt_user_id'] ?? null,
-            'parcel_journey_custom_field_id' => $validated['parcel_journey_custom_field_id'] ?? null,
-            'parcel_journey_flow_id' => $validated['parcel_journey_flow_id'] ?? null,
-            'parcel_journey_enabled' => $validated['parcel_journey_enabled'] ?? false,
-            'is_single_page' => $validated['is_single_page'] ?? false,
-            'status' => $validated['status'] ?? 'active',
-        ]);
-
-        (new PostHogService)->capture((string) $request->user()->id, 'page_connected', [
-            'workspace_id' => $workspace->id,
-            'page_id' => $page->id,
-            'page_name' => $page->name,
-            'shop_id' => $shop->id,
-        ]);
-
-        return redirect()->route('workspaces.pages.index', $workspace)
-            ->with('success', 'Page created successfully.');
     }
 
     public function update(UpdatePageRequest $request, Workspace $workspace, Page $page)
@@ -270,20 +165,6 @@ class PageController extends Controller
             ->with('success', 'Page budget updated successfully.');
     }
 
-    public function refresh(Request $request, Workspace $workspace, Page $page)
-    {
-        $this->authorize(Permission::RefreshPages->value, $workspace);
-
-        if ($page->workspace_id !== $workspace->id) {
-            abort(403);
-        }
-
-        $page->update(['orders_last_synced_at' => null, 'is_sync_logic_updated' => true]);
-        dispatch(new FetchPageOrders($page, 1, now()->subMonth()->unix(), now()->unix()))->onQueue('pancake');
-
-        return redirect()->route('workspaces.pages.index', $workspace);
-    }
-
     public function archive(Request $request, Workspace $workspace, Page $page)
     {
         $this->authorize(Permission::ArchivePages->value, $workspace);
@@ -308,38 +189,6 @@ class PageController extends Controller
         $page->activate();
 
         return redirect()->route('workspaces.pages.index', $workspace);
-    }
-
-    public function validatePosToken(Request $request, Workspace $workspace)
-    {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
-
-        $validated = $request->validate([
-            'shop_id' => 'required|string',
-            'token' => 'required|string',
-        ]);
-
-        try {
-            $response = Http::timeout(10)->get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
-                'api_key' => $validated['token'],
-            ]);
-
-            if ($response->successful()) {
-                return response()->json(['valid' => true, 'message' => 'POS token is valid.', 'data' => $response->json()], 200);
-            }
-
-            return response()->json([
-                'valid' => false,
-                'message' => 'Invalid POS token or shop ID.',
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'valid' => false,
-                'message' => 'Could not reach Pancake API.',
-            ]);
-        }
     }
 
     public function validatePancakeToken(Request $request, Workspace $workspace)

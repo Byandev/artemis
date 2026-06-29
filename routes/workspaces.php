@@ -26,8 +26,8 @@ use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamAdAccountController;
 use App\Http\Controllers\Workspaces\TeamController;
-use App\Http\Controllers\Workspaces\TeamPageController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
+use App\Http\Controllers\Workspaces\TeamShopController;
 use App\Http\Controllers\Workspaces\VideoEditorDashboardController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
@@ -157,15 +157,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
     Route::get('/workspaces/{workspace}/pages/export', [PageController::class, 'export'])->name('workspaces.pages.export');
     Route::post('/workspaces/{workspace}/pages/import', [PageController::class, 'import'])->name('workspaces.pages.import');
-    Route::get('/workspaces/{workspace}/pages/create', [PageController::class, 'create'])->name('workspaces.pages.create');
-    Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
-    Route::post('/workspaces/{workspace}/pages/validate-pos-token', [PageController::class, 'validatePosToken'])->name('workspaces.pages.validate-pos-token');
     Route::post('/workspaces/{workspace}/pages/validate-pancake-token', [PageController::class, 'validatePancakeToken'])->name('workspaces.pages.validate-pancake-token');
     Route::post('/workspaces/{workspace}/pages/validate-botcake-token', [PageController::class, 'validateBotcakeToken'])->name('workspaces.pages.validate-botcake-token');
     Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::put('/workspaces/{workspace}/pages/{page}/budget', [PageController::class, 'updateBudget'])->name('workspaces.pages.update-budget');
-    Route::post('/workspaces/{workspace}/pages/{page}/refresh', [PageController::class, 'refresh'])->name('workspaces.pages.refresh');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
 
@@ -176,6 +172,9 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/page-daily-budget-records/{pageDailyBudgetRecord}', [PageDailyBudgetRecordController::class, 'destroy'])->name('workspaces.page-daily-budget-records.destroy');
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
+    Route::post('/workspaces/{workspace}/shops', [ShopController::class, 'store'])->name('workspaces.shops.store');
+    Route::post('/workspaces/{workspace}/shops/validate-pos-token', [ShopController::class, 'validatePosToken'])->name('workspaces.shops.validate-pos-token');
+    Route::post('/workspaces/{workspace}/shops/{shop}/refresh-pages', [ShopController::class, 'refreshPages'])->name('workspaces.shops.refresh-pages');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-orders', [ShopController::class, 'refreshOrders'])->name('workspaces.shops.refresh-orders');
 
@@ -369,8 +368,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'update'])->name('workspaces.teams.schedule.update');
 
     // Team data-access assignment (team-level visibility)
-    Route::get('/workspaces/{workspace}/teams/{team}/pages', [TeamPageController::class, 'index'])->name('workspaces.teams.pages.index');
-    Route::put('/workspaces/{workspace}/teams/{team}/pages', [TeamPageController::class, 'update'])->name('workspaces.teams.pages.update');
+    Route::get('/workspaces/{workspace}/teams/{team}/shops', [TeamShopController::class, 'index'])->name('workspaces.teams.shops.index');
+    Route::put('/workspaces/{workspace}/teams/{team}/shops', [TeamShopController::class, 'update'])->name('workspaces.teams.shops.update');
     Route::get('/workspaces/{workspace}/teams/{team}/ad-accounts', [TeamAdAccountController::class, 'index'])->name('workspaces.teams.ad-accounts.index');
     Route::put('/workspaces/{workspace}/teams/{team}/ad-accounts', [TeamAdAccountController::class, 'update'])->name('workspaces.teams.ad-accounts.update');
 
@@ -518,8 +517,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-subscription');
         Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
             ->name('workspaces.update-modules');
-        Route::put('/workspaces/{workspace}/max-pages', [AdminWorkspaceController::class, 'updateMaxPages'])
-            ->name('workspaces.update-max-pages');
+        Route::put('/workspaces/{workspace}/max-shops', [AdminWorkspaceController::class, 'updateMaxShops'])
+            ->name('workspaces.update-max-shops');
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');

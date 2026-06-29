@@ -9,8 +9,8 @@ class ParcelJourneyNotificationLog extends Model
 {
     protected $guarded = [];
 
-    public function page(): BelongsTo
+    public function shop(): BelongsTo
     {
-        return $this->belongsTo(Page::class);
+        return $this->belongsTo(Shop::class);
     }
 }

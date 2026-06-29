@@ -36,11 +36,12 @@ class Team extends Model
     }
 
     /**
-     * Pages assigned to this team (team-level data ownership).
+     * Shops assigned to this team (team-level data ownership). Members see the
+     * orders, pages, budgets and metrics belonging to these shops.
      */
-    public function pages(): BelongsToMany
+    public function shops(): BelongsToMany
     {
-        return $this->belongsToMany(Page::class, 'team_page')->withTimestamps();
+        return $this->belongsToMany(Shop::class, 'team_shop')->withTimestamps();
     }
 
     /**

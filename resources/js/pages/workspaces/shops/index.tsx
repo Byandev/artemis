@@ -1,7 +1,16 @@
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import PageHeader from '@/components/common/PageHeader';
+import ValidateTokenButton from '@/components/pages/ValidateTokenButton';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -21,14 +30,22 @@ import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
+    LayoutGrid,
     ListChecks,
     MoreHorizontal,
+    Plus,
     RefreshCw,
     Search,
     Users,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner'; // Added toast import
+
+const inputClass =
+    'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
+const labelClass =
+    'block font-mono text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500';
+const errorClass = 'font-mono text-[11px] text-red-500';
 
 const ChecklistsBadge = ({ pending }: { pending: number }) => {
     const hasPending = pending > 0;
@@ -63,9 +80,19 @@ interface ShopsPage {
             search?: string;
         };
     };
+    shopLimit?: number | null;
+    shopCount?: number;
+    shopLimitReached?: boolean;
 }
 
-const Shops = ({ pages, workspace, query }: ShopsPage) => {
+const Shops = ({
+    pages,
+    workspace,
+    query,
+    shopLimit,
+    shopCount,
+    shopLimitReached,
+}: ShopsPage) => {
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
@@ -73,10 +100,30 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
     const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+    const [addOpen, setAddOpen] = useState(false);
     const { post, processing } = useForm({});
     const canRefreshShops = usePermission(PERMISSIONS.RefreshShops);
+    const canCreateShops = usePermission(PERMISSIONS.CreateShops);
     const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
     const canUseShopActions = canRefreshShops || canViewChecklist;
+
+    const addForm = useForm({
+        shop_id: '',
+        pos_token: '',
+    });
+
+    const submitAddShop = (e: React.FormEvent) => {
+        e.preventDefault();
+        addForm.post(workspaces.shops.store.url({ workspace }), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setAddOpen(false);
+                addForm.reset();
+                toast.success('Shop added. Pages are syncing.');
+            },
+            onError: () => toast.error('Failed to add shop. Check the form.'),
+        });
+    };
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -115,6 +162,17 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                 toast.success(`${shop.name} orders queued for refresh.`),
             onError: () =>
                 toast.error(`Failed to refresh orders for ${shop.name}.`),
+        });
+    };
+
+    const refreshPages = (shop: Shop) => {
+        post(workspaces.shops.refreshPages.url({ workspace, shop }), {
+            preserveScroll: true,
+            onStart: () =>
+                toast.info(`Refreshing page list for ${shop.name}...`),
+            onSuccess: () => router.reload({ only: ['pages'] }),
+            onError: () =>
+                toast.error(`Failed to refresh page list for ${shop.name}.`),
         });
     };
 
@@ -185,6 +243,15 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                                       )}
                                       {canRefreshShops && (
                                           <DropdownMenuItem
+                                              onClick={() => refreshPages(shop)}
+                                              disabled={processing}
+                                          >
+                                              <LayoutGrid className="mr-2 h-4 w-4" />
+                                              Refresh pages
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canRefreshShops && (
+                                          <DropdownMenuItem
                                               onClick={() => refreshUsers(shop)}
                                               disabled={processing}
                                           >
@@ -219,7 +286,39 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                 <PageHeader
                     title="Shops"
                     description="Manage connected shops and sync customer data"
-                />
+                >
+                    {canCreateShops && (
+                        <div className="flex items-center gap-3">
+                            {shopLimit != null && (
+                                <span
+                                    className={clsx(
+                                        'font-mono text-[10px] tracking-wider whitespace-nowrap uppercase',
+                                        shopLimitReached
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-gray-400 dark:text-gray-500',
+                                    )}
+                                >
+                                    {shopCount ?? 0}/{shopLimit} shops used
+                                    {shopLimitReached &&
+                                        ' · upgrade to add more'}
+                                </span>
+                            )}
+                            <Button
+                                size="sm"
+                                onClick={() => setAddOpen(true)}
+                                disabled={shopLimitReached}
+                                title={
+                                    shopLimitReached
+                                        ? `Shop limit reached (${shopCount ?? 0}/${shopLimit}). Upgrade your plan to add more.`
+                                        : undefined
+                                }
+                            >
+                                <Plus className="h-4 w-4" />
+                                Add Shop
+                            </Button>
+                        </div>
+                    )}
+                </PageHeader>
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
@@ -258,6 +357,135 @@ const Shops = ({ pages, workspace, query }: ShopsPage) => {
                         }}
                     />
                 </div>
+
+                {canCreateShops && (
+                    <Dialog
+                        open={addOpen}
+                        onOpenChange={(open) => {
+                            setAddOpen(open);
+                            if (!open) addForm.clearErrors();
+                        }}
+                    >
+                        <DialogContent>
+                            <form onSubmit={submitAddShop}>
+                                <DialogHeader>
+                                    <DialogTitle>Add Shop</DialogTitle>
+                                    <DialogDescription>
+                                        Enter your shop ID and POS token. We'll
+                                        fetch the shop's pages automatically.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="space-y-5 py-4">
+                                    <div className="space-y-1.5">
+                                        <label className={labelClass}>
+                                            Shop ID{' '}
+                                            <span className="text-red-400">
+                                                *
+                                            </span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            autoFocus
+                                            className={inputClass}
+                                            placeholder="e.g. 789"
+                                            value={addForm.data.shop_id}
+                                            onChange={(e) =>
+                                                addForm.setData(
+                                                    'shop_id',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        {addForm.errors.shop_id && (
+                                            <p className={errorClass}>
+                                                {addForm.errors.shop_id}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className={labelClass}>
+                                            POS Token{' '}
+                                            <span className="text-red-400">
+                                                *
+                                            </span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className={inputClass}
+                                            placeholder="Enter POS token"
+                                            value={addForm.data.pos_token}
+                                            onChange={(e) =>
+                                                addForm.setData(
+                                                    'pos_token',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        <ValidateTokenButton
+                                            url={`/workspaces/${workspace.slug}/shops/validate-pos-token`}
+                                            payload={{
+                                                shop_id: addForm.data.shop_id,
+                                                token: addForm.data.pos_token,
+                                            }}
+                                            disabledReason={
+                                                !addForm.data.shop_id
+                                                    ? 'Enter Shop ID first'
+                                                    : !addForm.data.pos_token
+                                                      ? 'Enter a token first'
+                                                      : undefined
+                                            }
+                                        />
+                                        {addForm.errors.pos_token && (
+                                            <p className={errorClass}>
+                                                {addForm.errors.pos_token}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {(
+                                        addForm.errors as Record<
+                                            string,
+                                            string | undefined
+                                        >
+                                    ).shop_limit && (
+                                        <p className={errorClass}>
+                                            {
+                                                (
+                                                    addForm.errors as Record<
+                                                        string,
+                                                        string | undefined
+                                                    >
+                                                ).shop_limit
+                                            }
+                                        </p>
+                                    )}
+                                </div>
+
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setAddOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        disabled={addForm.processing}
+                                    >
+                                        {addForm.processing
+                                            ? 'Adding…'
+                                            : 'Add Shop'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                )}
 
                 {canViewChecklist && (
                     <TargetChecklistDrawer

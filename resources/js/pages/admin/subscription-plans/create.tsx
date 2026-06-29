@@ -11,7 +11,7 @@ export default function Create() {
         name: '',
         price_php: '0',
         order_limit: '' as string,
-        page_limit: '' as string,
+        shop_limit: '' as string,
         data_retention_months: '12',
         analytics_tier: 'basic',
         parcel_journey_rate_php: '0',

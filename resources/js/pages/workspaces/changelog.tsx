@@ -12,6 +12,58 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.14.0',
+        date: '2026-06-29',
+        sections: [
+            {
+                title: 'Shops — Connect a Shop, Not a Page',
+                items: [
+                    'You now add a Shop instead of adding pages one at a time — enter the Shop ID and POS token in a quick pop-up and every page under that shop is imported and synced automatically',
+                    'New "Refresh page list" action on each shop re-checks the shop and pulls in any newly-created pages, leaving the pages you already have untouched',
+                    'First-time setup is now shop-based too — connect one shop and you are ready to go',
+                ],
+            },
+            {
+                title: 'Plans — Limits Are Now Per Shop',
+                items: [
+                    'Plan limits now count shops instead of pages, matching the new shop-first flow — your plan and the admin screens show how many shops are used and the shop limit',
+                ],
+            },
+            {
+                title: 'Teams — Assign Shops',
+                items: [
+                    'Teams now own shops instead of individual pages — pick the shops a team manages and its members automatically see all the orders, budgets, and metrics for those shops and their pages',
+                ],
+            },
+            {
+                title: 'Pages',
+                items: [
+                    'The POS token now lives on the shop, so it has been removed from the page form — it only needs to be set once per shop',
+                    'The page edit form is simpler: the Shop ID and POS token fields are gone',
+                    'The standalone "Add Page" flow and the per-page "Refresh Orders" action have been retired, since pages now come from — and sync with — their shop',
+                ],
+            },
+            {
+                title: 'Parcel Journey',
+                items: [
+                    'The parcel-journey analytics breakdown is now per shop instead of per page, for a cleaner view of tracked orders and messages sent across each shop',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.3',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Order Refresh Tooling',
+                items: [
+                    'New maintenance command to re-pull a workspace’s shop orders (all sources, incl. Webcake) over a configurable recent window — scopeable to a single shop or page — for backfills and one-off fixes without touching the hourly sync',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.13.2',
         date: '2026-06-28',
         sections: [

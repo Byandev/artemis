@@ -114,8 +114,10 @@ abstract class RtsBaseQuery
         // than leaving the data unfiltered.
         if ($this->request->filled('team_ids')) {
             $teamIds = (array) $this->request->input('team_ids');
+            // pancake_orders carries shop_id directly — scope via the shop's
+            // teams (covers page-less Webcake orders too).
             $this->query->whereHas(
-                'page.teams',
+                'shop.teams',
                 fn (Builder $q) => $q->whereIn('teams.id', $teamIds),
             );
         }

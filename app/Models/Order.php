@@ -19,7 +19,7 @@ class Order extends Model
 
     protected function visibilityTeamRelation(): string
     {
-        return 'page.teams';
+        return 'page.shop.teams';
     }
 
     public function shippingAddress(): HasOne|Order
