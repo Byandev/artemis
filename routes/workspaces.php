@@ -46,6 +46,7 @@ use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesContro
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
+use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
 use Modules\GencysERP\Http\Controllers\Web\UnitCodeController as GencysUnitCodeController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
@@ -386,6 +387,12 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
+
+    // Gencys ERP sync health for inventory items (per-item transaction + PO sync status).
+    Route::get('/workspaces/{workspace}/inventory/sync-health', [GencysSyncHealthController::class, 'index'])
+        ->middleware('can:View Inventory Items,workspace')
+        ->name('workspaces.inventory.sync-health');
+
     Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');

@@ -6,6 +6,7 @@ use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Modules\GencysERP\Jobs\FetchInventoryItemTransactionHistory;
+use Modules\GencysERP\Models\GencysSyncRun;
 
 class TriggerFetchERPTransactionHistory extends Command
 {
@@ -78,6 +79,19 @@ class TriggerFetchERPTransactionHistory extends Command
 
                     $callbackBase = rtrim(config('app.url'), '/');
 
+                    // Open a pending sync run per item, keyed by item id. We hand
+                    // each run's id to n8n (sync_run_id) so it can echo it back on
+                    // the callback for an exact match; items that never report back
+                    // stay pending until the stale-run sweeper fails them.
+                    $runIds = $chunk->mapWithKeys(fn ($item) => [
+                        $item->id => GencysSyncRun::start(
+                            $workspace->id,
+                            $item->id,
+                            GencysSyncRun::TYPE_TRANSACTION_HISTORY,
+                            ['date' => $transactionDate],
+                        )->id,
+                    ]);
+
                     $data = [
                         'workspace_id' => $workspace->id,
                         'workspace_api_key' => $apiKey->reveal(),
@@ -88,12 +102,13 @@ class TriggerFetchERPTransactionHistory extends Command
                         'items' => $chunk->map(fn ($item) => [
                             'id' => $item->id,
                             'keyword' => $item->sku,
+                            'sync_run_id' => $runIds[$item->id],
                         ])->values()->toArray(),
                     ];
 
                     $offset = $dispatched * $delay;
 
-                    dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data))
+                    dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data, $runIds->values()->all()))
                         ->delay(now()->addSeconds($offset));
                 });
         }
