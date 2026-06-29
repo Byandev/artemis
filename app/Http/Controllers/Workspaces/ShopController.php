@@ -218,6 +218,38 @@ class ShopController extends Controller
             ->with('success', "Page list refreshed. {$count} page(s) synced.");
     }
 
+    public function validatePosToken(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'shop_id' => 'required|string',
+            'token' => 'required|string',
+        ]);
+
+        try {
+            $response = Http::timeout(10)->get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
+                'api_key' => $validated['token'],
+            ]);
+
+            if ($response->successful()) {
+                return response()->json(['valid' => true, 'message' => 'POS token is valid.', 'data' => $response->json()], 200);
+            }
+
+            return response()->json([
+                'valid' => false,
+                'message' => 'Invalid POS token or shop ID.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Could not reach Pancake API.',
+            ]);
+        }
+    }
+
     public function refreshUsers(Request $request, Workspace $workspace, Shop $shop)
     {
         if (! $request->user()->isMemberOf($workspace)) {

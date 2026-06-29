@@ -3,6 +3,7 @@
 use App\Models\Page;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Jobs\FetchShopOrders;
@@ -85,6 +86,76 @@ test('refresh-pages on a foreign-workspace shop returns 403', function () {
     $this->actingAs($owner)
         ->post("/workspaces/{$workspaceA->slug}/shops/{$foreignShop->id}/refresh-pages")
         ->assertForbidden();
+});
+
+// ----- Validate POS token -----
+
+test('validatePosToken returns valid:true on successful upstream response', function () {
+    Http::fake([
+        'pos.pages.fm/*' => Http::response(['shop' => ['name' => 'Test']], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/validate-pos-token", [
+            'shop_id' => 'shop-1',
+            'token' => 'abc',
+        ])
+        ->assertOk()
+        ->assertJsonPath('valid', true);
+});
+
+test('validatePosToken returns valid:false on upstream failure', function () {
+    Http::fake([
+        'pos.pages.fm/*' => Http::response([], 401),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/validate-pos-token", [
+            'shop_id' => 'shop-1',
+            'token' => 'abc',
+        ])
+        ->assertOk()
+        ->assertJsonPath('valid', false);
+});
+
+test('validatePosToken requires membership', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $stranger = User::factory()->create();
+
+    $this->actingAs($stranger)
+        ->postJson("/workspaces/{$workspace->slug}/shops/validate-pos-token", [
+            'shop_id' => 'shop-1',
+            'token' => 'abc',
+        ])
+        ->assertForbidden();
+});
+
+test('validatePosToken validates input fields', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/validate-pos-token", [])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['shop_id', 'token']);
+});
+
+test('validatePosToken returns valid:false on connection exception', function () {
+    Http::fake(fn () => throw new ConnectionException('timed out'));
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/validate-pos-token", [
+            'shop_id' => 'shop-1',
+            'token' => 'abc',
+        ])
+        ->assertOk()
+        ->assertJsonPath('valid', false)
+        ->assertJsonPath('message', 'Could not reach Pancake API.');
 });
 
 // ----- Store (add shop, auto-fetch pages) -----

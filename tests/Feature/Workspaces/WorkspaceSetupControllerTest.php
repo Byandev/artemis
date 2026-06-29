@@ -1,16 +1,26 @@
 <?php
 
+use App\Models\Shop;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\Workspace;
 
-test('create page redirects existing-workspace users to their dashboard', function () {
+test('create page redirects existing-workspace users with a shop to their dashboard', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    Shop::factory()->forWorkspace($workspace)->create();
 
     $this->actingAs($owner)
         ->get('/workspaces/setup')
         ->assertRedirect("/workspaces/{$workspace->slug}/dashboard");
+});
+
+test('create page redirects existing-workspace users without a shop to onboarding', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($owner)
+        ->get('/workspaces/setup')
+        ->assertRedirect("/workspaces/{$workspace->slug}/onboarding");
 });
 
 test('create page renders for users without workspaces', function () {
@@ -87,6 +97,7 @@ test('store rejects invalid monthly_order_volume', function () {
 
 test('store does not create a second workspace if user already has one', function () {
     ['user' => $owner, 'workspace' => $existing] = makeWorkspaceWithOwner();
+    Shop::factory()->forWorkspace($existing)->create();
     $count = Workspace::count();
 
     $this->actingAs($owner)

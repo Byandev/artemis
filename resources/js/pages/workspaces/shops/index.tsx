@@ -288,37 +288,37 @@ const Shops = ({
                     description="Manage connected shops and sync customer data"
                 >
                     {canCreateShops && (
-                        <Button
-                            size="sm"
-                            onClick={() => setAddOpen(true)}
-                            disabled={shopLimitReached}
-                            title={
-                                shopLimitReached
-                                    ? `Shop limit reached (${shopCount ?? 0}/${shopLimit}). Upgrade your plan to add more.`
-                                    : undefined
-                            }
-                        >
-                            <Plus className="h-4 w-4" />
-                            Add Shop
-                        </Button>
+                        <div className="flex items-center gap-3">
+                            {shopLimit != null && (
+                                <span
+                                    className={clsx(
+                                        'font-mono text-[10px] tracking-wider whitespace-nowrap uppercase',
+                                        shopLimitReached
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-gray-400 dark:text-gray-500',
+                                    )}
+                                >
+                                    {shopCount ?? 0}/{shopLimit} shops used
+                                    {shopLimitReached &&
+                                        ' · upgrade to add more'}
+                                </span>
+                            )}
+                            <Button
+                                size="sm"
+                                onClick={() => setAddOpen(true)}
+                                disabled={shopLimitReached}
+                                title={
+                                    shopLimitReached
+                                        ? `Shop limit reached (${shopCount ?? 0}/${shopLimit}). Upgrade your plan to add more.`
+                                        : undefined
+                                }
+                            >
+                                <Plus className="h-4 w-4" />
+                                Add Shop
+                            </Button>
+                        </div>
                     )}
                 </PageHeader>
-
-                {canCreateShops && shopLimit != null && (
-                    <div className="-mt-4 mb-6 flex justify-end">
-                        <span
-                            className={clsx(
-                                'font-mono text-[10px] tracking-wider uppercase',
-                                shopLimitReached
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-gray-400 dark:text-gray-500',
-                            )}
-                        >
-                            {shopCount ?? 0}/{shopLimit} shops used
-                            {shopLimitReached && ' · upgrade to add more'}
-                        </span>
-                    </div>
-                )}
 
                 <div className="mb-3 flex items-center gap-2">
                     <div className="relative w-full max-w-xs">
@@ -424,7 +424,7 @@ const Shops = ({
                                             }
                                         />
                                         <ValidateTokenButton
-                                            url={`/workspaces/${workspace.slug}/pages/validate-pos-token`}
+                                            url={`/workspaces/${workspace.slug}/shops/validate-pos-token`}
                                             payload={{
                                                 shop_id: addForm.data.shop_id,
                                                 token: addForm.data.pos_token,

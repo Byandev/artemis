@@ -425,36 +425,36 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
                     description="Manage your shop pages and their connected stores"
                     stackActionsOnMobile
                 >
-                    {canViewPages && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleExport}
-                        >
-                            <Download className="h-4 w-4" />
-                            Export
-                        </Button>
-                    )}
-                    {canCreatePages && (
-                        <>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".xlsx,.xls,.csv"
-                                className="hidden"
-                                onChange={handleImportFile}
-                            />
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={importing}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <Upload className="h-4 w-4" />
-                                {importing ? 'Importing…' : 'Import'}
-                            </Button>
-                        </>
-                    )}
+                    {/*{canViewPages && (*/}
+                    {/*    <Button*/}
+                    {/*        size="sm"*/}
+                    {/*        variant="outline"*/}
+                    {/*        onClick={handleExport}*/}
+                    {/*    >*/}
+                    {/*        <Download className="h-4 w-4" />*/}
+                    {/*        Export*/}
+                    {/*    </Button>*/}
+                    {/*)}*/}
+                    {/*{canCreatePages && (*/}
+                    {/*    <>*/}
+                    {/*        <input*/}
+                    {/*            ref={fileInputRef}*/}
+                    {/*            type="file"*/}
+                    {/*            accept=".xlsx,.xls,.csv"*/}
+                    {/*            className="hidden"*/}
+                    {/*            onChange={handleImportFile}*/}
+                    {/*        />*/}
+                    {/*        <Button*/}
+                    {/*            size="sm"*/}
+                    {/*            variant="outline"*/}
+                    {/*            disabled={importing}*/}
+                    {/*            onClick={() => fileInputRef.current?.click()}*/}
+                    {/*        >*/}
+                    {/*            <Upload className="h-4 w-4" />*/}
+                    {/*            {importing ? 'Importing…' : 'Import'}*/}
+                    {/*        </Button>*/}
+                    {/*    </>*/}
+                    {/*)}*/}
                 </PageHeader>
 
                 <Dialog
