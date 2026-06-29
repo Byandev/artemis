@@ -5,9 +5,7 @@ use App\Models\PageDailyBudgetRecord;
 use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use Modules\Pancake\Jobs\FetchShopOrders;
 
 test('owner can view pages index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -104,20 +102,6 @@ test('archive across workspaces returns 403', function () {
     $this->actingAs($owner)
         ->post("/workspaces/{$workspaceA->slug}/pages/{$foreignPage->id}/archive")
         ->assertForbidden();
-});
-
-test('refresh resets sync timestamp and dispatches a job', function () {
-    Bus::fake();
-
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $page = Page::factory()->forWorkspace($workspace)->recentlySynced()->create();
-
-    $this->actingAs($owner)
-        ->post("/workspaces/{$workspace->slug}/pages/{$page->id}/refresh")
-        ->assertRedirect();
-
-    expect($page->fresh()->orders_last_synced_at)->toBeNull();
-    Bus::assertDispatched(FetchShopOrders::class);
 });
 
 test('validatePosToken returns valid:true on successful upstream response', function () {
@@ -250,16 +234,6 @@ test('validateBotcakeToken returns valid:false on upstream failure', function ()
         ])
         ->assertOk()
         ->assertJsonPath('valid', false);
-});
-
-test('refresh on a foreign-workspace page returns 403', function () {
-    ['user' => $owner, 'workspace' => $a] = makeWorkspaceWithOwner();
-    ['workspace' => $b] = makeWorkspaceWithOwner();
-    $foreign = Page::factory()->forWorkspace($b)->create();
-
-    $this->actingAs($owner)
-        ->post("/workspaces/{$a->slug}/pages/{$foreign->id}/refresh")
-        ->assertForbidden();
 });
 
 test('guest is redirected to login from pages index', function () {

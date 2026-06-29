@@ -30,6 +30,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
 import {
+    LayoutGrid,
     ListChecks,
     MoreHorizontal,
     Plus,
@@ -164,6 +165,17 @@ const Shops = ({
         });
     };
 
+    const refreshPages = (shop: Shop) => {
+        post(workspaces.shops.refreshPages.url({ workspace, shop }), {
+            preserveScroll: true,
+            onStart: () =>
+                toast.info(`Refreshing page list for ${shop.name}...`),
+            onSuccess: () => router.reload({ only: ['pages'] }),
+            onError: () =>
+                toast.error(`Failed to refresh page list for ${shop.name}.`),
+        });
+    };
+
     const openChecklist = (shop: Shop) => {
         setSelectedShop(shop);
         setChecklistDrawerOpen(true);
@@ -227,6 +239,15 @@ const Shops = ({
                                           >
                                               <ListChecks className="mr-2 h-4 w-4" />
                                               View Checklist
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canRefreshShops && (
+                                          <DropdownMenuItem
+                                              onClick={() => refreshPages(shop)}
+                                              disabled={processing}
+                                          >
+                                              <LayoutGrid className="mr-2 h-4 w-4" />
+                                              Refresh pages
                                           </DropdownMenuItem>
                                       )}
                                       {canRefreshShops && (

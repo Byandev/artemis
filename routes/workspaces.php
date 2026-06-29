@@ -173,6 +173,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
     Route::post('/workspaces/{workspace}/shops', [ShopController::class, 'store'])->name('workspaces.shops.store');
+    Route::post('/workspaces/{workspace}/shops/{shop}/refresh-pages', [ShopController::class, 'refreshPages'])->name('workspaces.shops.refresh-pages');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-orders', [ShopController::class, 'refreshOrders'])->name('workspaces.shops.refresh-orders');
 

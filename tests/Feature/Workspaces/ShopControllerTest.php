@@ -46,6 +46,47 @@ test('refresh-users on a foreign-workspace shop returns 403', function () {
         ->assertForbidden();
 });
 
+test('refresh-pages re-syncs the shop pages from the POS API', function () {
+    Http::fake([
+        'pos.pages.fm/*' => Http::response([
+            'shop' => [
+                'name' => 'S',
+                'pages' => [
+                    ['id' => 7001, 'name' => 'Renamed Page'],
+                    ['id' => 7002, 'name' => 'Newly Added'],
+                ],
+            ],
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => 'tok']);
+    Page::factory()->create([
+        'id' => 7001,
+        'workspace_id' => $workspace->id,
+        'shop_id' => $shop->id,
+        'name' => 'Old Name',
+    ]);
+
+    $this->actingAs($owner)
+        ->post("/workspaces/{$workspace->slug}/shops/{$shop->id}/refresh-pages")
+        ->assertRedirect("/workspaces/{$workspace->slug}/shops");
+
+    // New page discovered, existing page's name refreshed.
+    expect(Page::where('id', 7002)->where('shop_id', $shop->id)->exists())->toBeTrue();
+    expect(Page::find(7001)->name)->toBe('Renamed Page');
+});
+
+test('refresh-pages on a foreign-workspace shop returns 403', function () {
+    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    $foreignShop = Shop::factory()->forWorkspace($workspaceB)->create();
+
+    $this->actingAs($owner)
+        ->post("/workspaces/{$workspaceA->slug}/shops/{$foreignShop->id}/refresh-pages")
+        ->assertForbidden();
+});
+
 // ----- Store (add shop, auto-fetch pages) -----
 
 test('store creates a shop, stores the POS token, and auto-fetches its pages', function () {
