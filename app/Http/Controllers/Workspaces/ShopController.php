@@ -4,14 +4,21 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Workspaces\StoreShopRequest;
 use App\Http\Sorts\PendingRequiredChecklistsSort;
+use App\Models\Page;
 use App\Models\Shop;
 use App\Models\Workspace;
+use App\Services\PostHogService;
 use App\Support\TeamVisibility;
+use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Modules\Pancake\Jobs\FetchPageOrders;
 use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -21,6 +28,17 @@ use Spatie\QueryBuilder\QueryBuilder;
 class ShopController extends Controller
 {
     use AuthorizesRequests;
+
+    private function assertShopLimitNotReached(Workspace $workspace): void
+    {
+        $info = $workspace->shopLimitInfo();
+
+        if ($info['reached']) {
+            throw ValidationException::withMessages([
+                'shop_limit' => "You've reached your plan's shop limit ({$info['limit']}). Upgrade your plan to add more shops.",
+            ]);
+        }
+    }
 
     public function index(Request $request, Workspace $workspace)
     {
@@ -67,6 +85,8 @@ class ShopController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
+        $shopLimitInfo = $workspace->shopLimitInfo();
+
         return Inertia::render('workspaces/shops/index', [
             'pages' => $pages,
             'workspace' => $workspace,
@@ -74,7 +94,95 @@ class ShopController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
+            'shopLimit' => $shopLimitInfo['limit'],
+            'shopCount' => $shopLimitInfo['count'],
+            'shopLimitReached' => $shopLimitInfo['reached'],
         ]);
+    }
+
+    public function store(StoreShopRequest $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::CreateShops->value, $workspace);
+
+        $this->assertShopLimitNotReached($workspace);
+
+        $validated = $request->validated();
+
+        $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
+            'api_key' => $validated['pos_token'],
+        ]);
+
+        if ($response->failed()) {
+            throw ValidationException::withMessages(['pos_token' => 'Invalid API Key.']);
+        }
+
+        $resJson = $response->json();
+
+        if (Shop::where('id', $validated['shop_id'])->where('workspace_id', $workspace->id)->exists()) {
+            throw ValidationException::withMessages(['shop_id' => 'This shop has already been added to this workspace.']);
+        }
+
+        $shop = Shop::create([
+            'id' => $validated['shop_id'],
+            'workspace_id' => $workspace->id,
+            'name' => $resJson['shop']['name'] ?? 'Shop '.$validated['shop_id'],
+            'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
+        ]);
+
+        $createdPages = $this->syncShopPages($shop, $workspace, $resJson, $validated['pos_token'], $request->user()->id);
+
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+        dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+
+        (new PostHogService)->capture((string) $request->user()->id, 'shop_connected', [
+            'workspace_id' => $workspace->id,
+            'shop_id' => $shop->id,
+            'shop_name' => $shop->name,
+            'pages_created' => $createdPages,
+        ]);
+
+        return redirect()->route('workspaces.shops.index', $workspace)
+            ->with('success', "Shop added. {$createdPages} page(s) imported and syncing.");
+    }
+
+    /**
+     * Create/refresh the pages that belong to a shop from the POS API response
+     * and queue an order fetch for each. Returns the number of pages touched.
+     */
+    private function syncShopPages(Shop $shop, Workspace $workspace, array $resJson, string $posToken, int $ownerId): int
+    {
+        $pages = collect($resJson['shop']['pages'] ?? []);
+        $now = Carbon::now();
+        $count = 0;
+
+        foreach ($pages as $pageData) {
+            if (! isset($pageData['id'])) {
+                continue;
+            }
+
+            // A page id is globally unique; skip pages already owned by another workspace.
+            $existing = Page::withTrashed()->find($pageData['id']);
+            if ($existing && $existing->workspace_id !== $workspace->id) {
+                continue;
+            }
+
+            $page = Page::updateOrCreate(
+                ['id' => $pageData['id']],
+                [
+                    'workspace_id' => $workspace->id,
+                    'shop_id' => $shop->id,
+                    'owner_id' => $ownerId,
+                    'name' => $pageData['name'] ?? 'Page '.$pageData['id'],
+                    'pos_token' => $posToken,
+                    'status' => 'active',
+                ]
+            );
+
+            dispatch(new FetchPageOrders($page, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
+            $count++;
+        }
+
+        return $count;
     }
 
     public function refreshUsers(Request $request, Workspace $workspace, Shop $shop)

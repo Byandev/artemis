@@ -22,34 +22,32 @@ class OnboardingController extends Controller
 {
     public function create(Request $request, Workspace $workspace)
     {
-        // Skip if workspace already has pages (onboarding already done)
-        if ($workspace->pages()->exists()) {
+        // Skip if workspace already has shops (onboarding already done)
+        if ($workspace->shops()->exists()) {
             return redirect()->route('workspace.dashboard', $workspace->slug);
         }
 
-        $info = $workspace->pageLimitInfo();
+        $info = $workspace->shopLimitInfo();
 
         return Inertia::render('workspaces/onboarding', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
-            'pageLimit' => $info['limit'],
-            'pageCount' => $info['count'],
-            'pageLimitReached' => $info['reached'],
+            'shopLimit' => $info['limit'],
+            'shopCount' => $info['count'],
+            'shopLimitReached' => $info['reached'],
         ]);
     }
 
     public function store(Request $request, Workspace $workspace)
     {
-        $info = $workspace->pageLimitInfo();
+        $info = $workspace->shopLimitInfo();
         if ($info['reached']) {
             throw ValidationException::withMessages([
-                'page_limit' => "You've reached your plan's page limit ({$info['limit']}). Upgrade your plan to add more pages.",
+                'shop_limit' => "You've reached your plan's shop limit ({$info['limit']}). Upgrade your plan to add more shops.",
             ]);
         }
 
         $validated = $request->validate([
-            'page_id' => ['required', 'integer'],
             'shop_id' => ['required', 'integer'],
-            'page_name' => ['required', 'string', 'max:255'],
             'pos_token' => ['required', 'string', 'max:255'],
         ]);
 
@@ -63,31 +61,44 @@ class OnboardingController extends Controller
         }
 
         $resJson = $response->json();
-        $pageData = collect($resJson['shop']['pages'] ?? [])->firstWhere('id', $validated['page_id']);
-
-        if (! $pageData) {
-            throw ValidationException::withMessages(['page_id' => 'Page not found for this shop. Please check the Page ID.']);
-        }
 
         // Create or get Shop
         $shop = Shop::firstOrCreate([
             'id' => $validated['shop_id'],
             'workspace_id' => $workspace->id,
         ], [
-            'name' => $resJson['shop']['name'] ?? $validated['page_name'],
+            'name' => $resJson['shop']['name'] ?? 'Shop '.$validated['shop_id'],
             'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
         ]);
 
-        // Create Page
-        $page = Page::create([
-            'id' => $validated['page_id'],
-            'workspace_id' => $workspace->id,
-            'owner_id' => $request->user()->id,
-            'shop_id' => $validated['shop_id'],
-            'name' => $validated['page_name'],
-            'pos_token' => $validated['pos_token'],
-            'status' => 'active',
-        ]);
+        // Auto-create the shop's pages from the POS API response
+        $now = Carbon::now();
+        $createdPages = 0;
+        foreach (collect($resJson['shop']['pages'] ?? []) as $pageData) {
+            if (! isset($pageData['id'])) {
+                continue;
+            }
+
+            $existing = Page::withTrashed()->find($pageData['id']);
+            if ($existing && $existing->workspace_id !== $workspace->id) {
+                continue;
+            }
+
+            $page = Page::updateOrCreate(
+                ['id' => $pageData['id']],
+                [
+                    'workspace_id' => $workspace->id,
+                    'shop_id' => $shop->id,
+                    'owner_id' => $request->user()->id,
+                    'name' => $pageData['name'] ?? 'Page '.$pageData['id'],
+                    'pos_token' => $validated['pos_token'],
+                    'status' => 'active',
+                ]
+            );
+
+            dispatch(new FetchPageOrders($page, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
+            $createdPages++;
+        }
 
         // Create free trial subscription if none exists
         if (! $workspace->subscription) {
@@ -106,22 +117,17 @@ class OnboardingController extends Controller
 
         if ($shop->wasRecentlyCreated) {
             dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-            dispatch(new FetchShopOrders($shop, 1, \Carbon\Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+            dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
         }
 
-        // Dispatch fetch jobs
-        $now = Carbon::now();
-        dispatch(new FetchPageOrders($page, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
-        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-
-        (new PostHogService)->capture((string) $request->user()->id, 'onboarding_page_connected', [
+        (new PostHogService)->capture((string) $request->user()->id, 'onboarding_shop_connected', [
             'workspace_id' => $workspace->id,
-            'page_id' => $page->id,
-            'page_name' => $page->name,
             'shop_id' => $shop->id,
+            'shop_name' => $shop->name,
+            'pages_created' => $createdPages,
         ]);
 
-        return back()->with('success', 'Page connected! Syncing your data...');
+        return back()->with('success', 'Shop connected! Syncing your data...');
     }
 
     public function status(Request $request, Workspace $workspace)

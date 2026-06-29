@@ -11,7 +11,7 @@ interface SubscriptionPlan {
     name: string;
     price_php: string;
     order_limit: number | null;
-    page_limit: number | null;
+    shop_limit: number | null;
     data_retention_months: number;
     analytics_tier: string;
     parcel_journey_rate_php: string | null;
@@ -32,7 +32,7 @@ export default function Edit({ plan }: Props) {
         name: plan.name,
         price_php: plan.price_php,
         order_limit: plan.order_limit?.toString() ?? '',
-        page_limit: plan.page_limit?.toString() ?? '',
+        shop_limit: plan.shop_limit?.toString() ?? '',
         data_retention_months: plan.data_retention_months.toString(),
         analytics_tier: plan.analytics_tier,
         parcel_journey_rate_php: plan.parcel_journey_rate_php ?? '0',

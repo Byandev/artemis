@@ -37,7 +37,6 @@ import {
     Edit,
     ListChecks,
     MoreHorizontal,
-    Plus,
     RefreshCw,
     Search,
     Upload,
@@ -66,9 +65,6 @@ interface PagesProps {
             owner_id?: string | string[];
         };
     };
-    pageLimit?: number | null;
-    pageCount?: number;
-    pageLimitReached?: boolean;
 }
 
 interface PageProps {
@@ -150,15 +146,7 @@ const currencyFormatter = new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 2,
 });
 
-const Pages = ({
-    pages,
-    workspace,
-    users,
-    query,
-    pageLimit,
-    pageCount,
-    pageLimitReached,
-}: PagesProps) => {
+const Pages = ({ pages, workspace, users, query }: PagesProps) => {
     const { flash } = usePage().props as PageProps;
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
@@ -235,10 +223,6 @@ const Pages = ({
 
     const handleEdit = (page: Page) => {
         router.get(`/workspaces/${workspace.slug}/pages/${page.id}/edit`);
-    };
-
-    const handleCreate = () => {
-        router.get(`/workspaces/${workspace.slug}/pages/create`);
     };
 
     const handleExport = () => {
@@ -387,20 +371,6 @@ const Pages = ({
             },
         },
         {
-            accessorKey: 'orders_last_synced_at',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Last Sync'} />
-            ),
-            cell: ({ row }) => {
-                const date = row.original.orders_last_synced_at;
-                return (
-                    <span>
-                        {date ? new Date(date).toLocaleString() : 'Never'}
-                    </span>
-                );
-            },
-        },
-        {
             accessorKey: 'deleted_at',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Sync Status'} />
@@ -542,38 +512,7 @@ const Pages = ({
                             </Button>
                         </>
                     )}
-                    {canCreatePages && (
-                        <Button
-                            size="sm"
-                            onClick={handleCreate}
-                            disabled={pageLimitReached}
-                            title={
-                                pageLimitReached
-                                    ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
-                                    : undefined
-                            }
-                        >
-                            <Plus className="h-4 w-4" />
-                            Add New Page
-                        </Button>
-                    )}
                 </PageHeader>
-
-                {canCreatePages && pageLimit != null && (
-                    <div className="-mt-4 mb-6 flex justify-end">
-                        <span
-                            className={clsx(
-                                'font-mono text-[10px] tracking-wider uppercase',
-                                pageLimitReached
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-gray-400 dark:text-gray-500',
-                            )}
-                        >
-                            {pageCount ?? 0}/{pageLimit} pages used
-                            {pageLimitReached && ' · upgrade to add more'}
-                        </span>
-                    </div>
-                )}
 
                 <Dialog
                     open={!!budgetPage}
