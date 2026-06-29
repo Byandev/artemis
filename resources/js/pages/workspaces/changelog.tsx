@@ -12,6 +12,48 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.14.1',
+        date: '2026-06-29',
+        sections: [
+            {
+                title: 'Inventory — Gencys ERP Sync Health (New)',
+                items: [
+                    'New "Sync Health" page under Inventory shows, for every active item, whether its ERP transaction-history and purchase-order syncs went through — status, rows pulled, when it last ran, and any error message',
+                    'A summary up top tracks the last 24 hours at a glance: total runs, success rate, and failures, alongside a feed of recent sync runs you can filter by type and status',
+                    'The per-item status list is searchable by SKU or product name and paginated, so large catalogs stay easy to scan',
+                    'Syncs that never hear back from the ERP are now automatically marked failed after a grace period instead of sitting stuck on "pending" forever',
+                ],
+            },
+            {
+                title: 'Inventory — Transaction Logs',
+                items: [
+                    'The "Inventory Stock (ERP)" column and inline editing of a transaction’s remaining quantity now appear only for ERP-connected (Gencys partner) workspaces — everyone else sees a cleaner, read-only view',
+                ],
+            },
+            {
+                title: 'Creatives — Filters',
+                items: [
+                    'New filter panel on the Creatives page — narrow the list by Format, Ads Status, Creator, and Product, with an "Apply Changes" button, a "Clear all" reset, and a badge showing how many filters are active',
+                ],
+            },
+            {
+                title: 'Finance — Transaction Import',
+                items: [
+                    'The CSV import dialog now guides you while mapping columns: it flags missing required fields and duplicate mappings, shows sample data under each dropdown, and only reveals the preview and enables import once every column is mapped correctly',
+                ],
+            },
+            {
+                title: 'Security & Activity Logs',
+                items: [
+                    'Password changes are now recorded — both successful changes and failed attempts — and tied to the right workspace so they show up in its activity log',
+                    'Turning a workspace’s public-page password protection on or off is now logged as its own distinct event',
+                    'Exporting transaction history is now recorded in the activity log',
+                    'Removed vague "updated" entries for password fields so the activity log stays clean and meaningful',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.14.0',
         date: '2026-06-29',
         sections: [
