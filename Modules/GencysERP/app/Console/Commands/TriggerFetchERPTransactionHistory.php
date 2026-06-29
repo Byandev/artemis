@@ -6,11 +6,13 @@ use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Modules\GencysERP\Jobs\FetchInventoryItemTransactionHistory;
+use Modules\GencysERP\Models\GencysSyncRun;
 
 class TriggerFetchERPTransactionHistory extends Command
 {
     protected $signature = 'gencys-erp:trigger-fetch-erp-transaction-history
         {--date= : The transaction history date in Y-m-d format (defaults to yesterday)}
+        {--item=* : Limit to specific inventory item id(s); repeat (--item=1 --item=2) or comma-separate (--item=1,2). Omit for all active items}
         {--delay=10 : Seconds to stagger each queued workspace by}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
         {--sync : POST to the webhook immediately in-process instead of queueing (use this to hit an n8n test-mode webhook)}';
@@ -42,13 +44,24 @@ class TriggerFetchERPTransactionHistory extends Command
         $transactionDate = $date->format('m/d/Y');
         $sync = (bool) $this->option('sync');
         $delay = max(0, (int) $this->option('delay'));
+        $itemIds = $this->itemIds();
+
+        if (! empty($itemIds)) {
+            $this->info('Limiting to inventory item id(s): '.implode(', ', $itemIds));
+        }
 
         $workspaces = Workspace::whereNotNull('erp_username')
             ->where('erp_username', '!=', '')
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
-            ->with(['apiKeys', 'inventoryItems' => function ($query) {
-                $query->where('is_active', true);
+            ->with(['apiKeys', 'inventoryItems' => function ($query) use ($itemIds) {
+                // A specific --item selection wins over the active-only default so a
+                // single item can be re-synced (or tested) even when it's inactive.
+                if (empty($itemIds)) {
+                    $query->where('is_active', true);
+                } else {
+                    $query->whereIn('id', $itemIds);
+                }
             }])
             ->get();
 
@@ -78,6 +91,19 @@ class TriggerFetchERPTransactionHistory extends Command
 
                     $callbackBase = rtrim(config('app.url'), '/');
 
+                    // Open a pending sync run per item, keyed by item id. We hand
+                    // each run's id to n8n (sync_run_id) so it can echo it back on
+                    // the callback for an exact match; items that never report back
+                    // stay pending until the stale-run sweeper fails them.
+                    $runIds = $chunk->mapWithKeys(fn ($item) => [
+                        $item->id => GencysSyncRun::start(
+                            $workspace->id,
+                            $item->id,
+                            GencysSyncRun::TYPE_TRANSACTION_HISTORY,
+                            ['date' => $transactionDate],
+                        )->id,
+                    ]);
+
                     $data = [
                         'workspace_id' => $workspace->id,
                         'workspace_api_key' => $apiKey->reveal(),
@@ -88,12 +114,13 @@ class TriggerFetchERPTransactionHistory extends Command
                         'items' => $chunk->map(fn ($item) => [
                             'id' => $item->id,
                             'keyword' => $item->sku,
+                            'sync_run_id' => $runIds[$item->id],
                         ])->values()->toArray(),
                     ];
 
                     $offset = $dispatched * $delay;
 
-                    dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data))
+                    dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data, $runIds->values()->all()))
                         ->delay(now()->addSeconds($offset));
                 });
         }
@@ -102,5 +129,22 @@ class TriggerFetchERPTransactionHistory extends Command
         $this->info(($sync ? 'Sent' : 'Queued')." {$totalCount} workspace(s).");
 
         return 0;
+    }
+
+    /**
+     * Parse the --item option into a list of inventory item ids. Accepts repeated
+     * flags (--item=1 --item=2) and/or comma-separated values (--item=1,2).
+     *
+     * @return int[]
+     */
+    private function itemIds(): array
+    {
+        return collect((array) $this->option('item'))
+            ->flatMap(fn ($value) => explode(',', (string) $value))
+            ->map(fn ($value) => (int) trim($value))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 }

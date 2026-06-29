@@ -260,264 +260,261 @@ export default function Index({
         );
     };
 
-    const columns = useMemo<ColumnDef<TableRow>[]>(
-        () =>
-            [
-                {
-                    id: 'inventory_item',
-                    accessorFn: (row) => row.inventory_item?.sku,
-                    enableSorting: false,
-                    header: ({ column }) => (
-                        <SortableHeader
-                            column={column}
-                            title="Inventory Item"
-                        />
-                    ),
-                    cell: ({ row }) => {
-                        const item = row.original.inventory_item;
-                        return (
-                            <div className="flex h-10 items-center">
-                                {item ? (
-                                    <div className="flex flex-col gap-0.5">
-                                        <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">
-                                            {item.sku}
+    const columns = useMemo<ColumnDef<TableRow>[]>(() => {
+        const cols: ColumnDef<TableRow>[] = [
+            {
+                id: 'inventory_item',
+                accessorFn: (row) => row.inventory_item?.sku,
+                enableSorting: false,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Inventory Item" />
+                ),
+                cell: ({ row }) => {
+                    const item = row.original.inventory_item;
+                    return (
+                        <div className="flex h-10 items-center">
+                            {item ? (
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-400">
+                                        {item.sku}
+                                    </span>
+                                    {item.product && (
+                                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                            {item.product.name}
                                         </span>
-                                        {item.product && (
-                                            <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                                                {item.product.name}
-                                            </span>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <span className="text-[12px] text-gray-400">
-                                        —
-                                    </span>
-                                )}
-                            </div>
-                        );
-                    },
-                },
-                {
-                    accessorKey: 'date',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader column={column} title="Date" />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
-                                {moment(row.original.date).format(
-                                    'DD MMM YYYY',
-                                )}
-                            </span>
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: 'ref_no',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader column={column} title="Reference No." />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                                {row.original.ref_no || (
-                                    <span className="italic opacity-50">
-                                        No Reference
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: 'po_qty_in',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader
-                            column={column}
-                            title="PO Quantity In"
-                        />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                                {row.original.po_qty_in || 0}
-                            </p>
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: 'po_qty_out',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader
-                            column={column}
-                            title="PO Quantity Out"
-                        />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                                {row.original.po_qty_out || 0}
-                            </p>
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: 'rts_goods_in',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader column={column} title="RTS Goods In" />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                                {row.original.rts_goods_in || 0}
-                            </p>
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: 'rts_goods_out',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader column={column} title="RTS Goods Out" />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                                {row.original.rts_goods_out || 0}
-                            </p>
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: 'rts_bad',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader column={column} title="RTS Bad" />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <p className="text-[12px] text-gray-500 dark:text-gray-400">
-                                {row.original.rts_bad || 0}
-                            </p>
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: 'lost',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader column={column} title="Lost" />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <p className="text-[12px] text-orange-500 dark:text-orange-400">
-                                {row.original.lost || 0}
-                            </p>
-                        </div>
-                    ),
-                },
-                {
-                    accessorKey: 'remaining_qty',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader
-                            column={column}
-                            title="Remaining Qty (Manual)"
-                        />
-                    ),
-                    cell: ({ row }) => (
-                        <RemainingQtyCell
-                            transaction={row.original}
-                            workspace={workspace}
-                            canEdit={canEditTransactionLogs}
-                        />
-                    ),
-                },
-                {
-                    accessorKey: 'inventory_remaining_stock',
-                    enableSorting: true,
-                    header: ({ column }) => (
-                        <SortableHeader
-                            column={column}
-                            title="Inventory Stock (ERP)"
-                        />
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <p className="text-[12px] font-medium text-gray-600 dark:text-gray-300">
-                                {row.original.inventory_remaining_stock ?? '—'}
-                            </p>
-                        </div>
-                    ),
-                },
-                {
-                    id: 'actions',
-                    header: () => (
-                        <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                            Actions
-                        </div>
-                    ),
-                    cell: ({ row }) => (
-                        <div className="flex h-10 items-center justify-center">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
-                                        <MoreHorizontal className="h-3.5 w-3.5" />
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                    align="center"
-                                    className="w-36"
-                                >
-                                    {canEditTransactionLogs && (
-                                        <DropdownMenuItem
-                                            onClick={() =>
-                                                handleEdit(row.original)
-                                            }
-                                        >
-                                            <Edit className="mr-2 h-3.5 w-3.5" />
-                                            Edit
-                                        </DropdownMenuItem>
                                     )}
-                                    {canEditTransactionLogs &&
-                                        canDeleteTransactionLogs && (
-                                            <DropdownMenuSeparator />
-                                        )}
-                                    {canDeleteTransactionLogs && (
-                                        <DropdownMenuItem
-                                            variant="destructive"
-                                            onClick={() =>
-                                                confirmDelete(row.original)
-                                            }
-                                        >
-                                            <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                            Delete
-                                        </DropdownMenuItem>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                                </div>
+                            ) : (
+                                <span className="text-[12px] text-gray-400">
+                                    —
+                                </span>
+                            )}
                         </div>
-                    ),
+                    );
                 },
-            ].filter(
+            },
+            {
+                accessorKey: 'date',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Date" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <span className="text-[12px] font-medium text-gray-700 dark:text-gray-300">
+                            {moment(row.original.date).format('DD MMM YYYY')}
+                        </span>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'ref_no',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Reference No." />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                            {row.original.ref_no || (
+                                <span className="italic opacity-50">
+                                    No Reference
+                                </span>
+                            )}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'po_qty_in',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="PO Quantity In" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                            {row.original.po_qty_in || 0}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'po_qty_out',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="PO Quantity Out" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                            {row.original.po_qty_out || 0}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'rts_goods_in',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RTS Goods In" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                            {row.original.rts_goods_in || 0}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'rts_goods_out',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RTS Goods Out" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                            {row.original.rts_goods_out || 0}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'rts_bad',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="RTS Bad" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] text-gray-500 dark:text-gray-400">
+                            {row.original.rts_bad || 0}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'lost',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Lost" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] text-orange-500 dark:text-orange-400">
+                            {row.original.lost || 0}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'remaining_qty',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader
+                        column={column}
+                        title="Remaining Qty (Manual)"
+                    />
+                ),
+                cell: ({ row }) => (
+                    <RemainingQtyCell
+                        transaction={row.original}
+                        workspace={workspace}
+                        canEdit={
+                            canEditTransactionLogs &&
+                            workspace.is_gencys_partner
+                        }
+                    />
+                ),
+            },
+            {
+                accessorKey: 'inventory_remaining_stock',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader
+                        column={column}
+                        title="Inventory Stock (ERP)"
+                    />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <p className="text-[12px] font-medium text-gray-600 dark:text-gray-300">
+                            {row.original.inventory_remaining_stock ?? '—'}
+                        </p>
+                    </div>
+                ),
+            },
+            {
+                id: 'actions',
+                header: () => (
+                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                        Actions
+                    </div>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center justify-center">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/6 bg-stone-50 text-gray-400 transition-all hover:border-black/12 hover:bg-stone-100 hover:text-gray-600 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-500 dark:hover:border-white/12 dark:hover:bg-zinc-700 dark:hover:text-gray-300">
+                                    <MoreHorizontal className="h-3.5 w-3.5" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="center"
+                                className="w-36"
+                            >
+                                {canEditTransactionLogs && (
+                                    <DropdownMenuItem
+                                        onClick={() => handleEdit(row.original)}
+                                    >
+                                        <Edit className="mr-2 h-3.5 w-3.5" />
+                                        Edit
+                                    </DropdownMenuItem>
+                                )}
+                                {canEditTransactionLogs &&
+                                    canDeleteTransactionLogs && (
+                                        <DropdownMenuSeparator />
+                                    )}
+                                {canDeleteTransactionLogs && (
+                                    <DropdownMenuItem
+                                        variant="destructive"
+                                        onClick={() =>
+                                            confirmDelete(row.original)
+                                        }
+                                    >
+                                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                        Delete
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                ),
+            },
+        ];
+
+        return cols
+            .filter(
                 (column) => canManageTransactionLogs || column.id !== 'actions',
-            ),
-        [
-            canDeleteTransactionLogs,
-            canEditTransactionLogs,
-            canManageTransactionLogs,
-            workspace,
-        ],
-    );
+            )
+            .filter(
+                (column) =>
+                    workspace.is_gencys_partner ||
+                    !('accessorKey' in column) ||
+                    column.accessorKey !== 'inventory_remaining_stock',
+            );
+    }, [
+        canDeleteTransactionLogs,
+        canEditTransactionLogs,
+        canManageTransactionLogs,
+        workspace,
+    ]);
 
     // Columns for the summarized (one row per item per date) view.
-    const summaryColumns = useMemo<ColumnDef<TableRow>[]>(
-        () => [
+    const summaryColumns = useMemo<ColumnDef<TableRow>[]>(() => {
+        const cols: ColumnDef<TableRow>[] = [
             {
                 id: 'inventory_item',
                 enableSorting: false,
@@ -653,9 +650,14 @@ export default function Index({
                     </div>
                 ),
             },
-        ],
-        [],
-    );
+        ];
+
+        return cols.filter(
+            (column) =>
+                workspace.is_gencys_partner ||
+                column.id !== 'inventory_remaining_stock',
+        );
+    }, [workspace.is_gencys_partner]);
 
     const activeColumns = summarize ? summaryColumns : columns;
     // The backend returns per-transaction rows normally, or summed-per-item rows when

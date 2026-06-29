@@ -5,6 +5,7 @@ namespace App\Http\Controllers\PublicApi;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 
@@ -13,9 +14,9 @@ class TransactionHistoryController extends Controller
     /**
      * Receive ERP transaction history synced back by n8n for many inventory items at once.
      *
-     * One call carries many items. The body is a bare JSON array of
-     * { id, transactions: [...] } objects, where `id` is the inventory item id.
-     * Each item is processed exactly like the single-item sync.
+     * The body is { items: [ { id, sync_run_id, transactions: [...] } ] }, where
+     * `id` is the inventory item id and `sync_run_id` is the run we opened on
+     * dispatch and n8n echoes back so we can mark it done.
      */
     public function bulkSync(Request $request): JsonResponse
     {
@@ -51,6 +52,9 @@ class TransactionHistoryController extends Controller
 
             $saved = $this->saveTransactions($item, $rows);
 
+            // The entry's sync_run_id is the run we opened for this item on dispatch.
+            GencysSyncRun::succeedById($workspace->id, $this->syncRunId($entry), count($rows), $saved);
+
             $results[] = [
                 'inventory_item_id' => $item->id,
                 'transactions_received' => count($rows),
@@ -60,6 +64,14 @@ class TransactionHistoryController extends Controller
         }
 
         return response()->json(['data' => $results]);
+    }
+
+    /** Pull the sync run id n8n echoed back, tolerating a couple of key spellings. */
+    private function syncRunId(array $entry): ?int
+    {
+        $id = $entry['sync_run_id'] ?? $entry['syncRunId'] ?? null;
+
+        return ($id === null || $id === '') ? null : (int) $id;
     }
 
     /**
