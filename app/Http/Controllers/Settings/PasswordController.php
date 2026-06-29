@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Enums\Logging\LogCategory;
+use App\Enums\Logging\LogStatus;
+use App\Facades\Activity;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
@@ -36,6 +39,17 @@ class PasswordController extends Controller
         $request->user()->update([
             'password' => Hash::make($validated['password']),
         ]);
+
+        // Dedicated security entry — the generic model observer only records a
+        // vague "user updated", so changing a password gets its own audit line
+        // (mirrors the password.reset event from the forgot-password flow).
+        Activity::build()->asUser()
+            ->category(LogCategory::Security)
+            ->action('account.password.changed')
+            ->status(LogStatus::Success)
+            ->user($request->user()->getKey())
+            ->message('Account password was changed')
+            ->save();
 
         return back();
     }
