@@ -5,7 +5,8 @@ namespace Modules\GencysERP\Console\Commands;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
-use Modules\GencysERP\Jobs\FetchInventoryItemTransactionHistory;
+use Modules\GencysERP\Models\ErpSyncRun;
+use Modules\GencysERP\Services\ErpSyncService;
 
 class TriggerFetchERPTransactionHistory extends Command
 {
@@ -17,7 +18,7 @@ class TriggerFetchERPTransactionHistory extends Command
 
     protected $description = 'Trigger n8n webhook for each workspace with ERP credentials to fetch its ERP transaction history';
 
-    public function handle()
+    public function handle(ErpSyncService $sync)
     {
         $webhookUrl = $this->option('webhook') ?: config('services.n8n.transaction_history_webhook_url');
 
@@ -39,17 +40,12 @@ class TriggerFetchERPTransactionHistory extends Command
             return 1;
         }
 
-        $transactionDate = $date->format('m/d/Y');
-        $sync = (bool) $this->option('sync');
         $delay = max(0, (int) $this->option('delay'));
 
         $workspaces = Workspace::whereNotNull('erp_username')
             ->where('erp_username', '!=', '')
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
-            ->with(['apiKeys', 'inventoryItems' => function ($query) {
-                $query->where('is_active', true);
-            }])
             ->get();
 
         if ($workspaces->isEmpty()) {
@@ -58,48 +54,28 @@ class TriggerFetchERPTransactionHistory extends Command
             return 0;
         }
 
-        $this->info(($sync ? 'Sending' : 'Queueing')." ERP transaction history for {$transactionDate}…");
+        $this->info("Queueing ERP transaction history for {$date->format('m/d/Y')}…");
 
-        $dispatched = 0;
-        $totalCount = 0;
+        $totalItems = 0;
+        $totalChunks = 0;
 
         foreach ($workspaces as $workspace) {
-            $apiKey = $workspace->apiKeys->first();
+            $run = $sync->startTransactionHistoryRun(
+                workspace: $workspace,
+                date: $date,
+                trigger: ErpSyncRun::TRIGGER_SCHEDULE,
+                webhookOverride: $this->option('webhook') ?: null,
+                delaySeconds: $delay,
+            );
 
-            // One payload per workspace carrying every item, so n8n logs into the ERP
-            // once and loops the items reusing that session. This is what avoids the
-            // per-item logins that were tripping the ERP's rate limit (429).
-            $workspace->inventoryItems
-                ->chunk(10)
-                ->values()
-                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $transactionDate, $webhookUrl, $delay) {
-                    $dispatched++;
-                    $totalCount += count($chunk);
-
-                    $callbackBase = rtrim(config('app.url'), '/');
-
-                    $data = [
-                        'workspace_id' => $workspace->id,
-                        'workspace_api_key' => $apiKey->reveal(),
-                        'erp_username' => $workspace->erp_username,
-                        'erp_password' => $workspace->erp_password,
-                        'date' => $transactionDate,
-                        'webhook_url' => "{$callbackBase}/api/v1/public/inventory-items/transactions/bulk-sync",
-                        'items' => $chunk->map(fn ($item) => [
-                            'id' => $item->id,
-                            'keyword' => $item->sku,
-                        ])->values()->toArray(),
-                    ];
-
-                    $offset = $dispatched * $delay;
-
-                    dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data))
-                        ->delay(now()->addSeconds($offset));
-                });
+            if ($run) {
+                $totalItems += $run->total_items;
+                $totalChunks += $run->total_chunks;
+            }
         }
 
         $this->newLine();
-        $this->info(($sync ? 'Sent' : 'Queued')." {$totalCount} workspace(s).");
+        $this->info("Queued {$totalChunks} chunk(s) covering {$totalItems} item(s).");
 
         return 0;
     }

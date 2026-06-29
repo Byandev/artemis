@@ -346,6 +346,12 @@ export function AppSidebar() {
                               icon: ShoppingCart,
                               permission: PERMISSIONS.ViewPurchasedOrders,
                           },
+                          {
+                              title: 'Sync Monitoring',
+                              href: `/workspaces/${slug}/inventory/sync-monitoring`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewInventoryItems,
+                          },
                       ],
                   },
               ]

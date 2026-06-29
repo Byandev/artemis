@@ -51,6 +51,7 @@ use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
+use Modules\Inventory\Http\Controllers\SyncMonitoringController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsCalendarController;
@@ -412,6 +413,13 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/orders/{purchasedOrder}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('orders.expected-delivery');
         Route::put('/orders/{purchasedOrder}/status', [PurchaseOrderMonitoringController::class, 'updateStatus'])->name('orders.status');
         Route::put('/items/{purchasedOrderItem}/remarks', [PurchaseOrderMonitoringController::class, 'updateRemarks'])->name('items.remarks');
+    });
+
+    // ERP sync monitoring: track the transaction-history + purchase-order fetches
+    // and re-dispatch a run's failed chunks.
+    Route::prefix('/workspaces/{workspace}/inventory/sync-monitoring')->name('workspaces.inventory.sync-monitoring.')->group(function () {
+        Route::get('/', [SyncMonitoringController::class, 'index'])->name('index');
+        Route::post('/runs/{run}/retry', [SyncMonitoringController::class, 'retryRun'])->name('runs.retry');
     });
 
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {

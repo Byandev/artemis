@@ -5,6 +5,7 @@ namespace App\Http\Controllers\PublicApi;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\GencysERP\Models\ErpSyncChunk;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 
@@ -59,7 +60,30 @@ class TransactionHistoryController extends Controller
             ];
         }
 
+        $this->confirmSyncChunk($request, $workspace, collect($results)->sum(fn ($r) => $r['transactions_saved'] ?? 0));
+
         return response()->json(['data' => $results]);
+    }
+
+    /**
+     * If the callback URL carried a sync chunk id (n8n posts the webhook_url
+     * verbatim, query string included), mark that chunk confirmed so the
+     * monitoring page knows the data actually landed — not just that n8n
+     * accepted the job. No-op when the param is absent or the chunk isn't this
+     * workspace's.
+     */
+    private function confirmSyncChunk(Request $request, $workspace, int $recordsSynced): void
+    {
+        $chunkId = $request->query('sync_chunk_id');
+
+        if (! $chunkId) {
+            return;
+        }
+
+        ErpSyncChunk::where('id', $chunkId)
+            ->where('workspace_id', $workspace->id)
+            ->first()
+            ?->markConfirmed($recordsSynced);
     }
 
     /**

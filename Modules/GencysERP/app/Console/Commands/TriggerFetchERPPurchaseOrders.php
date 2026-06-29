@@ -5,7 +5,8 @@ namespace Modules\GencysERP\Console\Commands;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
-use Modules\GencysERP\Jobs\FetchInventoryItemPurchaseOrders;
+use Modules\GencysERP\Models\ErpSyncRun;
+use Modules\GencysERP\Services\ErpSyncService;
 
 class TriggerFetchERPPurchaseOrders extends Command
 {
@@ -18,11 +19,9 @@ class TriggerFetchERPPurchaseOrders extends Command
 
     protected $description = 'Trigger n8n webhook for each workspace with ERP credentials to fetch its ERP purchase orders';
 
-    public function handle()
+    public function handle(ErpSyncService $sync)
     {
         $webhookUrl = $this->option('webhook') ?: config('services.n8n.purchase_order_webhook_url');
-
-        $this->info($webhookUrl);
 
         if (empty($webhookUrl)) {
             $this->error('n8n purchase order webhook URL is not configured (services.n8n.purchase_order_webhook_url). Pass --webhook= to override.');
@@ -50,21 +49,10 @@ class TriggerFetchERPPurchaseOrders extends Command
             return 1;
         }
 
-        $startDateFormatted = $startDate->format('m/d/Y');
-        $endDateFormatted = $endDate->format('m/d/Y');
-
-        $sync = (bool) $this->option('sync');
-        $delay = max(0, (int) $this->option('delay'));
-
         $workspaces = Workspace::whereNotNull('erp_username')
             ->where('erp_username', '!=', '')
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
-            ->with(['apiKeys', 'deliveredPurchaseOrders' => function ($query) {
-                $query->select(['cust_po_no', 'workspace_id']);
-            }, 'inventoryItems' => function ($query) {
-                $query->where('is_active', true);
-            }])
             ->get();
 
         if ($workspaces->isEmpty()) {
@@ -73,48 +61,28 @@ class TriggerFetchERPPurchaseOrders extends Command
             return 0;
         }
 
-        $this->info(($sync ? 'Sending' : 'Queueing')." ERP purchase orders for {$startDateFormatted} – {$endDateFormatted}…");
+        $this->info("Queueing ERP purchase orders for {$startDate->format('m/d/Y')} – {$endDate->format('m/d/Y')}…");
 
-        $dispatched = 0;
-        $totalCount = 0;
+        $totalItems = 0;
+        $totalChunks = 0;
 
         foreach ($workspaces as $workspace) {
-            $apiKey = $workspace->apiKeys->first();
+            $run = $sync->startPurchaseOrderRun(
+                workspace: $workspace,
+                startDate: $startDate,
+                endDate: $endDate,
+                trigger: ErpSyncRun::TRIGGER_SCHEDULE,
+                webhookOverride: $this->option('webhook') ?: null,
+            );
 
-            // One payload per workspace carrying every item, so n8n logs into the ERP
-            // once and loops the items reusing that session. This is what avoids the
-            // per-item logins that were tripping the ERP's rate limit (429).
-            $workspace->inventoryItems
-                ->chunk(10)
-                ->values()
-                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $webhookUrl, $startDateFormatted, $endDateFormatted) {
-                    $dispatched++;
-                    $totalCount += count($chunk);
-
-                    $callbackBase = rtrim(config('app.url'), '/');
-
-                    $data = [
-                        'workspace_id' => $workspace->id,
-                        'workspace_api_key' => $apiKey->reveal(),
-                        'erp_username' => $workspace->erp_username,
-                        'erp_password' => $workspace->erp_password,
-                        'start_date' => $startDateFormatted,
-                        'end_date' => $endDateFormatted,
-                        'webhook_url' => "{$callbackBase}/api/v1/public/purchase-orders/bulk-sync",
-                        'items' => $chunk->map(fn ($item) => [
-                            'id' => $item->id,
-                            'keyword' => $item->sku,
-                        ])->values()->toArray(),
-                        'delivered_purchase_orders_no' => $workspace->deliveredPurchaseOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
-                    ];
-
-                    dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data))
-                        ->delay(now()->addMinutes($dispatched * 3));
-                });
+            if ($run) {
+                $totalItems += $run->total_items;
+                $totalChunks += $run->total_chunks;
+            }
         }
 
         $this->newLine();
-        $this->info(($sync ? 'Sent' : 'Queued')." {$totalCount} workspace(s).");
+        $this->info("Queued {$totalChunks} chunk(s) covering {$totalItems} item(s).");
 
         return 0;
     }

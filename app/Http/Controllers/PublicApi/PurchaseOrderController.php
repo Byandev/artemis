@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Modules\GencysERP\Models\ErpSyncChunk;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
@@ -157,7 +158,30 @@ class PurchaseOrderController extends Controller
             }
         });
 
+        $this->confirmSyncChunk($request, $workspace, collect($results)->where('status', 'synced')->count());
+
         return response()->json(['data' => $results]);
+    }
+
+    /**
+     * If the callback URL carried a sync chunk id (n8n posts the webhook_url
+     * verbatim, query string included), mark that chunk confirmed so the
+     * monitoring page knows the orders actually landed — not just that n8n
+     * accepted the job. No-op when the param is absent or the chunk isn't this
+     * workspace's.
+     */
+    private function confirmSyncChunk(Request $request, $workspace, int $recordsSynced): void
+    {
+        $chunkId = $request->query('sync_chunk_id');
+
+        if (! $chunkId) {
+            return;
+        }
+
+        ErpSyncChunk::where('id', $chunkId)
+            ->where('workspace_id', $workspace->id)
+            ->first()
+            ?->markConfirmed($recordsSynced);
     }
 
     /** Parse any date/datetime string into Y-m-d, or null when empty/unparseable. */
