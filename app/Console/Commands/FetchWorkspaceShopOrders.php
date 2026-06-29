@@ -51,9 +51,8 @@ class FetchWorkspaceShopOrders extends Command
         }
 
         $shops = Shop::where('workspace_id', $workspace->id)
-            ->whereHas('pages', fn ($query) => $query
-                ->whereNotNull('pos_token')
-                ->where('status', 'active'))
+            ->whereNotNull('pos_token')
+            ->whereHas('pages', fn ($query) => $query->where('status', 'active'))
             ->when($this->option('shop'), fn ($q, $id) => $q->where('id', $id))
             ->orderBy('name')
             ->get();

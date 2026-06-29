@@ -321,27 +321,6 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
             cell: ({ row }) => row.original.owner?.name || '-',
         },
         {
-            id: 'teams',
-            header: 'Teams',
-            cell: ({ row }) => {
-                const teams = row.original.teams ?? [];
-                if (teams.length === 0)
-                    return <span className="text-gray-400">-</span>;
-                return (
-                    <div className="flex flex-wrap gap-1">
-                        {teams.map((t) => (
-                            <span
-                                key={t.id}
-                                className="inline-flex items-center rounded-full bg-brand-500/10 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:text-brand-400"
-                            >
-                                {t.name}
-                            </span>
-                        ))}
-                    </div>
-                );
-            },
-        },
-        {
             accessorKey: 'latest_budget',
             header: ({ column }) => (
                 <SortableHeader

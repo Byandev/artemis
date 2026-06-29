@@ -9,7 +9,6 @@ export interface Page {
     owner_id: number;
     name: string;
     facebook_url?: string;
-    pos_token?: string;
     botcake_token?: string;
     infotxt_token?: string;
     infotxt_user_id?: string;
@@ -27,7 +26,6 @@ export interface Page {
     shop?: Shop;
     owner?: User;
     product?: Product;
-    teams?: { id: number; name: string }[];
     latest_budget?: {
         budget: number | string | null;
         date: string;

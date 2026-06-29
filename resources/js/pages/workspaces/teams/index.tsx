@@ -158,10 +158,10 @@ export default function TeamsIndex({
                                           {canEditTeams && (
                                               <DropdownMenuItem asChild>
                                                   <Link
-                                                      href={`/workspaces/${workspace.slug}/teams/${team.id}/pages`}
+                                                      href={`/workspaces/${workspace.slug}/teams/${team.id}/shops`}
                                                   >
                                                       <LayoutGrid />
-                                                      Pages
+                                                      Shops
                                                   </Link>
                                               </DropdownMenuItem>
                                           )}

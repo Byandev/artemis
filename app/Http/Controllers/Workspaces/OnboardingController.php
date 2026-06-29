@@ -14,7 +14,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Modules\Pancake\Jobs\FetchPageOrders;
 use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;
 
@@ -69,10 +68,16 @@ class OnboardingController extends Controller
         ], [
             'name' => $resJson['shop']['name'] ?? 'Shop '.$validated['shop_id'],
             'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
+            'pos_token' => $validated['pos_token'],
         ]);
 
-        // Auto-create the shop's pages from the POS API response
-        $now = Carbon::now();
+        // Ensure an existing shop also has its token set.
+        if (! $shop->pos_token) {
+            $shop->update(['pos_token' => $validated['pos_token']]);
+        }
+
+        // Auto-create the shop's pages from the POS API response. Orders sync at
+        // the shop level (FetchShopOrders, dispatched below).
         $createdPages = 0;
         foreach (collect($resJson['shop']['pages'] ?? []) as $pageData) {
             if (! isset($pageData['id'])) {
@@ -84,19 +89,17 @@ class OnboardingController extends Controller
                 continue;
             }
 
-            $page = Page::updateOrCreate(
+            Page::updateOrCreate(
                 ['id' => $pageData['id']],
                 [
                     'workspace_id' => $workspace->id,
                     'shop_id' => $shop->id,
                     'owner_id' => $request->user()->id,
                     'name' => $pageData['name'] ?? 'Page '.$pageData['id'],
-                    'pos_token' => $validated['pos_token'],
                     'status' => 'active',
                 ]
             );
 
-            dispatch(new FetchPageOrders($page, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
             $createdPages++;
         }
 
@@ -132,13 +135,13 @@ class OnboardingController extends Controller
 
     public function status(Request $request, Workspace $workspace)
     {
-        $page = $workspace->pages()->first();
+        $shop = $workspace->shops()->first();
 
-        if (! $page) {
+        if (! $shop) {
             return response()->json(['syncing' => false, 'complete' => false]);
         }
 
-        $complete = $page->orders_last_synced_at !== null;
+        $complete = $shop->orders_last_synced_at !== null;
 
         return response()->json([
             'syncing' => ! $complete,

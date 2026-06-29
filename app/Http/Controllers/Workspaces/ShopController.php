@@ -10,7 +10,6 @@ use App\Models\Page;
 use App\Models\Shop;
 use App\Models\Workspace;
 use App\Services\PostHogService;
-use App\Support\TeamVisibility;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -18,7 +17,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Modules\Pancake\Jobs\FetchPageOrders;
 use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -64,10 +62,7 @@ class ShopController extends Controller
             });
 
         $baseQuery = Shop::where('shops.workspace_id', $workspace->id)
-            ->when(
-                TeamVisibility::shouldScope($request->user(), $workspace),
-                fn ($q) => $q->whereHas('pages', fn ($p) => $p->visibleTo($request->user(), $workspace)),
-            )
+            ->visibleTo($request->user(), $workspace)
             ->select('shops.*')
             ->selectSub($pendingChecklistsSub, 'pending_required_checklists_count');
 
@@ -127,9 +122,10 @@ class ShopController extends Controller
             'workspace_id' => $workspace->id,
             'name' => $resJson['shop']['name'] ?? 'Shop '.$validated['shop_id'],
             'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
+            'pos_token' => $validated['pos_token'],
         ]);
 
-        $createdPages = $this->syncShopPages($shop, $workspace, $resJson, $validated['pos_token'], $request->user()->id);
+        $createdPages = $this->syncShopPages($shop, $workspace, $resJson, $request->user()->id);
 
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
         dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
@@ -146,13 +142,13 @@ class ShopController extends Controller
     }
 
     /**
-     * Create/refresh the pages that belong to a shop from the POS API response
-     * and queue an order fetch for each. Returns the number of pages touched.
+     * Create/refresh the pages that belong to a shop from the POS API response.
+     * Orders are pulled at the shop level (FetchShopOrders), so no per-page
+     * fetch is queued here. Returns the number of pages touched.
      */
-    private function syncShopPages(Shop $shop, Workspace $workspace, array $resJson, string $posToken, int $ownerId): int
+    private function syncShopPages(Shop $shop, Workspace $workspace, array $resJson, int $ownerId): int
     {
         $pages = collect($resJson['shop']['pages'] ?? []);
-        $now = Carbon::now();
         $count = 0;
 
         foreach ($pages as $pageData) {
@@ -166,19 +162,17 @@ class ShopController extends Controller
                 continue;
             }
 
-            $page = Page::updateOrCreate(
+            Page::updateOrCreate(
                 ['id' => $pageData['id']],
                 [
                     'workspace_id' => $workspace->id,
                     'shop_id' => $shop->id,
                     'owner_id' => $ownerId,
                     'name' => $pageData['name'] ?? 'Page '.$pageData['id'],
-                    'pos_token' => $posToken,
                     'status' => 'active',
                 ]
             );
 
-            dispatch(new FetchPageOrders($page, 1, $now->copy()->subMonth()->unix(), $now->unix()))->onQueue('pancake');
             $count++;
         }
 

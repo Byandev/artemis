@@ -7,8 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use Modules\Pancake\Jobs\FetchPageOrders;
-use Modules\Pancake\Jobs\FetchShopUsers;
+use Modules\Pancake\Jobs\FetchShopOrders;
 
 test('owner can view pages index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -35,7 +34,6 @@ test('owner can update a page', function () {
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/pages/{$page->id}/edit")
         ->put("/workspaces/{$workspace->slug}/pages/{$page->id}", [
-            'shop_id' => $page->shop_id,
             'name' => 'Renamed Page',
             'parcel_journey_enabled' => false,
             'owner_id' => $owner->id,
@@ -73,7 +71,6 @@ test('cannot update a page from a different workspace', function () {
 
     $this->actingAs($owner)
         ->put("/workspaces/{$workspaceA->slug}/pages/{$foreignPage->id}", [
-            'shop_id' => $foreignPage->shop_id,
             'name' => 'Hijacked',
             'parcel_journey_enabled' => false,
             'owner_id' => $owner->id,
@@ -120,7 +117,7 @@ test('refresh resets sync timestamp and dispatches a job', function () {
         ->assertRedirect();
 
     expect($page->fresh()->orders_last_synced_at)->toBeNull();
-    Bus::assertDispatched(FetchPageOrders::class);
+    Bus::assertDispatched(FetchShopOrders::class);
 });
 
 test('validatePosToken returns valid:true on successful upstream response', function () {
@@ -255,142 +252,6 @@ test('validateBotcakeToken returns valid:false on upstream failure', function ()
         ->assertJsonPath('valid', false);
 });
 
-test('store creates a page and shop after Pancake API confirms', function () {
-    Bus::fake();
-    Http::fake([
-        'pos.pages.fm/*' => Http::response([
-            'shop' => [
-                'id' => 123,
-                'name' => 'My Shop',
-                'avatar_url' => 'https://cdn.example.test/avatar.png',
-                'pages' => [
-                    ['id' => 9001, 'name' => 'Hat Page'],
-                ],
-            ],
-        ], 200),
-    ]);
-
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/pages/create")
-        ->post("/workspaces/{$workspace->slug}/pages", [
-            'id' => 9001,
-            'shop_id' => 123,
-            'name' => 'Hat Page',
-            'pos_token' => 'valid-pos-token',
-            'parcel_journey_enabled' => false,
-        ])
-        ->assertRedirect("/workspaces/{$workspace->slug}/pages");
-
-    expect(Page::where('id', 9001)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
-    expect(Shop::where('id', 123)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
-    Bus::assertDispatched(FetchPageOrders::class);
-    Bus::assertDispatched(FetchShopUsers::class);
-});
-
-test('store rejects invalid POS token (Pancake returns failed response)', function () {
-    Bus::fake();
-    Http::fake([
-        'pos.pages.fm/*' => Http::response(['error' => 'invalid'], 401),
-    ]);
-
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/pages/create")
-        ->post("/workspaces/{$workspace->slug}/pages", [
-            'id' => 9001,
-            'shop_id' => 123,
-            'name' => 'Hat Page',
-            'pos_token' => 'bogus',
-            'parcel_journey_enabled' => false,
-        ])
-        ->assertSessionHasErrors('pos_token');
-
-    expect(Page::where('id', 9001)->exists())->toBeFalse();
-    Bus::assertNothingDispatched();
-});
-
-test('store rejects when Pancake response does not contain the requested page id', function () {
-    Bus::fake();
-    Http::fake([
-        'pos.pages.fm/*' => Http::response([
-            'shop' => [
-                'name' => 'My Shop',
-                'pages' => [
-                    ['id' => 1, 'name' => 'Other Page'],
-                ],
-            ],
-        ], 200),
-    ]);
-
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/pages/create")
-        ->post("/workspaces/{$workspace->slug}/pages", [
-            'id' => 9001,
-            'shop_id' => 123,
-            'name' => 'Hat Page',
-            'pos_token' => 'valid',
-            'parcel_journey_enabled' => false,
-        ])
-        ->assertSessionHasErrors('id');
-
-    expect(Page::where('id', 9001)->exists())->toBeFalse();
-});
-
-test('store validates required fields', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/pages/create")
-        ->post("/workspaces/{$workspace->slug}/pages", [])
-        ->assertSessionHasErrors(['id', 'shop_id', 'name', 'pos_token']);
-});
-
-test('store rejects duplicate page id (already in any workspace)', function () {
-    Bus::fake();
-    ['workspace' => $other] = makeWorkspaceWithOwner();
-    Page::factory()->forWorkspace($other)->create(['id' => 9001]);
-
-    Http::fake([
-        'pos.pages.fm/*' => Http::response([
-            'shop' => ['name' => 'Shop', 'pages' => [['id' => 9001, 'name' => 'P']]],
-        ], 200),
-    ]);
-
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/pages/create")
-        ->post("/workspaces/{$workspace->slug}/pages", [
-            'id' => 9001,
-            'shop_id' => 123,
-            'name' => 'Hat Page',
-            'pos_token' => 'valid',
-            'parcel_journey_enabled' => false,
-        ])
-        ->assertSessionHasErrors('id');
-});
-
-test('non-member cannot reach store', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    $stranger = User::factory()->create();
-
-    $this->actingAs($stranger)
-        ->from("/workspaces/{$workspace->slug}/pages/create")
-        ->post("/workspaces/{$workspace->slug}/pages", [
-            'id' => 9001,
-            'shop_id' => 123,
-            'name' => 'X',
-            'pos_token' => 'tok',
-            'parcel_journey_enabled' => false,
-        ])
-        ->assertForbidden();
-});
-
 test('refresh on a foreign-workspace page returns 403', function () {
     ['user' => $owner, 'workspace' => $a] = makeWorkspaceWithOwner();
     ['workspace' => $b] = makeWorkspaceWithOwner();
@@ -398,15 +259,6 @@ test('refresh on a foreign-workspace page returns 403', function () {
 
     $this->actingAs($owner)
         ->post("/workspaces/{$a->slug}/pages/{$foreign->id}/refresh")
-        ->assertForbidden();
-});
-
-test('non-member cannot view pages create page', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    $stranger = User::factory()->create();
-
-    $this->actingAs($stranger)
-        ->get("/workspaces/{$workspace->slug}/pages/create")
         ->assertForbidden();
 });
 

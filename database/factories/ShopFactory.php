@@ -24,6 +24,7 @@ class ShopFactory extends Factory
             'workspace_id' => Workspace::factory(),
             'name' => fake()->company().' Shop',
             'avatar_url' => fake()->optional()->imageUrl(200, 200, 'business'),
+            'pos_token' => fake()->optional()->uuid(),
         ];
     }
 

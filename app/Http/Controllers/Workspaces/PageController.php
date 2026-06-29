@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Pancake\Jobs\FetchPageOrders;
+use Modules\Pancake\Jobs\FetchShopOrders;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -66,7 +66,7 @@ class PageController extends Controller
                 'parcel_journey_enabled',
                 AllowedSort::custom('pending_required_checklists_count', new PendingRequiredChecklistsSort),
             ])
-            ->with(['shop', 'owner', 'latestBudget', 'teams:id,name'])
+            ->with(['shop.teams:id,name', 'owner', 'latestBudget'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
@@ -175,7 +175,13 @@ class PageController extends Controller
         }
 
         $page->update(['orders_last_synced_at' => null, 'is_sync_logic_updated' => true]);
-        dispatch(new FetchPageOrders($page, 1, now()->subMonth()->unix(), now()->unix()))->onQueue('pancake');
+
+        // Orders sync at the shop level — refresh re-pulls the page's shop.
+        $page->loadMissing('shop');
+        if ($page->shop) {
+            $page->shop->update(['orders_last_synced_at' => null]);
+            dispatch(new FetchShopOrders($page->shop, 1, now()->subMonths(3)->unix(), now()->unix()))->onQueue('pancake');
+        }
 
         return redirect()->route('workspaces.pages.index', $workspace);
     }

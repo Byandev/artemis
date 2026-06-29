@@ -28,19 +28,17 @@ class FetchShopOrders implements ShouldQueue
 
         $this->shop->loadMissing('pages');
 
-        $tokenPage = $this->shop->pages->firstWhere(fn ($page) => filled($page->pos_token));
+        $token = $this->shop->pos_token;
 
-        if (! $tokenPage) {
+        if (! $token) {
             return;
         }
 
-        $token = $tokenPage->pos_token;
-
         // Page-less Webcake orders still need a page context so SyncParcelTrackingAction
         // can fire delivery SMS. Prefer a parcel-journey-enabled page in the shop (only
-        // those actually send); fall back to the token page just to satisfy the
+        // those actually send); fall back to any page in the shop just to satisfy the
         // OrderForDelivery FK. SMS templates are workspace-level, so any enabled page works.
-        $fallbackPage = $this->shop->pages->firstWhere('parcel_journey_enabled', true) ?? $tokenPage;
+        $fallbackPage = $this->shop->pages->firstWhere('parcel_journey_enabled', true) ?? $this->shop->pages->first();
 
         $pancake = new Pancake($this->shop->id, $token);
 
