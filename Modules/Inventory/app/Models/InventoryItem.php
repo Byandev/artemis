@@ -27,6 +27,8 @@ class InventoryItem extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'last_transaction_synced_at' => 'datetime',
+        'last_purchase_order_synced_at' => 'datetime',
     ];
 
     /**

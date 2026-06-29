@@ -15,84 +15,153 @@ use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
 /**
- * Monitoring for the ERP transaction-history and purchase-order syncs: a feed of
- * runs (with per-chunk success/failure), per-item coverage drawn from the latest
- * run, and a button to re-dispatch a run's failed chunks.
+ * Per-inventory-item monitoring for the ERP syncs: a board of every active item
+ * with how recently it last synced (transactions and purchase orders) and how it
+ * fared in the latest run, a drill-in to one item's full sync history, and retry
+ * of a failed sync — at the run, chunk, or item level.
  */
 class SyncMonitoringController extends Controller
 {
     use AuthorizesRequests;
 
+    /** An item with no successful transaction sync within this many days needs attention. */
+    private const STALE_AFTER_DAYS = 3;
+
     public function index(Request $request, Workspace $workspace)
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        $runs = QueryBuilder::for(ErpSyncRun::where('workspace_id', $workspace->id))
-            ->allowedFilters([
-                AllowedFilter::exact('type'),
-                AllowedFilter::exact('status'),
-            ])
-            ->allowedSorts(['started_at', 'finished_at', 'type', 'status', 'total_items', 'items_synced'])
-            ->defaultSort('-started_at')
-            ->withCount([
-                'chunks as chunks_total',
-                'chunks as chunks_sent' => fn ($q) => $q->whereIn('status', [ErpSyncChunk::STATUS_SENT, ErpSyncChunk::STATUS_CONFIRMED]),
-                'chunks as chunks_failed' => fn ($q) => $q->where('status', ErpSyncChunk::STATUS_FAILED),
-                'chunks as chunks_pending' => fn ($q) => $q->where('status', ErpSyncChunk::STATUS_PENDING),
-            ])
-            ->paginate($request->integer('per_page', 15))
-            ->withQueryString();
+        $staleThreshold = now()->subDays(self::STALE_AFTER_DAYS);
 
-        $runs->getCollection()->each(function ($run) {
-            $run->duration_seconds = $run->started_at && $run->finished_at
-                ? $run->started_at->diffInSeconds($run->finished_at)
-                : null;
-        });
-
-        // Coverage: every active item with how it fared in the most recent run of
-        // each type. Built by expanding the latest run's chunk item lists in PHP
-        // (no JSON-column queries), so it works regardless of how n8n calls back.
+        // How each item fared in the most recent run of each type. Built by
+        // expanding the latest run's chunk item lists (no JSON-column queries).
         $latestTransactionRun = $this->latestRunWithChunks($workspace, ErpSyncRun::TYPE_TRANSACTION_HISTORY);
         $latestPurchaseOrderRun = $this->latestRunWithChunks($workspace, ErpSyncRun::TYPE_PURCHASE_ORDER);
 
-        $transactionMap = $this->itemStatusMap($latestTransactionRun);
-        $purchaseOrderMap = $this->itemStatusMap($latestPurchaseOrderRun);
+        $transactionMap = $this->latestRunItemMap($latestTransactionRun);
+        $purchaseOrderMap = $this->latestRunItemMap($latestPurchaseOrderRun);
 
-        $activeItems = InventoryItem::where('workspace_id', $workspace->id)
-            ->where('is_active', true)
-            ->orderBy('sku')
-            ->get(['id', 'sku', 'remaining_qty']);
+        $items = QueryBuilder::for(
+            InventoryItem::where('workspace_id', $workspace->id)->where('is_active', true)
+        )
+            ->with('product:id,name')
+            ->allowedFilters([
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $query->where('sku', 'like', "%{$value}%");
+                }),
+                AllowedFilter::callback('attention', function ($query, $value) use ($staleThreshold) {
+                    if (! filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                        return;
+                    }
 
-        $coverage = $activeItems->map(fn ($item) => [
-            'id' => $item->id,
-            'sku' => $item->sku,
-            'remaining_qty' => $item->remaining_qty,
-            'tx_status' => $transactionMap[$item->id]['status'] ?? null,
-            'tx_synced_at' => $transactionMap[$item->id]['synced_at'] ?? null,
-            'po_status' => $purchaseOrderMap[$item->id]['status'] ?? null,
-            'po_synced_at' => $purchaseOrderMap[$item->id]['synced_at'] ?? null,
-        ])->values();
+                    $query->where(function ($q) use ($staleThreshold) {
+                        $q->whereNull('last_transaction_synced_at')
+                            ->orWhere('last_transaction_synced_at', '<', $staleThreshold);
+                    });
+                }),
+            ])
+            ->allowedSorts(['sku', 'remaining_qty', 'last_transaction_synced_at', 'last_purchase_order_synced_at'])
+            ->defaultSort('last_transaction_synced_at') // oldest/never-synced first — the ones needing attention
+            ->paginate($request->integer('per_page', 25))
+            ->withQueryString();
 
-        $synced = [ErpSyncChunk::STATUS_SENT, ErpSyncChunk::STATUS_CONFIRMED];
-        $itemsNotSynced = $coverage->reject(fn ($c) => in_array($c['tx_status'], $synced, true))->count();
+        $items->getCollection()->transform(function (InventoryItem $item) use ($transactionMap, $purchaseOrderMap, $staleThreshold) {
+            $tx = $transactionMap[$item->id] ?? null;
+            $po = $purchaseOrderMap[$item->id] ?? null;
+            $stale = ! $item->last_transaction_synced_at || $item->last_transaction_synced_at->lt($staleThreshold);
+
+            return [
+                'id' => $item->id,
+                'sku' => $item->sku,
+                'product_name' => $item->product?->name,
+                'remaining_qty' => $item->remaining_qty,
+                'last_transaction_synced_at' => $item->last_transaction_synced_at?->toIso8601String(),
+                'last_purchase_order_synced_at' => $item->last_purchase_order_synced_at?->toIso8601String(),
+                'tx_latest_status' => $tx['status'] ?? null,   // null = not in the latest run
+                'po_latest_status' => $po['status'] ?? null,
+                'retryable_chunk_id' => $this->retryableChunkId($tx, $po),
+                'is_stale' => $stale,
+            ];
+        });
 
         return Inertia::render('workspaces/inventory/sync-monitoring/index', [
             'workspace' => $workspace,
-            'runs' => $runs,
-            'coverage' => $coverage,
+            'items' => $items,
+            'recentRuns' => $this->recentRuns($workspace),
             'stats' => [
-                'active_items' => $activeItems->count(),
-                'items_not_synced' => $itemsNotSynced,
+                'active_items' => InventoryItem::where('workspace_id', $workspace->id)->where('is_active', true)->count(),
+                'stale_items' => InventoryItem::where('workspace_id', $workspace->id)
+                    ->where('is_active', true)
+                    ->where(function ($q) use ($staleThreshold) {
+                        $q->whereNull('last_transaction_synced_at')
+                            ->orWhere('last_transaction_synced_at', '<', $staleThreshold);
+                    })
+                    ->count(),
                 'failed_chunks' => ErpSyncChunk::where('workspace_id', $workspace->id)
                     ->where('status', ErpSyncChunk::STATUS_FAILED)
                     ->count(),
                 'last_transaction_run' => $this->runSummary($latestTransactionRun),
                 'last_purchase_order_run' => $this->runSummary($latestPurchaseOrderRun),
+                'stale_after_days' => self::STALE_AFTER_DAYS,
             ],
             'query' => [
                 ...$request->only(['sort', 'page', 'perPage']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
+            ],
+        ]);
+    }
+
+    /**
+     * One item's full sync history — every chunk that included it, newest first —
+     * so you can see exactly when it synced, failed, or was retried.
+     */
+    public function show(Request $request, Workspace $workspace, InventoryItem $item)
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        $item->load('product:id,name');
+
+        $history = ErpSyncChunk::where('workspace_id', $workspace->id)
+            ->whereJsonContains('item_ids', $item->id)
+            ->with('run:id,type,trigger,started_at')
+            ->orderByDesc('id')
+            ->paginate($request->integer('per_page', 20))
+            ->withQueryString();
+
+        $history->getCollection()->transform(fn (ErpSyncChunk $chunk) => [
+            'id' => $chunk->id,
+            'run_id' => $chunk->gencys_erp_sync_run_id,
+            'type' => $chunk->type,
+            'trigger' => $chunk->run?->trigger,
+            'status' => $chunk->status,
+            'attempts' => $chunk->attempts,
+            'item_count' => $chunk->item_count,
+            'records_synced' => $chunk->items_synced,
+            'webhook_status' => $chunk->webhook_status,
+            'error_message' => $chunk->error_message,
+            'started_at' => $chunk->run?->started_at?->toIso8601String(),
+            'dispatched_at' => $chunk->dispatched_at?->toIso8601String(),
+            'confirmed_at' => $chunk->confirmed_at?->toIso8601String(),
+        ]);
+
+        return Inertia::render('workspaces/inventory/sync-monitoring/item', [
+            'workspace' => $workspace,
+            'item' => [
+                'id' => $item->id,
+                'sku' => $item->sku,
+                'product_name' => $item->product?->name,
+                'remaining_qty' => $item->remaining_qty,
+                'is_active' => $item->is_active,
+                'last_transaction_synced_at' => $item->last_transaction_synced_at?->toIso8601String(),
+                'last_purchase_order_synced_at' => $item->last_purchase_order_synced_at?->toIso8601String(),
+            ],
+            'history' => $history,
+            'query' => [
+                ...$request->only(['page', 'perPage']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
             ],
         ]);
     }
@@ -118,22 +187,34 @@ class SyncMonitoringController extends Controller
             : "Re-queued {$failed->count()} failed chunk(s).");
     }
 
+    /** Re-dispatch a single chunk (used by an item's history and the board retry button). */
+    public function retryChunk(Request $request, Workspace $workspace, ErpSyncChunk $chunk, ErpSyncService $sync)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        abort_unless($chunk->workspace_id === $workspace->id, 404);
+
+        $sync->retryChunk($chunk);
+
+        return back()->with('success', 'Sync re-queued.');
+    }
+
     private function latestRunWithChunks(Workspace $workspace, string $type): ?ErpSyncRun
     {
         return ErpSyncRun::where('workspace_id', $workspace->id)
             ->where('type', $type)
             ->latest('started_at')
-            ->with('chunks:id,gencys_erp_sync_run_id,status,item_ids,dispatched_at,confirmed_at')
+            ->with('chunks:id,gencys_erp_sync_run_id,status,item_ids')
             ->first();
     }
 
     /**
-     * Map each inventory item id to the status and timestamp of the chunk that
+     * Map each inventory item id to the status and chunk of the chunk that
      * carried it in the given run.
      *
-     * @return array<int, array{status: string, synced_at: ?string}>
+     * @return array<int, array{status: string, chunk_id: int}>
      */
-    private function itemStatusMap(?ErpSyncRun $run): array
+    private function latestRunItemMap(?ErpSyncRun $run): array
     {
         if (! $run) {
             return [];
@@ -142,17 +223,52 @@ class SyncMonitoringController extends Controller
         $map = [];
 
         foreach ($run->chunks as $chunk) {
-            $when = $chunk->confirmed_at ?? $chunk->dispatched_at;
-
             foreach ($chunk->item_ids ?? [] as $itemId) {
-                $map[$itemId] = [
-                    'status' => $chunk->status,
-                    'synced_at' => $when?->toIso8601String(),
-                ];
+                $map[$itemId] = ['status' => $chunk->status, 'chunk_id' => $chunk->id];
             }
         }
 
         return $map;
+    }
+
+    /**
+     * The chunk id to retry for an item: the failed chunk from its latest run
+     * (transactions preferred, then purchase orders), or null if neither failed.
+     */
+    private function retryableChunkId(?array $tx, ?array $po): ?int
+    {
+        foreach ([$tx, $po] as $entry) {
+            if (($entry['status'] ?? null) === ErpSyncChunk::STATUS_FAILED) {
+                return $entry['chunk_id'];
+            }
+        }
+
+        return null;
+    }
+
+    private function recentRuns(Workspace $workspace): array
+    {
+        return ErpSyncRun::where('workspace_id', $workspace->id)
+            ->withCount([
+                'chunks as chunks_total',
+                'chunks as chunks_failed' => fn ($q) => $q->where('status', ErpSyncChunk::STATUS_FAILED),
+                'chunks as chunks_pending' => fn ($q) => $q->where('status', ErpSyncChunk::STATUS_PENDING),
+            ])
+            ->latest('started_at')
+            ->limit(8)
+            ->get()
+            ->map(fn (ErpSyncRun $run) => [
+                'id' => $run->id,
+                'type' => $run->type,
+                'status' => $run->status,
+                'total_items' => $run->total_items,
+                'items_synced' => $run->items_synced,
+                'chunks_total' => $run->chunks_total,
+                'chunks_failed' => $run->chunks_failed,
+                'chunks_pending' => $run->chunks_pending,
+                'started_at' => $run->started_at?->toIso8601String(),
+            ])
+            ->all();
     }
 
     private function runSummary(?ErpSyncRun $run): ?array

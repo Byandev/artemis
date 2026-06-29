@@ -5,6 +5,7 @@ namespace Modules\GencysERP\Models;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Inventory\Models\InventoryItem;
 
 /**
  * One dispatched job: the chunk of inventory items n8n fetches in a single ERP
@@ -63,6 +64,7 @@ class ErpSyncChunk extends Model
             'error_message' => null,
         ])->save();
 
+        $this->stampItemSyncTimestamps();
         $this->run?->recalculateStatus();
     }
 
@@ -88,6 +90,26 @@ class ErpSyncChunk extends Model
             'error_message' => null,
         ])->save();
 
+        $this->stampItemSyncTimestamps();
         $this->run?->recalculateStatus();
+    }
+
+    /**
+     * Stamp every item in this chunk with "last synced now" for its type, so the
+     * monitoring board can show per-item recency without scanning chunk history.
+     */
+    private function stampItemSyncTimestamps(): void
+    {
+        $itemIds = $this->item_ids ?? [];
+
+        if (empty($itemIds)) {
+            return;
+        }
+
+        $column = $this->type === ErpSyncRun::TYPE_TRANSACTION_HISTORY
+            ? 'last_transaction_synced_at'
+            : 'last_purchase_order_synced_at';
+
+        InventoryItem::whereIn('id', $itemIds)->update([$column => now()]);
     }
 }

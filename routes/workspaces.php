@@ -415,10 +415,12 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ERP sync monitoring: track the transaction-history + purchase-order fetches
-    // and re-dispatch a run's failed chunks.
+    // per inventory item, drill into one item's history, and retry failed syncs.
     Route::prefix('/workspaces/{workspace}/inventory/sync-monitoring')->name('workspaces.inventory.sync-monitoring.')->group(function () {
         Route::get('/', [SyncMonitoringController::class, 'index'])->name('index');
+        Route::get('/items/{item}', [SyncMonitoringController::class, 'show'])->name('items.show');
         Route::post('/runs/{run}/retry', [SyncMonitoringController::class, 'retryRun'])->name('runs.retry');
+        Route::post('/chunks/{chunk}/retry', [SyncMonitoringController::class, 'retryChunk'])->name('chunks.retry');
     });
 
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
