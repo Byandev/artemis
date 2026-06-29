@@ -30,7 +30,7 @@ class FetchPageOrders implements ShouldQueue
 
         $params = "&page_size=100&page_number=$page_number&updateStatus=updated_at&extra_fields[]=return_rate";
 
-        if (!$this->page->is_single_page) {
+        if (! $this->page->is_single_page) {
             $params .= "&order_sources[]=-1&order_sources[]={$this->page->id}";
         }
 
@@ -47,7 +47,7 @@ class FetchPageOrders implements ShouldQueue
         $data = $response['data'];
 
         foreach ($data as $i => $order) {
-            if (!$order['page_id'] && $this->page->is_single_page) {
+            if (! $order['page_id'] && $this->page->is_single_page) {
                 $order['page_id'] = $this->page->id;
             }
             dispatch(new SyncOrder($this->page->workspace, $this->page, $order))->delay(now()->addSeconds($i))->onQueue('pancake');

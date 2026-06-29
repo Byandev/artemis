@@ -24,7 +24,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Pancake\Actions\SyncCustomerAction;
 use Modules\Pancake\Jobs\FetchPageOrders;
 use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;

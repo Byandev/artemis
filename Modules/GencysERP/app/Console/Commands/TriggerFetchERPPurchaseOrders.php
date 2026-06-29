@@ -60,7 +60,9 @@ class TriggerFetchERPPurchaseOrders extends Command
             ->where('erp_username', '!=', '')
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
-            ->with(['apiKeys', 'inventoryItems' => function ($query) {
+            ->with(['apiKeys', 'deliveredPurchaseOrders' => function ($query) {
+                $query->select(['cust_po_no', 'workspace_id']);
+            }, 'inventoryItems' => function ($query) {
                 $query->where('is_active', true);
             }])
             ->get();
@@ -85,7 +87,7 @@ class TriggerFetchERPPurchaseOrders extends Command
             $workspace->inventoryItems
                 ->chunk(10)
                 ->values()
-                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $webhookUrl, $delay, $startDateFormatted, $endDateFormatted) {
+                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $webhookUrl, $startDateFormatted, $endDateFormatted) {
                     $dispatched++;
                     $totalCount += count($chunk);
 
@@ -103,12 +105,11 @@ class TriggerFetchERPPurchaseOrders extends Command
                             'id' => $item->id,
                             'keyword' => $item->sku,
                         ])->values()->toArray(),
+                        'delivered_purchase_orders_no' => $workspace->deliveredPurchaseOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
                     ];
 
-                    $offset = $dispatched * $delay;
-
                     dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data))
-                        ->delay(now()->addMinutes($offset * 3));
+                        ->delay(now()->addMinutes($dispatched * 3));
                 });
         }
 
