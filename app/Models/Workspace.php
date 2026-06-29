@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
+use Modules\Inventory\Models\PurchasedOrder;
 use Modules\MetaAds\Models\User as MetaUser;
 
 class Workspace extends Model
@@ -27,7 +28,7 @@ class Workspace extends Model
         'description',
         'owner_id',
         'monthly_order_volume',
-        'max_pages',
+        'max_shops',
         'inventory_module_enabled',
         'finance_module_enabled',
         'products_module_enabled',
@@ -80,7 +81,7 @@ class Workspace extends Model
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
-        'max_pages' => 'integer',
+        'max_shops' => 'integer',
         // Reversible encryption so the automation pipeline can read it back.
         'erp_password' => 'encrypted',
     ];
@@ -420,15 +421,15 @@ class Workspace extends Model
         ];
     }
 
-    public function pageLimit(): ?int
+    public function shopLimit(): ?int
     {
-        return $this->max_pages ?? $this->subscription?->plan?->page_limit;
+        return $this->max_shops ?? $this->subscription?->plan?->shop_limit;
     }
 
-    public function pageLimitInfo(): array
+    public function shopLimitInfo(): array
     {
-        $limit = $this->pageLimit();
-        $count = $this->pages()->count();
+        $limit = $this->shopLimit();
+        $count = $this->shops()->count();
 
         return [
             'limit' => $limit,
@@ -437,13 +438,23 @@ class Workspace extends Model
         ];
     }
 
-    public function hasReachedPageLimit(): bool
+    public function hasReachedShopLimit(): bool
     {
-        return $this->pageLimitInfo()['reached'];
+        return $this->shopLimitInfo()['reached'];
     }
 
     public function inventoryItems(): HasMany|Workspace
     {
         return $this->hasMany(InventoryItem::class);
+    }
+
+    public function purchaseOrders(): HasMany|Workspace
+    {
+        return $this->hasMany(PurchasedOrder::class);
+    }
+
+    public function deliveredPurchaseOrders(): HasMany|Workspace
+    {
+        return $this->hasMany(PurchasedOrder::class)->where('status', 7);
     }
 }

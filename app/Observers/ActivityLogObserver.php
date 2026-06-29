@@ -8,6 +8,7 @@ use App\Facades\Activity;
 use App\Models\Workspace;
 use App\Providers\ActivityLogServiceProvider;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
@@ -46,7 +47,12 @@ class ActivityLogObserver
 
     public function deleted(Model $model): void
     {
-        $this->record($model, 'deleted');
+        // A soft delete is an "archive", not a permanent removal — only a real
+        // (force) delete should read as "deleted" in the audit trail.
+        $isArchive = in_array(SoftDeletes::class, class_uses_recursive($model), true)
+            && ! $model->isForceDeleting();
+
+        $this->record($model, $isArchive ? 'archived' : 'deleted');
     }
 
     public function restored(Model $model): void

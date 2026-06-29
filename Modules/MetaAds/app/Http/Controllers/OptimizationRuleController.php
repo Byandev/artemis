@@ -83,8 +83,16 @@ class OptimizationRuleController extends Controller
         ]);
     }
 
-    public function edit(Workspace $workspace, OptimizationRule $optimizationRule): Response
+    public function edit(Request $request, Workspace $workspace, OptimizationRule $optimizationRule): Response
     {
+        // Read access requires View OR Manage; the form renders read-only for
+        // users who only have View (saving is gated by Manage on update()).
+        abort_unless(
+            $request->user()->can('View Optimization Rules', $workspace)
+            || $request->user()->can('Manage Optimization Rules', $workspace),
+            403,
+        );
+
         $this->authorizeRule($workspace, $optimizationRule);
 
         $optimizationRule->load(['conditions', 'adAccounts:id,name']);

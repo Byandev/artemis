@@ -62,7 +62,6 @@ export interface ApprovedStat extends CountStat {
 export type AdsBreakdown = Record<AdsStatus, number>;
 
 export interface Pipeline {
-    waiting: number;
     for_approval: number;
     revision: number;
     approved: number;

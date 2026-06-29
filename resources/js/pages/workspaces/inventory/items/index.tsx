@@ -22,7 +22,7 @@ import { Head, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Item {
@@ -174,12 +174,16 @@ export default function ItemIndex({
         );
     };
 
-    // FIXED: Only trigger search when the input actually changes,
-    // this prevents resetting to page 1 on every initial load/pagination.
+    // Skip the query on the very first render (initial load/pagination), but
+    // fire on every subsequent input change — including clearing the search
+    // back to empty, which must reload the full list.
+    const isFirstRender = useRef(true);
     useEffect(() => {
-        if (searchValue !== (query?.filter?.search ?? '')) {
-            performQuery(searchValue);
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
         }
+        performQuery(searchValue);
         return () => performQuery.cancel();
     }, [searchValue]);
 

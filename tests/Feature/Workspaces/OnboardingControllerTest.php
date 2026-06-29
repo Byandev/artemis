@@ -6,7 +6,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-use Modules\Pancake\Jobs\FetchPageOrders;
+use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;
 
 test('onboarding page renders for new workspaces', function () {
@@ -17,16 +17,16 @@ test('onboarding page renders for new workspaces', function () {
         ->assertOk();
 });
 
-test('onboarding redirects to dashboard if a page already exists', function () {
+test('onboarding redirects to dashboard if a shop already exists', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    Page::factory()->forWorkspace($workspace)->create();
+    Shop::factory()->forWorkspace($workspace)->create();
 
     $this->actingAs($owner)
         ->get("/workspaces/{$workspace->slug}/onboarding")
         ->assertRedirect("/workspaces/{$workspace->slug}/dashboard");
 });
 
-test('onboarding store creates page and shop after upstream API confirms', function () {
+test('onboarding store creates shop and auto-fetches its pages after upstream API confirms', function () {
     Bus::fake();
     SubscriptionPlan::create([
         'code' => SubscriptionPlan::CODE_FREE_TRIAL, 'name' => 'Free Trial',
@@ -48,16 +48,15 @@ test('onboarding store creates page and shop after upstream API confirms', funct
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/onboarding")
         ->post("/workspaces/{$workspace->slug}/onboarding", [
-            'page_id' => 9999,
             'shop_id' => 555,
-            'page_name' => 'My Page',
             'pos_token' => 'valid-token',
         ])
         ->assertRedirect();
 
     expect(Page::where('id', 9999)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
-    expect(Shop::where('id', 555)->where('workspace_id', $workspace->id)->exists())->toBeTrue();
-    Bus::assertDispatched(FetchPageOrders::class);
+    expect(Shop::where('id', 555)->where('workspace_id', $workspace->id)
+        ->where('pos_token', 'valid-token')->exists())->toBeTrue();
+    Bus::assertDispatched(FetchShopOrders::class);
     Bus::assertDispatched(FetchShopUsers::class);
 });
 
@@ -84,9 +83,7 @@ test('onboarding store creates a free trial subscription if none exists', functi
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/onboarding")
         ->post("/workspaces/{$workspace->slug}/onboarding", [
-            'page_id' => 9999,
             'shop_id' => 555,
-            'page_name' => 'P',
             'pos_token' => 'token',
         ])
         ->assertRedirect();
@@ -118,9 +115,7 @@ test('onboarding store does not duplicate subscription if one already exists', f
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/onboarding")
         ->post("/workspaces/{$workspace->slug}/onboarding", [
-            'page_id' => 9999,
             'shop_id' => 555,
-            'page_name' => 'P',
             'pos_token' => 'token',
         ])
         ->assertRedirect();
@@ -137,34 +132,13 @@ test('onboarding store rejects when Pancake API fails', function () {
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/onboarding")
         ->post("/workspaces/{$workspace->slug}/onboarding", [
-            'page_id' => 9999,
             'shop_id' => 555,
-            'page_name' => 'P',
             'pos_token' => 'bad',
         ])
         ->assertSessionHasErrors('pos_token');
 
-    expect(Page::where('id', 9999)->exists())->toBeFalse();
+    expect(Shop::where('id', 555)->exists())->toBeFalse();
     Bus::assertNothingDispatched();
-});
-
-test('onboarding store rejects when page id is not in shop response', function () {
-    Bus::fake();
-    Http::fake(['pos.pages.fm/*' => Http::response([
-        'shop' => ['name' => 'S', 'pages' => [['id' => 1, 'name' => 'X']]],
-    ], 200)]);
-
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/onboarding")
-        ->post("/workspaces/{$workspace->slug}/onboarding", [
-            'page_id' => 9999,
-            'shop_id' => 555,
-            'page_name' => 'P',
-            'pos_token' => 'token',
-        ])
-        ->assertSessionHasErrors('page_id');
 });
 
 test('onboarding store validates required fields', function () {
@@ -173,7 +147,7 @@ test('onboarding store validates required fields', function () {
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/onboarding")
         ->post("/workspaces/{$workspace->slug}/onboarding", [])
-        ->assertSessionHasErrors(['page_id', 'shop_id', 'page_name', 'pos_token']);
+        ->assertSessionHasErrors(['shop_id', 'pos_token']);
 });
 
 test('onboarding skip creates a free trial subscription if none exists', function () {
@@ -195,21 +169,21 @@ test('onboarding skip creates a free trial subscription if none exists', functio
 test('onboarding status returns syncing/complete state', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    // No page yet
+    // No shop yet
     $this->actingAs($owner)
         ->getJson("/workspaces/{$workspace->slug}/onboarding/status")
         ->assertOk()
         ->assertJson(['syncing' => false, 'complete' => false]);
 
-    // Page exists, never synced
-    $page = Page::factory()->forWorkspace($workspace)->neverSynced()->create();
+    // Shop exists, never synced
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['orders_last_synced_at' => null]);
     $this->actingAs($owner)
         ->getJson("/workspaces/{$workspace->slug}/onboarding/status")
         ->assertOk()
         ->assertJson(['syncing' => true, 'complete' => false]);
 
-    // Page synced
-    $page->update(['orders_last_synced_at' => now()]);
+    // Shop synced
+    $shop->update(['orders_last_synced_at' => now()]);
     $this->actingAs($owner)
         ->getJson("/workspaces/{$workspace->slug}/onboarding/status")
         ->assertOk()

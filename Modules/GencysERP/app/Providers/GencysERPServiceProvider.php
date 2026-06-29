@@ -4,6 +4,8 @@ namespace Modules\GencysERP\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Modules\GencysERP\Console\Commands\TriggerFetchDailySalesTrackerCommand;
+use Modules\GencysERP\Console\Commands\TriggerFetchERPPurchaseOrders;
+use Modules\GencysERP\Console\Commands\TriggerFetchERPTransactionHistory;
 use Modules\GencysERP\Console\Commands\TriggerFetchUnitCodeCommand;
 use Modules\GencysERP\Console\Commands\TriggerFetchUnitCodeInventoryCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
@@ -29,6 +31,8 @@ class GencysERPServiceProvider extends ModuleServiceProvider
         TriggerFetchDailySalesTrackerCommand::class,
         TriggerFetchUnitCodeCommand::class,
         TriggerFetchUnitCodeInventoryCommand::class,
+        TriggerFetchERPPurchaseOrders::class,
+        TriggerFetchERPTransactionHistory::class,
     ];
 
     /**

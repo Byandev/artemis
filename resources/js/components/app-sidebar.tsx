@@ -195,8 +195,10 @@ export function AppSidebar() {
                       icon: Megaphone,
                       anyOf: [
                           PERMISSIONS.ViewMetaAds,
+                          PERMISSIONS.ViewAdAccounts,
                           PERMISSIONS.ViewOptimizationRules,
                           PERMISSIONS.ApproveOptimizationRules,
+                          PERMISSIONS.ViewOptimizationLogs,
                       ],
                       items: [
                           {
@@ -209,7 +211,7 @@ export function AppSidebar() {
                               title: 'Ad Accounts',
                               href: `/workspaces/${slug}/integrations/meta/ad-accounts`,
                               icon: Database,
-                              permission: PERMISSIONS.ViewMetaAds,
+                              permission: PERMISSIONS.ViewAdAccounts,
                           },
                           {
                               title: 'Ads Manager',
@@ -251,7 +253,7 @@ export function AppSidebar() {
                               title: 'Optimization Logs',
                               href: `/workspaces/${slug}/integrations/meta/optimization-rules/logs`,
                               icon: History,
-                              permission: PERMISSIONS.ViewOptimizationRules,
+                              permission: PERMISSIONS.ViewOptimizationLogs,
                           },
                           {
                               title: 'Sync Health',
@@ -502,12 +504,11 @@ function PublicLinks({
     leaderboardEnabled: boolean;
 }) {
     const canViewRmoLink = useAnyPermission([
-        PERMISSIONS.ViewRtsAnalytics,
-        PERMISSIONS.ViewCsrManagement,
+        PERMISSIONS.ViewRmoManagement,
     ]);
-    const canViewLeaderboardLink = useAnyPermission(
-        PERMISSIONS.ViewCsrAnalytics,
-    );
+    const canViewLeaderboardLink = useAnyPermission([
+        PERMISSIONS.ViewLeaderboards,
+    ]);
 
     const links = [
         ...(rmoEnabled && canViewRmoLink

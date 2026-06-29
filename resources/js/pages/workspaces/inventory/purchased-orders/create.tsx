@@ -48,6 +48,7 @@ export default function Create({ workspace, items }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         issue_date: '',
         delivery_no: '',
+        expected_delivery_date: '',
         cust_po_no: '',
         control_no: '',
         delivery_fee: '0',
@@ -232,6 +233,32 @@ export default function Create({ workspace, items }: Props) {
                                     placeholder="DR-001"
                                     className={inputClass}
                                 />
+                            </div>
+                            <div>
+                                <label className={labelClass}>
+                                    Expected Delivery
+                                </label>
+                                <DatePicker
+                                    id="purchased-order-expected-delivery"
+                                    mode="single"
+                                    placeholder="Select date"
+                                    defaultDate={
+                                        data.expected_delivery_date || undefined
+                                    }
+                                    onChange={(dates) =>
+                                        setData(
+                                            'expected_delivery_date',
+                                            dates.length
+                                                ? format(dates[0], 'yyyy-MM-dd')
+                                                : '',
+                                        )
+                                    }
+                                />
+                                {errors.expected_delivery_date && (
+                                    <p className="mt-1 font-mono text-[11px] text-red-500">
+                                        {errors.expected_delivery_date}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className={labelClass}>

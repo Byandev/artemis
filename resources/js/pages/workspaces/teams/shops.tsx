@@ -8,7 +8,7 @@ import { ArrowLeft, Check, Loader2, Save, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-interface PageItem {
+interface ShopItem {
     id: number;
     name: string;
 }
@@ -16,8 +16,8 @@ interface PageItem {
 interface Props {
     workspace: Workspace;
     team: { id: number; name: string };
-    pages: PageItem[];
-    assignedPageIds: number[];
+    shops: ShopItem[];
+    assignedShopIds: number[];
 }
 
 const BACK_BTN =
@@ -25,30 +25,30 @@ const BACK_BTN =
 const SAVE_BTN =
     'flex h-8 items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-brand-700 disabled:opacity-40';
 
-export default function TeamPages({
+export default function TeamShops({
     workspace,
     team,
-    pages,
-    assignedPageIds,
+    shops,
+    assignedShopIds,
 }: Props) {
     const [selected, setSelected] = useState<Set<number>>(
-        new Set(assignedPageIds),
+        new Set(assignedShopIds),
     );
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
 
     const filtered = useMemo(
         () =>
-            pages.filter((p) =>
-                p.name.toLowerCase().includes(search.toLowerCase().trim()),
+            shops.filter((s) =>
+                s.name.toLowerCase().includes(search.toLowerCase().trim()),
             ),
-        [pages, search],
+        [shops, search],
     );
 
     const hasChanges = useMemo(() => {
-        if (selected.size !== assignedPageIds.length) return true;
-        return assignedPageIds.some((id) => !selected.has(id));
-    }, [selected, assignedPageIds]);
+        if (selected.size !== assignedShopIds.length) return true;
+        return assignedShopIds.some((id) => !selected.has(id));
+    }, [selected, assignedShopIds]);
 
     const toggle = (id: number) => {
         setSelected((prev) => {
@@ -62,11 +62,11 @@ export default function TeamPages({
     const save = () => {
         setSaving(true);
         router.put(
-            `/workspaces/${workspace.slug}/teams/${team.id}/pages`,
-            { page_ids: Array.from(selected) },
+            `/workspaces/${workspace.slug}/teams/${team.id}/shops`,
+            { shop_ids: Array.from(selected) },
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Team pages updated'),
+                onSuccess: () => toast.success('Team shops updated'),
                 onError: () => toast.error('Failed to save'),
                 onFinish: () => setSaving(false),
             },
@@ -75,11 +75,11 @@ export default function TeamPages({
 
     return (
         <AppLayout>
-            <Head title={`${team.name} Pages — ${workspace.name}`} />
+            <Head title={`${team.name} Shops — ${workspace.name}`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title={`${team.name} — Pages`}
-                    description="Choose which pages this team owns. Members see orders, budgets and metrics only for these pages."
+                    title={`${team.name} — Shops`}
+                    description="Choose which shops this team owns. Members see orders, budgets and metrics only for these shops' pages."
                     stackActionsOnMobile
                 >
                     <Link
@@ -111,7 +111,7 @@ export default function TeamPages({
                     <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search pages…"
+                        placeholder="Search shops…"
                         className="h-9 w-full bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200"
                     />
                 </div>
@@ -119,17 +119,17 @@ export default function TeamPages({
                 {/* List */}
                 {filtered.length === 0 ? (
                     <div className="rounded-[14px] border border-black/6 bg-white py-16 text-center text-sm text-gray-400 dark:border-white/6 dark:bg-zinc-900">
-                        No pages found.
+                        No shops found.
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                        {filtered.map((page) => {
-                            const isSelected = selected.has(page.id);
+                        {filtered.map((shop) => {
+                            const isSelected = selected.has(shop.id);
                             return (
                                 <button
-                                    key={page.id}
+                                    key={shop.id}
                                     type="button"
-                                    onClick={() => toggle(page.id)}
+                                    onClick={() => toggle(shop.id)}
                                     className={[
                                         'flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all',
                                         isSelected
@@ -150,7 +150,7 @@ export default function TeamPages({
                                         )}
                                     </span>
                                     <span className="truncate text-[13px] font-medium text-gray-800 dark:text-gray-200">
-                                        {page.name}
+                                        {shop.name}
                                     </span>
                                 </button>
                             );
@@ -159,8 +159,8 @@ export default function TeamPages({
                 )}
 
                 <p className="mt-3 px-1 font-mono text-[11px] text-gray-400">
-                    {selected.size} of {pages.length} page
-                    {pages.length === 1 ? '' : 's'} selected
+                    {selected.size} of {shops.length} shop
+                    {shops.length === 1 ? '' : 's'} selected
                 </p>
             </div>
         </AppLayout>

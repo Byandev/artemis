@@ -7,4 +7,5 @@ export interface Shop {
     created_at: string;
     updated_at: string;
     pending_required_checklists_count?: number;
+    teams?: { id: number; name: string }[];
 }

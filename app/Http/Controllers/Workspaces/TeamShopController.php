@@ -4,14 +4,14 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Page;
+use App\Models\Shop;
 use App\Models\Team;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-class TeamPageController extends Controller
+class TeamShopController extends Controller
 {
     use AuthorizesRequests;
 
@@ -20,11 +20,11 @@ class TeamPageController extends Controller
         $this->authorize(Permission::ViewTeams->value, $workspace);
         $this->ensureTeamBelongsToWorkspace($team, $workspace);
 
-        return Inertia::render('workspaces/teams/pages', [
+        return Inertia::render('workspaces/teams/shops', [
             'workspace' => $workspace,
             'team' => $team->only(['id', 'name']),
-            'pages' => Page::ofWorkspace($workspace)->orderBy('name')->get(['id', 'name']),
-            'assignedPageIds' => $team->pages()->pluck('pages.id'),
+            'shops' => Shop::where('workspace_id', $workspace->id)->orderBy('name')->get(['id', 'name']),
+            'assignedShopIds' => $team->shops()->pluck('shops.id'),
         ]);
     }
 
@@ -34,18 +34,18 @@ class TeamPageController extends Controller
         $this->ensureTeamBelongsToWorkspace($team, $workspace);
 
         $validated = $request->validate([
-            'page_ids' => ['array'],
-            'page_ids.*' => ['integer'],
+            'shop_ids' => ['array'],
+            'shop_ids.*' => ['integer'],
         ]);
 
-        // Only sync pages that actually belong to this workspace.
-        $validPageIds = Page::ofWorkspace($workspace)
-            ->whereIn('id', $validated['page_ids'] ?? [])
+        // Only sync shops that actually belong to this workspace.
+        $validShopIds = Shop::where('workspace_id', $workspace->id)
+            ->whereIn('id', $validated['shop_ids'] ?? [])
             ->pluck('id');
 
-        $team->pages()->sync($validPageIds);
+        $team->shops()->sync($validShopIds);
 
-        return redirect()->back()->with('success', 'Team pages updated successfully.');
+        return redirect()->back()->with('success', 'Team shops updated successfully.');
     }
 
     private function ensureTeamBelongsToWorkspace(Team $team, Workspace $workspace): void

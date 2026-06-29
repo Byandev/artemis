@@ -18,9 +18,8 @@ class TriggerFetchShopOrders extends Command
         $shipped = in_array((int) now()->format('G'), [9, 12, 15, 18, 21], true);
 
         Shop::whereNotNull('orders_last_synced_at')
-            ->whereHas('pages', fn ($query) => $query
-                ->whereNotNull('pos_token')
-                ->where('status', 'active'))
+            ->whereNotNull('pos_token')
+            ->whereHas('pages', fn ($query) => $query->where('status', 'active'))
             ->when($this->argument('id'), fn ($query, $id) => $query->where('id', $id))
             ->orderBy('created_at', 'asc')
             ->get()

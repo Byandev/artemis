@@ -9,7 +9,7 @@ final class SmsSentCount
 {
     public function compute(int $workspaceId, array $date_range, array $filter): float
     {
-        $saved = ParcelJourneyNotificationLog::whereHas('page', function ($query) use ($workspaceId) {
+        $saved = ParcelJourneyNotificationLog::whereHas('shop', function ($query) use ($workspaceId) {
             $query->where('workspace_id', $workspaceId);
         })
             ->whereBetween('date', [$date_range['start_date'], $date_range['end_date']])

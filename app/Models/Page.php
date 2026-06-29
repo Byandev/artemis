@@ -20,7 +20,6 @@ class Page extends Model
 
     protected $casts = [
         'orders_last_synced_at' => 'datetime',
-        'is_single_page' => 'boolean',
     ];
 
     protected $hidden = [];
@@ -92,12 +91,12 @@ class Page extends Model
     }
 
     /**
-     * Teams this page belongs to. Drives team-level visibility — a user sees a
-     * page if they share any team with it.
+     * Team-level visibility flows through the page's shop: a user sees a page if
+     * they share a team with its shop (see App\Models\Concerns\ScopesToVisibleTeams).
      */
-    public function teams(): BelongsToMany
+    protected function visibilityTeamRelation(): string
     {
-        return $this->belongsToMany(Team::class, 'team_page')->withTimestamps();
+        return 'shop.teams';
     }
 
     public function latestBudget(): HasOne

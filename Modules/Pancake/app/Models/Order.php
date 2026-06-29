@@ -20,9 +20,11 @@ class Order extends Model
 
     protected $table = 'pancake_orders';
 
+    // Scope via the order's shop directly (shop_id) rather than through the
+    // page — this also covers page-less Webcake orders (page_id is null).
     protected function visibilityTeamRelation(): string
     {
-        return 'page.teams';
+        return 'shop.teams';
     }
 
     protected $casts = [

@@ -12,7 +12,7 @@ interface Props {
 /** Themed section container with a header divider, matching ComponentCard. */
 export default function Panel({ title, icon, count, action, children }: Props) {
     return (
-        <div className="rounded-[14px] border border-black/6 bg-white transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
+        <div className="flex h-full flex-col rounded-[14px] border border-black/6 bg-white transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
             <div className="flex items-center gap-1.5 border-b border-black/5 px-5 py-3.5 dark:border-white/5">
                 {icon}
                 <h3 className="text-[13px] font-semibold tracking-tight text-gray-700 dark:text-gray-200">

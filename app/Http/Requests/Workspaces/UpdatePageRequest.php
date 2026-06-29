@@ -27,10 +27,8 @@ class UpdatePageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'shop_id' => 'required|integer|exists:shops,id',
             'name' => 'required|string|max:255',
             'facebook_url' => 'nullable|url|max:500',
-            'pos_token' => 'nullable|string|max:255',
             'botcake_token' => 'nullable|string|max:255',
             'infotxt_token' => 'nullable|string|max:255',
             'infotxt_user_id' => 'nullable|string|max:255',
@@ -38,7 +36,6 @@ class UpdatePageRequest extends FormRequest
             'parcel_journey_custom_field_id' => 'nullable|integer',
             'parcel_journey_flow_id' => 'nullable|integer',
             'parcel_journey_enabled' => 'required|boolean',
-            'is_single_page' => 'boolean',
             'owner_id' => 'required|integer|exists:users,id',
             'status' => 'required|in:active,inactive',
         ];
@@ -52,8 +49,6 @@ class UpdatePageRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'shop_id.required' => 'The shops is required.',
-            'shop_id.exists' => 'The selected shops does not exist.',
             'name.required' => 'The page name is required.',
             'facebook_url.url' => 'The Facebook URL must be a valid URL.',
         ];

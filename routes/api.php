@@ -37,7 +37,7 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::get('/inventory-items/keywords', [InventoryItemController::class, 'keywords'])->name('inventory-items.keywords');
     Route::post('/inventory-items/sync', [InventoryItemController::class, 'sync'])->name('inventory-items.sync');
 
-    Route::post('/purchase-orders/sync', [PurchaseOrderController::class, 'sync'])->name('purchase-orders.sync');
+    Route::post('/purchase-orders/bulk-sync', [PurchaseOrderController::class, 'bulkSync'])->name('purchase-orders.bulk-sync');
     Route::post('/inventory-items/transactions/bulk-sync', [TransactionHistoryController::class, 'bulkSync'])->name('transaction-history.bulk-sync');
 });
 

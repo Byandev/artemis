@@ -28,6 +28,7 @@ enum Permission: string
 
     // Shops
     case ViewShops = 'View Shops';
+    case CreateShops = 'Create Shops';
     case RefreshShops = 'Refresh Shops';
 
     // Products
@@ -169,6 +170,7 @@ enum Permission: string
             self::UpdatePageBudget => 'Pages',
 
             self::ViewShops,
+            self::CreateShops,
             self::RefreshShops => 'Shops',
 
             self::ViewProducts,

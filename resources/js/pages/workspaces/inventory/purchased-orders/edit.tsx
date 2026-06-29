@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -23,6 +24,7 @@ interface PurchasedOrder {
     id: number;
     issue_date: string;
     delivery_no: string | null;
+    expected_delivery_date: string | null;
     cust_po_no: string | null;
     control_no: string | null;
     delivery_fee: string;
@@ -58,6 +60,7 @@ export default function Edit({ workspace, order, items }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         issue_date: order.issue_date ?? '',
         delivery_no: order.delivery_no ?? '',
+        expected_delivery_date: order.expected_delivery_date ?? '',
         cust_po_no: order.cust_po_no ?? '',
         control_no: order.control_no ?? '',
         delivery_fee: order.delivery_fee ?? '',
@@ -236,6 +239,28 @@ export default function Edit({ workspace, order, items }: Props) {
                                 {errors.delivery_no && (
                                     <p className="mt-1 font-mono text-[11px] text-red-500">
                                         {errors.delivery_no}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <label className={labelClass}>
+                                    Expected Delivery
+                                </label>
+                                <DatePicker
+                                    id="expected-delivery-date"
+                                    mode="single"
+                                    fullWidth
+                                    placeholder="Select date"
+                                    defaultDate={
+                                        data.expected_delivery_date || undefined
+                                    }
+                                    onChange={(_dates, dateStr) =>
+                                        setData('expected_delivery_date', dateStr)
+                                    }
+                                />
+                                {errors.expected_delivery_date && (
+                                    <p className="mt-1 font-mono text-[11px] text-red-500">
+                                        {errors.expected_delivery_date}
                                     </p>
                                 )}
                             </div>
