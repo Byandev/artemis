@@ -25,8 +25,14 @@ use Illuminate\Support\Str;
  */
 class ActivityLogObserver
 {
-    /** Attributes never worth reporting as a change. */
-    private const IGNORED = ['updated_at', 'created_at', 'remember_token'];
+    /**
+     * Attributes never worth reporting as a change. Password fields are covered
+     * by dedicated security logs (account.password.changed,
+     * workspace.public_password.set/removed, password.reset), so excluding them
+     * here keeps a password change to a single, clear entry instead of also
+     * emitting a generic "User/Workspace updated" row.
+     */
+    private const IGNORED = ['updated_at', 'created_at', 'remember_token', 'password', 'public_password'];
 
     public function created(Model $model): void
     {
