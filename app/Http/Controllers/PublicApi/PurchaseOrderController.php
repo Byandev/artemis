@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
@@ -74,7 +75,10 @@ class PurchaseOrderController extends Controller
 
         $results = [];
 
-        DB::transaction(function () use ($orders, $workspace, $itemsById, &$results) {
+        // PO lines synced per inventory item, used to resolve each item's sync run.
+        $perItem = [];
+
+        DB::transaction(function () use ($orders, $workspace, $itemsById, &$results, &$perItem) {
             foreach ($orders as $po) {
                 $controlNo = $po['control_no'] ?? null;
 
@@ -123,6 +127,11 @@ class PurchaseOrderController extends Controller
                     );
 
                     $lineIds[] = $orderItem->id;
+
+                    // Tally PO lines per item and remember the sync run id n8n
+                    // echoed back (on the line, else on the PO) for an exact match.
+                    $perItem[$item->id]['lines'] = ($perItem[$item->id]['lines'] ?? 0) + 1;
+                    $perItem[$item->id]['sync_run_id'] ??= $this->syncRunId($line) ?? $this->syncRunId($po);
                 }
 
                 // Deliveries are PO-level; attach them to the PO's (single) item
@@ -157,7 +166,49 @@ class PurchaseOrderController extends Controller
             }
         });
 
+        // Resolve each item's outstanding PO sync run now that the data is committed.
+        foreach ($perItem as $itemId => $info) {
+            $this->recordSyncRun($workspace->id, $info['sync_run_id'] ?? null, (int) $itemId, $info['lines']);
+        }
+
         return response()->json(['data' => $results]);
+    }
+
+    /** Pull the sync run id n8n echoed back, tolerating a couple of key spellings. */
+    private function syncRunId(array $source): ?int
+    {
+        $id = $source['sync_run_id'] ?? $source['syncRunId'] ?? null;
+
+        return ($id === null || $id === '') ? null : (int) $id;
+    }
+
+    /**
+     * Resolve the item's purchase-order sync run as successful. We match the exact
+     * run id n8n echoed back when present, otherwise the item's latest pending
+     * run. If neither exists (a manual or replayed callback), record a fresh
+     * resolved run so the sync still shows up in the Sync Health view. `$lines`
+     * is the number of PO line items synced for this inventory item.
+     */
+    private function recordSyncRun(int $workspaceId, ?int $syncRunId, int $itemId, int $lines): void
+    {
+        $run = GencysSyncRun::resolveFor($workspaceId, $syncRunId, $itemId, GencysSyncRun::TYPE_PURCHASE_ORDER);
+
+        if ($run) {
+            $run->succeed($lines, $lines);
+
+            return;
+        }
+
+        GencysSyncRun::create([
+            'workspace_id' => $workspaceId,
+            'inventory_item_id' => $itemId,
+            'sync_type' => GencysSyncRun::TYPE_PURCHASE_ORDER,
+            'status' => GencysSyncRun::STATUS_SUCCESS,
+            'rows_received' => $lines,
+            'rows_saved' => $lines,
+            'started_at' => now(),
+            'finished_at' => now(),
+        ]);
     }
 
     /** Parse any date/datetime string into Y-m-d, or null when empty/unparseable. */

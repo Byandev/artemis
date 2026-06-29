@@ -346,6 +346,12 @@ export function AppSidebar() {
                               icon: ShoppingCart,
                               permission: PERMISSIONS.ViewPurchasedOrders,
                           },
+                          {
+                              title: 'Sync Health',
+                              href: `/workspaces/${slug}/inventory/sync-health`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewInventoryItems,
+                          },
                       ],
                   },
               ]

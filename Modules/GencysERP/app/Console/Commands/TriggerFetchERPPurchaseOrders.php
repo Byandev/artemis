@@ -6,6 +6,7 @@ use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Modules\GencysERP\Jobs\FetchInventoryItemPurchaseOrders;
+use Modules\GencysERP\Models\GencysSyncRun;
 
 class TriggerFetchERPPurchaseOrders extends Command
 {
@@ -93,6 +94,19 @@ class TriggerFetchERPPurchaseOrders extends Command
 
                     $callbackBase = rtrim(config('app.url'), '/');
 
+                    // Open a pending sync run per item, keyed by item id. We hand
+                    // each run's id to n8n (sync_run_id) so it can echo it back on
+                    // the callback for an exact match; items that never report back
+                    // stay pending until the stale-run sweeper fails them.
+                    $runIds = $chunk->mapWithKeys(fn ($item) => [
+                        $item->id => GencysSyncRun::start(
+                            $workspace->id,
+                            $item->id,
+                            GencysSyncRun::TYPE_PURCHASE_ORDER,
+                            ['start_date' => $startDateFormatted, 'end_date' => $endDateFormatted],
+                        )->id,
+                    ]);
+
                     $data = [
                         'workspace_id' => $workspace->id,
                         'workspace_api_key' => $apiKey->reveal(),
@@ -104,11 +118,12 @@ class TriggerFetchERPPurchaseOrders extends Command
                         'items' => $chunk->map(fn ($item) => [
                             'id' => $item->id,
                             'keyword' => $item->sku,
+                            'sync_run_id' => $runIds[$item->id],
                         ])->values()->toArray(),
                         'delivered_purchase_orders_no' => $workspace->deliveredPurchaseOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
                     ];
 
-                    dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data))
+                    dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data, $runIds->values()->all()))
                         ->delay(now()->addMinutes($dispatched * 3));
                 });
         }

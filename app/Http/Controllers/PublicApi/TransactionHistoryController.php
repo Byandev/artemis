@@ -5,6 +5,7 @@ namespace App\Http\Controllers\PublicApi;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 
@@ -51,6 +52,8 @@ class TransactionHistoryController extends Controller
 
             $saved = $this->saveTransactions($item, $rows);
 
+            $this->recordSyncRun($workspace->id, $this->syncRunId($entry), $item->id, count($rows), $saved);
+
             $results[] = [
                 'inventory_item_id' => $item->id,
                 'transactions_received' => count($rows),
@@ -60,6 +63,42 @@ class TransactionHistoryController extends Controller
         }
 
         return response()->json(['data' => $results]);
+    }
+
+    /** Pull the sync run id n8n echoed back, tolerating a couple of key spellings. */
+    private function syncRunId(array $entry): ?int
+    {
+        $id = $entry['sync_run_id'] ?? $entry['syncRunId'] ?? null;
+
+        return ($id === null || $id === '') ? null : (int) $id;
+    }
+
+    /**
+     * Resolve the item's transaction-history sync run as successful. We match the
+     * exact run id n8n echoed back when present, otherwise the item's latest
+     * pending run. If neither exists (a manual or replayed callback), record a
+     * fresh resolved run so the sync still shows up in the Sync Health view.
+     */
+    private function recordSyncRun(int $workspaceId, ?int $syncRunId, int $itemId, int $received, int $saved): void
+    {
+        $run = GencysSyncRun::resolveFor($workspaceId, $syncRunId, $itemId, GencysSyncRun::TYPE_TRANSACTION_HISTORY);
+
+        if ($run) {
+            $run->succeed($received, $saved);
+
+            return;
+        }
+
+        GencysSyncRun::create([
+            'workspace_id' => $workspaceId,
+            'inventory_item_id' => $itemId,
+            'sync_type' => GencysSyncRun::TYPE_TRANSACTION_HISTORY,
+            'status' => GencysSyncRun::STATUS_SUCCESS,
+            'rows_received' => $received,
+            'rows_saved' => $saved,
+            'started_at' => now(),
+            'finished_at' => now(),
+        ]);
     }
 
     /**

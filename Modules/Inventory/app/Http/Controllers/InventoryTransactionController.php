@@ -194,6 +194,8 @@ class InventoryTransactionController extends Controller
     {
         $this->authorize('Edit Transaction Logs', $workspace);
 
+        abort_unless($workspace->is_gencys_partner, 403);
+
         $validated = $request->validate([
             'remaining_qty' => 'required|numeric',
         ]);

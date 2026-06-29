@@ -28,6 +28,10 @@ Schedule::command('inventory:sync-averages')->hourly();
 // once a day at 8am.
 Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('08:00')->withoutOverlapping();
 
+// Flag inventory items whose ERP sync was dispatched but never reported back
+// (e.g. the ERP login failed inside n8n) so silent failures show up as failed.
+Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
+
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
