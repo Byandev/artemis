@@ -250,19 +250,6 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
         );
     };
 
-    const refresh = (page: Page) => {
-        setProcessing(true);
-        router.post(
-            workspaces.pages.refresh.url({ workspace, page }),
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => toast.success('Refresh started.'),
-                onError: () => toast.error('Failed to refresh page.'),
-                onFinish: () => setProcessing(false),
-            },
-        );
-    };
 
     const openChecklist = (page: Page) => {
         setSelectedPage(page);

@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Pancake\Jobs\FetchShopOrders;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -164,26 +163,6 @@ class PageController extends Controller
         return redirect()
             ->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page budget updated successfully.');
-    }
-
-    public function refresh(Request $request, Workspace $workspace, Page $page)
-    {
-        $this->authorize(Permission::RefreshPages->value, $workspace);
-
-        if ($page->workspace_id !== $workspace->id) {
-            abort(403);
-        }
-
-        $page->update(['orders_last_synced_at' => null, 'is_sync_logic_updated' => true]);
-
-        // Orders sync at the shop level — refresh re-pulls the page's shop.
-        $page->loadMissing('shop');
-        if ($page->shop) {
-            $page->shop->update(['orders_last_synced_at' => null]);
-            dispatch(new FetchShopOrders($page->shop, 1, now()->subMonths(3)->unix(), now()->unix()))->onQueue('pancake');
-        }
-
-        return redirect()->route('workspaces.pages.index', $workspace);
     }
 
     public function archive(Request $request, Workspace $workspace, Page $page)
