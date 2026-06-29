@@ -30,20 +30,17 @@ import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import {
     ChevronDown,
-    Clapperboard,
-    FileImage,
     MessageSquare,
     MoreHorizontal,
     Package,
     Pencil,
     Plus,
     Search,
-    SlidersHorizontal,
     Trash2,
     TriangleAlert,
     X,
 } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     AdsBadge,
     FinalBadge,
@@ -51,9 +48,11 @@ import {
     InitialAvatar,
 } from './components/atoms';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
+import CreativesFilter, {
+    CreativesFilterValue,
+} from './components/creatives-filter';
 import { InlineAssignee } from './components/inline-assignee';
 import {
-    ADS_DOT,
     ADS_STATUS_LABELS,
     AdsStatus,
     Creative,
@@ -449,16 +448,44 @@ export default function CreativesIndex({
         },
     ];
 
-    // Filter item style helper
-    const filterItem = (active: boolean) =>
-        `flex w-full items-center gap-2 rounded-[8px] px-2.5 py-1.5 font-mono text-[11px] transition-colors ${active ? 'bg-emerald-500/[0.08] text-emerald-600 dark:bg-emerald-500/[0.10] dark:text-emerald-400' : 'text-gray-600 hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-zinc-800'}`;
+    // Filter values arrive as comma-separated strings; expand them into arrays for
+    // the multi-select UI.
+    const parseList = (v?: string) => (v ? v.split(',').filter(Boolean) : []);
 
-    const activeFilterCount = [
-        query.filter?.format,
-        query.filter?.ads_status,
-        query.filter?.creator_id,
-        query.filter?.product_id,
-    ].filter(Boolean).length;
+    const filterValue: CreativesFilterValue = useMemo(
+        () => ({
+            formats: parseList(query.filter?.format),
+            ads_statuses: parseList(query.filter?.ads_status),
+            creator_ids: parseList(query.filter?.creator_id),
+            product_ids: parseList(query.filter?.product_id),
+        }),
+        [query.filter],
+    );
+
+    const formatOptions = [
+        { key: 'video', label: 'Video' },
+        { key: 'image', label: 'Image' },
+    ];
+    const adsStatusOptions = (
+        Object.entries(ADS_STATUS_LABELS) as [AdsStatus, string][]
+    ).map(([key, label]) => ({ key, label }));
+    const creatorOptions = creators.map((c) => ({
+        key: String(c.id),
+        label: c.name,
+    }));
+    const productOptions = products.map((p) => ({
+        key: String(p.id),
+        label: p.title,
+    }));
+
+    const applyFilters = (v: CreativesFilterValue) =>
+        navigate({
+            'filter[format]': v.formats.join(',') || undefined,
+            'filter[ads_status]': v.ads_statuses.join(',') || undefined,
+            'filter[creator_id]': v.creator_ids.join(',') || undefined,
+            'filter[product_id]': v.product_ids.join(',') || undefined,
+            page: 1,
+        });
 
     return (
         <AppLayout>
@@ -516,221 +543,14 @@ export default function CreativesIndex({
                         }}
                     />
 
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-black/8 bg-white px-3 font-mono text-[12px] font-medium text-gray-500 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-400 dark:shadow-none dark:hover:bg-zinc-800">
-                                <SlidersHorizontal className="h-3.5 w-3.5" />
-                                Filters
-                                {activeFilterCount > 0 && (
-                                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 font-mono text-[9px] font-bold text-white">
-                                        {activeFilterCount}
-                                    </span>
-                                )}
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-52 p-2" align="end">
-                            <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                                Format
-                            </p>
-                            {(
-                                [
-                                    {
-                                        key: '',
-                                        icon: null,
-                                        label: 'All formats',
-                                    },
-                                    {
-                                        key: 'video',
-                                        icon: (
-                                            <Clapperboard className="h-3 w-3" />
-                                        ),
-                                        label: 'Video',
-                                    },
-                                    {
-                                        key: 'image',
-                                        icon: <FileImage className="h-3 w-3" />,
-                                        label: 'Image',
-                                    },
-                                ] as {
-                                    key: string;
-                                    icon: React.ReactNode;
-                                    label: string;
-                                }[]
-                            ).map(({ key, icon, label }) => (
-                                <button
-                                    key={key}
-                                    className={filterItem(
-                                        (query.filter?.format ?? '') === key,
-                                    )}
-                                    onClick={() =>
-                                        navigate({
-                                            'filter[format]': key || undefined,
-                                            page: 1,
-                                        })
-                                    }
-                                >
-                                    {icon ?? <span className="h-3 w-3" />}
-                                    {label}
-                                </button>
-                            ))}
-
-                            <DropdownMenuSeparator className="my-2" />
-
-                            <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                                Ads Status
-                            </p>
-                            <button
-                                className={filterItem(
-                                    !query.filter?.ads_status,
-                                )}
-                                onClick={() =>
-                                    navigate({
-                                        'filter[ads_status]': undefined,
-                                        page: 1,
-                                    })
-                                }
-                            >
-                                <span className="h-3 w-3" />
-                                All statuses
-                            </button>
-                            {(
-                                Object.entries(ADS_STATUS_LABELS) as [
-                                    AdsStatus,
-                                    string,
-                                ][]
-                            ).map(([v, l]) => (
-                                <button
-                                    key={v}
-                                    className={filterItem(
-                                        query.filter?.ads_status === v,
-                                    )}
-                                    onClick={() =>
-                                        navigate({
-                                            'filter[ads_status]': v,
-                                            page: 1,
-                                        })
-                                    }
-                                >
-                                    <span
-                                        className={`h-1.5 w-1.5 rounded-full ${ADS_DOT[v]}`}
-                                    />
-                                    {l}
-                                </button>
-                            ))}
-
-                            {creators.length > 0 && (
-                                <>
-                                    <DropdownMenuSeparator className="my-2" />
-                                    <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                                        Creator
-                                    </p>
-                                    <button
-                                        className={filterItem(
-                                            !query.filter?.creator_id,
-                                        )}
-                                        onClick={() =>
-                                            navigate({
-                                                'filter[creator_id]': undefined,
-                                                page: 1,
-                                            })
-                                        }
-                                    >
-                                        <span className="h-3 w-3" />
-                                        All creators
-                                    </button>
-                                    {creators.map((c) => (
-                                        <button
-                                            key={c.id}
-                                            className={filterItem(
-                                                query.filter?.creator_id ===
-                                                    String(c.id),
-                                            )}
-                                            onClick={() =>
-                                                navigate({
-                                                    'filter[creator_id]':
-                                                        String(c.id),
-                                                    page: 1,
-                                                })
-                                            }
-                                        >
-                                            <span className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 font-mono text-[8px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                {c.name.charAt(0).toUpperCase()}
-                                            </span>
-                                            <span className="truncate">
-                                                {c.name}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </>
-                            )}
-
-                            {products.length > 0 && (
-                                <>
-                                    <DropdownMenuSeparator className="my-2" />
-                                    <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                                        Product
-                                    </p>
-                                    <button
-                                        className={filterItem(
-                                            !query.filter?.product_id,
-                                        )}
-                                        onClick={() =>
-                                            navigate({
-                                                'filter[product_id]': undefined,
-                                                page: 1,
-                                            })
-                                        }
-                                    >
-                                        <span className="h-3 w-3" />
-                                        All products
-                                    </button>
-                                    <div className="max-h-44 overflow-y-auto">
-                                        {products.map((p) => (
-                                            <button
-                                                key={p.id}
-                                                className={filterItem(
-                                                    query.filter?.product_id ===
-                                                        String(p.id),
-                                                )}
-                                                onClick={() =>
-                                                    navigate({
-                                                        'filter[product_id]':
-                                                            String(p.id),
-                                                        page: 1,
-                                                    })
-                                                }
-                                            >
-                                                <Package className="h-3 w-3 shrink-0" />
-                                                <span className="truncate">
-                                                    {p.title}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-
-                            {activeFilterCount > 0 && (
-                                <>
-                                    <DropdownMenuSeparator className="my-2" />
-                                    <button
-                                        className="flex w-full items-center justify-center rounded-[8px] px-2.5 py-1.5 font-mono text-[11px] text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/[0.08]"
-                                        onClick={() =>
-                                            navigate({
-                                                'filter[format]': undefined,
-                                                'filter[ads_status]': undefined,
-                                                'filter[creator_id]': undefined,
-                                                'filter[product_id]': undefined,
-                                                page: 1,
-                                            })
-                                        }
-                                    >
-                                        Clear all filters
-                                    </button>
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <CreativesFilter
+                        value={filterValue}
+                        formatOptions={formatOptions}
+                        adsStatusOptions={adsStatusOptions}
+                        creatorOptions={creatorOptions}
+                        productOptions={productOptions}
+                        onApply={applyFilters}
+                    />
                 </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
