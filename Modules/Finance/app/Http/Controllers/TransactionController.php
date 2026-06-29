@@ -2,7 +2,9 @@
 
 namespace Modules\Finance\Http\Controllers;
 
+use App\Enums\Logging\LogCategory;
 use App\Enums\Permission;
+use App\Facades\Activity;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -265,6 +267,21 @@ class TransactionController extends Controller
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->get();
+
+        Activity::build()
+            ->asUser()
+            ->workspace($workspace)
+            ->category(LogCategory::Security)
+            ->action('finance.transactions.exported')
+            ->message("Exported {$transactions->count()} finance transaction(s)")
+            ->metadata([
+                'count' => $transactions->count(),
+                'filters' => $request->only([
+                    'search', 'account_id', 'type', 'transaction_type',
+                    'sub_category', 'missing_type', 'expenses_missing_sub',
+                ]),
+            ])
+            ->save();
 
         $fileName = 'transactions-'.now()->format('Y-m-d-His').'.csv';
 
