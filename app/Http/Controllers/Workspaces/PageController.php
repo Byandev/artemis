@@ -19,7 +19,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Pancake\Jobs\FetchShopOrders;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -166,26 +165,6 @@ class PageController extends Controller
             ->with('success', 'Page budget updated successfully.');
     }
 
-    public function refresh(Request $request, Workspace $workspace, Page $page)
-    {
-        $this->authorize(Permission::RefreshPages->value, $workspace);
-
-        if ($page->workspace_id !== $workspace->id) {
-            abort(403);
-        }
-
-        $page->update(['orders_last_synced_at' => null, 'is_sync_logic_updated' => true]);
-
-        // Orders sync at the shop level — refresh re-pulls the page's shop.
-        $page->loadMissing('shop');
-        if ($page->shop) {
-            $page->shop->update(['orders_last_synced_at' => null]);
-            dispatch(new FetchShopOrders($page->shop, 1, now()->subMonths(3)->unix(), now()->unix()))->onQueue('pancake');
-        }
-
-        return redirect()->route('workspaces.pages.index', $workspace);
-    }
-
     public function archive(Request $request, Workspace $workspace, Page $page)
     {
         $this->authorize(Permission::ArchivePages->value, $workspace);
@@ -210,38 +189,6 @@ class PageController extends Controller
         $page->activate();
 
         return redirect()->route('workspaces.pages.index', $workspace);
-    }
-
-    public function validatePosToken(Request $request, Workspace $workspace)
-    {
-        if (! $request->user()->isMemberOf($workspace)) {
-            abort(403, 'You do not have access to this workspace.');
-        }
-
-        $validated = $request->validate([
-            'shop_id' => 'required|string',
-            'token' => 'required|string',
-        ]);
-
-        try {
-            $response = Http::timeout(10)->get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
-                'api_key' => $validated['token'],
-            ]);
-
-            if ($response->successful()) {
-                return response()->json(['valid' => true, 'message' => 'POS token is valid.', 'data' => $response->json()], 200);
-            }
-
-            return response()->json([
-                'valid' => false,
-                'message' => 'Invalid POS token or shop ID.',
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'valid' => false,
-                'message' => 'Could not reach Pancake API.',
-            ]);
-        }
     }
 
     public function validatePancakeToken(Request $request, Workspace $workspace)

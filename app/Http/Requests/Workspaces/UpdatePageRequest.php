@@ -36,7 +36,6 @@ class UpdatePageRequest extends FormRequest
             'parcel_journey_custom_field_id' => 'nullable|integer',
             'parcel_journey_flow_id' => 'nullable|integer',
             'parcel_journey_enabled' => 'required|boolean',
-            'is_single_page' => 'boolean',
             'owner_id' => 'required|integer|exists:users,id',
             'status' => 'required|in:active,inactive',
         ];

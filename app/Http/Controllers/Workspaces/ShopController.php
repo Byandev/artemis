@@ -144,7 +144,9 @@ class ShopController extends Controller
     /**
      * Create/refresh the pages that belong to a shop from the POS API response.
      * Orders are pulled at the shop level (FetchShopOrders), so no per-page
-     * fetch is queued here. Returns the number of pages touched.
+     * fetch is queued here. Existing pages keep their owner and status — only
+     * the name/shop link is refreshed; newly-discovered pages get $ownerId and
+     * become active. Returns the number of pages touched.
      */
     private function syncShopPages(Shop $shop, Workspace $workspace, array $resJson, int $ownerId): int
     {
@@ -162,21 +164,90 @@ class ShopController extends Controller
                 continue;
             }
 
-            Page::updateOrCreate(
-                ['id' => $pageData['id']],
-                [
+            if ($existing) {
+                $existing->update([
+                    'shop_id' => $shop->id,
+                    'name' => $pageData['name'] ?? $existing->name,
+                ]);
+            } else {
+                Page::create([
+                    'id' => $pageData['id'],
                     'workspace_id' => $workspace->id,
                     'shop_id' => $shop->id,
                     'owner_id' => $ownerId,
                     'name' => $pageData['name'] ?? 'Page '.$pageData['id'],
                     'status' => 'active',
-                ]
-            );
+                ]);
+            }
 
             $count++;
         }
 
         return $count;
+    }
+
+    public function refreshPages(Request $request, Workspace $workspace, Shop $shop)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $this->authorize(Permission::RefreshShops->value, $workspace);
+
+        if ($shop->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        if (! $shop->pos_token) {
+            return redirect()->route('workspaces.shops.index', $workspace)
+                ->with('error', 'This shop has no POS token, so its page list cannot be refreshed.');
+        }
+
+        $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$shop->id, [
+            'api_key' => $shop->pos_token,
+        ]);
+
+        if ($response->failed()) {
+            return redirect()->route('workspaces.shops.index', $workspace)
+                ->with('error', 'Could not reach the POS API to refresh the page list.');
+        }
+
+        $count = $this->syncShopPages($shop, $workspace, $response->json(), $request->user()->id);
+
+        return redirect()->route('workspaces.shops.index', $workspace)
+            ->with('success', "Page list refreshed. {$count} page(s) synced.");
+    }
+
+    public function validatePosToken(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'shop_id' => 'required|string',
+            'token' => 'required|string',
+        ]);
+
+        try {
+            $response = Http::timeout(10)->get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
+                'api_key' => $validated['token'],
+            ]);
+
+            if ($response->successful()) {
+                return response()->json(['valid' => true, 'message' => 'POS token is valid.', 'data' => $response->json()], 200);
+            }
+
+            return response()->json([
+                'valid' => false,
+                'message' => 'Invalid POS token or shop ID.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Could not reach Pancake API.',
+            ]);
+        }
     }
 
     public function refreshUsers(Request $request, Workspace $workspace, Shop $shop)
@@ -212,7 +283,7 @@ class ShopController extends Controller
 
         // Pull the last month across all sources (incl. Webcake). The job advances
         // orders_last_synced_at when it finishes, so the hourly sync resumes from here.
-        dispatch(new FetchShopOrders($shop, 1, now()->subMonths(3)->unix(), now()->unix()))
+        dispatch(new FetchShopOrders($shop, 1, now()->subMonths(2)->unix(), now()->unix()))
             ->onQueue('pancake');
 
         return redirect()->route('workspaces.shops.index', $workspace);

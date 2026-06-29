@@ -37,7 +37,6 @@ import {
     Edit,
     ListChecks,
     MoreHorizontal,
-    RefreshCw,
     Search,
     Upload,
     Wallet,
@@ -166,7 +165,6 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
     const [selectedPage, setSelectedPage] = useState<Page | null>(null);
     const [budgetPage, setBudgetPage] = useState<Page | null>(null);
 
-    const [processing, setProcessing] = useState(false);
     const budgetForm = useForm({
         budget: '0',
     });
@@ -178,13 +176,9 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
     const canEditPageBudget = usePermission(
         PERMISSIONS.EditPageDailyBudgetRecords,
     );
-    const canRefreshPages = usePermission(PERMISSIONS.RefreshPages);
     const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
     const canUsePageActions =
-        canViewChecklist ||
-        canEditPages ||
-        canRefreshPages ||
-        canEditPageBudget;
+        canViewChecklist || canEditPages || canEditPageBudget;
 
     useEffect(() => {
         if (flash?.success) {
@@ -250,19 +244,6 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
         );
     };
 
-    const refresh = (page: Page) => {
-        setProcessing(true);
-        router.post(
-            workspaces.pages.refresh.url({ workspace, page }),
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => toast.success('Refresh started.'),
-                onError: () => toast.error('Failed to refresh page.'),
-                onFinish: () => setProcessing(false),
-            },
-        );
-    };
 
     const openChecklist = (page: Page) => {
         setSelectedPage(page);
@@ -426,23 +407,6 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
                                               Update Budget
                                           </DropdownMenuItem>
                                       )}
-                                      {false && (
-                                          <DropdownMenuItem
-                                              onClick={() => refresh(page)}
-                                              disabled={processing}
-                                          >
-                                              <RefreshCw
-                                                  className={
-                                                      processing
-                                                          ? 'animate-spin'
-                                                          : ''
-                                                  }
-                                              />
-                                              {processing
-                                                  ? 'Refreshing…'
-                                                  : 'Refresh Orders'}
-                                          </DropdownMenuItem>
-                                      )}
                                   </DropdownMenuContent>
                               </DropdownMenu>
                           );
@@ -461,36 +425,36 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
                     description="Manage your shop pages and their connected stores"
                     stackActionsOnMobile
                 >
-                    {canViewPages && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleExport}
-                        >
-                            <Download className="h-4 w-4" />
-                            Export
-                        </Button>
-                    )}
-                    {canCreatePages && (
-                        <>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".xlsx,.xls,.csv"
-                                className="hidden"
-                                onChange={handleImportFile}
-                            />
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={importing}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <Upload className="h-4 w-4" />
-                                {importing ? 'Importing…' : 'Import'}
-                            </Button>
-                        </>
-                    )}
+                    {/*{canViewPages && (*/}
+                    {/*    <Button*/}
+                    {/*        size="sm"*/}
+                    {/*        variant="outline"*/}
+                    {/*        onClick={handleExport}*/}
+                    {/*    >*/}
+                    {/*        <Download className="h-4 w-4" />*/}
+                    {/*        Export*/}
+                    {/*    </Button>*/}
+                    {/*)}*/}
+                    {/*{canCreatePages && (*/}
+                    {/*    <>*/}
+                    {/*        <input*/}
+                    {/*            ref={fileInputRef}*/}
+                    {/*            type="file"*/}
+                    {/*            accept=".xlsx,.xls,.csv"*/}
+                    {/*            className="hidden"*/}
+                    {/*            onChange={handleImportFile}*/}
+                    {/*        />*/}
+                    {/*        <Button*/}
+                    {/*            size="sm"*/}
+                    {/*            variant="outline"*/}
+                    {/*            disabled={importing}*/}
+                    {/*            onClick={() => fileInputRef.current?.click()}*/}
+                    {/*        >*/}
+                    {/*            <Upload className="h-4 w-4" />*/}
+                    {/*            {importing ? 'Importing…' : 'Import'}*/}
+                    {/*        </Button>*/}
+                    {/*    </>*/}
+                    {/*)}*/}
                 </PageHeader>
 
                 <Dialog

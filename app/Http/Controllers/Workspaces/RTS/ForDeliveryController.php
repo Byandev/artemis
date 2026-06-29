@@ -49,7 +49,7 @@ class ForDeliveryController extends Controller
         // orders but only when the parcel was delivered.
         $isToday = $deliveryDate?->isToday() ?? false;
         $isDeliveredYesterday = ($deliveryDate?->isYesterday() ?? false)
-            && strtolower((string) $orderForDelivery->parcel_status) === 'delivered';
+            && (strtolower((string) $orderForDelivery->parcel_status) === 'delivered' || strtolower((string) $orderForDelivery->parcel_status) === 'returning');
 
         if (! $isToday && ! $isDeliveredYesterday) {
             return redirect()->back()->with('error', "Status can only be updated for orders scheduled for delivery today, or yesterday's delivered orders.");
