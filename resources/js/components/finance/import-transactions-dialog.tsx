@@ -211,7 +211,53 @@ export function ImportTransactionsDialog({
         [mappedRows],
     );
 
-    const canSubmit = !!accountId && validRows.length > 0 && !submitting;
+    // First non-empty value in a column — shown under each dropdown so the user
+    // can confirm they picked the right column without guessing from the header.
+    const sampleFor = (col: number): string => {
+        if (col < 0) return '';
+        for (const r of rawRows) {
+            const v = (r[col] ?? '').trim();
+            if (v) return v;
+        }
+        return '';
+    };
+
+    // Required fields still unmapped. Credits/Debits is an either/or — at least
+    // one must be set so we can tell money in from money out.
+    const missingRequired = useMemo(() => {
+        const m: string[] = [];
+        if (dateCol < 0) m.push('Date');
+        if (detailsCol < 0) m.push('Description');
+        if (creditsCol < 0 && debitsCol < 0) m.push('Credits or Debits');
+        return m;
+    }, [dateCol, detailsCol, creditsCol, debitsCol]);
+
+    // Columns mapped to more than one field — flagged inline so a stray
+    // double-mapping doesn't silently corrupt the import.
+    const duplicateCols = useMemo(() => {
+        const used = [
+            dateCol,
+            detailsCol,
+            creditsCol,
+            debitsCol,
+            runningCol,
+            remarksCol,
+        ].filter((c) => c >= 0);
+        const seen = new Set<number>();
+        const dups = new Set<number>();
+        for (const c of used) {
+            if (seen.has(c)) dups.add(c);
+            seen.add(c);
+        }
+        return [...dups];
+    }, [dateCol, detailsCol, creditsCol, debitsCol, runningCol, remarksCol]);
+
+    const canSubmit =
+        !!accountId &&
+        validRows.length > 0 &&
+        missingRequired.length === 0 &&
+        duplicateCols.length === 0 &&
+        !submitting;
 
     const submit = () => {
         if (!canSubmit) return;
@@ -245,26 +291,54 @@ export function ImportTransactionsDialog({
         );
     };
 
-    const ColSelect = ({
+    // A single column-mapping row: dropdown + a live hint that becomes a sample
+    // value once mapped (or a duplicate warning). Kept as a plain render helper
+    // rather than a component so re-renders don't remount the <select>.
+    const renderMapField = ({
+        label,
+        required,
+        hint,
         value,
         onChange,
     }: {
+        label: string;
+        required?: boolean;
+        hint: string;
         value: number;
         onChange: (v: number) => void;
-    }) => (
-        <select
-            value={value}
-            onChange={(e) => onChange(Number(e.target.value))}
-            className={inputCls}
-        >
-            <option value={-1}>— not mapped —</option>
-            {headers.map((h, i) => (
-                <option key={i} value={i}>
-                    {h || `Column ${i + 1}`}
-                </option>
-            ))}
-        </select>
-    );
+    }) => {
+        const sample = sampleFor(value);
+        const dup = value >= 0 && duplicateCols.includes(value);
+        const note =
+            value < 0
+                ? hint
+                : dup
+                  ? '⚠ this column is mapped twice'
+                  : sample
+                    ? `e.g. ${sample.length > 28 ? sample.slice(0, 28) + '…' : sample}`
+                    : '(this column is empty)';
+        return (
+            <Field label={label} required={required}>
+                <select
+                    value={value}
+                    onChange={(e) => onChange(Number(e.target.value))}
+                    className={`${inputCls} ${dup ? 'border-amber-400! ring-2 ring-amber-400/20' : ''}`}
+                >
+                    <option value={-1}>— not mapped —</option>
+                    {headers.map((h, i) => (
+                        <option key={i} value={i}>
+                            {h || `Column ${i + 1}`}
+                        </option>
+                    ))}
+                </select>
+                <p
+                    className={`mt-1 truncate font-mono text-[10px] ${dup ? 'text-amber-600' : 'text-gray-400'}`}
+                >
+                    {note}
+                </p>
+            </Field>
+        );
+    };
 
     return (
         <Dialog
@@ -281,9 +355,9 @@ export function ImportTransactionsDialog({
                             Import Transactions (CSV)
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-                            Upload a Gotyme export (Date, Details, Category,
-                            Credits, Debits, Running Balance, Remarks). Parsing
-                            happens in your browser.
+                            Upload a CSV (e.g. a Gotyme export). We'll try to
+                            match the columns automatically — just confirm or
+                            fix them below. Parsing happens in your browser.
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -328,46 +402,73 @@ export function ImportTransactionsDialog({
                             </p>
 
                             <div>
-                                <h3 className="mb-2 font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                                    Column Mapping
-                                </h3>
+                                <div className="mb-2 flex items-center justify-between">
+                                    <h3 className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                                        Match Your Columns
+                                    </h3>
+                                    <span className="font-mono text-[10px] text-gray-400">
+                                        <span className="text-red-400">*</span>{' '}
+                                        required
+                                    </span>
+                                </div>
+
+                                {missingRequired.length > 0 ? (
+                                    <p className="mb-3 rounded-[10px] border border-amber-300/50 bg-amber-50 px-3 py-2 text-[11px] text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-400">
+                                        Tell us which column holds each value.
+                                        Still needed:{' '}
+                                        <span className="font-semibold">
+                                            {missingRequired.join(', ')}
+                                        </span>
+                                        .
+                                    </p>
+                                ) : (
+                                    <p className="mb-3 rounded-[10px] border border-emerald-300/50 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/5 dark:text-emerald-400">
+                                        All required columns matched — review
+                                        the preview below, then import.
+                                    </p>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Field label="Date">
-                                        <ColSelect
-                                            value={dateCol}
-                                            onChange={setDateCol}
-                                        />
-                                    </Field>
-                                    <Field label="Details → Description">
-                                        <ColSelect
-                                            value={detailsCol}
-                                            onChange={setDetailsCol}
-                                        />
-                                    </Field>
-                                    <Field label="Credits → IN amount">
-                                        <ColSelect
-                                            value={creditsCol}
-                                            onChange={setCreditsCol}
-                                        />
-                                    </Field>
-                                    <Field label="Debits → OUT amount">
-                                        <ColSelect
-                                            value={debitsCol}
-                                            onChange={setDebitsCol}
-                                        />
-                                    </Field>
-                                    <Field label="Running Balance">
-                                        <ColSelect
-                                            value={runningCol}
-                                            onChange={setRunningCol}
-                                        />
-                                    </Field>
-                                    <Field label="Remarks → Notes">
-                                        <ColSelect
-                                            value={remarksCol}
-                                            onChange={setRemarksCol}
-                                        />
-                                    </Field>
+                                    {renderMapField({
+                                        label: 'Date',
+                                        required: true,
+                                        hint: 'Which column has the date?',
+                                        value: dateCol,
+                                        onChange: setDateCol,
+                                    })}
+                                    {renderMapField({
+                                        label: 'Description',
+                                        required: true,
+                                        hint: 'Which column describes the transaction?',
+                                        value: detailsCol,
+                                        onChange: setDetailsCol,
+                                    })}
+                                    {renderMapField({
+                                        label: 'Credits (money in)',
+                                        required: true,
+                                        hint: 'Amounts received — map this or Debits',
+                                        value: creditsCol,
+                                        onChange: setCreditsCol,
+                                    })}
+                                    {renderMapField({
+                                        label: 'Debits (money out)',
+                                        required: true,
+                                        hint: 'Amounts paid out — map this or Credits',
+                                        value: debitsCol,
+                                        onChange: setDebitsCol,
+                                    })}
+                                    {renderMapField({
+                                        label: 'Running Balance',
+                                        hint: 'Optional — balance after each row',
+                                        value: runningCol,
+                                        onChange: setRunningCol,
+                                    })}
+                                    {renderMapField({
+                                        label: 'Remarks → Notes',
+                                        hint: 'Optional — extra notes',
+                                        value: remarksCol,
+                                        onChange: setRemarksCol,
+                                    })}
                                 </div>
                             </div>
 
@@ -383,107 +484,118 @@ export function ImportTransactionsDialog({
                                         </span>
                                     )}
                                 </h3>
-                                <div className="max-h-64 overflow-auto rounded-[10px] border border-black/6 dark:border-white/6">
-                                    <table className="w-full text-[11px]">
-                                        <thead className="sticky top-0 bg-stone-50 dark:bg-zinc-800">
-                                            <tr>
-                                                {[
-                                                    'Date',
-                                                    'Description',
-                                                    'Credit',
-                                                    'Debit',
-                                                    'Running Balance',
-                                                    'Notes',
-                                                    'Status',
-                                                ].map((h, i) => (
-                                                    <th
-                                                        key={h}
-                                                        className={`px-3 py-2 ${i >= 2 && i <= 4 ? 'text-right' : 'text-left'} font-mono text-[10px] tracking-wider text-gray-400 uppercase`}
-                                                    >
-                                                        {h}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {mappedRows
-                                                .slice(0, 100)
-                                                .map((r, i) => (
-                                                    <tr
-                                                        key={i}
-                                                        className={`border-t border-black/6 dark:border-white/6 ${r._warn ? 'bg-amber-50/50 dark:bg-amber-500/5' : ''}`}
-                                                    >
-                                                        <td className="px-3 py-1.5 font-mono text-gray-600">
-                                                            {r.date || '—'}
-                                                        </td>
-                                                        <td
-                                                            className="max-w-[240px] truncate px-3 py-1.5 text-gray-700 dark:text-gray-200"
-                                                            title={
-                                                                r.description
-                                                            }
+                                {missingRequired.length > 0 ? (
+                                    <div className="rounded-[10px] border border-dashed border-black/10 bg-stone-50/60 px-3 py-6 text-center text-[11px] text-gray-400 dark:border-white/10 dark:bg-white/2">
+                                        Match the required columns above to
+                                        preview your transactions.
+                                    </div>
+                                ) : (
+                                    <div className="max-h-64 overflow-auto rounded-[10px] border border-black/6 dark:border-white/6">
+                                        <table className="w-full text-[11px]">
+                                            <thead className="sticky top-0 bg-stone-50 dark:bg-zinc-800">
+                                                <tr>
+                                                    {[
+                                                        'Date',
+                                                        'Description',
+                                                        'Credit',
+                                                        'Debit',
+                                                        'Running Balance',
+                                                        'Notes',
+                                                        'Status',
+                                                    ].map((h, i) => (
+                                                        <th
+                                                            key={h}
+                                                            className={`px-3 py-2 ${i >= 2 && i <= 4 ? 'text-right' : 'text-left'} font-mono text-[10px] tracking-wider text-gray-400 uppercase`}
                                                         >
-                                                            {r.description ||
-                                                                '—'}
-                                                        </td>
-                                                        <td className="px-3 py-1.5 text-right font-mono text-emerald-600 dark:text-emerald-400">
-                                                            {r.type === 'in' &&
-                                                            r.amount > 0
-                                                                ? r.amount.toLocaleString(
-                                                                      'en-PH',
-                                                                      {
-                                                                          minimumFractionDigits: 2,
-                                                                      },
-                                                                  )
-                                                                : ''}
-                                                        </td>
-                                                        <td className="px-3 py-1.5 text-right font-mono text-red-500 dark:text-red-400">
-                                                            {r.type === 'out' &&
-                                                            r.amount > 0
-                                                                ? r.amount.toLocaleString(
-                                                                      'en-PH',
-                                                                      {
-                                                                          minimumFractionDigits: 2,
-                                                                      },
-                                                                  )
-                                                                : ''}
-                                                        </td>
-                                                        <td className="px-3 py-1.5 text-right font-mono text-gray-700 dark:text-gray-200">
-                                                            {r.running_balance !=
-                                                            null
-                                                                ? r.running_balance.toLocaleString(
-                                                                      'en-PH',
-                                                                      {
-                                                                          minimumFractionDigits: 2,
-                                                                      },
-                                                                  )
-                                                                : ''}
-                                                        </td>
-                                                        <td className="px-3 py-1.5 text-gray-500">
-                                                            {r.notes}
-                                                        </td>
-                                                        <td className="px-3 py-1.5 font-mono text-[10px]">
-                                                            {r._warn ? (
-                                                                <span className="text-amber-600">
-                                                                    skip:{' '}
-                                                                    {r._warn}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-emerald-600">
-                                                                    ok
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                    {mappedRows.length > 100 && (
-                                        <div className="border-t border-black/6 px-3 py-2 text-center font-mono text-[10px] text-gray-400 dark:border-white/6">
-                                            Showing first 100 of{' '}
-                                            {mappedRows.length}
-                                        </div>
-                                    )}
-                                </div>
+                                                            {h}
+                                                        </th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {mappedRows
+                                                    .slice(0, 100)
+                                                    .map((r, i) => (
+                                                        <tr
+                                                            key={i}
+                                                            className={`border-t border-black/6 dark:border-white/6 ${r._warn ? 'bg-amber-50/50 dark:bg-amber-500/5' : ''}`}
+                                                        >
+                                                            <td className="px-3 py-1.5 font-mono text-gray-600">
+                                                                {r.date || '—'}
+                                                            </td>
+                                                            <td
+                                                                className="max-w-[240px] truncate px-3 py-1.5 text-gray-700 dark:text-gray-200"
+                                                                title={
+                                                                    r.description
+                                                                }
+                                                            >
+                                                                {r.description ||
+                                                                    '—'}
+                                                            </td>
+                                                            <td className="px-3 py-1.5 text-right font-mono text-emerald-600 dark:text-emerald-400">
+                                                                {r.type ===
+                                                                    'in' &&
+                                                                r.amount > 0
+                                                                    ? r.amount.toLocaleString(
+                                                                          'en-PH',
+                                                                          {
+                                                                              minimumFractionDigits: 2,
+                                                                          },
+                                                                      )
+                                                                    : ''}
+                                                            </td>
+                                                            <td className="px-3 py-1.5 text-right font-mono text-red-500 dark:text-red-400">
+                                                                {r.type ===
+                                                                    'out' &&
+                                                                r.amount > 0
+                                                                    ? r.amount.toLocaleString(
+                                                                          'en-PH',
+                                                                          {
+                                                                              minimumFractionDigits: 2,
+                                                                          },
+                                                                      )
+                                                                    : ''}
+                                                            </td>
+                                                            <td className="px-3 py-1.5 text-right font-mono text-gray-700 dark:text-gray-200">
+                                                                {r.running_balance !=
+                                                                null
+                                                                    ? r.running_balance.toLocaleString(
+                                                                          'en-PH',
+                                                                          {
+                                                                              minimumFractionDigits: 2,
+                                                                          },
+                                                                      )
+                                                                    : ''}
+                                                            </td>
+                                                            <td className="px-3 py-1.5 text-gray-500">
+                                                                {r.notes}
+                                                            </td>
+                                                            <td className="px-3 py-1.5 font-mono text-[10px]">
+                                                                {r._warn ? (
+                                                                    <span className="text-amber-600">
+                                                                        skip:{' '}
+                                                                        {
+                                                                            r._warn
+                                                                        }
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-emerald-600">
+                                                                        ok
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                        {mappedRows.length > 100 && (
+                                            <div className="border-t border-black/6 px-3 py-2 text-center font-mono text-[10px] text-gray-400 dark:border-white/6">
+                                                Showing first 100 of{' '}
+                                                {mappedRows.length}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}

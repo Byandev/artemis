@@ -6,12 +6,14 @@ use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Modules\GencysERP\Jobs\FetchInventoryItemPurchaseOrders;
+use Modules\GencysERP\Models\GencysSyncRun;
 
 class TriggerFetchERPPurchaseOrders extends Command
 {
     protected $signature = 'gencys-erp:trigger-fetch-erp-purchase-orders
         {--start-date= : Start of the PO date range in Y-m-d format (defaults to 3 months ago)}
         {--end-date= : End of the PO date range in Y-m-d format (defaults to today)}
+        {--item=* : Limit to specific inventory item id(s); repeat (--item=1 --item=2) or comma-separate (--item=1,2). Omit for all active items}
         {--delay=10 : Seconds to stagger each queued workspace by}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
         {--sync : POST to the webhook immediately in-process instead of queueing (use this to hit an n8n test-mode webhook)}';
@@ -55,6 +57,11 @@ class TriggerFetchERPPurchaseOrders extends Command
 
         $sync = (bool) $this->option('sync');
         $delay = max(0, (int) $this->option('delay'));
+        $itemIds = $this->itemIds();
+
+        if (! empty($itemIds)) {
+            $this->info('Limiting to inventory item id(s): '.implode(', ', $itemIds));
+        }
 
         $workspaces = Workspace::whereNotNull('erp_username')
             ->where('erp_username', '!=', '')
@@ -62,8 +69,14 @@ class TriggerFetchERPPurchaseOrders extends Command
             ->whereHas('apiKeys')
             ->with(['apiKeys', 'deliveredPurchaseOrders' => function ($query) {
                 $query->select(['cust_po_no', 'workspace_id']);
-            }, 'inventoryItems' => function ($query) {
-                $query->where('is_active', true);
+            }, 'inventoryItems' => function ($query) use ($itemIds) {
+                // A specific --item selection wins over the active-only default so a
+                // single item can be re-synced (or tested) even when it's inactive.
+                if (empty($itemIds)) {
+                    $query->where('is_active', true);
+                } else {
+                    $query->whereIn('id', $itemIds);
+                }
             }])
             ->get();
 
@@ -93,6 +106,19 @@ class TriggerFetchERPPurchaseOrders extends Command
 
                     $callbackBase = rtrim(config('app.url'), '/');
 
+                    // Open a pending sync run per item, keyed by item id. We hand
+                    // each run's id to n8n (sync_run_id) so it can echo it back on
+                    // the callback for an exact match; items that never report back
+                    // stay pending until the stale-run sweeper fails them.
+                    $runIds = $chunk->mapWithKeys(fn ($item) => [
+                        $item->id => GencysSyncRun::start(
+                            $workspace->id,
+                            $item->id,
+                            GencysSyncRun::TYPE_PURCHASE_ORDER,
+                            ['start_date' => $startDateFormatted, 'end_date' => $endDateFormatted],
+                        )->id,
+                    ]);
+
                     $data = [
                         'workspace_id' => $workspace->id,
                         'workspace_api_key' => $apiKey->reveal(),
@@ -104,11 +130,12 @@ class TriggerFetchERPPurchaseOrders extends Command
                         'items' => $chunk->map(fn ($item) => [
                             'id' => $item->id,
                             'keyword' => $item->sku,
+                            'sync_run_id' => $runIds[$item->id],
                         ])->values()->toArray(),
                         'delivered_purchase_orders_no' => $workspace->deliveredPurchaseOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
                     ];
 
-                    dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data))
+                    dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data, $runIds->values()->all()))
                         ->delay(now()->addMinutes($dispatched * 3));
                 });
         }
@@ -117,5 +144,22 @@ class TriggerFetchERPPurchaseOrders extends Command
         $this->info(($sync ? 'Sent' : 'Queued')." {$totalCount} workspace(s).");
 
         return 0;
+    }
+
+    /**
+     * Parse the --item option into a list of inventory item ids. Accepts repeated
+     * flags (--item=1 --item=2) and/or comma-separated values (--item=1,2).
+     *
+     * @return int[]
+     */
+    private function itemIds(): array
+    {
+        return collect((array) $this->option('item'))
+            ->flatMap(fn ($value) => explode(',', (string) $value))
+            ->map(fn ($value) => (int) trim($value))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 }
