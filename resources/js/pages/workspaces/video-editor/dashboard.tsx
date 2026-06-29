@@ -10,7 +10,6 @@ import {
     RecentActivitySection,
     RevisionListSection,
     ThroughputSection,
-    WaitingListSection,
 } from '@/pages/workspaces/creatives/components/dashboard/sections';
 import {
     ApplyFilter,
@@ -103,7 +102,7 @@ export default function VideoEditorDashboard({
                         workspaceSlug={workspace.slug}
                         filters={filters}
                     />
-                    <div className="lg:col-span-2">
+                    <div className="lg:col-span-2 lg:h-full">
                         <PipelineSection
                             workspaceSlug={workspace.slug}
                             filters={filters}
@@ -111,13 +110,8 @@ export default function VideoEditorDashboard({
                     </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="mt-3">
                     <RevisionListSection
-                        workspaceSlug={workspace.slug}
-                        filters={filters}
-                        editUrl={editUrl}
-                    />
-                    <WaitingListSection
                         workspaceSlug={workspace.slug}
                         filters={filters}
                         editUrl={editUrl}

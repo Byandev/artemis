@@ -4,7 +4,6 @@ namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,9 +11,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Modules\Inventory\Exports\PurchasedOrderExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
-use Modules\Inventory\Models\PurchasedOrderItem;
 use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class PurchasedOrderController extends Controller
@@ -42,6 +39,7 @@ class PurchasedOrderController extends Controller
             ->allowedSorts([
                 'issue_date',
                 'delivery_no',
+                'expected_delivery_date',
                 'cust_po_no',
                 'control_no',
                 'delivery_fee',
@@ -56,31 +54,8 @@ class PurchasedOrderController extends Controller
     {
         $this->authorize('View Purchased Orders', $workspace);
 
-        // One row per PO item: PO details + item monitoring (deliveries,
-        // balance, timeliness) live on the same row; expanding shows the
-        // item's delivery attempts.
-        $items = QueryBuilder::for($this->scopedItems($workspace))
-            ->allowedFilters([
-                AllowedFilter::callback('search', fn (Builder $query, $value) => $this->applyItemSearch($query, $value)),
-                AllowedFilter::callback('start_date', fn (Builder $query, $value) => $query->whereHas('purchasedOrder', fn (Builder $po) => $po->whereDate('issue_date', '>=', $value))),
-                AllowedFilter::callback('end_date', fn (Builder $query, $value) => $query->whereHas('purchasedOrder', fn (Builder $po) => $po->whereDate('issue_date', '<=', $value))),
-            ])
-            ->allowedSorts([
-                AllowedSort::field('po_issue_date'),
-                AllowedSort::field('expected_delivery_date'),
-                AllowedSort::field('count'),
-                'delivered_qty',
-            ])
-            ->defaultSort('-po_issue_date')
-            ->addSelect(['po_issue_date' => PurchasedOrder::select('issue_date')
-                ->whereColumn('id', 'inventory_purchased_order_items.inventory_purchased_order_id')])
-            ->withSum('deliveries as delivered_qty', 'qty')
-            ->with([
-                'purchasedOrder:id,issue_date,cust_po_no,control_no,delivery_no,status',
-                'inventoryItem:id,sku,product_id',
-                'inventoryItem.product:id,name',
-                'deliveries' => fn ($query) => $query->orderBy('delivery_date')->orderBy('id'),
-            ])
+        $orders = $this->buildQuery($workspace)
+            ->with(['items.inventoryItem.product', 'items.deliveries'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
@@ -92,7 +67,7 @@ class PurchasedOrderController extends Controller
 
         return Inertia::render('workspaces/inventory/purchased-orders/index', [
             'workspace' => $workspace,
-            'items' => $items,
+            'orders' => $orders,
             'totals' => [
                 'delivery_fee' => (float) $totals->total_delivery_fee,
                 'cogs' => (float) $totals->total_cogs,
@@ -104,27 +79,6 @@ class PurchasedOrderController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
-    }
-
-    /** Purchase order items scoped to the given workspace. */
-    private function scopedItems(Workspace $workspace): Builder
-    {
-        return PurchasedOrderItem::query()
-            ->whereHas('purchasedOrder', fn (Builder $po) => $po->where('workspace_id', $workspace->id));
-    }
-
-    /** Search across the parent PO, the inventory item, and delivery numbers. */
-    private function applyItemSearch(Builder $query, string $value): Builder
-    {
-        return $query->where(function (Builder $q) use ($value) {
-            $q->whereHas('purchasedOrder', fn (Builder $po) => $po
-                ->where('cust_po_no', 'like', "%{$value}%")
-                ->orWhere('control_no', 'like', "%{$value}%")
-                ->orWhere('delivery_no', 'like', "%{$value}%"))
-                ->orWhereHas('inventoryItem', fn (Builder $item) => $item->where('sku', 'like', "%{$value}%"))
-                ->orWhereHas('inventoryItem.product', fn (Builder $product) => $product->where('name', 'like', "%{$value}%"))
-                ->orWhereHas('deliveries', fn (Builder $delivery) => $delivery->where('delivery_no', 'like', "%{$value}%"));
-        });
     }
 
     public function export(Request $request, Workspace $workspace)
@@ -153,6 +107,7 @@ class PurchasedOrderController extends Controller
         $request->validate([
             'issue_date' => 'required|date_format:Y-m-d|date',
             'delivery_no' => 'nullable|string|max:255',
+            'expected_delivery_date' => 'nullable|date_format:Y-m-d|date',
             'cust_po_no' => 'nullable|string|max:255',
             'control_no' => 'nullable|string|max:255',
             'delivery_fee' => 'required|numeric|min:0',
@@ -169,6 +124,7 @@ class PurchasedOrderController extends Controller
             'workspace_id' => $workspace->id,
             'issue_date' => $request->issue_date,
             'delivery_no' => $request->delivery_no,
+            'expected_delivery_date' => $request->expected_delivery_date,
             'cust_po_no' => $request->cust_po_no,
             'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
@@ -202,6 +158,7 @@ class PurchasedOrderController extends Controller
         $request->validate([
             'issue_date' => 'required|date_format:Y-m-d|date',
             'delivery_no' => 'nullable|string|max:255',
+            'expected_delivery_date' => 'nullable|date_format:Y-m-d|date',
             'cust_po_no' => 'nullable|string|max:255',
             'control_no' => 'nullable|string|max:255',
             'delivery_fee' => 'required|numeric|min:0',
@@ -217,6 +174,7 @@ class PurchasedOrderController extends Controller
         $purchasedOrder->update([
             'issue_date' => $request->issue_date,
             'delivery_no' => $request->delivery_no,
+            'expected_delivery_date' => $request->expected_delivery_date,
             'cust_po_no' => $request->cust_po_no,
             'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,

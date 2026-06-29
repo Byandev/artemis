@@ -17,15 +17,12 @@ class PurchasedOrderItem extends Model
         'count',
         'amount',
         'total_amount',
-        'expected_delivery_date',
-        'delivery_status',
         'remarks',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
         'total_amount' => 'decimal:2',
-        'expected_delivery_date' => 'date:Y-m-d',
     ];
 
     /**
@@ -37,7 +34,6 @@ class PurchasedOrderItem extends Model
         'delivered_qty',
         'balance',
         'fulfillment_status',
-        'delivery_timeliness',
     ];
 
     public function purchasedOrder(): BelongsTo
@@ -75,49 +71,11 @@ class PurchasedOrderItem extends Model
             ->where('count', '<=', $this->deliveredQtySubquery());
     }
 
-    /** Has an expected date, at least one delivery, and is behind it (outstanding past due, or last drop landed late). */
-    public function scopeDelayed(Builder $query): Builder
-    {
-        return $query
-            ->whereNotNull('expected_delivery_date')
-            ->whereHas('deliveries')
-            ->where(function (Builder $outer) {
-                $outer
-                    ->where(function (Builder $outstanding) {
-                        $outstanding
-                            ->where('count', '>', $this->deliveredQtySubquery())
-                            ->whereDate('expected_delivery_date', '<', now()->toDateString());
-                    })
-                    ->orWhere(function (Builder $completed) {
-                        $completed
-                            ->where('count', '<=', $this->deliveredQtySubquery())
-                            ->where('expected_delivery_date', '<', $this->lastDeliverySubquery());
-                    });
-            });
-    }
-
-    /** Has an expected date, at least one delivery, and is not delayed. */
-    public function scopeOnSchedule(Builder $query): Builder
-    {
-        return $query
-            ->whereNotNull('expected_delivery_date')
-            ->whereHas('deliveries')
-            ->whereNot(fn (Builder $q) => $q->delayed());
-    }
-
     /** Correlated subquery: total quantity delivered for the current item row. */
     protected function deliveredQtySubquery(): Builder
     {
         return PurchasedOrderItemDelivery::query()
             ->selectRaw('coalesce(sum(qty), 0)')
-            ->whereColumn('inventory_purchased_order_item_id', $this->qualifyColumn('id'));
-    }
-
-    /** Correlated subquery: latest delivery date for the current item row. */
-    protected function lastDeliverySubquery(): Builder
-    {
-        return PurchasedOrderItemDelivery::query()
-            ->selectRaw('max(delivery_date)')
             ->whereColumn('inventory_purchased_order_item_id', $this->qualifyColumn('id'));
     }
 
@@ -154,33 +112,5 @@ class PurchasedOrderItem extends Model
         }
 
         return 'partial';
-    }
-
-    /** ontime | delayed | null. Null until something is delivered; manual override wins thereafter. */
-    public function getDeliveryTimelinessAttribute(): ?string
-    {
-        // Nothing delivered yet — timeliness is undefined until the first delivery lands.
-        if ($this->fulfillment_status === 'waiting') {
-            return null;
-        }
-
-        if (in_array($this->delivery_status, ['ontime', 'delayed'], true)) {
-            return $this->delivery_status;
-        }
-
-        $expected = $this->expected_delivery_date;
-
-        if (! $expected) {
-            return null;
-        }
-
-        if ($this->fulfillment_status === 'delivered') {
-            $lastDelivery = $this->deliveries->max('delivery_date');
-
-            return $lastDelivery && $lastDelivery->gt($expected) ? 'delayed' : 'ontime';
-        }
-
-        // Still outstanding — delayed once the expected date has passed.
-        return now()->startOfDay()->gt($expected) ? 'delayed' : 'ontime';
     }
 }

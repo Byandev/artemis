@@ -3,6 +3,7 @@
 use App\Models\ActivityLog;
 use App\Models\Page;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Maatwebsite\Excel\Facades\Excel;
 
 uses(RefreshDatabase::class);
 
@@ -41,4 +42,21 @@ test('read (GET) requests are not logged', function () {
         ->assertOk();
 
     expect(ActivityLog::query()->whereJsonContains('metadata->method', 'GET')->exists())->toBeFalse();
+});
+
+test('exporting data (a GET download) is audited', function () {
+    Excel::fake();
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($owner)
+        ->get("/workspaces/{$workspace->slug}/pages/export")
+        ->assertOk();
+
+    $log = ActivityLog::query()->where('action_type', 'workspaces.pages.export')->first();
+
+    expect($log)->not->toBeNull()
+        ->and($log->user_id)->toBe($owner->id)
+        ->and($log->workspace_id)->toBe($workspace->id)
+        ->and($log->metadata['method'])->toBe('GET')
+        ->and($log->message)->toContain('Exported Pages');
 });

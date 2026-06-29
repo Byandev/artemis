@@ -20,7 +20,7 @@ class AdminWorkspaceController extends Controller
         $baseQuery = Workspace::query()
             ->select('workspaces.*')
             ->with(['owner:id,name', 'subscription.plan', 'metricSetting'])
-            ->withCount('pages');
+            ->withCount(['pages', 'shops']);
 
         $workspaces = QueryBuilder::for($baseQuery)
             ->allowedFilters([
@@ -30,6 +30,7 @@ class AdminWorkspaceController extends Controller
                 'slug',
                 'created_at',
                 'pages_count',
+                'shops_count',
 
                 AllowedSort::callback('owner', function ($query, bool $descending) {
                     $direction = $descending ? 'desc' : 'asc';
@@ -144,14 +145,14 @@ class AdminWorkspaceController extends Controller
         return back()->with('success', "Modules updated for {$workspace->name}.");
     }
 
-    public function updateMaxPages(Request $request, Workspace $workspace)
+    public function updateMaxShops(Request $request, Workspace $workspace)
     {
         $validated = $request->validate([
-            'max_pages' => 'nullable|integer|min:1',
+            'max_shops' => 'nullable|integer|min:1',
         ]);
 
         $workspace->update($validated);
 
-        return back()->with('success', "Max pages updated for {$workspace->name}.");
+        return back()->with('success', "Max shops updated for {$workspace->name}.");
     }
 }

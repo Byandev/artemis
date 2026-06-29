@@ -4,15 +4,20 @@ import {
     Column,
     ColumnDef,
     ColumnOrderState,
+    ExpandedState,
     PaginationState,
+    Row,
+    RowData,
     RowSelectionState,
     SortingState,
     VisibilityState,
     flexRender,
     getCoreRowModel,
+    getExpandedRowModel,
     getSortedRowModel,
     useReactTable
 } from "@tanstack/react-table";
+import { Fragment } from 'react';
 
 import Pagination from '@/components/ui/pagination';
 import {
@@ -31,9 +36,19 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Inbox } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toBackendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { TriangleDownIcon, TriangleUpIcon } from '@radix-ui/react-icons';
+
+// Allow columns to tighten/override their header & cell padding via meta.
+declare module '@tanstack/react-table' {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    interface ColumnMeta<TData extends RowData, TValue> {
+        headerClassName?: string;
+        cellClassName?: string;
+    }
+}
 import { useMemo, useState } from 'react';
 
 interface DataTableProps<TData, TValue> {
@@ -51,6 +66,8 @@ interface DataTableProps<TData, TValue> {
     onColumnVisibilityChange?: (state: VisibilityState) => void
     columnOrder?: ColumnOrderState
     onColumnOrderChange?: (order: ColumnOrderState) => void
+    /** When provided, rows become expandable and this renders the expanded panel. */
+    renderSubRow?: (row: Row<TData>) => React.ReactNode
 }
 
 export function DataTable<TData, TValue>({
@@ -67,8 +84,10 @@ export function DataTable<TData, TValue>({
                                              onColumnVisibilityChange,
                                              columnOrder,
                                              onColumnOrderChange,
+                                             renderSubRow,
                                          }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
+    const [expanded, setExpanded] = useState<ExpandedState>({})
 
     const hasPaginationMeta = Boolean(
         meta
@@ -95,6 +114,9 @@ export function DataTable<TData, TValue>({
             if (onFetch) onFetch({ sort: toBackendSort(next), page: 1, per_page: meta?.per_page ?? null })
         },
         getSortedRowModel: getSortedRowModel(),
+        getExpandedRowModel: getExpandedRowModel(),
+        onExpandedChange: setExpanded,
+        getRowCanExpand: () => Boolean(renderSubRow),
         getRowId,
         enableRowSelection: !!onRowSelectionChange,
         onRowSelectionChange: onRowSelectionChange
@@ -121,6 +143,7 @@ export function DataTable<TData, TValue>({
             ...(rowSelection !== undefined ? { rowSelection } : {}),
             ...(columnVisibility !== undefined ? { columnVisibility } : {}),
             ...(columnOrder !== undefined ? { columnOrder } : {}),
+            ...(renderSubRow ? { expanded } : {}),
         },
         manualSorting: true,
     })
@@ -135,7 +158,7 @@ export function DataTable<TData, TValue>({
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} className="px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6 [&:has([role=checkbox])]:pr-0">
+                                        <TableHead key={header.id} className={cn("px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6 [&:has([role=checkbox])]:pr-0", header.column.columnDef.meta?.headerClassName)}>
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
@@ -151,21 +174,29 @@ export function DataTable<TData, TValue>({
                     <TableBody>
                         {table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
-                                <TableRow
-                                    key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
-                                    className={[
-                                        'transition-colors hover:bg-emerald-500/3',
-                                        onRowClick ? 'cursor-pointer' : '',
-                                    ].join(' ')}
-                                    onClick={() => onRowClick?.(row.original)}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className='px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top'>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
+                                <Fragment key={row.id}>
+                                    <TableRow
+                                        data-state={row.getIsSelected() && "selected"}
+                                        className={[
+                                            'transition-colors hover:bg-emerald-500/3',
+                                            onRowClick ? 'cursor-pointer' : '',
+                                        ].join(' ')}
+                                        onClick={() => onRowClick?.(row.original)}
+                                    >
+                                        {row.getVisibleCells().map((cell) => (
+                                            <TableCell key={cell.id} className={cn('px-4 py-3  text-[12px] text-black dark:text-gray-400 border-b border-black/6 dark:border-white/6 align-top', cell.column.columnDef.meta?.cellClassName)}>
+                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                    {renderSubRow && row.getIsExpanded() && (
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableCell colSpan={row.getVisibleCells().length} className="border-b border-black/6 bg-stone-50/60 p-0 dark:border-white/6 dark:bg-zinc-900/40">
+                                                {renderSubRow(row)}
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </Fragment>
                             ))
                         ) : (
                             <TableRow className="hover:bg-transparent">

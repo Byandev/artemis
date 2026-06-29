@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Console\Commands;
+namespace Modules\GencysERP\Console\Commands;
 
-use App\Jobs\FetchInventoryItemTransactionHistory;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Modules\GencysERP\Jobs\FetchInventoryItemTransactionHistory;
 
 class TriggerFetchERPTransactionHistory extends Command
 {
-    protected $signature = 'trigger-fetch-erp-transaction-history
+    protected $signature = 'gencys-erp:trigger-fetch-erp-transaction-history
         {--date= : The transaction history date in Y-m-d format (defaults to yesterday)}
         {--delay=10 : Seconds to stagger each queued workspace by}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
@@ -19,7 +19,7 @@ class TriggerFetchERPTransactionHistory extends Command
 
     public function handle()
     {
-        $webhookUrl = config('services.n8n.transaction_history_webhook_url');
+        $webhookUrl = $this->option('webhook') ?: config('services.n8n.transaction_history_webhook_url');
 
         if (empty($webhookUrl)) {
             $this->error('n8n transaction history webhook URL is not configured (services.n8n.transaction_history_webhook_url). Pass --webhook= to override.');
@@ -92,7 +92,7 @@ class TriggerFetchERPTransactionHistory extends Command
                     ];
 
                     $offset = $dispatched * $delay;
-                    
+
                     dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data))
                         ->delay(now()->addSeconds($offset));
                 });

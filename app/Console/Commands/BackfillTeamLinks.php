@@ -2,16 +2,16 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Page;
+use App\Models\Shop;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Modules\MetaAds\Models\AdAccount;
 
 /**
- * Seeds the team_page and team_ad_account links used by team-level visibility,
+ * Seeds the team_shop and team_ad_account links used by team-level visibility,
  * derived from existing ownership:
- *   - Pages   -> the teams the page's owner belongs to (in the same workspace).
+ *   - Shops   -> the teams the owners of the shop's pages belong to (same workspace).
  *   - Ad accts -> the teams of the app user who connected the account (manage tier),
  *                 to mirror today's full access. Admins can downgrade later.
  *
@@ -24,7 +24,7 @@ class BackfillTeamLinks extends Command
         {--workspace= : Limit to a single workspace id}
         {--dry-run : Report what would change without writing}';
 
-    protected $description = 'Backfill team_page and team_ad_account links from existing ownership for team-level visibility.';
+    protected $description = 'Backfill team_shop and team_ad_account links from existing ownership for team-level visibility.';
 
     public function handle(): int
     {
@@ -35,29 +35,31 @@ class BackfillTeamLinks extends Command
             ->when($this->option('workspace'), fn ($q, $id) => $q->where('id', $id))
             ->get();
 
-        $pageLinks = 0;
-        $pagesUnlinked = 0;
+        $shopLinks = 0;
+        $shopsUnlinked = 0;
         $accountLinks = 0;
         $accountsUnlinked = 0;
 
         foreach ($workspaces as $workspace) {
-            // Pages -> owner's teams in this workspace.
-            foreach (Page::ofWorkspace($workspace)->with('owner.teams')->get() as $page) {
-                $teamIds = $page->owner
-                    ? $page->owner->teams->where('workspace_id', $workspace->id)->pluck('id')
-                    : collect();
+            // Shops -> the teams of the owners of the shop's pages, in this workspace.
+            foreach (Shop::where('workspace_id', $workspace->id)->with('pages.owner.teams')->get() as $shop) {
+                $teamIds = $shop->pages
+                    ->flatMap(fn ($page) => $page->owner
+                        ? $page->owner->teams->where('workspace_id', $workspace->id)->pluck('id')
+                        : collect())
+                    ->unique();
 
                 if ($teamIds->isEmpty()) {
-                    $pagesUnlinked++;
+                    $shopsUnlinked++;
 
                     continue;
                 }
 
                 if (! $dry) {
-                    $page->teams()->syncWithoutDetaching($teamIds);
+                    $shop->teams()->syncWithoutDetaching($teamIds);
                 }
 
-                $pageLinks += $teamIds->count();
+                $shopLinks += $teamIds->count();
             }
 
             // Ad accounts -> teams of the app user(s) who connected them (manage tier).
@@ -93,7 +95,7 @@ class BackfillTeamLinks extends Command
             }
         }
 
-        $this->info("{$prefix}Page links written: {$pageLinks}; pages with no resolvable team: {$pagesUnlinked}");
+        $this->info("{$prefix}Shop links written: {$shopLinks}; shops with no resolvable team: {$shopsUnlinked}");
         $this->info("{$prefix}Ad-account links written: {$accountLinks}; ad accounts with no resolvable team: {$accountsUnlinked}");
 
         return self::SUCCESS;

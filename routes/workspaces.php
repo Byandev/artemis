@@ -26,8 +26,8 @@ use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamAdAccountController;
 use App\Http\Controllers\Workspaces\TeamController;
-use App\Http\Controllers\Workspaces\TeamPageController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
+use App\Http\Controllers\Workspaces\TeamShopController;
 use App\Http\Controllers\Workspaces\VideoEditorDashboardController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
@@ -156,8 +156,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
     Route::get('/workspaces/{workspace}/pages/export', [PageController::class, 'export'])->name('workspaces.pages.export');
     Route::post('/workspaces/{workspace}/pages/import', [PageController::class, 'import'])->name('workspaces.pages.import');
-    Route::get('/workspaces/{workspace}/pages/create', [PageController::class, 'create'])->name('workspaces.pages.create');
-    Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
     Route::post('/workspaces/{workspace}/pages/validate-pos-token', [PageController::class, 'validatePosToken'])->name('workspaces.pages.validate-pos-token');
     Route::post('/workspaces/{workspace}/pages/validate-pancake-token', [PageController::class, 'validatePancakeToken'])->name('workspaces.pages.validate-pancake-token');
     Route::post('/workspaces/{workspace}/pages/validate-botcake-token', [PageController::class, 'validateBotcakeToken'])->name('workspaces.pages.validate-botcake-token');
@@ -175,6 +173,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/page-daily-budget-records/{pageDailyBudgetRecord}', [PageDailyBudgetRecordController::class, 'destroy'])->name('workspaces.page-daily-budget-records.destroy');
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
+    Route::post('/workspaces/{workspace}/shops', [ShopController::class, 'store'])->name('workspaces.shops.store');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-orders', [ShopController::class, 'refreshOrders'])->name('workspaces.shops.refresh-orders');
 
@@ -218,7 +217,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.fb-accounts');
     Route::get('/workspaces/{workspace}/integrations/meta/ad-accounts', [IntegrationsController::class, 'adAccounts'])
-        ->middleware('can:View Meta Ads,workspace')
+        ->middleware('can:View Ad Accounts,workspace')
         ->name('workspaces.metaads.ad-accounts');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager', [AdsManagerController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
@@ -265,10 +264,12 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:Approve Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.approvals.reject');
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/logs', [OptimizationRuleController::class, 'logs'])
-        ->middleware('can:View Optimization Rules,workspace')
+        ->middleware('can:View Optimization Logs,workspace')
         ->name('workspaces.metaads.optimization-rules.logs');
+    // Viewable by "View Optimization Rules" (read-only) or "Manage Optimization
+    // Rules" (editable) — the controller authorizes either; saving stays gated
+    // by Manage on the update route below.
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])
-        ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.edit');
     Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'store'])
         ->middleware('can:Manage Optimization Rules,workspace')
@@ -286,7 +287,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.destroy');
     Route::get('/workspaces/{workspace}/integrations/meta/connect', [MetaOAuthController::class, 'redirect'])
-        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->middleware('can:Connect FB Account,workspace')
         ->name('workspaces.metaads.connect');
     Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', AdAccountSyncController::class)
         ->middleware('can:Manage Meta Ads Accounts,workspace')
@@ -366,8 +367,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'update'])->name('workspaces.teams.schedule.update');
 
     // Team data-access assignment (team-level visibility)
-    Route::get('/workspaces/{workspace}/teams/{team}/pages', [TeamPageController::class, 'index'])->name('workspaces.teams.pages.index');
-    Route::put('/workspaces/{workspace}/teams/{team}/pages', [TeamPageController::class, 'update'])->name('workspaces.teams.pages.update');
+    Route::get('/workspaces/{workspace}/teams/{team}/shops', [TeamShopController::class, 'index'])->name('workspaces.teams.shops.index');
+    Route::put('/workspaces/{workspace}/teams/{team}/shops', [TeamShopController::class, 'update'])->name('workspaces.teams.shops.update');
     Route::get('/workspaces/{workspace}/teams/{team}/ad-accounts', [TeamAdAccountController::class, 'index'])->name('workspaces.teams.ad-accounts.index');
     Route::put('/workspaces/{workspace}/teams/{team}/ad-accounts', [TeamAdAccountController::class, 'update'])->name('workspaces.teams.ad-accounts.update');
 
@@ -407,7 +408,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/items/{purchasedOrderItem}/deliveries', [PurchaseOrderMonitoringController::class, 'storeDelivery'])->name('deliveries.store');
         Route::put('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'updateDelivery'])->name('deliveries.update');
         Route::delete('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'destroyDelivery'])->name('deliveries.destroy');
-        Route::put('/items/{purchasedOrderItem}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('items.expected-delivery');
+        Route::put('/orders/{purchasedOrder}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('orders.expected-delivery');
         Route::put('/orders/{purchasedOrder}/status', [PurchaseOrderMonitoringController::class, 'updateStatus'])->name('orders.status');
         Route::put('/items/{purchasedOrderItem}/remarks', [PurchaseOrderMonitoringController::class, 'updateRemarks'])->name('items.remarks');
     });
@@ -508,8 +509,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-subscription');
         Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
             ->name('workspaces.update-modules');
-        Route::put('/workspaces/{workspace}/max-pages', [AdminWorkspaceController::class, 'updateMaxPages'])
-            ->name('workspaces.update-max-pages');
+        Route::put('/workspaces/{workspace}/max-shops', [AdminWorkspaceController::class, 'updateMaxShops'])
+            ->name('workspaces.update-max-shops');
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');

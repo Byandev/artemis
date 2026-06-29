@@ -11,22 +11,22 @@ Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
-//// Fetch ERP purchase orders for inventory items. Runs three times a day: 9am, 12nn, 5pm.
-//Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('09:00')->withoutOverlapping();
-//Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('12:00')->withoutOverlapping();
-//Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('17:00')->withoutOverlapping();
+// // Fetch ERP purchase orders for inventory items. Runs three times a day: 9am, 12nn, 5pm.
+// Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('09:00')->withoutOverlapping();
+// Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('12:00')->withoutOverlapping();
+// Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('17:00')->withoutOverlapping();
 
 // Fetch ERP data for inventory items with sales keywords. Jobs are queued with a
 // staggered delay (the command's --delay default) so the n8n webhook isn't hit all
 // at once. Runs three times a day: 9am, 12nn, 5pm.
-//Schedule::command('trigger-fetch-erp-inventory')->dailyAt('09:00')->withoutOverlapping();
-//Schedule::command('trigger-fetch-erp-inventory')->dailyAt('12:00')->withoutOverlapping();
-//Schedule::command('trigger-fetch-erp-inventory')->dailyAt('17:00')->withoutOverlapping();
+// Schedule::command('trigger-fetch-erp-inventory')->dailyAt('09:00')->withoutOverlapping();
+// Schedule::command('trigger-fetch-erp-inventory')->dailyAt('12:00')->withoutOverlapping();
+// Schedule::command('trigger-fetch-erp-inventory')->dailyAt('17:00')->withoutOverlapping();
 
 // Fetch ERP transaction history for inventory items with transaction keywords. Jobs
 // are queued with a staggered delay so the n8n webhook isn't hit all at once. Runs
 // once a day at 8am.
-Schedule::command('trigger-fetch-erp-transaction-history')->dailyAt('08:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('08:00')->withoutOverlapping();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);

@@ -27,8 +27,6 @@ class PageImport implements ToCollection, WithHeadingRow
         'product_id' => 'product_id',
         'status' => 'status',
         'name' => 'name',
-        'pos_token' => 'pos_token',
-        'pos_api_key' => 'pos_token',
         'botcake_token' => 'botcake_token',
         'infotxt_token' => 'infotxt_token',
         'infotxt_user_id' => 'infotxt_user_id',
@@ -82,15 +80,25 @@ class PageImport implements ToCollection, WithHeadingRow
 
             try {
                 // pages.shop_id is a foreign key — make sure the shop exists
-                // in this workspace before creating the page.
+                // in this workspace before creating the page. The POS token now
+                // lives on the shop, so route any imported token there.
                 if (! empty($attributes['shop_id'])) {
-                    Shop::firstOrCreate(
+                    $posToken = $row->get('pos_token') ?: $row->get('pos_api_key') ?: null;
+
+                    $shop = Shop::firstOrCreate(
                         [
                             'id' => $attributes['shop_id'],
                             'workspace_id' => $this->workspace->id,
                         ],
-                        ['name' => 'Imported Shop '.$attributes['shop_id']],
+                        [
+                            'name' => 'Imported Shop '.$attributes['shop_id'],
+                            'pos_token' => $posToken,
+                        ],
                     );
+
+                    if ($posToken && ! $shop->pos_token) {
+                        $shop->update(['pos_token' => $posToken]);
+                    }
                 }
 
                 Page::create($attributes + [

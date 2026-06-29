@@ -7,7 +7,7 @@ interface SubscriptionPlan {
     name: string;
     price_php: string;
     order_limit: number | null;
-    page_limit: number | null;
+    shop_limit: number | null;
     data_retention_months: number;
     analytics_tier: string;
     support_tier: string;
@@ -91,9 +91,9 @@ export default function SubscriptionExpiredModal() {
                                 </li>
                                 <li className="flex items-center gap-2">
                                     <Check className="h-3.5 w-3.5 text-green-500" />
-                                    {plan.page_limit
-                                        ? `${plan.page_limit} pages`
-                                        : 'Unlimited pages'}
+                                    {plan.shop_limit
+                                        ? `${plan.shop_limit} shops`
+                                        : 'Unlimited shops'}
                                 </li>
                                 <li className="flex items-center gap-2">
                                     <Check className="h-3.5 w-3.5 text-green-500" />
