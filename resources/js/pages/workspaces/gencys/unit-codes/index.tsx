@@ -18,24 +18,24 @@ import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { debounce } from 'lodash';
 import {
     ChevronDown,
     ChevronRight,
     Pencil,
-    Plus,
+    RefreshCw,
     Search,
     Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 interface UnitCodeItem {
     id: number;
     unit_code: string | null;
-    inventory_item_code: string | null;
+    item_code: string | null;
     quantity: number | null;
-    price: string | null;
 }
 
 interface UnitCodeRow extends UnitCode {
@@ -59,6 +59,9 @@ function parseSort(sort?: string | null): { field: string; desc: boolean } {
 }
 
 export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
+    const { flash } = usePage().props as {
+        flash?: { success?: string; error?: string };
+    };
     const canCreate = usePermission(PERMISSIONS.CreateUnitCode);
     const canEdit = usePermission(PERMISSIONS.EditUnitCode);
     const canDelete = usePermission(PERMISSIONS.DeleteUnitCode);
@@ -68,6 +71,12 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
     const [formOpen, setFormOpen] = useState(false);
     const [editing, setEditing] = useState<UnitCodeRow | null>(null);
     const [deleting, setDeleting] = useState<UnitCodeRow | null>(null);
+    const [syncing, setSyncing] = useState(false);
+
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.success, flash?.error]);
 
     const sort = parseSort(query.sort);
 
@@ -101,14 +110,21 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchValue]);
 
-    const openCreate = () => {
-        setEditing(null);
-        setFormOpen(true);
-    };
-
     const openEdit = (row: UnitCodeRow) => {
         setEditing(row);
         setFormOpen(true);
+    };
+
+    const handleSync = () => {
+        router.post(
+            `/workspaces/${workspace.slug}/gencys/unit-codes/sync`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setSyncing(true),
+                onFinish: () => setSyncing(false),
+            },
+        );
     };
 
     return (
@@ -122,10 +138,17 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                     />
                     {canCreate && (
                         <button
-                            onClick={openCreate}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                            onClick={handleSync}
+                            disabled={syncing}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            <Plus className="h-4 w-4" /> Add Unit Code
+                            <RefreshCw
+                                className={cn(
+                                    'h-4 w-4',
+                                    syncing && 'animate-spin',
+                                )}
+                            />
+                            {syncing ? 'Syncing…' : 'Sync from ERP'}
                         </button>
                     )}
                 </div>
@@ -388,13 +411,10 @@ function FragmentRow({
                             <thead className="text-gray-400">
                                 <tr>
                                     <th className="py-1 text-left font-medium">
-                                        Inventory Item Code
+                                        Item Code
                                     </th>
                                     <th className="py-1 text-right font-medium">
                                         Quantity
-                                    </th>
-                                    <th className="py-1 text-right font-medium">
-                                        Price
                                     </th>
                                 </tr>
                             </thead>
@@ -405,13 +425,10 @@ function FragmentRow({
                                         className="text-gray-600 dark:text-gray-300"
                                     >
                                         <td className="py-1 font-mono">
-                                            {item.inventory_item_code ?? '—'}
+                                            {item.item_code ?? '—'}
                                         </td>
                                         <td className="py-1 text-right">
                                             {item.quantity ?? '—'}
-                                        </td>
-                                        <td className="py-1 text-right">
-                                            {item.price ?? '—'}
                                         </td>
                                     </tr>
                                 ))}
