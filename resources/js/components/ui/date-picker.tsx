@@ -24,6 +24,13 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // The flatpickr instance is only recreated when mode/id/defaultDate change,
+    // so it would otherwise capture a stale `onChange`. Keep the latest callback
+    // in a ref and call through it, so consumers that rebuild `onChange` each
+    // render (e.g. filter navigation closures) always get the current one.
+    const onChangeRef = useRef(onChange);
+    useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
     const [selectedDates, setSelectedDates] = useState<Date[]>(() => {
         if (!defaultDate) return [];
         const arr = Array.isArray(defaultDate) ? defaultDate : [defaultDate];
@@ -37,8 +44,9 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
 
         const wrappedOnChange: Hook = (dates, dateStr, instance) => {
             setSelectedDates([...dates]);
-            if (typeof onChange === 'function') onChange(dates, dateStr, instance);
-            else if (Array.isArray(onChange)) onChange.forEach((fn) => fn(dates, dateStr, instance));
+            const cb = onChangeRef.current;
+            if (typeof cb === 'function') cb(dates, dateStr, instance);
+            else if (Array.isArray(cb)) cb.forEach((fn) => fn(dates, dateStr, instance));
         };
 
         const instance = flatpickr(inputRef.current, {
