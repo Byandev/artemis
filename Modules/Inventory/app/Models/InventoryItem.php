@@ -60,40 +60,44 @@ class InventoryItem extends Model
     }
 
     /**
-     * Recompute each transaction's actual stock (remaining_qty) from its audit anchors.
+     * Recompute each transaction's running stock (remaining_qty) as a ledger.
      *
-     * The external system's running balance (inventory_remaining_stock) is trusted for
-     * the movement — the ups and downs — but not the absolute level. A physically audited
-     * row (is_audited) fixes the true level; from there forward,
-     *
-     *     actual = external + offset,   offset = audited_count − external_at_audit
-     *
-     * until the next audit resets the offset. Rows before the first audit fall back to the
-     * external value (offset 0). The item's own remaining_qty is refreshed from the most
-     * recent transaction so the inventory list shows the corrected current stock.
+     * A physically audited row (is_audited) sets the starting balance — its counted
+     * remaining_qty is taken as-is. From there every later row rolls the balance forward
+     * by its own net movement (goods in − out − bad − lost; see
+     * InventoryTransaction::netMovement), until the next audit re-anchors it. Before the
+     * first audit there's no counted level, so the earliest row seeds from the external
+     * stock (inventory_remaining_stock) when present. The item's own remaining_qty is
+     * refreshed from the most recent transaction so the inventory list shows current stock.
      */
     public function recalculateActualStock(): void
     {
-        $offset = 0;
-
         $transactions = $this->transactions()
             ->orderBy('date')
             ->orderBy('id')
             ->get();
 
+        $running = null;
+
         foreach ($transactions as $transaction) {
             if ($transaction->is_audited) {
-                // The audited row is the anchor: it keeps its counted value and sets the
-                // offset every later row rides on.
-                $offset = (int) round((float) $transaction->remaining_qty - (float) $transaction->inventory_remaining_stock);
+                // The counted level is the new starting balance; trust it as-is.
+                $running = (int) $transaction->remaining_qty;
 
                 continue;
             }
 
-            $actual = (int) round((float) $transaction->inventory_remaining_stock + $offset);
+            if ($running === null) {
+                // No audit yet: seed from the external stock if we have one.
+                $running = $transaction->inventory_remaining_stock !== null
+                    ? (int) round((float) $transaction->inventory_remaining_stock)
+                    : $transaction->netMovement();
+            } else {
+                $running += $transaction->netMovement();
+            }
 
-            if ((int) $transaction->remaining_qty !== $actual) {
-                $transaction->update(['remaining_qty' => $actual]);
+            if ((int) $transaction->remaining_qty !== $running) {
+                $transaction->update(['remaining_qty' => $running]);
             }
         }
 
