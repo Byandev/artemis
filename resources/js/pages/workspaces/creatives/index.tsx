@@ -143,12 +143,15 @@ export default function CreativesIndex({
         [rowSelection],
     );
 
-    const handleBulkAssign = (mode: 'add' | 'replace') => {
+    const handleBulkAssign = (
+        mode: 'add' | 'replace',
+        reviewerIds: number[] = bulkReviewerIds,
+    ) => {
         router.post(
             `${baseUrl}/bulk-reviewers`,
             {
                 ids: selectedIds.map(Number),
-                reviewer_ids: bulkReviewerIds,
+                reviewer_ids: reviewerIds,
                 mode,
             },
             {
@@ -630,17 +633,18 @@ export default function CreativesIndex({
                                     bulkProcessing ||
                                     bulkReviewerIds.length === 0
                                 }
+                                title="Add the selected reviewers to every selected creative"
                                 className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                             >
-                                Add
+                                Assign
                             </button>
                             <button
-                                onClick={() => handleBulkAssign('replace')}
+                                onClick={() => handleBulkAssign('replace', [])}
                                 disabled={bulkProcessing}
-                                title="Overwrite reviewers on the selected creatives (empty clears them)"
-                                className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                                title="Remove all reviewers from every selected creative"
+                                className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-rose-600 transition-all hover:bg-rose-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-rose-400 dark:hover:bg-rose-500/10"
                             >
-                                Replace
+                                Unassign
                             </button>
                             <button
                                 onClick={() => {
