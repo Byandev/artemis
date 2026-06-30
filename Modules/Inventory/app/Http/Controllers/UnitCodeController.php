@@ -9,6 +9,8 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -78,14 +80,16 @@ class UnitCodeController extends Controller
 
         $callbackBase = rtrim(config('services.n8n.gencys_unit_code_callback_url') ?: config('app.url'), '/');
 
-        // The API key alone identifies the workspace on the callback, so no
-        // workspace id/slug is sent.
-        FetchUnitCodeJob::dispatch($webhookUrl, [
+        $response = Http::timeout(30)->post($webhookUrl, [
             'workspace_api_key' => $apiKey->reveal(),
             'erp_username' => $workspace->erp_username,
             'erp_password' => $workspace->erp_password,
             'webhook_url' => "{$callbackBase}/api/v1/public/inventory/unit-codes/bulk-sync",
         ]);
+
+        if (! $response->successful()) {
+            return back()->with('error', 'Something went wrong while syncing.' . "\n" . $response->body());
+        }
 
         return back()->with('success', 'Unit code sync started. New codes from the ERP will appear here shortly.');
     }
