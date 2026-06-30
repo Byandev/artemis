@@ -1,0 +1,912 @@
+{
+  "name": "Prod - Fetch Purchase Order",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fc2ac815-3729-43bc-aa11-fb2bb22f7cc8",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -464,
+        608
+      ],
+      "id": "e833177e-977e-497e-9302-bef52876508e",
+      "name": "Webhook",
+      "webhookId": "fc2ac815-3729-43bc-aa11-fb2bb22f7cc8"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const username = $json.body.erp_username;\nconst password = $json.body.erp_password;\n\n// Open ERP login page\nawait $page.goto(\n  'https://meta-digitrading.lhike-erp.com/home',\n  {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }\n);\n\n// Wait for login form\nawait $page.waitForSelector('input[name=\"txtusername\"]', {\n  timeout: 30000\n});\n\n// Fill credentials\nawait $page.type('input[name=\"txtusername\"]', username, {\n  delay: 50\n});\n\nawait $page.type('input[name=\"txtpass\"]', password, {\n  delay: 50\n});\n\n// Submit login form\nawait Promise.all([\n  $page.click('button[type=\"submit\"]'),\n  $page.waitForNavigation({\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }).catch(() => null)\n]);\n\n// Check for login error\nconst loginError = await $page.$('.alert-danger');\n\nif (loginError) {\n  const errorText = await $page.evaluate(\n    el => el.textContent.trim(),\n    loginError\n  );\n\n  throw new Error(`Login failed: ${errorText}`);\n}\n\n// Optional: verify login succeeded\nconst currentUrl = $page.url();\n\nif (currentUrl.includes('/login')) {\n  throw new Error('Login may have failed. Still on login page.');\n}\n\n// Get cookies\nconst cookies = await $page.cookies();\n\nreturn [\n  {\n    json: {\n      success: true,\n      currentUrl,\n      cookies\n    }\n  }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        608
+      ],
+      "id": "7e595920-ce05-4457-9cd2-d17730ca3268",
+      "name": "Login"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const {\n    cookies,\n    keyword,\n    startDate,\n    endDate\n} = $json;\n\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\n\nawait $page.setViewport({\n    width: 1512,\n    height: 982,\n    deviceScaleFactor: 1\n});\n\nasync function extractTable() {\n    return await $page.evaluate(() => {\n        const table =\n            document.querySelector('table.dataTable') ||\n            document.querySelector('table');\n        if (!table) return [];\n        const headers = Array.from(\n            table.querySelectorAll('thead th')\n        ).map(th => th.innerText.trim());\n        return Array.from(table.querySelectorAll('tbody tr'))\n            .map(tr => {\n                const cells = Array.from(tr.querySelectorAll('td'));\n                if (!cells.length) return null;\n\n                const row = Object.fromEntries(\n                    headers.map((h, i) => [\n                        h || `col_${i}`,\n                        (cells[i]?.innerText ?? '').trim()\n                    ])\n                );\n\n                // grab the id from any element in the row that carries data-id\n                const el = tr.querySelector('[data-id]');\n                let id = el ? el.getAttribute('data-id') : null;\n\n                // fallback: parse it out of a purchase/<action>/<id> href\n                if (!id) {\n                    const link = tr.querySelector('a[href*=\"purchase/\"]');\n                    const m = link && link.getAttribute('href').match(/purchase\\/\\w+\\/(\\d+)/);\n                    id = m ? m[1] : null;\n                }\n\n                row.id = id;\n                return row;\n            })\n            .filter(Boolean);\n    });\n}\n\nasync function isNextDisabled() {\n    return await $page.evaluate(() => {\n        const nextLi = document.querySelector('li.next');\n\n        return !nextLi || nextLi.classList.contains('disabled');\n    });\n}\n\n\nawait $page.goto(\n    'https://meta-digitrading.lhike-erp.com/purchase', {\n        waitUntil: 'networkidle2',\n        timeout: 60000\n    }\n);\n\nconst landedUrl = $page.url();\n\nif (!/\\/purchase/i.test(landedUrl)) {\n    throw new Error(\n        `Expected /purchase but landed on: ${landedUrl} — cookies/session may be invalid.`\n    );\n}\n\nawait $page.waitForSelector('input#sissuedate', {\n    timeout: 60000\n});\n\nawait $page.waitForSelector('input#eissuedate', {\n    timeout: 60000\n});\n\nawait $page.$eval('input#sissuedate', el => (el.value = ''));\nawait $page.$eval('input#eissuedate', el => (el.value = ''));\nawait $page.$eval('input#sitem', el => (el.value = ''));\n\nawait $page.type('input#sissuedate', startDate, {\n    delay: 50\n});\nawait $page.type('input#eissuedate', endDate, {\n    delay: 50\n});\n\nawait $page.type('input#sitem', keyword, {\n    delay: 50\n});\n\nawait $page.click('a#btndtsearch');\n\nawait $page.waitForNetworkIdle({\n    idleTime: 500,\n    timeout: 30000\n});\n\ntry {\n    await $page.select('select[name$=\"_length\"]', '100');\n\n    await $page.waitForNetworkIdle({\n        idleTime: 500,\n        timeout: 30000\n    });\n} catch (_) {}\n\nawait $page.waitForSelector('table');\n\nconst all = [];\nconst seen = new Set();\n\nwhile (true) {\n    const pageRows = await extractTable();\n\n    for (const r of pageRows) {\n        const key = JSON.stringify(r);\n\n        if (!seen.has(key)) {\n            seen.add(key);\n            all.push(r);\n        }\n    }\n\n    if (await isNextDisabled()) {\n        break;\n    }\n\n    const firstRowSig = await $page.evaluate(() => {\n        const first =\n            document.querySelector(\n                'table.dataTable tbody tr, table tbody tr'\n            );\n\n        return first ? first.innerText.trim() : '';\n    });\n\n    await $page.click('li.next a');\n\n    await $page.waitForFunction(\n        prev => {\n            const first =\n                document.querySelector(\n                    'table.dataTable tbody tr, table tbody tr'\n                );\n\n            const now = first ? first.innerText.trim() : '';\n\n            return now && now !== prev;\n        }, {\n            timeout: 30000\n        },\n        firstRowSig\n    );\n}\n\nreturn [{\n    json: {\n        startDate,\n        endDate,\n        keyword,\n        totalRows: all.length,\n        rows: all\n    },\n}];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        624
+      ],
+      "id": "a62c6fd7-32f8-4b68-85ea-1fb972f82293",
+      "name": "Puppeteer",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const statusMap = {\n  \"For Approval\": 1,\n  \"Approved\": 2,\n  \"To Pay\": 3,\n  \"Paid\": 4,\n  \"For Purchase\": 5,\n  \"Waiting For Delivery\": 6,\n  \"Delivered\": 7,\n  \"Cancelled\": 8\n};\n\nconst output = [];\nfor (const item of items) {\n  const rows = (item.json.rows || [])\n      .filter(item => {\n        return item[\"No\"] != \"No data available in table\";\n      })\n  for (const row of rows) {\n    const cleanRow = {};\n    for (const [key, value] of Object.entries(row)) {\n      cleanRow[key.replace(/\\u00A0/g, ' ').trim()] = value;\n    }\n\n    // take only the part before \" - \", then trim\n    const rawStatus = cleanRow[\"Status\"] || \"\";\n    const statusName = rawStatus.split(\" - \")[0].trim();\n\n    output.push({\n      json: {\n        id: cleanRow['id'],\n        inventory_item_id: $('Code in JavaScript4').first().json.id,\n        issueDate: cleanRow[\"Issue Date\"],\n        deliveryNo: cleanRow[\"Delivery No.\"],\n        customerPoNo: cleanRow[\"Cust. PO No.\"],\n        controlNo: cleanRow[\"Control No.\"],\n        item: cleanRow[\"Item\"],\n        cogAmount: Number(String(cleanRow[\"COG Amount\"] || 0).replace(/,/g, \"\")),\n        deliveryFee: Number(String(cleanRow[\"Delivery Fee\"] || 0).replace(/,/g, \"\")),\n        totalAmount: Number(String(cleanRow[\"Total Amount\"] || 0).replace(/,/g, \"\")),\n        statusName: statusName,\n        statusId: statusMap[statusName] || null,\n        pickupDate: cleanRow[\"Pickup Date\"] === \"0000-00-00\" ? null : cleanRow[\"Pickup Date\"],\n        supplier: cleanRow[\"Supplier\"]\n      }\n    });\n  }\n}\n\nreturn output.filter(o => o.json.item.toLowerCase() === $input.first().json.keyword.toLowerCase());"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        624
+      ],
+      "id": "c232a357-1010-4fba-b975-d0e95cca763c",
+      "name": "Code in JavaScript1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1008,
+        608
+      ],
+      "id": "fc65456d-905d-4a7b-8df4-633ee0900a57",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.cookies = $('Login').first().json.cookies;\n  item.json.keyword = $input.first().json.keyword;\n  item.json.startDate = $('Webhook').first().json.body.start_date;\n  item.json.endDate = $('Webhook').first().json.body.end_date;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        624
+      ],
+      "id": "04ad43ce-2a8b-49c1-8744-d89db656a455",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Webhook').first().json.body.items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        608
+      ],
+      "id": "5bdd9bce-f41e-4fb7-a01d-39a2a7464fd2",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2256,
+        416
+      ],
+      "id": "ad98a567-d147-428d-be23-32f5da7c7e76",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.first().json.items.map(item => {\n  return {\n    ...item,\n    cookies: $('Login').first().json.cookies,\n  }\n})"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        400
+      ],
+      "id": "9c87c024-7cde-4632-84e0-18e207b9a8f1",
+      "name": "Code in JavaScript6",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, id, poId, statusId, inventory_item_id,  } = $json;\nconst targetId = id ?? poId;\nif (!targetId) {\n  throw new Error('No PO id provided (expected $json.id or $json.poId).');\n}\n\nif (cookies && cookies.length) {\n  await $page.setCookie(...cookies);\n}\nawait $page.setViewport({ width: 1512, height: 982, deviceScaleFactor: 1 });\n\nconst url = `https://meta-digitrading.lhike-erp.com/purchase/view/${targetId}`;\nawait $page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });\n\nconst landedUrl = $page.url();\nif (!/\\/purchase\\/view\\//i.test(landedUrl)) {\n  throw new Error(`Expected /purchase/view but landed on: ${landedUrl} — cookies/session may be invalid.`);\n}\n\nawait $page.waitForSelector('#purchaseForm', { timeout: 60000 });\n\nconst data = await $page.evaluate(() => {\n  // --- helpers ---\n  const clean = s => (s == null ? null : String(s).replace(/\\u00A0/g, ' ').trim());\n  const txt  = el => (el ? clean(el.innerText) : null);      // visible text\n  const ctxt = el => (el ? clean(el.textContent) : null);    // text even if hidden\n  const val  = sel => {\n    const el = document.querySelector(sel);\n    return el ? clean(el.value) : null;\n  };\n  const num = v => {\n    if (v == null) return null;\n    const n = Number(String(v).replace(/[^0-9.\\-]/g, ''));\n    return Number.isNaN(n) ? null : n;\n  };\n  const cleanDate = v => (v === '0000-00-00' ? null : v);\n  const selText = sel => {\n    const el = document.querySelector(sel);\n    if (!el || el.selectedIndex < 0) return null;\n    const opt = el.options[el.selectedIndex];\n    return opt ? clean(opt.text) : null;\n  };\n  const selectedMulti = sel => {\n    const el = document.querySelector(sel);\n    if (!el) return [];\n    return Array.from(el.selectedOptions).map(o => ({ id: o.value, name: clean(o.text) }));\n  };\n\n  // TOTAL AMOUNT and TOTAL BALANCE share name=\"txttotalAmt\"\n  const totals = Array.from(document.querySelectorAll('input[name=\"txttotalAmt\"]'));\n  const totalAmountStr  = totals[0] ? totals[0].value : null;\n  const totalBalanceStr = totals[1] ? totals[1].value : null;\n\n  // current status: dropdown toggle is .hidden (innerText would be empty -> use textContent)\n  const currentStatus =\n    ctxt(document.querySelector('.btn-group .dropdown-toggle small b')) ||\n    txt(document.querySelector('.note-success h4'));\n\n  // order items table\n  const items = Array.from(document.querySelectorAll('#divselorder table tr.new-tr')).map(tr => {\n    const tds = Array.from(tr.querySelectorAll('td'));\n    return {\n      qty:    num(txt(tds[0])),\n      item:   txt(tds[1]),\n      cog:    num(txt(tds[2])),\n      amount: num(txt(tds[3])),\n      goods:  num(txt(tds[4])),\n      damage: num(txt(tds[5])),\n    };\n  });\n\n  // receipts\n  const receipts = Array.from(document.querySelectorAll('.img-receipt'))\n    .map(img => img.getAttribute('src'))\n    .filter(Boolean);\n\n  // history panel (right column)\n  let createdBy = null, createdDate = null, lastUpdatedBy = null, lastUpdatedDate = null;\n  const statusLog = [];\n  const historyRaw = [];\n  const histTable = document.querySelector('table.table-bordered');\n  if (histTable) {\n    const rows = Array.from(histTable.querySelectorAll('tr'));\n    rows.forEach(r => historyRaw.push(txt(r)));\n\n    for (let i = 0; i < rows.length; i++) {\n      const label = txt(rows[i]);\n      const next = rows[i + 1] ? txt(rows[i + 1]) : null;\n      if (label === 'Created by') createdBy = next;\n      else if (label === 'Created Date') createdDate = next;\n      else if (label === 'Last updated by') lastUpdatedBy = next;\n      else if (label === 'Last updated Date') lastUpdatedDate = next;\n    }\n\n    rows.forEach((r, i) => {\n      const t = txt(r);\n      if (t && t.startsWith('Status:')) {\n        const b = r.querySelector('b');\n        const small = r.querySelector('small');\n        const detailRow = rows[i + 1];\n        let detail = null, timestamp = null;\n        if (detailRow) {\n          detail = txt(detailRow);\n          const smalls = detailRow.querySelectorAll('small');\n          timestamp = smalls.length ? clean(smalls[smalls.length - 1].textContent) : null;\n        }\n        statusLog.push({\n          status: b ? txt(b) : null,\n          by: small ? txt(small) : null,\n          detail,\n          timestamp,\n        });\n      }\n    });\n  }\n\n  return {\n    poId:        val('#txtpoid'),\n    empId:       val('#txtempid'),\n    action:      val('#txtaction'),\n    currentStatus,\n    issueDate:   cleanDate(val('input[name=\"txtissuedate\"]')),\n    customerPoNo: val('input[name=\"txtcustpo\"]'),\n    controlNo:   val('input[name=\"txtctrolno\"]'),\n    deliveryNo:  val('input[name=\"txtdeliveryno\"]'),\n    deliveryTo:  val('input[name=\"txtdeliveryto\"]'),\n    deliveryAddress: val('textarea[name=\"txtdeliveryadd\"]'),\n    supplier:    selText('#selsupp'),\n    supplierId:  (document.querySelector('#selsupp') || {}).value || null,\n    deliveryFee: num(val('#txtdeliveryamt')),\n    discount:    num(val('#txtdiscount')),\n    payment:     num(val('input[name=\"txttotaldpAmt\"]')),\n    totalAmount: num(totalAmountStr),\n    totalBalance: num(totalBalanceStr),\n    assignedTo:  selectedMulti('#assignedto'),\n    pickupDate:  cleanDate(val('input[name=\"txtpickedupdate\"]')),\n    remarks:     val('textarea[name=\"txtremarks\"]'),\n    receipts,\n    items,\n    history: {\n      createdBy,\n      createdDate,\n      lastUpdatedBy,\n      lastUpdatedDate,\n      statusLog,\n      raw: historyRaw,\n    },\n  };\n});\n\nreturn [{ json: { ...data, statusId } }];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        2752,
+        432
+      ],
+      "id": "75f4dbd2-73b3-489a-8a52-3be9c990e73a",
+      "name": "Puppeteer1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"webhook\": $('Webhook').first().json.body.webhook_url,\n  \"apiKey\": $('Webhook').first().json.body.workspace_api_key,\n  \"data\": $('Webhook').first().json.body.items.map(item => {\n    return {\n      \"id\": item.id,\n      \"sync_run_id\": item.sync_run_id,\n      \"purchased_orders\": $input.all()\n        .map(po => po.json.formatted)\n        .filter(po => !!po.items.find(poItem => poItem.inventory_item_id == item.id))\n    }\n  })\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        160
+      ],
+      "id": "d2026458-c7e6-4dc3-b501-40578baea984",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.formatted = {\n    issue_date: $input.first().json.issueDate,\n    delivery_no: $input.first().json.deliveryNo,\n    cust_po_no: $input.first().json.customerPoNo,\n    control_no: $input.first().json.controlNo,\n    delivery_fee: $input.first().json.deliveryFee,\n    total_amount: $input.first().json.totalAmount,\n    status: $input.first().json.statusId,\n    created_at: $input.first().json.history.createdDate,\n    items: $input.first().json.items.map(item => {\n      return {\n        inventory_item_id: $('Code in JavaScript9').first().json.inventory_item_id,\n        count: item.qty,\n        amount: item.cog,\n        total_amount: item.amount\n      }\n    }),\n    deliveries: $input.first().json.history.statusLog.filter(i => i.status === 'Delivered').map(item => {\n      function parseDelivery(raw) {\n        if (!raw) return { received: null, date: null };\n      \n        const receivedMatch = raw.match(/Received:\\s*([\\d,]+)/);\n        const dateMatch = raw.match(/\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}(?::\\d{2})?/);\n      \n        return {\n          received: receivedMatch ? Number(receivedMatch[1].replace(/,/g, '')) : null,\n          date: dateMatch ? dateMatch[0] : null,\n        };\n      }\n\n      const { date, received } = parseDelivery(item.detail);\n\n      return { qty: received, created_at: date };\n      \n    })\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        432
+      ],
+      "id": "ea70bb32-01ab-4181-a0f5-379e70beaf25",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        432
+      ],
+      "id": "cf2d3826-d717-4596-b4e1-e37e26b175df",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.webhook }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.apiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  data: $json.data\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2816,
+        160
+      ],
+      "id": "cd2e8d56-2ff5-4460-b25e-d5a9e1122208",
+      "name": "HTTP Request1",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d49ea42c-f206-4bc7-a58f-b89c861f99b7",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1632,
+        416
+      ],
+      "id": "438225a7-ec7d-4897-bbd6-938d25169110",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const deliveredPoNums = $('Webhook').first().json.body.delivered_purchase_orders_no;\n\nconst items = $input.all().filter(i => i.json.id)\n  .filter(i => ! deliveredPoNums.includes(i.json.customerPoNo))\n\nreturn [\n  {\n    count: items.length,\n    items: items.map(item => item.json)\n  }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1312,
+        416
+      ],
+      "id": "083592cd-9b39-47ce-80ba-aaf2f6f8dbe6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"webhook\": $('Webhook').first().json.body.webhook_url,\n  \"apiKey\": $('Webhook').first().json.body.workspace_api_key,\n  \"data\": $('Webhook').first().json.body.items.map(item => {\n    return {\n      \"id\": item.id,\n      \"sync_run_id\": item.sync_run_id,\n      \"purchased_orders\": []\n    }\n  })\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        800
+      ],
+      "id": "d3e5872e-7f79-4c84-906b-bdd7058a4d83",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.webhook }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.apiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  data: $json.data\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2832,
+        800
+      ],
+      "id": "b51024a2-58b6-4aaa-85ee-071af011016a",
+      "name": "HTTP Request",
+      "executeOnce": true
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.byandev.com",
+            "x-real-ip": "165.232.171.5",
+            "x-forwarded-for": "165.232.171.5",
+            "x-forwarded-proto": "https",
+            "connection": "upgrade",
+            "content-length": "4759",
+            "user-agent": "GuzzleHttp/7",
+            "content-type": "application/json",
+            "baggage": "sentry-trace_id=b2405e4776ff49abb0ea4ea754e3e665,sentry-sample_rand=0.498747,sentry-sample_rate=0.1,sentry-public_key=a6821d7e205b79c38c66b9cff573c483,sentry-org_id=4511255889051648,sentry-environment=production",
+            "sentry-trace": "b2405e4776ff49abb0ea4ea754e3e665-ff24c9ed1dae412d-0"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "workspace_id": 11,
+            "workspace_api_key": "art_dxkhViuteRWV6YRA5Aiyw3YjOL7aG0itKwWt50a1",
+            "erp_username": "bryan.tech",
+            "erp_password": "meta.tech.erp@2026",
+            "start_date": "03/30/2026",
+            "end_date": "06/30/2026",
+            "webhook_url": "https://artemis.ph/api/v1/public/purchase-orders/bulk-sync",
+            "items": [
+              {
+                "id": 61,
+                "keyword": "PUKITIN PERFUME 2.0",
+                "sync_run_id": 367
+              },
+              {
+                "id": 62,
+                "keyword": "PIKUTIN HARABAS 2.0",
+                "sync_run_id": 368
+              },
+              {
+                "id": 63,
+                "keyword": "PIKUTIN SPUTING 2.0",
+                "sync_run_id": 369
+              },
+              {
+                "id": 64,
+                "keyword": "PIKUTIN HABULIN 2.0",
+                "sync_run_id": 370
+              },
+              {
+                "id": 65,
+                "keyword": "Pikutin Comb For Men",
+                "sync_run_id": 371
+              },
+              {
+                "id": 66,
+                "keyword": "Pikutin Travel Atomizer",
+                "sync_run_id": 372
+              },
+              {
+                "id": 67,
+                "keyword": "Pikutin Perfume 2.0",
+                "sync_run_id": 373
+              },
+              {
+                "id": 68,
+                "keyword": "Her Reset Ovarra",
+                "sync_run_id": 374
+              },
+              {
+                "id": 69,
+                "keyword": "Pikutin Padrino 1.0",
+                "sync_run_id": 375
+              },
+              {
+                "id": 70,
+                "keyword": "Hikari New Life Kidney Therapy Healing Oil (BFM)",
+                "sync_run_id": 376
+              },
+              {
+                "id": 71,
+                "keyword": "Amazing Life Herbal Spray with Curcumin Extract - BFM",
+                "sync_run_id": 377
+              },
+              {
+                "id": 72,
+                "keyword": "KidneyCare Herbal Balm - Fast Comfort Formula",
+                "sync_run_id": 378
+              },
+              {
+                "id": 73,
+                "keyword": "Magnerve Cooling Gel",
+                "sync_run_id": 379
+              },
+              {
+                "id": 74,
+                "keyword": "Golden Digest Detox Trinitea",
+                "sync_run_id": 380
+              },
+              {
+                "id": 75,
+                "keyword": "Hikari Liver Care Drops",
+                "sync_run_id": 381
+              },
+              {
+                "id": 76,
+                "keyword": "Amazing Life Herbal Spray with Curcumin Extract",
+                "sync_run_id": 382
+              },
+              {
+                "id": 77,
+                "keyword": "Anti-Cancer Miracle Philippine Giant Clam Oil",
+                "sync_run_id": 383
+              },
+              {
+                "id": 78,
+                "keyword": "Chia Seeds for Diabetes 100g",
+                "sync_run_id": 384
+              },
+              {
+                "id": 79,
+                "keyword": "Pikutin Habulin-10ml",
+                "sync_run_id": 385
+              },
+              {
+                "id": 80,
+                "keyword": "Pikutin Sputing-10ml",
+                "sync_run_id": 386
+              }
+            ],
+            "delivered_purchase_orders_no": [
+              "CPO-TP693",
+              "CPO-TP654",
+              "CPO-TP694",
+              "CPO-TP655",
+              "CPO-TP568",
+              "CPO-TP695",
+              "CPO-TP656",
+              "CPO-TP569",
+              "CPO-TP795",
+              "CPO-TP796",
+              "CPO-TP692",
+              "CPO-TP559",
+              "CPO-TP820",
+              "CPO-TP643",
+              "CPO-TP551",
+              "CPO-TP798",
+              "CPO-TP771",
+              "CPO-TP740",
+              "CPO-TP792",
+              "CPO-TP783",
+              "CPO-TP770",
+              "CPO-TP749",
+              "CPO-TP727",
+              "CPO-TP815",
+              "CPO-TP781",
+              "CPO-TP765",
+              "CPO-TP747",
+              "CPO-TP743",
+              "CPO-TP698",
+              "CPO-TP839",
+              "CPO-TP787",
+              "CPO-TP766",
+              "CPO-TP748",
+              "CPO-TP719",
+              "CPO-TP701",
+              "CPO-TP697",
+              "CPO-TP808",
+              "CPO-TP791",
+              "CPO-TP769",
+              "CPO-TP754",
+              "CPO-TP728",
+              "CPO-TP687",
+              "CPO-TP681",
+              "CPO-TP679",
+              "CPO-TP652",
+              "CPO-TP768",
+              "CPO-TP730",
+              "CPO-TP708",
+              "CPO-TP688",
+              "CPO-TP674",
+              "CPO-TP666",
+              "CPO-TP651",
+              "CPO-TP634",
+              "CPO-TP622",
+              "CPO-TP817",
+              "CPO-TP802",
+              "CPO-TP779",
+              "CPO-TP746",
+              "CPO-TP715",
+              "CPO-TP684",
+              "CPO-TP668",
+              "CPO-TP649",
+              "CPO-TP648",
+              "CPO-TP623",
+              "CPO-TP616",
+              "CPO-TP609",
+              "CPO-TP602",
+              "CPO-TP827",
+              "CPO-TP806",
+              "CPO-TP794",
+              "CPO-TP778",
+              "CPO-TP758",
+              "CPO-TP709",
+              "CPO-TP663",
+              "CPO-TP617",
+              "CPO-TP595",
+              "CPO-TP586",
+              "CPO-TP621",
+              "CPO-TP543",
+              "CPO-TP639",
+              "CPO-TP620",
+              "CPO-TP545",
+              "CPO-TP828",
+              "CPO-TP822",
+              "CPO-TP840",
+              "CPO-TP835",
+              "CPO-TP800",
+              "CPO-TP773",
+              "CPO-TP756",
+              "CPO-TP738",
+              "CPO-TP721",
+              "CPO-TP724",
+              "CPO-TP725",
+              "CPO-TP723",
+              "CPO-TP741",
+              "CPO-TP718",
+              "CPO-TP591",
+              "CPO-TP753",
+              "CPO-TP552",
+              "CPO-TP553",
+              "CPO-TP519",
+              "CPO-TP638",
+              "CPO-TP619",
+              "CPO-TP544",
+              "CPO-TP637",
+              "CPO-TP618",
+              "CPO-TP542",
+              "CPO-TP682",
+              "CPO-TP676",
+              "CPO-TP664",
+              "CPO-TP662",
+              "CPO-TP601",
+              "CPO-TP581",
+              "CPO-TP579",
+              "CPO-TP711",
+              "CPO-TP629",
+              "CPO-TP604",
+              "CPO-TP583",
+              "CPO-TP565",
+              "CPO-TP541",
+              "CPO-TP516",
+              "CPO-TP804",
+              "CPO-TP785",
+              "CPO-TP755",
+              "CPO-TP729",
+              "CPO-TP714",
+              "CPO-TP686",
+              "CPO-TP678",
+              "CPO-TP669",
+              "CPO-TP646",
+              "CPO-TP641",
+              "CPO-TP635",
+              "CPO-TP606",
+              "CPO-TP588",
+              "CPO-TP564",
+              "CPO-TP533",
+              "CPO-TP520",
+              "CPO-TP816",
+              "CPO-TP786",
+              "CPO-TP761",
+              "CPO-TP731",
+              "CPO-TP699",
+              "CPO-TP673",
+              "CPO-TP647",
+              "CPO-TP630",
+              "CPO-TP615",
+              "CPO-TP512",
+              "CPO-TP803",
+              "CPO-TP737",
+              "CPO-TP720",
+              "CPO-TP696",
+              "CPO-TP633",
+              "CPO-TP605",
+              "CPO-TP598",
+              "CPO-TP577",
+              "CPO-TP558",
+              "CPO-TP526",
+              "CPO-TP514",
+              "CPO-TP832",
+              "CPO-TP810",
+              "CPO-TP683",
+              "CPO-TP667",
+              "CPO-TP645",
+              "CPO-TP627",
+              "CPO-TP608",
+              "CPO-TP593",
+              "CPO-TP576",
+              "CPO-TP555",
+              "CPO-TP535",
+              "CPO-TP515",
+              "CPO-TP805",
+              "CPO-TP793",
+              "CPO-TP757",
+              "CPO-TP710",
+              "CPO-TP677",
+              "CPO-TP587",
+              "CPO-TP575",
+              "CPO-TP556",
+              "CPO-TP521",
+              "CPO-TP780",
+              "CPO-TP736",
+              "CPO-TP578",
+              "CPO-TP570",
+              "CPO-TP546",
+              "CPO-TP534",
+              "CPO-TP833",
+              "CPO-TP813",
+              "CPO-TP788",
+              "CPO-TP762",
+              "CPO-TP734",
+              "CPO-TP726",
+              "CPO-TP632",
+              "CPO-TP624",
+              "CPO-TP614",
+              "CPO-TP610",
+              "CPO-TP594",
+              "CPO-TP523",
+              "CPO-TP510",
+              "CPO-TP837",
+              "CPO-TP819",
+              "CPO-TP790",
+              "CPO-TP774",
+              "CPO-TP750",
+              "CPO-TP712",
+              "CPO-TP685",
+              "CPO-TP661",
+              "CPO-TP631",
+              "CPO-TP612",
+              "CPO-TP560",
+              "CPO-TP554",
+              "CPO-TP531",
+              "CPO-TP836",
+              "CPO-TP789",
+              "CPO-TP763",
+              "CPO-TP735",
+              "CPO-TP717",
+              "CPO-TP691",
+              "CPO-TP671",
+              "CPO-TP660",
+              "CPO-TP642",
+              "CPO-TP628",
+              "CPO-TP611",
+              "CPO-TP600",
+              "CPO-TP596",
+              "CPO-TP589",
+              "CPO-TP582",
+              "CPO-TP573",
+              "CPO-TP563",
+              "CPO-TP548",
+              "CPO-TP530",
+              "CPO-TP513",
+              "CPO-TP812",
+              "CPO-TP777",
+              "CPO-TP776",
+              "CPO-TP733",
+              "CPO-TP713",
+              "CPO-TP670",
+              "CPO-TP659",
+              "CPO-TP626",
+              "CPO-TP597",
+              "CPO-TP562",
+              "CPO-TP811",
+              "CPO-TP799",
+              "CPO-TP775",
+              "CPO-TP716",
+              "CPO-TP689",
+              "CPO-TP644",
+              "CPO-TP613",
+              "CPO-TP607",
+              "CPO-TP574",
+              "CPO-TP561",
+              "CPO-TP549",
+              "CPO-TP529",
+              "CPO-TP821",
+              "CPO-TP807"
+            ]
+          },
+          "webhookUrl": "https://n8n.byandev.com/webhook/fc2ac815-3729-43bc-aa11-fb2bb22f7cc8",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Puppeteer": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Puppeteer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Puppeteer1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "Puppeteer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "23468826-71a2-4fee-97b7-34bb5670072e",
+  "meta": {
+    "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
+  },
+  "id": "XB3BRpXznudGKX1N",
+  "tags": []
+}
