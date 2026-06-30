@@ -62,12 +62,15 @@ class CreativesController extends Controller
                 AllowedFilter::callback('review_status', function ($query, $value) {
                     $query->whereHas('latestReview', fn ($q) => $q->where('status', $value));
                 }),
-                AllowedFilter::callback('date_from', function ($query, $value) {
-                    $query->where('creative_date', '>=', $value);
-                }),
-                AllowedFilter::callback('date_to', function ($query, $value) {
-                    $query->where('creative_date', '<=', $value);
-                }),
+                // Three independent date-range filters, one per date column.
+                // whereDate keeps the end day inclusive for the datetime columns
+                // (created_at / approved_at).
+                AllowedFilter::callback('creative_date_from', fn ($q, $v) => $q->whereDate('creative_date', '>=', $v)),
+                AllowedFilter::callback('creative_date_to', fn ($q, $v) => $q->whereDate('creative_date', '<=', $v)),
+                AllowedFilter::callback('created_at_from', fn ($q, $v) => $q->whereDate('created_at', '>=', $v)),
+                AllowedFilter::callback('created_at_to', fn ($q, $v) => $q->whereDate('created_at', '<=', $v)),
+                AllowedFilter::callback('approved_at_from', fn ($q, $v) => $q->whereDate('approved_at', '>=', $v)),
+                AllowedFilter::callback('approved_at_to', fn ($q, $v) => $q->whereDate('approved_at', '<=', $v)),
             ])
             ->allowedSorts([
                 AllowedSort::field('name'),

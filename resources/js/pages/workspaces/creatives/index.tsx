@@ -1,7 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import DatePicker from '@/components/ui/date-picker';
 import {
     Dialog,
     DialogClose,
@@ -41,7 +40,7 @@ import {
     TriangleAlert,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AdsBadge,
     FinalBadge,
@@ -50,6 +49,7 @@ import {
 } from './components/atoms';
 import { AssigneePicker } from './components/assignee-picker';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
+import CreativesDateFilter from './components/creatives-date-filter';
 import CreativesFilter, {
     CreativesFilterValue,
 } from './components/creatives-filter';
@@ -176,34 +176,48 @@ export default function CreativesIndex({
     );
     const [search, setSearch] = useState(query.filter?.search ?? '');
 
+    // `navigate` is captured once by uncontrolled children (e.g. the flatpickr
+    // DatePicker only re-binds its onChange when its own deps change). Reading
+    // `query` straight from the closure would therefore go stale and clobber
+    // filters set since the capture. Keep the latest `query` in a ref and read
+    // through it so `navigate` has a stable identity yet always sees fresh
+    // filters.
+    const queryRef = useRef(query);
+    queryRef.current = query;
+
     const navigate = useCallback(
         (params: Record<string, string | number | null | undefined>) => {
+            const q = queryRef.current;
             router.get(
                 baseUrl,
                 {
-                    sort: query.sort,
+                    sort: q.sort,
                     page: 1,
-                    per_page: query.per_page,
-                    'filter[search]': query.filter?.search || undefined,
-                    'filter[format]': query.filter?.format || undefined,
-                    'filter[ads_status]': query.filter?.ads_status || undefined,
-                    'filter[creator_id]': query.filter?.creator_id || undefined,
-                    'filter[product_id]': query.filter?.product_id || undefined,
-                    'filter[date_from]': query.filter?.date_from || undefined,
-                    'filter[date_to]': query.filter?.date_to || undefined,
+                    per_page: q.per_page,
+                    'filter[search]': q.filter?.search || undefined,
+                    'filter[format]': q.filter?.format || undefined,
+                    'filter[ads_status]': q.filter?.ads_status || undefined,
+                    'filter[creator_id]': q.filter?.creator_id || undefined,
+                    'filter[product_id]': q.filter?.product_id || undefined,
+                    'filter[creative_date_from]':
+                        q.filter?.creative_date_from || undefined,
+                    'filter[creative_date_to]':
+                        q.filter?.creative_date_to || undefined,
+                    'filter[created_at_from]':
+                        q.filter?.created_at_from || undefined,
+                    'filter[created_at_to]':
+                        q.filter?.created_at_to || undefined,
+                    'filter[approved_at_from]':
+                        q.filter?.approved_at_from || undefined,
+                    'filter[approved_at_to]':
+                        q.filter?.approved_at_to || undefined,
                     ...params,
                 },
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [baseUrl, query],
+        [baseUrl],
     );
-
-    const dateRange = useMemo(() => {
-        const from = query.filter?.date_from;
-        const to = query.filter?.date_to;
-        return from && to ? [from, to] : undefined;
-    }, [query.filter?.date_from, query.filter?.date_to]);
 
     const debouncedSearch = useCallback(
         debounce(
@@ -582,28 +596,9 @@ export default function CreativesIndex({
 
                     <div className="flex-1" />
 
-                    <DatePicker
-                        id="creatives-date-range"
-                        mode="range"
-                        placeholder="All dates"
-                        defaultDate={dateRange as never}
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                const fmt = (d: Date) =>
-                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                navigate({
-                                    'filter[date_from]': fmt(dates[0]),
-                                    'filter[date_to]': fmt(dates[1]),
-                                    page: 1,
-                                });
-                            } else if (dates.length === 0) {
-                                navigate({
-                                    'filter[date_from]': undefined,
-                                    'filter[date_to]': undefined,
-                                    page: 1,
-                                });
-                            }
-                        }}
+                    <CreativesDateFilter
+                        filter={query.filter}
+                        onChange={(params) => navigate({ ...params, page: 1 })}
                     />
 
                     <CreativesFilter
