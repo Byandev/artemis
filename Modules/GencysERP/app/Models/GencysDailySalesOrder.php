@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GencysDailySalesOrder extends Model
 {
-    protected $table = 'gencys_daily_sales_orders';
+    protected $table = 'gencys_orders';
 
     // `id` holds Gencys' own order id (sent as "id" in the payload), so it is
     // assigned explicitly rather than auto-incremented.
