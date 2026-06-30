@@ -20,8 +20,11 @@ import { InitialAvatar } from './atoms';
 /**
  * Inline, ClickUp-style reviewer assignment for the creatives table. Shows the
  * assigned reviewers as stacked avatars, or a dashed "Assign" pill when empty.
- * Uses DropdownMenu (modal) — the same reliable pattern as the Ads status cell —
- * so the list is fully hoverable/clickable inside a clickable table row.
+ *
+ * Selections are staged locally — toggling a reviewer only updates the pending
+ * set, and nothing is saved until the user clicks "Assign". This keeps the menu
+ * open while picking several people instead of firing (and collapsing) on every
+ * click.
  */
 export function InlineAssignee({
     creative,
@@ -34,32 +37,49 @@ export function InlineAssignee({
     baseUrl: string;
     canEdit: boolean;
 }) {
-    // Optimistic local copy so toggles feel instant and the menu stays open.
-    const [selectedIds, setSelectedIds] = useState<number[]>(
-        creative.assigned_reviewers.map((r) => r.id),
-    );
+    // Saved reviewers (what the trigger avatars reflect).
+    const savedIds = creative.assigned_reviewers.map((r) => r.id);
 
+    const [open, setOpen] = useState(false);
+    // Pending edits — only committed on "Assign".
+    const [pendingIds, setPendingIds] = useState<number[]>(savedIds);
+    const [saving, setSaving] = useState(false);
+
+    // Reset the pending set to what's saved whenever the menu opens or the
+    // underlying creative changes, so an abandoned edit doesn't linger.
     useEffect(() => {
-        setSelectedIds(creative.assigned_reviewers.map((r) => r.id));
-    }, [creative.assigned_reviewers]);
+        if (open) setPendingIds(creative.assigned_reviewers.map((r) => r.id));
+    }, [open, creative.assigned_reviewers]);
 
     const toggle = (id: number) => {
-        const next = selectedIds.includes(id)
-            ? selectedIds.filter((x) => x !== id)
-            : [...selectedIds, id];
-        setSelectedIds(next);
-        router.put(
-            `${baseUrl}/${creative.id}`,
-            { assigned_reviewer_ids: next },
-            { preserveScroll: true, preserveState: true },
+        setPendingIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
         );
     };
 
-    const selected = reviewers.filter((r) => selectedIds.includes(r.id));
+    const dirty =
+        pendingIds.length !== savedIds.length ||
+        pendingIds.some((id) => !savedIds.includes(id));
+
+    const save = () => {
+        router.put(
+            `${baseUrl}/${creative.id}`,
+            { assigned_reviewer_ids: pendingIds },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onSuccess: () => setOpen(false),
+            },
+        );
+    };
+
+    const saved = reviewers.filter((r) => savedIds.includes(r.id));
 
     const avatars = (
         <div className="flex -space-x-1.5">
-            {selected.map((r) => (
+            {saved.map((r) => (
                 <Tooltip key={r.id}>
                     <TooltipTrigger asChild>
                         <span className="rounded-full ring-2 ring-white dark:ring-zinc-900">
@@ -77,7 +97,7 @@ export function InlineAssignee({
 
     // Read-only when the user can't edit creatives.
     if (!canEdit) {
-        return selected.length > 0 ? (
+        return saved.length > 0 ? (
             avatars
         ) : (
             <span className="font-mono text-[12px] text-gray-300 dark:text-gray-700">
@@ -88,9 +108,9 @@ export function InlineAssignee({
 
     return (
         <div onClick={(e) => e.stopPropagation()}>
-            <DropdownMenu>
+            <DropdownMenu open={open} onOpenChange={setOpen}>
                 <DropdownMenuTrigger asChild>
-                    {selected.length > 0 ? (
+                    {saved.length > 0 ? (
                         <button
                             type="button"
                             className="cursor-pointer rounded-full transition-opacity hover:opacity-80"
@@ -117,7 +137,7 @@ export function InlineAssignee({
                         </div>
                     ) : (
                         reviewers.map((r) => {
-                            const isSelected = selectedIds.includes(r.id);
+                            const isSelected = pendingIds.includes(r.id);
                             return (
                                 <DropdownMenuItem
                                     key={r.id}
@@ -140,6 +160,31 @@ export function InlineAssignee({
                                 </DropdownMenuItem>
                             );
                         })
+                    )}
+                    {reviewers.length > 0 && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <div className="flex items-center gap-2 px-1.5 py-1">
+                                <button
+                                    type="button"
+                                    onClick={save}
+                                    disabled={saving || !dirty}
+                                    className="flex h-7 flex-1 items-center justify-center rounded-md bg-emerald-600 font-mono text-[11px] font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                    {saving ? 'Assigning…' : 'Assign'}
+                                </button>
+                                {dirty && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setPendingIds(savedIds)}
+                                        disabled={saving}
+                                        className="flex h-7 items-center rounded-md px-2 font-mono text-[11px] font-medium text-gray-500 transition-colors hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200"
+                                    >
+                                        Reset
+                                    </button>
+                                )}
+                            </div>
+                        </>
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>

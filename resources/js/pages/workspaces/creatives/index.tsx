@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import {
@@ -26,7 +27,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import {
     ChevronDown,
@@ -47,6 +48,7 @@ import {
     FormatBadge,
     InitialAvatar,
 } from './components/atoms';
+import { AssigneePicker } from './components/assignee-picker';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
 import CreativesFilter, {
     CreativesFilterValue,
@@ -131,6 +133,36 @@ export default function CreativesIndex({
     );
     const [deleteId, setDeleteId] = useState<number | null>(null);
 
+    // Bulk reviewer assignment: row selection + the reviewers to apply.
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [bulkReviewerIds, setBulkReviewerIds] = useState<number[]>([]);
+    const [bulkProcessing, setBulkProcessing] = useState(false);
+
+    const selectedIds = useMemo(
+        () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+        [rowSelection],
+    );
+
+    const handleBulkAssign = (mode: 'add' | 'replace') => {
+        router.post(
+            `${baseUrl}/bulk-reviewers`,
+            {
+                ids: selectedIds.map(Number),
+                reviewer_ids: bulkReviewerIds,
+                mode,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setBulkProcessing(true),
+                onFinish: () => setBulkProcessing(false),
+                onSuccess: () => {
+                    setRowSelection({});
+                    setBulkReviewerIds([]);
+                },
+            },
+        );
+    };
+
     // Always derive from fresh props so reviews/remarks update without reopening
     const detailCreative =
         detailCreativeId !== null
@@ -194,6 +226,37 @@ export default function CreativesIndex({
     };
 
     const columns: ColumnDef<Creative>[] = [
+        ...(canEdit
+            ? [
+                  {
+                      id: 'select',
+                      enableSorting: false,
+                      header: ({ table }) => (
+                          <Checkbox
+                              checked={
+                                  table.getIsAllPageRowsSelected() ||
+                                  (table.getIsSomePageRowsSelected() &&
+                                      'indeterminate')
+                              }
+                              onCheckedChange={(value) =>
+                                  table.toggleAllPageRowsSelected(!!value)
+                              }
+                              aria-label="Select all"
+                          />
+                      ),
+                      cell: ({ row }) => (
+                          <Checkbox
+                              checked={row.getIsSelected()}
+                              onCheckedChange={(value) =>
+                                  row.toggleSelected(!!value)
+                              }
+                              aria-label="Select row"
+                              onClick={(e) => e.stopPropagation()}
+                          />
+                      ),
+                  } as ColumnDef<Creative>,
+              ]
+            : []),
         {
             accessorKey: 'name',
             enableSorting: true,
@@ -553,12 +616,64 @@ export default function CreativesIndex({
                     />
                 </div>
 
+                {canEdit && selectedIds.length > 0 && (
+                    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-emerald-500/20 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-400/20 dark:bg-emerald-500/5">
+                        <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                            {selectedIds.length} selected
+                        </span>
+                        <div className="w-64">
+                            <AssigneePicker
+                                reviewers={reviewers}
+                                selectedIds={bulkReviewerIds}
+                                onChange={setBulkReviewerIds}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => handleBulkAssign('add')}
+                                disabled={
+                                    bulkProcessing ||
+                                    bulkReviewerIds.length === 0
+                                }
+                                className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                                Add
+                            </button>
+                            <button
+                                onClick={() => handleBulkAssign('replace')}
+                                disabled={bulkProcessing}
+                                title="Overwrite reviewers on the selected creatives (empty clears them)"
+                                className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                            >
+                                Replace
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setRowSelection({});
+                                    setBulkReviewerIds([]);
+                                }}
+                                disabled={bulkProcessing}
+                                className="flex h-8 items-center rounded-lg px-2 font-mono! text-[12px]! font-medium text-gray-500 transition-all hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         data={creatives.data}
                         meta={{ ...omit(creatives, ['data']) }}
                         initialSorting={initialSorting}
+                        getRowId={(row) => String(row.id)}
+                        {...(canEdit
+                            ? {
+                                  rowSelection,
+                                  onRowSelectionChange: setRowSelection,
+                              }
+                            : {})}
                         onFetch={(params) =>
                             navigate({
                                 sort: (params?.sort as string) ?? undefined,

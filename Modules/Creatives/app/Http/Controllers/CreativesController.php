@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Creatives\Http\Requests\StoreCreativeRequest;
 use Modules\Creatives\Http\Requests\StoreReviewRequest;
@@ -168,6 +169,45 @@ class CreativesController extends Controller
         return redirect()
             ->route('workspaces.creatives.index', $workspace)
             ->with('success', 'Creative created successfully');
+    }
+
+    /**
+     * Assign reviewers to several creatives at once. `mode` is either
+     * 'add' (attach the selected reviewers, keeping existing ones) or
+     * 'replace' (overwrite each creative's reviewer set — an empty list
+     * clears all). Reviewers live in the `creative_reviewers` pivot.
+     */
+    public function bulkAssignReviewers(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::EditCreatives->value, $workspace);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'reviewer_ids' => ['present', 'array'],
+            'reviewer_ids.*' => ['integer', 'exists:users,id'],
+            'mode' => ['required', Rule::in(['add', 'replace'])],
+        ]);
+
+        $creatives = Creative::where('workspace_id', $workspace->id)
+            ->whereIn('id', $validated['ids'])
+            ->get();
+
+        DB::transaction(function () use ($creatives, $validated) {
+            foreach ($creatives as $creative) {
+                if ($validated['mode'] === 'replace') {
+                    $creative->assignedReviewers()->sync($validated['reviewer_ids']);
+                } else {
+                    $creative->assignedReviewers()->syncWithoutDetaching($validated['reviewer_ids']);
+                }
+            }
+        });
+
+        $count = $creatives->count();
+        $verb = $validated['mode'] === 'replace' ? 'updated' : 'assigned';
+
+        return back()->with('success', "Reviewers {$verb} for {$count} creative(s).");
     }
 
     public function edit(Request $request, Workspace $workspace, Creative $creative)
