@@ -4,6 +4,7 @@ namespace Modules\GencysERP\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Modules\GencysERP\Console\Commands\ExpireStaleSyncRuns;
+use Modules\GencysERP\Console\Commands\SyncInventoryFromGencysOrders;
 use Modules\GencysERP\Console\Commands\TriggerFetchDailySalesTrackerCommand;
 use Modules\GencysERP\Console\Commands\TriggerFetchERPPurchaseOrders;
 use Modules\GencysERP\Console\Commands\TriggerFetchERPTransactionHistory;
@@ -31,6 +32,7 @@ class GencysERPServiceProvider extends ModuleServiceProvider
         TriggerFetchERPPurchaseOrders::class,
         TriggerFetchERPTransactionHistory::class,
         ExpireStaleSyncRuns::class,
+        SyncInventoryFromGencysOrders::class,
     ];
 
     /**
