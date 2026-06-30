@@ -38,4 +38,31 @@ class InventoryTransaction extends Model
     {
         return $this->belongsTo(InventoryItem::class);
     }
+
+    /**
+     * Net effect of this transaction on stock: goods in minus goods out, bad and
+     * lost. This is the single source of truth for the movement sign convention —
+     * both the ERP sync and recalculateActualStock() roll the running balance
+     * forward with it.
+     */
+    public function netMovement(): int
+    {
+        return self::netMovementFromRow($this->getAttributes());
+    }
+
+    /**
+     * Same movement formula computed from a raw row array (the ERP sync payload),
+     * so the running balance can be derived before the model is persisted.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    public static function netMovementFromRow(array $row): int
+    {
+        return (int) ($row['po_qty_in'] ?? 0)
+            + (int) ($row['rts_goods_in'] ?? 0)
+            - (int) ($row['po_qty_out'] ?? 0)
+            - (int) ($row['rts_goods_out'] ?? 0)
+            - (int) ($row['rts_bad'] ?? 0)
+            - (int) ($row['lost'] ?? 0);
+    }
 }
