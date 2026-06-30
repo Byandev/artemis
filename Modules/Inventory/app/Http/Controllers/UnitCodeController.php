@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\GencysERP\Http\Controllers\Web;
+namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
@@ -12,7 +12,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\GencysERP\Models\GencysUnitCode;
+use Modules\GencysERP\Jobs\FetchUnitCodeJob;
+use Modules\Inventory\Models\InventoryUnitCode;
+use Modules\Inventory\Models\InventoryUnitCodeItem;
 
 class UnitCodeController extends Controller
 {
@@ -32,7 +34,10 @@ class UnitCodeController extends Controller
         [$sortColumn, $sortDir, $sortParam] = $this->resolveSort($request);
 
         $unitCodes = $this->filtered($request, $workspace)
-            ->with('items:id,gencys_unit_code_id,unit_code,inventory_item_code,quantity,price')
+            // Items link by (workspace_id, unit_code); scope to this workspace.
+            ->with(['items' => fn ($q) => $q
+                ->where('workspace_id', $workspace->id)
+                ->select(['id', 'workspace_id', 'unit_code', 'item_code', 'quantity'])])
             ->orderBy($sortColumn, $sortDir)
             ->orderBy('id', 'desc')
             ->paginate($request->integer('per_page', 25))
@@ -49,6 +54,42 @@ class UnitCodeController extends Controller
         ]);
     }
 
+    /**
+     * Kick off an on-demand ERP unit-code sync for this workspace. Dispatches the
+     * same n8n fetch the scheduled command runs, scoped to the current workspace.
+     * n8n scrapes the codes and posts them back to the public callback endpoint.
+     */
+    public function sync(Workspace $workspace): RedirectResponse
+    {
+        $this->authorize('Create Unit Code', $workspace);
+
+        $webhookUrl = config('services.n8n.inventory_unit_code_webhook_url')
+            ?: config('services.n8n.webhook_url');
+
+        if (empty($webhookUrl)) {
+            return back()->with('error', 'Unit code sync is not configured yet. Please contact support.');
+        }
+
+        $apiKey = $workspace->apiKeys()->first();
+
+        if (blank($workspace->erp_username) || blank($workspace->erp_password) || ! $apiKey) {
+            return back()->with('error', 'This workspace is not connected to the ERP. Add ERP credentials and an API key first.');
+        }
+
+        $callbackBase = rtrim(config('services.n8n.gencys_unit_code_callback_url') ?: config('app.url'), '/');
+
+        // The API key alone identifies the workspace on the callback, so no
+        // workspace id/slug is sent.
+        FetchUnitCodeJob::dispatch($webhookUrl, [
+            'workspace_api_key' => $apiKey->reveal(),
+            'erp_username' => $workspace->erp_username,
+            'erp_password' => $workspace->erp_password,
+            'webhook_url' => "{$callbackBase}/api/v1/public/inventory/unit-codes/bulk-sync",
+        ]);
+
+        return back()->with('success', 'Unit code sync started. New codes from the ERP will appear here shortly.');
+    }
+
     public function store(Request $request, Workspace $workspace): RedirectResponse
     {
         $this->authorize('Create Unit Code', $workspace);
@@ -56,15 +97,14 @@ class UnitCodeController extends Controller
         $data = $this->validateData($request, $workspace);
 
         DB::transaction(function () use ($workspace, $data) {
-            $unitCode = GencysUnitCode::create([
-                // Manual entries have no Gencys row_id; the local id auto-increments.
+            $unitCode = InventoryUnitCode::create([
                 'workspace_id' => $workspace->id,
                 'sku' => $data['sku'],
                 'unit_code' => $data['unit_code'],
                 'total_amount' => $data['total_amount'] ?? null,
             ]);
 
-            $this->syncItems($unitCode, $data['items'] ?? []);
+            $this->syncItems($workspace->id, $unitCode->unit_code, $data['items'] ?? []);
         });
 
         return redirect()
@@ -72,21 +112,30 @@ class UnitCodeController extends Controller
             ->with('success', 'Unit code created successfully.');
     }
 
-    public function update(Request $request, Workspace $workspace, GencysUnitCode $unitCode): RedirectResponse
+    public function update(Request $request, Workspace $workspace, InventoryUnitCode $unitCode): RedirectResponse
     {
         $this->authorize('Edit Unit Code', $workspace);
         abort_unless($unitCode->workspace_id === $workspace->id, 404);
 
         $data = $this->validateData($request, $workspace, $unitCode);
 
-        DB::transaction(function () use ($unitCode, $data) {
+        DB::transaction(function () use ($workspace, $unitCode, $data) {
+            // Items link by unit_code, so clear the old set if the code is renamed.
+            $original = $unitCode->unit_code;
+
             $unitCode->update([
                 'sku' => $data['sku'],
                 'unit_code' => $data['unit_code'],
                 'total_amount' => $data['total_amount'] ?? null,
             ]);
 
-            $this->syncItems($unitCode, $data['items'] ?? []);
+            if ($original !== $unitCode->unit_code) {
+                InventoryUnitCodeItem::where('workspace_id', $workspace->id)
+                    ->where('unit_code', $original)
+                    ->delete();
+            }
+
+            $this->syncItems($workspace->id, $unitCode->unit_code, $data['items'] ?? []);
         });
 
         return redirect()
@@ -94,12 +143,18 @@ class UnitCodeController extends Controller
             ->with('success', 'Unit code updated successfully.');
     }
 
-    public function destroy(Workspace $workspace, GencysUnitCode $unitCode): RedirectResponse
+    public function destroy(Workspace $workspace, InventoryUnitCode $unitCode): RedirectResponse
     {
         $this->authorize('Delete Unit Code', $workspace);
         abort_unless($unitCode->workspace_id === $workspace->id, 404);
 
-        $unitCode->delete();
+        DB::transaction(function () use ($workspace, $unitCode) {
+            InventoryUnitCodeItem::where('workspace_id', $workspace->id)
+                ->where('unit_code', $unitCode->unit_code)
+                ->delete();
+
+            $unitCode->delete();
+        });
 
         return redirect()
             ->route('workspaces.gencys.unit-codes.index', $workspace->slug)
@@ -111,7 +166,7 @@ class UnitCodeController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function validateData(Request $request, Workspace $workspace, ?GencysUnitCode $unitCode = null): array
+    private function validateData(Request $request, Workspace $workspace, ?InventoryUnitCode $unitCode = null): array
     {
         return $request->validate([
             'sku' => ['nullable', 'string', 'max:255'],
@@ -119,47 +174,48 @@ class UnitCodeController extends Controller
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('gencys_unit_codes', 'unit_code')
+                Rule::unique('inventory_unit_codes', 'unit_code')
                     ->where('workspace_id', $workspace->id)
                     ->ignore($unitCode?->id),
             ],
             'total_amount' => ['nullable', 'numeric', 'min:0'],
             'items' => ['nullable', 'array'],
-            'items.*.inventory_item_code' => ['nullable', 'string', 'max:255'],
+            'items.*.item_code' => ['nullable', 'string', 'max:255'],
             'items.*.quantity' => ['nullable', 'integer', 'min:0'],
-            'items.*.price' => ['nullable', 'numeric', 'min:0'],
         ]);
     }
 
     /**
-     * Replace a unit code's inventory items with the given set. Each line's
-     * `unit_code` mirrors the parent so the row is self-describing.
+     * Replace a unit code's items with the given set. Items link to their parent
+     * by (workspace_id, unit_code), so the whole set is cleared and re-inserted.
      *
      * @param  array<int, array<string, mixed>>  $items
      */
-    private function syncItems(GencysUnitCode $unitCode, array $items): void
+    private function syncItems(int $workspaceId, string $unitCode, array $items): void
     {
-        $unitCode->items()->delete();
+        InventoryUnitCodeItem::where('workspace_id', $workspaceId)
+            ->where('unit_code', $unitCode)
+            ->delete();
 
         $rows = collect($items)
-            ->filter(fn ($item) => filled($item['inventory_item_code'] ?? null))
+            ->filter(fn ($item) => filled($item['item_code'] ?? null))
             ->map(fn ($item) => [
-                'unit_code' => $unitCode->unit_code,
-                'inventory_item_code' => $item['inventory_item_code'],
+                'workspace_id' => $workspaceId,
+                'unit_code' => $unitCode,
+                'item_code' => $item['item_code'],
                 'quantity' => $item['quantity'] ?? null,
-                'price' => $item['price'] ?? null,
             ])
             ->all();
 
         if (! empty($rows)) {
-            $unitCode->items()->createMany($rows);
+            InventoryUnitCodeItem::insert($rows);
         }
     }
 
     /** Workspace-scoped query with the request's search filter applied. */
     private function filtered(Request $request, Workspace $workspace): Builder
     {
-        $query = GencysUnitCode::query()->where('workspace_id', $workspace->id);
+        $query = InventoryUnitCode::query()->where('workspace_id', $workspace->id);
 
         if ($search = $request->input('filter.search')) {
             $query->where(function (Builder $q) use ($search) {

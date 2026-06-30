@@ -28,11 +28,11 @@ class TriggerFetchUnitCodeCommand extends Command
      */
     public function handle(): int
     {
-        $webhookUrl = config('services.n8n.gencys_unit_code_webhook_url')
+        $webhookUrl = config('services.n8n.inventory_unit_code_webhook_url')
             ?: config('services.n8n.webhook_url');
 
         if (empty($webhookUrl)) {
-            $this->error('n8n webhook URL is not configured (services.n8n.gencys_unit_code_webhook_url).');
+            $this->error('n8n webhook URL is not configured (services.n8n.inventory_unit_code_webhook_url).');
 
             return self::FAILURE;
         }
@@ -62,7 +62,7 @@ class TriggerFetchUnitCodeCommand extends Command
         // point at a reachable host (local n8n, staging, tunnel) instead of being
         // hardcoded. Defaults to APP_URL when N8N_GENCYS_UNIT_CODE_CALLBACK_URL isn't set.
         $callbackBase = rtrim(config('services.n8n.gencys_unit_code_callback_url') ?: config('app.url'), '/');
-        $callbackUrl = "{$callbackBase}/api/v1/public/gencys/unit-codes";
+        $callbackUrl = "{$callbackBase}/api/v1/public/inventory/unit-codes/bulk-sync";
         $dispatched = 0;
         $skipped = 0;
 
@@ -76,9 +76,9 @@ class TriggerFetchUnitCodeCommand extends Command
                 continue;
             }
 
+            // The API key alone identifies the workspace on the callback, so no
+            // workspace id/slug is sent.
             $data = [
-                'workspace_id' => $workspace->id,
-                'workspace_slug' => $workspace->slug,
                 'workspace_api_key' => $apiKey->reveal(),
                 // ERP login the n8n pipeline authenticates with (password decrypted).
                 'erp_username' => $workspace->erp_username,

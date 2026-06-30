@@ -326,6 +326,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewInventoryItems,
                           PERMISSIONS.ViewTransactionLogs,
                           PERMISSIONS.ViewPurchasedOrders,
+                          PERMISSIONS.ViewUnitCode,
                       ],
                       items: [
                           {
@@ -347,6 +348,12 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewPurchasedOrders,
                           },
                           {
+                              title: 'Unit Code',
+                              href: `/workspaces/${slug}/gencys/unit-codes`,
+                              icon: Activity,
+                              permission: PERMISSIONS.ViewUnitCode,
+                          },
+                          {
                               title: 'Sync Health',
                               href: `/workspaces/${slug}/inventory/sync-health`,
                               icon: Activity,
@@ -361,19 +368,13 @@ export function AppSidebar() {
                   {
                       title: 'Gencys ERP',
                       icon: Activity,
-                      anyOf: [PERMISSIONS.ViewDailySalesTracker, PERMISSIONS.ViewUnitCode],
+                      anyOf: [PERMISSIONS.ViewDailySalesTracker],
                       items: [
                           {
                               title: 'Daily Sales Tracker',
                               href: `/workspaces/${slug}/gencys/daily-sales-tracker`,
                               icon: Activity,
                               permission: PERMISSIONS.ViewDailySalesTracker,
-                          },
-                          {
-                              title: 'Unit Code',
-                              href: `/workspaces/${slug}/gencys/unit-codes`,
-                              icon: Activity,
-                              permission: PERMISSIONS.ViewUnitCode,
                           },
                       ],
                   },
@@ -509,9 +510,7 @@ function PublicLinks({
     rmoEnabled: boolean;
     leaderboardEnabled: boolean;
 }) {
-    const canViewRmoLink = useAnyPermission([
-        PERMISSIONS.ViewRmoManagement,
-    ]);
+    const canViewRmoLink = useAnyPermission([PERMISSIONS.ViewRmoManagement]);
     const canViewLeaderboardLink = useAnyPermission([
         PERMISSIONS.ViewLeaderboards,
     ]);

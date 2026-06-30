@@ -14,9 +14,8 @@ import { toast } from 'sonner';
 
 export interface UnitCodeItem {
     id?: number;
-    inventory_item_code: string | null;
+    item_code: string | null;
     quantity: number | string | null;
-    price: number | string | null;
 }
 
 export interface UnitCode {
@@ -35,15 +34,13 @@ interface Props {
 }
 
 type FormItem = {
-    inventory_item_code: string;
+    item_code: string;
     quantity: string;
-    price: string;
 };
 
 const emptyItem: FormItem = {
-    inventory_item_code: '',
+    item_code: '',
     quantity: '',
-    price: '',
 };
 
 const inputClass =
@@ -79,14 +76,11 @@ export function UnitCodeFormDialog({
                 items:
                     unitCode.items && unitCode.items.length > 0
                         ? unitCode.items.map((item) => ({
-                              inventory_item_code:
-                                  item.inventory_item_code ?? '',
+                              item_code: item.item_code ?? '',
                               quantity:
                                   item.quantity != null
                                       ? String(item.quantity)
                                       : '',
-                              price:
-                                  item.price != null ? String(item.price) : '',
                           }))
                         : [{ ...emptyItem }],
             });
@@ -243,22 +237,22 @@ export function UnitCodeFormDialog({
                                     key={index}
                                     className="grid grid-cols-12 items-start gap-2"
                                 >
-                                    <div className="col-span-6">
+                                    <div className="col-span-8">
                                         <input
                                             type="text"
                                             placeholder="Item code"
-                                            value={item.inventory_item_code}
+                                            value={item.item_code}
                                             onChange={(e) =>
                                                 setItem(
                                                     index,
-                                                    'inventory_item_code',
+                                                    'item_code',
                                                     e.target.value,
                                                 )
                                             }
                                             className={inputClass}
                                         />
                                         {(errors as Record<string, string>)[
-                                            `items.${index}.inventory_item_code`
+                                            `items.${index}.item_code`
                                         ] && (
                                             <p className="mt-1 font-mono text-[10px] text-red-500">
                                                 {
@@ -268,13 +262,13 @@ export function UnitCodeFormDialog({
                                                             string
                                                         >
                                                     )[
-                                                        `items.${index}.inventory_item_code`
+                                                        `items.${index}.item_code`
                                                     ]
                                                 }
                                             </p>
                                         )}
                                     </div>
-                                    <div className="col-span-2">
+                                    <div className="col-span-3">
                                         <input
                                             type="number"
                                             min="0"
@@ -284,23 +278,6 @@ export function UnitCodeFormDialog({
                                                 setItem(
                                                     index,
                                                     'quantity',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={inputClass}
-                                        />
-                                    </div>
-                                    <div className="col-span-3">
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            placeholder="Price"
-                                            value={item.price}
-                                            onChange={(e) =>
-                                                setItem(
-                                                    index,
-                                                    'price',
                                                     e.target.value,
                                                 )
                                             }
