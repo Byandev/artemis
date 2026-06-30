@@ -1,5 +1,4 @@
 import PageHeader from '@/components/common/PageHeader';
-import DatePicker from '@/components/ui/date-picker';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -21,10 +20,8 @@ import { cn } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
-import flatpickr from 'flatpickr';
 import { debounce } from 'lodash';
 import { ChevronDown, Columns3, Search, Truck } from 'lucide-react';
-import moment from 'moment';
 import {
     useCallback,
     useEffect,
@@ -32,8 +29,11 @@ import {
     useState,
     type ReactNode,
 } from 'react';
+import DailySalesDateFilters, {
+    DateFilterValue,
+    EMPTY_DATE_FILTERS,
+} from './daily-sales-date-filters';
 import DailySalesFilters from './daily-sales-filters';
-import DateOption = flatpickr.Options.DateOption;
 
 interface OrderItem {
     id: number;
@@ -89,14 +89,12 @@ interface Props {
         page?: number | string;
         filter?: {
             search?: string;
-            start_date?: string;
-            end_date?: string;
-            shipped_out_start_date?: string;
-            shipped_out_end_date?: string;
             csr?: string[];
             platform?: string[];
             parcel_status?: string[];
             order_status?: string[];
+            // Date-range keys (`{field}_start` / `{field}_end`).
+            [dateKey: string]: string | string[] | undefined;
         };
     };
 }
@@ -429,14 +427,15 @@ export default function DailySalesTrackerIndex({
     const baseUrl = `/workspaces/${workspace.slug}/gencys/daily-sales-tracker`;
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [dateRange, setDateRange] = useState<string[]>(() => [
-        query?.filter?.start_date ?? '',
-        query?.filter?.end_date ?? '',
-    ]);
-    const [shippedDateRange, setShippedDateRange] = useState<string[]>(() => [
-        query?.filter?.shipped_out_start_date ?? '',
-        query?.filter?.shipped_out_end_date ?? '',
-    ]);
+    const [dateFilters, setDateFilters] = useState<DateFilterValue>(() => {
+        const f = query?.filter ?? {};
+        const init = { ...EMPTY_DATE_FILTERS };
+        for (const key of Object.keys(EMPTY_DATE_FILTERS)) {
+            const value = f[key];
+            if (typeof value === 'string') init[key] = value;
+        }
+        return init;
+    });
     const [csrFilter, setCsrFilter] = useState<string[]>(
         query?.filter?.csr ?? [],
     );
@@ -469,12 +468,18 @@ export default function DailySalesTrackerIndex({
 
     const arr = (v: string[]) => (v.length ? v : undefined);
 
+    // Map the date-filter object to query params, dropping empty bounds.
+    const dateParams = (df: DateFilterValue) =>
+        Object.fromEntries(
+            Object.keys(EMPTY_DATE_FILTERS).map((key) => [
+                key,
+                df[key] || undefined,
+            ]),
+        );
+
     const buildFilter = () => ({
         search: searchValue || undefined,
-        start_date: dateRange[0] || undefined,
-        end_date: dateRange[1] || undefined,
-        shipped_out_start_date: shippedDateRange[0] || undefined,
-        shipped_out_end_date: shippedDateRange[1] || undefined,
+        ...dateParams(dateFilters),
         csr: arr(csrFilter),
         platform: arr(platformFilter),
         parcel_status: arr(parcelStatusFilter),
@@ -509,8 +514,7 @@ export default function DailySalesTrackerIndex({
             query?.perPage,
             orders.per_page,
             searchValue,
-            dateRange,
-            shippedDateRange,
+            dateFilters,
             csrFilter,
             platformFilter,
             parcelStatusFilter,
@@ -525,24 +529,27 @@ export default function DailySalesTrackerIndex({
 
     useEffect(() => {
         const f = query?.filter ?? {};
+        const serverDates = Object.fromEntries(
+            Object.keys(EMPTY_DATE_FILTERS).map((key) => [
+                key,
+                (typeof f[key] === 'string' ? (f[key] as string) : '') ||
+                    undefined,
+            ]),
+        );
         const serverSig = JSON.stringify({
             search: f.search || undefined,
-            start_date: f.start_date || undefined,
-            end_date: f.end_date || undefined,
-            shipped_out_start_date: f.shipped_out_start_date || undefined,
-            shipped_out_end_date: f.shipped_out_end_date || undefined,
-            csr: arr(f.csr ?? []),
-            platform: arr(f.platform ?? []),
-            parcel_status: arr(f.parcel_status ?? []),
-            order_status: arr(f.order_status ?? []),
+            ...serverDates,
+            csr: arr((f.csr as string[]) ?? []),
+            platform: arr((f.platform as string[]) ?? []),
+            parcel_status: arr((f.parcel_status as string[]) ?? []),
+            order_status: arr((f.order_status as string[]) ?? []),
         });
         if (JSON.stringify(buildFilter()) !== serverSig) debouncedFetch();
         return () => debouncedFetch.cancel();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         searchValue,
-        dateRange,
-        shippedDateRange,
+        dateFilters,
         csrFilter,
         platformFilter,
         parcelStatusFilter,
@@ -576,48 +583,11 @@ export default function DailySalesTrackerIndex({
                             aria-label="Search daily sales orders"
                         />
                     </div>
-                    <DatePicker
-                        id="gencys-sales-order-date-range"
-                        mode="range"
-                        placeholder="Filter by order date"
-                        defaultDate={
-                            (dateRange[0] && dateRange[1]
-                                ? dateRange
-                                : undefined) as never as DateOption
-                        }
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                setDateRange([
-                                    moment(dates[0]).format('YYYY-MM-DD'),
-                                    moment(dates[1]).format('YYYY-MM-DD'),
-                                ]);
-                            } else if (dates.length === 0) {
-                                setDateRange(['', '']);
-                            }
-                        }}
-                    />
-                    <DatePicker
-                        id="gencys-sales-shipped-date-range"
-                        mode="range"
-                        placeholder="Filter by shipped out date"
-                        defaultDate={
-                            (shippedDateRange[0] && shippedDateRange[1]
-                                ? shippedDateRange
-                                : undefined) as never as DateOption
-                        }
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                setShippedDateRange([
-                                    moment(dates[0]).format('YYYY-MM-DD'),
-                                    moment(dates[1]).format('YYYY-MM-DD'),
-                                ]);
-                            } else if (dates.length === 0) {
-                                setShippedDateRange(['', '']);
-                            }
-                        }}
-                    />
-
                     <div className="flex items-center gap-2 sm:ml-auto">
+                        <DailySalesDateFilters
+                            value={dateFilters}
+                            onChange={setDateFilters}
+                        />
                         <DailySalesFilters
                             value={{
                                 csr: csrFilter,
