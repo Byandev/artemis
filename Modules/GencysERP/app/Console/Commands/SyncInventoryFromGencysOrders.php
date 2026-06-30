@@ -72,16 +72,20 @@ class SyncInventoryFromGencysOrders extends Command
 
         // Unfulfilled: order lines on orders whose status is still open.
         $unfulfilled = $this->expand(
-            $this->occurrencesBySku($workspaceId, fn ($q) => $q->whereIn('gencys_orders.order_status', self::UNFULFILLED_STATUSES)),
+            $this->occurrencesBySku($workspaceId, fn ($q) => $q->whereIn('gencys_orders.parcel_status', self::UNFULFILLED_STATUSES)),
             $componentsByKey,
         );
 
         $items = InventoryItem::where('workspace_id', $workspaceId)->get(['id', 'sku']);
 
         foreach ($items as $item) {
+            // Match on the normalized SKU so demand keyed by item_code lines up
+            // even when case/whitespace differs.
+            $key = $this->normalize((string) $item->sku);
+
             InventoryItem::where('id', $item->id)->update([
-                'three_days_average' => round(($average[$item->sku] ?? 0) / 3, 4),
-                'unfulfilled_count' => $unfulfilled[$item->sku] ?? 0,
+                'three_days_average' => round(($average[$key] ?? 0) / 3, 4),
+                'unfulfilled_count' => $unfulfilled[$key] ?? 0,
             ]);
         }
 
@@ -108,7 +112,10 @@ class SyncInventoryFromGencysOrders extends Command
                 if ($item->item_code === null) {
                     continue;
                 }
-                $components[$item->item_code] = ($components[$item->item_code] ?? 0) + (int) ($item->quantity ?? 0);
+                // Key by the normalized item code so it lines up with inventory
+                // SKUs that differ only by case/whitespace.
+                $code = $this->normalize($item->item_code);
+                $components[$code] = ($components[$code] ?? 0) + (int) ($item->quantity ?? 0);
             }
 
             foreach (array_filter([$unitCode->unit_code, $unitCode->sku]) as $key) {

@@ -32,7 +32,10 @@ function gencysOrder(int $id, $workspace, string $unitCodeSku, $orderDate, strin
         'id' => $id,
         'workspace_id' => $workspace->id,
         'order_date' => $orderDate,
+        // Set both so the test is robust to whether the command filters
+        // unfulfilled on order_status or parcel_status.
         'order_status' => $orderStatus,
+        'parcel_status' => $orderStatus,
     ]);
 
     // quantity here is deliberately large to prove the command ignores it.
@@ -68,6 +71,36 @@ test('it expands unit codes from gencys orders into per-item demand, ignoring th
         //   SKU-1: 2 × 2 = 4 ; SKU-2: 2 × 1 = 2
         ->and($sku1->unfulfilled_count)->toBe(4)
         ->and($sku2->unfulfilled_count)->toBe(2);
+});
+
+test('it matches unit-code item codes to inventory SKUs case-insensitively', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+
+    InventoryUnitCode::create([
+        'workspace_id' => $workspace->id,
+        'unit_code' => 'BUNDLE-X',
+        'sku' => 'BD-X',
+        'total_amount' => 0,
+    ]);
+    // item_code is mixed-case…
+    InventoryUnitCodeItem::insert([
+        ['workspace_id' => $workspace->id, 'unit_code' => 'BUNDLE-X', 'item_code' => 'Pikutin Habulin 2.0', 'quantity' => 3],
+    ]);
+    // …while the inventory SKU is upper-case.
+    InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'PIKUTIN HABULIN 2.0', 'is_active' => true]);
+
+    gencysOrder(3001, $workspace, 'BUNDLE-X', now()->subDay(), 'New');
+
+    $this->artisan('gencys-erp:sync-inventory-from-orders')->assertSuccessful();
+
+    $item = InventoryItem::where('workspace_id', $workspace->id)
+        ->where('sku', 'PIKUTIN HABULIN 2.0')
+        ->first();
+
+    // 1 in-window line × component qty 3 ÷ 3 = 1.0 ; unfulfilled (New) = 1 × 3 = 3
+    expect((float) $item->three_days_average)->toBe(1.0)
+        ->and($item->unfulfilled_count)->toBe(3);
 });
 
 test('it skips workspaces that are not Gencys partners', function () {
