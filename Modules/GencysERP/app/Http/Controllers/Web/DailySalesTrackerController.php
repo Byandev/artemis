@@ -10,43 +10,73 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class DailySalesTrackerController extends Controller
 {
     use AuthorizesRequests;
 
-    /** Columns the table may be sorted by (frontend field => DB column). */
+    /** Columns the table may be sorted by. */
     private const SORTABLE = [
-        'order_date' => 'order_date',
-        'csr' => 'csr',
-        'verifier_name' => 'verifier_name',
-        'upsell_by' => 'upsell_by',
-        'contact' => 'contact',
-        'order_details' => 'order_details',
-        'total_qty' => 'total_qty',
-        'page' => 'page',
-        'platform' => 'platform',
-        'tracking_number' => 'tracking_number',
-        'parcel_status' => 'parcel_status',
-        'order_status' => 'order_status',
-        'encoded_date' => 'encoded_date',
-        'parcel_updated_date' => 'parcel_updated_date',
-        'shipped_out_date' => 'shipped_out_date',
-        'date_added' => 'date_added',
-        'price_upsell' => 'price_upsell',
-        'intern_brands_name' => 'intern_brands_name',
-        'total_cog' => 'total_cog',
+        'order_date',
+        'csr',
+        'verifier_name',
+        'upsell_by',
+        'customer_name',
+        'address',
+        'province',
+        'city',
+        'brgy',
+        'contact',
+        'order_details',
+        'total_qty',
+        'price_final',
+        'price_initial',
+        'shipping_fee',
+        'page',
+        'platform',
+        'tracking_number',
+        'courier',
+        'parcel_status',
+        'order_status',
+        'mop',
+        'encoded_date',
+        'parcel_updated_date',
+        'shipped_out_date',
+        'date_added',
+        'price_upsell',
+        'intern_brands_name',
+        'total_cog',
     ];
 
     public function index(Request $request, Workspace $workspace): Response
     {
         $this->authorize('View Daily Sales Tracker', $workspace);
 
-        [$sortColumn, $sortDir, $sortParam] = $this->resolveSort($request);
-
-        $orders = $this->filtered($request, $workspace)
+        $orders = QueryBuilder::for(
+            GencysDailySalesOrder::query()->where('workspace_id', $workspace->id)
+        )
+            ->allowedFilters([
+                AllowedFilter::callback('search', function (Builder $query, $value) {
+                    $query->where(function (Builder $q) use ($value) {
+                        foreach (['csr', 'customer_name', 'contact', 'tracking_number', 'page', 'order_details', 'intern_brands_name', 'order_status', 'parcel_status'] as $column) {
+                            $q->orWhere($column, 'like', "%{$value}%");
+                        }
+                    });
+                }),
+                AllowedFilter::callback('start_date', fn (Builder $query, $value) => $query->whereDate('order_date', '>=', $value)),
+                AllowedFilter::callback('end_date', fn (Builder $query, $value) => $query->whereDate('order_date', '<=', $value)),
+                AllowedFilter::callback('shipped_out_start_date', fn (Builder $query, $value) => $query->whereDate('shipped_out_date', '>=', $value)),
+                AllowedFilter::callback('shipped_out_end_date', fn (Builder $query, $value) => $query->whereDate('shipped_out_date', '<=', $value)),
+                AllowedFilter::exact('csr'),
+                AllowedFilter::exact('platform'),
+                AllowedFilter::exact('parcel_status'),
+                AllowedFilter::exact('order_status'),
+            ])
+            ->allowedSorts(self::SORTABLE)
+            ->defaultSort('-order_date')
             ->with('items:id,order_id,quantity,sku')
-            ->orderBy($sortColumn, $sortDir)
             ->orderBy('id', 'desc')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
@@ -66,59 +96,10 @@ class DailySalesTrackerController extends Controller
             'parcelStatuses' => $distinct('parcel_status'),
             'orderStatuses' => $distinct('order_status'),
             'query' => [
-                'sort' => $sortParam,
+                'sort' => $request->input('sort', '-order_date'),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
         ]);
-    }
-
-    /** Workspace-scoped query with the request's search / date / csr filters applied. */
-    private function filtered(Request $request, Workspace $workspace): Builder
-    {
-        $query = GencysDailySalesOrder::query()->where('workspace_id', $workspace->id);
-
-        if ($search = $request->input('filter.search')) {
-            $query->where(function (Builder $q) use ($search) {
-                foreach (['csr', 'contact', 'tracking_number', 'page', 'order_details', 'intern_brands_name', 'order_status', 'parcel_status'] as $column) {
-                    $q->orWhere($column, 'like', "%{$search}%");
-                }
-            });
-        }
-
-        if ($start = $request->input('filter.start_date')) {
-            $query->whereDate('order_date', '>=', $start);
-        }
-
-        if ($end = $request->input('filter.end_date')) {
-            $query->whereDate('order_date', '<=', $end);
-        }
-
-        // Multi-select filters: accept an array (whereIn) or a single value.
-        foreach (['csr', 'platform', 'parcel_status', 'order_status'] as $column) {
-            $values = array_values(array_filter(
-                (array) $request->input("filter.{$column}", []),
-                fn ($v) => $v !== null && $v !== '',
-            ));
-
-            if (! empty($values)) {
-                $query->whereIn($column, $values);
-            }
-        }
-
-        return $query;
-    }
-
-    /** Resolve the sort param ("-order_date") into [column, direction, normalized param]. */
-    private function resolveSort(Request $request): array
-    {
-        $raw = (string) $request->input('sort', '-order_date');
-        $desc = str_starts_with($raw, '-');
-        $field = $desc ? substr($raw, 1) : $raw;
-
-        $column = self::SORTABLE[$field] ?? 'order_date';
-        $field = array_search($column, self::SORTABLE, true) ?: 'order_date';
-
-        return [$column, $desc ? 'desc' : 'asc', ($desc ? '-' : '').$field];
     }
 }
