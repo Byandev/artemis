@@ -381,6 +381,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/botcake/sequence-messages', [SequenceMessageController::class, 'index'])->name('workspaces.botcake.sequence-messages.index');
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
+        Route::get('/export', [InventoryItemController::class, 'export'])->name('export');
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
         Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
