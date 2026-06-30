@@ -14,8 +14,8 @@ use App\Http\Controllers\PublicApi\ShopScanReturnController;
 use App\Http\Controllers\PublicApi\TransactionHistoryController;
 use App\Http\Controllers\PublicApi\UserController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
-use Modules\GencysERP\Http\Controllers\Api\UnitCodeController as GencysUnitCodeApiController;
 use Modules\GencysERP\Http\Controllers\Api\UnitCodeInventoryController as GencysUnitCodeInventoryApiController;
+use Modules\Inventory\Http\Controllers\Api\UnitCodeController as InventoryUnitCodeApiController;
 
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', HealthController::class)->name('health');
@@ -39,6 +39,11 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
 
     Route::post('/purchase-orders/bulk-sync', [PurchaseOrderController::class, 'bulkSync'])->name('purchase-orders.bulk-sync');
     Route::post('/inventory-items/transactions/bulk-sync', [TransactionHistoryController::class, 'bulkSync'])->name('transaction-history.bulk-sync');
+
+    // Inventory unit codes callback. The ERP sync (via n8n) posts the scraped
+    // unit codes (with their items) here, authenticating with the workspace API
+    // key header — that alone identifies the workspace.
+    Route::post('/inventory/unit-codes/bulk-sync', [InventoryUnitCodeApiController::class, 'bulkSync'])->name('inventory.unit-codes.bulk-sync');
 });
 
 // GencysERP daily sales tracker callback. n8n posts the scraped rows here and
@@ -46,12 +51,6 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
 // sits outside the api.key middleware group.
 Route::post('v1/public/gencys/daily-sales-tracker', [DailySalesTrackerController::class, 'store'])
     ->name('api.v1.public.gencys.daily-sales-tracker.store');
-
-// GencysERP unit codes callback. n8n posts the scraped unit codes here and
-// authenticates with the api_key embedded in the body (not a header), so this
-// sits outside the api.key middleware group.
-Route::post('v1/public/gencys/unit-codes', [GencysUnitCodeApiController::class, 'store'])
-    ->name('api.v1.public.gencys.unit-codes.store');
 
 // GencysERP unit code inventories callback. n8n posts the scraped inventory
 // items for a unit code here and authenticates with the api_key embedded in the

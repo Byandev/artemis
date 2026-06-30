@@ -26,7 +26,9 @@ class PurchasedOrderController extends Controller
                     $query->where(function ($q) use ($value) {
                         $q->where('delivery_no', 'like', "%{$value}%")
                             ->orWhere('cust_po_no', 'like', "%{$value}%")
-                            ->orWhere('control_no', 'like', "%{$value}%");
+                            ->orWhere('control_no', 'like', "%{$value}%")
+                            // Match orders containing an inventory item with this SKU.
+                            ->orWhereHas('items.inventoryItem', fn ($item) => $item->where('sku', 'like', "%{$value}%"));
                     });
                 }),
                 AllowedFilter::callback('start_date', function ($query, $value) {
