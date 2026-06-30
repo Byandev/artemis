@@ -16,12 +16,19 @@ class TriggerFetchERPPurchaseOrders extends Command
         {--item=* : Limit to specific inventory item id(s); repeat (--item=1 --item=2) or comma-separate (--item=1,2). Omit for all active items}
         {--delay=10 : Seconds to stagger each queued workspace by}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
-        {--sync : POST to the webhook immediately in-process instead of queueing (use this to hit an n8n test-mode webhook)}';
+        {--sync : POST to the webhook immediately in-process instead of queueing (use this to hit an n8n test-mode webhook)}
+        {--force : Run outside production (by default this command only runs on production)}';
 
     protected $description = 'Trigger n8n webhook for each workspace with ERP credentials to fetch its ERP purchase orders';
 
     public function handle()
     {
+        if (! app()->environment('production') && ! $this->option('force')) {
+            $this->warn('This command only runs on production. Re-run with --force to override (current environment: '.app()->environment().').');
+
+            return 0;
+        }
+
         $webhookUrl = $this->option('webhook') ?: config('services.n8n.purchase_order_webhook_url');
 
         $this->info($webhookUrl);
@@ -98,7 +105,7 @@ class TriggerFetchERPPurchaseOrders extends Command
             // once and loops the items reusing that session. This is what avoids the
             // per-item logins that were tripping the ERP's rate limit (429).
             $workspace->inventoryItems
-                ->chunk(10)
+                ->chunk(20)
                 ->values()
                 ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $webhookUrl, $startDateFormatted, $endDateFormatted) {
                     $dispatched++;
