@@ -78,6 +78,7 @@ export interface PageProps {
             search?: string;
             format?: string;
             ads_status?: string;
+            final_status?: string;
             creator_id?: string;
             product_id?: string;
             date_from?: string;

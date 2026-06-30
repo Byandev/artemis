@@ -10,9 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\GencysERP\Models\GencysUnitCodeInventoryItem;
 use Modules\Inventory\Exports\InventoryItemExport;
 use Modules\Inventory\Models\InventoryItem;
+use Modules\Inventory\Models\InventoryUnitCodeItem;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -134,12 +134,12 @@ class InventoryItemController extends Controller
 
         abort_unless($workspace->is_gencys_partner, 403);
 
-        $codes = GencysUnitCodeInventoryItem::query()
-            ->whereHas('unitCode', fn ($q) => $q->where('workspace_id', $workspace->id))
-            ->whereNotNull('inventory_item_code')
-            ->where('inventory_item_code', '!=', '')
+        $codes = InventoryUnitCodeItem::query()
+            ->where('workspace_id', $workspace->id)
+            ->whereNotNull('item_code')
+            ->where('item_code', '!=', '')
             ->distinct()
-            ->pluck('inventory_item_code');
+            ->pluck('item_code');
 
         $created = 0;
 

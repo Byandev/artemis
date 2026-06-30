@@ -12,6 +12,47 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.15.0',
+        date: '2026-06-30',
+        sections: [
+            {
+                title: 'Gencys ERP — Daily Sales Tracker (More Detail)',
+                items: [
+                    'Each order now captures the customer’s name and full address (province, city, barangay), the courier, the payment method, and the pricing — initial price, final price, and shipping fee — all pulled in automatically from the sync',
+                    'The tracker table shows these new columns and you can sort by customer, province, city, courier, and order/parcel status',
+                    'Search now spans CSR, customer name, contact, tracking number, page, order details, brand, and status; plus filters for order-date range, shipped-out-date range, parcel status, and order status',
+                ],
+            },
+            {
+                title: 'Inventory — Unit Codes Rebuilt',
+                items: [
+                    'Unit codes now live in Inventory as a general, workspace-wide catalog rather than a Gencys-only list, so the same unit codes can drive inventory regardless of where they came from',
+                    'Each unit code can be expanded to show its breakdown — the component item codes and how many of each it contains',
+                    'The list is sortable by unit code and SKU, and a Sync button pulls the latest codes on demand',
+                ],
+            },
+            {
+                title: 'Inventory — Automatic Demand From Gencys Orders',
+                items: [
+                    'A new daily sync (7am) works out each inventory item’s recent demand straight from Gencys orders — it expands every order’s unit code into its component items, then fills in the item’s 3-day average and unfulfilled count',
+                    'This keeps the "Days It Can Last" and "PO Needed" figures on the inventory list current without any manual entry',
+                ],
+            },
+            {
+                title: 'Inventory — Export Items',
+                items: [
+                    'New Export button on the Inventory Items list downloads an Excel file of the current view — SKU, product, status, lead time, unfulfilled, remaining quantity, waiting for delivery, 3-day average, days it can last, and PO needed — respecting whatever filters you have applied',
+                ],
+            },
+            {
+                title: 'Inventory — Purchased Orders Search by SKU',
+                items: [
+                    'You can now find a purchased order by the SKU of any inventory item on it, on top of the existing search by delivery no., customer PO, and control no.',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.14.2',
         date: '2026-06-30',
         sections: [
