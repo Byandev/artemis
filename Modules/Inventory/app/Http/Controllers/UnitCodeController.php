@@ -10,11 +10,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\GencysERP\Jobs\FetchUnitCodeJob;
 use Modules\Inventory\Models\InventoryUnitCode;
 use Modules\Inventory\Models\InventoryUnitCodeItem;
 
@@ -57,9 +55,9 @@ class UnitCodeController extends Controller
     }
 
     /**
-     * Kick off an on-demand ERP unit-code sync for this workspace. Dispatches the
-     * same n8n fetch the scheduled command runs, scoped to the current workspace.
-     * n8n scrapes the codes and posts them back to the public callback endpoint.
+     * Kick off an on-demand ERP unit-code sync for this workspace by calling the
+     * n8n webhook directly. n8n scrapes the codes and posts them back to the
+     * public bulk-sync callback endpoint, authenticating with this workspace's key.
      */
     public function sync(Workspace $workspace): RedirectResponse
     {
@@ -88,7 +86,7 @@ class UnitCodeController extends Controller
         ]);
 
         if (! $response->successful()) {
-            return back()->with('error', 'Something went wrong while syncing.' . "\n" . $response->body());
+            return back()->with('error', 'Something went wrong while syncing.'."\n".$response->body());
         }
 
         return back()->with('success', 'Unit code sync started. New codes from the ERP will appear here shortly.');
