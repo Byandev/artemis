@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GencysDailySalesOrder extends Model
 {
-    protected $table = 'gencys_daily_sales_orders';
+    protected $table = 'gencys_orders';
 
     // `id` holds Gencys' own order id (sent as "id" in the payload), so it is
     // assigned explicitly rather than auto-incremented.
@@ -23,14 +23,24 @@ class GencysDailySalesOrder extends Model
         'csr',
         'verifier_name',
         'upsell_by',
+        'customer_name',
+        'address',
+        'province',
+        'city',
+        'brgy',
         'contact',
         'order_details',
         'total_qty',
+        'price_final',
+        'price_initial',
+        'shipping_fee',
         'page',
         'platform',
         'tracking_number',
+        'courier',
         'parcel_status',
         'order_status',
+        'mop',
         'encoded_date',
         'parcel_updated_date',
         'shipped_out_date',
@@ -47,6 +57,9 @@ class GencysDailySalesOrder extends Model
         'shipped_out_date' => 'date:Y-m-d',
         'date_added' => 'datetime',
         'total_qty' => 'integer',
+        'price_final' => 'decimal:2',
+        'price_initial' => 'decimal:2',
+        'shipping_fee' => 'decimal:2',
         'price_upsell' => 'decimal:2',
         'total_cog' => 'decimal:2',
     ];

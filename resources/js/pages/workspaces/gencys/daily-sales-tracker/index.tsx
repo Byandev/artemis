@@ -48,15 +48,25 @@ interface Order {
     csr: string | null;
     verifier_name: string | null;
     upsell_by: string | null;
+    customer_name: string | null;
+    address: string | null;
+    province: string | null;
+    city: string | null;
+    brgy: string | null;
     contact: string | null;
     order_details: string | null;
     items?: OrderItem[];
     total_qty: number | null;
+    price_final: string | null;
+    price_initial: string | null;
+    shipping_fee: string | null;
     page: string | null;
     platform: string | null;
     tracking_number: string | null;
+    courier: string | null;
     parcel_status: string | null;
     order_status: string | null;
+    mop: string | null;
     encoded_date: string | null;
     parcel_updated_date: string | null;
     shipped_out_date: string | null;
@@ -81,6 +91,8 @@ interface Props {
             search?: string;
             start_date?: string;
             end_date?: string;
+            shipped_out_start_date?: string;
+            shipped_out_end_date?: string;
             csr?: string[];
             platform?: string[];
             parcel_status?: string[];
@@ -173,6 +185,50 @@ const COLUMNS: ColumnDef[] = [
         render: (o) => o.upsell_by || '—',
     },
     {
+        key: 'customer_name',
+        label: 'Customer',
+        sortable: true,
+        render: (o) => (
+            <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                {o.customer_name || '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'address',
+        label: 'Address',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => (
+            <span
+                className="block max-w-[220px] truncate"
+                title={o.address ?? ''}
+            >
+                {o.address || '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'province',
+        label: 'Province',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.province || '—',
+    },
+    {
+        key: 'city',
+        label: 'City',
+        sortable: true,
+        render: (o) => o.city || '—',
+    },
+    {
+        key: 'brgy',
+        label: 'Brgy',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.brgy || '—',
+    },
+    {
         key: 'contact',
         label: 'Contact',
         sortable: true,
@@ -217,6 +273,33 @@ const COLUMNS: ColumnDef[] = [
         ),
     },
     {
+        key: 'price_final',
+        label: 'Final ₱',
+        sortable: true,
+        align: 'right',
+        render: (o) => (
+            <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">
+                {o.price_final ? peso(o.price_final) : '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'price_initial',
+        label: 'Initial ₱',
+        sortable: true,
+        align: 'right',
+        defaultVisible: false,
+        render: (o) => (o.price_initial ? peso(o.price_initial) : '—'),
+    },
+    {
+        key: 'shipping_fee',
+        label: 'Shipping ₱',
+        sortable: true,
+        align: 'right',
+        defaultVisible: false,
+        render: (o) => (o.shipping_fee ? peso(o.shipping_fee) : '—'),
+    },
+    {
         key: 'page',
         label: 'Page',
         sortable: true,
@@ -239,6 +322,13 @@ const COLUMNS: ColumnDef[] = [
         render: (o) => o.tracking_number || '—',
     },
     {
+        key: 'courier',
+        label: 'Courier',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.courier || '—',
+    },
+    {
         key: 'parcel_status',
         label: 'Parcel Status',
         sortable: true,
@@ -249,6 +339,13 @@ const COLUMNS: ColumnDef[] = [
         label: 'Order Status',
         sortable: true,
         render: (o) => <StatusPill value={o.order_status} />,
+    },
+    {
+        key: 'mop',
+        label: 'MOP',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.mop || '—',
     },
     {
         key: 'encoded_date',
@@ -336,6 +433,10 @@ export default function DailySalesTrackerIndex({
         query?.filter?.start_date ?? '',
         query?.filter?.end_date ?? '',
     ]);
+    const [shippedDateRange, setShippedDateRange] = useState<string[]>(() => [
+        query?.filter?.shipped_out_start_date ?? '',
+        query?.filter?.shipped_out_end_date ?? '',
+    ]);
     const [csrFilter, setCsrFilter] = useState<string[]>(
         query?.filter?.csr ?? [],
     );
@@ -372,6 +473,8 @@ export default function DailySalesTrackerIndex({
         search: searchValue || undefined,
         start_date: dateRange[0] || undefined,
         end_date: dateRange[1] || undefined,
+        shipped_out_start_date: shippedDateRange[0] || undefined,
+        shipped_out_end_date: shippedDateRange[1] || undefined,
         csr: arr(csrFilter),
         platform: arr(platformFilter),
         parcel_status: arr(parcelStatusFilter),
@@ -407,6 +510,7 @@ export default function DailySalesTrackerIndex({
             orders.per_page,
             searchValue,
             dateRange,
+            shippedDateRange,
             csrFilter,
             platformFilter,
             parcelStatusFilter,
@@ -425,6 +529,8 @@ export default function DailySalesTrackerIndex({
             search: f.search || undefined,
             start_date: f.start_date || undefined,
             end_date: f.end_date || undefined,
+            shipped_out_start_date: f.shipped_out_start_date || undefined,
+            shipped_out_end_date: f.shipped_out_end_date || undefined,
             csr: arr(f.csr ?? []),
             platform: arr(f.platform ?? []),
             parcel_status: arr(f.parcel_status ?? []),
@@ -436,6 +542,7 @@ export default function DailySalesTrackerIndex({
     }, [
         searchValue,
         dateRange,
+        shippedDateRange,
         csrFilter,
         platformFilter,
         parcelStatusFilter,
@@ -470,7 +577,7 @@ export default function DailySalesTrackerIndex({
                         />
                     </div>
                     <DatePicker
-                        id="gencys-sales-date-range"
+                        id="gencys-sales-order-date-range"
                         mode="range"
                         placeholder="Filter by order date"
                         defaultDate={
@@ -486,6 +593,26 @@ export default function DailySalesTrackerIndex({
                                 ]);
                             } else if (dates.length === 0) {
                                 setDateRange(['', '']);
+                            }
+                        }}
+                    />
+                    <DatePicker
+                        id="gencys-sales-shipped-date-range"
+                        mode="range"
+                        placeholder="Filter by shipped out date"
+                        defaultDate={
+                            (shippedDateRange[0] && shippedDateRange[1]
+                                ? shippedDateRange
+                                : undefined) as never as DateOption
+                        }
+                        onChange={(dates) => {
+                            if (dates.length === 2) {
+                                setShippedDateRange([
+                                    moment(dates[0]).format('YYYY-MM-DD'),
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                ]);
+                            } else if (dates.length === 0) {
+                                setShippedDateRange(['', '']);
                             }
                         }}
                     />

@@ -21,7 +21,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import { Download, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -484,6 +484,21 @@ export default function ItemIndex({
                     description="Manage your inventory items and stock levels."
                 >
                     <div className="flex items-center gap-2">
+                        <a
+                            href={`${baseUrl}/export?${new URLSearchParams(
+                                Object.entries({
+                                    'filter[search]': searchValue || '',
+                                    'filter[is_active]': activeOnly
+                                        ? '1'
+                                        : 'all',
+                                    sort: query?.sort ?? '',
+                                }).filter(([, v]) => v !== ''),
+                            ).toString()}`}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </a>
                         {canCreateItems && workspace.is_gencys_partner && (
                             <button
                                 onClick={() =>
