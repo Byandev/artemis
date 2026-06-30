@@ -16,6 +16,7 @@ import { useCallback, useMemo, useState } from 'react';
 export interface CreativesFilterValue {
     formats: string[];
     ads_statuses: string[];
+    final_statuses: string[];
     creator_ids: string[];
     product_ids: string[];
 }
@@ -29,6 +30,7 @@ interface Props {
     value: CreativesFilterValue;
     formatOptions: Option[];
     adsStatusOptions: Option[];
+    finalStatusOptions: Option[];
     creatorOptions: Option[];
     productOptions: Option[];
     onApply: (value: CreativesFilterValue) => void;
@@ -122,6 +124,7 @@ export default function CreativesFilter({
     value,
     formatOptions,
     adsStatusOptions,
+    finalStatusOptions,
     creatorOptions,
     productOptions,
     onApply,
@@ -135,6 +138,7 @@ export default function CreativesFilter({
         let count = 0;
         if (value.formats.length > 0) count++;
         if (value.ads_statuses.length > 0) count++;
+        if (value.final_statuses.length > 0) count++;
         if (value.creator_ids.length > 0) count++;
         if (value.product_ids.length > 0) count++;
         return count;
@@ -164,6 +168,7 @@ export default function CreativesFilter({
         setLocalValue({
             formats: [],
             ads_statuses: [],
+            final_statuses: [],
             creator_ids: [],
             product_ids: [],
         });
@@ -257,6 +262,12 @@ export default function CreativesFilter({
                         options={formatOptions}
                         selected={localValue.formats}
                         onToggle={(id) => toggle('formats', id)}
+                    />
+                    <MultiSelectGroup
+                        name="Status"
+                        options={finalStatusOptions}
+                        selected={localValue.final_statuses}
+                        onToggle={(id) => toggle('final_statuses', id)}
                     />
                     <MultiSelectGroup
                         name="Ads Status"
