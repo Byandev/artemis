@@ -12,6 +12,26 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.14.2',
+        date: '2026-06-30',
+        sections: [
+            {
+                title: 'Inventory — Automatic ERP Syncs',
+                items: [
+                    'ERP transaction history now syncs automatically three times a day (8am, 12nn, 5pm) instead of just once each morning, so on-hand stock stays current throughout the day',
+                    'ERP purchase orders now sync automatically three times a day (9am, 1pm, 6pm) — previously this had to be triggered by hand',
+                    'Each sync now batches more items per run and spaces the runs further apart, easing load on the ERP and avoiding the rate-limit errors that could cause silent sync failures',
+                ],
+            },
+            {
+                title: 'Meta Ads',
+                items: [
+                    'Today’s ad insights now refresh every 6 hours instead of hourly, reducing load on the Meta API while still keeping the live day reasonably up to date',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.14.1',
         date: '2026-06-29',
         sections: [
