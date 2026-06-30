@@ -9,7 +9,9 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 use Modules\GencysERP\Models\GencysUnitCodeInventoryItem;
+use Modules\Inventory\Exports\InventoryItemExport;
 use Modules\Inventory\Models\InventoryItem;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -19,10 +21,13 @@ class InventoryItemController extends Controller
 {
     use AuthorizesRequests;
 
-    public function index(Request $request, Workspace $workspace)
+    /**
+     * Build the inventory-items query with the same computed columns, filters
+     * and sorts the list view uses, so the export mirrors exactly what the
+     * table shows. Returns the QueryBuilder un-paginated.
+     */
+    private function buildQuery(Request $request, Workspace $workspace): QueryBuilder
     {
-        $this->authorize('View Inventory Items', $workspace);
-
         $currentStocksSql = $workspace->inventory_sync || true
             ? '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)'
             : 'inventory_items.remaining_qty';
@@ -49,7 +54,7 @@ class InventoryItemController extends Controller
             $base->where('inventory_items.is_active', filter_var($isActiveFilter, FILTER_VALIDATE_BOOLEAN));
         }
 
-        $items = QueryBuilder::for($base)
+        return QueryBuilder::for($base)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
@@ -91,7 +96,14 @@ class InventoryItemController extends Controller
                     $query->orderByRaw("$poNeededSql ".($descending ? 'DESC' : 'ASC'));
                 }),
             ])
-            ->defaultSort('-created_at')
+            ->defaultSort('-created_at');
+    }
+
+    public function index(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        $items = $this->buildQuery($request, $workspace)
             ->paginate((int) $request->input('per_page', 100))
             ->withQueryString();
 
@@ -105,6 +117,15 @@ class InventoryItemController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    public function export(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        $filename = 'inventory-items-'.now()->format('Y-m-d-His').'.xlsx';
+
+        return Excel::download(new InventoryItemExport($this->buildQuery($request, $workspace)), $filename);
     }
 
     public function syncFromGencys(Workspace $workspace)
