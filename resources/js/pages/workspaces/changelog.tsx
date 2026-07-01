@@ -12,6 +12,30 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.15.1',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Creatives — Bulk Assign Reviewers',
+                items: [
+                    'Select multiple creatives with the new row checkboxes, then assign reviewers to all of them at once — choose “Add” to attach reviewers on top of any already set, or “Replace” to overwrite each creative’s reviewer list (clearing it if you pick none)',
+                ],
+            },
+            {
+                title: 'Creatives — Separate Date Filters',
+                items: [
+                    'The single date filter is now three independent date ranges — Creative Date, Created Date, and Approved Date — so you can narrow the list by any of them on their own or together',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Daily Sales Tracker Date Filters',
+                items: [
+                    'The tracker now offers a date range for each of its date columns — Order Date, Shipped, Encoded, Parcel Updated, and Date Added — each filterable on its own',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.15.0',
         date: '2026-06-30',
         sections: [
