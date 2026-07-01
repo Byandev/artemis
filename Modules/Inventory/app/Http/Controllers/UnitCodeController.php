@@ -76,7 +76,7 @@ class UnitCodeController extends Controller
             return back()->with('error', 'This workspace is not connected to the ERP. Add ERP credentials and an API key first.');
         }
 
-        $callbackBase = rtrim(config('services.n8n.gencys_unit_code_callback_url') ?: config('app.url'), '/');
+        $callbackBase = rtrim(config('app.url'), '/');
 
         $response = Http::timeout(30)->post($webhookUrl, [
             'workspace_api_key' => $apiKey->reveal(),

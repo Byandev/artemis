@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import { AdjustCountDialog } from '@/components/inventory/adjust-count-dialog';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
 import { ItemFormDialog } from '@/components/inventory/item-form-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,6 +11,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
@@ -20,8 +26,18 @@ import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
+import { format, parseISO } from 'date-fns';
 import { debounce, omit } from 'lodash';
-import { Download, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import {
+    ChevronsUpDown,
+    ClipboardCheck,
+    Download,
+    MoreHorizontal,
+    Package,
+    Pencil,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -43,6 +59,9 @@ interface Item {
     days_it_can_last: number | null;
     po_needed: number | null;
     current_stocks: number | null;
+    discrepancy: number | null;
+    discrepancy_counted_qty: number | null;
+    discrepancy_date: string | null;
 }
 
 interface Props {
@@ -64,6 +83,16 @@ const num = (v: number | null | undefined, decimals = 0) =>
               minimumFractionDigits: decimals,
               maximumFractionDigits: decimals,
           });
+
+// Short "30 Jun" label for the last-counted date; tolerant of a plain date string.
+const shortDate = (d: string | null | undefined) => {
+    if (!d) return '';
+    try {
+        return format(parseISO(d), 'd MMM');
+    } catch {
+        return d;
+    }
+};
 
 const MetricCell = ({
     value,
@@ -95,6 +124,7 @@ export default function ItemIndex({
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [syncingGencys, setSyncingGencys] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
+    const [adjustingItem, setAdjustingItem] = useState<Item | null>(null);
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     // Default to active-only; only an explicit `all` shows inactive items too.
@@ -103,6 +133,8 @@ export default function ItemIndex({
     );
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkProcessing, setBulkProcessing] = useState(false);
+    const [productPickerOpen, setProductPickerOpen] = useState(false);
+    const [productSearch, setProductSearch] = useState('');
 
     const canCreateItems = usePermission(PERMISSIONS.CreateInventoryItems);
     const canEditItems = usePermission(PERMISSIONS.EditInventoryItems);
@@ -170,6 +202,29 @@ export default function ItemIndex({
                 onSuccess: () => setRowSelection({}),
                 onError: () =>
                     toast.error('Failed to update inventory item status.'),
+            },
+        );
+    };
+
+    const filteredProducts = useMemo(() => {
+        const q = productSearch.trim().toLowerCase();
+        if (!q) return products;
+        return products.filter((p) => p.name?.toLowerCase().includes(q));
+    }, [products, productSearch]);
+
+    const handleBulkProduct = (productId: number | null) => {
+        setProductPickerOpen(false);
+        setProductSearch('');
+        router.post(
+            `${baseUrl}/bulk-product`,
+            { ids: selectedIds.map(Number), product_id: productId },
+            {
+                preserveScroll: true,
+                onStart: () => setBulkProcessing(true),
+                onFinish: () => setBulkProcessing(false),
+                onSuccess: () => setRowSelection({}),
+                onError: () =>
+                    toast.error('Failed to update inventory item product.'),
             },
         );
     };
@@ -319,6 +374,53 @@ export default function ItemIndex({
             ),
         },
         {
+            accessorKey: 'discrepancy',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Discrepancy"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => {
+                const d = row.original.discrepancy;
+                if (d == null) {
+                    return (
+                        <div className="text-center">
+                            <MetricCell value={null} />
+                        </div>
+                    );
+                }
+                const color =
+                    d > 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : d < 0
+                          ? 'text-red-500 dark:text-red-400'
+                          : 'text-gray-500 dark:text-gray-400';
+                const counted = row.original.discrepancy_counted_qty;
+                const date = shortDate(row.original.discrepancy_date);
+                const sub = [counted != null ? `cnt ${num(counted)}` : '', date]
+                    .filter(Boolean)
+                    .join(' · ');
+                return (
+                    <div className="flex flex-col items-center gap-0.5">
+                        <span
+                            className={`font-mono text-[12px] font-medium ${color}`}
+                        >
+                            {d > 0 ? '+' : ''}
+                            {num(d)}
+                        </span>
+                        {sub && (
+                            <span className="font-mono text-[9px] text-gray-400 dark:text-gray-500">
+                                {sub}
+                            </span>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
             accessorKey: 'remaining_after_fulfillment',
             enableSorting: true,
             header: ({ column }) => (
@@ -444,6 +546,16 @@ export default function ItemIndex({
                                           {canEditItems && (
                                               <DropdownMenuItem
                                                   onClick={() =>
+                                                      setAdjustingItem(item)
+                                                  }
+                                              >
+                                                  <ClipboardCheck className="mr-2 h-3.5 w-3.5" />
+                                                  Adjust count
+                                              </DropdownMenuItem>
+                                          )}
+                                          {canEditItems && (
+                                              <DropdownMenuItem
+                                                  onClick={() =>
                                                       setEditingItem(item)
                                                   }
                                               >
@@ -519,7 +631,7 @@ export default function ItemIndex({
                             >
                                 {syncingGencys
                                     ? 'Syncing…'
-                                    : 'Sync from Gencys'}
+                                    : 'Sync from Unit Codes'}
                             </button>
                         )}
                         {canCreateItems && (
@@ -575,6 +687,69 @@ export default function ItemIndex({
                             >
                                 Set Inactive
                             </button>
+                            <Popover
+                                open={productPickerOpen}
+                                onOpenChange={setProductPickerOpen}
+                            >
+                                <PopoverTrigger asChild>
+                                    <button
+                                        disabled={bulkProcessing}
+                                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                                    >
+                                        <Package className="h-3.5 w-3.5" />
+                                        Set Product
+                                        <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="start"
+                                    className="w-64 p-0"
+                                >
+                                    <div className="flex items-center gap-2 border-b border-black/6 px-3 dark:border-white/6">
+                                        <Search className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                                        <input
+                                            autoFocus
+                                            value={productSearch}
+                                            onChange={(e) =>
+                                                setProductSearch(e.target.value)
+                                            }
+                                            placeholder="Search products…"
+                                            className="h-9 w-full bg-transparent font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
+                                        />
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto p-1">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleBulkProduct(null)
+                                            }
+                                            className="flex w-full items-center rounded-md px-2 py-1.5 text-left font-mono! text-[12px]! text-gray-500 transition-colors hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-zinc-800"
+                                        >
+                                            No product (clear)
+                                        </button>
+                                        {filteredProducts.length === 0 ? (
+                                            <p className="px-2 py-3 text-center font-mono text-[11px] text-gray-400 dark:text-gray-600">
+                                                No products found.
+                                            </p>
+                                        ) : (
+                                            filteredProducts.map((product) => (
+                                                <button
+                                                    type="button"
+                                                    key={product.id}
+                                                    onClick={() =>
+                                                        handleBulkProduct(
+                                                            product.id,
+                                                        )
+                                                    }
+                                                    className="flex w-full items-center rounded-md px-2 py-1.5 text-left font-mono! text-[12px]! text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-200 dark:hover:bg-zinc-800"
+                                                >
+                                                    {product.name}
+                                                </button>
+                                            ))
+                                        )}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                             <button
                                 onClick={() => setRowSelection({})}
                                 disabled={bulkProcessing}
@@ -637,6 +812,15 @@ export default function ItemIndex({
                         item={editingItem as any}
                         workspace={workspace}
                         products={products}
+                    />
+                )}
+
+                {canEditItems && (
+                    <AdjustCountDialog
+                        open={adjustingItem !== null}
+                        item={adjustingItem}
+                        workspace={workspace}
+                        onClose={() => setAdjustingItem(null)}
                     />
                 )}
 

@@ -7,6 +7,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class InventoryItem extends Model
 {
@@ -59,53 +60,22 @@ class InventoryItem extends Model
         return $this->hasMany(InventoryTransaction::class);
     }
 
-    /**
-     * Recompute each transaction's running stock (remaining_qty) as a ledger.
-     *
-     * A physically audited row (is_audited) sets the starting balance — its counted
-     * remaining_qty is taken as-is. From there every later row rolls the balance forward
-     * by its own net movement (goods in − out − bad − lost; see
-     * InventoryTransaction::netMovement), until the next audit re-anchors it. Before the
-     * first audit there's no counted level, so the earliest row seeds from the external
-     * stock (inventory_remaining_stock) when present. The item's own remaining_qty is
-     * refreshed from the most recent transaction so the inventory list shows current stock.
-     */
-    public function recalculateActualStock(): void
+    /** Manual physical-count adjustments (discrepancy ledger) */
+    public function discrepancies(): HasMany
     {
-        $transactions = $this->transactions()
-            ->orderBy('date')
-            ->orderBy('id')
-            ->get();
+        return $this->hasMany(InventoryItemDiscrepancy::class);
+    }
 
-        $running = null;
-
-        foreach ($transactions as $transaction) {
-            if ($transaction->is_audited) {
-                // The counted level is the new starting balance; trust it as-is.
-                $running = (int) $transaction->remaining_qty;
-
-                continue;
-            }
-
-            if ($running === null) {
-                // No audit yet: seed from the external stock if we have one.
-                $running = $transaction->inventory_remaining_stock !== null
-                    ? (int) round((float) $transaction->inventory_remaining_stock)
-                    : $transaction->netMovement();
-            } else {
-                $running += $transaction->netMovement();
-            }
-
-            if ((int) $transaction->remaining_qty !== $running) {
-                $transaction->update(['remaining_qty' => $running]);
-            }
-        }
-
-        $latest = $transactions->last();
-
-        if ($latest && (int) $this->remaining_qty !== (int) $latest->remaining_qty) {
-            $this->update(['remaining_qty' => $latest->remaining_qty]);
-        }
+    /**
+     * The most recent physical-count adjustment. Its signed discrepancy is layered
+     * onto the transaction ledger to produce the item's displayed remaining stock —
+     * see InventoryItemController::buildQuery() for the read-side of this.
+     */
+    public function latestDiscrepancy(): HasOne
+    {
+        return $this->hasOne(InventoryItemDiscrepancy::class)
+            ->latest('date')
+            ->latest('id');
     }
 
     /** All purchased order items */

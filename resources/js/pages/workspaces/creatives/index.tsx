@@ -1,6 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import DatePicker from '@/components/ui/date-picker';
 import {
     Dialog,
     DialogClose,
@@ -26,7 +26,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import {
     ChevronDown,
@@ -40,14 +40,16 @@ import {
     TriangleAlert,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AdsBadge,
     FinalBadge,
     FormatBadge,
     InitialAvatar,
 } from './components/atoms';
+import { AssigneePicker } from './components/assignee-picker';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
+import CreativesDateFilter from './components/creatives-date-filter';
 import CreativesFilter, {
     CreativesFilterValue,
 } from './components/creatives-filter';
@@ -131,6 +133,39 @@ export default function CreativesIndex({
     );
     const [deleteId, setDeleteId] = useState<number | null>(null);
 
+    // Bulk reviewer assignment: row selection + the reviewers to apply.
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [bulkReviewerIds, setBulkReviewerIds] = useState<number[]>([]);
+    const [bulkProcessing, setBulkProcessing] = useState(false);
+
+    const selectedIds = useMemo(
+        () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+        [rowSelection],
+    );
+
+    const handleBulkAssign = (
+        mode: 'add' | 'replace',
+        reviewerIds: number[] = bulkReviewerIds,
+    ) => {
+        router.post(
+            `${baseUrl}/bulk-reviewers`,
+            {
+                ids: selectedIds.map(Number),
+                reviewer_ids: reviewerIds,
+                mode,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setBulkProcessing(true),
+                onFinish: () => setBulkProcessing(false),
+                onSuccess: () => {
+                    setRowSelection({});
+                    setBulkReviewerIds([]);
+                },
+            },
+        );
+    };
+
     // Always derive from fresh props so reviews/remarks update without reopening
     const detailCreative =
         detailCreativeId !== null
@@ -144,36 +179,48 @@ export default function CreativesIndex({
     );
     const [search, setSearch] = useState(query.filter?.search ?? '');
 
+    // `navigate` is captured once by uncontrolled children (e.g. the flatpickr
+    // DatePicker only re-binds its onChange when its own deps change). Reading
+    // `query` straight from the closure would therefore go stale and clobber
+    // filters set since the capture. Keep the latest `query` in a ref and read
+    // through it so `navigate` has a stable identity yet always sees fresh
+    // filters.
+    const queryRef = useRef(query);
+    queryRef.current = query;
+
     const navigate = useCallback(
         (params: Record<string, string | number | null | undefined>) => {
+            const q = queryRef.current;
             router.get(
                 baseUrl,
                 {
-                    sort: query.sort,
+                    sort: q.sort,
                     page: 1,
-                    per_page: query.per_page,
-                    'filter[search]': query.filter?.search || undefined,
-                    'filter[format]': query.filter?.format || undefined,
-                    'filter[ads_status]': query.filter?.ads_status || undefined,
-                    'filter[final_status]':
-                        query.filter?.final_status || undefined,
-                    'filter[creator_id]': query.filter?.creator_id || undefined,
-                    'filter[product_id]': query.filter?.product_id || undefined,
-                    'filter[date_from]': query.filter?.date_from || undefined,
-                    'filter[date_to]': query.filter?.date_to || undefined,
+                    per_page: q.per_page,
+                    'filter[search]': q.filter?.search || undefined,
+                    'filter[format]': q.filter?.format || undefined,
+                    'filter[ads_status]': q.filter?.ads_status || undefined,
+                    'filter[creator_id]': q.filter?.creator_id || undefined,
+                    'filter[product_id]': q.filter?.product_id || undefined,
+                    'filter[creative_date_from]':
+                        q.filter?.creative_date_from || undefined,
+                    'filter[creative_date_to]':
+                        q.filter?.creative_date_to || undefined,
+                    'filter[created_at_from]':
+                        q.filter?.created_at_from || undefined,
+                    'filter[created_at_to]':
+                        q.filter?.created_at_to || undefined,
+                    'filter[approved_at_from]':
+                        q.filter?.approved_at_from || undefined,
+                    'filter[approved_at_to]':
+                        q.filter?.approved_at_to || undefined,
                     ...params,
                 },
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [baseUrl, query],
+        [baseUrl],
     );
-
-    const dateRange = useMemo(() => {
-        const from = query.filter?.date_from;
-        const to = query.filter?.date_to;
-        return from && to ? [from, to] : undefined;
-    }, [query.filter?.date_from, query.filter?.date_to]);
 
     const debouncedSearch = useCallback(
         debounce(
@@ -196,6 +243,37 @@ export default function CreativesIndex({
     };
 
     const columns: ColumnDef<Creative>[] = [
+        ...(canEdit
+            ? [
+                  {
+                      id: 'select',
+                      enableSorting: false,
+                      header: ({ table }) => (
+                          <Checkbox
+                              checked={
+                                  table.getIsAllPageRowsSelected() ||
+                                  (table.getIsSomePageRowsSelected() &&
+                                      'indeterminate')
+                              }
+                              onCheckedChange={(value) =>
+                                  table.toggleAllPageRowsSelected(!!value)
+                              }
+                              aria-label="Select all"
+                          />
+                      ),
+                      cell: ({ row }) => (
+                          <Checkbox
+                              checked={row.getIsSelected()}
+                              onCheckedChange={(value) =>
+                                  row.toggleSelected(!!value)
+                              }
+                              aria-label="Select row"
+                              onClick={(e) => e.stopPropagation()}
+                          />
+                      ),
+                  } as ColumnDef<Creative>,
+              ]
+            : []),
         {
             accessorKey: 'name',
             enableSorting: true,
@@ -526,28 +604,9 @@ export default function CreativesIndex({
 
                     <div className="flex-1" />
 
-                    <DatePicker
-                        id="creatives-date-range"
-                        mode="range"
-                        placeholder="All dates"
-                        defaultDate={dateRange as never}
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                const fmt = (d: Date) =>
-                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                navigate({
-                                    'filter[date_from]': fmt(dates[0]),
-                                    'filter[date_to]': fmt(dates[1]),
-                                    page: 1,
-                                });
-                            } else if (dates.length === 0) {
-                                navigate({
-                                    'filter[date_from]': undefined,
-                                    'filter[date_to]': undefined,
-                                    page: 1,
-                                });
-                            }
-                        }}
+                    <CreativesDateFilter
+                        filter={query.filter}
+                        onChange={(params) => navigate({ ...params, page: 1 })}
                     />
 
                     <CreativesFilter
@@ -561,12 +620,65 @@ export default function CreativesIndex({
                     />
                 </div>
 
+                {canEdit && selectedIds.length > 0 && (
+                    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-emerald-500/20 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-400/20 dark:bg-emerald-500/5">
+                        <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                            {selectedIds.length} selected
+                        </span>
+                        <div className="w-64">
+                            <AssigneePicker
+                                reviewers={reviewers}
+                                selectedIds={bulkReviewerIds}
+                                onChange={setBulkReviewerIds}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => handleBulkAssign('add')}
+                                disabled={
+                                    bulkProcessing ||
+                                    bulkReviewerIds.length === 0
+                                }
+                                title="Add the selected reviewers to every selected creative"
+                                className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                                Assign
+                            </button>
+                            <button
+                                onClick={() => handleBulkAssign('replace', [])}
+                                disabled={bulkProcessing}
+                                title="Remove all reviewers from every selected creative"
+                                className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-rose-600 transition-all hover:bg-rose-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                            >
+                                Unassign
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setRowSelection({});
+                                    setBulkReviewerIds([]);
+                                }}
+                                disabled={bulkProcessing}
+                                className="flex h-8 items-center rounded-lg px-2 font-mono! text-[12px]! font-medium text-gray-500 transition-all hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
                         columns={columns}
                         data={creatives.data}
                         meta={{ ...omit(creatives, ['data']) }}
                         initialSorting={initialSorting}
+                        getRowId={(row) => String(row.id)}
+                        {...(canEdit
+                            ? {
+                                  rowSelection,
+                                  onRowSelectionChange: setRowSelection,
+                              }
+                            : {})}
                         onFetch={(params) =>
                             navigate({
                                 sort: (params?.sort as string) ?? undefined,

@@ -99,7 +99,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
         Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
         Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
-        Route::patch('/inventory/transactions/{transaction}/remaining-qty', [InventoryTransactionController::class, 'updateRemainingQty'])->name('inventory.transactions.remaining-qty');
         Route::delete('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
 
@@ -385,6 +384,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
         Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
+        Route::post('/bulk-product', [InventoryItemController::class, 'bulkUpdateProduct'])->name('bulk-product');
+        Route::get('/{item}/stock-as-of', [InventoryItemController::class, 'stockAsOf'])->name('stock-as-of');
+        Route::post('/{item}/discrepancies', [InventoryItemController::class, 'adjustCount'])->name('discrepancies.store');
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
@@ -470,6 +472,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [CreativesController::class, 'index'])->name('index');
         Route::get('/create', [CreativesController::class, 'create'])->name('create');
         Route::post('/', [CreativesController::class, 'store'])->name('store');
+        Route::post('/bulk-reviewers', [CreativesController::class, 'bulkAssignReviewers'])->name('reviewers.bulk');
         Route::get('/{creative}/edit', [CreativesController::class, 'edit'])->name('edit');
         Route::put('/{creative}', [CreativesController::class, 'update'])->name('update');
         Route::delete('/{creative}', [CreativesController::class, 'destroy'])->name('destroy');

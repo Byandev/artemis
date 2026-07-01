@@ -12,6 +12,90 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.15.4',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Inventory — Adjust Count & Discrepancies',
+                items: [
+                    'New “Adjust count” action on each item in the Inventory Items list — record a physical stock count and the item’s remaining quantity updates to match, carrying the difference forward as new stock moves in and out',
+                    'Pick the date you counted and the dialog shows what the system thought the stock was on that date, plus the exact discrepancy that will take effect, before you save',
+                    'New “Discrepancy” column on the Inventory Items list (and the Excel export) shows the offset currently applied, along with what was last counted and when',
+                ],
+            },
+            {
+                title: 'Inventory — Simpler Stock Sync',
+                items: [
+                    'ERP transaction history now records each row’s remaining stock exactly as the ERP reports it, instead of re-deriving a running total — the on-hand numbers now match the source',
+                    'The inline “remaining quantity” edit on the Transaction Logs page is now read-only; stock corrections go through the new Adjust Count flow instead',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.15.3',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Creatives — Simpler Date Filtering',
+                items: [
+                    'The date filter is now a single range picker with a column selector — pick which date to filter by (Creative Date, Created Date, or Approved Date) and set one range, rather than juggling three separate ranges',
+                    'Only one date type applies at a time, and switching the type carries your current range over to it',
+                    'The Clear button now reliably removes the date filter in one click',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Daily Sales Tracker Date Filtering',
+                items: [
+                    'The Daily Sales Tracker date filter now works the same way — one range picker plus a column selector to choose Order Date or Shipped Out Date, with only one date type filtering at a time and Clear working reliably',
+                ],
+            },
+            {
+                title: 'Video Editor Dashboard — Shows All Editors by Default',
+                items: [
+                    'The dashboard no longer defaults to just your own work — it now shows every editor’s activity out of the box, and you can narrow to specific people when you want to; any saved filter that previously pinned the view to you is reset automatically',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.15.2',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Inventory — Bulk Assign Product',
+                items: [
+                    'Select multiple items on the Inventory Items list and set their linked product in one go, instead of editing each item individually',
+                    'The picker is searchable, so you can find the right product quickly; choose “No product (clear)” to unlink the product from every selected item',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.15.1',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Creatives — Bulk Assign Reviewers',
+                items: [
+                    'Select multiple creatives with the new row checkboxes, then assign reviewers to all of them at once — choose “Add” to attach reviewers on top of any already set, or “Replace” to overwrite each creative’s reviewer list (clearing it if you pick none)',
+                ],
+            },
+            {
+                title: 'Creatives — Separate Date Filters',
+                items: [
+                    'The single date filter is now three independent date ranges — Creative Date, Created Date, and Approved Date — so you can narrow the list by any of them on their own or together',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Daily Sales Tracker Date Filters',
+                items: [
+                    'The tracker now offers a date range for each of its date columns — Order Date, Shipped, Encoded, Parcel Updated, and Date Added — each filterable on its own',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.15.0',
         date: '2026-06-30',
         sections: [

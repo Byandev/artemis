@@ -50,6 +50,18 @@ class DailySalesTrackerController extends Controller
         'total_cog',
     ];
 
+    /**
+     * Date columns exposed as range filters. Each becomes a pair of
+     * `{column}_start` / `{column}_end` filters (inclusive whereDate bounds).
+     */
+    private const DATE_RANGES = [
+        'order_date',
+        'shipped_out_date',
+        'encoded_date',
+        'parcel_updated_date',
+        'date_added',
+    ];
+
     public function index(Request $request, Workspace $workspace): Response
     {
         $this->authorize('View Daily Sales Tracker', $workspace);
@@ -65,10 +77,7 @@ class DailySalesTrackerController extends Controller
                         }
                     });
                 }),
-                AllowedFilter::callback('start_date', fn (Builder $query, $value) => $query->whereDate('order_date', '>=', $value)),
-                AllowedFilter::callback('end_date', fn (Builder $query, $value) => $query->whereDate('order_date', '<=', $value)),
-                AllowedFilter::callback('shipped_out_start_date', fn (Builder $query, $value) => $query->whereDate('shipped_out_date', '>=', $value)),
-                AllowedFilter::callback('shipped_out_end_date', fn (Builder $query, $value) => $query->whereDate('shipped_out_date', '<=', $value)),
+                ...$this->dateRangeFilters(),
                 AllowedFilter::exact('csr'),
                 AllowedFilter::exact('platform'),
                 AllowedFilter::exact('parcel_status'),
@@ -101,5 +110,29 @@ class DailySalesTrackerController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    /**
+     * Build inclusive `{column}_start` / `{column}_end` range filters for every
+     * date column in self::DATE_RANGES.
+     *
+     * @return array<int, AllowedFilter>
+     */
+    private function dateRangeFilters(): array
+    {
+        $filters = [];
+
+        foreach (self::DATE_RANGES as $column) {
+            $filters[] = AllowedFilter::callback(
+                "{$column}_start",
+                fn (Builder $query, $value) => $query->whereDate($column, '>=', $value),
+            );
+            $filters[] = AllowedFilter::callback(
+                "{$column}_end",
+                fn (Builder $query, $value) => $query->whereDate($column, '<=', $value),
+            );
+        }
+
+        return $filters;
     }
 }

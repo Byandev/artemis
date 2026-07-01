@@ -58,18 +58,14 @@ final class DashboardFilters
             ->values()
             ->all();
 
-        // Editor scope defaults to the signed-in user; selecting foreign users
-        // is safe because every section also scopes by workspace_id.
+        // Editor scope is unfiltered by default (empty = all users); selecting
+        // users is safe because every section also scopes by workspace_id.
         $userIds = collect((array) $request->input('user_ids', []))
             ->reject(fn ($id) => $id === '' || $id === 'all')
             ->map(fn ($id) => (int) $id)
             ->unique()
             ->values()
             ->all();
-
-        if (empty($userIds)) {
-            $userIds = [(int) $request->user()->id];
-        }
 
         return new self(
             dateFrom: $dateFrom,

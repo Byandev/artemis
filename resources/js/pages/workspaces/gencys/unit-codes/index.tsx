@@ -295,7 +295,7 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                                     syncing && 'animate-spin',
                                 )}
                             />
-                            {syncing ? 'Syncing…' : 'Sync from ERP'}
+                            {syncing ? 'Syncing…' : 'Sync from Gencys ERP'}
                         </button>
                     )}
                 </div>
