@@ -47,9 +47,6 @@ export default function CreativesDateFilter({
             DATE_RANGE_FIELDS.find((f) => hasRange(f.key))?.key ??
             DEFAULT_FIELD,
     );
-    // Bumped to remount the picker so flatpickr re-reads defaultDate.
-    const [resetKey, setResetKey] = useState(0);
-
     const start = filter?.[fromKey(selectedField)];
     const end = filter?.[toKey(selectedField)];
     const hasActiveRange = !!start && !!end;
@@ -75,14 +72,12 @@ export default function CreativesDateFilter({
             setSelectedField(next);
             // Carry any current range over to the newly-selected column.
             if (start && end) applyRange(next, start, end);
-            setResetKey((k) => k + 1);
         },
         [start, end, applyRange],
     );
 
     const handleClear = useCallback(() => {
         applyRange(selectedField);
-        setResetKey((k) => k + 1);
     }, [selectedField, applyRange]);
 
     return (
@@ -105,8 +100,11 @@ export default function CreativesDateFilter({
             </span>
 
             <DatePicker
-                id={`creatives-date-${selectedField}-${resetKey}`}
-                key={`${selectedField}-${resetKey}`}
+                // Key on the resolved range so the picker remounts (and re-seeds
+                // its display) whenever the range changes — including when it's
+                // cleared, once the navigation drops the filter params.
+                id={`creatives-date-${selectedField}`}
+                key={`${selectedField}:${start ?? ''}:${end ?? ''}`}
                 mode="range"
                 placeholder="All dates"
                 defaultDate={
