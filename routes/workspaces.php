@@ -470,6 +470,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [CreativesController::class, 'index'])->name('index');
         Route::get('/create', [CreativesController::class, 'create'])->name('create');
         Route::post('/', [CreativesController::class, 'store'])->name('store');
+        Route::post('/bulk-reviewers', [CreativesController::class, 'bulkAssignReviewers'])->name('reviewers.bulk');
         Route::get('/{creative}/edit', [CreativesController::class, 'edit'])->name('edit');
         Route::put('/{creative}', [CreativesController::class, 'update'])->name('update');
         Route::delete('/{creative}', [CreativesController::class, 'destroy'])->name('destroy');
