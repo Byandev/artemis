@@ -12,6 +12,32 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.15.3',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Creatives — Simpler Date Filtering',
+                items: [
+                    'The date filter is now a single range picker with a column selector — pick which date to filter by (Creative Date, Created Date, or Approved Date) and set one range, rather than juggling three separate ranges',
+                    'Only one date type applies at a time, and switching the type carries your current range over to it',
+                    'The Clear button now reliably removes the date filter in one click',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Daily Sales Tracker Date Filtering',
+                items: [
+                    'The Daily Sales Tracker date filter now works the same way — one range picker plus a column selector to choose Order Date or Shipped Out Date, with only one date type filtering at a time and Clear working reliably',
+                ],
+            },
+            {
+                title: 'Video Editor Dashboard — Shows All Editors by Default',
+                items: [
+                    'The dashboard no longer defaults to just your own work — it now shows every editor’s activity out of the box, and you can narrow to specific people when you want to; any saved filter that previously pinned the view to you is reset automatically',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.15.2',
         date: '2026-07-01',
         sections: [
