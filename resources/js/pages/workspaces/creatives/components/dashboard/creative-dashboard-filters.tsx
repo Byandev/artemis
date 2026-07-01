@@ -29,8 +29,6 @@ interface Props {
     value: CreativeFilterValue;
     editors: EditorOption[];
     products: ProductOption[];
-    /** Default editor (current user), restored on "Clear all". */
-    defaultUserId: string;
     onApply: (value: CreativeFilterValue) => void;
 }
 
@@ -122,7 +120,6 @@ export default function CreativeDashboardFilters({
     value,
     editors,
     products,
-    defaultUserId,
     onApply,
 }: Props) {
     const [isOpen, setIsOpen] = useState(false);
@@ -142,18 +139,14 @@ export default function CreativeDashboardFilters({
         { key: 'image', label: 'Image' },
     ];
 
-    const isDefaultEditors = (ids: string[]) =>
-        ids.length === 1 && ids[0] === defaultUserId;
-
-    // Count groups that differ from the default (me / all / all).
+    // Count groups with an active selection (all default to unfiltered).
     const activeCount = useMemo(() => {
         let count = 0;
-        if (!isDefaultEditors(value.user_ids)) count++;
+        if (value.user_ids.length > 0) count++;
         if (value.product_ids.length > 0) count++;
         if (value.formats.length > 0) count++;
         return count;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [value, defaultUserId]);
+    }, [value]);
 
     const toggle = useCallback((key: keyof CreativeFilterValue, id: string) => {
         setLocalValue((prev) => {
@@ -167,27 +160,19 @@ export default function CreativeDashboardFilters({
     }, []);
 
     const handleApply = useCallback(() => {
-        // Editor scope can't be empty; fall back to the current user.
-        const applied: CreativeFilterValue = {
-            ...localValue,
-            user_ids:
-                localValue.user_ids.length > 0
-                    ? localValue.user_ids
-                    : [defaultUserId],
-        };
-        onApply(applied);
+        onApply(localValue);
         setHasChanges(false);
         setIsOpen(false);
-    }, [localValue, defaultUserId, onApply]);
+    }, [localValue, onApply]);
 
     const handleClearAll = useCallback(() => {
         setLocalValue({
-            user_ids: [defaultUserId],
+            user_ids: [],
             product_ids: [],
             formats: [],
         });
         setHasChanges(true);
-    }, [defaultUserId]);
+    }, []);
 
     const handleOpenChange = useCallback(
         (open: boolean) => {

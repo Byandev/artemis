@@ -42,7 +42,9 @@ export default function VideoEditorDashboard({
     // endpoint, so changing a filter (or the chart granularity) updates only
     // the affected sections — no full page reload. Persisted per workspace so
     // they survive a browser refresh.
-    const STORAGE_KEY = `video-editor-dashboard-filters:${workspace.slug}`;
+    // Key is versioned (v2) to drop stale persisted filters that pinned the
+    // editor scope to the current user before the default became "all users".
+    const STORAGE_KEY = `video-editor-dashboard-filters:v2:${workspace.slug}`;
 
     const [filters, setFilters] = useState<DashboardFilters>(() => {
         try {
@@ -86,7 +88,6 @@ export default function VideoEditorDashboard({
                         filters={filters}
                         products={products}
                         editors={editors}
-                        currentUserId={currentUserId}
                         onChange={applyFilter}
                         listUrl={creativesBase}
                     />
