@@ -101,7 +101,7 @@ export default function DailySalesDateFilters({ value, onChange }: Props) {
     return (
         <div className="flex items-center gap-2">
             <Select value={selectedField} onValueChange={handleFieldChange}>
-                <SelectTrigger className="h-9 w-[180px] bg-white dark:bg-zinc-900">
+                <SelectTrigger className="h-9 w-[180px] rounded-[10px] border-black/8 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:border-black/14 dark:border-white/8 dark:bg-zinc-900 dark:shadow-none dark:hover:border-white/14">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -113,7 +113,7 @@ export default function DailySalesDateFilters({ value, onChange }: Props) {
                 </SelectContent>
             </Select>
 
-            <span className="text-sm font-medium text-gray-400 dark:text-gray-500">
+            <span className="text-[13px] font-medium text-gray-400 dark:text-gray-500">
                 :
             </span>
 
