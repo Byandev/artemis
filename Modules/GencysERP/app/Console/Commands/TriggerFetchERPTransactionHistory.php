@@ -126,7 +126,7 @@ class TriggerFetchERPTransactionHistory extends Command
                     ];
 
                     dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data, $runIds->values()->all()))
-                        ->delay(now()->addMinutes($dispatched * 3));
+                        ->delay(now()->addMinutes(($dispatched - 1) * 3));
                 });
         }
 

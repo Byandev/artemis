@@ -143,7 +143,7 @@ class TriggerFetchERPPurchaseOrders extends Command
                     ];
 
                     dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data, $runIds->values()->all()))
-                        ->delay(now()->addMinutes($dispatched * 3));
+                        ->delay(now()->addMinutes(($dispatched - 1) * 3));
                 });
         }
 

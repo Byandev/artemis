@@ -1,12 +1,16 @@
 import DatePicker from '@/components/ui/date-picker';
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
-import { CalendarDays, X } from 'lucide-react';
-import { useState } from 'react';
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import flatpickr from 'flatpickr';
+import { X } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { DATE_RANGE_FIELDS, DateField, PageProps } from '../types';
+import DateOption = flatpickr.Options.DateOption;
 
 type Filter = NonNullable<PageProps['query']['filter']>;
 
@@ -14,10 +18,15 @@ type Filter = NonNullable<PageProps['query']['filter']>;
 const fmt = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
+/** The date column selected by default when nothing is filtered yet. */
+const DEFAULT_FIELD: DateField = 'creative_date';
+
 /**
- * A "Dates" popover with three independent date-range pickers — one each for
- * Creative Date, Created Date and Approved Date — styled to match the Filters
- * control. Each range maps to `filter[<key>_from]` / `filter[<key>_to]`.
+ * Date filter for the Creative Tracker list. A single dropdown picks which date
+ * column to filter by (Creative Date, Created Date, Approved Date) and one range
+ * picker beside it sets the bounds — only one date type filters at a time.
+ * Switching the type carries the current range over to the newly-selected
+ * column. Each range maps to `filter[<key>_from]` / `filter[<key>_to]`.
  */
 export default function CreativesDateFilter({
     filter,
@@ -26,170 +35,101 @@ export default function CreativesDateFilter({
     filter?: Filter;
     onChange: (params: Record<string, string | undefined>) => void;
 }) {
-    const [open, setOpen] = useState(false);
-
     const fromKey = (k: DateField) => `${k}_from` as keyof Filter;
     const toKey = (k: DateField) => `${k}_to` as keyof Filter;
+    const hasRange = (k: DateField) =>
+        !!filter?.[fromKey(k)] && !!filter?.[toKey(k)];
 
-    const rangeFor = (k: DateField) => {
-        const from = filter?.[fromKey(k)];
-        const to = filter?.[toKey(k)];
-        return from && to ? [from, to] : undefined;
-    };
+    // Start on whichever column already carries a range (e.g. from the URL),
+    // otherwise fall back to the default (Creative Date).
+    const [selectedField, setSelectedField] = useState<DateField>(
+        () =>
+            DATE_RANGE_FIELDS.find((f) => hasRange(f.key))?.key ??
+            DEFAULT_FIELD,
+    );
+    const start = filter?.[fromKey(selectedField)];
+    const end = filter?.[toKey(selectedField)];
+    const hasActiveRange = !!start && !!end;
 
-    const activeCount = DATE_RANGE_FIELDS.filter(
-        ({ key }) => filter?.[fromKey(key)] && filter?.[toKey(key)],
-    ).length;
+    // Apply a range to `field` only, clearing every other date column so a
+    // single type filters at a time.
+    const applyRange = useCallback(
+        (field: DateField, from?: string, to?: string) => {
+            const params: Record<string, string | undefined> = {};
+            for (const { key } of DATE_RANGE_FIELDS) {
+                params[`filter[${key}_from]`] =
+                    key === field ? from : undefined;
+                params[`filter[${key}_to]`] = key === field ? to : undefined;
+            }
+            onChange(params);
+        },
+        [onChange],
+    );
 
-    const setRange = (k: DateField, from?: string, to?: string) =>
-        onChange({
-            [`filter[${k}_from]`]: from,
-            [`filter[${k}_to]`]: to,
-        });
+    const handleFieldChange = useCallback(
+        (field: string) => {
+            const next = field as DateField;
+            setSelectedField(next);
+            // Carry any current range over to the newly-selected column.
+            if (start && end) applyRange(next, start, end);
+        },
+        [start, end, applyRange],
+    );
 
-    const clearAll = () =>
-        onChange(
-            Object.fromEntries(
-                DATE_RANGE_FIELDS.flatMap(({ key }) => [
-                    [`filter[${key}_from]`, undefined],
-                    [`filter[${key}_to]`, undefined],
-                ]),
-            ),
-        );
+    const handleClear = useCallback(() => {
+        applyRange(selectedField);
+    }, [selectedField, applyRange]);
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <button
-                    className={[
-                        'inline-flex h-9 min-w-max shrink-0 items-center overflow-hidden rounded-[10px] border transition-all duration-150',
-                        'bg-white dark:bg-zinc-900',
-                        'shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none',
-                        open
-                            ? 'border-emerald-500/40 ring-2 ring-emerald-500/10 dark:border-emerald-500/30'
-                            : activeCount > 0
-                              ? 'border-emerald-500/30 hover:border-emerald-500/50 dark:border-emerald-500/20 dark:hover:border-emerald-500/30'
-                              : 'border-black/8 hover:border-black/14 dark:border-white/8 dark:hover:border-white/14',
-                    ].join(' ')}
-                >
-                    <span
-                        className={[
-                            'flex h-full w-9 shrink-0 items-center justify-center rounded-l-[10px] border-r transition-colors duration-150',
-                            activeCount > 0
-                                ? 'border-emerald-500/20 bg-emerald-500/[0.07] dark:border-emerald-500/15 dark:bg-emerald-500/10'
-                                : 'border-black/6 bg-stone-50 dark:border-white/6 dark:bg-white/3',
-                        ].join(' ')}
-                    >
-                        <CalendarDays
-                            className={[
-                                'h-3.5 w-3.5 transition-colors duration-150',
-                                activeCount > 0
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : 'text-gray-400 dark:text-gray-500',
-                            ].join(' ')}
-                        />
-                    </span>
-                    <span className="flex items-center gap-2 px-3">
-                        <span
-                            className={[
-                                'text-xs font-medium transition-colors duration-150',
-                                activeCount > 0
-                                    ? 'text-gray-700 dark:text-gray-200'
-                                    : 'text-gray-500 dark:text-gray-400',
-                            ].join(' ')}
-                        >
-                            Dates
-                        </span>
-                        {activeCount > 0 && (
-                            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500/[0.10] px-1 text-[10px] font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
-                                {activeCount}
-                            </span>
-                        )}
-                    </span>
-                </button>
-            </PopoverTrigger>
+        <div className="flex items-center gap-2">
+            <Select value={selectedField} onValueChange={handleFieldChange}>
+                <SelectTrigger className="h-9 w-[170px] rounded-[10px] border-black/8 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:border-black/14 dark:border-white/8 dark:bg-zinc-900 dark:shadow-none dark:hover:border-white/14">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {DATE_RANGE_FIELDS.map(({ key, label }) => (
+                        <SelectItem key={key} value={key}>
+                            {label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
 
-            <PopoverContent
-                align="end"
-                className="w-[calc(100vw-2rem)] overflow-visible rounded-[14px] border border-black/6 bg-white p-0 shadow-[0_8px_30px_rgba(0,0,0,0.08)] sm:w-80 dark:border-white/6 dark:bg-zinc-900 dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
-                // Don't auto-focus the first picker on open — focusing its input
-                // makes flatpickr auto-open that calendar, so the user's first
-                // click would just toggle it shut.
-                onOpenAutoFocus={(e) => e.preventDefault()}
-                // flatpickr renders its calendar into document.body, so a click
-                // inside it counts as "outside" the popover. Keep the popover
-                // open while interacting with any open calendar. The actual
-                // clicked node is on the wrapped original event, not e.target.
-                onInteractOutside={(e) => {
-                    const original = (
-                        e.detail as { originalEvent?: Event } | undefined
-                    )?.originalEvent;
-                    const target = (original?.target ?? e.target) as
-                        | Element
-                        | null
-                        | undefined;
-                    if (target?.closest?.('.flatpickr-calendar')) {
-                        e.preventDefault();
+            <span className="text-[13px] font-medium text-gray-400 dark:text-gray-500">
+                :
+            </span>
+
+            <DatePicker
+                // Key on the resolved range so the picker remounts (and re-seeds
+                // its display) whenever the range changes — including when it's
+                // cleared, once the navigation drops the filter params.
+                id={`creatives-date-${selectedField}`}
+                key={`${selectedField}:${start ?? ''}:${end ?? ''}`}
+                mode="range"
+                placeholder="All dates"
+                defaultDate={
+                    (start && end
+                        ? [start, end]
+                        : undefined) as never as DateOption
+                }
+                onChange={(dates) => {
+                    if (dates.length === 2) {
+                        applyRange(selectedField, fmt(dates[0]), fmt(dates[1]));
+                    } else if (dates.length === 0) {
+                        applyRange(selectedField);
                     }
                 }}
-            >
-                <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/6">
-                    <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100">
-                        Date ranges
-                    </span>
-                    {activeCount > 0 && (
-                        <button
-                            onClick={clearAll}
-                            className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
-                        >
-                            <X className="h-3 w-3" />
-                            Clear all
-                        </button>
-                    )}
-                </div>
+            />
 
-                <div className="space-y-3 p-4">
-                    {DATE_RANGE_FIELDS.map(({ key, label }) => {
-                        const isSet =
-                            !!filter?.[fromKey(key)] && !!filter?.[toKey(key)];
-                        return (
-                            <div key={key} className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-600">
-                                        {label}
-                                    </span>
-                                    {isSet && (
-                                        <button
-                                            onClick={() => setRange(key)}
-                                            className="text-[10px] font-medium text-gray-400 transition-colors hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400"
-                                        >
-                                            Clear
-                                        </button>
-                                    )}
-                                </div>
-                                <DatePicker
-                                    id={`creatives-${key}-range`}
-                                    mode="range"
-                                    fullWidth
-                                    placeholder="All dates"
-                                    defaultDate={rangeFor(key) as never}
-                                    onChange={(dates) => {
-                                        if (dates.length === 2) {
-                                            setRange(
-                                                key,
-                                                fmt(dates[0]),
-                                                fmt(dates[1]),
-                                            );
-                                        } else if (dates.length === 0) {
-                                            setRange(key);
-                                        }
-                                    }}
-                                />
-                            </div>
-                        );
-                    })}
-                </div>
-            </PopoverContent>
-        </Popover>
+            {hasActiveRange && (
+                <button
+                    onClick={handleClear}
+                    aria-label="Clear date filter"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-black/8 bg-white text-gray-400 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:border-black/14 hover:text-red-500 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-500 dark:shadow-none dark:hover:border-white/14 dark:hover:text-red-400"
+                >
+                    <X className="h-3.5 w-3.5" />
+                </button>
+            )}
+        </div>
     );
 }
