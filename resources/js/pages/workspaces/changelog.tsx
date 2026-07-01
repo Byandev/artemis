@@ -12,6 +12,19 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.15.2',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Inventory — Bulk Assign Product',
+                items: [
+                    'Select multiple items on the Inventory Items list and set their linked product in one go, instead of editing each item individually',
+                    'The picker is searchable, so you can find the right product quickly; choose “No product (clear)” to unlink the product from every selected item',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.15.1',
         date: '2026-07-01',
         sections: [
