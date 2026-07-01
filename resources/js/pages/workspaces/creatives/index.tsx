@@ -536,6 +536,7 @@ export default function CreativesIndex({
         () => ({
             formats: parseList(query.filter?.format),
             ads_statuses: parseList(query.filter?.ads_status),
+            final_statuses: parseList(query.filter?.final_status),
             creator_ids: parseList(query.filter?.creator_id),
             product_ids: parseList(query.filter?.product_id),
         }),
@@ -548,6 +549,9 @@ export default function CreativesIndex({
     ];
     const adsStatusOptions = (
         Object.entries(ADS_STATUS_LABELS) as [AdsStatus, string][]
+    ).map(([key, label]) => ({ key, label }));
+    const finalStatusOptions = (
+        Object.entries(FINAL_STATUS_LABELS) as [FinalStatus, string][]
     ).map(([key, label]) => ({ key, label }));
     const creatorOptions = creators.map((c) => ({
         key: String(c.id),
@@ -562,6 +566,7 @@ export default function CreativesIndex({
         navigate({
             'filter[format]': v.formats.join(',') || undefined,
             'filter[ads_status]': v.ads_statuses.join(',') || undefined,
+            'filter[final_status]': v.final_statuses.join(',') || undefined,
             'filter[creator_id]': v.creator_ids.join(',') || undefined,
             'filter[product_id]': v.product_ids.join(',') || undefined,
             page: 1,
@@ -608,6 +613,7 @@ export default function CreativesIndex({
                         value={filterValue}
                         formatOptions={formatOptions}
                         adsStatusOptions={adsStatusOptions}
+                        finalStatusOptions={finalStatusOptions}
                         creatorOptions={creatorOptions}
                         productOptions={productOptions}
                         onApply={applyFilters}

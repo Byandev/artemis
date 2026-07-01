@@ -57,6 +57,7 @@ class CreativesController extends Controller
                 }),
                 AllowedFilter::exact('format'),
                 AllowedFilter::exact('ads_status'),
+                AllowedFilter::exact('final_status'),
                 AllowedFilter::exact('creator_id'),
                 AllowedFilter::exact('product_id'),
                 AllowedFilter::callback('review_status', function ($query, $value) {
