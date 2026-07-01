@@ -385,6 +385,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
         Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
+        Route::post('/bulk-product', [InventoryItemController::class, 'bulkUpdateProduct'])->name('bulk-product');
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
