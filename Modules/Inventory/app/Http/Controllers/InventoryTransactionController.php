@@ -186,30 +186,6 @@ class InventoryTransactionController extends Controller
         return redirect()->back()->with('success', 'Entry updated successfully.');
     }
 
-    /**
-     * Inline edit of the remaining quantity — this is a physical audit. The edited row
-     * becomes the anchor its offset rides forward from, and every later row is re-leveled.
-     */
-    public function updateRemainingQty(Request $request, Workspace $workspace, InventoryTransaction $transaction)
-    {
-        $this->authorize('Edit Transaction Logs', $workspace);
-
-        abort_unless($workspace->is_gencys_partner, 403);
-
-        $validated = $request->validate([
-            'remaining_qty' => 'required|numeric',
-        ]);
-
-        $transaction->update([
-            'remaining_qty' => $validated['remaining_qty'],
-            'is_audited' => true,
-        ]);
-
-        $transaction->inventoryItem?->recalculateActualStock();
-
-        return redirect()->back()->with('success', 'Remaining quantity updated.');
-    }
-
     public function destroy(Workspace $workspace, InventoryTransaction $transaction)
     {
         $this->authorize('Delete Transaction Logs', $workspace);
