@@ -53,7 +53,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return items\n  .filter(item => {\n    const input = item.json;\n\n    return input[\"No\"] != \"No data available in table\";\n  })\n  .map((item) => {\n  const input = item.json;\n   \n  const goodsPO = input['In/Out - Goods (PO)'] ?? \"0\";\n  const damageRTS = input['In - Damage (RTS)'] ?? \"0\";\n  const goodsRTS = input['In/Out - Goods (RTS)'] ?? \"0\";\n  const type = input.Type ?? \"\";\n\n  const date = new Date(input['Transaction Date']);\n  const formatted = date.toISOString().split('T')[0];\n\n  const qty_in  = type === \"OUT\" ? \"0\" : String(goodsPO);\n  const qty_out = type === \"OUT\" ? String(goodsPO) : \"0\";\n  const rts_goods_in  = type === \"OUT\" ? \"0\" : String(goodsRTS);\n  const rts_goods_out = type === \"OUT\" ? String(goodsRTS) : \"0\";\n\n  // keep only non-empty original fields (drops Action, col_11..col_20, Search, etc.)\n  const cleaned = Object.fromEntries(\n    Object.entries(input).filter(([, v]) => v !== \"\" && v !== null && v !== undefined)\n  );\n\n  const remaining = input['Remaining Qty'] ?? 0;\n\n  return {\n    json: {\n      date: formatted,\n      ref_no: input[\"Transact By\"] ?? \"\",\n      po_qty_in: qty_in,\n      po_qty_out: qty_out,\n      rts_goods_in,\n      rts_goods_out,\n      rts_bad: damageRTS,\n      inventory_remaining_stock: remaining, \n    },\n  };\n});"
+        "jsCode": "return items\n  .filter(item => {\n    const input = item.json;\n\n    return input[\"No\"] != \"No data available in table\";\n  })\n  .map((item) => {\n  const input = item.json;\n   \n  const goodsPO = input['In/Out - Goods (PO)'] ?? \"0\";\n  const damageRTS = input['In - Damage (RTS)'] ?? \"0\";\n  const goodsRTS = input['In/Out - Goods (RTS)'] ?? \"0\";\n  const type = input.Type ?? \"\";\n\n  const date = new Date(input['Transaction Date']);\n  const formatted = date.toISOString().split('T')[0];\n\n  const qty_in  = type === \"OUT\" ? \"0\" : String(goodsPO);\n  const qty_out = type === \"OUT\" ? String(goodsPO) : \"0\";\n  const rts_goods_in  = type === \"OUT\" ? \"0\" : String(goodsRTS);\n  const rts_goods_out = type === \"OUT\" ? String(goodsRTS) : \"0\";\n\n  // keep only non-empty original fields (drops Action, col_11..col_20, Search, etc.)\n  const cleaned = Object.fromEntries(\n    Object.entries(input).filter(([, v]) => v !== \"\" && v !== null && v !== undefined)\n  );\n\n  const remaining = input['Remaining Qty'] ?? 0;\n\n  return {\n    json: {\n      item: input[\"Items\"],\n      date: formatted,\n      ref_no: input[\"Transact By\"] ?? \"\",\n      po_qty_in: qty_in,\n      po_qty_out: qty_out,\n      rts_goods_in,\n      rts_goods_out,\n      rts_bad: damageRTS,\n      inventory_remaining_stock: remaining, \n    },\n  };\n})\n  .filter(item => item.json.item.toLowerCase() ===$('Code in JavaScript').first().json.keyword.toLowerCase());"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -159,48 +159,7 @@
       "name": "Code in JavaScript3"
     }
   ],
-  "pinData": {
-    "Webhook": [
-      {
-        "json": {
-          "headers": {
-            "host": "n8n.byandev.com",
-            "x-real-ip": "139.59.99.189",
-            "x-forwarded-for": "139.59.99.189",
-            "x-forwarded-proto": "https",
-            "connection": "upgrade",
-            "content-length": "341",
-            "user-agent": "GuzzleHttp/7",
-            "content-type": "application/json",
-            "baggage": "sentry-trace_id=6f97a498f95244ddad5c9333e86e7489,sentry-sample_rand=0.166243,sentry-sample_rate=0.1,sentry-public_key=a6821d7e205b79c38c66b9cff573c483,sentry-org_id=4511255889051648,sentry-environment=development",
-            "sentry-trace": "6f97a498f95244ddad5c9333e86e7489-6344fc035f7440f7-0"
-          },
-          "params": {},
-          "query": {},
-          "body": {
-            "workspace_id": 1,
-            "workspace_api_key": "art_4TGgV4OLrHp5NCGXXuAi3pu0IV9F9eEhRiqLbjFj",
-            "erp_username": "bryan.tech",
-            "erp_password": "meta.tech.erp@2026",
-            "date": "06/28/2026",
-            "webhook_url": "https://test.artemis.ph/api/v1/public/inventory-items/transactions/bulk-sync",
-            "items": [
-              {
-                "id": 54,
-                "keyword": "Magnerve Cooling Gel",
-                "sync_run_id": 1
-              }
-            ]
-          },
-          "webhookUrl": "https://n8n.byandev.com/webhook/98fb33d8-e5ca-4643-acf9-2b0960edabdd",
-          "executionMode": "production"
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "Webhook": {
       "main": [
@@ -314,7 +273,7 @@
     "executionOrder": "v1",
     "availableInMCP": false
   },
-  "versionId": "a2ba2bed-240c-4c94-8408-69403fb32609",
+  "versionId": "8b4ec997-f435-41cc-95ac-35aa38518cf4",
   "meta": {
     "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
   },
