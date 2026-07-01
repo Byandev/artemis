@@ -27,8 +27,6 @@ interface Props {
     hasEnvWebhookFallback: boolean;
 }
 
-// The Discord notifications this workspace can receive. Kept in one place so the
-// list is easy to extend as new inventory alerts are added.
 const NOTIFICATIONS: {
     key: 'deliveries' | 'awaiting';
     icon: ComponentType<{ className?: string }>;

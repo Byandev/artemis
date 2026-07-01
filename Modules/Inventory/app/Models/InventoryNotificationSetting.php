@@ -24,12 +24,6 @@ class InventoryNotificationSetting extends Model
         'awaiting_enabled' => 'boolean',
     ];
 
-    /**
-     * Defaults applied to a brand-new (unsaved) settings instance, so a workspace
-     * that has never configured notifications still behaves sensibly.
-     *
-     * @var array<string, mixed>
-     */
     protected $attributes = [
         'deliveries_enabled' => true,
         'deliveries_send_at' => '17:00',
@@ -42,10 +36,6 @@ class InventoryNotificationSetting extends Model
         return $this->belongsTo(Workspace::class);
     }
 
-    /**
-     * The workspace's settings row, or a fresh unsaved instance carrying the
-     * defaults above. Never returns null, so callers can read fields directly.
-     */
     public static function forWorkspace(int $workspaceId): self
     {
         return static::firstOrNew(['workspace_id' => $workspaceId]);

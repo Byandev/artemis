@@ -57,7 +57,6 @@ return [
 
     'discord' => [
         'webhook_url' => env('DISCORD_WEBHOOK_URL'),
-        // Inventory-specific channel; falls back to the global webhook above.
         'inventory_webhook_url' => env('INVENTORY_DISCORD_WEBHOOK_URL'),
     ],
 

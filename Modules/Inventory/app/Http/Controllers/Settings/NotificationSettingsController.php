@@ -13,9 +13,6 @@ use Modules\Inventory\Models\InventoryNotificationSetting;
 
 class NotificationSettingsController extends Controller
 {
-    /**
-     * Show the workspace's inventory Discord notification settings.
-     */
     public function edit(Request $request, Workspace $workspace): Response
     {
         $this->ensureMember($request, $workspace);
@@ -31,14 +28,10 @@ class NotificationSettingsController extends Controller
                 'awaiting_enabled' => $setting->awaiting_enabled,
                 'awaiting_send_at' => $setting->awaiting_send_at,
             ],
-            // So the UI can note the fallback used when no webhook is set here.
             'hasEnvWebhookFallback' => filled(config('services.discord.inventory_webhook_url') ?: config('services.discord.webhook_url')),
         ]);
     }
 
-    /**
-     * Persist the workspace's inventory Discord notification settings.
-     */
     public function update(Request $request, Workspace $workspace): RedirectResponse
     {
         $this->ensureMember($request, $workspace);
@@ -60,7 +53,6 @@ class NotificationSettingsController extends Controller
             ->with('status', 'notifications-updated');
     }
 
-    /** Guard against editing a workspace the user is not a member of. */
     private function ensureMember(Request $request, Workspace $workspace): void
     {
         abort_unless(

@@ -47,7 +47,6 @@ Route::middleware('auth')->group(function () {
     Route::delete('/workspaces/{workspace}/settings/erp-credentials', [ErpCredentialController::class, 'destroy'])
         ->name('erp-credentials.destroy');
 
-    // Inventory Discord notifications — per-workspace webhook + schedule.
     Route::get('/workspaces/{workspace}/settings/notifications', [NotificationSettingsController::class, 'edit'])
         ->name('notifications.edit');
     Route::put('/workspaces/{workspace}/settings/notifications', [NotificationSettingsController::class, 'update'])

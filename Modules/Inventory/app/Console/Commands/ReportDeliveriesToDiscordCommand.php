@@ -35,12 +35,16 @@ class ReportDeliveriesToDiscordCommand extends Command
                 'item.inventoryItem.product:id,name',
             ])
             ->get()
-            // A delivery is meaningless without its parent PO; guard against orphans.
             ->filter(fn ($delivery) => $delivery->item?->purchasedOrder?->workspace)
+            ->filter(function ($delivery) {
+                $expected = $delivery->item->purchasedOrder->expected_delivery_date;
+
+                return $expected && $delivery->delivery_date->startOfDay()->eq($expected->startOfDay());
+            })
             ->values();
 
         if ($deliveries->isEmpty()) {
-            $this->info("No deliveries recorded on {$date} — nothing to send.");
+            $this->info("No on-time deliveries recorded on {$date} — nothing to send.");
 
             return self::SUCCESS;
         }
@@ -49,14 +53,12 @@ class ReportDeliveriesToDiscordCommand extends Command
 
         $sentCount = 0;
 
-        $prettyDate = Carbon::parse($date)->format('l, F j, Y');
+        $prettyDate = Carbon::parse($date)->format('F j, Y');
 
         foreach ($byWorkspace as $workspaceId => $workspaceDeliveries) {
             $workspace = $workspaceDeliveries->first()->item->purchasedOrder->workspace;
             $setting = InventoryNotificationSetting::forWorkspace((int) $workspaceId);
 
-            // Respect the workspace's on/off toggle and scheduled time (unless
-            // this is a manual --force run).
             if (! $setting->deliveries_enabled) {
                 continue;
             }
@@ -73,16 +75,10 @@ class ReportDeliveriesToDiscordCommand extends Command
                 continue;
             }
 
-            $totalQty = $workspaceDeliveries->sum('qty');
-            $orderCount = $workspaceDeliveries->groupBy(fn ($d) => $d->item->purchasedOrder->id)->count();
-
             $sent = $discord->send('', [
-                'author' => ['name' => $workspace->name],
-                'title' => "Items Received — {$prettyDate}",
-                'description' => "{$totalQty} item(s) received from {$orderCount} order(s).",
+                'title' => "{$prettyDate} Deliveries",
+                'description' => $this->buildBody($workspaceDeliveries),
                 'color' => 0x2ECC71,
-                'fields' => $this->buildFields($workspaceDeliveries),
-                'footer' => ['text' => 'Inventory'],
             ], $webhookUrl);
 
             if ($sent) {
@@ -97,36 +93,15 @@ class ReportDeliveriesToDiscordCommand extends Command
         return self::SUCCESS;
     }
 
-    /**
-     * One embed field per purchase order. Each line names the item, the quantity
-     * received, and whether it was on time. Capped to Discord's 25-field /
-     * 1024-char limits.
-     *
-     * @param  Collection<int, PurchasedOrderItemDelivery>  $deliveries
-     * @return array<int, array{name: string, value: string, inline: bool}>
-     */
-    private function buildFields(Collection $deliveries): array
+    private function buildBody(Collection $deliveries): string
     {
-        $fields = [];
+        $lines = $deliveries->map(function ($delivery) {
+            $ref = $this->purchaseOrderRef($delivery->item->purchasedOrder);
+            $name = $this->inventoryItemName($delivery->item->inventoryItem);
 
-        foreach ($deliveries->groupBy(fn ($d) => $d->item->purchasedOrder->id)->take(25) as $orderDeliveries) {
-            $order = $orderDeliveries->first()->item->purchasedOrder;
-            $expected = $order->expected_delivery_date;
+            return "- {$ref}: {$delivery->qty} {$name}";
+        })->implode("\n");
 
-            $lines = $orderDeliveries->map(function ($delivery) use ($expected) {
-                $name = $this->inventoryItemName($delivery->item->inventoryItem);
-                $note = $this->deliveryTimelinessNote($delivery->delivery_date, $expected);
-
-                return "{$delivery->qty} × {$name} ({$note})";
-            })->implode("\n");
-
-            $fields[] = [
-                'name' => $this->purchaseOrderLabel($order),
-                'value' => $this->clampFieldValue($lines),
-                'inline' => false,
-            ];
-        }
-
-        return $fields;
+        return $this->clampDescription($lines);
     }
 }
