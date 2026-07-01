@@ -28,9 +28,21 @@ class InventoryItemController extends Controller
      */
     private function buildQuery(Request $request, Workspace $workspace): QueryBuilder
     {
-        $currentStocksSql = $workspace->inventory_sync || true
-            ? '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)'
-            : 'inventory_items.remaining_qty';
+        // Raw ledger stock = the latest transaction's running remaining_qty.
+        $rawCurrentStocksSql = '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
+
+        // The latest physical-count adjustment (signed), layered on top of the ledger so
+        // the displayed stock reflects the last real count. See adjustCount(). Only NULL
+        // when the item has neither a transaction nor a count — then the cell stays "—"
+        // rather than collapsing to 0.
+        $latestDiscrepancySql = '(SELECT discrepancy FROM inventory_item_discrepancies WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
+        $currentStocksSql = "(CASE WHEN $rawCurrentStocksSql IS NULL AND $latestDiscrepancySql IS NULL THEN NULL ELSE COALESCE($rawCurrentStocksSql, 0) + COALESCE($latestDiscrepancySql, 0) END)";
+
+        // The counted quantity and date of that same latest adjustment, surfaced so the
+        // list can show what was last counted and when alongside the offset in effect.
+        // Identical ORDER BY as above, so all three read from the one latest row.
+        $latestCountedSql = '(SELECT counted_qty FROM inventory_item_discrepancies WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
+        $latestDiscrepancyDateSql = '(SELECT date FROM inventory_item_discrepancies WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
 
         // "Waiting for delivery" = the quantity still OWED on orders that are
         // awaiting delivery (status 6) — i.e. the undelivered remainder per item
@@ -61,6 +73,9 @@ class InventoryItemController extends Controller
             // Undelivered remainder on status-6 orders (see $waitingStocksSql).
             ->selectRaw("$waitingStocksSql as waiting_for_delivery_stocks")
             ->selectRaw("$currentStocksSql as current_stocks")
+            ->selectRaw("$latestDiscrepancySql as discrepancy")
+            ->selectRaw("$latestCountedSql as discrepancy_counted_qty")
+            ->selectRaw("$latestDiscrepancyDateSql as discrepancy_date")
             ->selectRaw("$remainingAfterFulfillmentSql as remaining_after_fulfillment")
             ->selectRaw("$poNeededSql as po_needed")
             ->selectRaw("$daysItCanLastSql as days_it_can_last")
@@ -94,6 +109,9 @@ class InventoryItemController extends Controller
                 }),
                 AllowedSort::callback('po_needed', function ($query, $descending) use ($poNeededSql) {
                     $query->orderByRaw("$poNeededSql ".($descending ? 'DESC' : 'ASC'));
+                }),
+                AllowedSort::callback('discrepancy', function ($query, $descending) use ($latestDiscrepancySql) {
+                    $query->orderByRaw("$latestDiscrepancySql ".($descending ? 'DESC' : 'ASC'));
                 }),
             ])
             ->defaultSort('-created_at');
@@ -229,6 +247,78 @@ class InventoryItemController extends Controller
 
         return redirect()->back()
             ->with('success', 'Inventory Items record updated.');
+    }
+
+    /**
+     * The item's ledger stock as of a date: the remaining_qty of the latest transaction
+     * dated on or before $date. Null when there's no transaction that early. This is the
+     * reference a physical count is measured against, so a backdated count compares to the
+     * stock as it stood then — not today's.
+     */
+    private function ledgerStockAsOf(InventoryItem $item, string $date): ?int
+    {
+        $qty = $item->transactions()
+            ->whereDate('date', '<=', $date)
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->value('remaining_qty');
+
+        return $qty === null ? null : (int) $qty;
+    }
+
+    /**
+     * The ledger stock as of a date, for the Adjust Count modal to show what the system
+     * thought the count was on the chosen date (and preview the resulting discrepancy).
+     */
+    public function stockAsOf(Request $request, Workspace $workspace, InventoryItem $item)
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        $validated = $request->validate([
+            'date' => ['required', 'date', 'regex:/^\d{4}-\d{2}-\d{2}$/'],
+        ]);
+
+        return response()->json([
+            'remaining_qty' => $this->ledgerStockAsOf($item, $validated['date']),
+        ]);
+    }
+
+    /**
+     * Record a physical stock count for an item. The user types the counted quantity; we
+     * store the signed discrepancy against the ledger stock as of the count date (see
+     * ledgerStockAsOf()). buildQuery() then layers the latest discrepancy onto the item's
+     * current stock, so the offset found on the count date carries forward.
+     */
+    public function adjustCount(Request $request, Workspace $workspace, InventoryItem $item)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        $validated = $request->validate([
+            'date' => [
+                'required',
+                'date',
+                'before_or_equal:today',
+                'regex:/^\d{4}-\d{2}-\d{2}$/',
+            ],
+            'counted_qty' => 'required|integer|min:0',
+        ]);
+
+        // Measure against the stock as it stood on the count date (0 if none that early).
+        $ledgerQty = $this->ledgerStockAsOf($item, $validated['date']) ?? 0;
+
+        $item->discrepancies()->create([
+            'workspace_id' => $workspace->id,
+            'date' => $validated['date'],
+            'counted_qty' => (int) $validated['counted_qty'],
+            'discrepancy' => (int) $validated['counted_qty'] - $ledgerQty,
+        ]);
+
+        return redirect()->back()
+            ->with('success', 'Stock count recorded.');
     }
 
     /**

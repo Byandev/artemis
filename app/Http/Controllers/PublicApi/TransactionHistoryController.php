@@ -75,48 +75,25 @@ class TransactionHistoryController extends Controller
     }
 
     /**
-     * Persist one item's rows, deriving each new row's remaining_qty by chaining
-     * forward from the previous transaction.
+     * Persist one item's rows exactly as the ERP reports them — no running-balance
+     * recalculation. Each row's remaining_qty is taken straight from the ERP's reported
+     * stock (inventory_remaining_stock); we don't chain movements forward or read the
+     * prior row.
      *
-     * To stay light on the database we don't reload/rewrite the whole history. We read
-     * the item's latest transaction once as the running anchor, then process the incoming
-     * rows oldest-first: a new row's remaining_qty = anchor.remaining_qty + the row's own
-     * net movement (goods in − out − bad − lost; see InventoryTransaction::netMovement),
-     * which carries a manually audited level forward. It's folded into firstOrCreate as a
-     * create-only value, so existing rows are never touched (an audited remaining_qty
-     * survives) and no extra UPDATE is issued per row. firstOrCreate matches on the whole
-     * row, so an exact re-sync is a no-op. Returns the rows seen.
-     *
-     * Assumes synced rows are newer than the stored history (the ERP appends recent days);
-     * backfilled older rows won't be re-levelled here — a manual audit triggers the full
-     * recalculateActualStock() pass for that.
+     * remaining_qty is folded into firstOrCreate as a create-only value and matches on the
+     * whole row, so an exact re-sync is a no-op and existing rows (including one whose
+     * remaining_qty was manually corrected) are never touched. Returns the rows seen.
      *
      * @param  array<int, array<string, mixed>>  $rows
      */
     private function saveTransactions(InventoryItem $item, array $rows): int
     {
-        // Chain in chronological order so each new row builds on the one before it.
-        usort($rows, fn ($a, $b) => strcmp((string) ($a['date'] ?? ''), (string) ($b['date'] ?? '')));
-
-        // The item's latest transaction so far is the running balance to build on.
-        $anchor = InventoryTransaction::where('inventory_item_id', $item->id)
-            ->orderByDesc('date')
-            ->orderByDesc('id')
-            ->first();
-
         $saved = 0;
 
         foreach ($rows as $row) {
             $remainingStock = (float) ($row['inventory_remaining_stock'] ?? 0);
-            $movement = InventoryTransaction::netMovementFromRow($row);
 
-            // New-row remaining_qty: prior balance + this row's net movement, carrying any
-            // audited level forward. The first-ever row (no prior) seeds from the ERP stock.
-            $remainingQty = $anchor
-                ? (int) $anchor->remaining_qty + $movement
-                : (int) round($remainingStock);
-
-            $transaction = InventoryTransaction::firstOrCreate(
+            InventoryTransaction::firstOrCreate(
                 [
                     'inventory_item_id' => $item->id,
                     'workspace_id' => $item->workspace_id,
@@ -129,11 +106,10 @@ class TransactionHistoryController extends Controller
                     'rts_bad' => (int) ($row['rts_bad'] ?? 0),
                     'inventory_remaining_stock' => $remainingStock,
                 ],
-                ['remaining_qty' => $remainingQty],
+                // Store the ERP count as-is; no derivation from movement or prior rows.
+                ['remaining_qty' => (int) round($remainingStock)],
             );
 
-            // Advance the anchor to this row (its stored value, audited or computed).
-            $anchor = $transaction;
             $saved++;
         }
 
