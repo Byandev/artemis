@@ -10,6 +10,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
@@ -21,7 +26,15 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { Download, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
+import {
+    ChevronsUpDown,
+    Download,
+    MoreHorizontal,
+    Package,
+    Pencil,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -103,6 +116,8 @@ export default function ItemIndex({
     );
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkProcessing, setBulkProcessing] = useState(false);
+    const [productPickerOpen, setProductPickerOpen] = useState(false);
+    const [productSearch, setProductSearch] = useState('');
 
     const canCreateItems = usePermission(PERMISSIONS.CreateInventoryItems);
     const canEditItems = usePermission(PERMISSIONS.EditInventoryItems);
@@ -170,6 +185,29 @@ export default function ItemIndex({
                 onSuccess: () => setRowSelection({}),
                 onError: () =>
                     toast.error('Failed to update inventory item status.'),
+            },
+        );
+    };
+
+    const filteredProducts = useMemo(() => {
+        const q = productSearch.trim().toLowerCase();
+        if (!q) return products;
+        return products.filter((p) => p.name?.toLowerCase().includes(q));
+    }, [products, productSearch]);
+
+    const handleBulkProduct = (productId: number | null) => {
+        setProductPickerOpen(false);
+        setProductSearch('');
+        router.post(
+            `${baseUrl}/bulk-product`,
+            { ids: selectedIds.map(Number), product_id: productId },
+            {
+                preserveScroll: true,
+                onStart: () => setBulkProcessing(true),
+                onFinish: () => setBulkProcessing(false),
+                onSuccess: () => setRowSelection({}),
+                onError: () =>
+                    toast.error('Failed to update inventory item product.'),
             },
         );
     };
@@ -575,6 +613,69 @@ export default function ItemIndex({
                             >
                                 Set Inactive
                             </button>
+                            <Popover
+                                open={productPickerOpen}
+                                onOpenChange={setProductPickerOpen}
+                            >
+                                <PopoverTrigger asChild>
+                                    <button
+                                        disabled={bulkProcessing}
+                                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                                    >
+                                        <Package className="h-3.5 w-3.5" />
+                                        Set Product
+                                        <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="start"
+                                    className="w-64 p-0"
+                                >
+                                    <div className="flex items-center gap-2 border-b border-black/6 px-3 dark:border-white/6">
+                                        <Search className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                                        <input
+                                            autoFocus
+                                            value={productSearch}
+                                            onChange={(e) =>
+                                                setProductSearch(e.target.value)
+                                            }
+                                            placeholder="Search products…"
+                                            className="h-9 w-full bg-transparent font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
+                                        />
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto p-1">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleBulkProduct(null)
+                                            }
+                                            className="flex w-full items-center rounded-md px-2 py-1.5 text-left font-mono! text-[12px]! text-gray-500 transition-colors hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-zinc-800"
+                                        >
+                                            No product (clear)
+                                        </button>
+                                        {filteredProducts.length === 0 ? (
+                                            <p className="px-2 py-3 text-center font-mono text-[11px] text-gray-400 dark:text-gray-600">
+                                                No products found.
+                                            </p>
+                                        ) : (
+                                            filteredProducts.map((product) => (
+                                                <button
+                                                    type="button"
+                                                    key={product.id}
+                                                    onClick={() =>
+                                                        handleBulkProduct(
+                                                            product.id,
+                                                        )
+                                                    }
+                                                    className="flex w-full items-center rounded-md px-2 py-1.5 text-left font-mono! text-[12px]! text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-200 dark:hover:bg-zinc-800"
+                                                >
+                                                    {product.name}
+                                                </button>
+                                            ))
+                                        )}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                             <button
                                 onClick={() => setRowSelection({})}
                                 disabled={bulkProcessing}

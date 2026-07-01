@@ -255,6 +255,36 @@ class InventoryItemController extends Controller
     }
 
     /**
+     * Assign (or clear) the linked product on multiple inventory items at once.
+     * A null product_id unlinks the product from the selected items.
+     */
+    public function bulkUpdateProduct(Request $request, Workspace $workspace)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'product_id' => [
+                'nullable',
+                Rule::exists('products', 'id')->where('workspace_id', $workspace->id),
+            ],
+        ]);
+
+        $productId = $validated['product_id'] ?? null;
+
+        $updated = InventoryItem::where('workspace_id', $workspace->id)
+            ->whereIn('id', $validated['ids'])
+            ->update(['product_id' => $productId]);
+
+        $message = $productId
+            ? "Product set for {$updated} inventory item(s)."
+            : "Product cleared for {$updated} inventory item(s).";
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
      * Split a comma-separated keyword string into a clean array:
      * trim, drop blanks, de-duplicate.
      *
