@@ -6,6 +6,7 @@ use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Modules\Inventory\Http\Controllers\Settings\NotificationSettingsController;
 
 Route::middleware('auth')->group(function () {
     Route::redirect('/settings', '/settings/profile');
@@ -45,4 +46,10 @@ Route::middleware('auth')->group(function () {
         ->name('erp-credentials.update');
     Route::delete('/workspaces/{workspace}/settings/erp-credentials', [ErpCredentialController::class, 'destroy'])
         ->name('erp-credentials.destroy');
+
+    // Inventory Discord notifications — per-workspace webhook + schedule.
+    Route::get('/workspaces/{workspace}/settings/notifications', [NotificationSettingsController::class, 'edit'])
+        ->name('notifications.edit');
+    Route::put('/workspaces/{workspace}/settings/notifications', [NotificationSettingsController::class, 'update'])
+        ->name('notifications.update');
 });
