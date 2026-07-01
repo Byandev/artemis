@@ -9,7 +9,9 @@ export type TransactionType =
     | 'refund'
     | 'voided'
     | 'courier_damaged_settlement'
-    | 'capex';
+    | 'capex'
+    | 'interest'
+    | 'interest_fee';
 
 export const TRANSACTION_TYPES: { value: TransactionType; label: string }[] = [
     { value: 'funds', label: 'Funds' },
@@ -26,6 +28,8 @@ export const TRANSACTION_TYPES: { value: TransactionType; label: string }[] = [
         label: 'Courier Damaged Settlement',
     },
     { value: 'capex', label: 'CapEx' },
+    { value: 'interest', label: 'Interest' },
+    { value: 'interest_fee', label: 'Interest Fee' },
 ];
 
 export const TRANSACTION_TYPE_LABEL: Record<TransactionType, string> =
@@ -67,5 +71,11 @@ export const TRANSACTION_TYPE_STYLE: Record<TransactionType, { cls: string }> =
         },
         capex: {
             cls: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400',
+        },
+        interest: {
+            cls: 'bg-lime-50 text-lime-700 dark:bg-lime-500/10 dark:text-lime-400',
+        },
+        interest_fee: {
+            cls: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400',
         },
     };
