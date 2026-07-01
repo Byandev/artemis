@@ -81,11 +81,25 @@ export interface PageProps {
             final_status?: string;
             creator_id?: string;
             product_id?: string;
-            date_from?: string;
-            date_to?: string;
+            creative_date_from?: string;
+            creative_date_to?: string;
+            created_at_from?: string;
+            created_at_to?: string;
+            approved_at_from?: string;
+            approved_at_to?: string;
         };
     };
 }
+
+// The three independent date-range filters, keyed by their date column. Each
+// maps to `filter[<key>_from]` / `filter[<key>_to]` query params.
+export type DateField = 'creative_date' | 'created_at' | 'approved_at';
+
+export const DATE_RANGE_FIELDS: { key: DateField; label: string }[] = [
+    { key: 'creative_date', label: 'Creative Date' },
+    { key: 'created_at', label: 'Created Date' },
+    { key: 'approved_at', label: 'Approved Date' },
+];
 
 export type AdsStatus = 'pending' | 'running' | 'kill' | 'scale';
 
