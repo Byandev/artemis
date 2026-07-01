@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import { AdjustCountDialog } from '@/components/inventory/adjust-count-dialog';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
 import { ItemFormDialog } from '@/components/inventory/item-form-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,9 +26,11 @@ import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
+import { format, parseISO } from 'date-fns';
 import { debounce, omit } from 'lodash';
 import {
     ChevronsUpDown,
+    ClipboardCheck,
     Download,
     MoreHorizontal,
     Package,
@@ -56,6 +59,9 @@ interface Item {
     days_it_can_last: number | null;
     po_needed: number | null;
     current_stocks: number | null;
+    discrepancy: number | null;
+    discrepancy_counted_qty: number | null;
+    discrepancy_date: string | null;
 }
 
 interface Props {
@@ -77,6 +83,16 @@ const num = (v: number | null | undefined, decimals = 0) =>
               minimumFractionDigits: decimals,
               maximumFractionDigits: decimals,
           });
+
+// Short "30 Jun" label for the last-counted date; tolerant of a plain date string.
+const shortDate = (d: string | null | undefined) => {
+    if (!d) return '';
+    try {
+        return format(parseISO(d), 'd MMM');
+    } catch {
+        return d;
+    }
+};
 
 const MetricCell = ({
     value,
@@ -108,6 +124,7 @@ export default function ItemIndex({
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [syncingGencys, setSyncingGencys] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
+    const [adjustingItem, setAdjustingItem] = useState<Item | null>(null);
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     // Default to active-only; only an explicit `all` shows inactive items too.
@@ -357,6 +374,53 @@ export default function ItemIndex({
             ),
         },
         {
+            accessorKey: 'discrepancy',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Discrepancy"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => {
+                const d = row.original.discrepancy;
+                if (d == null) {
+                    return (
+                        <div className="text-center">
+                            <MetricCell value={null} />
+                        </div>
+                    );
+                }
+                const color =
+                    d > 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : d < 0
+                          ? 'text-red-500 dark:text-red-400'
+                          : 'text-gray-500 dark:text-gray-400';
+                const counted = row.original.discrepancy_counted_qty;
+                const date = shortDate(row.original.discrepancy_date);
+                const sub = [counted != null ? `cnt ${num(counted)}` : '', date]
+                    .filter(Boolean)
+                    .join(' · ');
+                return (
+                    <div className="flex flex-col items-center gap-0.5">
+                        <span
+                            className={`font-mono text-[12px] font-medium ${color}`}
+                        >
+                            {d > 0 ? '+' : ''}
+                            {num(d)}
+                        </span>
+                        {sub && (
+                            <span className="font-mono text-[9px] text-gray-400 dark:text-gray-500">
+                                {sub}
+                            </span>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
             accessorKey: 'remaining_after_fulfillment',
             enableSorting: true,
             header: ({ column }) => (
@@ -479,6 +543,16 @@ export default function ItemIndex({
                                           align="end"
                                           className="w-36"
                                       >
+                                          {canEditItems && (
+                                              <DropdownMenuItem
+                                                  onClick={() =>
+                                                      setAdjustingItem(item)
+                                                  }
+                                              >
+                                                  <ClipboardCheck className="mr-2 h-3.5 w-3.5" />
+                                                  Adjust count
+                                              </DropdownMenuItem>
+                                          )}
                                           {canEditItems && (
                                               <DropdownMenuItem
                                                   onClick={() =>
@@ -738,6 +812,15 @@ export default function ItemIndex({
                         item={editingItem as any}
                         workspace={workspace}
                         products={products}
+                    />
+                )}
+
+                {canEditItems && (
+                    <AdjustCountDialog
+                        open={adjustingItem !== null}
+                        item={adjustingItem}
+                        workspace={workspace}
+                        onClose={() => setAdjustingItem(null)}
                     />
                 )}
 

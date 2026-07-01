@@ -68,84 +68,6 @@ const sumCell = (value: number) => (
     </div>
 );
 
-// Inline-editable remaining qty. Saves to its own transaction row.
-function RemainingQtyCell({
-    transaction,
-    workspace,
-    canEdit,
-}: {
-    transaction: InventoryTransaction;
-    workspace: Workspace;
-    canEdit: boolean;
-}) {
-    const [value, setValue] = useState(
-        transaction.remaining_qty?.toString() ?? '',
-    );
-    const [saving, setSaving] = useState(false);
-
-    useEffect(() => {
-        setValue(transaction.remaining_qty?.toString() ?? '');
-    }, [transaction.remaining_qty]);
-
-    const save = () => {
-        const original = transaction.remaining_qty?.toString() ?? '';
-        if (value === original || value === '') {
-            setValue(original);
-            return;
-        }
-
-        setSaving(true);
-        router.patch(
-            `/workspaces/${workspace.slug}/inventory/transactions/${transaction.id}/remaining-qty`,
-            { remaining_qty: parseInt(value, 10) },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                only: ['inventory'],
-                onSuccess: () => toast.success('Remaining quantity updated'),
-                onError: () => {
-                    toast.error('Failed to update remaining quantity');
-                    setValue(original);
-                },
-                onFinish: () => setSaving(false),
-            },
-        );
-    };
-
-    const isNegative = parseInt(value, 10) < 0;
-
-    if (!canEdit) {
-        return (
-            <div className="flex h-10 items-center justify-center">
-                <p
-                    className={`text-[12px] font-bold ${isNegative ? 'text-red-500' : 'text-emerald-600'}`}
-                >
-                    {transaction.remaining_qty ?? 0}
-                </p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex h-10 items-center justify-center">
-            <input
-                type="number"
-                value={value}
-                disabled={saving}
-                onChange={(e) => setValue(e.target.value)}
-                onBlur={save}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        (e.target as HTMLInputElement).blur();
-                    }
-                }}
-                className={`h-7 w-20 rounded-md border border-black/8 bg-stone-50 px-2 text-center font-mono! text-[12px]! font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 ${isNegative ? 'text-red-500' : 'text-emerald-600'}`}
-            />
-        </div>
-    );
-}
-
 export default function Index({
     inventory,
     workspace,
@@ -413,38 +335,20 @@ export default function Index({
                 accessorKey: 'remaining_qty',
                 enableSorting: true,
                 header: ({ column }) => (
-                    <SortableHeader
-                        column={column}
-                        title="Remaining Qty (Manual)"
-                    />
+                    <SortableHeader column={column} title="Remaining Qty" />
                 ),
-                cell: ({ row }) => (
-                    <RemainingQtyCell
-                        transaction={row.original}
-                        workspace={workspace}
-                        canEdit={
-                            canEditTransactionLogs &&
-                            workspace.is_gencys_partner
-                        }
-                    />
-                ),
-            },
-            {
-                accessorKey: 'inventory_remaining_stock',
-                enableSorting: true,
-                header: ({ column }) => (
-                    <SortableHeader
-                        column={column}
-                        title="Inventory Stock (ERP)"
-                    />
-                ),
-                cell: ({ row }) => (
-                    <div className="flex h-10 items-center justify-center">
-                        <p className="text-[12px] font-medium text-gray-600 dark:text-gray-300">
-                            {row.original.inventory_remaining_stock ?? '—'}
-                        </p>
-                    </div>
-                ),
+                cell: ({ row }) => {
+                    const qty = row.original.remaining_qty ?? 0;
+                    return (
+                        <div className="flex h-10 items-center justify-center">
+                            <p
+                                className={`text-[12px] font-bold ${qty < 0 ? 'text-red-500' : 'text-emerald-600'}`}
+                            >
+                                {qty}
+                            </p>
+                        </div>
+                    );
+                },
             },
             {
                 id: 'actions',
@@ -630,22 +534,6 @@ export default function Index({
                     <div className="flex h-10 items-center justify-center">
                         <p className="text-[12px] text-orange-500 dark:text-orange-400">
                             {row.original.lost || 0}
-                        </p>
-                    </div>
-                ),
-            },
-            {
-                id: 'inventory_remaining_stock',
-                enableSorting: false,
-                header: () => (
-                    <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                        Inventory Stock (ERP)
-                    </div>
-                ),
-                cell: ({ row }) => (
-                    <div className="flex h-10 items-center justify-center">
-                        <p className="text-[12px] font-medium text-gray-600 dark:text-gray-300">
-                            {row.original.inventory_remaining_stock ?? '—'}
                         </p>
                     </div>
                 ),
