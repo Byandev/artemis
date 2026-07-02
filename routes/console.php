@@ -31,6 +31,8 @@ Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 
 // ── Inventory (Discord) ─────────────────────────────────────────────────
+// Checked every minute; each command posts only for workspaces whose configured
+// send time matches the current time (times are whole hours, e.g. 08:00).
 Schedule::command('inventory:report-deliveries')->everyMinute()->withoutOverlapping();
 Schedule::command('inventory:report-late-deliveries')->everyMinute()->withoutOverlapping();
 
