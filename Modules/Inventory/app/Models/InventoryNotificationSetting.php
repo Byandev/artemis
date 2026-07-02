@@ -13,6 +13,8 @@ class InventoryNotificationSetting extends Model
     protected $fillable = [
         'workspace_id',
         'discord_webhook_url',
+        'deliveries_webhook_url',
+        'awaiting_webhook_url',
         'deliveries_enabled',
         'deliveries_send_at',
         'awaiting_enabled',
