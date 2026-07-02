@@ -44,18 +44,18 @@ Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapp
 
 // Entity tree (campaigns → ad sets → ads → creatives) changes when advertisers
 // edit Ads Manager — refresh every 6 hours.
-Schedule::command('meta-ads:sync-campaigns')->everySixHours()->withoutOverlapping();
-Schedule::command('meta-ads:sync-ad-sets')->everySixHours()->withoutOverlapping();
-Schedule::command('meta-ads:sync-ads')->everySixHours()->withoutOverlapping();
-Schedule::command('meta-ads:sync-creatives')->daily()->withoutOverlapping();
+//Schedule::command('meta-ads:sync-campaigns')->everySixHours()->withoutOverlapping();
+//Schedule::command('meta-ads:sync-ad-sets')->everySixHours()->withoutOverlapping();
+//Schedule::command('meta-ads:sync-ads')->everySixHours()->withoutOverlapping();
+//Schedule::command('meta-ads:sync-creatives')->daily()->withoutOverlapping();
 
 // Insights, narrowing the window as numbers settle:
 //  • 00:30 daily — re-pull the last 3 days to absorb late-attributed conversions.
 //  • every 6h    — refresh yesterday (attribution still landing).
 //  • every 2h    — refresh today (the live row updates throughout the day).
-Schedule::command('meta-ads:sync-insights --days=3')->dailyAt('00:30')->withoutOverlapping();
-Schedule::command('meta-ads:sync-insights --days=1 --until=yesterday')->everySixHours()->withoutOverlapping();
-Schedule::command('meta-ads:sync-insights --days=1')->everySixHours(30)->withoutOverlapping();
+//Schedule::command('meta-ads:sync-insights --days=3')->dailyAt('00:30')->withoutOverlapping();
+//Schedule::command('meta-ads:sync-insights --days=1 --until=yesterday')->everySixHours()->withoutOverlapping();
+//Schedule::command('meta-ads:sync-insights --days=1')->everySixHours(30)->withoutOverlapping();
 
 // Snapshot end-of-day budgets so we have history Meta doesn't keep. Runs at
 // 23:55 server time, after the 23:30 entity sync has captured the day's
@@ -64,7 +64,7 @@ Schedule::command('metaads:capture-budgets')->everyFourHours()->withoutOverlappi
 
 // Runs hourly; each optimization rule is evaluated only when its own
 // user-configured schedule (frequency / run-at hour) is due.
-Schedule::command('meta-ads:evaluate-optimization-rules')->hourly()->withoutOverlapping();
+//Schedule::command('meta-ads:evaluate-optimization-rules')->hourly()->withoutOverlapping();
 
 // Post the day's per-page ad budgets to Discord every morning (08:00 app tz).
 Schedule::command('metaads:report-page-budgets')->dailyAt('08:00');
