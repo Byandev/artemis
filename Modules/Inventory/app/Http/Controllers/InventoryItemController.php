@@ -5,8 +5,10 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Workspace;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -22,11 +24,14 @@ class InventoryItemController extends Controller
     use AuthorizesRequests;
 
     /**
-     * Build the inventory-items query with the same computed columns, filters
-     * and sorts the list view uses, so the export mirrors exactly what the
-     * table shows. Returns the QueryBuilder un-paginated.
+     * The correlated-subquery SQL fragments for an item's computed stock columns,
+     * all keyed off `inventory_items.id`. Extracted so both the flat list query
+     * (buildQuery) and the parent/child roll-up (buildSummaryQuery) compute stock
+     * identically. See each fragment's inline note for what it means.
+     *
+     * @return array<string, string>
      */
-    private function buildQuery(Request $request, Workspace $workspace): QueryBuilder
+    private function stockSql(): array
     {
         // Raw ledger stock = the latest transaction's running remaining_qty.
         $rawCurrentStocksSql = '(SELECT remaining_qty FROM inventory_transactions WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
@@ -54,31 +59,63 @@ class InventoryItemController extends Controller
         $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
-        // The list defaults to active items only. `filter[is_active]=all` shows every
-        // item; an explicit 0/1 narrows to inactive/active.
+        return [
+            'current_stocks' => $currentStocksSql,
+            'discrepancy' => $latestDiscrepancySql,
+            'discrepancy_counted_qty' => $latestCountedSql,
+            'discrepancy_date' => $latestDiscrepancyDateSql,
+            'waiting_for_delivery_stocks' => $waitingStocksSql,
+            'remaining_after_fulfillment' => $remainingAfterFulfillmentSql,
+            'po_needed' => $poNeededSql,
+            'days_it_can_last' => $daysItCanLastSql,
+        ];
+    }
+
+    /**
+     * Apply the list's `filter[is_active]` semantics to a base item query: default
+     * to active-only, `all` shows everything, an explicit 0/1 narrows.
+     */
+    private function applyActiveFilter(Request $request, $query): void
+    {
         $isActiveFilter = $request->input('filter.is_active');
 
-        $base = InventoryItem::where('inventory_items.workspace_id', $workspace->id);
-
         if ($isActiveFilter === null) {
-            $base->where('inventory_items.is_active', true);
+            $query->where('inventory_items.is_active', true);
         } elseif ($isActiveFilter !== 'all') {
-            $base->where('inventory_items.is_active', filter_var($isActiveFilter, FILTER_VALIDATE_BOOLEAN));
+            $query->where('inventory_items.is_active', filter_var($isActiveFilter, FILTER_VALIDATE_BOOLEAN));
         }
+    }
+
+    /**
+     * Build the inventory-items query with the same computed columns, filters
+     * and sorts the list view uses, so the export mirrors exactly what the
+     * table shows. Returns the QueryBuilder un-paginated.
+     */
+    private function buildQuery(Request $request, Workspace $workspace): QueryBuilder
+    {
+        $sql = $this->stockSql();
+
+        $base = InventoryItem::where('inventory_items.workspace_id', $workspace->id);
+        $this->applyActiveFilter($request, $base);
+
+        // Parent's SKU for child rows, so the flat list can show what each SKU is
+        // grouped under. NULL for parents and standalone items.
+        $parentSkuSql = '(SELECT sku FROM inventory_items p WHERE p.id = inventory_items.parent_id)';
 
         return QueryBuilder::for($base)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
-            // Undelivered remainder on status-6 orders (see $waitingStocksSql).
-            ->selectRaw("$waitingStocksSql as waiting_for_delivery_stocks")
-            ->selectRaw("$currentStocksSql as current_stocks")
-            ->selectRaw("$latestDiscrepancySql as discrepancy")
-            ->selectRaw("$latestCountedSql as discrepancy_counted_qty")
-            ->selectRaw("$latestDiscrepancyDateSql as discrepancy_date")
-            ->selectRaw("$remainingAfterFulfillmentSql as remaining_after_fulfillment")
-            ->selectRaw("$poNeededSql as po_needed")
-            ->selectRaw("$daysItCanLastSql as days_it_can_last")
+            ->selectRaw("$parentSkuSql as parent_sku")
+            // Undelivered remainder on status-6 orders (see waiting_for_delivery_stocks).
+            ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
+            ->selectRaw("{$sql['current_stocks']} as current_stocks")
+            ->selectRaw("{$sql['discrepancy']} as discrepancy")
+            ->selectRaw("{$sql['discrepancy_counted_qty']} as discrepancy_counted_qty")
+            ->selectRaw("{$sql['discrepancy_date']} as discrepancy_date")
+            ->selectRaw("{$sql['remaining_after_fulfillment']} as remaining_after_fulfillment")
+            ->selectRaw("{$sql['po_needed']} as po_needed")
+            ->selectRaw("{$sql['days_it_can_last']} as days_it_can_last")
             // three_days_average is a stored column updated hourly by inventory:update-averages
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -101,37 +138,126 @@ class InventoryItemController extends Controller
                 'three_days_average',
                 'current_stocks',
                 'waiting_for_delivery_stocks',
-                AllowedSort::callback('remaining_after_fulfillment', function ($query, $descending) use ($remainingAfterFulfillmentSql) {
-                    $query->orderByRaw("$remainingAfterFulfillmentSql ".($descending ? 'DESC' : 'ASC'));
+                AllowedSort::callback('remaining_after_fulfillment', function ($query, $descending) use ($sql) {
+                    $query->orderByRaw("{$sql['remaining_after_fulfillment']} ".($descending ? 'DESC' : 'ASC'));
                 }),
-                AllowedSort::callback('days_it_can_last', function ($query, $descending) use ($daysItCanLastSql) {
-                    $query->orderByRaw("$daysItCanLastSql ".($descending ? 'DESC' : 'ASC'));
+                AllowedSort::callback('days_it_can_last', function ($query, $descending) use ($sql) {
+                    $query->orderByRaw("{$sql['days_it_can_last']} ".($descending ? 'DESC' : 'ASC'));
                 }),
-                AllowedSort::callback('po_needed', function ($query, $descending) use ($poNeededSql) {
-                    $query->orderByRaw("$poNeededSql ".($descending ? 'DESC' : 'ASC'));
+                AllowedSort::callback('po_needed', function ($query, $descending) use ($sql) {
+                    $query->orderByRaw("{$sql['po_needed']} ".($descending ? 'DESC' : 'ASC'));
                 }),
-                AllowedSort::callback('discrepancy', function ($query, $descending) use ($latestDiscrepancySql) {
-                    $query->orderByRaw("$latestDiscrepancySql ".($descending ? 'DESC' : 'ASC'));
+                AllowedSort::callback('discrepancy', function ($query, $descending) use ($sql) {
+                    $query->orderByRaw("{$sql['discrepancy']} ".($descending ? 'DESC' : 'ASC'));
                 }),
             ])
             ->defaultSort('-created_at');
+    }
+
+    /**
+     * Roll every item up into its group and sum the child values. A "group" is a
+     * parent item (is_parent = true) together with the children pointing at it via
+     * parent_id; a standalone item is a group of one. Grouping key is
+     * COALESCE(parent_id, id) — a child shares its parent's id, a parent/standalone
+     * keys off its own id. The displayed row's identity (id, sku, product) comes
+     * from the parent when one exists, else from the single item, and the stock
+     * columns are SUMmed across the group. Returns a query builder to paginate.
+     */
+    private function buildSummaryQuery(Request $request, Workspace $workspace): Builder
+    {
+        $sql = $this->stockSql();
+
+        // Per-item computed rows for the whole workspace (parents included, so their
+        // children roll into them). The is_active filter still applies.
+        $inner = InventoryItem::query()
+            ->where('inventory_items.workspace_id', $workspace->id)
+            ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.unfulfilled_count, inventory_items.three_days_average, products.name as product_name')
+            ->selectRaw("{$sql['current_stocks']} as current_stocks")
+            ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
+            ->selectRaw("{$sql['discrepancy']} as discrepancy")
+            ->selectRaw("{$sql['remaining_after_fulfillment']} as remaining_after_fulfillment")
+            ->selectRaw("{$sql['po_needed']} as po_needed");
+
+        $this->applyActiveFilter($request, $inner);
+
+        if ($search = $request->input('filter.search')) {
+            $inner->where('inventory_items.sku', 'like', "%{$search}%");
+        }
+
+        if ($productId = $request->input('filter.product_id')) {
+            $inner->where('inventory_items.product_id', $productId);
+        }
+
+        // Aggregate the per-item rows into one row per group. Representative
+        // identity/attributes prefer the parent row (is_parent = 1), falling back
+        // to the item's own for standalone groups. Stock columns are summed;
+        // days_it_can_last is recomputed from the summed totals.
+        $outer = DB::query()
+            ->fromSub($inner, 'sub')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_id END), MAX(sub.product_id)) as product_id')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
+            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
+            ->selectRaw('MAX(sub.is_active) as is_active')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time)) as lead_time')
+            ->selectRaw('SUM(sub.unfulfilled_count) as unfulfilled_count')
+            ->selectRaw('SUM(sub.current_stocks) as current_stocks')
+            ->selectRaw('SUM(sub.waiting_for_delivery_stocks) as waiting_for_delivery_stocks')
+            ->selectRaw('SUM(sub.discrepancy) as discrepancy')
+            ->selectRaw('NULL as discrepancy_counted_qty')
+            ->selectRaw('NULL as discrepancy_date')
+            ->selectRaw('SUM(sub.remaining_after_fulfillment) as remaining_after_fulfillment')
+            ->selectRaw('SUM(sub.po_needed) as po_needed')
+            ->selectRaw('SUM(sub.three_days_average) as three_days_average')
+            ->selectRaw('(CASE WHEN SUM(sub.three_days_average) > 0 THEN SUM(sub.remaining_after_fulfillment) / SUM(sub.three_days_average) ELSE 0 END) as days_it_can_last')
+            ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
+
+        // Sorting on the aggregated aliases; anything unknown falls back to SKU.
+        $sortable = [
+            'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
+            'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
+            'po_needed', 'three_days_average', 'days_it_can_last',
+        ];
+        $sort = (string) $request->input('sort', 'sku');
+        $descending = str_starts_with($sort, '-');
+        $column = ltrim($sort, '-');
+
+        if (in_array($column, $sortable, true)) {
+            $outer->orderByRaw("$column ".($descending ? 'DESC' : 'ASC'));
+        } else {
+            $outer->orderBy('sku');
+        }
+
+        return $outer;
     }
 
     public function index(Request $request, Workspace $workspace)
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        $items = $this->buildQuery($request, $workspace)
-            ->paginate((int) $request->input('per_page', 100))
-            ->withQueryString();
+        $perPage = (int) $request->input('per_page', 100);
+        $summarize = $request->boolean('summarize');
+
+        $items = $summarize
+            ? $this->buildSummaryQuery($request, $workspace)->paginate($perPage)->withQueryString()
+            : $this->buildQuery($request, $workspace)->paginate($perPage)->withQueryString();
 
         return Inertia::render('workspaces/inventory/items/index', [
             'items' => $items,
             'products' => Product::where('workspace_id', $workspace->id)->get(),
+            // Existing parent items, to populate the "group under parent" picker.
+            'parents' => InventoryItem::where('workspace_id', $workspace->id)
+                ->where('is_parent', true)
+                ->orderBy('sku')
+                ->get(['id', 'sku']),
             'workspace' => $workspace,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
+                'summarize' => $summarize,
                 'filter' => $request->input('filter', []),
             ],
         ]);
@@ -370,6 +496,65 @@ class InventoryItemController extends Controller
         $message = $productId
             ? "Product set for {$updated} inventory item(s)."
             : "Product cleared for {$updated} inventory item(s).";
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    /**
+     * Group selected items under a parent placeholder item, so SKU variants of the
+     * same product (e.g. from different suppliers) roll up together in the summary
+     * view. Assigns to an existing parent (`parent_id`), creates one from
+     * `new_parent_sku`, or — when neither is given — ungroups the selected items
+     * (clears their parent_id). Parent placeholders are never fed to n8n.
+     */
+    public function bulkGroup(Request $request, Workspace $workspace)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        $validated = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'parent_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('inventory_items', 'id')->where(fn ($q) => $q
+                    ->where('workspace_id', $workspace->id)
+                    ->where('is_parent', true)),
+            ],
+            'new_parent_sku' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('inventory_items', 'sku')->where('workspace_id', $workspace->id),
+            ],
+        ]);
+
+        $parentId = $validated['parent_id'] ?? null;
+
+        if (! $parentId && ! empty($validated['new_parent_sku'])) {
+            $parent = InventoryItem::create([
+                'workspace_id' => $workspace->id,
+                'sku' => trim($validated['new_parent_sku']),
+                'is_parent' => true,
+                'is_active' => true,
+            ]);
+            $parentId = $parent->id;
+        }
+
+        // Never parent an item to itself, and never nest one parent under another —
+        // only leaf items (is_parent = false) can be grouped.
+        $ids = collect($validated['ids'])
+            ->reject(fn ($id) => $id === $parentId)
+            ->all();
+
+        $updated = InventoryItem::where('workspace_id', $workspace->id)
+            ->whereIn('id', $ids)
+            ->where('is_parent', false)
+            ->update(['parent_id' => $parentId]);
+
+        $message = $parentId
+            ? "{$updated} item(s) grouped under the parent item."
+            : "{$updated} item(s) ungrouped.";
 
         return redirect()->back()->with('success', $message);
     }
