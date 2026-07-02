@@ -159,7 +159,7 @@ class TransactionController extends Controller
             'rows.*.date' => ['required', 'date'],
             'rows.*.description' => ['required', 'string', 'max:255'],
             'rows.*.type' => ['required', 'in:in,out'],
-            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex'],
+            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex,interest,interest_fee'],
             'rows.*.amount' => ['required', 'numeric', 'min:0'],
             'rows.*.running_balance' => ['nullable', 'numeric'],
             'rows.*.position' => ['nullable', 'integer', 'min:1'],
@@ -213,7 +213,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex'],
+            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex,interest,interest_fee'],
         ]);
 
         $updated = Transaction::where('workspace_id', $workspace->id)

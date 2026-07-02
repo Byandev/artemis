@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\ActivityLogController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
@@ -176,6 +177,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-pages', [ShopController::class, 'refreshPages'])->name('workspaces.shops.refresh-pages');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-orders', [ShopController::class, 'refreshOrders'])->name('workspaces.shops.refresh-orders');
+    Route::delete('/workspaces/{workspace}/shops/{shop}', [ShopController::class, 'destroy'])->name('workspaces.shops.destroy');
 
     // Product routes
     // Redirect to analytics by default for navigation item active state
@@ -385,6 +387,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
         Route::post('/bulk-product', [InventoryItemController::class, 'bulkUpdateProduct'])->name('bulk-product');
+        Route::post('/bulk-group', [InventoryItemController::class, 'bulkGroup'])->name('bulk-group');
         Route::get('/{item}/stock-as-of', [InventoryItemController::class, 'stockAsOf'])->name('stock-as-of');
         Route::post('/{item}/discrepancies', [InventoryItemController::class, 'adjustCount'])->name('discrepancies.store');
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
@@ -523,6 +526,12 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-modules');
         Route::put('/workspaces/{workspace}/max-shops', [AdminWorkspaceController::class, 'updateMaxShops'])
             ->name('workspaces.update-max-shops');
+
+        // User Management
+        Route::get('/users', [AdminUserController::class, 'index'])
+            ->name('users.index');
+        Route::post('/users/{user}/reset-password', [AdminUserController::class, 'generatePasswordReset'])
+            ->name('users.reset-password');
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');
