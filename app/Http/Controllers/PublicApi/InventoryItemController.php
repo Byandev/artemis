@@ -14,6 +14,9 @@ class InventoryItemController extends Controller
         $workspace = $request->attributes->get('workspace');
 
         $items = InventoryItem::where('workspace_id', $workspace->id)
+            // Parent items are grouping placeholders with no supplier SKU to scrape;
+            // only their children carry real keywords, so keep parents out of n8n.
+            ->where('is_parent', false)
             ->whereNotNull('sales_keywords')
             ->where('sales_keywords', '!=', '')
             ->select(['id', 'sales_keywords', 'transaction_keywords'])

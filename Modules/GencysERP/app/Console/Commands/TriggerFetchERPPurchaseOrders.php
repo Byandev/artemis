@@ -77,6 +77,9 @@ class TriggerFetchERPPurchaseOrders extends Command
             ->with(['apiKeys', 'deliveredPurchaseOrders' => function ($query) {
                 $query->select(['cust_po_no', 'workspace_id']);
             }, 'inventoryItems' => function ($query) use ($itemIds) {
+                // Parent items are grouping placeholders with no ERP SKU — never sync them.
+                $query->where('is_parent', false);
+
                 // A specific --item selection wins over the active-only default so a
                 // single item can be re-synced (or tested) even when it's inactive.
                 if (empty($itemIds)) {
