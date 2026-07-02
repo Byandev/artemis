@@ -25,6 +25,7 @@ export const PERMISSIONS = {
     ViewShops: 'View Shops',
     CreateShops: 'Create Shops',
     RefreshShops: 'Refresh Shops',
+    DeleteShops: 'Delete Shops',
 
     // Products
     ViewProducts: 'View Products',
