@@ -31,8 +31,11 @@ Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 
 // ── Inventory (Discord) ─────────────────────────────────────────────────
-Schedule::command('inventory:report-deliveries')->everyMinute()->withoutOverlapping();
-Schedule::command('inventory:report-late-deliveries')->everyMinute()->withoutOverlapping();
+// Checked hourly (top of each hour); each command posts only for workspaces
+// whose configured send time matches the current hour. Send times are
+// whole hours only (e.g. 08:00), so an hourly run always lands on the match.
+Schedule::command('inventory:report-deliveries')->hourly()->withoutOverlapping();
+Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapping();
 
 // ── MetaAds ─────────────────────────────────────────────────────────────
 // Ad accounts rarely change; a light refresh every 30 min keeps new accounts
