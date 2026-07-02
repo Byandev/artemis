@@ -5,13 +5,11 @@ Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
 // Gencys ERP
-Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('08:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('12:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('17:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('16:00')->withoutOverlapping();
 
-Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('09:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('13:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('18:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('10:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('16:30')->withoutOverlapping();
 
 // Flag inventory items whose ERP sync was dispatched but never reported back
 // (e.g. the ERP login failed inside n8n) so silent failures show up as failed.
@@ -21,7 +19,8 @@ Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
 // GencysERP daily sales tracker — enable once the n8n flow + callback are ready.
-Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('06:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('08:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('15:00')->withoutOverlapping();
 
 // Recompute inventory demand (3-day average + unfulfilled) from Gencys orders,
 // after the day's orders have been fetched above.
