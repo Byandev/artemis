@@ -67,7 +67,7 @@ class ReportDeliveriesToDiscordCommand extends Command
                 continue;
             }
 
-            $webhookUrl = $this->webhookFor($setting->discord_webhook_url);
+            $webhookUrl = $this->webhookFor($setting->deliveries_webhook_url);
 
             if (empty($webhookUrl)) {
                 $this->warn("No Discord webhook for workspace {$workspace->name} — skipped.");
