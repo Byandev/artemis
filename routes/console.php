@@ -24,7 +24,8 @@ Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('15:0
 
 // Recompute inventory demand (3-day average + unfulfilled) from Gencys orders,
 // after the day's orders have been fetched above.
-Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('07:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('15:30')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
