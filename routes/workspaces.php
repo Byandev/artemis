@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\ActivityLogController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
@@ -523,6 +524,12 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-modules');
         Route::put('/workspaces/{workspace}/max-shops', [AdminWorkspaceController::class, 'updateMaxShops'])
             ->name('workspaces.update-max-shops');
+
+        // User Management
+        Route::get('/users', [AdminUserController::class, 'index'])
+            ->name('users.index');
+        Route::post('/users/{user}/reset-password', [AdminUserController::class, 'generatePasswordReset'])
+            ->name('users.reset-password');
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');
