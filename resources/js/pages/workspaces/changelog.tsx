@@ -12,6 +12,27 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.15.4',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Inventory — Adjust Count & Discrepancies',
+                items: [
+                    'New “Adjust count” action on each item in the Inventory Items list — record a physical stock count and the item’s remaining quantity updates to match, carrying the difference forward as new stock moves in and out',
+                    'Pick the date you counted and the dialog shows what the system thought the stock was on that date, plus the exact discrepancy that will take effect, before you save',
+                    'New “Discrepancy” column on the Inventory Items list (and the Excel export) shows the offset currently applied, along with what was last counted and when',
+                ],
+            },
+            {
+                title: 'Inventory — Simpler Stock Sync',
+                items: [
+                    'ERP transaction history now records each row’s remaining stock exactly as the ERP reports it, instead of re-deriving a running total — the on-hand numbers now match the source',
+                    'The inline “remaining quantity” edit on the Transaction Logs page is now read-only; stock corrections go through the new Adjust Count flow instead',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.15.3',
         date: '2026-07-01',
         sections: [

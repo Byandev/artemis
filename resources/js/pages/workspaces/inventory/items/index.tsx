@@ -736,7 +736,7 @@ export default function ItemIndex({
                             >
                                 {syncingGencys
                                     ? 'Syncing…'
-                                    : 'Sync from Gencys'}
+                                    : 'Sync from Unit Codes'}
                             </button>
                         )}
                         {canCreateItems && (
