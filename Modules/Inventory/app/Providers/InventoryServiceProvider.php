@@ -4,6 +4,8 @@ namespace Modules\Inventory\Providers;
 
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
+use Modules\Inventory\Console\Commands\ReportDeliveriesToDiscordCommand;
+use Modules\Inventory\Console\Commands\ReportLateDeliveriesToDiscordCommand;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -43,7 +45,10 @@ class InventoryServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        // $this->commands([]);
+        $this->commands([
+            ReportDeliveriesToDiscordCommand::class,
+            ReportLateDeliveriesToDiscordCommand::class,
+        ]);
     }
 
     /**
