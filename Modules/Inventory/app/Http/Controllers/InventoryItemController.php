@@ -95,7 +95,11 @@ class InventoryItemController extends Controller
     {
         $sql = $this->stockSql();
 
-        $base = InventoryItem::where('inventory_items.workspace_id', $workspace->id);
+        $base = InventoryItem::where('inventory_items.workspace_id', $workspace->id)
+            // Parent placeholders carry no stock of their own — their children do.
+            // The flat list rolls nothing up, so a parent would show as an empty
+            // row; only the summarize view surfaces the group. Hide them here.
+            ->where('inventory_items.is_parent', false);
         $this->applyActiveFilter($request, $base);
 
         // Parent's SKU for child rows, so the flat list can show what each SKU is
@@ -189,10 +193,23 @@ class InventoryItemController extends Controller
             $inner->where('inventory_items.product_id', $productId);
         }
 
+        // po_needed and days_it_can_last are non-additive — summing each child's
+        // per-item value would double-count the shared lead-time demand and average
+        // wrongly. Recompute them from the group's summed components instead, mirroring
+        // the per-item formulas in stockSql() but over the rolled-up totals. The group's
+        // lead_time is the representative one (parent's, else the max).
+        $groupLeadTime = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
+        $summedThreeDayAvg = 'SUM(sub.three_days_average)';
+        $summedWaiting = 'COALESCE(SUM(sub.waiting_for_delivery_stocks), 0)';
+        $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
+
+        $groupPoNeeded = "GREATEST(0, ($groupLeadTime * $summedThreeDayAvg) - $summedWaiting - $summedRemaining)";
+        $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
+
         // Aggregate the per-item rows into one row per group. Representative
         // identity/attributes prefer the parent row (is_parent = 1), falling back
-        // to the item's own for standalone groups. Stock columns are summed;
-        // days_it_can_last is recomputed from the summed totals.
+        // to the item's own for standalone groups. Additive stock columns are summed;
+        // po_needed and days_it_can_last are recomputed from the summed totals above.
         $outer = DB::query()
             ->fromSub($inner, 'sub')
             ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
@@ -202,7 +219,7 @@ class InventoryItemController extends Controller
             ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('MAX(sub.is_active) as is_active')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time)) as lead_time')
+            ->selectRaw("$groupLeadTime as lead_time")
             ->selectRaw('SUM(sub.unfulfilled_count) as unfulfilled_count')
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
             ->selectRaw('SUM(sub.waiting_for_delivery_stocks) as waiting_for_delivery_stocks')
@@ -210,9 +227,9 @@ class InventoryItemController extends Controller
             ->selectRaw('NULL as discrepancy_counted_qty')
             ->selectRaw('NULL as discrepancy_date')
             ->selectRaw('SUM(sub.remaining_after_fulfillment) as remaining_after_fulfillment')
-            ->selectRaw('SUM(sub.po_needed) as po_needed')
-            ->selectRaw('SUM(sub.three_days_average) as three_days_average')
-            ->selectRaw('(CASE WHEN SUM(sub.three_days_average) > 0 THEN SUM(sub.remaining_after_fulfillment) / SUM(sub.three_days_average) ELSE 0 END) as days_it_can_last')
+            ->selectRaw("$groupPoNeeded as po_needed")
+            ->selectRaw("$summedThreeDayAvg as three_days_average")
+            ->selectRaw("$groupDaysItCanLast as days_it_can_last")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
 
         // Sorting on the aggregated aliases; anything unknown falls back to SKU.
