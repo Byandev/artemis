@@ -9,8 +9,8 @@ import {
     TransactionFormDialog,
 } from '@/components/finance/transaction-form-dialog';
 import {
-    TRANSACTION_TYPE_LABEL,
-    TRANSACTION_TYPE_STYLE,
+    transactionTypeLabel,
+    transactionTypeStyle,
     TransactionType,
 } from '@/components/finance/transaction-type';
 import {
@@ -55,6 +55,7 @@ interface Props {
     workspace: Workspace;
     account: Account;
     transactions: Txn[];
+    transactionTypes: string[];
 }
 
 const fmt = (v: number | string) =>
@@ -67,6 +68,7 @@ export default function AccountShow({
     workspace,
     account,
     transactions,
+    transactionTypes,
 }: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<FinanceTransaction | null>(null);
@@ -175,16 +177,12 @@ export default function AccountShow({
                                 </tr>
                             )}
                             {rows.map((r) => {
-                                const s = r.transaction_type
-                                    ? (TRANSACTION_TYPE_STYLE[
-                                          r.transaction_type as TransactionType
-                                      ] ?? TRANSACTION_TYPE_STYLE.funds)
-                                    : TRANSACTION_TYPE_STYLE.funds;
-                                const label = r.transaction_type
-                                    ? (TRANSACTION_TYPE_LABEL[
-                                          r.transaction_type as TransactionType
-                                      ] ?? r.transaction_type)
-                                    : 'funds';
+                                const s = transactionTypeStyle(
+                                    r.transaction_type,
+                                );
+                                const label = transactionTypeLabel(
+                                    r.transaction_type,
+                                );
                                 return (
                                     <tr
                                         key={r.id}
@@ -336,6 +334,7 @@ export default function AccountShow({
                                 currency: account.currency,
                             },
                         ]}
+                        transactionTypes={transactionTypes}
                         defaults={{ account_id: account.id }}
                         workspaceSlug={workspace.slug}
                     />

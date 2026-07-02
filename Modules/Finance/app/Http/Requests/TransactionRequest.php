@@ -14,12 +14,25 @@ class TransactionRequest extends FormRequest
 
     public function rules(): array
     {
+        // Transaction types are now DB-backed and workspace-scoped; validate the
+        // submitted value exists in this workspace's finance_transaction_types.
+        $workspaceId = $this->route('workspace')?->id;
+
         return [
             'account_id' => ['required', 'exists:finance_accounts,id'],
             'date' => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(['in', 'out'])],
-            'transaction_type' => ['nullable', Rule::in(['funds', 'profit_share', 'expenses', 'transfer', 'remittance', 'loan', 'loan_payment', 'refund', 'voided', 'courier_damaged_settlement', 'capex', 'interest', 'interest_fee'])],
+            'transaction_type' => [
+                'nullable', 'string', 'max:255',
+                Rule::exists('finance_transaction_types', 'name')->where('workspace_id', $workspaceId),
+            ],
+            'requested_by' => ['nullable', 'string', 'max:255'],
+            'approved_by' => ['nullable', 'string', 'max:255'],
+            'department' => ['nullable', 'string', 'max:255'],
+            'charge_to' => ['nullable', 'string', 'max:255'],
+            'reference_no' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', Rule::in(['pending', 'approved', 'posted'])],
             'amount' => ['required', 'numeric', 'min:0'],
             'running_balance' => ['nullable', 'numeric'],
             'position' => ['nullable', 'integer', 'min:1'],

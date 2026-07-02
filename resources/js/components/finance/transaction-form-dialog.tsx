@@ -5,7 +5,7 @@ import {
 } from '@/components/finance/account-form-dialog';
 import { SUB_CATEGORIES, SubCategory } from '@/components/finance/sub-category';
 import {
-    TRANSACTION_TYPES,
+    buildTransactionTypeOptions,
     TransactionType,
 } from '@/components/finance/transaction-type';
 import {
@@ -18,15 +18,23 @@ import {
 import { useForm } from '@inertiajs/react';
 import React, { useEffect } from 'react';
 
+export type TransactionStatus = 'pending' | 'approved' | 'posted';
+
 export interface FinanceTransaction {
     id: number;
     account_id: number;
     date: string;
     description: string;
+    requested_by?: string | null;
+    approved_by?: string | null;
+    department?: string | null;
+    charge_to?: string | null;
     type: 'in' | 'out';
     transaction_type: TransactionType | null;
     amount: number | string;
     running_balance?: number | string | null;
+    reference_no?: string | null;
+    status?: TransactionStatus | null;
     position?: number | null;
     sub_category: SubCategory | null;
     notes: string | null;
@@ -43,6 +51,7 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     transaction?: FinanceTransaction | null;
     accounts: AccountOpt[];
+    transactionTypes: string[];
     defaults?: Partial<FinanceTransaction>;
     workspaceSlug: string;
 }
@@ -54,20 +63,29 @@ export function TransactionFormDialog({
     onOpenChange,
     transaction,
     accounts,
+    transactionTypes,
     defaults,
     workspaceSlug,
 }: Props) {
     const isEditing = !!transaction;
+    const typeOptions = buildTransactionTypeOptions(transactionTypes);
+    const defaultType = typeOptions[0]?.value ?? '';
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm({
             account_id: '',
             date: today(),
             description: '',
+            requested_by: '',
+            approved_by: '',
+            department: '',
+            charge_to: '',
             type: 'in' as 'in' | 'out',
-            transaction_type: 'funds' as TransactionType,
+            transaction_type: defaultType as TransactionType,
             amount: '',
             running_balance: '',
+            reference_no: '',
+            status: 'posted' as TransactionStatus,
             position: '',
             sub_category: '' as SubCategory | '',
             notes: '',
@@ -80,10 +98,17 @@ export function TransactionFormDialog({
                     account_id: String(transaction.account_id),
                     date: transaction.date,
                     description: transaction.description ?? '',
+                    requested_by: transaction.requested_by ?? '',
+                    approved_by: transaction.approved_by ?? '',
+                    department: transaction.department ?? '',
+                    charge_to: transaction.charge_to ?? '',
                     type: transaction.type,
-                    transaction_type: transaction.transaction_type ?? 'funds',
+                    transaction_type:
+                        transaction.transaction_type ?? defaultType,
                     amount: String(transaction.amount ?? ''),
                     running_balance: String(transaction.running_balance ?? ''),
+                    reference_no: transaction.reference_no ?? '',
+                    status: transaction.status ?? 'posted',
                     position: String(transaction.position ?? ''),
                     sub_category: transaction.sub_category ?? '',
                     notes: transaction.notes ?? '',
@@ -156,7 +181,11 @@ export function TransactionFormDialog({
                         </Field>
 
                         <div className="grid grid-cols-2 gap-3">
-                            <Field label="Date" required error={errors.date}>
+                            <Field
+                                label="Posted Date"
+                                required
+                                error={errors.date}
+                            >
                                 <input
                                     type="date"
                                     value={data.date}
@@ -186,7 +215,7 @@ export function TransactionFormDialog({
                         </div>
 
                         <Field
-                            label="Transaction Type"
+                            label="Type of Expense"
                             required
                             error={errors.transaction_type}
                         >
@@ -200,7 +229,7 @@ export function TransactionFormDialog({
                                 }
                                 className={inputCls}
                             >
-                                {TRANSACTION_TYPES.map((t) => (
+                                {typeOptions.map((t) => (
                                     <option key={t.value} value={t.value}>
                                         {t.label}
                                     </option>
@@ -209,7 +238,7 @@ export function TransactionFormDialog({
                         </Field>
 
                         <Field
-                            label="Description"
+                            label="Transaction"
                             required
                             error={errors.description}
                         >
@@ -222,6 +251,90 @@ export function TransactionFormDialog({
                                 className={inputCls}
                             />
                         </Field>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field
+                                label="Requested By"
+                                error={errors.requested_by}
+                            >
+                                <input
+                                    type="text"
+                                    value={data.requested_by}
+                                    onChange={(e) =>
+                                        setData('requested_by', e.target.value)
+                                    }
+                                    className={inputCls}
+                                />
+                            </Field>
+                            <Field
+                                label="Approved By"
+                                error={errors.approved_by}
+                            >
+                                <input
+                                    type="text"
+                                    value={data.approved_by}
+                                    onChange={(e) =>
+                                        setData('approved_by', e.target.value)
+                                    }
+                                    className={inputCls}
+                                />
+                            </Field>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field label="Department" error={errors.department}>
+                                <input
+                                    type="text"
+                                    value={data.department}
+                                    onChange={(e) =>
+                                        setData('department', e.target.value)
+                                    }
+                                    className={inputCls}
+                                />
+                            </Field>
+                            <Field label="Charge To" error={errors.charge_to}>
+                                <input
+                                    type="text"
+                                    value={data.charge_to}
+                                    onChange={(e) =>
+                                        setData('charge_to', e.target.value)
+                                    }
+                                    className={inputCls}
+                                />
+                            </Field>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <Field
+                                label="Reference No."
+                                error={errors.reference_no}
+                            >
+                                <input
+                                    type="text"
+                                    value={data.reference_no}
+                                    onChange={(e) =>
+                                        setData('reference_no', e.target.value)
+                                    }
+                                    className={inputCls}
+                                />
+                            </Field>
+                            <Field label="Status" error={errors.status}>
+                                <select
+                                    value={data.status}
+                                    onChange={(e) =>
+                                        setData(
+                                            'status',
+                                            e.target.value as TransactionStatus,
+                                        )
+                                    }
+                                    className={inputCls}
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="posted">Posted</option>
+                                </select>
+                            </Field>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <Field
@@ -298,7 +411,7 @@ export function TransactionFormDialog({
                             </Field>
                         </div>
 
-                        <Field label="Notes" error={errors.notes}>
+                        <Field label="Remarks" error={errors.notes}>
                             <textarea
                                 value={data.notes ?? ''}
                                 onChange={(e) =>

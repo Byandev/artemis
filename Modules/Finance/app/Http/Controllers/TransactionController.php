@@ -9,11 +9,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\TransactionRequest;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\Transaction;
+use Modules\Finance\Models\TransactionType;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -88,6 +90,8 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'accounts' => Account::where('workspace_id', $workspace->id)
                 ->orderBy('name')->get(['id', 'name', 'currency']),
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->orderBy('name')->pluck('name'),
             'totals' => [
                 'credit' => (float) $totals->total_credit,
                 'debit' => (float) $totals->total_debit,
@@ -159,7 +163,13 @@ class TransactionController extends Controller
             'rows.*.date' => ['required', 'date'],
             'rows.*.description' => ['required', 'string', 'max:255'],
             'rows.*.type' => ['required', 'in:in,out'],
-            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex,interest,interest_fee'],
+            'rows.*.transaction_type' => ['nullable', Rule::exists('finance_transaction_types', 'name')->where('workspace_id', $workspace->id)],
+            'rows.*.requested_by' => ['nullable', 'string', 'max:255'],
+            'rows.*.approved_by' => ['nullable', 'string', 'max:255'],
+            'rows.*.department' => ['nullable', 'string', 'max:255'],
+            'rows.*.charge_to' => ['nullable', 'string', 'max:255'],
+            'rows.*.reference_no' => ['nullable', 'string', 'max:255'],
+            'rows.*.status' => ['nullable', Rule::in(['pending', 'approved', 'posted'])],
             'rows.*.amount' => ['required', 'numeric', 'min:0'],
             'rows.*.running_balance' => ['nullable', 'numeric'],
             'rows.*.position' => ['nullable', 'integer', 'min:1'],
@@ -213,7 +223,7 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex,interest,interest_fee'],
+            'transaction_type' => ['nullable', Rule::exists('finance_transaction_types', 'name')->where('workspace_id', $workspace->id)],
         ]);
 
         $updated = Transaction::where('workspace_id', $workspace->id)
@@ -287,18 +297,28 @@ class TransactionController extends Controller
 
         return response()->streamDownload(function () use ($transactions) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Date', 'Account', 'Description', 'Type', 'Transaction Type', 'Sub Category', 'Amount', 'Running Balance', 'Notes']);
+            fputcsv($out, [
+                'Posted Date', 'Accounts', 'Transaction', 'Requested By', 'Approved By',
+                'Department', 'Type of Expense', 'Debit (Expense)', 'Credit (Income)',
+                'Running Balance', 'Reference No.', 'Charge To', 'Status', 'Sub Category', 'Remarks',
+            ]);
 
             foreach ($transactions as $txn) {
                 fputcsv($out, [
                     $txn->date,
                     $txn->account?->name ?? '',
                     $txn->description,
-                    $txn->type,
+                    $txn->requested_by ?? '',
+                    $txn->approved_by ?? '',
+                    $txn->department ?? '',
                     $txn->transaction_type ?? '',
-                    $txn->sub_category ?? '',
-                    $txn->amount,
+                    $txn->type === 'out' ? $txn->amount : '',
+                    $txn->type === 'in' ? $txn->amount : '',
                     $txn->running_balance ?? '',
+                    $txn->reference_no ?? '',
+                    $txn->charge_to ?? '',
+                    $txn->status ?? '',
+                    $txn->sub_category ?? '',
                     $txn->notes ?? '',
                 ]);
             }
