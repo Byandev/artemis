@@ -45,6 +45,7 @@ return [
 
     'discord' => [
         'webhook_url' => env('DISCORD_WEBHOOK_URL'),
+        'inventory_webhook_url' => env('INVENTORY_DISCORD_WEBHOOK_URL'),
     ],
 
 ];

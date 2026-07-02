@@ -30,6 +30,10 @@ Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('07:00')->wi
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 
+// ── Inventory (Discord) ─────────────────────────────────────────────────
+Schedule::command('inventory:report-deliveries')->everyMinute()->withoutOverlapping();
+Schedule::command('inventory:report-late-deliveries')->everyMinute()->withoutOverlapping();
+
 // ── MetaAds ─────────────────────────────────────────────────────────────
 // Ad accounts rarely change; a light refresh every 30 min keeps new accounts
 // and status changes visible.
