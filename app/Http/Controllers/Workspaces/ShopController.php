@@ -103,6 +103,8 @@ class ShopController extends Controller
 
         $validated = $request->validated();
 
+        // The "shop already added" case is caught by StoreShopRequest validation
+        // before we reach here, so no POS API call is made for a duplicate.
         $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
             'api_key' => $validated['pos_token'],
         ]);
@@ -112,10 +114,6 @@ class ShopController extends Controller
         }
 
         $resJson = $response->json();
-
-        if (Shop::where('id', $validated['shop_id'])->where('workspace_id', $workspace->id)->exists()) {
-            throw ValidationException::withMessages(['shop_id' => 'This shop has already been added to this workspace.']);
-        }
 
         $shop = Shop::create([
             'id' => $validated['shop_id'],
