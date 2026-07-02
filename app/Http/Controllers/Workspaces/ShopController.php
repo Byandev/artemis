@@ -288,4 +288,35 @@ class ShopController extends Controller
 
         return redirect()->route('workspaces.shops.index', $workspace);
     }
+
+    public function destroy(Request $request, Workspace $workspace, Shop $shop)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $this->authorize(Permission::DeleteShops->value, $workspace);
+
+        if ($shop->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        // Deleting the shop cascades (via FK) to pages, team_shop, products and
+        // pancake_shop_users. The tables below key off shop_id but have no FK
+        // cascade, and the checklist completions are polymorphic — so clean them
+        // up explicitly within a transaction alongside the shop delete.
+        DB::transaction(function () use ($shop) {
+            DB::table('pancake_orders')->where('shop_id', $shop->id)->delete();
+            DB::table('pancake_customers')->where('shop_id', $shop->id)->delete();
+            DB::table('pancake_order_for_delivery')->where('shop_id', $shop->id)->delete();
+            DB::table('parcel_journey_notification_logs')->where('shop_id', $shop->id)->delete();
+
+            $shop->checklistCompletions()->delete();
+
+            $shop->delete();
+        });
+
+        return redirect()->route('workspaces.shops.index', $workspace)
+            ->with('success', 'Shop and its related data were deleted.');
+    }
 }

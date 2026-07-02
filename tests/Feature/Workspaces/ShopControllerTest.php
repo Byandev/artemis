@@ -5,6 +5,7 @@ use App\Models\Shop;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Jobs\FetchShopOrders;
 use Modules\Pancake\Jobs\FetchShopUsers;
@@ -86,6 +87,73 @@ test('refresh-pages on a foreign-workspace shop returns 403', function () {
     $this->actingAs($owner)
         ->post("/workspaces/{$workspaceA->slug}/shops/{$foreignShop->id}/refresh-pages")
         ->assertForbidden();
+});
+
+// ----- Destroy (delete shop + related data) -----
+
+test('owner can delete a shop and its related data is removed', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create();
+
+    // Cascading child (FK): a page belonging to the shop.
+    Page::factory()->create([
+        'id' => 5001,
+        'workspace_id' => $workspace->id,
+        'shop_id' => $shop->id,
+    ]);
+
+    // Non-cascading children keyed by shop_id — must be cleaned up explicitly.
+    DB::table('pancake_orders')->insert([
+        'order_number' => 'ON-1',
+        'status' => 1,
+        'status_name' => 'new',
+        'shop_id' => $shop->id,
+        'page_id' => 5001,
+        'workspace_id' => $workspace->id,
+        'customer_id' => '11111111-1111-1111-1111-111111111111',
+        'inserted_at' => now(),
+    ]);
+    DB::table('pancake_customers')->insert([
+        'id' => '22222222-2222-2222-2222-222222222222',
+        'shop_id' => $shop->id,
+        'customer_id' => '33333333-3333-3333-3333-333333333333',
+        'name' => 'Cust',
+        'fb_id' => 'fb-1',
+    ]);
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/shops")
+        ->delete("/workspaces/{$workspace->slug}/shops/{$shop->id}")
+        ->assertRedirect("/workspaces/{$workspace->slug}/shops");
+
+    expect(Shop::where('id', $shop->id)->exists())->toBeFalse();
+    expect(Page::where('id', 5001)->exists())->toBeFalse();
+    expect(DB::table('pancake_orders')->where('shop_id', $shop->id)->exists())->toBeFalse();
+    expect(DB::table('pancake_customers')->where('shop_id', $shop->id)->exists())->toBeFalse();
+});
+
+test('deleting a foreign-workspace shop returns 403', function () {
+    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    $foreignShop = Shop::factory()->forWorkspace($workspaceB)->create();
+
+    $this->actingAs($owner)
+        ->delete("/workspaces/{$workspaceA->slug}/shops/{$foreignShop->id}")
+        ->assertForbidden();
+
+    expect(Shop::where('id', $foreignShop->id)->exists())->toBeTrue();
+});
+
+test('non-member cannot delete a shop', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create();
+    $stranger = User::factory()->create();
+
+    $this->actingAs($stranger)
+        ->delete("/workspaces/{$workspace->slug}/shops/{$shop->id}")
+        ->assertForbidden();
+
+    expect(Shop::where('id', $shop->id)->exists())->toBeTrue();
 });
 
 // ----- Validate POS token -----
