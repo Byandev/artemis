@@ -1,6 +1,16 @@
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import PageHeader from '@/components/common/PageHeader';
 import ValidateTokenButton from '@/components/pages/ValidateTokenButton';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -36,6 +46,7 @@ import {
     Plus,
     RefreshCw,
     Search,
+    Trash2,
     Users,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -101,11 +112,15 @@ const Shops = ({
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
     const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
     const [addOpen, setAddOpen] = useState(false);
+    const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
     const { post, processing } = useForm({});
+    const { delete: destroy, processing: deleting } = useForm({});
     const canRefreshShops = usePermission(PERMISSIONS.RefreshShops);
     const canCreateShops = usePermission(PERMISSIONS.CreateShops);
+    const canDeleteShops = usePermission(PERMISSIONS.DeleteShops);
     const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
-    const canUseShopActions = canRefreshShops || canViewChecklist;
+    const canUseShopActions =
+        canRefreshShops || canViewChecklist || canDeleteShops;
 
     const addForm = useForm({
         shop_id: '',
@@ -179,6 +194,22 @@ const Shops = ({
     const openChecklist = (shop: Shop) => {
         setSelectedShop(shop);
         setChecklistDrawerOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (!shopToDelete) return;
+        const shop = shopToDelete;
+        destroy(workspaces.shops.destroy.url({ workspace, shop }), {
+            preserveScroll: true,
+            onStart: () => toast.info(`Deleting ${shop.name}...`),
+            onSuccess: () => {
+                setShopToDelete(null);
+                toast.success(
+                    `${shop.name} and its related data were deleted.`,
+                );
+            },
+            onError: () => toast.error(`Failed to delete ${shop.name}.`),
+        });
     };
 
     const columns: ColumnDef<Shop>[] = [
@@ -268,6 +299,17 @@ const Shops = ({
                                           >
                                               <RefreshCw className="mr-2 h-4 w-4" />
                                               Refresh orders
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canDeleteShops && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  setShopToDelete(shop)
+                                              }
+                                              className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                                          >
+                                              <Trash2 className="mr-2 h-4 w-4" />
+                                              Delete shop
                                           </DropdownMenuItem>
                                       )}
                                   </DropdownMenuContent>
@@ -485,6 +527,43 @@ const Shops = ({
                             </form>
                         </DialogContent>
                     </Dialog>
+                )}
+
+                {canDeleteShops && (
+                    <AlertDialog
+                        open={!!shopToDelete}
+                        onOpenChange={(open) => !open && setShopToDelete(null)}
+                    >
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Shop</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to delete{' '}
+                                    <span className="font-medium">
+                                        {shopToDelete?.name}
+                                    </span>
+                                    ? This will also remove its pages, products,
+                                    users, orders, customers and delivery
+                                    records. This action cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={deleting}>
+                                    Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        confirmDelete();
+                                    }}
+                                    disabled={deleting}
+                                    className="bg-red-600 text-white hover:bg-red-700"
+                                >
+                                    {deleting ? 'Deleting...' : 'Delete'}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 )}
 
                 {canViewChecklist && (

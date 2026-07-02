@@ -1,0 +1,77 @@
+-- Insert inventory items into workspace 1, all linked to product 1.
+-- The parent/child columns (parent_id, is_parent) are included but left empty
+-- (parent_id NULL, is_parent 0) so every row is created as a standalone item;
+-- group them afterwards via the "Group under parent" action in the UI.
+--
+-- Prerequisites in the target DB:
+--   * workspaces.id = 1 must exist
+--   * products.id = 1 must exist (product_id has an FK to products)
+--   * inventory_items should not already contain these ids / (workspace_id, sku) pairs
+
+INSERT INTO `inventory_items`
+    (`id`, `workspace_id`, `product_id`, `parent_id`, `is_parent`, `sku`, `is_active`, `sales_keywords`, `transaction_keywords`, `lead_time`, `unfulfilled_count`, `three_days_average`, `remaining_qty`, `created_at`, `updated_at`)
+VALUES
+    (172, 1, 1, NULL, 0, '1 Money Amulet', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:08'),
+    (171, 1, 1, NULL, 0, 'ANTI-STROKE HERBAL NECK PATCH', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (170, 1, 1, NULL, 0, 'Pikutin-Padrino', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:10'),
+    (169, 1, 1, NULL, 0, 'Anti-Stroke Herbal Neck Patch-Less', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (168, 1, 1, NULL, 0, 'Pikutin Padrino Box', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:10'),
+    (167, 1, 1, NULL, 0, 'Anti-Stroke Herbal Neck Patch-DISCOUNTED', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (166, 1, 1, NULL, 0, 'Anti-Stroke Herbal Neck Patch-0.2', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (165, 1, 1, NULL, 0, 'Anti-Brain Problem Herbal Neck Patch-0.2', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (164, 1, 1, NULL, 0, 'Anti-Diabetes Herbal Foot Patch-01', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (163, 1, 1, NULL, 0, 'Anti-CKD Miracle Philippine Giant Clam Oil', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (162, 1, 1, NULL, 0, 'PIKUTIN OB SEALED STICKERS', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:10'),
+    (161, 1, 1, NULL, 0, 'PIKUTIN PERFUME BOX', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:10'),
+    (160, 1, 1, NULL, 0, 'PIKUTIN PERFUME STICKER', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:10'),
+    (159, 1, 1, NULL, 0, 'PIKUTIN HARABAS STICKER', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:10'),
+    (158, 1, 1, NULL, 0, 'PIKUTIN HABULIN STICKER', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (157, 1, 1, NULL, 0, 'PIKUTIN SPUTING STICKER', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:10'),
+    (156, 1, 1, NULL, 0, 'PIKUTIN PADRINO STICKER', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:10'),
+    (155, 1, 1, NULL, 0, 'Golden Digest Sticker', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (154, 1, 1, NULL, 0, 'Golden Digest Sticker 2.0', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (153, 1, 1, NULL, 0, 'ELIXIR OF HORMUZ-Ancient Botanical Body Oil (BFM)', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (152, 1, 1, NULL, 0, 'Hikari New Life Kidney Therapy Healing Oil (BFM-P45)', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (151, 1, 1, NULL, 0, 'Hikari New Life Kidney Therapy Healing Oil (BFM-P55)', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (150, 1, 1, NULL, 0, 'Magnerve Cooling Gel (BFM)', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 12:28:35', '2026-07-02 07:00:09'),
+    (149, 1, 1, NULL, 0, 'Ionic Naturals CMD', 1, '', NULL, 10, 0, 0.0000, NULL, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (145, 1, 1, NULL, 0, 'MAYON MIRACLE OIL 100mL', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (125, 1, 1, NULL, 0, 'MIGHTY MAGNESIUM CONCENTRATED MINERAL SPRAY 50ml', 1, NULL, NULL, 10, 56, 12.6667, 1232, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (124, 1, 1, NULL, 0, 'AMAZING NATURE 8-IN-1 HERBAL SPRAY 50mL', 1, NULL, NULL, 10, 0, 1.3333, 250, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (122, 1, 1, NULL, 0, 'Nature''s Prime Guyabano Healing Oil 100mL', 1, NULL, NULL, 10, 35, 11.6667, 4, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (121, 1, 1, NULL, 0, 'Anti-Diabetes Herbal Foot Patch', 1, NULL, NULL, 10, 36, 4.3333, 514, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (96, 1, 1, NULL, 0, 'NEUROBOOST RECOVERY GEL', 1, NULL, NULL, 10, 202, 42.3333, 1063, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (92, 1, 1, NULL, 0, 'PanaloDrops Advance Formula', 1, NULL, NULL, 10, 4, 1.3333, 49, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (89, 1, 1, NULL, 0, 'Chia Seeds For Diabetes', 1, NULL, NULL, 10, 27, 5.0000, NULL, '2026-06-25 11:12:19', '2026-07-02 07:00:09'),
+    (82, 1, 1, NULL, 0, 'Airzen Anti-Lung Problems', 1, NULL, NULL, 10, 147, 81.3333, 1800, '2026-06-25 11:12:19', '2026-07-02 07:00:08'),
+    (76, 1, 1, NULL, 0, 'Anti-Stroke Herbal Neck Patch 1', 1, NULL, NULL, 10, 0, 0.0000, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (73, 1, 1, NULL, 0, 'Thunderwing Advance Formula', 1, NULL, NULL, 10, 2, 0.3333, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:10'),
+    (71, 1, 1, NULL, 0, 'CardioPrime Healing Cream 2.0', 1, NULL, NULL, 10, 4, 1.3333, 559, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (70, 1, 1, NULL, 0, 'HikariJoint Therapy Healing Cream', 1, NULL, NULL, 10, 292, 66.6667, 258, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (68, 1, 1, NULL, 0, 'Guyabano Healing Capsules', 1, NULL, NULL, 10, 4, 0.0000, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (64, 1, 1, NULL, 0, 'HerbaLungs Chest Rub', 1, NULL, NULL, 10, 11, 2.3333, 435, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (63, 1, 1, NULL, 0, 'Pikutin Perfume-10ml', 1, NULL, NULL, 10, 74, 5.3333, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:10'),
+    (62, 1, 1, NULL, 0, 'Pikutin Harabas-10ml', 1, NULL, NULL, 10, 3, 0.6667, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:10'),
+    (61, 1, 1, NULL, 0, 'Pikutin Sputing-10ml', 1, NULL, NULL, 10, 4, 1.0000, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:10'),
+    (60, 1, 1, NULL, 0, 'Pikutin Habulin-10ml', 1, NULL, NULL, 10, 13, 4.6667, 107, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (59, 1, 1, NULL, 0, 'Chia Seeds for Diabetes 100g', 1, NULL, NULL, 10, 72, 15.6667, 224, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (58, 1, 1, NULL, 0, 'Anti-Cancer Miracle Philippine Giant Clam Oil', 1, NULL, NULL, 10, 336, 216.0000, 6059, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (57, 1, 1, NULL, 0, 'Amazing Life Herbal Spray with Curcumin Extract', 1, NULL, NULL, 10, 0, 0.0000, 423, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (56, 1, 1, NULL, 0, 'Hikari Liver Care Drops', 1, NULL, NULL, 10, 143, 29.0000, 336, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (55, 1, 1, NULL, 0, 'Golden Digest Detox Trinitea', 1, NULL, NULL, 10, 158, 52.6667, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (54, 1, 1, NULL, 0, 'Magnerve Cooling Gel', 1, NULL, NULL, 10, 83, 27.6667, 1171, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (53, 1, 1, NULL, 0, 'KidneyCare Herbal Balm - Fast Comfort Formula', 1, NULL, NULL, 10, 295, 62.3333, 3609, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (51, 1, 1, NULL, 0, 'Amazing Life Herbal Spray with Curcumin Extract - BFM', 1, '', NULL, 10, 39, 62.0000, 423, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (50, 1, 1, NULL, 0, 'Hikari New Life Kidney Therapy Healing Oil (BFM)', 1, NULL, NULL, 10, 317, 73.6667, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (48, 1, 1, NULL, 0, 'Pikutin Padrino 1.0', 1, NULL, NULL, 10, 1, 4.3333, 751, '2026-06-25 11:12:18', '2026-07-02 07:00:10'),
+    (47, 1, 1, NULL, 0, 'Her Reset Ovarra', 1, NULL, NULL, 10, 69, 20.0000, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (46, 1, 1, NULL, 0, 'Pikutin Perfume 2.0', 1, NULL, NULL, 10, 15, 34.6667, 4975, '2026-06-25 11:12:18', '2026-07-02 07:00:10'),
+    (45, 1, 1, NULL, 0, 'Pikutin Travel Atomizer', 1, NULL, NULL, 10, 1, 1.3333, 62, '2026-06-25 11:12:18', '2026-07-02 07:00:10'),
+    (44, 1, 1, NULL, 0, 'Pikutin Comb For Men', 1, NULL, NULL, 10, 0, 0.3333, NULL, '2026-06-25 11:12:18', '2026-07-02 07:00:09'),
+    (43, 1, 1, NULL, 0, 'test sku 3 sorting', 1, '', NULL, 10, 125, 4.0000, 120, '2026-06-19 10:02:17', '2026-06-19 10:02:17'),
+    (41, 1, 1, NULL, 0, 'Test SKU', 1, 'Test keyword, Test keyword 2', NULL, 10, 15, 5.0000, 150, '2026-06-19 09:55:32', '2026-06-19 09:55:32'),
+    (40, 1, 1, NULL, 0, 'PIKUTIN HABULIN 2.0', 1, 'PIKUTIN HABULIN 2.0, Pikutin Perfume for Men by Tiyo Bri Habulin Long Lasting EDP 50ml Fragrance Alluring Date Night Scent, Pikutin Perfume For Men Original Long Lasting 24hrs EDP 50ml Habulin Sweety Sexy Alluring Presence', 'pikutin habulin 2.0', 10, 2, 13.0000, 1670, '2026-06-18 11:40:43', '2026-07-02 07:00:09'),
+    (39, 1, 1, NULL, 0, 'PIKUTIN SPUTING 2.0', 1, 'PIKUTIN SPUTING 2.0, Pikutin Perfume for Men by Tiyo Bri Sputing Long Lasting EDP 50ml Fragrance Appropriate Professional Scent, Pikutin Perfume For Men Original Long Lasting 24hrs EDP 50ml Sputing Office Professional Scent', 'pikutin sputin 2.0', 10, 5, 26.6667, 4324, '2026-06-18 11:38:53', '2026-07-02 07:00:10'),
+    (38, 1, 1, NULL, 0, 'PIKUTIN HARABAS 2.0', 1, 'PIKUTIN HARABAS 2.0, Pikutin Perfume for Men by Tiyo Bri Harabas Long Lasting EDP 50ml Fragrance Masculine Night Out Scent, Pikutin Perfume For Men Original Long Lasting 24hrs EDP 50ml Harabas Strong Woody Masculine Nightout', 'PIKUTIN_HARABAS', 10, 2, 9.0000, 1220, '2026-06-18 11:35:43', '2026-07-02 07:00:10'),
+    (37, 1, 1, NULL, 0, 'PUKITIN PERFUME 2.0', 1, 'Pikutin Perfume For Men Original Long Lasting 24hrs EDP 50ml Clean Fresh Safe Everyday Scent Daily, PIKUTIN PERFUME 2.0', 'PIKUTIN PERFUME', 10, 0, 0.0000, 10948, '2026-06-18 10:39:28', '2026-07-02 07:00:10'),
+    (4, 1, 1, NULL, 0, 'Test SKU 2', 1, '22', '22', 10, 2, 5.0000, 150, '2026-04-08 16:40:39', '2026-06-19 09:54:30');

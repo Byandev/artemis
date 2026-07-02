@@ -32,11 +32,13 @@ import {
     ChevronsUpDown,
     ClipboardCheck,
     Download,
+    Layers,
     MoreHorizontal,
     Package,
     Pencil,
     Search,
     Trash2,
+    Ungroup,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -46,11 +48,19 @@ interface Item {
     sku: string;
     is_active: boolean;
     product_id: number;
+    parent_id?: number | null;
+    is_parent?: boolean;
+    // Flat view: the parent's SKU when this item is a child. Summary view:
+    // is_group flags a rolled-up parent row and child_count is how many SKUs it sums.
+    parent_sku?: string | null;
+    is_group?: boolean | number;
+    child_count?: number;
     sales_keywords: string;
     transaction_keywords: string;
     lead_time: number;
     unfulfilled_count: number;
     product?: { id: number; name: string };
+    product_name?: string | null;
     remaining_qty: number | null;
     unfulfilled: number | null;
     waiting_for_delivery_stocks: number | null;
@@ -64,14 +74,21 @@ interface Item {
     discrepancy_date: string | null;
 }
 
+interface ParentOption {
+    id: number;
+    sku: string;
+}
+
 interface Props {
     workspace: Workspace;
     items: PaginatedData<Item>;
     products: Product[];
+    parents: ParentOption[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
+        summarize?: boolean;
         filter?: { search?: string; is_active?: string | number | boolean };
     };
 }
@@ -114,6 +131,7 @@ export default function ItemIndex({
     workspace,
     items,
     products,
+    parents,
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -131,10 +149,15 @@ export default function ItemIndex({
     const [activeOnly, setActiveOnly] = useState(
         query?.filter?.is_active !== 'all',
     );
+    // Summarize rolls SKU variants up under their parent item and sums the values.
+    const [summarize, setSummarize] = useState(!!query?.summarize);
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkProcessing, setBulkProcessing] = useState(false);
     const [productPickerOpen, setProductPickerOpen] = useState(false);
     const [productSearch, setProductSearch] = useState('');
+    const [groupPickerOpen, setGroupPickerOpen] = useState(false);
+    const [parentSearch, setParentSearch] = useState('');
+    const [newParentSku, setNewParentSku] = useState('');
 
     const canCreateItems = usePermission(PERMISSIONS.CreateInventoryItems);
     const canEditItems = usePermission(PERMISSIONS.EditInventoryItems);
@@ -157,6 +180,7 @@ export default function ItemIndex({
                     sort: query?.sort,
                     'filter[search]': search || undefined,
                     'filter[is_active]': activeOnly ? 1 : 'all',
+                    summarize: summarize ? 1 : undefined,
                     page: 1,
                     per_page: query?.perPage ?? items.per_page,
                 },
@@ -168,7 +192,14 @@ export default function ItemIndex({
                 },
             );
         }, 400),
-        [baseUrl, query?.sort, query?.perPage, items.per_page, activeOnly],
+        [
+            baseUrl,
+            query?.sort,
+            query?.perPage,
+            items.per_page,
+            activeOnly,
+            summarize,
+        ],
     );
 
     const handleActiveOnlyChange = (checked: boolean) => {
@@ -179,6 +210,30 @@ export default function ItemIndex({
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[is_active]': checked ? 1 : 'all',
+                summarize: summarize ? 1 : undefined,
+                page: 1,
+                per_page: query?.perPage ?? items.per_page,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['items'],
+            },
+        );
+    };
+
+    const handleSummarizeChange = (checked: boolean) => {
+        setSummarize(checked);
+        // Selection/bulk actions only make sense on the flat list.
+        setRowSelection({});
+        router.get(
+            baseUrl,
+            {
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[is_active]': activeOnly ? 1 : 'all',
+                summarize: checked ? 1 : undefined,
                 page: 1,
                 per_page: query?.perPage ?? items.per_page,
             },
@@ -229,6 +284,38 @@ export default function ItemIndex({
         );
     };
 
+    const filteredParents = useMemo(() => {
+        const q = parentSearch.trim().toLowerCase();
+        if (!q) return parents;
+        return parents.filter((p) => p.sku?.toLowerCase().includes(q));
+    }, [parents, parentSearch]);
+
+    // Group the selected items under a parent: pass an existing parentId, a
+    // newParentSku to create one, or neither (null) to ungroup.
+    const handleBulkGroup = (
+        parentId: number | null,
+        newSku?: string | null,
+    ) => {
+        setGroupPickerOpen(false);
+        setParentSearch('');
+        setNewParentSku('');
+        router.post(
+            `${baseUrl}/bulk-group`,
+            {
+                ids: selectedIds.map(Number),
+                parent_id: parentId,
+                new_parent_sku: newSku || null,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setBulkProcessing(true),
+                onFinish: () => setBulkProcessing(false),
+                onSuccess: () => setRowSelection({}),
+                onError: () => toast.error('Failed to group inventory items.'),
+            },
+        );
+    };
+
     // Skip the query on the very first render (initial load/pagination), but
     // fire on every subsequent input change — including clearing the search
     // back to empty, which must reload the full list.
@@ -243,7 +330,7 @@ export default function ItemIndex({
     }, [searchValue]);
 
     const columns: ColumnDef<Item>[] = [
-        ...(canEditItems
+        ...(canEditItems && !summarize
             ? [
                   {
                       id: 'select',
@@ -280,18 +367,36 @@ export default function ItemIndex({
             header: ({ column }) => (
                 <SortableHeader column={column} title="SKU / Product" />
             ),
-            cell: ({ row }) => (
-                <div className="flex flex-col gap-0.5">
-                    <span className="font-mono text-[11px] font-medium text-gray-700 dark:text-gray-300">
-                        {row.original.sku}
-                    </span>
-                    {row.original.product && (
-                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                            {row.original.product.name}
+            cell: ({ row }) => {
+                const item = row.original;
+                const productName = item.product?.name ?? item.product_name;
+                const isGroup = !!item.is_group || !!item.is_parent;
+                return (
+                    <div className="flex flex-col gap-0.5">
+                        <span className="flex items-center gap-1.5 font-mono text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                            {item.sku}
+                            {isGroup && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-1.5 py-0.5 font-mono text-[9px] font-medium tracking-wider text-indigo-600 uppercase dark:bg-indigo-500/10 dark:text-indigo-400">
+                                    <Layers className="h-2.5 w-2.5" />
+                                    {summarize && item.child_count
+                                        ? `${item.child_count} SKUs`
+                                        : 'Parent'}
+                                </span>
+                            )}
                         </span>
-                    )}
-                </div>
-            ),
+                        {productName && (
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                                {productName}
+                            </span>
+                        )}
+                        {!summarize && item.parent_sku && (
+                            <span className="font-mono text-[9px] text-indigo-500 dark:text-indigo-400">
+                                ↳ under {item.parent_sku}
+                            </span>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'is_active',
@@ -520,7 +625,7 @@ export default function ItemIndex({
                 );
             },
         },
-        ...(canUseItemActions
+        ...(canUseItemActions && !summarize
             ? [
                   {
                       id: 'actions',
@@ -665,6 +770,16 @@ export default function ItemIndex({
                             Active only
                         </span>
                     </label>
+
+                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
+                        <Switch
+                            checked={summarize}
+                            onCheckedChange={handleSummarizeChange}
+                        />
+                        <span className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-300">
+                            Summarize by parent
+                        </span>
+                    </label>
                 </div>
 
                 {canEditItems && selectedIds.length > 0 && (
@@ -750,6 +865,111 @@ export default function ItemIndex({
                                     </div>
                                 </PopoverContent>
                             </Popover>
+                            <Popover
+                                open={groupPickerOpen}
+                                onOpenChange={setGroupPickerOpen}
+                            >
+                                <PopoverTrigger asChild>
+                                    <button
+                                        disabled={bulkProcessing}
+                                        className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                                    >
+                                        <Layers className="h-3.5 w-3.5" />
+                                        Group under parent
+                                        <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" />
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="start"
+                                    className="w-72 p-0"
+                                >
+                                    <div className="border-b border-black/6 p-2 dark:border-white/6">
+                                        <p className="mb-1 px-1 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                            Create new parent
+                                        </p>
+                                        <div className="flex items-center gap-1.5">
+                                            <input
+                                                value={newParentSku}
+                                                onChange={(e) =>
+                                                    setNewParentSku(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                onKeyDown={(e) => {
+                                                    if (
+                                                        e.key === 'Enter' &&
+                                                        newParentSku.trim()
+                                                    ) {
+                                                        handleBulkGroup(
+                                                            null,
+                                                            newParentSku.trim(),
+                                                        );
+                                                    }
+                                                }}
+                                                placeholder="New parent SKU / name"
+                                                className="h-8 w-full rounded-md border border-black/8 bg-stone-50 px-2 font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 focus:border-emerald-500 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600"
+                                            />
+                                            <button
+                                                type="button"
+                                                disabled={
+                                                    !newParentSku.trim() ||
+                                                    bulkProcessing
+                                                }
+                                                onClick={() =>
+                                                    handleBulkGroup(
+                                                        null,
+                                                        newParentSku.trim(),
+                                                    )
+                                                }
+                                                className="flex h-8 shrink-0 items-center rounded-md bg-emerald-600 px-2.5 font-mono! text-[11px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                                            >
+                                                Create
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 border-b border-black/6 px-3 dark:border-white/6">
+                                        <Search className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                                        <input
+                                            value={parentSearch}
+                                            onChange={(e) =>
+                                                setParentSearch(e.target.value)
+                                            }
+                                            placeholder="Search existing parents…"
+                                            className="h-9 w-full bg-transparent font-mono! text-[12px]! text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
+                                        />
+                                    </div>
+                                    <div className="max-h-56 overflow-y-auto p-1">
+                                        {filteredParents.length === 0 ? (
+                                            <p className="px-2 py-3 text-center font-mono text-[11px] text-gray-400 dark:text-gray-600">
+                                                No parent items yet.
+                                            </p>
+                                        ) : (
+                                            filteredParents.map((parent) => (
+                                                <button
+                                                    type="button"
+                                                    key={parent.id}
+                                                    onClick={() =>
+                                                        handleBulkGroup(
+                                                            parent.id,
+                                                        )
+                                                    }
+                                                    className="flex w-full items-center rounded-md px-2 py-1.5 text-left font-mono! text-[12px]! text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-200 dark:hover:bg-zinc-800"
+                                                >
+                                                    {parent.sku}
+                                                </button>
+                                            ))
+                                        )}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                            <button
+                                onClick={() => handleBulkGroup(null)}
+                                disabled={bulkProcessing}
+                                className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                            >
+                                <Ungroup className="h-3.5 w-3.5" />
+                                Ungroup
+                            </button>
                             <button
                                 onClick={() => setRowSelection({})}
                                 disabled={bulkProcessing}
@@ -769,7 +989,7 @@ export default function ItemIndex({
                         initialSorting={initialSorting}
                         meta={{ ...omit(items, ['data']) }}
                         getRowId={(row) => String(row.id)}
-                        {...(canEditItems
+                        {...(canEditItems && !summarize
                             ? {
                                   rowSelection,
                                   onRowSelectionChange: setRowSelection,
@@ -783,6 +1003,7 @@ export default function ItemIndex({
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     'filter[is_active]': activeOnly ? 1 : 'all',
+                                    summarize: summarize ? 1 : undefined,
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??

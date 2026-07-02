@@ -5,7 +5,6 @@ namespace Modules\Inventory\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryUnitCode;
 use Modules\Inventory\Models\InventoryUnitCodeItem;

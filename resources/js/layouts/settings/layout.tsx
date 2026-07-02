@@ -4,7 +4,7 @@ import { edit as editPassword } from '@/routes/password';
 import { edit } from '@/routes/profile';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, type InertiaLinkProps } from '@inertiajs/react';
-import { KeyRound, Server, User, type LucideIcon } from 'lucide-react';
+import { Bell, KeyRound, Server, User, type LucideIcon } from 'lucide-react';
 import { type PropsWithChildren } from 'react';
 
 type SettingsNavItem = {
@@ -57,6 +57,17 @@ export default function SettingsLayout({
                     title: 'ERP Credentials',
                     href: `/workspaces/${workspace.slug}/settings/erp-credentials`,
                     icon: Server,
+                },
+            ],
+        });
+
+        groups.push({
+            label: 'Notifications',
+            items: [
+                {
+                    title: 'Discord Notifications',
+                    href: `/workspaces/${workspace.slug}/settings/notifications`,
+                    icon: Bell,
                 },
             ],
         });

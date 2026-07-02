@@ -16,6 +16,8 @@ class InventoryItem extends Model
     protected $fillable = [
         'workspace_id',
         'product_id',
+        'parent_id',
+        'is_parent',
         'sku',
         'is_active',
         'sales_keywords',
@@ -28,6 +30,7 @@ class InventoryItem extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_parent' => 'boolean',
     ];
 
     /**
@@ -52,6 +55,21 @@ class InventoryItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * The placeholder parent item this SKU is grouped under (null when the item
+     * is standalone or is itself a parent). See is_parent.
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(InventoryItem::class, 'parent_id');
+    }
+
+    /** The child SKU variants grouped under this parent item. */
+    public function children(): HasMany
+    {
+        return $this->hasMany(InventoryItem::class, 'parent_id');
     }
 
     /** Inventory transactions (stock movements) */

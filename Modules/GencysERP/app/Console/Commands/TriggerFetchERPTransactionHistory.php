@@ -62,6 +62,9 @@ class TriggerFetchERPTransactionHistory extends Command
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
             ->with(['apiKeys', 'inventoryItems' => function ($query) use ($itemIds) {
+                // Parent items are grouping placeholders with no ERP SKU — never sync them.
+                $query->where('is_parent', false);
+
                 // A specific --item selection wins over the active-only default so a
                 // single item can be re-synced (or tested) even when it's inactive.
                 if (empty($itemIds)) {
@@ -92,7 +95,7 @@ class TriggerFetchERPTransactionHistory extends Command
             $workspace->inventoryItems
                 ->chunk(20)
                 ->values()
-                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $transactionDate, $webhookUrl, $delay) {
+                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $transactionDate, $webhookUrl) {
                     $dispatched++;
                     $totalCount += count($chunk);
 
