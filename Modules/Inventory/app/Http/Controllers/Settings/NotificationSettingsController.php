@@ -41,10 +41,11 @@ class NotificationSettingsController extends Controller
             'deliveries_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
             'awaiting_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
             'deliveries_enabled' => ['required', 'boolean'],
-            // Whole-hour send times only (HH:00).
-            'deliveries_send_at' => ['required', 'date_format:H:i'],
+            // Whole-hour send times only (HH:00) — the scheduler runs hourly,
+            // so a non-:00 minute would never match and silently never send.
+            'deliveries_send_at' => ['required', 'date_format:H:i', 'regex:/^\d{2}:00$/'],
             'awaiting_enabled' => ['required', 'boolean'],
-            'awaiting_send_at' => ['required', 'date_format:H:i'],
+            'awaiting_send_at' => ['required', 'date_format:H:i', 'regex:/^\d{2}:00$/'],
         ]);
 
         InventoryNotificationSetting::updateOrCreate(
