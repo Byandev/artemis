@@ -103,18 +103,25 @@ class ShopController extends Controller
 
         $validated = $request->validated();
 
-        $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
-            'api_key' => $validated['pos_token'],
-        ]);
-
-        if ($response->failed()) {
-            throw ValidationException::withMessages(['pos_token' => 'Invalid API Key.']);
-        }
-
-        $resJson = $response->json();
-
         if (Shop::where('id', $validated['shop_id'])->where('workspace_id', $workspace->id)->exists()) {
             throw ValidationException::withMessages(['shop_id' => 'This shop has already been added to this workspace.']);
+        }
+
+        $posToken = $validated['pos_token'] ?? null;
+        $resJson = null;
+
+        // With a POS token we verify it and pull the shop's pages/orders up front;
+        // without one the shop is created bare and can be connected later via refresh.
+        if ($posToken) {
+            $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$validated['shop_id'], [
+                'api_key' => $posToken,
+            ]);
+
+            if ($response->failed()) {
+                throw ValidationException::withMessages(['pos_token' => 'Invalid API Key.']);
+            }
+
+            $resJson = $response->json();
         }
 
         $shop = Shop::create([
@@ -122,13 +129,18 @@ class ShopController extends Controller
             'workspace_id' => $workspace->id,
             'name' => $resJson['shop']['name'] ?? 'Shop '.$validated['shop_id'],
             'avatar_url' => $resJson['shop']['avatar_url'] ?? null,
-            'pos_token' => $validated['pos_token'],
+            'pos_token' => $posToken,
         ]);
 
-        $createdPages = $this->syncShopPages($shop, $workspace, $resJson, $request->user()->id);
+        $createdPages = $resJson
+            ? $this->syncShopPages($shop, $workspace, $resJson, $request->user()->id)
+            : 0;
 
-        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-        dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        // Order/user sync needs the POS token, so only queue it when we have one.
+        if ($posToken) {
+            dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+            dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        }
 
         (new PostHogService)->capture((string) $request->user()->id, 'shop_connected', [
             'workspace_id' => $workspace->id,
@@ -137,8 +149,12 @@ class ShopController extends Controller
             'pages_created' => $createdPages,
         ]);
 
+        $message = $posToken
+            ? "Shop added. {$createdPages} page(s) imported and syncing."
+            : 'Shop added. Add a POS token via refresh to import its pages and orders.';
+
         return redirect()->route('workspaces.shops.index', $workspace)
-            ->with('success', "Shop added. {$createdPages} page(s) imported and syncing.");
+            ->with('success', $message);
     }
 
     /**

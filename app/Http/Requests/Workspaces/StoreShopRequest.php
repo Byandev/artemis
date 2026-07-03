@@ -24,7 +24,9 @@ class StoreShopRequest extends FormRequest
     {
         return [
             'shop_id' => 'required|integer',
-            'pos_token' => 'required|string|max:255',
+            // Optional: a shop can be created without a POS token and connected
+            // later via refresh. See ShopController::store().
+            'pos_token' => 'nullable|string|max:255',
         ];
     }
 
@@ -37,7 +39,6 @@ class StoreShopRequest extends FormRequest
     {
         return [
             'shop_id.required' => 'The shop ID is required.',
-            'pos_token.required' => 'The POS token is required.',
         ];
     }
 }

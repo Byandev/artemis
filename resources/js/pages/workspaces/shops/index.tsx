@@ -1,6 +1,7 @@
 import { TargetChecklistDrawer } from '@/components/checklist/target-checklist-drawer';
 import PageHeader from '@/components/common/PageHeader';
-import ValidateTokenButton from '@/components/pages/ValidateTokenButton';
+// POS Token field hidden for now — restore this import with the field below.
+// import ValidateTokenButton from '@/components/pages/ValidateTokenButton';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -446,6 +447,7 @@ const Shops = ({
                                         )}
                                     </div>
 
+                                    {/* POS Token field hidden for now — restore this block to re-enable it.
                                     <div className="space-y-1.5">
                                         <label className={labelClass}>
                                             POS Token{' '}
@@ -485,6 +487,7 @@ const Shops = ({
                                             </p>
                                         )}
                                     </div>
+                                    */}
 
                                     {(
                                         addForm.errors as Record<
