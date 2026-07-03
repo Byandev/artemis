@@ -1,10 +1,21 @@
 import PageHeader from '@/components/common/PageHeader';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PERMISSIONS } from '@/constants/permissions';
@@ -22,6 +33,7 @@ import {
     MoreHorizontal,
     RefreshCw,
     Search,
+    Trash2,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -66,6 +78,7 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
         [query?.sort],
     );
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [removeTarget, setRemoveTarget] = useState<MetaUser | null>(null);
 
     useEffect(() => {
         const t = setTimeout(() => {
@@ -94,6 +107,14 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
             {},
             { preserveScroll: true },
         );
+    };
+
+    const confirmRemove = () => {
+        if (!removeTarget) return;
+        router.delete(`${indexUrl}/users/${removeTarget.id}`, {
+            preserveScroll: true,
+            onFinish: () => setRemoveTarget(null),
+        });
     };
 
     const columns: ColumnDef<MetaUser>[] = [
@@ -193,6 +214,14 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
                                 <RefreshCw />
                                 Sync ad accounts
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setRemoveTarget(row.original)}
+                            >
+                                <Trash2 />
+                                Remove FB account
+                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -267,6 +296,35 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
                     />
                 </div>
             </div>
+
+            <AlertDialog
+                open={!!removeTarget}
+                onOpenChange={(open) => !open && setRemoveTarget(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remove FB account?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This revokes{' '}
+                            <span className="font-medium">
+                                {removeTarget?.name}
+                            </span>{' '}
+                            and deletes its ad accounts from this workspace. Your
+                            historical campaigns, ad sets, ads, creatives and
+                            insights are kept.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmRemove}
+                            className="bg-red-600 text-white hover:bg-red-700"
+                        >
+                            Remove
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

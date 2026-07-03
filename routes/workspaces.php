@@ -62,6 +62,7 @@ use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
+use Modules\MetaAds\Http\Controllers\RemoveFbAccountController;
 use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
@@ -294,6 +295,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', AdAccountSyncController::class)
         ->middleware('can:Manage Meta Ads Accounts,workspace')
         ->name('workspaces.metaads.sync-ad-accounts');
+    Route::delete('/workspaces/{workspace}/integrations/meta/users/{metaUser}', RemoveFbAccountController::class)
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.remove-fb-account');
     Route::patch('/workspaces/{workspace}/integrations/meta/ad-accounts/{adAccount}/toggle-sync', AdAccountToggleSyncController::class)
         ->middleware('can:Manage Meta Ads Accounts,workspace')
         ->name('workspaces.metaads.ad-accounts.toggle-sync');
