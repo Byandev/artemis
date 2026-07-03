@@ -48,6 +48,7 @@ use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceCo
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
+use Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
@@ -380,6 +381,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/botcake/flows', [FlowController::class, 'index'])->name('workspaces.botcake.flows.index');
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
     Route::get('/workspaces/{workspace}/botcake/sequence-messages', [SequenceMessageController::class, 'index'])->name('workspaces.botcake.sequence-messages.index');
+    Route::get('/workspaces/{workspace}/inventory/dashboard', [InventoryDashboardController::class, 'index'])
+        ->name('workspaces.inventory.dashboard');
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
         Route::get('/export', [InventoryItemController::class, 'export'])->name('export');
