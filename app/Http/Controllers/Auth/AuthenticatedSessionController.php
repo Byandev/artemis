@@ -78,7 +78,7 @@ class AuthenticatedSessionController extends Controller
                 // Auto-accept the invitation for consistency with register flow
                 DB::transaction(function () use ($invitation, $user) {
                     $workspace = $invitation->workspace;
-                    $workspace->addMember($user, $invitation->role);
+                    $workspace->addMember($user, $invitation->role_id);
                     $invitation->markAsAccepted();
                 });
 

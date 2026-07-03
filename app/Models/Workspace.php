@@ -285,10 +285,10 @@ class Workspace extends Model
     /**
      * Add a user to the workspace.
      */
-    public function addMember(User $user, string $role = 'member'): void
+    public function addMember(User $user, $role = null): void
     {
         if (! $this->hasMember($user)) {
-            $this->users()->attach($user->id, ['role' => $role]);
+            $this->users()->attach($user->id, ['role_id' => $role]);
         }
     }
 
