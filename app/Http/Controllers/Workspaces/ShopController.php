@@ -80,6 +80,12 @@ class ShopController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
+        // Reveal the POS token only to users who can edit shops, so the edit form
+        // can pre-fill it. It stays hidden from everyone else.
+        if ($request->user()->can(Permission::EditShops->value, $workspace)) {
+            $pages->getCollection()->each->makeVisible('pos_token');
+        }
+
         $shopLimitInfo = $workspace->shopLimitInfo();
 
         return Inertia::render('workspaces/shops/index', [
@@ -139,6 +145,47 @@ class ShopController extends Controller
 
         return redirect()->route('workspaces.shops.index', $workspace)
             ->with('success', "Shop added. {$createdPages} page(s) imported and syncing.");
+    }
+
+    public function update(Request $request, Workspace $workspace, Shop $shop)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $this->authorize(Permission::EditShops->value, $workspace);
+
+        if ($shop->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            // Optional — leave blank to keep the current token. When changed it is
+            // verified against the POS API before being saved.
+            'pos_token' => 'nullable|string|max:255',
+        ]);
+
+        $tokenChanged = ! empty($validated['pos_token'])
+            && $validated['pos_token'] !== $shop->pos_token;
+
+        if ($tokenChanged) {
+            $response = Http::get('https://pos.pages.fm/api/v1/shops/'.$shop->id, [
+                'api_key' => $validated['pos_token'],
+            ]);
+
+            if ($response->failed()) {
+                throw ValidationException::withMessages(['pos_token' => 'Invalid API Key.']);
+            }
+        }
+
+        $shop->update([
+            'name' => $validated['name'],
+            ...($tokenChanged ? ['pos_token' => $validated['pos_token']] : []),
+        ]);
+
+        return redirect()->route('workspaces.shops.index', $workspace)
+            ->with('success', 'Shop updated.');
     }
 
     /**
