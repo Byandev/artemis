@@ -64,7 +64,7 @@ Schedule::command('metaads:capture-budgets')->everyFourHours()->withoutOverlappi
 
 // Runs hourly; each optimization rule is evaluated only when its own
 // user-configured schedule (frequency / run-at hour) is due.
-//Schedule::command('meta-ads:evaluate-optimization-rules')->hourly()->withoutOverlapping();
+Schedule::command('meta-ads:evaluate-optimization-rules')->hourly()->withoutOverlapping();
 
 // Post the day's per-page ad budgets to Discord every morning (08:00 app tz).
 Schedule::command('metaads:report-page-budgets')->dailyAt('08:00');
