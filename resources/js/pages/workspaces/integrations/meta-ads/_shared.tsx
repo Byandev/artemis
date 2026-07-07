@@ -1248,7 +1248,6 @@ export function ColumnVisibilityMenu({
     const [search, setSearch] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-    const allCollapsed = Object.values(collapsed).every(Boolean);
 
     // Right-panel drag state
     const [dragId, setDragId] = useState<string | null>(null);
@@ -1355,6 +1354,13 @@ export function ColumnVisibilityMenu({
         if (g) g.opts.push(opt);
         else grouped.push({ category: cat, opts: [opt] });
     }
+
+    // All groups collapsed only when every currently-rendered group is collapsed.
+    // Derive from `grouped` (not the raw `collapsed` map) so the freshly-opened
+    // default of `{}` reads as "expanded" — otherwise `.every` on an empty object
+    // is `true` and the toggle mislabels as "Expand all" while groups are open.
+    const allCollapsed =
+        grouped.length > 0 && grouped.every((g) => collapsed[g.category]);
 
     const toggleCollapse = (cat: string) =>
         setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));

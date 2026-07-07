@@ -115,6 +115,14 @@ export default function FinanceExpenses({
     );
 
     const handleDateChange = (dates: Date[]) => {
+        if (dates.length === 0) {
+            router.get(
+                `/workspaces/${workspace.slug}/finance/expenses`,
+                { from: undefined, to: undefined },
+                { preserveState: true, preserveScroll: true, replace: true },
+            );
+            return;
+        }
         if (dates.length !== 2) return;
         const from = moment(dates[0]).format('YYYY-MM-DD');
         const to = moment(dates[1]).format('YYYY-MM-DD');

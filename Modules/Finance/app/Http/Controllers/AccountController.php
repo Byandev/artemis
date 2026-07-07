@@ -11,6 +11,7 @@ use Inertia\Inertia;
 use Modules\Finance\Http\Requests\AccountRequest;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\Transaction;
+use Modules\Finance\Models\TransactionType;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -106,6 +107,8 @@ class AccountController extends Controller
             'workspace' => $workspace,
             'account' => $account,
             'transactions' => $transactions,
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

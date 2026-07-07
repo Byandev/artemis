@@ -49,6 +49,11 @@ export default function DashboardFiltersBar({
                             date_from: moment(dates[0]).format('YYYY-MM-DD'),
                             date_to: moment(dates[1]).format('YYYY-MM-DD'),
                         });
+                    } else if (dates.length === 0) {
+                        onChange({
+                            date_from: undefined,
+                            date_to: undefined,
+                        });
                     }
                 }}
                 defaultDate={
