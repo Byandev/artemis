@@ -31,6 +31,7 @@ class PageFactory extends Factory
             'botcake_token' => fake()->optional()->uuid(),
             'infotxt_token' => fake()->optional()->uuid(),
             'infotxt_user_id' => fake()->optional()->numerify('######'),
+            'sms_provider' => 'infotxt',
             'orders_last_synced_at' => fake()->optional()->dateTimeBetween('-1 month', 'now'),
         ];
     }
