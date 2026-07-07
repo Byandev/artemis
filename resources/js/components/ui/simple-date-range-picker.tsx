@@ -79,6 +79,12 @@ export function SimpleDateRangePicker({
     setOpen(false)
   }
 
+  const handleClear = () => {
+    setTempValue(undefined)
+    actualOnChange?.(undefined)
+    setOpen(false)
+  }
+
   const handlePresetClick = (preset: DatePreset) => {
     const range = preset.getValue()
     setTempValue(range)
@@ -202,22 +208,36 @@ export function SimpleDateRangePicker({
                 className="text-[0.7rem] md:text-[0.7rem] p-2 md:p-1.5 [&_button[data-range-middle=true]]:bg-gray-100 [&_button[data-range-middle=true]]:text-gray-900 dark:[&_button[data-range-middle=true]]:bg-gray-800 dark:[&_button[data-range-middle=true]]:text-gray-100 [&_button[data-range-middle=true]]:hover:bg-gray-200 dark:[&_button[data-range-middle=true]]:hover:bg-gray-700 [&_button[data-range-start=true]]:relative [&_button[data-range-start=true]]:z-10 [&_button[data-range-end=true]]:relative [&_button[data-range-end=true]]:z-10 [&_.text-\[0\.8rem\]]:text-[0.65rem] [&_.text-muted-foreground]:text-[0.65rem] [&_.font-medium]:text-[0.7rem]"
               />
             </div>
-            <div className="flex items-center justify-end gap-2 p-2 md:p-2 border-t">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCancel}
-                className="h-8 md:h-7 text-xs px-3 md:px-2"
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleApply}
-                className="h-8 md:h-7 text-xs px-4 md:px-3"
-              >
-                Apply
-              </Button>
+            <div className="flex items-center justify-between gap-2 p-2 md:p-2 border-t">
+              {actualValue ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClear}
+                  className="h-8 md:h-7 text-xs px-3 md:px-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  Clear
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancel}
+                  className="h-8 md:h-7 text-xs px-3 md:px-2"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleApply}
+                  className="h-8 md:h-7 text-xs px-4 md:px-3"
+                >
+                  Apply
+                </Button>
+              </div>
             </div>
           </div>
         </div>
