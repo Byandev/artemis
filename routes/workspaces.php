@@ -46,6 +46,7 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
+use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
 use Modules\Inventory\Http\Controllers\InventoryDashboardController;
@@ -463,6 +464,11 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/transactions/bulk-update-sub-category', [FinanceTransactionController::class, 'bulkUpdateSubCategory'])->name('transactions.bulk-update-sub-category');
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
+
+        Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
+        Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');
+        Route::put('/transaction-types/{transactionType}', [FinanceTransactionTypeController::class, 'update'])->name('transaction-types.update');
+        Route::delete('/transaction-types/{transactionType}', [FinanceTransactionTypeController::class, 'destroy'])->name('transaction-types.destroy');
 
         Route::get('/remittances', [FinanceRemittanceController::class, 'index'])->name('remittances.index');
         Route::post('/remittances', [FinanceRemittanceController::class, 'store'])->name('remittances.store');

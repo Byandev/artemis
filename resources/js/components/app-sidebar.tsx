@@ -48,6 +48,7 @@ import {
     SlidersHorizontal,
     Sparkles,
     Store,
+    Tags,
     Trophy,
     Truck,
     User,
@@ -430,6 +431,12 @@ export function AppSidebar() {
                               title: 'Transactions',
                               href: `/workspaces/${currentWorkspace.slug}/finance/transactions`,
                               icon: ArrowLeftRight,
+                              permission: PERMISSIONS.ViewFinanceTransactions,
+                          },
+                          {
+                              title: 'Transaction Types',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/transaction-types`,
+                              icon: Tags,
                               permission: PERMISSIONS.ViewFinanceTransactions,
                           },
                           {
