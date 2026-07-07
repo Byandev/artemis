@@ -15,6 +15,7 @@ use App\Http\Controllers\PublicApi\TransactionHistoryController;
 use App\Http\Controllers\PublicApi\UserController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Api\InternController as GencysInternApiController;
+use Modules\GencysERP\Http\Controllers\Api\InternDailyRecordController as GencysInternDailyRecordApiController;
 use Modules\GencysERP\Http\Controllers\Api\UnitCodeInventoryController as GencysUnitCodeInventoryApiController;
 use Modules\Inventory\Http\Controllers\Api\UnitCodeController as InventoryUnitCodeApiController;
 
@@ -64,6 +65,11 @@ Route::post('v1/public/gencys/unit-code-inventories', [GencysUnitCodeInventoryAp
 // sits outside the api.key middleware group.
 Route::post('v1/public/gencys/interns', [GencysInternApiController::class, 'store'])
     ->name('api.v1.public.gencys.interns.store');
+
+// GencysERP intern daily records callback. n8n posts the scraped per-intern
+// daily records here, authenticating with the api_key embedded in the body.
+Route::post('v1/public/gencys/intern-daily-records', [GencysInternDailyRecordApiController::class, 'store'])
+    ->name('api.v1.public.gencys.intern-daily-records.store');
 
 // v2 — new mobile app (login with users.id, filter by assignee_user_id)
 Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' => ['api.key']], function () {

@@ -22,6 +22,10 @@ Schedule::command('trigger-fetch-shops-users')->daily(7);
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('08:00')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('15:00')->withoutOverlapping();
 
+// GencysERP intern daily records — one payload per chunk of interns, per day.
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('08:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('15:30')->withoutOverlapping();
+
 // Recompute inventory demand (3-day average + unfulfilled) from Gencys orders,
 // after the day's orders have been fetched above.
 Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('09:00')->withoutOverlapping();
