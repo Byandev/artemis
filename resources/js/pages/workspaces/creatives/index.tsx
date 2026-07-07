@@ -1,6 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import DatePicker from '@/components/ui/date-picker';
 import {
     Dialog,
     DialogClose,
@@ -26,34 +26,36 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { ColumnDef } from '@tanstack/react-table';
+import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import {
     ChevronDown,
-    Clapperboard,
-    FileImage,
+    HelpCircle,
     MessageSquare,
     MoreHorizontal,
     Package,
     Pencil,
     Plus,
     Search,
-    SlidersHorizontal,
     Trash2,
     TriangleAlert,
     X,
 } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AdsBadge,
     FinalBadge,
     FormatBadge,
     InitialAvatar,
 } from './components/atoms';
+import { AssigneePicker } from './components/assignee-picker';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
+import CreativesDateFilter from './components/creatives-date-filter';
+import CreativesFilter, {
+    CreativesFilterValue,
+} from './components/creatives-filter';
 import { InlineAssignee } from './components/inline-assignee';
 import {
-    ADS_DOT,
     ADS_STATUS_LABELS,
     AdsStatus,
     Creative,
@@ -132,6 +134,39 @@ export default function CreativesIndex({
     );
     const [deleteId, setDeleteId] = useState<number | null>(null);
 
+    // Bulk reviewer assignment: row selection + the reviewers to apply.
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [bulkReviewerIds, setBulkReviewerIds] = useState<number[]>([]);
+    const [bulkProcessing, setBulkProcessing] = useState(false);
+
+    const selectedIds = useMemo(
+        () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+        [rowSelection],
+    );
+
+    const handleBulkAssign = (
+        mode: 'add' | 'replace',
+        reviewerIds: number[] = bulkReviewerIds,
+    ) => {
+        router.post(
+            `${baseUrl}/bulk-reviewers`,
+            {
+                ids: selectedIds.map(Number),
+                reviewer_ids: reviewerIds,
+                mode,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setBulkProcessing(true),
+                onFinish: () => setBulkProcessing(false),
+                onSuccess: () => {
+                    setRowSelection({});
+                    setBulkReviewerIds([]);
+                },
+            },
+        );
+    };
+
     // Always derive from fresh props so reviews/remarks update without reopening
     const detailCreative =
         detailCreativeId !== null
@@ -145,34 +180,48 @@ export default function CreativesIndex({
     );
     const [search, setSearch] = useState(query.filter?.search ?? '');
 
+    // `navigate` is captured once by uncontrolled children (e.g. the flatpickr
+    // DatePicker only re-binds its onChange when its own deps change). Reading
+    // `query` straight from the closure would therefore go stale and clobber
+    // filters set since the capture. Keep the latest `query` in a ref and read
+    // through it so `navigate` has a stable identity yet always sees fresh
+    // filters.
+    const queryRef = useRef(query);
+    queryRef.current = query;
+
     const navigate = useCallback(
         (params: Record<string, string | number | null | undefined>) => {
+            const q = queryRef.current;
             router.get(
                 baseUrl,
                 {
-                    sort: query.sort,
+                    sort: q.sort,
                     page: 1,
-                    per_page: query.per_page,
-                    'filter[search]': query.filter?.search || undefined,
-                    'filter[format]': query.filter?.format || undefined,
-                    'filter[ads_status]': query.filter?.ads_status || undefined,
-                    'filter[creator_id]': query.filter?.creator_id || undefined,
-                    'filter[product_id]': query.filter?.product_id || undefined,
-                    'filter[date_from]': query.filter?.date_from || undefined,
-                    'filter[date_to]': query.filter?.date_to || undefined,
+                    per_page: q.per_page,
+                    'filter[search]': q.filter?.search || undefined,
+                    'filter[format]': q.filter?.format || undefined,
+                    'filter[ads_status]': q.filter?.ads_status || undefined,
+                    'filter[creator_id]': q.filter?.creator_id || undefined,
+                    'filter[product_id]': q.filter?.product_id || undefined,
+                    'filter[creative_date_from]':
+                        q.filter?.creative_date_from || undefined,
+                    'filter[creative_date_to]':
+                        q.filter?.creative_date_to || undefined,
+                    'filter[created_at_from]':
+                        q.filter?.created_at_from || undefined,
+                    'filter[created_at_to]':
+                        q.filter?.created_at_to || undefined,
+                    'filter[approved_at_from]':
+                        q.filter?.approved_at_from || undefined,
+                    'filter[approved_at_to]':
+                        q.filter?.approved_at_to || undefined,
                     ...params,
                 },
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [baseUrl, query],
+        [baseUrl],
     );
-
-    const dateRange = useMemo(() => {
-        const from = query.filter?.date_from;
-        const to = query.filter?.date_to;
-        return from && to ? [from, to] : undefined;
-    }, [query.filter?.date_from, query.filter?.date_to]);
 
     const debouncedSearch = useCallback(
         debounce(
@@ -195,6 +244,37 @@ export default function CreativesIndex({
     };
 
     const columns: ColumnDef<Creative>[] = [
+        ...(canEdit
+            ? [
+                  {
+                      id: 'select',
+                      enableSorting: false,
+                      header: ({ table }) => (
+                          <Checkbox
+                              checked={
+                                  table.getIsAllPageRowsSelected() ||
+                                  (table.getIsSomePageRowsSelected() &&
+                                      'indeterminate')
+                              }
+                              onCheckedChange={(value) =>
+                                  table.toggleAllPageRowsSelected(!!value)
+                              }
+                              aria-label="Select all"
+                          />
+                      ),
+                      cell: ({ row }) => (
+                          <Checkbox
+                              checked={row.getIsSelected()}
+                              onCheckedChange={(value) =>
+                                  row.toggleSelected(!!value)
+                              }
+                              aria-label="Select row"
+                              onClick={(e) => e.stopPropagation()}
+                          />
+                      ),
+                  } as ColumnDef<Creative>,
+              ]
+            : []),
         {
             accessorKey: 'name',
             enableSorting: true,
@@ -449,16 +529,49 @@ export default function CreativesIndex({
         },
     ];
 
-    // Filter item style helper
-    const filterItem = (active: boolean) =>
-        `flex w-full items-center gap-2 rounded-[8px] px-2.5 py-1.5 font-mono text-[11px] transition-colors ${active ? 'bg-emerald-500/[0.08] text-emerald-600 dark:bg-emerald-500/[0.10] dark:text-emerald-400' : 'text-gray-600 hover:bg-stone-100 dark:text-gray-400 dark:hover:bg-zinc-800'}`;
+    // Filter values arrive as comma-separated strings; expand them into arrays for
+    // the multi-select UI.
+    const parseList = (v?: string) => (v ? v.split(',').filter(Boolean) : []);
 
-    const activeFilterCount = [
-        query.filter?.format,
-        query.filter?.ads_status,
-        query.filter?.creator_id,
-        query.filter?.product_id,
-    ].filter(Boolean).length;
+    const filterValue: CreativesFilterValue = useMemo(
+        () => ({
+            formats: parseList(query.filter?.format),
+            ads_statuses: parseList(query.filter?.ads_status),
+            final_statuses: parseList(query.filter?.final_status),
+            creator_ids: parseList(query.filter?.creator_id),
+            product_ids: parseList(query.filter?.product_id),
+        }),
+        [query.filter],
+    );
+
+    const formatOptions = [
+        { key: 'video', label: 'Video' },
+        { key: 'image', label: 'Image' },
+    ];
+    const adsStatusOptions = (
+        Object.entries(ADS_STATUS_LABELS) as [AdsStatus, string][]
+    ).map(([key, label]) => ({ key, label }));
+    const finalStatusOptions = (
+        Object.entries(FINAL_STATUS_LABELS) as [FinalStatus, string][]
+    ).map(([key, label]) => ({ key, label }));
+    const creatorOptions = creators.map((c) => ({
+        key: String(c.id),
+        label: c.name,
+    }));
+    const productOptions = products.map((p) => ({
+        key: String(p.id),
+        label: p.title,
+    }));
+
+    const applyFilters = (v: CreativesFilterValue) =>
+        navigate({
+            'filter[format]': v.formats.join(',') || undefined,
+            'filter[ads_status]': v.ads_statuses.join(',') || undefined,
+            'filter[final_status]': v.final_statuses.join(',') || undefined,
+            'filter[creator_id]': v.creator_ids.join(',') || undefined,
+            'filter[product_id]': v.product_ids.join(',') || undefined,
+            page: 1,
+        });
 
     return (
         <AppLayout>
@@ -468,6 +581,20 @@ export default function CreativesIndex({
                     title="Creative Tracker"
                     description="Track creatives from ideation through review and launch"
                 >
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <a
+                                href="https://drive.google.com/file/d/18ov38v52BFzI64dt3iyzxBlULJ9ZkBta/view?usp=sharing"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="Watch the setup tutorial"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-all hover:bg-stone-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-zinc-800 dark:hover:text-gray-100"
+                            >
+                                <HelpCircle className="h-5 w-5" />
+                            </a>
+                        </TooltipTrigger>
+                        <TooltipContent>Watch the setup tutorial</TooltipContent>
+                    </Tooltip>
                     {canCreate && (
                         <button
                             onClick={() => router.visit(`${baseUrl}/create`)}
@@ -492,246 +619,67 @@ export default function CreativesIndex({
 
                     <div className="flex-1" />
 
-                    <DatePicker
-                        id="creatives-date-range"
-                        mode="range"
-                        placeholder="All dates"
-                        defaultDate={dateRange as never}
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                const fmt = (d: Date) =>
-                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                navigate({
-                                    'filter[date_from]': fmt(dates[0]),
-                                    'filter[date_to]': fmt(dates[1]),
-                                    page: 1,
-                                });
-                            } else if (dates.length === 0) {
-                                navigate({
-                                    'filter[date_from]': undefined,
-                                    'filter[date_to]': undefined,
-                                    page: 1,
-                                });
-                            }
-                        }}
+                    <CreativesDateFilter
+                        filter={query.filter}
+                        onChange={(params) => navigate({ ...params, page: 1 })}
                     />
 
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="inline-flex h-9 items-center gap-2 rounded-[10px] border border-black/8 bg-white px-3 font-mono text-[12px] font-medium text-gray-500 shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-colors hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-400 dark:shadow-none dark:hover:bg-zinc-800">
-                                <SlidersHorizontal className="h-3.5 w-3.5" />
-                                Filters
-                                {activeFilterCount > 0 && (
-                                    <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 font-mono text-[9px] font-bold text-white">
-                                        {activeFilterCount}
-                                    </span>
-                                )}
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-52 p-2" align="end">
-                            <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                                Format
-                            </p>
-                            {(
-                                [
-                                    {
-                                        key: '',
-                                        icon: null,
-                                        label: 'All formats',
-                                    },
-                                    {
-                                        key: 'video',
-                                        icon: (
-                                            <Clapperboard className="h-3 w-3" />
-                                        ),
-                                        label: 'Video',
-                                    },
-                                    {
-                                        key: 'image',
-                                        icon: <FileImage className="h-3 w-3" />,
-                                        label: 'Image',
-                                    },
-                                ] as {
-                                    key: string;
-                                    icon: React.ReactNode;
-                                    label: string;
-                                }[]
-                            ).map(({ key, icon, label }) => (
-                                <button
-                                    key={key}
-                                    className={filterItem(
-                                        (query.filter?.format ?? '') === key,
-                                    )}
-                                    onClick={() =>
-                                        navigate({
-                                            'filter[format]': key || undefined,
-                                            page: 1,
-                                        })
-                                    }
-                                >
-                                    {icon ?? <span className="h-3 w-3" />}
-                                    {label}
-                                </button>
-                            ))}
-
-                            <DropdownMenuSeparator className="my-2" />
-
-                            <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                                Ads Status
-                            </p>
-                            <button
-                                className={filterItem(
-                                    !query.filter?.ads_status,
-                                )}
-                                onClick={() =>
-                                    navigate({
-                                        'filter[ads_status]': undefined,
-                                        page: 1,
-                                    })
-                                }
-                            >
-                                <span className="h-3 w-3" />
-                                All statuses
-                            </button>
-                            {(
-                                Object.entries(ADS_STATUS_LABELS) as [
-                                    AdsStatus,
-                                    string,
-                                ][]
-                            ).map(([v, l]) => (
-                                <button
-                                    key={v}
-                                    className={filterItem(
-                                        query.filter?.ads_status === v,
-                                    )}
-                                    onClick={() =>
-                                        navigate({
-                                            'filter[ads_status]': v,
-                                            page: 1,
-                                        })
-                                    }
-                                >
-                                    <span
-                                        className={`h-1.5 w-1.5 rounded-full ${ADS_DOT[v]}`}
-                                    />
-                                    {l}
-                                </button>
-                            ))}
-
-                            {creators.length > 0 && (
-                                <>
-                                    <DropdownMenuSeparator className="my-2" />
-                                    <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                                        Creator
-                                    </p>
-                                    <button
-                                        className={filterItem(
-                                            !query.filter?.creator_id,
-                                        )}
-                                        onClick={() =>
-                                            navigate({
-                                                'filter[creator_id]': undefined,
-                                                page: 1,
-                                            })
-                                        }
-                                    >
-                                        <span className="h-3 w-3" />
-                                        All creators
-                                    </button>
-                                    {creators.map((c) => (
-                                        <button
-                                            key={c.id}
-                                            className={filterItem(
-                                                query.filter?.creator_id ===
-                                                    String(c.id),
-                                            )}
-                                            onClick={() =>
-                                                navigate({
-                                                    'filter[creator_id]':
-                                                        String(c.id),
-                                                    page: 1,
-                                                })
-                                            }
-                                        >
-                                            <span className="flex h-3 w-3 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 font-mono text-[8px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                {c.name.charAt(0).toUpperCase()}
-                                            </span>
-                                            <span className="truncate">
-                                                {c.name}
-                                            </span>
-                                        </button>
-                                    ))}
-                                </>
-                            )}
-
-                            {products.length > 0 && (
-                                <>
-                                    <DropdownMenuSeparator className="my-2" />
-                                    <p className="mb-1 px-2 font-mono text-[9px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                                        Product
-                                    </p>
-                                    <button
-                                        className={filterItem(
-                                            !query.filter?.product_id,
-                                        )}
-                                        onClick={() =>
-                                            navigate({
-                                                'filter[product_id]': undefined,
-                                                page: 1,
-                                            })
-                                        }
-                                    >
-                                        <span className="h-3 w-3" />
-                                        All products
-                                    </button>
-                                    <div className="max-h-44 overflow-y-auto">
-                                        {products.map((p) => (
-                                            <button
-                                                key={p.id}
-                                                className={filterItem(
-                                                    query.filter?.product_id ===
-                                                        String(p.id),
-                                                )}
-                                                onClick={() =>
-                                                    navigate({
-                                                        'filter[product_id]':
-                                                            String(p.id),
-                                                        page: 1,
-                                                    })
-                                                }
-                                            >
-                                                <Package className="h-3 w-3 shrink-0" />
-                                                <span className="truncate">
-                                                    {p.title}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-
-                            {activeFilterCount > 0 && (
-                                <>
-                                    <DropdownMenuSeparator className="my-2" />
-                                    <button
-                                        className="flex w-full items-center justify-center rounded-[8px] px-2.5 py-1.5 font-mono text-[11px] text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/[0.08]"
-                                        onClick={() =>
-                                            navigate({
-                                                'filter[format]': undefined,
-                                                'filter[ads_status]': undefined,
-                                                'filter[creator_id]': undefined,
-                                                'filter[product_id]': undefined,
-                                                page: 1,
-                                            })
-                                        }
-                                    >
-                                        Clear all filters
-                                    </button>
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <CreativesFilter
+                        value={filterValue}
+                        formatOptions={formatOptions}
+                        adsStatusOptions={adsStatusOptions}
+                        finalStatusOptions={finalStatusOptions}
+                        creatorOptions={creatorOptions}
+                        productOptions={productOptions}
+                        onApply={applyFilters}
+                    />
                 </div>
+
+                {canEdit && selectedIds.length > 0 && (
+                    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-emerald-500/20 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-400/20 dark:bg-emerald-500/5">
+                        <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                            {selectedIds.length} selected
+                        </span>
+                        <div className="w-64">
+                            <AssigneePicker
+                                reviewers={reviewers}
+                                selectedIds={bulkReviewerIds}
+                                onChange={setBulkReviewerIds}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => handleBulkAssign('add')}
+                                disabled={
+                                    bulkProcessing ||
+                                    bulkReviewerIds.length === 0
+                                }
+                                title="Add the selected reviewers to every selected creative"
+                                className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                                Assign
+                            </button>
+                            <button
+                                onClick={() => handleBulkAssign('replace', [])}
+                                disabled={bulkProcessing}
+                                title="Remove all reviewers from every selected creative"
+                                className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-rose-600 transition-all hover:bg-rose-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                            >
+                                Unassign
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setRowSelection({});
+                                    setBulkReviewerIds([]);
+                                }}
+                                disabled={bulkProcessing}
+                                className="flex h-8 items-center rounded-lg px-2 font-mono! text-[12px]! font-medium text-gray-500 transition-all hover:text-gray-700 disabled:opacity-50 dark:text-gray-400 dark:hover:text-gray-200"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
@@ -739,6 +687,13 @@ export default function CreativesIndex({
                         data={creatives.data}
                         meta={{ ...omit(creatives, ['data']) }}
                         initialSorting={initialSorting}
+                        getRowId={(row) => String(row.id)}
+                        {...(canEdit
+                            ? {
+                                  rowSelection,
+                                  onRowSelectionChange: setRowSelection,
+                              }
+                            : {})}
                         onFetch={(params) =>
                             navigate({
                                 sort: (params?.sort as string) ?? undefined,

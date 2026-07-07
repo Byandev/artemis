@@ -19,7 +19,7 @@ class Order extends Model
 
     protected function visibilityTeamRelation(): string
     {
-        return 'page.teams';
+        return 'page.shop.teams';
     }
 
     public function shippingAddress(): HasOne|Order
@@ -54,6 +54,13 @@ class Order extends Model
         $shopIds = $filters['shop_ids'] ?? null;
         $productIds = $filters['product_ids'] ?? null;
         $teamIds = $filters['team_ids'] ?? null;
+        $sourceNames = $filters['order_source_names'] ?? null;
+
+        // Filter by order source name (e.g. Facebook, Webcake). On the orders table,
+        // so it includes page-less Webcake orders.
+        if ($sourceNames) {
+            $query->whereIn('pancake_orders.order_source_name', is_array($sourceNames) ? $sourceNames : explode(',', $sourceNames));
+        }
 
         // Filter by page IDs
         if ($pageIds) {

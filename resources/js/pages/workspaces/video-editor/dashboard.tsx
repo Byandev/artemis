@@ -10,7 +10,6 @@ import {
     RecentActivitySection,
     RevisionListSection,
     ThroughputSection,
-    WaitingListSection,
 } from '@/pages/workspaces/creatives/components/dashboard/sections';
 import {
     ApplyFilter,
@@ -43,7 +42,9 @@ export default function VideoEditorDashboard({
     // endpoint, so changing a filter (or the chart granularity) updates only
     // the affected sections — no full page reload. Persisted per workspace so
     // they survive a browser refresh.
-    const STORAGE_KEY = `video-editor-dashboard-filters:${workspace.slug}`;
+    // Key is versioned (v2) to drop stale persisted filters that pinned the
+    // editor scope to the current user before the default became "all users".
+    const STORAGE_KEY = `video-editor-dashboard-filters:v2:${workspace.slug}`;
 
     const [filters, setFilters] = useState<DashboardFilters>(() => {
         try {
@@ -87,7 +88,6 @@ export default function VideoEditorDashboard({
                         filters={filters}
                         products={products}
                         editors={editors}
-                        currentUserId={currentUserId}
                         onChange={applyFilter}
                         listUrl={creativesBase}
                     />
@@ -103,7 +103,7 @@ export default function VideoEditorDashboard({
                         workspaceSlug={workspace.slug}
                         filters={filters}
                     />
-                    <div className="lg:col-span-2">
+                    <div className="lg:col-span-2 lg:h-full">
                         <PipelineSection
                             workspaceSlug={workspace.slug}
                             filters={filters}
@@ -111,13 +111,8 @@ export default function VideoEditorDashboard({
                     </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="mt-3">
                     <RevisionListSection
-                        workspaceSlug={workspace.slug}
-                        filters={filters}
-                        editUrl={editUrl}
-                    />
-                    <WaitingListSection
                         workspaceSlug={workspace.slug}
                         filters={filters}
                         editUrl={editUrl}

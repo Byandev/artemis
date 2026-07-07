@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Creatives\Http\Requests\StoreCreativeRequest;
 use Modules\Creatives\Http\Requests\StoreReviewRequest;
@@ -56,17 +57,21 @@ class CreativesController extends Controller
                 }),
                 AllowedFilter::exact('format'),
                 AllowedFilter::exact('ads_status'),
+                AllowedFilter::exact('final_status'),
                 AllowedFilter::exact('creator_id'),
                 AllowedFilter::exact('product_id'),
                 AllowedFilter::callback('review_status', function ($query, $value) {
                     $query->whereHas('latestReview', fn ($q) => $q->where('status', $value));
                 }),
-                AllowedFilter::callback('date_from', function ($query, $value) {
-                    $query->where('creative_date', '>=', $value);
-                }),
-                AllowedFilter::callback('date_to', function ($query, $value) {
-                    $query->where('creative_date', '<=', $value);
-                }),
+                // Three independent date-range filters, one per date column.
+                // whereDate keeps the end day inclusive for the datetime columns
+                // (created_at / approved_at).
+                AllowedFilter::callback('creative_date_from', fn ($q, $v) => $q->whereDate('creative_date', '>=', $v)),
+                AllowedFilter::callback('creative_date_to', fn ($q, $v) => $q->whereDate('creative_date', '<=', $v)),
+                AllowedFilter::callback('created_at_from', fn ($q, $v) => $q->whereDate('created_at', '>=', $v)),
+                AllowedFilter::callback('created_at_to', fn ($q, $v) => $q->whereDate('created_at', '<=', $v)),
+                AllowedFilter::callback('approved_at_from', fn ($q, $v) => $q->whereDate('approved_at', '>=', $v)),
+                AllowedFilter::callback('approved_at_to', fn ($q, $v) => $q->whereDate('approved_at', '<=', $v)),
             ])
             ->allowedSorts([
                 AllowedSort::field('name'),
@@ -168,6 +173,45 @@ class CreativesController extends Controller
         return redirect()
             ->route('workspaces.creatives.index', $workspace)
             ->with('success', 'Creative created successfully');
+    }
+
+    /**
+     * Assign reviewers to several creatives at once. `mode` is either
+     * 'add' (attach the selected reviewers, keeping existing ones) or
+     * 'replace' (overwrite each creative's reviewer set — an empty list
+     * clears all). Reviewers live in the `creative_reviewers` pivot.
+     */
+    public function bulkAssignReviewers(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::EditCreatives->value, $workspace);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'reviewer_ids' => ['present', 'array'],
+            'reviewer_ids.*' => ['integer', 'exists:users,id'],
+            'mode' => ['required', Rule::in(['add', 'replace'])],
+        ]);
+
+        $creatives = Creative::where('workspace_id', $workspace->id)
+            ->whereIn('id', $validated['ids'])
+            ->get();
+
+        DB::transaction(function () use ($creatives, $validated) {
+            foreach ($creatives as $creative) {
+                if ($validated['mode'] === 'replace') {
+                    $creative->assignedReviewers()->sync($validated['reviewer_ids']);
+                } else {
+                    $creative->assignedReviewers()->syncWithoutDetaching($validated['reviewer_ids']);
+                }
+            }
+        });
+
+        $count = $creatives->count();
+        $verb = $validated['mode'] === 'replace' ? 'updated' : 'assigned';
+
+        return back()->with('success', "Reviewers {$verb} for {$count} creative(s).");
     }
 
     public function edit(Request $request, Workspace $workspace, Creative $creative)

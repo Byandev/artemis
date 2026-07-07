@@ -3,9 +3,11 @@
 namespace Modules\GencysERP\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\GencysERP\Console\Commands\ExpireStaleSyncRuns;
+use Modules\GencysERP\Console\Commands\SyncInventoryFromGencysOrders;
 use Modules\GencysERP\Console\Commands\TriggerFetchDailySalesTrackerCommand;
-use Modules\GencysERP\Console\Commands\TriggerFetchUnitCodeCommand;
-use Modules\GencysERP\Console\Commands\TriggerFetchUnitCodeInventoryCommand;
+use Modules\GencysERP\Console\Commands\TriggerFetchERPPurchaseOrders;
+use Modules\GencysERP\Console\Commands\TriggerFetchERPTransactionHistory;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class GencysERPServiceProvider extends ModuleServiceProvider
@@ -27,8 +29,10 @@ class GencysERPServiceProvider extends ModuleServiceProvider
      */
     protected array $commands = [
         TriggerFetchDailySalesTrackerCommand::class,
-        TriggerFetchUnitCodeCommand::class,
-        TriggerFetchUnitCodeInventoryCommand::class,
+        TriggerFetchERPPurchaseOrders::class,
+        TriggerFetchERPTransactionHistory::class,
+        ExpireStaleSyncRuns::class,
+        SyncInventoryFromGencysOrders::class,
     ];
 
     /**

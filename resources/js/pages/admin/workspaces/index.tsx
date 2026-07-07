@@ -41,7 +41,8 @@ interface Workspace {
     slug: string;
     owner?: { name: string };
     pages_count: number;
-    max_pages: number | null;
+    shops_count: number;
+    max_shops: number | null;
     subscription?: Subscription | null;
     inventory_module_enabled: boolean;
     finance_module_enabled: boolean;
@@ -253,7 +254,7 @@ export default function Index({ workspaces, plans, filters }: Props) {
     const [editingModules, setEditingModules] = useState<Workspace | null>(
         null,
     );
-    const [editingMaxPages, setEditingMaxPages] = useState<Workspace | null>(
+    const [editingMaxShops, setEditingMaxShops] = useState<Workspace | null>(
         null,
     );
 
@@ -358,11 +359,11 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 <div className="text-center">
                     <div className="inline-flex items-center gap-1.5 rounded-full border border-brand-100 bg-brand-50/50 px-3 py-1 text-xs font-bold text-brand-600 dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400">
                         <Files className="h-3 w-3" />
-                        {row.original.pages_count}
-                        {row.original.max_pages !== null
-                            ? ` / ${row.original.max_pages}`
+                        {row.original.shops_count}
+                        {row.original.max_shops !== null
+                            ? ` / ${row.original.max_shops}`
                             : ''}{' '}
-                        Pages
+                        Shops
                     </div>
                 </div>
             ),
@@ -417,9 +418,9 @@ export default function Index({ workspaces, plans, filters }: Props) {
                         <ArrowUpRight className="h-4 w-4" />
                     </Link>
                     <button
-                        onClick={() => setEditingMaxPages(row.original)}
+                        onClick={() => setEditingMaxShops(row.original)}
                         className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        title="Set max pages"
+                        title="Set max shops"
                     >
                         <Files className="h-4 w-4" />
                     </button>
@@ -516,10 +517,10 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 />
             )}
 
-            {editingMaxPages && (
-                <MaxPagesModal
-                    workspace={editingMaxPages}
-                    onClose={() => setEditingMaxPages(null)}
+            {editingMaxShops && (
+                <MaxShopsModal
+                    workspace={editingMaxShops}
+                    onClose={() => setEditingMaxShops(null)}
                 />
             )}
 
@@ -655,7 +656,7 @@ function SubscriptionModal({
     );
 }
 
-function MaxPagesModal({
+function MaxShopsModal({
     workspace,
     onClose,
 }: {
@@ -663,12 +664,12 @@ function MaxPagesModal({
     onClose: () => void;
 }) {
     const { data, setData, put, processing } = useForm({
-        max_pages: workspace.max_pages?.toString() ?? '',
+        max_shops: workspace.max_shops?.toString() ?? '',
     });
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        put(`/admin/workspaces/${workspace.slug}/max-pages`, {
+        put(`/admin/workspaces/${workspace.slug}/max-shops`, {
             onSuccess: () => onClose(),
             preserveScroll: true,
         });
@@ -686,7 +687,7 @@ function MaxPagesModal({
                 <div className="mb-5 flex items-center justify-between">
                     <div>
                         <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                            Max Pages Limit
+                            Max Shops Limit
                         </h3>
                         <p className="text-sm text-zinc-500">
                             {workspace.name}
@@ -703,22 +704,22 @@ function MaxPagesModal({
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
                         <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Maximum Pages
+                            Maximum Shops
                         </label>
                         <input
                             type="number"
                             min="1"
                             placeholder="No limit"
-                            value={data.max_pages}
+                            value={data.max_shops}
                             onChange={(e) =>
-                                setData('max_pages', e.target.value)
+                                setData('max_shops', e.target.value)
                             }
                             className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
                         />
                         <p className="mt-1 text-xs text-zinc-500">
                             Leave empty to use the subscription plan limit
-                            instead. Currently using {workspace.pages_count}{' '}
-                            page(s).
+                            instead. Currently using {workspace.shops_count}{' '}
+                            shop(s).
                         </p>
                     </div>
 

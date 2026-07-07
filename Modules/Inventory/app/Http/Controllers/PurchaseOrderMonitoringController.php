@@ -51,16 +51,16 @@ class PurchaseOrderMonitoringController extends Controller
         return back()->with('success', 'Delivery deleted.');
     }
 
-    public function updateExpectedDelivery(Request $request, Workspace $workspace, PurchasedOrderItem $purchasedOrderItem)
+    public function updateExpectedDelivery(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
         $this->authorize('Edit Purchased Orders', $workspace);
-        $this->ensureItemBelongsToWorkspace($purchasedOrderItem, $workspace);
+        abort_unless($purchasedOrder->workspace_id === $workspace->id, 404);
 
         $validated = $request->validate([
             'expected_delivery_date' => 'nullable|date_format:Y-m-d|date',
         ]);
 
-        $purchasedOrderItem->update([
+        $purchasedOrder->update([
             'expected_delivery_date' => $validated['expected_delivery_date'] ?? null,
         ]);
 

@@ -127,6 +127,10 @@ const InventoryFormDialog = ({
         setData(key as any, Math.max(0, parsed));
     };
 
+    // Display 0 as an empty field with a "0" placeholder so it can be cleared
+    // and typed over without having to select the zero first.
+    const numValue = (v: number) => (v === 0 ? '' : v);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl [&_[data-default-close=true]]:hidden">
@@ -241,7 +245,8 @@ const InventoryFormDialog = ({
                                 <input
                                     type="number"
                                     min="0"
-                                    value={data.po_qty_in}
+                                    value={numValue(data.po_qty_in)}
+                                    placeholder="0"
                                     onChange={(e) =>
                                         handleNumericChange(
                                             'po_qty_in',
@@ -264,7 +269,8 @@ const InventoryFormDialog = ({
                                 <input
                                     type="number"
                                     min="0"
-                                    value={data.po_qty_out}
+                                    value={numValue(data.po_qty_out)}
+                                    placeholder="0"
                                     onChange={(e) =>
                                         handleNumericChange(
                                             'po_qty_out',
@@ -290,7 +296,8 @@ const InventoryFormDialog = ({
                                 <input
                                     type="number"
                                     min="0"
-                                    value={data.rts_goods_in}
+                                    value={numValue(data.rts_goods_in)}
+                                    placeholder="0"
                                     onChange={(e) =>
                                         handleNumericChange(
                                             'rts_goods_in',
@@ -313,7 +320,8 @@ const InventoryFormDialog = ({
                                 <input
                                     type="number"
                                     min="0"
-                                    value={data.rts_goods_out}
+                                    value={numValue(data.rts_goods_out)}
+                                    placeholder="0"
                                     onChange={(e) =>
                                         handleNumericChange(
                                             'rts_goods_out',
@@ -339,7 +347,8 @@ const InventoryFormDialog = ({
                                 <input
                                     type="number"
                                     min="0"
-                                    value={data.rts_bad}
+                                    value={numValue(data.rts_bad)}
+                                    placeholder="0"
                                     onChange={(e) =>
                                         handleNumericChange(
                                             'rts_bad',
@@ -361,7 +370,8 @@ const InventoryFormDialog = ({
                                 <input
                                     type="number"
                                     min="0"
-                                    value={data.lost}
+                                    value={numValue(data.lost)}
+                                    placeholder="0"
                                     onChange={(e) =>
                                         handleNumericChange(
                                             'lost',
@@ -387,7 +397,8 @@ const InventoryFormDialog = ({
                                 <input
                                     type="number"
                                     min="0"
-                                    value={data.remaining_qty}
+                                    value={numValue(data.remaining_qty)}
+                                    placeholder="0"
                                     onChange={(e) =>
                                         handleNumericChange(
                                             'remaining_qty',

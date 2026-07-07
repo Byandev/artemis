@@ -5,6 +5,7 @@ namespace App\Http\Controllers\PublicApi;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 
@@ -13,9 +14,9 @@ class TransactionHistoryController extends Controller
     /**
      * Receive ERP transaction history synced back by n8n for many inventory items at once.
      *
-     * One call carries many items. The body is a bare JSON array of
-     * { id, transactions: [...] } objects, where `id` is the inventory item id.
-     * Each item is processed exactly like the single-item sync.
+     * The body is { items: [ { id, sync_run_id, transactions: [...] } ] }, where
+     * `id` is the inventory item id and `sync_run_id` is the run we opened on
+     * dispatch and n8n echoes back so we can mark it done.
      */
     public function bulkSync(Request $request): JsonResponse
     {
@@ -51,6 +52,9 @@ class TransactionHistoryController extends Controller
 
             $saved = $this->saveTransactions($item, $rows);
 
+            // The entry's sync_run_id is the run we opened for this item on dispatch.
+            GencysSyncRun::succeedById($workspace->id, $this->syncRunId($entry), count($rows), $saved);
+
             $results[] = [
                 'inventory_item_id' => $item->id,
                 'transactions_received' => count($rows),
@@ -62,13 +66,23 @@ class TransactionHistoryController extends Controller
         return response()->json(['data' => $results]);
     }
 
+    /** Pull the sync run id n8n echoed back, tolerating a couple of key spellings. */
+    private function syncRunId(array $entry): ?int
+    {
+        $id = $entry['sync_run_id'] ?? $entry['syncRunId'] ?? null;
+
+        return ($id === null || $id === '') ? null : (int) $id;
+    }
+
     /**
-     * Persist one item's rows, then re-level its actual stock from the audit anchors.
+     * Persist one item's rows exactly as the ERP reports them — no running-balance
+     * recalculation. Each row's remaining_qty is taken straight from the ERP's reported
+     * stock (inventory_remaining_stock); we don't chain movements forward or read the
+     * prior row.
      *
-     * firstOrCreate matches on the whole row: since ref_no alone isn't unique (it's the
-     * ERP "Transact By" name), rows that differ in any field are kept as distinct records,
-     * while an exact re-sync of the same row is a no-op. Existing rows are never touched,
-     * so an audited remaining_qty survives. Returns the rows seen.
+     * remaining_qty is folded into firstOrCreate as a create-only value and matches on the
+     * whole row, so an exact re-sync is a no-op and existing rows (including one whose
+     * remaining_qty was manually corrected) are never touched. Returns the rows seen.
      *
      * @param  array<int, array<string, mixed>>  $rows
      */
@@ -77,22 +91,24 @@ class TransactionHistoryController extends Controller
         $saved = 0;
 
         foreach ($rows as $row) {
-            $transaction = InventoryTransaction::firstOrCreate([
-                'inventory_item_id' => $item->id,
-                'workspace_id' => $item->workspace_id,
-                'ref_no' => $row['ref_no'],
-                'date' => $row['date'] ?? null,
-                'po_qty_in' => (int) ($row['po_qty_in'] ?? 0),
-                'po_qty_out' => (int) ($row['po_qty_out'] ?? 0),
-                'rts_goods_in' => (int) ($row['rts_goods_in'] ?? 0),
-                'rts_goods_out' => (int) ($row['rts_goods_out'] ?? 0),
-                'rts_bad' => (int) ($row['rts_bad'] ?? 0),
-                'inventory_remaining_stock' => (float) ($row['inventory_remaining_stock'] ?? 0),
-            ]);
+            $remainingStock = (float) ($row['inventory_remaining_stock'] ?? 0);
 
-            if (! $transaction->remaining_qty) {
-                $transaction->update(['remaining_qty' => $transaction->inventory_remaining_stock]);
-            }
+            InventoryTransaction::firstOrCreate(
+                [
+                    'inventory_item_id' => $item->id,
+                    'workspace_id' => $item->workspace_id,
+                    'ref_no' => $row['ref_no'],
+                    'number' => $row['number'] ?? null,
+                    'date' => $row['date'] ?? null,
+                    'po_qty_in' => (int) ($row['po_qty_in'] ?? 0),
+                    'po_qty_out' => (int) ($row['po_qty_out'] ?? 0),
+                    'rts_goods_in' => (int) ($row['rts_goods_in'] ?? 0),
+                    'rts_goods_out' => (int) ($row['rts_goods_out'] ?? 0),
+                    'rts_bad' => (int) ($row['rts_bad'] ?? 0),
+                    'inventory_remaining_stock' => $remainingStock,
+                    'remaining_qty' => (int) round($remainingStock)
+                ],
+            );
 
             $saved++;
         }

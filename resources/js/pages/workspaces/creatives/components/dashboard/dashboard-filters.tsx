@@ -16,7 +16,6 @@ interface Props {
     filters: DashboardFilters;
     products: ProductOption[];
     editors: EditorOption[];
-    currentUserId: number;
     onChange: ApplyFilter;
     listUrl: string;
 }
@@ -26,7 +25,6 @@ export default function DashboardFiltersBar({
     filters,
     products,
     editors,
-    currentUserId,
     onChange,
     listUrl,
 }: Props) {
@@ -40,7 +38,6 @@ export default function DashboardFiltersBar({
                 }}
                 editors={editors}
                 products={products}
-                defaultUserId={String(currentUserId)}
                 onApply={(value) => onChange(value)}
             />
             <DatePicker

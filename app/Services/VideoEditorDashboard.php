@@ -118,7 +118,6 @@ class VideoEditorDashboard
         $ads = $this->adsBreakdown($creatives);
 
         return [
-            'waiting' => $status['waiting'],
             'for_approval' => $status['for_approval'],
             'revision' => $status['revision'],
             'approved' => $status['approved'],
@@ -136,20 +135,6 @@ class VideoEditorDashboard
         return $this->editorCreatives($workspace, $filters)
             ->filter(fn (Creative $c) => $this->isNeedsRevision($c))
             ->sortByDesc(fn (Creative $c) => $c->latestReview?->created_at ?? $c->updated_at)
-            ->take(self::LIST_LIMIT)
-            ->map(fn (Creative $c) => $this->workItem($c))
-            ->values()
-            ->all();
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    public function waitingList(Workspace $workspace, DashboardFilters $filters): array
-    {
-        return $this->editorCreatives($workspace, $filters)
-            ->filter(fn (Creative $c) => $this->isWaiting($c))
-            ->sortByDesc('creative_date')
             ->take(self::LIST_LIMIT)
             ->map(fn (Creative $c) => $this->workItem($c))
             ->values()
@@ -347,17 +332,16 @@ class VideoEditorDashboard
      * revision flag can co-exist with approval), so each is counted on its own.
      *
      * @param  Collection<int, Creative>  $creatives
-     * @return array{waiting: int, for_approval: int, revision: int, approved: int}
+     * @return array{for_approval: int, revision: int, approved: int}
      */
     private function statusBreakdown(Collection $creatives): array
     {
-        $counts = ['waiting' => 0, 'for_approval' => 0, 'revision' => 0, 'approved' => 0];
+        $counts = ['for_approval' => 0, 'revision' => 0, 'approved' => 0];
 
         foreach ($creatives as $c) {
             $counts['approved'] += $this->isApproved($c) ? 1 : 0;
             $counts['revision'] += $this->isNeedsRevision($c) ? 1 : 0;
             $counts['for_approval'] += $this->isAwaitingReview($c) ? 1 : 0;
-            $counts['waiting'] += $this->isWaiting($c) ? 1 : 0;
         }
 
         return $counts;
@@ -405,13 +389,6 @@ class VideoEditorDashboard
     private function isAwaitingReview(Creative $c): bool
     {
         return $c->final_status === self::FINAL_FOR_APPROVAL;
-    }
-
-    private function isWaiting(Creative $c): bool
-    {
-        return ! $this->isApproved($c)
-            && ! $this->isNeedsRevision($c)
-            && ! $this->isAwaitingReview($c);
     }
 
     /**

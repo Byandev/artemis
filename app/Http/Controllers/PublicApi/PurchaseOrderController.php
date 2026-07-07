@@ -3,155 +3,163 @@
 namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
+use App\Models\Workspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
+use Modules\Inventory\Models\PurchasedOrderItemDelivery;
 
 class PurchaseOrderController extends Controller
 {
-    /** ERP status label (lowercased) => local status code (PurchasedOrder::STATUSES). */
-    private const STATUS_MAP = [
-        'for approval' => 1,
-        'approved' => 2,
-        'to pay' => 3,
-        'paid' => 4,
-        'for purchase' => 5,
-        'waiting for delivery' => 6,
-        'delivered' => 7,
-        'cancelled' => 8,
-        'canceled' => 8,
-    ];
-
     /**
-     * Receive ERP purchase orders synced back by n8n for a single inventory item.
+     * Receive ERP purchase orders synced back by n8n, grouped per inventory item.
+     * Each data[] entry echoes the item id and the sync_run_id we sent, and lists
+     * that item's purchase orders:
      *
-     * Expected payload (one row per PO, as returned by the ERP):
      * {
-     *   "inventory_item_id": 123,            // or "inventory_id"
-     *   "purchase_orders": [
+     *   "data": [
      *     {
-     *       "controlNo": "CN-TP703",         // unique key per workspace (used to upsert the PO)
-     *       "issueDate": "20/04/2026",       // d/m/Y
-     *       "deliveryNo": "DN-TP703",
-     *       "customerPoNo": "CPO-TP703",
-     *       "deliveryFee": 0,
-     *       "totalAmount": 518400,
-     *       "cogAmount": 518400,             // line cost for this inventory item
-     *       "status": "For Approval",
-     *       "pickupDate": null,              // d/m/Y, optional -> expected delivery date
-     *       "quantity": 0                    // optional; ERP currently omits it
+     *       "id": 55,                     // inventory item id
+     *       "sync_run_id": 2,             // the run we opened on dispatch
+     *       "purchased_orders": [
+     *         {
+     *           "control_no": "CN-TP839", // unique key per workspace (upsert key)
+     *           "issue_date": "2026-06-25",
+     *           "delivery_no": "DN-TP839",
+     *           "cust_po_no": "CPO-TP839",
+     *           "delivery_fee": 0,
+     *           "total_amount": 42752,
+     *           "status": 7,              // PurchasedOrder::STATUSES code (1-8)
+     *           "items": [ { "count": 800, "amount": 57.23, "total_amount": 45784 } ],
+     *           "deliveries": [ { "qty": 800, "created_at": "2026-06-29 11:07:02" } ]
+     *         }
+     *       ]
      *     }
      *   ]
      * }
+     *
+     * These ERP POs carry a single inventory item, so each PO's line is attached
+     * to the entry's item. Deliveries are replaced wholesale each sync. Items not
+     * owned by the authenticated workspace are skipped.
      */
-    public function sync(Request $request): JsonResponse
+    public function bulkSync(Request $request): JsonResponse
     {
         $workspace = $request->attributes->get('workspace');
 
-        $validated = $request->validate([
-            'inventory_item_id' => ['required_without:inventory_id', 'integer'],
-            'inventory_id' => ['required_without:inventory_item_id', 'integer'],
-            'purchase_orders' => ['present', 'array'],
-            'purchase_orders.*.controlNo' => ['required', 'string', 'max:255'],
-            'purchase_orders.*.issueDate' => ['required', 'string'],
-            'purchase_orders.*.deliveryNo' => ['nullable', 'string', 'max:255'],
-            'purchase_orders.*.customerPoNo' => ['nullable', 'string', 'max:255'],
-            'purchase_orders.*.deliveryFee' => ['nullable', 'numeric'],
-            'purchase_orders.*.totalAmount' => ['nullable', 'numeric'],
-            'purchase_orders.*.cogAmount' => ['nullable', 'numeric'],
-            'purchase_orders.*.status' => ['nullable', 'string'],
-            'purchase_orders.*.pickupDate' => ['nullable', 'string'],
-            'purchase_orders.*.quantity' => ['nullable', 'integer'],
-        ]);
+        $entries = $request->input('data', []);
 
-        $inventoryItemId = $validated['inventory_item_id'] ?? $validated['inventory_id'];
+        $itemsById = InventoryItem::where('workspace_id', $workspace->id)
+            ->whereIn('id', collect($entries)->pluck('id')->filter()->unique()->all())
+            ->get()
+            ->keyBy('id');
 
-        $item = InventoryItem::where('workspace_id', $workspace->id)
-            ->where('id', $inventoryItemId)
-            ->firstOrFail();
+        $results = [];
 
-        $synced = DB::transaction(function () use ($workspace, $item, $validated) {
-            $count = 0;
+        DB::transaction(function () use ($entries, $workspace, $itemsById, &$results) {
+            foreach ($entries as $entry) {
+                $item = $itemsById->get($entry['id'] ?? null);
 
-            foreach ($validated['purchase_orders'] as $po) {
-                $order = PurchasedOrder::updateOrCreate(
-                    [
-                        'workspace_id' => $workspace->id,
-                        'control_no' => $po['controlNo'],
-                    ],
-                    [
-                        'issue_date' => $this->parseDate($po['issueDate']),
-                        'delivery_no' => $po['deliveryNo'] ?? null,
-                        'cust_po_no' => $po['customerPoNo'] ?? null,
-                        'delivery_fee' => $po['deliveryFee'] ?? 0,
-                        'total_amount' => $po['totalAmount'] ?? 0,
-                        'status' => $this->mapStatus($po['status'] ?? null),
-                    ]
-                );
+                $synced = 0;
+                foreach (($entry['purchased_orders'] ?? []) as $po) {
+                    if ($item && $this->saveOrder($workspace, $item, $po)) {
+                        $synced++;
+                    }
+                }
 
-                PurchasedOrderItem::updateOrCreate(
-                    [
-                        'inventory_purchased_order_id' => $order->id,
-                        'inventory_item_id' => $item->id,
-                    ],
-                    [
-                        'count' => $po['quantity'] ?? 0,
-                        'amount' => 0,
-                        'total_amount' => $po['cogAmount'] ?? 0,
-                        'expected_delivery_date' => $this->parseDate($po['pickupDate'] ?? null),
-                    ]
-                );
+                // The entry's sync_run_id is the run we opened for this item.
+                GencysSyncRun::succeedById($workspace->id, $entry['sync_run_id'] ?? null, $synced);
 
-                $count++;
+                $results[] = [
+                    'inventory_item_id' => $entry['id'] ?? null,
+                    'orders_synced' => $synced,
+                ];
             }
-
-            return $count;
         });
 
-        return response()->json([
-            'data' => [
-                'inventory_item_id' => $item->id,
-                'purchase_orders_synced' => $synced,
-            ],
-        ]);
+        return response()->json(['data' => $results]);
     }
 
-    /** Parse the ERP's d/m/Y date string into Y-m-d, or null. */
-    private function parseDate(?string $value): ?string
+    /**
+     * Upsert one purchase order (header, its single item line, and deliveries)
+     * for the given inventory item. Returns false when the PO has no control_no.
+     */
+    private function saveOrder(Workspace $workspace, InventoryItem $item, array $po): bool
+    {
+        $controlNo = $po['control_no'] ?? null;
+
+        if (! $controlNo) {
+            return false;
+        }
+
+        $order = PurchasedOrder::updateOrCreate(
+            ['workspace_id' => $workspace->id, 'control_no' => $controlNo],
+            [
+                'issue_date' => $this->toDate($po['issue_date'] ?? null),
+                'delivery_no' => $po['delivery_no'] ?? null,
+                'cust_po_no' => $po['cust_po_no'] ?? null,
+                'delivery_fee' => $po['delivery_fee'] ?? 0,
+                'total_amount' => $po['total_amount'] ?? 0,
+                'status' => $this->normalizeStatus($po['status'] ?? null),
+            ]
+        );
+
+        $line = $po['items'][0] ?? [];
+
+        $orderItem = PurchasedOrderItem::updateOrCreate(
+            ['inventory_purchased_order_id' => $order->id, 'inventory_item_id' => $item->id],
+            [
+                'count' => (int) ($line['count'] ?? 0),
+                'amount' => $line['amount'] ?? 0,
+                'total_amount' => $line['total_amount'] ?? 0,
+            ]
+        );
+
+        // Replace deliveries wholesale so delivered quantities track the ERP.
+        if (array_key_exists('deliveries', $po)) {
+            PurchasedOrderItemDelivery::where('inventory_purchased_order_item_id', $orderItem->id)->delete();
+
+            foreach (($po['deliveries'] ?? []) as $delivery) {
+                PurchasedOrderItemDelivery::create([
+                    'inventory_purchased_order_item_id' => $orderItem->id,
+                    'delivery_date' => $this->toDate($delivery['delivery_date'] ?? $delivery['created_at'] ?? null)
+                        ?? $this->toDate($po['issue_date'] ?? null)
+                        ?? now()->toDateString(),
+                    'delivery_no' => $delivery['delivery_no'] ?? $po['delivery_no'] ?? null,
+                    'qty' => (int) ($delivery['qty'] ?? 0),
+                ]);
+            }
+        }
+
+        return true;
+    }
+
+    /** Parse any date/datetime string into Y-m-d, or null when empty/unparseable. */
+    private function toDate(?string $value): ?string
     {
         if (empty($value)) {
             return null;
         }
 
-        return Carbon::createFromFormat('d/m/Y', $value)->format('Y-m-d');
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
-    /** Map an ERP status label to a local status code, defaulting to 1 (For Approval). */
-    private function mapStatus(?string $status): int
+    /**
+     * Resolve an already-mapped numeric status to a local code, keeping it when
+     * it's a known status and defaulting to 1 (For Approval) otherwise.
+     */
+    private function normalizeStatus(mixed $status): int
     {
-        if (empty($status)) {
-            return 1;
-        }
+        $code = (int) $status;
 
-        $normalized = Str::lower(trim($status));
-
-        if (isset(self::STATUS_MAP[$normalized])) {
-            return self::STATUS_MAP[$normalized];
-        }
-
-        if (Str::startsWith($normalized, 'delivered')) {
-            return 7;
-        }
-
-        if (Str::contains($normalized, 'cancel')) {
-            return 8;
-        }
-
-        return 1;
+        return array_key_exists($code, PurchasedOrder::STATUSES) ? $code : 1;
     }
 }

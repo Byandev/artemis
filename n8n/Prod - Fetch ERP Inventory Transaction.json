@@ -1,0 +1,282 @@
+{
+  "name": "Prod - Fetch ERP Inventory Transaction",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f86f8c15-be77-421a-b3f1-f152ede494f6",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -368,
+        -208
+      ],
+      "id": "c83ab367-cf30-460e-9ee5-0aec83bdf20c",
+      "name": "Webhook",
+      "webhookId": "f86f8c15-be77-421a-b3f1-f152ede494f6"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const username = $json.body.erp_username;\nconst password = $json.body.erp_password;\n\n// Open ERP login page\nawait $page.goto(\n  'https://meta-digitrading.lhike-erp.com/home',\n  {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }\n);\n\n// Wait for login form\nawait $page.waitForSelector('input[name=\"txtusername\"]', {\n  timeout: 30000\n});\n\n// Fill credentials\nawait $page.type('input[name=\"txtusername\"]', username, {\n  delay: 50\n});\n\nawait $page.type('input[name=\"txtpass\"]', password, {\n  delay: 50\n});\n\n// Submit login form\nawait Promise.all([\n  $page.click('button[type=\"submit\"]'),\n  $page.waitForNavigation({\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }).catch(() => null)\n]);\n\n// Check for login error\nconst loginError = await $page.$('.alert-danger');\n\nif (loginError) {\n  const errorText = await $page.evaluate(\n    el => el.textContent.trim(),\n    loginError\n  );\n\n  throw new Error(`Login failed: ${errorText}`);\n}\n\n// Optional: verify login succeeded\nconst currentUrl = $page.url();\n\nif (currentUrl.includes('/login')) {\n  throw new Error('Login may have failed. Still on login page.');\n}\n\n// Get cookies\nconst cookies = await $page.cookies();\n\nreturn [\n  {\n    json: {\n      success: true,\n      currentUrl,\n      cookies\n    }\n  }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        -208
+      ],
+      "id": "4317b649-51f4-4e4e-a573-a88f0b03a875",
+      "name": "Login"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, date, keyword } = $json;\n\nconst startDate = date;\nconst endDate = date;\n\nawait $page.setCookie(...cookies);\n  \nawait $page.goto('https://meta-digitrading.lhike-erp.com/inventorytransactionhistory', { waitUntil: 'networkidle2', timeout: 60000 });\n\nawait $page.type(\n  'input#sdate',\n  startDate,\n  { delay: 50 }\n);\n\nawait $page.type(\n  'input#edate',\n  endDate,\n  { delay: 50 }\n);\n\nawait $page.type(\n  'input#itemname',\n  keyword,\n  { delay: 50 }\n);\n\nawait $page.click('a#btndtsearch')\n\n\nawait $page.waitForNetworkIdle({\n  idleTime: 500,      // ms with no network requests\n  timeout: 50000\n});\n\nasync function extractTable($page) {\n  return await $page.evaluate(() => {\n    const table = document.querySelector('table');\n    if (!table) return [];\n\n    const headers = Array.from(table.querySelectorAll('thead th'))\n      .map(th => th.innerText.trim());\n\n    const rows = Array.from(table.querySelectorAll('tbody tr'));\n\n    return rows.map(tr => {\n      const cells = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim());\n      return Object.fromEntries(headers.map((h, i) => [h || `col_${i}`, cells[i] ?? '']));\n    });\n  });\n}\n\nasync function isNextDisabled($page) {\n  return await $page.evaluate(() => {\n    const nextLi = document.querySelector('li.next');\n    return !nextLi || nextLi.classList.contains('disabled');\n  });\n}\n\nasync function clickNext($page) {\n  await $page.click('li.next a');\n}\n\nconst all = [];\nconst seen = new Set();\n\nawait $page.waitForSelector('table');\nawait $page.waitForSelector('li.next');\n\nwhile (true) {\n  const pageRows = await extractTable($page);\n\n  for (const r of pageRows) {\n    const key = r['No'] ?? JSON.stringify(r);\n    if (!seen.has(key)) {\n      seen.add(key);\n      all.push(r);\n    }\n  }\n\n  if (await isNextDisabled($page)) break;\n\n  // signature of current page so we can detect change\n  const firstRowSig = await $page.evaluate(() => {\n    const first = document.querySelector('table tbody tr');\n    return first ? first.innerText.trim() : '';\n  });\n\n  await clickNext($page);\n\n  // wait until table updates\n  await $page.waitForFunction(\n    (prev) => {\n      const first = document.querySelector('table tbody tr');\n      const now = first ? first.innerText.trim() : '';\n      return now && now !== prev;\n    },\n    {},\n    firstRowSig\n  );\n}\n\n\nreturn all.reverse(); // (n8n) or console.log(all)\n",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        944,
+        -192
+      ],
+      "id": "a1d6bc20-2986-447d-ada5-69f0cdae49ba",
+      "name": "Get Transaction History"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items\n  .filter(item => {\n    const input = item.json;\n\n    return input[\"No\"] != \"No data available in table\";\n  })\n  .map((item) => {\n  const input = item.json;\n   \n  const goodsPO = input['In/Out - Goods (PO)'] ?? \"0\";\n  const damageRTS = input['In - Damage (RTS)'] ?? \"0\";\n  const goodsRTS = input['In/Out - Goods (RTS)'] ?? \"0\";\n  const type = input.Type ?? \"\";\n\n  const date = new Date(input['Transaction Date']);\n  const formatted = date.toISOString().split('T')[0];\n\n  const qty_in  = type === \"OUT\" ? \"0\" : String(goodsPO);\n  const qty_out = type === \"OUT\" ? String(goodsPO) : \"0\";\n  const rts_goods_in  = type === \"OUT\" ? \"0\" : String(goodsRTS);\n  const rts_goods_out = type === \"OUT\" ? String(goodsRTS) : \"0\";\n\n  // keep only non-empty original fields (drops Action, col_11..col_20, Search, etc.)\n  const cleaned = Object.fromEntries(\n    Object.entries(input).filter(([, v]) => v !== \"\" && v !== null && v !== undefined)\n  );\n\n  const remaining = input['Remaining Qty'] ?? 0;\n\n  return {\n    json: {\n      item: input[\"Items\"],\n      date: formatted,\n      ref_no: input[\"Transact By\"] ?? \"\",\n      po_qty_in: qty_in,\n      po_qty_out: qty_out,\n      rts_goods_in,\n      rts_goods_out,\n      rts_bad: damageRTS,\n      inventory_remaining_stock: remaining, \n    },\n  };\n})\n  .filter(item => item.json.item.toLowerCase() ===$('Code in JavaScript').first().json.keyword.toLowerCase());"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        -192
+      ],
+      "id": "711104ce-4d4e-4da0-b55b-8db37d4a5624",
+      "name": "Normalize",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.webhook }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.apiKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  items: $json.data\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1024,
+        -432
+      ],
+      "id": "1f00bbcb-285a-4306-92df-0f96e7901c64",
+      "name": "HTTP Request",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.cookies = $('Login').first().json.cookies;\n  item.json.keyword = $input.first().json.keyword;\n  item.json.date = $('Webhook').first().json.body.date;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -192
+      ],
+      "id": "5fd567fd-4121-4249-bb60-3de808cd41a0",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        416,
+        -208
+      ],
+      "id": "dad0faaf-6ade-474f-a8fb-ca37230f374b",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Webhook').first().json.body.items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        -208
+      ],
+      "id": "b645fecc-528a-434d-846e-69fb951af9fe",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    \"id\": $('Code in JavaScript').first().json.id,\n    \"sync_run_id\": $('Code in JavaScript').first().json.sync_run_id,\n    \"transactions\": $input.all().filter(item => Object.keys(item.json).length > 1).map(item => item.json)\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -192
+      ],
+      "id": "18f851ce-d0dd-4b2f-a3bb-fc489e7af5b7",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  \"webhook\": $('Webhook').first().json.body.webhook_url,\n  \"apiKey\": $('Webhook').first().json.body.workspace_api_key,\n  \"data\": $input.all().map(item => item.json)\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -432
+      ],
+      "id": "01e9dce5-91af-4efe-bd46-14602b30f46e",
+      "name": "Code in JavaScript3"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transaction History": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Get Transaction History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "8b4ec997-f435-41cc-95ac-35aa38518cf4",
+  "meta": {
+    "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
+  },
+  "id": "kX4uDmchmcSghzUy",
+  "tags": []
+}

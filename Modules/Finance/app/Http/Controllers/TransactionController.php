@@ -2,16 +2,20 @@
 
 namespace Modules\Finance\Http\Controllers;
 
+use App\Enums\Logging\LogCategory;
 use App\Enums\Permission;
+use App\Facades\Activity;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\TransactionRequest;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\Transaction;
+use Modules\Finance\Models\TransactionType;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -54,14 +58,27 @@ class TransactionController extends Controller
                 AllowedFilter::exact('account_id'),
                 AllowedFilter::exact('type'),
                 AllowedFilter::callback('transaction_type', fn ($q, $v) => is_array($v) ? $q->whereIn('transaction_type', $v) : $q->where('transaction_type', $v)),
+                AllowedFilter::callback('transaction_type_id', fn ($q, $v) => is_array($v) ? $q->whereIn('transaction_type_id', $v) : $q->where('transaction_type_id', $v)),
                 AllowedFilter::callback('sub_category', fn ($q, $v) => is_array($v) ? $q->whereIn('sub_category', $v) : $q->where('sub_category', $v)),
-                AllowedFilter::callback('missing_type', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN) ? $q->whereNull('transaction_type') : $q),
+                AllowedFilter::callback('missing_type', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN) ? $q->whereNull('transaction_type_id') : $q),
                 AllowedFilter::callback('expenses_missing_sub', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN)
-                    ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
+                    ? $q->where('transaction_type_id', $this->expensesTypeId($workspace))->whereNull('sub_category')
                     : $q),
                 AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('date', '>=', $v)),
                 AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('date', '<=', $v)),
             ]);
+    }
+
+    /**
+     * Resolve the id of the workspace's "expenses" transaction type (the legacy
+     * name), used by the "expenses without sub category" filter now that types
+     * are referenced by id. Returns null (matches nothing) if absent.
+     */
+    protected function expensesTypeId(Workspace $workspace): ?int
+    {
+        return TransactionType::where('workspace_id', $workspace->id)
+            ->where('name', 'expenses')
+            ->value('id');
     }
 
     public function index(Request $request, Workspace $workspace)
@@ -86,6 +103,8 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'accounts' => Account::where('workspace_id', $workspace->id)
                 ->orderBy('name')->get(['id', 'name', 'currency']),
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->orderBy('name')->get(['id', 'name']),
             'totals' => [
                 'credit' => (float) $totals->total_credit,
                 'debit' => (float) $totals->total_debit,
@@ -157,7 +176,14 @@ class TransactionController extends Controller
             'rows.*.date' => ['required', 'date'],
             'rows.*.description' => ['required', 'string', 'max:255'],
             'rows.*.type' => ['required', 'in:in,out'],
-            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex'],
+            'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex,interest,interest_fee'],
+            'rows.*.transaction_type_id' => ['nullable', Rule::exists('finance_transaction_types', 'id')->where('workspace_id', $workspace->id)],
+            'rows.*.requested_by' => ['nullable', 'string', 'max:255'],
+            'rows.*.approved_by' => ['nullable', 'string', 'max:255'],
+            'rows.*.department' => ['nullable', 'string', 'max:255'],
+            'rows.*.charge_to' => ['nullable', 'string', 'max:255'],
+            'rows.*.reference_no' => ['nullable', 'string', 'max:255'],
+            'rows.*.status' => ['nullable', Rule::in(['pending', 'approved', 'posted'])],
             'rows.*.amount' => ['required', 'numeric', 'min:0'],
             'rows.*.running_balance' => ['nullable', 'numeric'],
             'rows.*.position' => ['nullable', 'integer', 'min:1'],
@@ -211,12 +237,12 @@ class TransactionController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['integer'],
-            'transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex'],
+            'transaction_type_id' => ['nullable', Rule::exists('finance_transaction_types', 'id')->where('workspace_id', $workspace->id)],
         ]);
 
         $updated = Transaction::where('workspace_id', $workspace->id)
             ->whereIn('id', $validated['ids'])
-            ->update(['transaction_type' => $validated['transaction_type'] ?? null]);
+            ->update(['transaction_type_id' => $validated['transaction_type_id'] ?? null]);
 
         return redirect()->back()->with('success', "{$updated} transactions updated.");
     }
@@ -245,7 +271,7 @@ class TransactionController extends Controller
 
         $transactions = QueryBuilder::for(
             Transaction::where('workspace_id', $workspace->id)
-                ->with(['account'])
+                ->with(['account', 'transactionType'])
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
@@ -256,32 +282,58 @@ class TransactionController extends Controller
                 AllowedFilter::exact('account_id'),
                 AllowedFilter::exact('type'),
                 AllowedFilter::callback('transaction_type', fn ($q, $v) => is_array($v) ? $q->whereIn('transaction_type', $v) : $q->where('transaction_type', $v)),
+                AllowedFilter::callback('transaction_type_id', fn ($q, $v) => is_array($v) ? $q->whereIn('transaction_type_id', $v) : $q->where('transaction_type_id', $v)),
                 AllowedFilter::callback('sub_category', fn ($q, $v) => is_array($v) ? $q->whereIn('sub_category', $v) : $q->where('sub_category', $v)),
-                AllowedFilter::callback('missing_type', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN) ? $q->whereNull('transaction_type') : $q),
+                AllowedFilter::callback('missing_type', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN) ? $q->whereNull('transaction_type_id') : $q),
                 AllowedFilter::callback('expenses_missing_sub', fn ($q, $v) => filter_var($v, FILTER_VALIDATE_BOOLEAN)
-                    ? $q->where('transaction_type', 'expenses')->whereNull('sub_category')
+                    ? $q->where('transaction_type_id', $this->expensesTypeId($workspace))->whereNull('sub_category')
                     : $q),
             ])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->get();
 
+        Activity::build()
+            ->asUser()
+            ->workspace($workspace)
+            ->category(LogCategory::Security)
+            ->action('finance.transactions.exported')
+            ->message("Exported {$transactions->count()} finance transaction(s)")
+            ->metadata([
+                'count' => $transactions->count(),
+                'filters' => $request->only([
+                    'search', 'account_id', 'type', 'transaction_type', 'transaction_type_id',
+                    'sub_category', 'missing_type', 'expenses_missing_sub',
+                ]),
+            ])
+            ->save();
+
         $fileName = 'transactions-'.now()->format('Y-m-d-His').'.csv';
 
         return response()->streamDownload(function () use ($transactions) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Date', 'Account', 'Description', 'Type', 'Transaction Type', 'Sub Category', 'Amount', 'Running Balance', 'Notes']);
+            fputcsv($out, [
+                'Posted Date', 'Accounts', 'Transaction', 'Requested By', 'Approved By',
+                'Department', 'Type of Expense', 'Debit (Expense)', 'Credit (Income)',
+                'Running Balance', 'Reference No.', 'Charge To', 'Status', 'Sub Category', 'Remarks',
+            ]);
 
             foreach ($transactions as $txn) {
                 fputcsv($out, [
                     $txn->date,
                     $txn->account?->name ?? '',
                     $txn->description,
-                    $txn->type,
-                    $txn->transaction_type ?? '',
-                    $txn->sub_category ?? '',
-                    $txn->amount,
+                    $txn->requested_by ?? '',
+                    $txn->approved_by ?? '',
+                    $txn->department ?? '',
+                    $txn->transactionType?->name ?? $txn->transaction_type ?? '',
+                    $txn->type === 'out' ? $txn->amount : '',
+                    $txn->type === 'in' ? $txn->amount : '',
                     $txn->running_balance ?? '',
+                    $txn->reference_no ?? '',
+                    $txn->charge_to ?? '',
+                    $txn->status ?? '',
+                    $txn->sub_category ?? '',
                     $txn->notes ?? '',
                 ]);
             }

@@ -9,6 +9,7 @@ use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
+use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
 Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
@@ -52,11 +53,25 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/ads', [VideoEditorDashboardController::class, 'ads'])->name('ads');
             Route::get('/pipeline', [VideoEditorDashboardController::class, 'pipeline'])->name('pipeline');
             Route::get('/revision-list', [VideoEditorDashboardController::class, 'revisionList'])->name('revision-list');
-            Route::get('/waiting-list', [VideoEditorDashboardController::class, 'waitingList'])->name('waiting-list');
             Route::get('/throughput', [VideoEditorDashboardController::class, 'throughput'])->name('throughput');
             Route::get('/leaderboard', [VideoEditorDashboardController::class, 'leaderboard'])->name('leaderboard');
             Route::get('/recent-activity', [VideoEditorDashboardController::class, 'recentActivity'])->name('recent-activity');
             Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
+        });
+
+        // Inventory dashboard — one endpoint per widget so each loads, skeletons
+        // and refreshes independently. See InventoryDashboardStatsController.
+        Route::prefix('inventory/dashboard')->name('inventory.dashboard.')->group(function () {
+            Route::get('/kpis', [InventoryDashboardStatsController::class, 'kpis'])->name('kpis');
+            Route::get('/movement', [InventoryDashboardStatsController::class, 'movement'])->name('movement');
+            Route::get('/po-status', [InventoryDashboardStatsController::class, 'poStatus'])->name('po-status');
+            Route::get('/fulfillment', [InventoryDashboardStatsController::class, 'fulfillment'])->name('fulfillment');
+            Route::get('/shrinkage', [InventoryDashboardStatsController::class, 'shrinkage'])->name('shrinkage');
+            Route::get('/stock-health', [InventoryDashboardStatsController::class, 'stockHealth'])->name('stock-health');
+            Route::get('/upcoming-deliveries', [InventoryDashboardStatsController::class, 'upcomingDeliveries'])->name('upcoming-deliveries');
+            Route::get('/recent-adjustments', [InventoryDashboardStatsController::class, 'recentAdjustments'])->name('recent-adjustments');
+            Route::get('/top-discrepancies', [InventoryDashboardStatsController::class, 'topDiscrepancies'])->name('top-discrepancies');
+            Route::get('/alerts', [InventoryDashboardStatsController::class, 'alerts'])->name('alerts');
         });
     });
 });

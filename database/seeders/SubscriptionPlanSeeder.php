@@ -22,7 +22,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'name' => 'Free Trial',
                 'price_php' => 0,
                 'order_limit' => 10000,
-                'page_limit' => 1,
+                'shop_limit' => 1,
                 'data_retention_months' => 6,
                 'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
                 'parcel_journey_rate_php' => null,
@@ -37,7 +37,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'name' => 'Starter',
                 'price_php' => 2999,
                 'order_limit' => 3000,
-                'page_limit' => 5,
+                'shop_limit' => 5,
                 'data_retention_months' => 3,
                 'analytics_tier' => SubscriptionPlan::ANALYTICS_BASIC,
                 'parcel_journey_rate_php' => null,
@@ -52,7 +52,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'name' => 'Growth',
                 'price_php' => 5999,
                 'order_limit' => 10000,
-                'page_limit' => 25,
+                'shop_limit' => 25,
                 'data_retention_months' => 6,
                 'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
                 'parcel_journey_rate_php' => null,
@@ -67,7 +67,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'name' => 'Scale',
                 'price_php' => 14999,
                 'order_limit' => 30000,
-                'page_limit' => 100,
+                'shop_limit' => 100,
                 'data_retention_months' => 12,
                 'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
                 'parcel_journey_rate_php' => null,
@@ -82,7 +82,7 @@ class SubscriptionPlanSeeder extends Seeder
                 'name' => 'Enterprise',
                 'price_php' => 0, // Custom — negotiated per customer; UI displays "Custom"
                 'order_limit' => null, // unlimited
-                'page_limit' => null,  // unlimited
+                'shop_limit' => null,  // unlimited
                 'data_retention_months' => 24,
                 'analytics_tier' => SubscriptionPlan::ANALYTICS_FULL,
                 'parcel_journey_rate_php' => null,

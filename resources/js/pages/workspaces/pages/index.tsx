@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -36,8 +37,6 @@ import {
     Edit,
     ListChecks,
     MoreHorizontal,
-    Plus,
-    RefreshCw,
     Search,
     Upload,
     Wallet,
@@ -55,17 +54,16 @@ import { toast } from 'sonner';
 interface PagesProps {
     workspace: Workspace;
     pages: PaginatedData<Page>;
+    users: { id: number | string; name: string }[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
         filter?: {
             search?: string;
+            owner_id?: string | string[];
         };
     };
-    pageLimit?: number | null;
-    pageCount?: number;
-    pageLimitReached?: boolean;
 }
 
 interface PageProps {
@@ -147,25 +145,26 @@ const currencyFormatter = new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 2,
 });
 
-const Pages = ({
-    pages,
-    workspace,
-    query,
-    pageLimit,
-    pageCount,
-    pageLimitReached,
-}: PagesProps) => {
+const Pages = ({ pages, workspace, users, query }: PagesProps) => {
     const { flash } = usePage().props as PageProps;
     const initialSorting = useMemo(() => {
         return toFrontendSort(query?.sort ?? null);
     }, [query?.sort]);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [selectedOwners, setSelectedOwners] = useState<string[]>(() => {
+        const owner = query?.filter?.owner_id;
+        if (!owner) return [];
+        return Array.isArray(owner) ? owner.map(String) : [String(owner)];
+    });
+    const ownerOptions = useMemo(
+        () => users.map((u) => ({ value: String(u.id), label: u.name })),
+        [users],
+    );
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
     const [selectedPage, setSelectedPage] = useState<Page | null>(null);
     const [budgetPage, setBudgetPage] = useState<Page | null>(null);
 
-    const [processing, setProcessing] = useState(false);
     const budgetForm = useForm({
         budget: '0',
     });
@@ -177,13 +176,9 @@ const Pages = ({
     const canEditPageBudget = usePermission(
         PERMISSIONS.EditPageDailyBudgetRecords,
     );
-    const canRefreshPages = usePermission(PERMISSIONS.RefreshPages);
     const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
     const canUsePageActions =
-        canViewChecklist ||
-        canEditPages ||
-        canRefreshPages ||
-        canEditPageBudget;
+        canViewChecklist || canEditPages || canEditPageBudget;
 
     useEffect(() => {
         if (flash?.success) {
@@ -197,12 +192,16 @@ const Pages = ({
 
     useEffect(() => {
         const timer = setTimeout(() => {
+            const hasFilter = !!searchValue || selectedOwners.length > 0;
             router.get(
                 workspaces.pages.index({ workspace }),
                 {
                     sort: query?.sort,
                     'filter[search]': searchValue || undefined,
-                    page: searchValue ? 1 : (query?.page ?? 1),
+                    'filter[owner_id]': selectedOwners.length
+                        ? selectedOwners
+                        : undefined,
+                    page: hasFilter ? 1 : (query?.page ?? 1),
                 },
                 {
                     preserveState: true,
@@ -214,14 +213,10 @@ const Pages = ({
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchValue]);
+    }, [searchValue, selectedOwners]);
 
     const handleEdit = (page: Page) => {
         router.get(`/workspaces/${workspace.slug}/pages/${page.id}/edit`);
-    };
-
-    const handleCreate = () => {
-        router.get(`/workspaces/${workspace.slug}/pages/create`);
     };
 
     const handleExport = () => {
@@ -249,19 +244,6 @@ const Pages = ({
         );
     };
 
-    const refresh = (page: Page) => {
-        setProcessing(true);
-        router.post(
-            workspaces.pages.refresh.url({ workspace, page }),
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => toast.success('Refresh started.'),
-                onError: () => toast.error('Failed to refresh page.'),
-                onFinish: () => setProcessing(false),
-            },
-        );
-    };
 
     const openChecklist = (page: Page) => {
         setSelectedPage(page);
@@ -320,27 +302,6 @@ const Pages = ({
             cell: ({ row }) => row.original.owner?.name || '-',
         },
         {
-            id: 'teams',
-            header: 'Teams',
-            cell: ({ row }) => {
-                const teams = row.original.teams ?? [];
-                if (teams.length === 0)
-                    return <span className="text-gray-400">-</span>;
-                return (
-                    <div className="flex flex-wrap gap-1">
-                        {teams.map((t) => (
-                            <span
-                                key={t.id}
-                                className="inline-flex items-center rounded-full bg-brand-500/10 px-2 py-0.5 text-[11px] font-medium text-brand-700 dark:text-brand-400"
-                            >
-                                {t.name}
-                            </span>
-                        ))}
-                    </div>
-                );
-            },
-        },
-        {
             accessorKey: 'latest_budget',
             header: ({ column }) => (
                 <SortableHeader
@@ -366,20 +327,6 @@ const Pages = ({
                             </span>
                         )}
                     </div>
-                );
-            },
-        },
-        {
-            accessorKey: 'orders_last_synced_at',
-            header: ({ column }) => (
-                <SortableHeader column={column} title={'Last Sync'} />
-            ),
-            cell: ({ row }) => {
-                const date = row.original.orders_last_synced_at;
-                return (
-                    <span>
-                        {date ? new Date(date).toLocaleString() : 'Never'}
-                    </span>
                 );
             },
         },
@@ -460,23 +407,6 @@ const Pages = ({
                                               Update Budget
                                           </DropdownMenuItem>
                                       )}
-                                      {canRefreshPages && (
-                                          <DropdownMenuItem
-                                              onClick={() => refresh(page)}
-                                              disabled={processing}
-                                          >
-                                              <RefreshCw
-                                                  className={
-                                                      processing
-                                                          ? 'animate-spin'
-                                                          : ''
-                                                  }
-                                              />
-                                              {processing
-                                                  ? 'Refreshing…'
-                                                  : 'Refresh Orders'}
-                                          </DropdownMenuItem>
-                                      )}
                                   </DropdownMenuContent>
                               </DropdownMenu>
                           );
@@ -495,68 +425,37 @@ const Pages = ({
                     description="Manage your shop pages and their connected stores"
                     stackActionsOnMobile
                 >
-                    {canViewPages && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleExport}
-                        >
-                            <Download className="h-4 w-4" />
-                            Export
-                        </Button>
-                    )}
-                    {canCreatePages && (
-                        <>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".xlsx,.xls,.csv"
-                                className="hidden"
-                                onChange={handleImportFile}
-                            />
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={importing}
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <Upload className="h-4 w-4" />
-                                {importing ? 'Importing…' : 'Import'}
-                            </Button>
-                        </>
-                    )}
-                    {canCreatePages && (
-                        <Button
-                            size="sm"
-                            onClick={handleCreate}
-                            disabled={pageLimitReached}
-                            title={
-                                pageLimitReached
-                                    ? `Page limit reached (${pageCount}/${pageLimit}). Upgrade your plan to add more.`
-                                    : undefined
-                            }
-                        >
-                            <Plus className="h-4 w-4" />
-                            Add New Page
-                        </Button>
-                    )}
+                    {/*{canViewPages && (*/}
+                    {/*    <Button*/}
+                    {/*        size="sm"*/}
+                    {/*        variant="outline"*/}
+                    {/*        onClick={handleExport}*/}
+                    {/*    >*/}
+                    {/*        <Download className="h-4 w-4" />*/}
+                    {/*        Export*/}
+                    {/*    </Button>*/}
+                    {/*)}*/}
+                    {/*{canCreatePages && (*/}
+                    {/*    <>*/}
+                    {/*        <input*/}
+                    {/*            ref={fileInputRef}*/}
+                    {/*            type="file"*/}
+                    {/*            accept=".xlsx,.xls,.csv"*/}
+                    {/*            className="hidden"*/}
+                    {/*            onChange={handleImportFile}*/}
+                    {/*        />*/}
+                    {/*        <Button*/}
+                    {/*            size="sm"*/}
+                    {/*            variant="outline"*/}
+                    {/*            disabled={importing}*/}
+                    {/*            onClick={() => fileInputRef.current?.click()}*/}
+                    {/*        >*/}
+                    {/*            <Upload className="h-4 w-4" />*/}
+                    {/*            {importing ? 'Importing…' : 'Import'}*/}
+                    {/*        </Button>*/}
+                    {/*    </>*/}
+                    {/*)}*/}
                 </PageHeader>
-
-                {canCreatePages && pageLimit != null && (
-                    <div className="-mt-4 mb-6 flex justify-end">
-                        <span
-                            className={clsx(
-                                'font-mono text-[10px] tracking-wider uppercase',
-                                pageLimitReached
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-gray-400 dark:text-gray-500',
-                            )}
-                        >
-                            {pageCount ?? 0}/{pageLimit} pages used
-                            {pageLimitReached && ' · upgrade to add more'}
-                        </span>
-                    </div>
-                )}
 
                 <Dialog
                     open={!!budgetPage}
@@ -621,7 +520,7 @@ const Pages = ({
                     </DialogContent>
                 </Dialog>
 
-                <div className="mb-3 flex items-center gap-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
@@ -631,6 +530,14 @@ const Pages = ({
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
                     </div>
+                    <MultiSelect
+                        compact
+                        options={ownerOptions}
+                        selected={selectedOwners}
+                        onChange={setSelectedOwners}
+                        placeholder="All owners"
+                        className="w-48"
+                    />
                 </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -641,12 +548,14 @@ const Pages = ({
                         initialSorting={initialSorting}
                         meta={{ ...omit(pages, ['data']) }}
                         onFetch={(params) => {
-                            console.log(params);
                             router.get(
                                 workspaces.pages.index({ workspace }),
                                 {
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
+                                    'filter[owner_id]': selectedOwners.length
+                                        ? selectedOwners
+                                        : undefined,
                                     page: params?.page ?? 1,
                                     per_page: params?.per_page,
                                 },

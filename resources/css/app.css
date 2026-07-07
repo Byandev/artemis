@@ -454,6 +454,33 @@
     border-radius: 0 !important;
 }
 
+/*
+ * Inventory dashboard charts use ApexCharts' built-in tooltip (not a custom
+ * HTML one), so restore a solid, shadowed card just inside those panels —
+ * scoped so the global "bare" rule above still applies everywhere else.
+ */
+.inv-chart-panel .apexcharts-tooltip.apexcharts-theme-light {
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.14),
+        0 2px 6px rgba(0, 0, 0, 0.08) !important;
+    border-radius: 12px !important;
+    padding: 9px 12px !important;
+}
+
+.dark .inv-chart-panel .apexcharts-tooltip.apexcharts-theme-light {
+    background: #18181b !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.55),
+        0 2px 6px rgba(0, 0, 0, 0.4) !important;
+}
+
+.inv-chart-panel .apexcharts-tooltip-title {
+    @apply !mb-1 !text-[10px];
+}
+
 .apexcharts-tooltip-marker {
     margin-right: 6px;
     height: 6px;

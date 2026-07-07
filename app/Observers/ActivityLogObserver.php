@@ -8,6 +8,7 @@ use App\Facades\Activity;
 use App\Models\Workspace;
 use App\Providers\ActivityLogServiceProvider;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
@@ -24,8 +25,14 @@ use Illuminate\Support\Str;
  */
 class ActivityLogObserver
 {
-    /** Attributes never worth reporting as a change. */
-    private const IGNORED = ['updated_at', 'created_at', 'remember_token'];
+    /**
+     * Attributes never worth reporting as a change. Password fields are covered
+     * by dedicated security logs (account.password.changed,
+     * workspace.public_password.set/removed, password.reset), so excluding them
+     * here keeps a password change to a single, clear entry instead of also
+     * emitting a generic "User/Workspace updated" row.
+     */
+    private const IGNORED = ['updated_at', 'created_at', 'remember_token', 'password', 'public_password'];
 
     public function created(Model $model): void
     {
@@ -46,7 +53,12 @@ class ActivityLogObserver
 
     public function deleted(Model $model): void
     {
-        $this->record($model, 'deleted');
+        // A soft delete is an "archive", not a permanent removal — only a real
+        // (force) delete should read as "deleted" in the audit trail.
+        $isArchive = in_array(SoftDeletes::class, class_uses_recursive($model), true)
+            && ! $model->isForceDeleting();
+
+        $this->record($model, $isArchive ? 'archived' : 'deleted');
     }
 
     public function restored(Model $model): void

@@ -1248,7 +1248,6 @@ export function ColumnVisibilityMenu({
     const [search, setSearch] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-    const allCollapsed = Object.values(collapsed).every(Boolean);
 
     // Right-panel drag state
     const [dragId, setDragId] = useState<string | null>(null);
@@ -1323,6 +1322,13 @@ export function ColumnVisibilityMenu({
     const activeAppliedPreset =
         presets.find((p) => presetMatches(p, value, columnOrder)) ?? null;
 
+    // The trigger button reflects the COMMITTED state, not the draft — otherwise
+    // it shows a stale count after Cancel (draft discarded) or Reset (defaults
+    // applied), since the draft only re-syncs when the dialog opens.
+    const appliedCount = options.filter((o) =>
+        effectiveVisible(o.id, value),
+    ).length;
+
     // Left panel: categories
     const categories = [
         'All',
@@ -1348,6 +1354,13 @@ export function ColumnVisibilityMenu({
         if (g) g.opts.push(opt);
         else grouped.push({ category: cat, opts: [opt] });
     }
+
+    // All groups collapsed only when every currently-rendered group is collapsed.
+    // Derive from `grouped` (not the raw `collapsed` map) so the freshly-opened
+    // default of `{}` reads as "expanded" — otherwise `.every` on an empty object
+    // is `true` and the toggle mislabels as "Expand all" while groups are open.
+    const allCollapsed =
+        grouped.length > 0 && grouped.every((g) => collapsed[g.category]);
 
     const toggleCollapse = (cat: string) =>
         setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -1432,7 +1445,7 @@ export function ColumnVisibilityMenu({
                     </span>
                 ) : (
                     <span className="text-gray-400 dark:text-gray-500">
-                        {selectedCount}/{options.length}
+                        {appliedCount}/{options.length}
                     </span>
                 )}
             </Button>

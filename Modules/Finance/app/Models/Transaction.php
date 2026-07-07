@@ -15,10 +15,17 @@ class Transaction extends Model
         'account_id',
         'date',
         'description',
+        'requested_by',
+        'approved_by',
+        'department',
+        'charge_to',
         'type',
         'transaction_type',
+        'transaction_type_id',
         'amount',
         'running_balance',
+        'reference_no',
+        'status',
         'position',
         'sub_category',
         'notes',
@@ -31,6 +38,11 @@ class Transaction extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    public function transactionType(): BelongsTo
+    {
+        return $this->belongsTo(TransactionType::class, 'transaction_type_id');
     }
 
     public function remittance(): HasOne

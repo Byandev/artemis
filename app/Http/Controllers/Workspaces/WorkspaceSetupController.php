@@ -23,8 +23,8 @@ class WorkspaceSetupController extends Controller
             $workspace = $request->user()->ownedWorkspaces()->first()
                 ?? $request->user()->workspaces()->first();
 
-            // Require at least one connected page before reaching the dashboard.
-            if (! $workspace->pages()->exists()) {
+            // Require at least one connected shop before reaching the dashboard.
+            if (! $workspace->shops()->exists()) {
                 return redirect()->route('workspace.onboarding', $workspace->slug);
             }
 
@@ -46,10 +46,10 @@ class WorkspaceSetupController extends Controller
             $workspace = $request->user()->ownedWorkspaces()->first()
                 ?? $request->user()->workspaces()->first();
 
-            // Require at least one connected page before reaching the dashboard.
-            if (! $workspace->pages()->exists()) {
+            // Require at least one connected shop before reaching the dashboard.
+            if (! $workspace->shops()->exists()) {
                 return redirect()->route('workspace.onboarding', $workspace->slug)
-                    ->with('info', 'Finish connecting your first page to continue.');
+                    ->with('info', 'Finish connecting your first shop to continue.');
             }
 
             return redirect()->route('workspace.dashboard', $workspace->slug)

@@ -1,54 +1,41 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
-
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
-
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
-Schedule::command('trigger-fetch-page-orders')->hourly();
+Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
-//// Fetch ERP purchase orders for inventory items. Runs three times a day: 9am, 12nn, 5pm.
-//Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('09:00')->withoutOverlapping();
-//Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('12:00')->withoutOverlapping();
-//Schedule::command('trigger-fetch-erp-purchase-orders')->dailyAt('17:00')->withoutOverlapping();
+// Gencys ERP
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('16:00')->withoutOverlapping();
 
-// Fetch ERP data for inventory items with sales keywords. Jobs are queued with a
-// staggered delay (the command's --delay default) so the n8n webhook isn't hit all
-// at once. Runs three times a day: 9am, 12nn, 5pm.
-//Schedule::command('trigger-fetch-erp-inventory')->dailyAt('09:00')->withoutOverlapping();
-//Schedule::command('trigger-fetch-erp-inventory')->dailyAt('12:00')->withoutOverlapping();
-//Schedule::command('trigger-fetch-erp-inventory')->dailyAt('17:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('10:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('16:30')->withoutOverlapping();
 
-// Fetch ERP transaction history for inventory items with transaction keywords. Jobs
-// are queued with a staggered delay so the n8n webhook isn't hit all at once. Runs
-// once a day at 8am.
-Schedule::command('trigger-fetch-erp-transaction-history')->dailyAt('08:00')->withoutOverlapping();
+// Flag inventory items whose ERP sync was dispatched but never reported back
+// (e.g. the ERP login failed inside n8n) so silent failures show up as failed.
+Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
-// Schedule::command('trigger-fetch-csr-erp-dail-records --date="2 days ago"')->dailyAt('02:00');
-// Schedule::command('trigger-fetch-csr-erp-dail-records --date="3 days ago"')->dailyAt('03:00');
-// Schedule::command('trigger-fetch-csr-erp-dail-records --date="4 days ago"')->dailyAt('04:00');
-// Schedule::command('trigger-fetch-csr-erp-dail-records --date="5 days ago"')->dailyAt('05:00');
-// Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('12:00');
-// Schedule::command('trigger-fetch-csr-erp-dail-records')->dailyAt('15:00');
-
 // GencysERP daily sales tracker — enable once the n8n flow + callback are ready.
-// Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('06:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('08:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('15:00')->withoutOverlapping();
 
-// GencysERP unit codes — enable once the n8n flow + callback are ready.
-// Schedule::command('gencys-erp:trigger-fetch-unit-code')->dailyAt('06:00')->withoutOverlapping();
-
-// GencysERP unit code inventories — enable once the n8n flow + callback are ready.
-// Schedule::command('gencys-erp:trigger-fetch-unit-code-inventory')->dailyAt('06:30')->withoutOverlapping();
+// Recompute inventory demand (3-day average + unfulfilled) from Gencys orders,
+// after the day's orders have been fetched above.
+Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('15:30')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
+
+// ── Inventory (Discord) ─────────────────────────────────────────────────
+// Checked hourly (top of each hour); each command posts only for workspaces
+// whose configured send time matches the current hour. Send times are
+// whole hours only (e.g. 08:00), so an hourly run always lands on the match.
+Schedule::command('inventory:report-deliveries')->hourly()->withoutOverlapping();
+Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapping();
 
 // ── MetaAds ─────────────────────────────────────────────────────────────
 // Ad accounts rarely change; a light refresh every 30 min keeps new accounts
@@ -68,7 +55,7 @@ Schedule::command('meta-ads:sync-creatives')->daily()->withoutOverlapping();
 //  • every 2h    — refresh today (the live row updates throughout the day).
 Schedule::command('meta-ads:sync-insights --days=3')->dailyAt('00:30')->withoutOverlapping();
 Schedule::command('meta-ads:sync-insights --days=1 --until=yesterday')->everySixHours()->withoutOverlapping();
-Schedule::command('meta-ads:sync-insights --days=1')->hourlyAt(30)->withoutOverlapping();
+Schedule::command('meta-ads:sync-insights --days=1')->everySixHours(30)->withoutOverlapping();
 
 // Snapshot end-of-day budgets so we have history Meta doesn't keep. Runs at
 // 23:55 server time, after the 23:30 entity sync has captured the day's

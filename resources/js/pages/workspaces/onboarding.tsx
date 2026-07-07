@@ -19,9 +19,9 @@ import {
 
 interface Props {
     workspace: { id: number; name: string; slug: string };
-    pageLimit?: number | null;
-    pageCount?: number;
-    pageLimitReached?: boolean;
+    shopLimit?: number | null;
+    shopCount?: number;
+    shopLimitReached?: boolean;
 }
 
 const inputCls =
@@ -29,9 +29,9 @@ const inputCls =
 
 export default function Onboarding({
     workspace,
-    pageLimit,
-    pageCount,
-    pageLimitReached,
+    shopLimit,
+    shopCount,
+    shopLimitReached,
 }: Props) {
     const { flash } = usePage().props as { flash?: { success?: string } };
     const [syncing, setSyncing] = useState(false);
@@ -39,9 +39,7 @@ export default function Onboarding({
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const { data, setData, post, processing, errors } = useForm({
-        page_id: '',
         shop_id: '',
-        page_name: '',
         pos_token: '',
     });
 
@@ -145,38 +143,13 @@ export default function Onboarding({
 
     return (
         <AuthLayout
-            title="Connect your page"
-            description="Link your Pancake page to start syncing orders"
+            title="Connect your shop"
+            description="Link your Pancake shop to start syncing orders"
         >
             <Head title="Onboarding" />
 
             <form onSubmit={submit} className="flex flex-col gap-5">
                 <div className="space-y-4">
-                    {/* Page ID */}
-                    <div className="space-y-1.5">
-                        <label
-                            htmlFor="page_id"
-                            className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
-                        >
-                            Page ID <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                            id="page_id"
-                            type="number"
-                            required
-                            autoFocus
-                            value={data.page_id}
-                            onChange={(e) => setData('page_id', e.target.value)}
-                            placeholder="e.g. 123456"
-                            className={inputCls}
-                        />
-                        {errors.page_id && (
-                            <p className="font-mono text-[11px] text-red-500">
-                                {errors.page_id}
-                            </p>
-                        )}
-                    </div>
-
                     {/* Shop ID */}
                     <div className="space-y-1.5">
                         <label
@@ -189,6 +162,7 @@ export default function Onboarding({
                             id="shop_id"
                             type="number"
                             required
+                            autoFocus
                             value={data.shop_id}
                             onChange={(e) => setData('shop_id', e.target.value)}
                             placeholder="e.g. 789"
@@ -197,32 +171,6 @@ export default function Onboarding({
                         {errors.shop_id && (
                             <p className="font-mono text-[11px] text-red-500">
                                 {errors.shop_id}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Page Name */}
-                    <div className="space-y-1.5">
-                        <label
-                            htmlFor="page_name"
-                            className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500"
-                        >
-                            Page Name <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                            id="page_name"
-                            type="text"
-                            required
-                            value={data.page_name}
-                            onChange={(e) =>
-                                setData('page_name', e.target.value)
-                            }
-                            placeholder="My Store Page"
-                            className={inputCls}
-                        />
-                        {errors.page_name && (
-                            <p className="font-mono text-[11px] text-red-500">
-                                {errors.page_name}
                             </p>
                         )}
                     </div>
@@ -260,10 +208,10 @@ export default function Onboarding({
                     {/* Submit */}
                     <button
                         type="submit"
-                        disabled={processing || pageLimitReached}
+                        disabled={processing || shopLimitReached}
                         title={
-                            pageLimitReached
-                                ? `Page limit reached (${pageCount ?? 0}/${pageLimit}). Upgrade your plan to add more.`
+                            shopLimitReached
+                                ? `Shop limit reached (${shopCount ?? 0}/${shopLimit}). Upgrade your plan to add more.`
                                 : undefined
                         }
                         className="mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-emerald-600 font-mono! text-[13px]! font-semibold text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
@@ -274,16 +222,16 @@ export default function Onboarding({
                         {processing ? 'Connecting...' : 'Connect & Sync Orders'}
                     </button>
 
-                    {pageLimit != null && (
+                    {shopLimit != null && (
                         <p
                             className={`text-center font-mono text-[10px] tracking-wider uppercase ${
-                                pageLimitReached
+                                shopLimitReached
                                     ? 'text-amber-600 dark:text-amber-400'
                                     : 'text-gray-400 dark:text-gray-500'
                             }`}
                         >
-                            {pageCount ?? 0}/{pageLimit} pages used
-                            {pageLimitReached && ' · upgrade to add more'}
+                            {shopCount ?? 0}/{shopLimit} shops used
+                            {shopLimitReached && ' · upgrade to add more'}
                         </p>
                     )}
 
@@ -313,7 +261,7 @@ export default function Onboarding({
 
                 <div className="flex flex-col gap-1.5">
                     <a
-                        href="https://drive.google.com/file/d/17uzVBqY4N3VIu8lL2WRzTQXE6cUQjPBg/view?usp=sharing"
+                        href="https://drive.google.com/file/d/1R3BvJAuD7G22Pln_jCnpgy889FIHhXcS/view?usp=sharing"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group flex items-center gap-2.5 rounded-[8px] px-2 py-1.5 text-[12px] text-gray-700 transition-colors hover:bg-white dark:text-gray-300 dark:hover:bg-zinc-900"

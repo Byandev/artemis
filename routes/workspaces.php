@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
 use App\Http\Controllers\Workspaces\ActivityLogController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
@@ -26,8 +27,8 @@ use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamAdAccountController;
 use App\Http\Controllers\Workspaces\TeamController;
-use App\Http\Controllers\Workspaces\TeamPageController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
+use App\Http\Controllers\Workspaces\TeamShopController;
 use App\Http\Controllers\Workspaces\VideoEditorDashboardController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
@@ -45,12 +46,15 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
+use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
-use Modules\GencysERP\Http\Controllers\Web\UnitCodeController as GencysUnitCodeController;
+use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
+use Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
+use Modules\Inventory\Http\Controllers\UnitCodeController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsCalendarController;
@@ -98,7 +102,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/inventory/transactions', [InventoryTransactionController::class, 'index'])->name('inventory.transactions.index');
         Route::post('/inventory/transactions', [InventoryTransactionController::class, 'store'])->name('inventory.transactions.store');
         Route::patch('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'update'])->name('inventory.transactions.update');
-        Route::patch('/inventory/transactions/{transaction}/remaining-qty', [InventoryTransactionController::class, 'updateRemainingQty'])->name('inventory.transactions.remaining-qty');
         Route::delete('/inventory/transactions/{transaction}', [InventoryTransactionController::class, 'destroy'])->name('inventory.transactions.destroy');
     });
 
@@ -156,15 +159,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index'])->name('workspaces.pages.index');
     Route::get('/workspaces/{workspace}/pages/export', [PageController::class, 'export'])->name('workspaces.pages.export');
     Route::post('/workspaces/{workspace}/pages/import', [PageController::class, 'import'])->name('workspaces.pages.import');
-    Route::get('/workspaces/{workspace}/pages/create', [PageController::class, 'create'])->name('workspaces.pages.create');
-    Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store'])->name('workspaces.pages.store');
-    Route::post('/workspaces/{workspace}/pages/validate-pos-token', [PageController::class, 'validatePosToken'])->name('workspaces.pages.validate-pos-token');
     Route::post('/workspaces/{workspace}/pages/validate-pancake-token', [PageController::class, 'validatePancakeToken'])->name('workspaces.pages.validate-pancake-token');
     Route::post('/workspaces/{workspace}/pages/validate-botcake-token', [PageController::class, 'validateBotcakeToken'])->name('workspaces.pages.validate-botcake-token');
     Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::put('/workspaces/{workspace}/pages/{page}/budget', [PageController::class, 'updateBudget'])->name('workspaces.pages.update-budget');
-    Route::post('/workspaces/{workspace}/pages/{page}/refresh', [PageController::class, 'refresh'])->name('workspaces.pages.refresh');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
 
@@ -175,7 +174,12 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/page-daily-budget-records/{pageDailyBudgetRecord}', [PageDailyBudgetRecordController::class, 'destroy'])->name('workspaces.page-daily-budget-records.destroy');
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
+    Route::post('/workspaces/{workspace}/shops', [ShopController::class, 'store'])->name('workspaces.shops.store');
+    Route::post('/workspaces/{workspace}/shops/validate-pos-token', [ShopController::class, 'validatePosToken'])->name('workspaces.shops.validate-pos-token');
+    Route::post('/workspaces/{workspace}/shops/{shop}/refresh-pages', [ShopController::class, 'refreshPages'])->name('workspaces.shops.refresh-pages');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
+    Route::post('/workspaces/{workspace}/shops/{shop}/refresh-orders', [ShopController::class, 'refreshOrders'])->name('workspaces.shops.refresh-orders');
+    Route::delete('/workspaces/{workspace}/shops/{shop}', [ShopController::class, 'destroy'])->name('workspaces.shops.destroy');
 
     // Product routes
     // Redirect to analytics by default for navigation item active state
@@ -201,6 +205,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/price', [AnalyticController::class, 'groupByPrice'])->name('workspaces.rts.analytics.group-by-price');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cx-rts', [AnalyticController::class, 'groupByCxRts'])->name('workspaces.rts.analytics.group-by-cx-rts');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/delivery-attempts', [AnalyticController::class, 'groupByDeliveryAttempts'])->name('workspaces.rts.analytics.group-by-delivery-attempts');
+    Route::get('/workspaces/{workspace}/rts/analytics/group-by/order-source', [AnalyticController::class, 'groupByOrderSource'])->name('workspaces.rts.analytics.group-by-order-source');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/ad', [AnalyticController::class, 'groupByAd'])->name('workspaces.rts.analytics.group-by-ad');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/order-frequency', [AnalyticController::class, 'groupByOrderFrequency'])->name('workspaces.rts.analytics.group-by-order-frequency');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/confirmed-by', [AnalyticController::class, 'groupByConfirmedBy'])->name('workspaces.rts.analytics.group-by-confirmed-by');
@@ -265,8 +270,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/logs', [OptimizationRuleController::class, 'logs'])
         ->middleware('can:View Optimization Logs,workspace')
         ->name('workspaces.metaads.optimization-rules.logs');
+    // Viewable by "View Optimization Rules" (read-only) or "Manage Optimization
+    // Rules" (editable) — the controller authorizes either; saving stays gated
+    // by Manage on the update route below.
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules/{optimizationRule}/edit', [OptimizationRuleController::class, 'edit'])
-        ->middleware('can:Manage Optimization Rules,workspace')
         ->name('workspaces.metaads.optimization-rules.edit');
     Route::post('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'store'])
         ->middleware('can:Manage Optimization Rules,workspace')
@@ -364,8 +371,8 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'update'])->name('workspaces.teams.schedule.update');
 
     // Team data-access assignment (team-level visibility)
-    Route::get('/workspaces/{workspace}/teams/{team}/pages', [TeamPageController::class, 'index'])->name('workspaces.teams.pages.index');
-    Route::put('/workspaces/{workspace}/teams/{team}/pages', [TeamPageController::class, 'update'])->name('workspaces.teams.pages.update');
+    Route::get('/workspaces/{workspace}/teams/{team}/shops', [TeamShopController::class, 'index'])->name('workspaces.teams.shops.index');
+    Route::put('/workspaces/{workspace}/teams/{team}/shops', [TeamShopController::class, 'update'])->name('workspaces.teams.shops.update');
     Route::get('/workspaces/{workspace}/teams/{team}/ad-accounts', [TeamAdAccountController::class, 'index'])->name('workspaces.teams.ad-accounts.index');
     Route::put('/workspaces/{workspace}/teams/{team}/ad-accounts', [TeamAdAccountController::class, 'update'])->name('workspaces.teams.ad-accounts.update');
 
@@ -375,14 +382,27 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/botcake/flows', [FlowController::class, 'index'])->name('workspaces.botcake.flows.index');
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
     Route::get('/workspaces/{workspace}/botcake/sequence-messages', [SequenceMessageController::class, 'index'])->name('workspaces.botcake.sequence-messages.index');
+    Route::get('/workspaces/{workspace}/inventory/dashboard', [InventoryDashboardController::class, 'index'])
+        ->name('workspaces.inventory.dashboard');
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
+        Route::get('/export', [InventoryItemController::class, 'export'])->name('export');
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
         Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
+        Route::post('/bulk-product', [InventoryItemController::class, 'bulkUpdateProduct'])->name('bulk-product');
+        Route::post('/bulk-group', [InventoryItemController::class, 'bulkGroup'])->name('bulk-group');
+        Route::get('/{item}/stock-as-of', [InventoryItemController::class, 'stockAsOf'])->name('stock-as-of');
+        Route::post('/{item}/discrepancies', [InventoryItemController::class, 'adjustCount'])->name('discrepancies.store');
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
+
+    // Gencys ERP sync health for inventory items (per-item transaction + PO sync status).
+    Route::get('/workspaces/{workspace}/inventory/sync-health', [GencysSyncHealthController::class, 'index'])
+        ->middleware('can:View Inventory Items,workspace')
+        ->name('workspaces.inventory.sync-health');
+
     Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
@@ -405,17 +425,18 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/items/{purchasedOrderItem}/deliveries', [PurchaseOrderMonitoringController::class, 'storeDelivery'])->name('deliveries.store');
         Route::put('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'updateDelivery'])->name('deliveries.update');
         Route::delete('/deliveries/{delivery}', [PurchaseOrderMonitoringController::class, 'destroyDelivery'])->name('deliveries.destroy');
-        Route::put('/items/{purchasedOrderItem}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('items.expected-delivery');
+        Route::put('/orders/{purchasedOrder}/expected-delivery', [PurchaseOrderMonitoringController::class, 'updateExpectedDelivery'])->name('orders.expected-delivery');
         Route::put('/orders/{purchasedOrder}/status', [PurchaseOrderMonitoringController::class, 'updateStatus'])->name('orders.status');
         Route::put('/items/{purchasedOrderItem}/remarks', [PurchaseOrderMonitoringController::class, 'updateRemarks'])->name('items.remarks');
     });
 
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
         Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
-        Route::get('/unit-codes', [GencysUnitCodeController::class, 'index'])->name('unit-codes.index');
-        Route::post('/unit-codes', [GencysUnitCodeController::class, 'store'])->name('unit-codes.store');
-        Route::put('/unit-codes/{unitCode}', [GencysUnitCodeController::class, 'update'])->name('unit-codes.update');
-        Route::delete('/unit-codes/{unitCode}', [GencysUnitCodeController::class, 'destroy'])->name('unit-codes.destroy');
+        Route::get('/unit-codes', [UnitCodeController::class, 'index'])->name('unit-codes.index');
+        Route::post('/unit-codes/sync', [UnitCodeController::class, 'sync'])->name('unit-codes.sync');
+        Route::post('/unit-codes', [UnitCodeController::class, 'store'])->name('unit-codes.store');
+        Route::put('/unit-codes/{unitCode}', [UnitCodeController::class, 'update'])->name('unit-codes.update');
+        Route::delete('/unit-codes/{unitCode}', [UnitCodeController::class, 'destroy'])->name('unit-codes.destroy');
     });
 
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
@@ -444,6 +465,11 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
 
+        Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
+        Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');
+        Route::put('/transaction-types/{transactionType}', [FinanceTransactionTypeController::class, 'update'])->name('transaction-types.update');
+        Route::delete('/transaction-types/{transactionType}', [FinanceTransactionTypeController::class, 'destroy'])->name('transaction-types.destroy');
+
         Route::get('/remittances', [FinanceRemittanceController::class, 'index'])->name('remittances.index');
         Route::post('/remittances', [FinanceRemittanceController::class, 'store'])->name('remittances.store');
         Route::post('/remittances/import', [FinanceRemittanceController::class, 'import'])->name('remittances.import');
@@ -458,6 +484,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [CreativesController::class, 'index'])->name('index');
         Route::get('/create', [CreativesController::class, 'create'])->name('create');
         Route::post('/', [CreativesController::class, 'store'])->name('store');
+        Route::post('/bulk-reviewers', [CreativesController::class, 'bulkAssignReviewers'])->name('reviewers.bulk');
         Route::get('/{creative}/edit', [CreativesController::class, 'edit'])->name('edit');
         Route::put('/{creative}', [CreativesController::class, 'update'])->name('update');
         Route::delete('/{creative}', [CreativesController::class, 'destroy'])->name('destroy');
@@ -506,8 +533,14 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('workspaces.update-subscription');
         Route::put('/workspaces/{workspace}/modules', [AdminWorkspaceController::class, 'updateModules'])
             ->name('workspaces.update-modules');
-        Route::put('/workspaces/{workspace}/max-pages', [AdminWorkspaceController::class, 'updateMaxPages'])
-            ->name('workspaces.update-max-pages');
+        Route::put('/workspaces/{workspace}/max-shops', [AdminWorkspaceController::class, 'updateMaxShops'])
+            ->name('workspaces.update-max-shops');
+
+        // User Management
+        Route::get('/users', [AdminUserController::class, 'index'])
+            ->name('users.index');
+        Route::post('/users/{user}/reset-password', [AdminUserController::class, 'generatePasswordReset'])
+            ->name('users.reset-password');
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');

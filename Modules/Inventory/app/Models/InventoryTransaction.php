@@ -19,6 +19,7 @@ class InventoryTransaction extends Model
         'inventory_item_id',
         'date',
         'ref_no',
+        'number',
         'po_qty_in',
         'po_qty_out',
         'rts_goods_out',
@@ -26,12 +27,7 @@ class InventoryTransaction extends Model
         'rts_bad',
         'lost',
         'remaining_qty',
-        'is_audited',
         'inventory_remaining_stock',
-    ];
-
-    protected $casts = [
-        'is_audited' => 'boolean',
     ];
 
     public function inventoryItem(): BelongsTo

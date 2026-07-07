@@ -26,7 +26,6 @@ class PageExport implements FromCollection, WithHeadings, WithMapping
         'status',
         'name',
         'facebook_url',
-        'pos_token',
         'botcake_token',
         'infotxt_token',
         'infotxt_user_id',

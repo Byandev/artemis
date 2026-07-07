@@ -12,6 +12,303 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.15.4',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Inventory — Adjust Count & Discrepancies',
+                items: [
+                    'New “Adjust count” action on each item in the Inventory Items list — record a physical stock count and the item’s remaining quantity updates to match, carrying the difference forward as new stock moves in and out',
+                    'Pick the date you counted and the dialog shows what the system thought the stock was on that date, plus the exact discrepancy that will take effect, before you save',
+                    'New “Discrepancy” column on the Inventory Items list (and the Excel export) shows the offset currently applied, along with what was last counted and when',
+                ],
+            },
+            {
+                title: 'Inventory — Simpler Stock Sync',
+                items: [
+                    'ERP transaction history now records each row’s remaining stock exactly as the ERP reports it, instead of re-deriving a running total — the on-hand numbers now match the source',
+                    'The inline “remaining quantity” edit on the Transaction Logs page is now read-only; stock corrections go through the new Adjust Count flow instead',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.15.3',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Creatives — Simpler Date Filtering',
+                items: [
+                    'The date filter is now a single range picker with a column selector — pick which date to filter by (Creative Date, Created Date, or Approved Date) and set one range, rather than juggling three separate ranges',
+                    'Only one date type applies at a time, and switching the type carries your current range over to it',
+                    'The Clear button now reliably removes the date filter in one click',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Daily Sales Tracker Date Filtering',
+                items: [
+                    'The Daily Sales Tracker date filter now works the same way — one range picker plus a column selector to choose Order Date or Shipped Out Date, with only one date type filtering at a time and Clear working reliably',
+                ],
+            },
+            {
+                title: 'Video Editor Dashboard — Shows All Editors by Default',
+                items: [
+                    'The dashboard no longer defaults to just your own work — it now shows every editor’s activity out of the box, and you can narrow to specific people when you want to; any saved filter that previously pinned the view to you is reset automatically',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.15.2',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Inventory — Bulk Assign Product',
+                items: [
+                    'Select multiple items on the Inventory Items list and set their linked product in one go, instead of editing each item individually',
+                    'The picker is searchable, so you can find the right product quickly; choose “No product (clear)” to unlink the product from every selected item',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.15.1',
+        date: '2026-07-01',
+        sections: [
+            {
+                title: 'Creatives — Bulk Assign Reviewers',
+                items: [
+                    'Select multiple creatives with the new row checkboxes, then assign reviewers to all of them at once — choose “Add” to attach reviewers on top of any already set, or “Replace” to overwrite each creative’s reviewer list (clearing it if you pick none)',
+                ],
+            },
+            {
+                title: 'Creatives — Separate Date Filters',
+                items: [
+                    'The single date filter is now three independent date ranges — Creative Date, Created Date, and Approved Date — so you can narrow the list by any of them on their own or together',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Daily Sales Tracker Date Filters',
+                items: [
+                    'The tracker now offers a date range for each of its date columns — Order Date, Shipped, Encoded, Parcel Updated, and Date Added — each filterable on its own',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.15.0',
+        date: '2026-06-30',
+        sections: [
+            {
+                title: 'Gencys ERP — Daily Sales Tracker (More Detail)',
+                items: [
+                    'Each order now captures the customer’s name and full address (province, city, barangay), the courier, the payment method, and the pricing — initial price, final price, and shipping fee — all pulled in automatically from the sync',
+                    'The tracker table shows these new columns and you can sort by customer, province, city, courier, and order/parcel status',
+                    'Search now spans CSR, customer name, contact, tracking number, page, order details, brand, and status; plus filters for order-date range, shipped-out-date range, parcel status, and order status',
+                ],
+            },
+            {
+                title: 'Inventory — Unit Codes Rebuilt',
+                items: [
+                    'Unit codes now live in Inventory as a general, workspace-wide catalog rather than a Gencys-only list, so the same unit codes can drive inventory regardless of where they came from',
+                    'Each unit code can be expanded to show its breakdown — the component item codes and how many of each it contains',
+                    'The list is sortable by unit code and SKU, and a Sync button pulls the latest codes on demand',
+                ],
+            },
+            {
+                title: 'Inventory — Automatic Demand From Gencys Orders',
+                items: [
+                    'A new daily sync (7am) works out each inventory item’s recent demand straight from Gencys orders — it expands every order’s unit code into its component items, then fills in the item’s 3-day average and unfulfilled count',
+                    'This keeps the "Days It Can Last" and "PO Needed" figures on the inventory list current without any manual entry',
+                ],
+            },
+            {
+                title: 'Inventory — Export Items',
+                items: [
+                    'New Export button on the Inventory Items list downloads an Excel file of the current view — SKU, product, status, lead time, unfulfilled, remaining quantity, waiting for delivery, 3-day average, days it can last, and PO needed — respecting whatever filters you have applied',
+                ],
+            },
+            {
+                title: 'Inventory — Purchased Orders Search by SKU',
+                items: [
+                    'You can now find a purchased order by the SKU of any inventory item on it, on top of the existing search by delivery no., customer PO, and control no.',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.14.2',
+        date: '2026-06-30',
+        sections: [
+            {
+                title: 'Inventory — Automatic ERP Syncs',
+                items: [
+                    'ERP transaction history now syncs automatically three times a day (8am, 12nn, 5pm) instead of just once each morning, so on-hand stock stays current throughout the day',
+                    'ERP purchase orders now sync automatically three times a day (9am, 1pm, 6pm) — previously this had to be triggered by hand',
+                    'Each sync now batches more items per run and spaces the runs further apart, easing load on the ERP and avoiding the rate-limit errors that could cause silent sync failures',
+                ],
+            },
+            {
+                title: 'Meta Ads',
+                items: [
+                    'Today’s ad insights now refresh every 6 hours instead of hourly, reducing load on the Meta API while still keeping the live day reasonably up to date',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.14.1',
+        date: '2026-06-29',
+        sections: [
+            {
+                title: 'Inventory — Gencys ERP Sync Health (New)',
+                items: [
+                    'New "Sync Health" page under Inventory shows, for every active item, whether its ERP transaction-history and purchase-order syncs went through — status, rows pulled, when it last ran, and any error message',
+                    'A summary up top tracks the last 24 hours at a glance: total runs, success rate, and failures, alongside a feed of recent sync runs you can filter by type and status',
+                    'The per-item status list is searchable by SKU or product name and paginated, so large catalogs stay easy to scan',
+                    'Syncs that never hear back from the ERP are now automatically marked failed after a grace period instead of sitting stuck on "pending" forever',
+                ],
+            },
+            {
+                title: 'Inventory — Transaction Logs',
+                items: [
+                    'The "Inventory Stock (ERP)" column and inline editing of a transaction’s remaining quantity now appear only for ERP-connected (Gencys partner) workspaces — everyone else sees a cleaner, read-only view',
+                ],
+            },
+            {
+                title: 'Creatives — Filters',
+                items: [
+                    'New filter panel on the Creatives page — narrow the list by Format, Ads Status, Creator, and Product, with an "Apply Changes" button, a "Clear all" reset, and a badge showing how many filters are active',
+                ],
+            },
+            {
+                title: 'Finance — Transaction Import',
+                items: [
+                    'The CSV import dialog now guides you while mapping columns: it flags missing required fields and duplicate mappings, shows sample data under each dropdown, and only reveals the preview and enables import once every column is mapped correctly',
+                ],
+            },
+            {
+                title: 'Security & Activity Logs',
+                items: [
+                    'Password changes are now recorded — both successful changes and failed attempts — and tied to the right workspace so they show up in its activity log',
+                    'Turning a workspace’s public-page password protection on or off is now logged as its own distinct event',
+                    'Exporting transaction history is now recorded in the activity log',
+                    'Removed vague "updated" entries for password fields so the activity log stays clean and meaningful',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.14.0',
+        date: '2026-06-29',
+        sections: [
+            {
+                title: 'Shops — Connect a Shop, Not a Page',
+                items: [
+                    'You now add a Shop instead of adding pages one at a time — enter the Shop ID and POS token in a quick pop-up and every page under that shop is imported and synced automatically',
+                    'New "Refresh page list" action on each shop re-checks the shop and pulls in any newly-created pages, leaving the pages you already have untouched',
+                    'First-time setup is now shop-based too — connect one shop and you are ready to go',
+                ],
+            },
+            {
+                title: 'Plans — Limits Are Now Per Shop',
+                items: [
+                    'Plan limits now count shops instead of pages, matching the new shop-first flow — your plan and the admin screens show how many shops are used and the shop limit',
+                ],
+            },
+            {
+                title: 'Teams — Assign Shops',
+                items: [
+                    'Teams now own shops instead of individual pages — pick the shops a team manages and its members automatically see all the orders, budgets, and metrics for those shops and their pages',
+                ],
+            },
+            {
+                title: 'Pages',
+                items: [
+                    'The POS token now lives on the shop, so it has been removed from the page form — it only needs to be set once per shop',
+                    'The page edit form is simpler: the Shop ID and POS token fields are gone',
+                    'The standalone "Add Page" flow and the per-page "Refresh Orders" action have been retired, since pages now come from — and sync with — their shop',
+                ],
+            },
+            {
+                title: 'Parcel Journey',
+                items: [
+                    'The parcel-journey analytics breakdown is now per shop instead of per page, for a cleaner view of tracked orders and messages sent across each shop',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.3',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Order Refresh Tooling',
+                items: [
+                    'New maintenance command to re-pull a workspace’s shop orders (all sources, incl. Webcake) over a configurable recent window — scopeable to a single shop or page — for backfills and one-off fixes without touching the hourly sync',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.2',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Fix',
+                items: [
+                    'Shop order syncing now processes every order again — a leftover debug limit that only synced a handful of test orders has been removed, with order dispatches staggered to ease load on Pancake',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.1',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Shops — Fix',
+                items: [
+                    'Refreshing a shop’s orders now resets its "Last Sync" first, so the column reflects the manual re-pull instead of showing a stale timestamp until the sync finishes',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.13.0',
+        date: '2026-06-28',
+        sections: [
+            {
+                title: 'Pancake — Webcake Orders Now Captured',
+                items: [
+                    'Order syncing now runs per shop instead of per page, so orders from every source are pulled in — including Webcake orders, which have no page and were previously skipped entirely',
+                    'Each order now records where it came from (e.g. Facebook or Webcake), so its source is visible and filterable across the app',
+                    'Delivery-journey text messages still go out for Webcake orders — they fall back to a shop page for messaging, while the order itself stays correctly marked as page-less',
+                    'The "Single Page Shop" toggle has been removed from the page form — it is no longer needed now that syncing covers the whole shop',
+                ],
+            },
+            {
+                title: 'Shops',
+                items: [
+                    'New "Refresh orders" action on each shop re-pulls the last few months of orders across all sources on demand',
+                    'Shops now show a "Last Sync" column so you can see when each shop last pulled orders',
+                ],
+            },
+            {
+                title: 'Dashboard',
+                items: [
+                    'New "Order Source" filter (Facebook, Webcake) on the dashboard — every metric, breakdown, and per-page/shop/user view respects it',
+                ],
+            },
+            {
+                title: 'RTS Analytics',
+                items: [
+                    'New "By Order Source" breakdown showing RTS rate for Facebook vs Webcake orders, alongside the By Price, By Delivery Attempts, and By Order Frequency cards',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.12.0',
         date: '2026-06-26',
         sections: [
@@ -79,7 +376,7 @@ const changelog: ChangelogEntry[] = [
                 title: 'Team-Level Data Access',
                 items: [
                     "Data can now be scoped to teams — once a team owns pages or ad accounts, its members see only that team's records across pages, orders, products, shops, budgets, RTS analytics, creatives, the video-editor dashboard, Botcake sequences/flows/messages, and Meta ad performance",
-                    "New \"View All Workspace Data\" permission sets the boundary: owners, super admins, and anyone with this permission see everything; remove it from a role (e.g. CSR) to limit that role to its teams' data",
+                    'New "View All Workspace Data" permission sets the boundary: owners, super admins, and anyone with this permission see everything; remove it from a role (e.g. CSR) to limit that role to its teams\' data',
                     'Safe rollout — on release every existing role keeps full visibility, so nothing changes until you deliberately scope a role; a backfill command seeds team ownership from existing page owners',
                     "Fails closed — a scoped member who isn't on any team sees nothing until they're added to one, and you're warned if you assign such a role to a teamless member",
                 ],
@@ -90,7 +387,7 @@ const changelog: ChangelogEntry[] = [
                     'New per-team screens (from the Teams list) to choose which pages and ad accounts a team owns',
                     "Ad accounts have two access tiers per team — View (see the account's data) or Manage; Manage is required to change budgets or statuses and to approve optimization proposals, and the Optimization History shows only the accounts you can manage",
                     'Pages and ad accounts can belong to multiple teams, and a member can be on multiple teams — they see the combined data of all their teams',
-                    'The Pages list now shows each page\'s teams; the ad-account assignment screen lists only synced accounts and shows the Facebook user who connected each',
+                    "The Pages list now shows each page's teams; the ad-account assignment screen lists only synced accounts and shows the Facebook user who connected each",
                 ],
             },
             {

@@ -24,9 +24,7 @@ const errorClass = 'font-mono text-[11px] text-red-500';
 
 export default function Edit({ workspace, page, users }: Props) {
     const { data, setData, put, processing, errors } = useForm({
-        shop_id: page.shop_id?.toString() ?? '',
         name: page.name ?? '',
-        pos_token: page.pos_token ?? '',
         botcake_token: page.botcake_token ?? '',
         infotxt_token: page.infotxt_token ?? '',
         infotxt_user_id: page.infotxt_user_id ?? '',
@@ -90,26 +88,6 @@ export default function Edit({ workspace, page, users }: Props) {
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div className={fieldClass}>
                                     <label className={labelClass}>
-                                        Shop ID{' '}
-                                        <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        className={inputClass}
-                                        placeholder="e.g. 789"
-                                        value={data.shop_id}
-                                        onChange={(e) =>
-                                            setData('shop_id', e.target.value)
-                                        }
-                                    />
-                                    {errors.shop_id && (
-                                        <p className={errorClass}>
-                                            {errors.shop_id}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className={fieldClass}>
-                                    <label className={labelClass}>
                                         Page Name{' '}
                                         <span className="text-red-400">*</span>
                                     </label>
@@ -128,7 +106,7 @@ export default function Edit({ workspace, page, users }: Props) {
                                         </p>
                                     )}
                                 </div>
-                                <div className={`${fieldClass} sm:col-span-2`}>
+                                <div className={`${fieldClass}`}>
                                     <label className={labelClass}>Owner</label>
                                     <select
                                         value={data.owner_id}
@@ -192,74 +170,6 @@ export default function Edit({ workspace, page, users }: Props) {
                                 Integration Tokens
                             </p>
                             <div className="grid gap-5 sm:grid-cols-2">
-                                <div className={`${fieldClass} sm:col-span-2`}>
-                                    <label className={labelClass}>
-                                        POS Token{' '}
-                                        <span className="text-red-400">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Enter POS token"
-                                        value={data.pos_token}
-                                        onChange={(e) =>
-                                            setData('pos_token', e.target.value)
-                                        }
-                                    />
-                                    <ValidateTokenButton
-                                        url={`/workspaces/${workspace.slug}/pages/validate-pos-token`}
-                                        payload={{
-                                            shop_id: data.shop_id,
-                                            token: data.pos_token,
-                                        }}
-                                        disabledReason={
-                                            !data.shop_id
-                                                ? 'Enter Shop ID first'
-                                                : !data.pos_token
-                                                  ? 'Enter a token first'
-                                                  : undefined
-                                        }
-                                    />
-                                    {errors.pos_token && (
-                                        <p className={errorClass}>
-                                            {errors.pos_token}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className={`${fieldClass} sm:col-span-2`}>
-                                    <label className={labelClass}>
-                                        Pancake Token
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Enter Pancake token"
-                                        value={data.pancake_token}
-                                        onChange={(e) =>
-                                            setData(
-                                                'pancake_token',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    <ValidateTokenButton
-                                        url={`/workspaces/${workspace.slug}/pages/validate-pancake-token`}
-                                        payload={{
-                                            page_id: page.id.toString(),
-                                            token: data.pancake_token,
-                                        }}
-                                        disabledReason={
-                                            !data.pancake_token
-                                                ? 'Enter a token first'
-                                                : undefined
-                                        }
-                                    />
-                                    {errors.pancake_token && (
-                                        <p className={errorClass}>
-                                            {errors.pancake_token}
-                                        </p>
-                                    )}
-                                </div>
                                 <div className={`${fieldClass} sm:col-span-2`}>
                                     <label className={labelClass}>
                                         Botcake Token

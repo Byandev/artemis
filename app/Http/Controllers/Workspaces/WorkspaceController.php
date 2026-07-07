@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Workspaces;
 
+use App\Enums\Logging\LogCategory;
+use App\Enums\Logging\LogStatus;
 use App\Enums\Permission;
+use App\Facades\Activity;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Workspace;
@@ -107,15 +110,28 @@ class WorkspaceController extends Controller
             'password' => ['nullable', 'string', 'min:4', 'max:255'],
         ]);
 
+        $isSet = filled($validated['password'] ?? null);
+
         $workspace->update([
-            'public_password' => filled($validated['password'] ?? null)
+            'public_password' => $isSet
                 ? Hash::make($validated['password'])
                 : null,
         ]);
 
+        // Dedicated security entry — gating/ungating public pages is a security
+        // change, so it gets its own audit line under the workspace rather than
+        // being buried as a generic "workspace updated" data entry.
+        Activity::build()->asUser()
+            ->category(LogCategory::Security)
+            ->action($isSet ? 'workspace.public_password.set' : 'workspace.public_password.removed')
+            ->status(LogStatus::Success)
+            ->workspace($workspace->getKey())
+            ->message($isSet ? 'Public pages password set' : 'Public pages password removed')
+            ->save();
+
         return back()->with(
             'success',
-            filled($validated['password'] ?? null)
+            $isSet
                 ? 'Public pages password set.'
                 : 'Public pages password removed.',
         );
@@ -223,6 +239,7 @@ class WorkspaceController extends Controller
             'product_ids' => $request->query('product_ids'),
             'page_ids' => $request->query('page_ids'),
             'shop_ids' => $request->query('shop_ids'),
+            'order_source_names' => $request->query('order_source_names'),
         ];
 
         $salesData = Order::where('workspace_id', $workspace->id)

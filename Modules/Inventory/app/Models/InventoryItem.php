@@ -7,6 +7,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class InventoryItem extends Model
 {
@@ -15,6 +16,8 @@ class InventoryItem extends Model
     protected $fillable = [
         'workspace_id',
         'product_id',
+        'parent_id',
+        'is_parent',
         'sku',
         'is_active',
         'sales_keywords',
@@ -27,6 +30,7 @@ class InventoryItem extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_parent' => 'boolean',
     ];
 
     /**
@@ -53,55 +57,43 @@ class InventoryItem extends Model
         return $this->belongsTo(Product::class);
     }
 
+    /**
+     * The placeholder parent item this SKU is grouped under (null when the item
+     * is standalone or is itself a parent). See is_parent.
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(InventoryItem::class, 'parent_id');
+    }
+
+    /** The child SKU variants grouped under this parent item. */
+    public function children(): HasMany
+    {
+        return $this->hasMany(InventoryItem::class, 'parent_id');
+    }
+
     /** Inventory transactions (stock movements) */
     public function transactions(): HasMany
     {
         return $this->hasMany(InventoryTransaction::class);
     }
 
-    /**
-     * Recompute each transaction's actual stock (remaining_qty) from its audit anchors.
-     *
-     * The external system's running balance (inventory_remaining_stock) is trusted for
-     * the movement — the ups and downs — but not the absolute level. A physically audited
-     * row (is_audited) fixes the true level; from there forward,
-     *
-     *     actual = external + offset,   offset = audited_count − external_at_audit
-     *
-     * until the next audit resets the offset. Rows before the first audit fall back to the
-     * external value (offset 0). The item's own remaining_qty is refreshed from the most
-     * recent transaction so the inventory list shows the corrected current stock.
-     */
-    public function recalculateActualStock(): void
+    /** Manual physical-count adjustments (discrepancy ledger) */
+    public function discrepancies(): HasMany
     {
-        $offset = 0;
+        return $this->hasMany(InventoryItemDiscrepancy::class);
+    }
 
-        $transactions = $this->transactions()
-            ->orderBy('date')
-            ->orderBy('id')
-            ->get();
-
-        foreach ($transactions as $transaction) {
-            if ($transaction->is_audited) {
-                // The audited row is the anchor: it keeps its counted value and sets the
-                // offset every later row rides on.
-                $offset = (int) round((float) $transaction->remaining_qty - (float) $transaction->inventory_remaining_stock);
-
-                continue;
-            }
-
-            $actual = (int) round((float) $transaction->inventory_remaining_stock + $offset);
-
-            if ((int) $transaction->remaining_qty !== $actual) {
-                $transaction->update(['remaining_qty' => $actual]);
-            }
-        }
-
-        $latest = $transactions->last();
-
-        if ($latest && (int) $this->remaining_qty !== (int) $latest->remaining_qty) {
-            $this->update(['remaining_qty' => $latest->remaining_qty]);
-        }
+    /**
+     * The most recent physical-count adjustment. Its signed discrepancy is layered
+     * onto the transaction ledger to produce the item's displayed remaining stock —
+     * see InventoryItemController::buildQuery() for the read-side of this.
+     */
+    public function latestDiscrepancy(): HasOne
+    {
+        return $this->hasOne(InventoryItemDiscrepancy::class)
+            ->latest('date')
+            ->latest('id');
     }
 
     /** All purchased order items */

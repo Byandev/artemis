@@ -28,7 +28,6 @@ class PageFactory extends Factory
             'owner_id' => User::factory(),
             'name' => fake()->company().' Page',
             'facebook_url' => fake()->optional()->url(),
-            'pos_token' => fake()->optional()->uuid(),
             'botcake_token' => fake()->optional()->uuid(),
             'infotxt_token' => fake()->optional()->uuid(),
             'infotxt_user_id' => fake()->optional()->numerify('######'),

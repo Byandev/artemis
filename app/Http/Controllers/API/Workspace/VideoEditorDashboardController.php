@@ -67,13 +67,6 @@ class VideoEditorDashboardController extends Controller
         );
     }
 
-    public function waitingList(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
-    {
-        return response()->json(
-            $this->dashboard->waitingList($workspace, $request->filters())
-        );
-    }
-
     public function throughput(VideoEditorDashboardRequest $request, Workspace $workspace): JsonResponse
     {
         return response()->json(

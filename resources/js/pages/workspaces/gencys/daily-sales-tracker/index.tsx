@@ -1,5 +1,4 @@
 import PageHeader from '@/components/common/PageHeader';
-import DatePicker from '@/components/ui/date-picker';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -21,10 +20,8 @@ import { cn } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
-import flatpickr from 'flatpickr';
 import { debounce } from 'lodash';
 import { ChevronDown, Columns3, Search, Truck } from 'lucide-react';
-import moment from 'moment';
 import {
     useCallback,
     useEffect,
@@ -32,8 +29,11 @@ import {
     useState,
     type ReactNode,
 } from 'react';
+import DailySalesDateFilters, {
+    DateFilterValue,
+    EMPTY_DATE_FILTERS,
+} from './daily-sales-date-filters';
 import DailySalesFilters from './daily-sales-filters';
-import DateOption = flatpickr.Options.DateOption;
 
 interface OrderItem {
     id: number;
@@ -48,15 +48,25 @@ interface Order {
     csr: string | null;
     verifier_name: string | null;
     upsell_by: string | null;
+    customer_name: string | null;
+    address: string | null;
+    province: string | null;
+    city: string | null;
+    brgy: string | null;
     contact: string | null;
     order_details: string | null;
     items?: OrderItem[];
     total_qty: number | null;
+    price_final: string | null;
+    price_initial: string | null;
+    shipping_fee: string | null;
     page: string | null;
     platform: string | null;
     tracking_number: string | null;
+    courier: string | null;
     parcel_status: string | null;
     order_status: string | null;
+    mop: string | null;
     encoded_date: string | null;
     parcel_updated_date: string | null;
     shipped_out_date: string | null;
@@ -79,12 +89,12 @@ interface Props {
         page?: number | string;
         filter?: {
             search?: string;
-            start_date?: string;
-            end_date?: string;
             csr?: string[];
             platform?: string[];
             parcel_status?: string[];
             order_status?: string[];
+            // Date-range keys (`{field}_start` / `{field}_end`).
+            [dateKey: string]: string | string[] | undefined;
         };
     };
 }
@@ -173,6 +183,50 @@ const COLUMNS: ColumnDef[] = [
         render: (o) => o.upsell_by || '—',
     },
     {
+        key: 'customer_name',
+        label: 'Customer',
+        sortable: true,
+        render: (o) => (
+            <span className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                {o.customer_name || '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'address',
+        label: 'Address',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => (
+            <span
+                className="block max-w-[220px] truncate"
+                title={o.address ?? ''}
+            >
+                {o.address || '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'province',
+        label: 'Province',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.province || '—',
+    },
+    {
+        key: 'city',
+        label: 'City',
+        sortable: true,
+        render: (o) => o.city || '—',
+    },
+    {
+        key: 'brgy',
+        label: 'Brgy',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.brgy || '—',
+    },
+    {
         key: 'contact',
         label: 'Contact',
         sortable: true,
@@ -217,6 +271,33 @@ const COLUMNS: ColumnDef[] = [
         ),
     },
     {
+        key: 'price_final',
+        label: 'Final ₱',
+        sortable: true,
+        align: 'right',
+        render: (o) => (
+            <span className="text-[12px] font-semibold text-gray-800 dark:text-gray-200">
+                {o.price_final ? peso(o.price_final) : '—'}
+            </span>
+        ),
+    },
+    {
+        key: 'price_initial',
+        label: 'Initial ₱',
+        sortable: true,
+        align: 'right',
+        defaultVisible: false,
+        render: (o) => (o.price_initial ? peso(o.price_initial) : '—'),
+    },
+    {
+        key: 'shipping_fee',
+        label: 'Shipping ₱',
+        sortable: true,
+        align: 'right',
+        defaultVisible: false,
+        render: (o) => (o.shipping_fee ? peso(o.shipping_fee) : '—'),
+    },
+    {
         key: 'page',
         label: 'Page',
         sortable: true,
@@ -239,6 +320,13 @@ const COLUMNS: ColumnDef[] = [
         render: (o) => o.tracking_number || '—',
     },
     {
+        key: 'courier',
+        label: 'Courier',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.courier || '—',
+    },
+    {
         key: 'parcel_status',
         label: 'Parcel Status',
         sortable: true,
@@ -249,6 +337,13 @@ const COLUMNS: ColumnDef[] = [
         label: 'Order Status',
         sortable: true,
         render: (o) => <StatusPill value={o.order_status} />,
+    },
+    {
+        key: 'mop',
+        label: 'MOP',
+        sortable: true,
+        defaultVisible: false,
+        render: (o) => o.mop || '—',
     },
     {
         key: 'encoded_date',
@@ -332,10 +427,15 @@ export default function DailySalesTrackerIndex({
     const baseUrl = `/workspaces/${workspace.slug}/gencys/daily-sales-tracker`;
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [dateRange, setDateRange] = useState<string[]>(() => [
-        query?.filter?.start_date ?? '',
-        query?.filter?.end_date ?? '',
-    ]);
+    const [dateFilters, setDateFilters] = useState<DateFilterValue>(() => {
+        const f = query?.filter ?? {};
+        const init = { ...EMPTY_DATE_FILTERS };
+        for (const key of Object.keys(EMPTY_DATE_FILTERS)) {
+            const value = f[key];
+            if (typeof value === 'string') init[key] = value;
+        }
+        return init;
+    });
     const [csrFilter, setCsrFilter] = useState<string[]>(
         query?.filter?.csr ?? [],
     );
@@ -368,10 +468,18 @@ export default function DailySalesTrackerIndex({
 
     const arr = (v: string[]) => (v.length ? v : undefined);
 
+    // Map the date-filter object to query params, dropping empty bounds.
+    const dateParams = (df: DateFilterValue) =>
+        Object.fromEntries(
+            Object.keys(EMPTY_DATE_FILTERS).map((key) => [
+                key,
+                df[key] || undefined,
+            ]),
+        );
+
     const buildFilter = () => ({
         search: searchValue || undefined,
-        start_date: dateRange[0] || undefined,
-        end_date: dateRange[1] || undefined,
+        ...dateParams(dateFilters),
         csr: arr(csrFilter),
         platform: arr(platformFilter),
         parcel_status: arr(parcelStatusFilter),
@@ -406,7 +514,7 @@ export default function DailySalesTrackerIndex({
             query?.perPage,
             orders.per_page,
             searchValue,
-            dateRange,
+            dateFilters,
             csrFilter,
             platformFilter,
             parcelStatusFilter,
@@ -421,21 +529,27 @@ export default function DailySalesTrackerIndex({
 
     useEffect(() => {
         const f = query?.filter ?? {};
+        const serverDates = Object.fromEntries(
+            Object.keys(EMPTY_DATE_FILTERS).map((key) => [
+                key,
+                (typeof f[key] === 'string' ? (f[key] as string) : '') ||
+                    undefined,
+            ]),
+        );
         const serverSig = JSON.stringify({
             search: f.search || undefined,
-            start_date: f.start_date || undefined,
-            end_date: f.end_date || undefined,
-            csr: arr(f.csr ?? []),
-            platform: arr(f.platform ?? []),
-            parcel_status: arr(f.parcel_status ?? []),
-            order_status: arr(f.order_status ?? []),
+            ...serverDates,
+            csr: arr((f.csr as string[]) ?? []),
+            platform: arr((f.platform as string[]) ?? []),
+            parcel_status: arr((f.parcel_status as string[]) ?? []),
+            order_status: arr((f.order_status as string[]) ?? []),
         });
         if (JSON.stringify(buildFilter()) !== serverSig) debouncedFetch();
         return () => debouncedFetch.cancel();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         searchValue,
-        dateRange,
+        dateFilters,
         csrFilter,
         platformFilter,
         parcelStatusFilter,
@@ -469,28 +583,11 @@ export default function DailySalesTrackerIndex({
                             aria-label="Search daily sales orders"
                         />
                     </div>
-                    <DatePicker
-                        id="gencys-sales-date-range"
-                        mode="range"
-                        placeholder="Filter by order date"
-                        defaultDate={
-                            (dateRange[0] && dateRange[1]
-                                ? dateRange
-                                : undefined) as never as DateOption
-                        }
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                setDateRange([
-                                    moment(dates[0]).format('YYYY-MM-DD'),
-                                    moment(dates[1]).format('YYYY-MM-DD'),
-                                ]);
-                            } else if (dates.length === 0) {
-                                setDateRange(['', '']);
-                            }
-                        }}
-                    />
-
                     <div className="flex items-center gap-2 sm:ml-auto">
+                        <DailySalesDateFilters
+                            value={dateFilters}
+                            onChange={setDateFilters}
+                        />
                         <DailySalesFilters
                             value={{
                                 csr: csrFilter,

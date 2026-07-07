@@ -16,12 +16,14 @@ type PropsType = {
     fullWidth?: boolean;
     /** Show a clear (×) button when a date is selected. Defaults to true. */
     clearable?: boolean;
+    compact?: boolean;
 };
 
 const fmt     = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtYear = (d: Date) => d.getFullYear().toString();
 
 export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, clearable = true }: PropsType) {
+export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact }: PropsType) {
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,13 +68,19 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
     const hasEnd   = selectedDates.length >= 2;
     const sameYear = hasEnd && fmtYear(selectedDates[0]) === fmtYear(selectedDates[1]);
 
+    const heightCls   = compact ? 'h-7' : 'h-9';
+    const iconCellCls = compact ? 'w-7' : 'w-9';
+    const iconSizeCls = compact ? 'h-3 w-3' : 'h-3.5 w-3.5';
+    const padCls      = compact ? 'px-2' : 'px-3';
+    const textCls     = compact ? 'text-[11px]' : 'text-[13px]';
+
     return (
         <div className={fullWidth ? 'w-full' : undefined}>
             {label && <Label htmlFor={id}>{label}</Label>}
 
             <div
                 onClick={() => fpRef.current?.open()}
-                className={`relative items-center h-9 rounded-[10px] border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-black/14 dark:hover:border-white/14 transition-all duration-150 cursor-pointer select-none ${fullWidth ? 'flex w-full' : 'inline-flex shrink-0 min-w-max'}`}
+                className={`relative items-center ${heightCls} rounded-[10px] border border-black/8 dark:border-white/8 bg-white dark:bg-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] dark:shadow-none hover:border-black/14 dark:hover:border-white/14 transition-all duration-150 cursor-pointer select-none ${fullWidth ? 'flex w-full' : 'inline-flex shrink-0 min-w-max'}`}
             >
                 {/* Hidden input flatpickr binds to */}
                 <input
@@ -83,17 +91,17 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
                 />
 
                 {/* Icon cell */}
-                <span className="relative z-10 pointer-events-none flex items-center justify-center w-9 h-full border-r border-black/6 dark:border-white/6 bg-stone-50 dark:bg-white/3 shrink-0 rounded-l-[9px]">
-                    <CalendarDays className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                <span className={`relative z-10 pointer-events-none flex items-center justify-center ${iconCellCls} h-full border-r border-black/6 dark:border-white/6 bg-stone-50 dark:bg-white/3 shrink-0 rounded-l-[9px]`}>
+                    <CalendarDays className={`${iconSizeCls} text-gray-400 dark:text-gray-500`} />
                 </span>
 
                 {/* Date display */}
-                <div className="relative z-10 pointer-events-none flex items-center px-3 whitespace-nowrap">
+                <div className={`relative z-10 pointer-events-none flex items-center ${padCls} whitespace-nowrap`}>
                     {isRange ? (
                         hasStart ? (
                             <div className="flex items-center gap-1.5">
                                 <span className="flex items-baseline gap-1">
-                                    <span className="text-[13px] font-medium text-gray-700 dark:text-gray-200">
+                                    <span className={`${textCls} font-medium text-gray-700 dark:text-gray-200`}>
                                         {fmt(selectedDates[0])}
                                     </span>
                                     {!sameYear && (
@@ -105,7 +113,7 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
                                 <ArrowRight className="h-3 w-3 text-gray-300 dark:text-gray-600 shrink-0" />
                                 {hasEnd ? (
                                     <span className="flex items-baseline gap-1">
-                                        <span className="text-[13px] font-medium text-gray-700 dark:text-gray-200">
+                                        <span className={`${textCls} font-medium text-gray-700 dark:text-gray-200`}>
                                             {fmt(selectedDates[1])}
                                         </span>
                                         <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">
@@ -113,18 +121,18 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
                                         </span>
                                     </span>
                                 ) : (
-                                    <span className="text-[13px] text-gray-300 dark:text-gray-600">End date</span>
+                                    <span className={`${textCls} text-gray-300 dark:text-gray-600`}>End date</span>
                                 )}
                             </div>
                         ) : (
-                            <span className="text-[13px] text-gray-300 dark:text-gray-600">
+                            <span className={`${textCls} text-gray-300 dark:text-gray-600`}>
                                 {placeholder ?? 'Select range'}
                             </span>
                         )
                     ) : (
                         hasStart ? (
                             <span className="flex items-baseline gap-1.5">
-                                <span className="text-[13px] font-medium text-gray-700 dark:text-gray-200">
+                                <span className={`${textCls} font-medium text-gray-700 dark:text-gray-200`}>
                                     {fmt(selectedDates[0])}
                                 </span>
                                 <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500">
@@ -132,7 +140,7 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
                                 </span>
                             </span>
                         ) : (
-                            <span className="text-[13px] text-gray-300 dark:text-gray-600">
+                            <span className={`${textCls} text-gray-300 dark:text-gray-600`}>
                                 {placeholder ?? 'Select date'}
                             </span>
                         )
