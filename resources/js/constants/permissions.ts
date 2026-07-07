@@ -69,6 +69,7 @@ export const PERMISSIONS = {
 
     // Gencys ERP
     ViewDailySalesTracker: 'View Daily Sales Tracker',
+    ViewGencysInterns: 'View Gencys Interns',
     ViewUnitCode: 'View Unit Code',
     CreateUnitCode: 'Create Unit Code',
     EditUnitCode: 'Edit Unit Code',

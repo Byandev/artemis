@@ -41,6 +41,11 @@ return [
         'transaction_history_webhook_url' => env('N8N_TRANSACTION_HISTORY_WEBHOOK_URL'),
         'inventory_unit_code_webhook_url' => env('N8N_INVENTORY_UNIT_CODE_WEBHOOK_URL'),
         'gencys_daily_sales_webhook_url' => env('N8N_GENCYS_DAILY_SALES_WEBHOOK_URL'),
+        'gencys_interns_webhook_url' => env('N8N_GENCYS_INTERNS_WEBHOOK_URL'),
+
+        // Public base URL n8n posts callbacks back to (e.g. an ngrok/Herd tunnel
+        // in local dev). Falls back to APP_URL when unset.
+        'callback_base_url' => env('N8N_CALLBACK_BASE_URL'),
     ],
 
     'discord' => [
