@@ -173,6 +173,17 @@ const Index = ({ workspace, records, pages, query }: Props) => {
                 },
                 { preserveState: false, replace: true, preserveScroll: true },
             );
+        } else if (dates.length === 0) {
+            setDateRange(['', '']);
+            router.get(
+                `/workspaces/${workspace.slug}/page-daily-budget-records`,
+                {
+                    ...buildFilterParams(),
+                    'filter[date_from]': undefined,
+                    'filter[date_to]': undefined,
+                },
+                { preserveState: false, replace: true, preserveScroll: true },
+            );
         }
     };
 

@@ -146,6 +146,15 @@ export default function Flows({ workspace, flows, query }: Props) {
     };
 
     const onRangeChange = (dates: Date[]) => {
+        if (dates.length === 0) {
+            navigate({
+                mode: undefined,
+                from: undefined,
+                to: undefined,
+                page: 1,
+            });
+            return;
+        }
         if (dates.length !== 2) return;
         navigate({
             mode: 'historical',

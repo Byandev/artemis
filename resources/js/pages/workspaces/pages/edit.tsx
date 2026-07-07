@@ -172,40 +172,6 @@ export default function Edit({ workspace, page, users }: Props) {
                             <div className="grid gap-5 sm:grid-cols-2">
                                 <div className={`${fieldClass} sm:col-span-2`}>
                                     <label className={labelClass}>
-                                        Pancake Token
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Enter Pancake token"
-                                        value={data.pancake_token}
-                                        onChange={(e) =>
-                                            setData(
-                                                'pancake_token',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    <ValidateTokenButton
-                                        url={`/workspaces/${workspace.slug}/pages/validate-pancake-token`}
-                                        payload={{
-                                            page_id: page.id.toString(),
-                                            token: data.pancake_token,
-                                        }}
-                                        disabledReason={
-                                            !data.pancake_token
-                                                ? 'Enter a token first'
-                                                : undefined
-                                        }
-                                    />
-                                    {errors.pancake_token && (
-                                        <p className={errorClass}>
-                                            {errors.pancake_token}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className={`${fieldClass} sm:col-span-2`}>
-                                    <label className={labelClass}>
                                         Botcake Token
                                     </label>
                                     <input

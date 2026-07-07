@@ -284,6 +284,11 @@ export default function ReportShow({
                                             'YYYY-MM-DD',
                                         ),
                                     });
+                                } else if (dates.length === 0) {
+                                    patch({
+                                        since: report.config.since,
+                                        until: report.config.until,
+                                    });
                                 }
                             }}
                             defaultDate={[config.since, config.until] as never}

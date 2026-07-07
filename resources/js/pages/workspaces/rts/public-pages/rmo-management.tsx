@@ -1520,7 +1520,12 @@ function RmoManagement({
                             defaultDate={deliveryDate}
                             placeholder="Select date"
                             onChange={(_, dateStr) => {
-                                if (dateStr && dateStr !== deliveryDate)
+                                if (!dateStr) {
+                                    if (deliveryDate !== todayLocal)
+                                        handleDateChange(todayLocal);
+                                    return;
+                                }
+                                if (dateStr !== deliveryDate)
                                     handleDateChange(dateStr);
                             }}
                         />

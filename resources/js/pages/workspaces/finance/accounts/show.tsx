@@ -9,9 +9,10 @@ import {
     TransactionFormDialog,
 } from '@/components/finance/transaction-form-dialog';
 import {
-    TRANSACTION_TYPE_LABEL,
-    TRANSACTION_TYPE_STYLE,
     TransactionType,
+    TransactionTypeItem,
+    transactionTypeLabel,
+    transactionTypeStyle,
 } from '@/components/finance/transaction-type';
 import {
     DropdownMenu,
@@ -42,10 +43,17 @@ interface Txn {
     account_id: number;
     date: string;
     description: string;
+    requested_by?: string | null;
+    approved_by?: string | null;
+    department?: string | null;
+    charge_to?: string | null;
     type: 'in' | 'out';
     transaction_type: TransactionType | null;
+    transaction_type_id?: number | null;
     amount: number | string;
     running_balance: number | string | null;
+    reference_no?: string | null;
+    status?: 'pending' | 'approved' | 'posted' | null;
     sub_category: SubCategory | null;
     notes: string | null;
     remittance?: { id: number; courier: string; soa_number: string } | null;
@@ -55,6 +63,7 @@ interface Props {
     workspace: Workspace;
     account: Account;
     transactions: Txn[];
+    transactionTypes: TransactionTypeItem[];
 }
 
 const fmt = (v: number | string) =>
@@ -67,7 +76,12 @@ export default function AccountShow({
     workspace,
     account,
     transactions,
+    transactionTypes,
 }: Props) {
+    const typeNameById = useMemo(
+        () => new Map(transactionTypes.map((t) => [t.id, t.name])),
+        [transactionTypes],
+    );
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<FinanceTransaction | null>(null);
     const [toDelete, setToDelete] = useState<Txn | null>(null);
@@ -175,16 +189,16 @@ export default function AccountShow({
                                 </tr>
                             )}
                             {rows.map((r) => {
-                                const s = r.transaction_type
-                                    ? (TRANSACTION_TYPE_STYLE[
-                                          r.transaction_type as TransactionType
-                                      ] ?? TRANSACTION_TYPE_STYLE.funds)
-                                    : TRANSACTION_TYPE_STYLE.funds;
-                                const label = r.transaction_type
-                                    ? (TRANSACTION_TYPE_LABEL[
-                                          r.transaction_type as TransactionType
-                                      ] ?? r.transaction_type)
-                                    : 'funds';
+                                // Prefer the dynamic type (via FK); fall back to
+                                // the legacy enum value for un-linked rows.
+                                const typeName =
+                                    r.transaction_type_id != null
+                                        ? (typeNameById.get(
+                                              r.transaction_type_id,
+                                          ) ?? null)
+                                        : r.transaction_type;
+                                const s = transactionTypeStyle(typeName);
+                                const label = transactionTypeLabel(typeName);
                                 return (
                                     <tr
                                         key={r.id}
@@ -222,7 +236,7 @@ export default function AccountShow({
                                                         }
                                                     </span>
                                                 )}
-                                                {r.transaction_type && (
+                                                {typeName && (
                                                     <span
                                                         className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s.cls}`}
                                                     >
@@ -275,10 +289,25 @@ export default function AccountShow({
                                                                                 ),
                                                                                 description:
                                                                                     r.description,
+                                                                                requested_by:
+                                                                                    r.requested_by,
+                                                                                approved_by:
+                                                                                    r.approved_by,
+                                                                                department:
+                                                                                    r.department,
+                                                                                charge_to:
+                                                                                    r.charge_to,
                                                                                 type: r.type,
                                                                                 transaction_type:
                                                                                     r.transaction_type,
+                                                                                transaction_type_id:
+                                                                                    r.transaction_type_id,
                                                                                 amount: r.amount,
+                                                                                running_balance:
+                                                                                    r.running_balance,
+                                                                                reference_no:
+                                                                                    r.reference_no,
+                                                                                status: r.status,
                                                                                 sub_category:
                                                                                     r.sub_category,
                                                                                 notes: r.notes,
@@ -336,6 +365,7 @@ export default function AccountShow({
                                 currency: account.currency,
                             },
                         ]}
+                        transactionTypes={transactionTypes}
                         defaults={{ account_id: account.id }}
                         workspaceSlug={workspace.slug}
                     />
