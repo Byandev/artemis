@@ -51,7 +51,7 @@ interface Props {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
-        filter?: { search?: string; meta_user?: string };
+        filter?: { search?: string; meta_user?: string; owner?: string };
         showAll?: boolean;
     };
 }
@@ -157,6 +157,7 @@ export default function MetaAdAccounts({
     const [metaUserId, setMetaUserId] = useState(
         query?.filter?.meta_user ?? '',
     );
+    const [ownerId, setOwnerId] = useState(query?.filter?.owner ?? '');
     const [showAll, setShowAll] = useState(query?.showAll ?? false);
     const [syncToggles, setSyncToggles] = useState<Record<string, boolean>>(
         () =>
@@ -223,6 +224,7 @@ export default function MetaAdAccounts({
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[meta_user]': metaUserId || undefined,
+                'filter[owner]': ownerId || undefined,
                 show_all: showAll ? 1 : undefined,
                 page: 1,
                 per_page: query?.perPage ?? adAccounts.per_page,
@@ -255,6 +257,12 @@ export default function MetaAdAccounts({
         const next = value === 'all' ? '' : value;
         setMetaUserId(next);
         navigate({ 'filter[meta_user]': next || undefined, page: 1 });
+    };
+
+    const handleOwnerChange = (value: string) => {
+        const next = value === 'all' ? '' : value;
+        setOwnerId(next);
+        navigate({ 'filter[owner]': next || undefined, page: 1 });
     };
 
     const columns: ColumnDef<AdAccount>[] = [
@@ -357,7 +365,9 @@ export default function MetaAdAccounts({
             cell: ({ row }) => (
                 <InlineOwner
                     owner={
-                        ownerMap[row.original.id] ?? row.original.owner ?? null
+                        row.original.id in ownerMap
+                            ? ownerMap[row.original.id]
+                            : (row.original.owner ?? null)
                     }
                     users={owners}
                     canEdit={canManageMetaAds}
@@ -468,6 +478,23 @@ export default function MetaAdAccounts({
                             {metaUsers.map((u) => (
                                 <SelectItem key={u.id} value={String(u.id)}>
                                     {u.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select
+                        value={ownerId || 'all'}
+                        onValueChange={handleOwnerChange}
+                    >
+                        <SelectTrigger className="h-9 w-[200px] font-mono text-[11px]">
+                            <SelectValue placeholder="All owners" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All owners</SelectItem>
+                            {owners.map((o) => (
+                                <SelectItem key={o.id} value={String(o.id)}>
+                                    {o.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>

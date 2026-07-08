@@ -75,6 +75,7 @@ class IntegrationsController extends Controller
                 AllowedFilter::callback('meta_user', function ($query, $value) {
                     $query->whereHas('metaUsers', fn ($q) => $q->where('meta_ads_users.id', $value));
                 }),
+                AllowedFilter::exact('owner', 'owner_id'),
             ])
             ->allowedSorts(['name', 'business_name', 'currency', 'country_code', 'account_status', 'last_synced_at'])
             ->defaultSort('name')
