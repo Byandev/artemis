@@ -20,6 +20,7 @@ import clsx from 'clsx';
 import { omit } from 'lodash';
 import { Facebook, Search, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { InlineOwner, OwnerOption } from './components/inline-owner';
 
 interface AdAccount {
     id: string;
@@ -31,6 +32,8 @@ interface AdAccount {
     last_synced_at: string | null;
     uses_system_user: boolean;
     active_sync: boolean;
+    owner_id: number | null;
+    owner?: OwnerOption | null;
     meta_users?: { id: string; name: string }[];
 }
 
@@ -43,6 +46,7 @@ interface Props {
     workspace: Workspace;
     adAccounts: PaginatedData<AdAccount>;
     metaUsers: MetaUserOption[];
+    owners: OwnerOption[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -139,6 +143,7 @@ export default function MetaAdAccounts({
     workspace,
     adAccounts,
     metaUsers,
+    owners,
     query,
 }: Props) {
     const canManageMetaAds = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
@@ -159,6 +164,12 @@ export default function MetaAdAccounts({
                 adAccounts.data.map((a) => [a.id, a.active_sync]),
             ),
     );
+    const [ownerMap, setOwnerMap] = useState<
+        Record<string, OwnerOption | null>
+    >(() =>
+        Object.fromEntries(adAccounts.data.map((a) => [a.id, a.owner ?? null])),
+    );
+    const [ownerSaving, setOwnerSaving] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         setSyncToggles(
@@ -166,7 +177,32 @@ export default function MetaAdAccounts({
                 adAccounts.data.map((a) => [a.id, a.active_sync]),
             ),
         );
+        setOwnerMap(
+            Object.fromEntries(
+                adAccounts.data.map((a) => [a.id, a.owner ?? null]),
+            ),
+        );
     }, [adAccounts.data]);
+
+    const assignOwner = (adAccount: AdAccount, ownerId: number | null) => {
+        const prev = ownerMap[adAccount.id] ?? null;
+        const next = ownerId
+            ? (owners.find((o) => o.id === ownerId) ?? null)
+            : null;
+        setOwnerMap((m) => ({ ...m, [adAccount.id]: next }));
+        setOwnerSaving((s) => ({ ...s, [adAccount.id]: true }));
+        axios
+            .patch(
+                `/workspaces/${workspace.slug}/integrations/meta/ad-accounts/${adAccount.id}/owner`,
+                { owner_id: ownerId },
+            )
+            .catch(() => {
+                setOwnerMap((m) => ({ ...m, [adAccount.id]: prev }));
+            })
+            .finally(() => {
+                setOwnerSaving((s) => ({ ...s, [adAccount.id]: false }));
+            });
+    };
 
     const toggleSync = (adAccount: AdAccount) => {
         const next = !syncToggles[adAccount.id];
@@ -312,6 +348,23 @@ export default function MetaAdAccounts({
                     </div>
                 );
             },
+        },
+        {
+            id: 'owner',
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Owner" enabled={false} />
+            ),
+            cell: ({ row }) => (
+                <InlineOwner
+                    owner={
+                        ownerMap[row.original.id] ?? row.original.owner ?? null
+                    }
+                    users={owners}
+                    canEdit={canManageMetaAds}
+                    saving={ownerSaving[row.original.id] ?? false}
+                    onAssign={(ownerId) => assignOwner(row.original, ownerId)}
+                />
+            ),
         },
         {
             accessorKey: 'last_synced_at',

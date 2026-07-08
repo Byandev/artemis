@@ -4,9 +4,11 @@ namespace Modules\MetaAds\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Team;
+use App\Models\User as AppUser;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\MetaAds\Services\MetaGraphClient;
@@ -53,6 +55,14 @@ class AdAccount extends Model
         }
 
         return $metaUser->graphClient();
+    }
+
+    /**
+     * The app user who owns this ad account. Nullable.
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(AppUser::class, 'owner_id');
     }
 
     public function metaUsers(): BelongsToMany
