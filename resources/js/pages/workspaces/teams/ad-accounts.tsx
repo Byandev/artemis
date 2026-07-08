@@ -1,5 +1,12 @@
 import { Can } from '@/components/can';
 import PageHeader from '@/components/common/PageHeader';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { PERMISSIONS } from '@/constants/permissions';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -15,6 +22,7 @@ interface AdAccountItem {
     id: string;
     name: string;
     connected_by?: string;
+    owner?: { id: number; name: string } | null;
 }
 
 interface Props {
@@ -46,14 +54,36 @@ export default function TeamAdAccounts({
         new Map(Object.entries(assigned)),
     );
     const [search, setSearch] = useState('');
+    // '' = all owners, 'unassigned' = no owner, otherwise the owner id as a string.
+    const [ownerFilter, setOwnerFilter] = useState('');
     const [saving, setSaving] = useState(false);
+
+    // Distinct owners present among the loaded accounts, for the filter dropdown.
+    const ownerOptions = useMemo(() => {
+        const map = new Map<number, string>();
+        for (const a of adAccounts) {
+            if (a.owner) map.set(a.owner.id, a.owner.name);
+        }
+        return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) =>
+            a.name.localeCompare(b.name),
+        );
+    }, [adAccounts]);
 
     const filtered = useMemo(
         () =>
-            adAccounts.filter((a) =>
-                a.name.toLowerCase().includes(search.toLowerCase().trim()),
-            ),
-        [adAccounts, search],
+            adAccounts.filter((a) => {
+                const matchesName = a.name
+                    .toLowerCase()
+                    .includes(search.toLowerCase().trim());
+                const matchesOwner =
+                    ownerFilter === ''
+                        ? true
+                        : ownerFilter === 'unassigned'
+                          ? !a.owner
+                          : String(a.owner?.id) === ownerFilter;
+                return matchesName && matchesOwner;
+            }),
+        [adAccounts, search, ownerFilter],
     );
 
     const hasChanges = useMemo(() => {
@@ -124,15 +154,38 @@ export default function TeamAdAccounts({
                     </Can>
                 </PageHeader>
 
-                {/* Search */}
-                <div className="mb-3 flex items-center gap-2 rounded-lg border border-black/8 bg-white px-3 dark:border-white/8 dark:bg-zinc-900">
-                    <Search className="h-4 w-4 text-gray-400" />
-                    <input
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search ad accounts…"
-                        className="h-9 w-full bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200"
-                    />
+                {/* Filters */}
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="flex flex-1 items-center gap-2 rounded-lg border border-black/8 bg-white px-3 dark:border-white/8 dark:bg-zinc-900">
+                        <Search className="h-4 w-4 text-gray-400" />
+                        <input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search ad accounts…"
+                            className="h-9 w-full bg-transparent text-[13px] text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200"
+                        />
+                    </div>
+                    <Select
+                        value={ownerFilter || 'all'}
+                        onValueChange={(v) =>
+                            setOwnerFilter(v === 'all' ? '' : v)
+                        }
+                    >
+                        <SelectTrigger className="h-9 w-full font-mono text-[11px] sm:w-[220px]">
+                            <SelectValue placeholder="All owners" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All owners</SelectItem>
+                            <SelectItem value="unassigned">
+                                Unassigned
+                            </SelectItem>
+                            {ownerOptions.map((o) => (
+                                <SelectItem key={o.id} value={String(o.id)}>
+                                    {o.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 {/* List */}
