@@ -75,6 +75,7 @@ enum Permission: string
     // Gencys ERP
     case ViewDailySalesTracker = 'View Daily Sales Tracker';
     case ViewGencysInterns = 'View Gencys Interns';
+    case ViewGencysInternDailyRecords = 'View Gencys Intern Daily Records';
     case ViewUnitCode = 'View Unit Code';
     case CreateUnitCode = 'Create Unit Code';
     case EditUnitCode = 'Edit Unit Code';
@@ -213,6 +214,7 @@ enum Permission: string
 
             self::ViewDailySalesTracker,
             self::ViewGencysInterns,
+            self::ViewGencysInternDailyRecords,
             self::ViewUnitCode,
             self::CreateUnitCode,
             self::EditUnitCode,

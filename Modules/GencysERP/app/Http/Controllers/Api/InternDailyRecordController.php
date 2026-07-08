@@ -22,9 +22,20 @@ class InternDailyRecordController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        $workspaceId = $request->input('data.workspace_id');
-        $rawKey = $request->input('data.api_key');
-        $records = $request->input('data.records', []);
+        // n8n posts { data: {...} }; tolerate a top-level [ { data: {...} } ] wrapper too.
+        $data = $request->input('data');
+        if (! is_array($data)) {
+            $first = $request->all()[0] ?? null;
+            $data = is_array($first) ? ($first['data'] ?? []) : [];
+        }
+
+        $workspaceId = $data['workspace_id'] ?? null;
+        $rawKey = $data['api_key'] ?? null;
+
+        // One record per intern inline under `data`; also accept a `records` array.
+        $records = (isset($data['records']) && is_array($data['records']) && $data['records'] !== [])
+            ? $data['records']
+            : [$data];
 
         $apiKey = $rawKey ? WorkspaceApiKey::findByRawKey($rawKey) : null;
 
@@ -58,12 +69,14 @@ class InternDailyRecordController extends Controller
                 [
                     'workspace_id' => $workspace->id,
                     'gencys_intern_id' => $gencysInternId,
-                    'record_date' => $this->date($record['date'] ?? $record['record_date'] ?? null),
+                    // Fall back to today when n8n doesn't echo the record date.
+                    'record_date' => $this->date($record['date'] ?? $record['record_date'] ?? null)
+                        ?? now()->toDateString(),
                 ],
                 [
-                    'sales' => $this->decimalOrNull($record['sales'] ?? null),
+                    'sales' => $this->decimalOrNull($record['total_sales'] ?? $record['sales'] ?? null),
                     'roas' => $this->decimalOrNull($record['roas'] ?? null),
-                    'ad_spent' => $this->decimalOrNull($record['ad_spent'] ?? $record['adSpent'] ?? null),
+                    'ad_spent' => $this->decimalOrNull($record['ads_spent'] ?? $record['ad_spent'] ?? $record['adSpent'] ?? null),
                     'rts_rate' => $this->decimalOrNull($record['rts_rate'] ?? $record['rtsRate'] ?? null),
                     'rts_amount' => $this->decimalOrNull($record['rts_amount'] ?? $record['rtsAmount'] ?? null),
                 ],

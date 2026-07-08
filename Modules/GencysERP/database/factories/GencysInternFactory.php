@@ -18,9 +18,8 @@ class GencysInternFactory extends Factory
             'full_name' => $this->faker->name(),
             'company_name' => $this->faker->company(),
             'username' => $this->faker->unique()->userName(),
-            'contact_number_email' => $this->faker->boolean()
-                ? $this->faker->safeEmail()
-                : $this->faker->numerify('09#########'),
+            'contact_number' => $this->faker->numerify('09#########'),
+            'email' => $this->faker->safeEmail(),
         ];
     }
 }

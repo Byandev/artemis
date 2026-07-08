@@ -20,7 +20,8 @@ class GencysIntern extends Model
         'full_name',
         'company_name',
         'username',
-        'contact_number_email',
+        'contact_number',
+        'email',
     ];
 
     protected $casts = [

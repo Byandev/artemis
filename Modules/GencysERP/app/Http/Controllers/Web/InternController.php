@@ -27,7 +27,8 @@ class InternController extends Controller
         'full_name',
         'company_name',
         'username',
-        'contact_number_email',
+        'contact_number',
+        'email',
     ];
 
     public function index(Request $request, Workspace $workspace): Response
@@ -40,7 +41,7 @@ class InternController extends Controller
             ->allowedFilters([
                 AllowedFilter::callback('search', function (Builder $query, $value) {
                     $query->where(function (Builder $q) use ($value) {
-                        foreach (['full_name', 'company_name', 'username', 'contact_number_email'] as $column) {
+                        foreach (['full_name', 'company_name', 'username', 'contact_number', 'email'] as $column) {
                             $q->orWhere($column, 'like', "%{$value}%");
                         }
                     });
@@ -98,7 +99,7 @@ class InternController extends Controller
             'api_key' => $apiKey->reveal(),
             'erp_username' => $workspace->erp_username,
             'erp_password' => $workspace->erp_password,
-            'webhook_url' => 'https://stretchy-wanetta-unwinning.ngrok-free.dev/api/v1/public/gencys/interns',
+            'webhook_url' => "{$callbackBase}/api/v1/public/gencys/interns",
         ]);
 
         if (! $response->successful()) {

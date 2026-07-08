@@ -48,6 +48,7 @@ use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceCo
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\InternController as GencysInternController;
+use Modules\GencysERP\Http\Controllers\Web\InternDailyRecordController as GencysInternDailyRecordController;
 use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
@@ -431,6 +432,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
         Route::get('/interns', [GencysInternController::class, 'index'])->name('interns.index');
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');
+        Route::get('/intern-daily-records', [GencysInternDailyRecordController::class, 'index'])->name('intern-daily-records.index');
         Route::get('/unit-codes', [UnitCodeController::class, 'index'])->name('unit-codes.index');
         Route::post('/unit-codes/sync', [UnitCodeController::class, 'sync'])->name('unit-codes.sync');
         Route::post('/unit-codes', [UnitCodeController::class, 'store'])->name('unit-codes.store');

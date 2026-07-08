@@ -51,9 +51,10 @@ class InternController extends Controller
                     'full_name' => $this->str($intern['fullName'] ?? $intern['full_name'] ?? null),
                     'company_name' => $this->str($intern['companyName'] ?? $intern['company_name'] ?? null),
                     'username' => $this->str($intern['username'] ?? null),
-                    'contact_number_email' => $this->str(
-                        $intern['contactNumberEmail'] ?? $intern['contact_number_email'] ?? $intern['email'] ?? null
+                    'contact_number' => $this->str(
+                        $intern['contactNumber'] ?? $intern['contact_number'] ?? $intern['phone'] ?? null
                     ),
+                    'email' => $this->str($intern['email'] ?? null),
                 ],
             );
             $record->wasRecentlyCreated ? $created++ : $updated++;

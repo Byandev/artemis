@@ -371,6 +371,7 @@ export function AppSidebar() {
                       anyOf: [
                           PERMISSIONS.ViewDailySalesTracker,
                           PERMISSIONS.ViewGencysInterns,
+                          PERMISSIONS.ViewGencysInternDailyRecords,
                       ],
                       items: [
                           {
@@ -384,6 +385,13 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/gencys/interns`,
                               icon: Users,
                               permission: PERMISSIONS.ViewGencysInterns,
+                          },
+                          {
+                              title: 'Intern Daily Records',
+                              href: `/workspaces/${slug}/gencys/intern-daily-records`,
+                              icon: Activity,
+                              permission:
+                                  PERMISSIONS.ViewGencysInternDailyRecords,
                           },
                       ],
                   },

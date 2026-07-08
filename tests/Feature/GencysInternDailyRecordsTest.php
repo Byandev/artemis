@@ -117,6 +117,58 @@ test('re-syncing the same intern and day updates rather than duplicates', functi
         ->and((float) GencysInternDailyRecord::where('gencys_intern_id', $intern->id)->first()->sales)->toBe(250.0);
 });
 
+test('the callback accepts a single inline record (per-intern shape) with total_sales', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 3]);
+
+    // Exactly the shape n8n posts: fields inline under data, "total_sales" with
+    // a currency symbol/commas, no records array, no date.
+    $this->postJson('/api/v1/public/gencys/intern-daily-records', [
+        'data' => [
+            'workspace_id' => $workspace->id,
+            'api_key' => $raw,
+            'intern_id' => 3,
+            'total_sales' => '₱ 131,088.00',
+            'rts_amount' => 0,
+            'rts_rate' => 0,
+        ],
+    ])->assertOk()->assertJson(['saved' => 1, 'skipped' => 0]);
+
+    $record = GencysInternDailyRecord::where('gencys_intern_id', $intern->id)->first();
+    expect($record)->not->toBeNull()
+        ->and((float) $record->sales)->toBe(131088.0)
+        ->and((float) $record->rts_amount)->toBe(0.0)
+        ->and($record->record_date)->not->toBeNull();
+});
+
+test('the callback accepts the array wrapper and the ads_spent field', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 24]);
+
+    // The exact n8n shape: top-level array, "ads_spent" (with the s), currency strings.
+    $this->postJson('/api/v1/public/gencys/intern-daily-records', [[
+        'data' => [
+            'workspace_id' => $workspace->id,
+            'api_key' => $raw,
+            'intern_id' => 24,
+            'total_sales' => '₱ 25,502.00',
+            'ads_spent' => '6,087.04',
+            'roas' => '4.19',
+            'rts_amount' => 0,
+            'rts_rate' => 0,
+            'date' => '2026-07-07',
+        ],
+    ]])->assertOk()->assertJson(['saved' => 1]);
+
+    $record = GencysInternDailyRecord::where('gencys_intern_id', $intern->id)->first();
+    expect($record)->not->toBeNull()
+        ->and((float) $record->sales)->toBe(25502.0)
+        ->and((float) $record->ad_spent)->toBe(6087.04)
+        ->and((float) $record->roas)->toBe(4.19);
+});
+
 test('the callback rejects a bad api key', function () {
     $this->postJson('/api/v1/public/gencys/intern-daily-records', [
         'data' => ['workspace_id' => 1, 'api_key' => 'art_bad', 'records' => []],

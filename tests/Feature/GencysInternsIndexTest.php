@@ -133,7 +133,8 @@ test('the public callback upserts interns keyed on the gencys row id', function 
                     'fullName' => 'Juan Dela Cruz',
                     'companyName' => 'Acme',
                     'username' => 'juan.dc',
-                    'contactNumberEmail' => 'juan@acme.test',
+                    'contactNumber' => '09171234567',
+                    'email' => 'juan@acme.test',
                 ],
                 ['fullName' => 'No Row Id'], // skipped: no stable key
             ],
@@ -147,7 +148,8 @@ test('the public callback upserts interns keyed on the gencys row id', function 
     $intern = GencysIntern::where('workspace_id', $workspace->id)->where('intern_id', 12)->first();
     expect($intern)->not->toBeNull()
         ->and($intern->full_name)->toBe('Juan Dela Cruz')
-        ->and($intern->contact_number_email)->toBe('juan@acme.test');
+        ->and($intern->contact_number)->toBe('09171234567')
+        ->and($intern->email)->toBe('juan@acme.test');
 
     // Re-syncing the same row id updates rather than duplicates.
     $payload['data']['interns'] = [[
@@ -155,7 +157,8 @@ test('the public callback upserts interns keyed on the gencys row id', function 
         'fullName' => 'Juan Dela Cruz',
         'companyName' => 'Globex',
         'username' => 'juan.dc',
-        'contactNumberEmail' => '09171234567',
+        'contactNumber' => '09171234567',
+        'email' => 'juan@acme.test',
     ]];
 
     $this->postJson('/api/v1/public/gencys/interns', $payload)

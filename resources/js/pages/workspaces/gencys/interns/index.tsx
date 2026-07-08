@@ -27,7 +27,8 @@ interface Intern {
     full_name: string | null;
     company_name: string | null;
     username: string | null;
-    contact_number_email: string | null;
+    contact_number: string | null;
+    email: string | null;
 }
 
 interface Props {
@@ -183,17 +184,26 @@ export default function GencysInternsIndex({
                 ),
             },
             {
-                accessorKey: 'contact_number_email',
+                accessorKey: 'contact_number',
                 enableSorting: true,
                 header: ({ column }) => (
-                    <SortableHeader
-                        column={column}
-                        title="Contact Number / Email"
-                    />
+                    <SortableHeader column={column} title="Contact Number" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[12px] text-gray-600 dark:text-gray-400">
+                        {row.original.contact_number ?? '—'}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'email',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Email" />
                 ),
                 cell: ({ row }) => (
                     <span className="text-[12px] text-gray-600 dark:text-gray-400">
-                        {row.original.contact_number_email ?? '—'}
+                        {row.original.email ?? '—'}
                     </span>
                 ),
             },
