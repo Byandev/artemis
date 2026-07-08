@@ -55,6 +55,7 @@ use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\Inventory\Http\Controllers\UnitCodeController;
+use Modules\MetaAds\Http\Controllers\AdAccountOwnerController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsCalendarController;
@@ -304,6 +305,9 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/workspaces/{workspace}/integrations/meta/ad-accounts/{adAccount}/toggle-sync', AdAccountToggleSyncController::class)
         ->middleware('can:Manage Meta Ads Accounts,workspace')
         ->name('workspaces.metaads.ad-accounts.toggle-sync');
+    Route::patch('/workspaces/{workspace}/integrations/meta/ad-accounts/{adAccount}/owner', AdAccountOwnerController::class)
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.ad-accounts.owner');
 
     // Meta Ads saved reports (SuperAds-style report builder)
     Route::get('/workspaces/{workspace}/integrations/meta/reports', [ReportController::class, 'index'])
