@@ -12,6 +12,27 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.17.0',
+        date: '2026-07-09',
+        sections: [
+            {
+                title: 'Products — Assigned to Shops, Not Pages',
+                items: [
+                    'Products are now linked to shops instead of individual pages — pick the shops that sell a product right on the product form, and everything a product rolls up (sales, RTS, ROAS, ad spend) follows through the shop',
+                    'Your existing product-to-page links were carried over to their shops automatically, so product analytics keep working with no manual re-linking',
+                ],
+            },
+            {
+                title: 'Inventory & ERP — Team Visibility',
+                items: [
+                    'Inventory Items, Transaction Logs, Purchase Orders, Unit Codes, and ERP Sync Health now respect team visibility — you see only the records for the teams you belong to, the same way Pages and Shops already do',
+                    'Owners, managers, and anyone with “View All Workspace Data” still see everything, and the “viewing as team” switcher narrows these pages too',
+                    'Items not yet linked to a product stay visible only to full-access users, keeping each team’s view focused on its own stock',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.16.0',
         date: '2026-07-09',
         sections: [
