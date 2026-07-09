@@ -1,6 +1,9 @@
+import { Product } from '@/types/models/Product';
+
 export interface Shop {
     id: number;
     workspace_id: number;
+    product_id?: number | null;
     avatar_url: string;
     name: string;
     pos_token?: string | null;
@@ -9,4 +12,5 @@ export interface Shop {
     updated_at: string;
     pending_required_checklists_count?: number;
     teams?: { id: number; name: string }[];
+    product?: Product | null;
 }

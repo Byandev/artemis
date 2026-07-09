@@ -122,13 +122,13 @@ const ParcelUpdateNotification = ({
                 },
             },
             {
-                id: 'order.page.product.name',
-                accessorKey: 'order.page.product.name',
+                id: 'order.page.shop.product.name',
+                accessorKey: 'order.page.shop.product.name',
                 header: ({ column }) => (
                     <SortableHeader column={column} title={'Product'} />
                 ),
                 cell: ({ row }) => {
-                    return row.original.order?.page?.product?.name || '-';
+                    return row.original.order?.page?.shop?.product?.name || '-';
                 },
             },
             {

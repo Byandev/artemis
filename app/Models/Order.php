@@ -72,11 +72,11 @@ class Order extends Model
             $query->whereIn('pancake_orders.shop_id', is_array($shopIds) ? $shopIds : explode(',', $shopIds));
         }
 
-        // Filter by product IDs (via pages)
+        // Filter by product IDs (via the order's shop, which now holds the product link)
         if ($productIds) {
             $productIdsArray = is_array($productIds) ? $productIds : explode(',', $productIds);
-            $query->whereHas('page', function ($q) use ($productIdsArray) {
-                $q->whereIn('product_id', $productIdsArray);
+            $query->whereIn('pancake_orders.shop_id', function ($q) use ($productIdsArray) {
+                $q->from('shops')->select('id')->whereIn('product_id', $productIdsArray);
             });
         }
 
