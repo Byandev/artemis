@@ -41,6 +41,12 @@ export const PERMISSIONS = {
     DeleteTeams: 'Delete Teams',
     ManageSchedule: 'Manage Schedule',
 
+    // Departments
+    ViewDepartments: 'View Departments',
+    CreateDepartments: 'Create Departments',
+    EditDepartments: 'Edit Departments',
+    DeleteDepartments: 'Delete Departments',
+
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
     ViewRtsAiChat: 'View RTS AI Chat',

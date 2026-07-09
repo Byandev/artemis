@@ -46,6 +46,12 @@ enum Permission: string
     case DeleteTeams = 'Delete Teams';
     case ManageSchedule = 'Manage Schedule';
 
+    // Departments
+    case ViewDepartments = 'View Departments';
+    case CreateDepartments = 'Create Departments';
+    case EditDepartments = 'Edit Departments';
+    case DeleteDepartments = 'Delete Departments';
+
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
     case ViewRtsAiChat = 'View RTS AI Chat';
@@ -187,6 +193,11 @@ enum Permission: string
             self::EditTeams,
             self::DeleteTeams,
             self::ManageSchedule => 'Teams',
+
+            self::ViewDepartments,
+            self::CreateDepartments,
+            self::EditDepartments,
+            self::DeleteDepartments => 'Departments',
 
             self::ViewRtsAnalytics,
             self::ViewRtsAiChat,
