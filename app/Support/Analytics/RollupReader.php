@@ -318,7 +318,12 @@ class RollupReader
                 $sub->from('pages')
                     ->select('id')
                     ->where('workspace_id', $workspaceId)
-                    ->whereIn('product_id', $productIds);
+                    ->whereIn('shop_id', function ($sub2) use ($workspaceId, $productIds) {
+                        $sub2->from('shops')
+                            ->select('id')
+                            ->where('workspace_id', $workspaceId)
+                            ->whereIn('product_id', $productIds);
+                    });
             });
         }
 

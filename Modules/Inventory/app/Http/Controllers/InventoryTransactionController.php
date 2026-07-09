@@ -17,9 +17,14 @@ class InventoryTransactionController extends Controller
 {
     use AuthorizesRequests;
 
-    private function buildQuery(Workspace $workspace): QueryBuilder
+    private function buildQuery(Request $request, Workspace $workspace): QueryBuilder
     {
-        return QueryBuilder::for(InventoryTransaction::where('inventory_transactions.workspace_id', $workspace->id))
+        return QueryBuilder::for(
+            InventoryTransaction::where('inventory_transactions.workspace_id', $workspace->id)
+                // Team scoping via the transaction's inventory item (no-op for
+                // unrestricted users); rows whose item has no team are hidden.
+                ->visibleTo($request->user(), $workspace)
+        )
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
@@ -64,10 +69,11 @@ class InventoryTransactionController extends Controller
      * Aggregated query: one row per inventory item per date, summing the flow columns
      * across that item's transactions on each day (respecting the search/date filters).
      */
-    private function buildSummaryQuery(Workspace $workspace): QueryBuilder
+    private function buildSummaryQuery(Request $request, Workspace $workspace): QueryBuilder
     {
         $aggregated = InventoryTransaction::query()
             ->where('inventory_transactions.workspace_id', $workspace->id)
+            ->visibleTo($request->user(), $workspace)
             ->select('inventory_item_id', 'date')
             ->selectRaw('SUM(po_qty_in) as po_qty_in')
             ->selectRaw('SUM(po_qty_out) as po_qty_out')
@@ -115,8 +121,8 @@ class InventoryTransactionController extends Controller
         $summarize = $request->boolean('summarize');
 
         $query = $summarize
-            ? $this->buildSummaryQuery($workspace)
-            : $this->buildQuery($workspace);
+            ? $this->buildSummaryQuery($request, $workspace)
+            : $this->buildQuery($request, $workspace);
 
         $inventory = $query
             ->with(['inventoryItem.product'])

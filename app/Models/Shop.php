@@ -29,6 +29,15 @@ class Shop extends Model
         return $this->belongsTo(Workspace::class);
     }
 
+    /**
+     * The product this shop sells. Assignment lives at the shop level (one
+     * product per shop) — nullable while a shop is unassigned.
+     */
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
     public function pages(): HasMany
     {
         return $this->hasMany(Page::class);

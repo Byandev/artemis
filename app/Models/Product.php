@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -37,9 +38,23 @@ class Product extends Model implements HasMedia
         return $this->belongsTo(User::class, 'owner_id');
     }
 
-    public function pages(): HasMany
+    /**
+     * Shops assigned to this product. This is the authoritative product link
+     * (shops.product_id) — a product can be sold by many shops.
+     */
+    public function shops(): HasMany
     {
-        return $this->hasMany(Page::class);
+        return $this->hasMany(Shop::class);
+    }
+
+    /**
+     * Pages reachable through this product's shops. Kept as a convenience so
+     * team-visibility scoping (whereHas('pages', ...)) and product.pages lookups
+     * keep working now that the product link moved from the page to the shop.
+     */
+    public function pages(): HasManyThrough
+    {
+        return $this->hasManyThrough(Page::class, Shop::class, 'product_id', 'shop_id', 'id', 'id');
     }
 
     public function image(): MorphOne
@@ -59,7 +74,8 @@ class Product extends Model implements HasMedia
             $q->from('ad_records')
                 ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
                 ->join('pages', 'pages.id', '=', 'ads.page_id')
-                ->whereColumn('pages.product_id', 'products.id')
+                ->join('shops', 'shops.id', '=', 'pages.shop_id')
+                ->whereColumn('shops.product_id', 'products.id')
                 ->selectRaw('COALESCE(SUM(ad_records.sales), 0)');
         }, 'advertising_sales');
     }
@@ -70,7 +86,8 @@ class Product extends Model implements HasMedia
             $q->from('ad_records')
                 ->join('ads', 'ads.id', '=', 'ad_records.ad_id')
                 ->join('pages', 'pages.id', '=', 'ads.page_id')
-                ->whereColumn('pages.product_id', 'products.id')
+                ->join('shops', 'shops.id', '=', 'pages.shop_id')
+                ->whereColumn('shops.product_id', 'products.id')
                 ->when($start_date, function ($q1) use ($start_date) {
                     $q1->whereDate('ad_records.date', '>=', $start_date);
                 })
@@ -86,7 +103,8 @@ class Product extends Model implements HasMedia
         return $query->selectSub(function ($q) use ($start_date, $end_date) {
             $q->from('orders')
                 ->join('pages', 'pages.id', '=', 'orders.page_id')
-                ->whereColumn('pages.product_id', 'products.id')
+                ->join('shops', 'shops.id', '=', 'pages.shop_id')
+                ->whereColumn('shops.product_id', 'products.id')
                 ->when($start_date, function ($q1) use ($start_date) {
                     $q1->whereDate('orders.confirmed_at', '>=', $start_date);
                 })
@@ -120,7 +138,8 @@ class Product extends Model implements HasMedia
         return $query->selectSub(function ($q) use ($start_date, $end_date) {
             $q->from('orders')
                 ->join('pages', 'pages.id', '=', 'orders.page_id')
-                ->whereColumn('pages.product_id', 'products.id')
+                ->join('shops', 'shops.id', '=', 'pages.shop_id')
+                ->whereColumn('shops.product_id', 'products.id')
                 ->whereNotNull('orders.confirmed_at')
                 ->whereNotNull('orders.delivered_at')
                 ->when($start_date, function ($q1) use ($start_date) {
@@ -138,7 +157,8 @@ class Product extends Model implements HasMedia
         return $query->selectSub(function ($q) use ($start_date, $end_date) {
             $q->from('orders')
                 ->join('pages', 'pages.id', '=', 'orders.page_id')
-                ->whereColumn('pages.product_id', 'products.id')
+                ->join('shops', 'shops.id', '=', 'pages.shop_id')
+                ->whereColumn('shops.product_id', 'products.id')
                 ->whereNotNull('orders.confirmed_at')
                 ->whereNotNull('orders.returning_at')
                 ->when($start_date, function ($q1) use ($start_date) {
