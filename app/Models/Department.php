@@ -17,7 +17,6 @@ class Department extends Model
         'name',
         'code',
         'description',
-        'manager_id',
         'is_active',
     ];
 
@@ -31,14 +30,6 @@ class Department extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
-    }
-
-    /**
-     * The user who heads the department (optional).
-     */
-    public function manager(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'manager_id');
     }
 
     /**

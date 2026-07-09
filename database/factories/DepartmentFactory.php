@@ -20,7 +20,6 @@ class DepartmentFactory extends Factory
             'name' => fake()->unique()->words(2, true),
             'code' => strtoupper(fake()->unique()->lexify('???')),
             'description' => fake()->optional()->sentence(),
-            'manager_id' => null,
             'is_active' => true,
         ];
     }

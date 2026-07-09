@@ -39,11 +39,6 @@ class UpdateDepartmentRequest extends FormRequest
             ],
             'code' => ['nullable', 'string', 'max:50'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'manager_id' => [
-                'nullable',
-                Rule::exists('workspace_user', 'user_id')
-                    ->where(fn ($query) => $query->where('workspace_id', $workspace->id)),
-            ],
             'is_active' => ['boolean'],
         ];
     }
@@ -55,7 +50,6 @@ class UpdateDepartmentRequest extends FormRequest
     {
         return [
             'name.unique' => 'A department with this name already exists in this workspace.',
-            'manager_id.exists' => 'The selected manager is not a member of this workspace.',
         ];
     }
 }

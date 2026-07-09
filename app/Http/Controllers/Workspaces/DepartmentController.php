@@ -24,7 +24,6 @@ class DepartmentController extends Controller
 
         $departments = QueryBuilder::for(
             Department::ofWorkspace($workspace)
-                ->with('manager:id,name,email')
                 ->withCount('users')
         )
             ->allowedFilters([
@@ -36,14 +35,9 @@ class DepartmentController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        $workspaceMembers = $workspace->users()
-            ->select('users.id', 'users.name', 'users.email')
-            ->get();
-
         return Inertia::render('workspaces/departments/index', [
             'workspace' => $workspace,
             'departments' => $departments,
-            'workspaceMembers' => $workspaceMembers,
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),

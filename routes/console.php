@@ -5,7 +5,7 @@ Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
 // Gencys ERP
-Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-    history')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('16:00')->withoutOverlapping();
 
 Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('10:00')->withoutOverlapping();

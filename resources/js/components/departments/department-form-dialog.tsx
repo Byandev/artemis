@@ -12,24 +12,16 @@ import { useForm } from '@inertiajs/react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
-interface Member {
-    id: number;
-    name: string;
-    email: string;
-}
-
 export interface Department {
     id: number;
     name: string;
     code?: string | null;
     description?: string | null;
-    manager_id?: number | null;
     is_active: boolean;
 }
 
 interface DepartmentFormDialogProps {
     workspace: Workspace;
-    workspaceMembers: Member[];
     open: boolean;
     onOpenChange: (open: boolean) => void;
     department?: Department | null;
@@ -43,7 +35,6 @@ const labelClass =
 
 export function DepartmentFormDialog({
     workspace,
-    workspaceMembers,
     open,
     onOpenChange,
     department,
@@ -54,7 +45,6 @@ export function DepartmentFormDialog({
         name: '',
         code: '',
         description: '',
-        manager_id: '' as number | '',
         is_active: true,
     });
 
@@ -64,7 +54,6 @@ export function DepartmentFormDialog({
                 name: department.name,
                 code: department.code ?? '',
                 description: department.description ?? '',
-                manager_id: department.manager_id ?? '',
                 is_active: department.is_active,
             });
         } else {
@@ -113,11 +102,13 @@ export function DepartmentFormDialog({
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            {isEditing ? 'Edit Department' : 'Create Department'}
+                            {isEditing
+                                ? 'Edit Department'
+                                : 'Create Department'}
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
                             {isEditing
-                                ? 'Update department details and its manager'
+                                ? 'Update department details'
                                 : 'Create a new department for this workspace'}
                         </DialogDescription>
                     </DialogHeader>
@@ -135,7 +126,9 @@ export function DepartmentFormDialog({
                                 autoFocus
                                 placeholder="e.g. Customer Support"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 className={inputClass}
                             />
                             {errors.name && (
@@ -152,41 +145,14 @@ export function DepartmentFormDialog({
                                 type="text"
                                 placeholder="e.g. CS"
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
+                                onChange={(e) =>
+                                    setData('code', e.target.value)
+                                }
                                 className={inputClass}
                             />
                             {errors.code && (
                                 <p className="font-mono text-[11px] text-red-500">
                                     {errors.code}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Manager */}
-                        <div className="space-y-1.5">
-                            <label className={labelClass}>Manager</label>
-                            <select
-                                value={data.manager_id}
-                                onChange={(e) =>
-                                    setData(
-                                        'manager_id',
-                                        e.target.value
-                                            ? Number(e.target.value)
-                                            : '',
-                                    )
-                                }
-                                className={inputClass}
-                            >
-                                <option value="">No manager</option>
-                                {workspaceMembers.map((member) => (
-                                    <option key={member.id} value={member.id}>
-                                        {member.name}
-                                    </option>
-                                ))}
-                            </select>
-                            {errors.manager_id && (
-                                <p className="font-mono text-[11px] text-red-500">
-                                    {errors.manager_id}
                                 </p>
                             )}
                         </div>

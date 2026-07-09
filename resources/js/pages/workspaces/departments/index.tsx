@@ -16,7 +16,7 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData, User } from '@/types';
+import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
@@ -25,7 +25,6 @@ import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface DepartmentRow extends Department {
-    manager?: Pick<User, 'id' | 'name' | 'email'> | null;
     users_count: number;
     created_at: string;
 }
@@ -33,7 +32,6 @@ interface DepartmentRow extends Department {
 interface Props {
     workspace: Workspace;
     departments: PaginatedData<DepartmentRow>;
-    workspaceMembers: Pick<User, 'id' | 'name' | 'email'>[];
     query?: {
         sort?: string | null;
         per_page?: number | string;
@@ -45,7 +43,6 @@ interface Props {
 export default function DepartmentsIndex({
     workspace,
     departments,
-    workspaceMembers,
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -120,20 +117,6 @@ export default function DepartmentsIndex({
                 ) : (
                     <span className="text-[11px] text-gray-300 dark:text-gray-600">
                         —
-                    </span>
-                ),
-        },
-        {
-            id: 'manager',
-            header: 'Manager',
-            cell: ({ row }) =>
-                row.original.manager ? (
-                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                        {row.original.manager.name}
-                    </span>
-                ) : (
-                    <span className="text-[11px] text-gray-300 dark:text-gray-600">
-                        Unassigned
                     </span>
                 ),
         },
@@ -287,7 +270,6 @@ export default function DepartmentsIndex({
                         }}
                         department={editing}
                         workspace={workspace}
-                        workspaceMembers={workspaceMembers}
                     />
                 )}
 
