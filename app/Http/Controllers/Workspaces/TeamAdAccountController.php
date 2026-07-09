@@ -25,16 +25,22 @@ class TeamAdAccountController extends Controller
         // with the Facebook user(s) who connected them.
         $accounts = AdAccount::forWorkspace($workspace)
             ->where('active_sync', true)
-            ->with(['metaUsers' => function ($q) use ($workspace) {
-                $q->whereHas('workspaces', fn ($w) => $w->where('workspaces.id', $workspace->id))
-                    ->select('meta_ads_users.id', 'meta_ads_users.name');
-            }])
+            ->with([
+                'metaUsers' => function ($q) use ($workspace) {
+                    $q->whereHas('workspaces', fn ($w) => $w->where('workspaces.id', $workspace->id))
+                        ->select('meta_ads_users.id', 'meta_ads_users.name');
+                },
+                'owner:id,name',
+            ])
             ->orderBy('name')
-            ->get(['id', 'name'])
+            ->get(['id', 'name', 'owner_id'])
             ->map(fn ($account) => [
                 'id' => (string) $account->id,
                 'name' => $account->name,
                 'connected_by' => $account->metaUsers->pluck('name')->filter()->implode(', '),
+                'owner' => $account->owner
+                    ? ['id' => $account->owner->id, 'name' => $account->owner->name]
+                    : null,
             ]);
 
         // { "<adAccountId>": "view"|"manage" } for already-linked active accounts.

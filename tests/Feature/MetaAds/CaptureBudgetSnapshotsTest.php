@@ -48,6 +48,102 @@ it('writes the page daily budget record from the summed daily budget', function 
         ->and((float) $record->budget)->toBe(500.00);
 });
 
+it('captures the campaign daily budget when the ad set carries none (CBO)', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509182]);
+
+    // CBO: the budget lives on the campaign and the ad set's own budget is null,
+    // but the ad set still tags the page it promotes.
+    $account = AdAccount::firstOrCreate(['id' => 555], ['name' => 'Acct']);
+    $campaign = Campaign::create([
+        'id' => 900900901,
+        'meta_ads_account_id' => $account->id,
+        'name' => 'CBO',
+        'status' => 'ACTIVE',
+        'effective_status' => 'ACTIVE',
+        'daily_budget' => 750.00,
+    ]);
+    AdSet::create([
+        'id' => 900900902,
+        'meta_ads_account_id' => $account->id,
+        'meta_ads_campaign_id' => $campaign->id,
+        'meta_page_id' => $page->id,
+        'name' => 'AS',
+        'daily_budget' => null,
+        'lifetime_budget' => null,
+        'status' => 'ACTIVE',
+        'effective_status' => 'ACTIVE',
+    ]);
+
+    captureBudgets('2026-06-13');
+
+    $record = PageDailyBudgetRecord::where('page_id', $page->id)->where('date', '2026-06-13')->first();
+
+    expect($record)->not->toBeNull()
+        ->and((float) $record->budget)->toBe(750.00);
+});
+
+it('sums ad-set and campaign daily budgets on the same page', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509200]);
+
+    $account = AdAccount::firstOrCreate(['id' => 555], ['name' => 'Acct']);
+
+    // ABO campaign + ad set carrying its own budget.
+    $aboCampaign = Campaign::create(['id' => 900900910, 'meta_ads_account_id' => $account->id, 'name' => 'ABO', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE']);
+    AdSet::create([
+        'id' => 900900911,
+        'meta_ads_account_id' => $account->id,
+        'meta_ads_campaign_id' => $aboCampaign->id,
+        'meta_page_id' => $page->id,
+        'name' => 'ABO AS',
+        'daily_budget' => 200.00,
+        'status' => 'ACTIVE',
+        'effective_status' => 'ACTIVE',
+    ]);
+
+    // CBO campaign on the same page, budget on the campaign.
+    $cboCampaign = Campaign::create(['id' => 900900912, 'meta_ads_account_id' => $account->id, 'name' => 'CBO', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'daily_budget' => 300.00]);
+    AdSet::create([
+        'id' => 900900913,
+        'meta_ads_account_id' => $account->id,
+        'meta_ads_campaign_id' => $cboCampaign->id,
+        'meta_page_id' => $page->id,
+        'name' => 'CBO AS',
+        'daily_budget' => null,
+        'status' => 'ACTIVE',
+        'effective_status' => 'ACTIVE',
+    ]);
+
+    captureBudgets('2026-06-13');
+
+    $record = PageDailyBudgetRecord::where('page_id', $page->id)->where('date', '2026-06-13')->first();
+
+    expect((float) $record->budget)->toBe(500.00);
+});
+
+it('ignores a campaign budget whose ad sets are all paused', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509300]);
+
+    $account = AdAccount::firstOrCreate(['id' => 555], ['name' => 'Acct']);
+    $campaign = Campaign::create(['id' => 900900920, 'meta_ads_account_id' => $account->id, 'name' => 'CBO', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'daily_budget' => 750.00]);
+    AdSet::create([
+        'id' => 900900921,
+        'meta_ads_account_id' => $account->id,
+        'meta_ads_campaign_id' => $campaign->id,
+        'meta_page_id' => $page->id,
+        'name' => 'AS',
+        'daily_budget' => null,
+        'status' => 'PAUSED',
+        'effective_status' => 'PAUSED',
+    ]);
+
+    captureBudgets('2026-06-13');
+
+    expect(PageDailyBudgetRecord::where('page_id', $page->id)->count())->toBe(0);
+});
+
 it('writes a zero page daily budget record for lifetime-only budgets', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     $page = Page::factory()->forWorkspace($workspace)->create(['id' => 745492068656489]);
