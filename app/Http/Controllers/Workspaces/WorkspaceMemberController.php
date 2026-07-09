@@ -6,12 +6,14 @@ use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\WorkspaceInvitation\InviterNameSort;
 use App\Http\Sorts\WorkspaceMember\RoleNameSort;
+use App\Models\Department;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -33,13 +35,16 @@ class WorkspaceMemberController extends Controller
             // --- CHANGED: Using leftJoin instead of join to ensure Owners (who might not be in the pivot) still show up and sort correctly ---
             ->leftJoin('workspace_user', 'users.id', '=', 'workspace_user.user_id')
             ->leftJoin('roles', 'workspace_user.role_id', '=', 'roles.id')
+            ->leftJoin('departments', 'workspace_user.department_id', '=', 'departments.id')
             ->where('workspace_user.workspace_id', $workspace->id)
             ->select(
                 'users.*',
                 'workspace_user.role as pivot_legacy_role',
                 'workspace_user.role_id as pivot_role_id',
+                'workspace_user.department_id as pivot_department_id',
                 'workspace_user.created_at as pivot_created_at',
                 'roles.name as pivot_role_name',
+                'departments.name as pivot_department_name',
             )
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -54,6 +59,7 @@ class WorkspaceMemberController extends Controller
                 AllowedSort::field('name', 'users.name'),
                 AllowedSort::field('email', 'users.email'),
                 AllowedSort::custom('role', new RoleNameSort),
+                AllowedSort::field('department', 'departments.name'),
                 'pivot_created_at',
             ])
             ->defaultSort('-pivot_created_at')
@@ -69,9 +75,18 @@ class WorkspaceMemberController extends Controller
                 $user->pivot = (object) [
                     'role_id' => $user->pivot_role_id,
                     'role' => $role,
+                    'department_id' => $user->pivot_department_id,
+                    'department' => $user->pivot_department_name,
                     'created_at' => $user->pivot_created_at,
                 ];
-                unset($user->pivot_legacy_role, $user->pivot_role_id, $user->pivot_role_name, $user->pivot_created_at);
+                unset(
+                    $user->pivot_legacy_role,
+                    $user->pivot_role_id,
+                    $user->pivot_role_name,
+                    $user->pivot_department_id,
+                    $user->pivot_department_name,
+                    $user->pivot_created_at,
+                );
 
                 return $user;
             });
@@ -102,6 +117,10 @@ class WorkspaceMemberController extends Controller
             'pendingInvitations' => $pendingInvitations,
             'isAdmin' => $request->user()->isAdminOf($workspace),
             'roles' => Role::where('workspace_id', $workspace->id)->get(),
+            'departments' => Department::ofWorkspace($workspace)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']),
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'invitation_sort' => $request->input('invitation_sort'),
@@ -156,6 +175,60 @@ class WorkspaceMemberController extends Controller
         }
 
         return back()->with('success', 'Member role updated successfully.');
+    }
+
+    public function assignDepartment(Request $request, Workspace $workspace, User $user)
+    {
+        $this->authorize(Permission::EditMembers->value, $workspace);
+
+        if (! $user->isMemberOf($workspace)) {
+            return back()->withErrors(['error' => 'This user is not a member of the workspace.']);
+        }
+
+        $validated = $request->validate([
+            'department_id' => $this->departmentRule($workspace),
+        ]);
+
+        $workspace->assignMemberDepartment($user, $validated['department_id'] ?? null);
+
+        return back()->with('success', 'Department updated successfully.');
+    }
+
+    public function bulkAssignDepartment(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::EditMembers->value, $workspace);
+
+        $validated = $request->validate([
+            'user_ids' => ['required', 'array', 'min:1'],
+            'user_ids.*' => [
+                Rule::exists('workspace_user', 'user_id')
+                    ->where(fn ($query) => $query->where('workspace_id', $workspace->id)),
+            ],
+            'department_id' => $this->departmentRule($workspace),
+        ]);
+
+        $count = $workspace->assignMembersDepartment(
+            $validated['user_ids'],
+            $validated['department_id'] ?? null,
+        );
+
+        $label = $validated['department_id'] ? 'assigned' : 'cleared';
+
+        return back()->with('success', "Department {$label} for {$count} member(s).");
+    }
+
+    /**
+     * A nullable department must belong to the current workspace.
+     *
+     * @return array<int, mixed>
+     */
+    private function departmentRule(Workspace $workspace): array
+    {
+        return [
+            'nullable',
+            Rule::exists('departments', 'id')
+                ->where(fn ($query) => $query->where('workspace_id', $workspace->id)),
+        ];
     }
 
     public function destroy(Request $request, Workspace $workspace, User $user)

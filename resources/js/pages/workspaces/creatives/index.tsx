@@ -192,29 +192,19 @@ export default function CreativesIndex({
     const navigate = useCallback(
         (params: Record<string, string | number | null | undefined>) => {
             const q = queryRef.current;
+            // Carry over EVERY active filter (not a hardcoded subset) so nothing —
+            // e.g. final_status — is dropped when paginating, sorting or searching.
+            const filters: Record<string, string | undefined> = {};
+            Object.entries(q.filter ?? {}).forEach(([key, value]) => {
+                filters[`filter[${key}]`] = value || undefined;
+            });
             router.get(
                 baseUrl,
                 {
                     sort: q.sort,
                     page: 1,
                     per_page: q.per_page,
-                    'filter[search]': q.filter?.search || undefined,
-                    'filter[format]': q.filter?.format || undefined,
-                    'filter[ads_status]': q.filter?.ads_status || undefined,
-                    'filter[creator_id]': q.filter?.creator_id || undefined,
-                    'filter[product_id]': q.filter?.product_id || undefined,
-                    'filter[creative_date_from]':
-                        q.filter?.creative_date_from || undefined,
-                    'filter[creative_date_to]':
-                        q.filter?.creative_date_to || undefined,
-                    'filter[created_at_from]':
-                        q.filter?.created_at_from || undefined,
-                    'filter[created_at_to]':
-                        q.filter?.created_at_to || undefined,
-                    'filter[approved_at_from]':
-                        q.filter?.approved_at_from || undefined,
-                    'filter[approved_at_to]':
-                        q.filter?.approved_at_to || undefined,
+                    ...filters,
                     ...params,
                 },
                 { preserveState: true, replace: true, preserveScroll: true },

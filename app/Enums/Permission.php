@@ -46,6 +46,12 @@ enum Permission: string
     case DeleteTeams = 'Delete Teams';
     case ManageSchedule = 'Manage Schedule';
 
+    // Departments
+    case ViewDepartments = 'View Departments';
+    case CreateDepartments = 'Create Departments';
+    case EditDepartments = 'Edit Departments';
+    case DeleteDepartments = 'Delete Departments';
+
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
     case ViewRtsAiChat = 'View RTS AI Chat';
@@ -75,6 +81,8 @@ enum Permission: string
 
     // Gencys ERP
     case ViewDailySalesTracker = 'View Daily Sales Tracker';
+    case ViewGencysInterns = 'View Gencys Interns';
+    case ViewGencysInternDailyRecords = 'View Gencys Intern Daily Records';
     case ViewUnitCode = 'View Unit Code';
     case CreateUnitCode = 'Create Unit Code';
     case EditUnitCode = 'Edit Unit Code';
@@ -188,6 +196,11 @@ enum Permission: string
             self::DeleteTeams,
             self::ManageSchedule => 'Teams',
 
+            self::ViewDepartments,
+            self::CreateDepartments,
+            self::EditDepartments,
+            self::DeleteDepartments => 'Departments',
+
             self::ViewRtsAnalytics,
             self::ViewRtsAiChat,
             self::ViewRmoManagement,
@@ -213,6 +226,8 @@ enum Permission: string
             self::DeletePurchasedOrders => 'Inventory',
 
             self::ViewDailySalesTracker,
+            self::ViewGencysInterns,
+            self::ViewGencysInternDailyRecords,
             self::ViewUnitCode,
             self::CreateUnitCode,
             self::EditUnitCode,
