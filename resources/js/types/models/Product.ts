@@ -1,3 +1,5 @@
+import { Shop } from '@/types/models/Shop';
+
 export interface Product {
     id: number;
     workspace_id: number;
@@ -14,6 +16,7 @@ export interface Product {
         id: number;
         name: string;
     };
+    shops?: Shop[];
     advertising_sales?: number;
     sales?: number;
     ad_spent?: number;

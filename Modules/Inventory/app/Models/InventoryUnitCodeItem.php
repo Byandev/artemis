@@ -35,4 +35,15 @@ class InventoryUnitCodeItem extends Model
     {
         return $this->belongsTo(InventoryUnitCode::class, 'unit_code', 'unit_code');
     }
+
+    /**
+     * The inventory item this line refers to, matched by SKU
+     * (item_code = inventory_items.sku). Used to reach the item's product/shop/team
+     * for visibility scoping. Not a hard foreign key — codes without a matching SKU
+     * simply resolve to none.
+     */
+    public function inventoryItem(): BelongsTo
+    {
+        return $this->belongsTo(InventoryItem::class, 'item_code', 'sku');
+    }
 }

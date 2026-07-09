@@ -34,8 +34,8 @@ class SyncInventoryAverage extends Command
             // 3-day average: sum of item quantities on confirmed orders in the last 3 full days
             $totalQty = DB::table('pancake_order_items')
                 ->join('pancake_orders', 'pancake_orders.id', '=', 'pancake_order_items.order_id')
-                ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                ->where('pages.product_id', $item->product_id)
+                ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
+                ->where('shops.product_id', $item->product_id)
                 ->whereNotNull('pancake_orders.confirmed_at')
                 ->whereBetween('pancake_orders.confirmed_at', [$start, $end])
                 ->sum('pancake_order_items.quantity');
@@ -45,8 +45,8 @@ class SyncInventoryAverage extends Command
             // Unfulfilled count: sum of item quantities on orders with status in 1, 8, 9
             $unfulfilled = DB::table('pancake_order_items')
                 ->join('pancake_orders', 'pancake_orders.id', '=', 'pancake_order_items.order_id')
-                ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                ->where('pages.product_id', $item->product_id)
+                ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
+                ->where('shops.product_id', $item->product_id)
                 ->whereIn('pancake_orders.status', [1, 8, 9])
                 ->sum('pancake_order_items.quantity');
 

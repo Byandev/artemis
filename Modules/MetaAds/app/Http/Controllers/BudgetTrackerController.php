@@ -38,7 +38,8 @@ class BudgetTrackerController extends Controller
                 fn ($q) => $q->whereHas('page', fn ($p) => $p->visibleTo($user, $workspace)),
             )
             ->whereIn('date', [$today, $yesterday])
-            ->with(['page' => fn ($q) => $q->withTrashed()->select('id', 'name', 'product_id', 'owner_id')])
+            ->with(['page' => fn ($q) => $q->withTrashed()->select('id', 'name', 'shop_id', 'owner_id')
+                ->with(['shop' => fn ($s) => $s->select('id', 'product_id')])])
             ->get(['id', 'page_id', 'date', 'budget']);
 
         // Resolve labels once for the product and user groupings.
@@ -58,9 +59,9 @@ class BudgetTrackerController extends Controller
             $records,
             $today,
             $yesterday,
-            fn ($rec) => $rec->page?->product_id,
-            fn ($rec) => $rec->page?->product_id
-                ? ($productNames[$rec->page->product_id] ?? 'Unknown product')
+            fn ($rec) => $rec->page?->shop?->product_id,
+            fn ($rec) => $rec->page?->shop?->product_id
+                ? ($productNames[$rec->page->shop->product_id] ?? 'Unknown product')
                 : 'Unassigned',
         );
 

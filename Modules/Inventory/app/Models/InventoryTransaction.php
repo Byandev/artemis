@@ -2,13 +2,14 @@
 
 namespace Modules\Inventory\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InventoryTransaction extends Model
 {
-    use HasFactory;
+    use HasFactory, ScopesToVisibleTeams;
 
     protected $table = 'inventory_transactions';
 
@@ -29,6 +30,12 @@ class InventoryTransaction extends Model
         'remaining_qty',
         'inventory_remaining_stock',
     ];
+
+    /** Team visibility flows through the transaction's inventory item. */
+    protected function visibilityTeamRelation(): string
+    {
+        return 'inventoryItem.product.shops.teams';
+    }
 
     public function inventoryItem(): BelongsTo
     {

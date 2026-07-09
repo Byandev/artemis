@@ -165,7 +165,10 @@ final class RtsRate
 
         if ($productIds) {
             $query->whereIn(self::ROLLUP_TABLE.'.page_id', function ($sub) use ($workspaceId, $productIds) {
-                $sub->from('pages')->select('id')->where('workspace_id', $workspaceId)->whereIn('product_id', $productIds);
+                $sub->from('pages')->select('id')->where('workspace_id', $workspaceId)
+                    ->whereIn('shop_id', function ($sub2) use ($workspaceId, $productIds) {
+                        $sub2->from('shops')->select('id')->where('workspace_id', $workspaceId)->whereIn('product_id', $productIds);
+                    });
             });
         }
 

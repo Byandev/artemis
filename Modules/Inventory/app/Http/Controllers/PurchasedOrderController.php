@@ -18,9 +18,14 @@ class PurchasedOrderController extends Controller
 {
     use AuthorizesRequests;
 
-    private function buildQuery(Workspace $workspace): QueryBuilder
+    private function buildQuery(Request $request, Workspace $workspace): QueryBuilder
     {
-        return QueryBuilder::for(PurchasedOrder::where('workspace_id', $workspace->id))
+        return QueryBuilder::for(
+            // Team scoping: an order is visible if any of its line items reaches
+            // the user's team (no-op for unrestricted users).
+            PurchasedOrder::where('workspace_id', $workspace->id)
+                ->visibleTo($request->user(), $workspace)
+        )
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
@@ -56,12 +61,12 @@ class PurchasedOrderController extends Controller
     {
         $this->authorize('View Purchased Orders', $workspace);
 
-        $orders = $this->buildQuery($workspace)
+        $orders = $this->buildQuery($request, $workspace)
             ->with(['items.inventoryItem.product', 'items.deliveries'])
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        $totals = $this->buildQuery($workspace)
+        $totals = $this->buildQuery($request, $workspace)
             ->selectRaw('COALESCE(SUM(delivery_fee), 0) as total_delivery_fee')
             ->selectRaw('COALESCE(SUM(total_amount), 0) as total_amount')
             ->selectRaw('COALESCE(SUM(total_amount - delivery_fee), 0) as total_cogs')
@@ -89,7 +94,7 @@ class PurchasedOrderController extends Controller
 
         $filename = 'purchased-orders-'.now()->format('Y-m-d-His').'.xlsx';
 
-        return Excel::download(new PurchasedOrderExport($this->buildQuery($workspace)), $filename);
+        return Excel::download(new PurchasedOrderExport($this->buildQuery($request, $workspace)), $filename);
     }
 
     public function create(Workspace $workspace)
