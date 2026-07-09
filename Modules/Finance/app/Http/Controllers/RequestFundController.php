@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\RequestFundRequest;
-use Modules\Finance\Models\RequestFund;
+use Modules\Finance\Models\FundRequest;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -26,7 +26,7 @@ class RequestFundController extends Controller
         }
     }
 
-    protected function ensureOwns(Workspace $workspace, RequestFund $requestFund): void
+    protected function ensureOwns(Workspace $workspace, FundRequest $requestFund): void
     {
         if ($requestFund->workspace_id !== $workspace->id) {
             abort(404);
@@ -39,7 +39,7 @@ class RequestFundController extends Controller
         $this->authorize(Permission::ViewFinanceRequestFunds->value, $workspace);
 
         $requestFunds = QueryBuilder::for(
-            RequestFund::where('workspace_id', $workspace->id)
+            FundRequest::where('workspace_id', $workspace->id)
                 ->with([
                     'requester:id,name',
                     'chargeToUser:id,name',
@@ -72,7 +72,7 @@ class RequestFundController extends Controller
             'workspace' => $workspace,
             'requestFunds' => $requestFunds,
             'users' => $workspace->users()->get(['users.id', 'users.name']),
-            'statuses' => RequestFund::STATUSES,
+            'statuses' => FundRequest::STATUSES,
             'canApproveStatus' => $request->user()->can(Permission::ApproveFinanceRequestFunds->value, $workspace),
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
@@ -88,7 +88,7 @@ class RequestFundController extends Controller
 
         // New requests always start pending; the reference number is generated
         // here (never supplied by the client) and approval happens via updateStatus.
-        RequestFund::create([
+        FundRequest::create([
             ...$request->validated(),
             'workspace_id' => $workspace->id,
             'reference_no' => $this->nextReferenceNo($workspace),
@@ -100,7 +100,7 @@ class RequestFundController extends Controller
             ->with('success', 'Fund request created.');
     }
 
-    public function update(RequestFundRequest $request, Workspace $workspace, RequestFund $requestFund)
+    public function update(RequestFundRequest $request, Workspace $workspace, FundRequest $requestFund)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::EditFinanceRequestFunds->value, $workspace);
@@ -113,7 +113,7 @@ class RequestFundController extends Controller
             ->with('success', 'Fund request updated.');
     }
 
-    public function destroy(Request $request, Workspace $workspace, RequestFund $requestFund)
+    public function destroy(Request $request, Workspace $workspace, FundRequest $requestFund)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::DeleteFinanceRequestFunds->value, $workspace);
@@ -130,19 +130,19 @@ class RequestFundController extends Controller
      * that status changes are separated from ordinary edits. The approver is
      * stamped when moving into an approved/released state and cleared otherwise.
      */
-    public function updateStatus(Request $request, Workspace $workspace, RequestFund $requestFund)
+    public function updateStatus(Request $request, Workspace $workspace, FundRequest $requestFund)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ApproveFinanceRequestFunds->value, $workspace);
         $this->ensureOwns($workspace, $requestFund);
 
         $validated = $request->validate([
-            'status' => ['required', Rule::in(RequestFund::STATUSES)],
+            'status' => ['required', Rule::in(FundRequest::STATUSES)],
         ]);
 
         $requestFund->update([
             'status' => $validated['status'],
-            'approved_by' => in_array($validated['status'], RequestFund::APPROVED_STATUSES, true)
+            'approved_by' => in_array($validated['status'], FundRequest::APPROVED_STATUSES, true)
                 ? ($requestFund->approved_by ?? $request->user()->id)
                 : null,
         ]);
@@ -155,7 +155,7 @@ class RequestFundController extends Controller
      */
     protected function nextReferenceNo(Workspace $workspace): string
     {
-        $count = RequestFund::where('workspace_id', $workspace->id)->count();
+        $count = FundRequest::where('workspace_id', $workspace->id)->count();
 
         return 'RF-'.str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
     }

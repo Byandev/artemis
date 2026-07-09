@@ -7,7 +7,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class RequestFund extends Model
+class FundRequest extends Model
 {
     protected $table = 'finance_request_funds';
 
