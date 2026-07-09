@@ -2,13 +2,13 @@
 
 namespace Modules\Inventory\Console\Commands;
 
+use App\Models\Workspace;
 use App\Services\DiscordNotifier;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Modules\Inventory\Console\Commands\Concerns\FormatsInventoryReports;
-use Modules\Inventory\Models\InventoryNotificationSetting;
-use Modules\Inventory\Models\PurchasedOrderItemDelivery;
+use Modules\Inventory\Models\PurchasedOrder;
 
 class ReportDeliveriesToDiscordCommand extends Command
 {
@@ -26,60 +26,35 @@ class ReportDeliveriesToDiscordCommand extends Command
         $force = (bool) $this->option('force');
         $nowHHMM = now()->format('H:i');
 
-        // Deliveries recorded on the date, with everything needed to group by
-        // workspace → purchase order and name each line item.
-        $deliveries = PurchasedOrderItemDelivery::query()
-            ->whereDate('delivery_date', $date)
-            ->with([
-                'item.purchasedOrder.workspace:id,name',
-                'item.inventoryItem.product:id,name',
-            ])
-            ->get()
-            ->filter(fn ($delivery) => $delivery->item?->purchasedOrder?->workspace)
-            ->filter(function ($delivery) {
-                $expected = $delivery->item->purchasedOrder->expected_delivery_date;
+        $workspaces = $this->workspacesDueNow($force, $nowHHMM);
 
-                return $expected && $delivery->delivery_date->startOfDay()->eq($expected->startOfDay());
-            })
-            ->values();
-
-        if ($deliveries->isEmpty()) {
-            $this->info("No on-time deliveries recorded on {$date} — nothing to send.");
+        if ($workspaces->isEmpty()) {
+            $this->info($force
+                ? 'No workspace has the deliveries report enabled with a webhook to post to.'
+                : "No workspace is due a deliveries report at {$nowHHMM}.");
 
             return self::SUCCESS;
         }
 
-        $byWorkspace = $deliveries->groupBy(fn ($d) => $d->item->purchasedOrder->workspace->id);
-
-        $sentCount = 0;
+        $ordersByWorkspace = $this->ordersDeliveredOn($date, $workspaces->keys()->all());
 
         $prettyDate = Carbon::parse($date)->format('F j, Y');
+        $sentCount = 0;
 
-        foreach ($byWorkspace as $workspaceId => $workspaceDeliveries) {
-            $workspace = $workspaceDeliveries->first()->item->purchasedOrder->workspace;
-            $setting = InventoryNotificationSetting::forWorkspace((int) $workspaceId);
+        foreach ($workspaces as $workspaceId => $workspace) {
+            $orders = $ordersByWorkspace->get($workspaceId, new Collection);
 
-            if (! $setting->deliveries_enabled) {
-                continue;
-            }
-
-            if (! $force && $setting->deliveries_send_at !== $nowHHMM) {
-                continue;
-            }
-
-            $webhookUrl = $this->webhookFor($setting->deliveries_webhook_url);
-
-            if (empty($webhookUrl)) {
-                $this->warn("No Discord webhook for workspace {$workspace->name} — skipped.");
+            if ($orders->isEmpty()) {
+                $this->line("No deliveries on {$date} for {$workspace->name} — skipped.");
 
                 continue;
             }
 
             $sent = $discord->send('', [
                 'title' => "{$prettyDate} Deliveries",
-                'description' => $this->buildBody($workspaceDeliveries),
+                'description' => $this->buildBody($orders),
                 'color' => 0x2ECC71,
-            ], $webhookUrl);
+            ], $workspace->inventoryNotificationSetting->deliveries_webhook_url);
 
             if ($sent) {
                 $sentCount++;
@@ -93,15 +68,71 @@ class ReportDeliveriesToDiscordCommand extends Command
         return self::SUCCESS;
     }
 
-    private function buildBody(Collection $deliveries): string
+    /**
+     * Workspaces that opted into the delivery report: enabled, with their own
+     * webhook to post to, and due at the current hour unless --force. Keyed by
+     * workspace id. A workspace with no settings row has not opted in.
+     *
+     * @return Collection<int, Workspace>
+     */
+    private function workspacesDueNow(bool $force, string $nowHHMM): Collection
     {
-        $lines = $deliveries->map(function ($delivery) {
-            $ref = $this->purchaseOrderRef($delivery->item->purchasedOrder);
-            $name = $this->inventoryItemName($delivery->item->inventoryItem);
+        return Workspace::query()
+            ->whereHas('inventoryNotificationSetting', function ($query) use ($force, $nowHHMM) {
+                $query->where('deliveries_enabled', true)
+                    ->whereNotNull('deliveries_webhook_url')
+                    ->where('deliveries_webhook_url', '!=', '')
+                    ->unless($force, fn ($q) => $q->where('deliveries_send_at', $nowHHMM));
+            })
+            ->with('inventoryNotificationSetting:id,workspace_id,deliveries_webhook_url')
+            ->get(['id', 'name'])
+            ->keyBy('id');
+    }
 
-            return "- {$ref}: {$delivery->qty} {$name}";
-        })->implode("\n");
+    /**
+     * Purchase orders carrying at least one delivery recorded on the date, keyed
+     * by workspace. Items and deliveries are constrained to the same date so the
+     * body only walks the rows it prints. An order is included whether or not it
+     * has an expected delivery date.
+     *
+     * @param  list<int>  $workspaceIds
+     * @return Collection<int, Collection<int, PurchasedOrder>>
+     */
+    private function ordersDeliveredOn(string $date, array $workspaceIds): Collection
+    {
+        $onDate = fn ($query) => $query->whereDate('delivery_date', $date);
 
-        return $this->clampDescription($lines);
+        return PurchasedOrder::query()
+            ->whereIn('workspace_id', $workspaceIds)
+            ->whereHas('items.deliveries', $onDate)
+            ->with([
+                'items' => fn ($query) => $query->whereHas('deliveries', $onDate),
+                'items.deliveries' => $onDate,
+                'items.inventoryItem.product:id,name',
+            ])
+            ->orderBy('id')
+            ->get()
+            ->groupBy('workspace_id');
+    }
+
+    /**
+     * @param  Collection<int, PurchasedOrder>  $orders
+     */
+    private function buildBody(Collection $orders): string
+    {
+        $blocks = $orders->map(function (PurchasedOrder $order) {
+            $lines = $order->items->flatMap(
+                fn ($item) => $item->deliveries->map(function ($delivery) use ($item, $order) {
+                    $name = $this->inventoryItemName($item->inventoryItem);
+                    $note = $this->deliveryTimelinessNote($delivery->delivery_date, $order->expected_delivery_date);
+
+                    return "- {$delivery->qty} {$name} ({$note})";
+                })
+            );
+
+            return '**'.$this->purchaseOrderLabel($order)."**\n".$lines->implode("\n");
+        });
+
+        return $this->clampDescription($blocks->implode("\n\n"));
     }
 }
