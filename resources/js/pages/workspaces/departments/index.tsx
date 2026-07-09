@@ -26,6 +26,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 interface DepartmentRow extends Department {
     manager?: Pick<User, 'id' | 'name' | 'email'> | null;
+    users_count: number;
     created_at: string;
 }
 
@@ -135,6 +136,19 @@ export default function DepartmentsIndex({
                         Unassigned
                     </span>
                 ),
+        },
+        {
+            accessorKey: 'users_count',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Members" />
+            ),
+            cell: ({ row }) => (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
+                    {row.original.users_count}{' '}
+                    {row.original.users_count === 1 ? 'member' : 'members'}
+                </span>
+            ),
         },
         {
             accessorKey: 'is_active',

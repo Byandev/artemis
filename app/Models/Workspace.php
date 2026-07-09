@@ -310,6 +310,30 @@ class Workspace extends Model
         ]);
     }
 
+    /**
+     * Assign (or clear, when null) a member's department within this workspace.
+     */
+    public function assignMemberDepartment(User $user, ?int $departmentId): int
+    {
+        return $this->users()->updateExistingPivot($user->id, [
+            'department_id' => $departmentId,
+        ]);
+    }
+
+    /**
+     * Bulk assign (or clear, when null) the department for many members at once.
+     *
+     * @param  array<int>  $userIds
+     */
+    public function assignMembersDepartment(array $userIds, ?int $departmentId): int
+    {
+        return $this->users()
+            ->newPivotStatement()
+            ->where('workspace_id', $this->id)
+            ->whereIn('user_id', $userIds)
+            ->update(['department_id' => $departmentId]);
+    }
+
     public function parcelJourneyNotificationTemplates(): HasMany
     {
         return $this->hasMany(ParcelJourneyNotificationTemplate::class);

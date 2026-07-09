@@ -25,12 +25,13 @@ class DepartmentController extends Controller
         $departments = QueryBuilder::for(
             Department::ofWorkspace($workspace)
                 ->with('manager:id,name,email')
+                ->withCount('users')
         )
             ->allowedFilters([
                 AllowedFilter::partial('search', 'name'),
                 AllowedFilter::exact('is_active'),
             ])
-            ->allowedSorts(['name', 'code', 'is_active', 'created_at'])
+            ->allowedSorts(['name', 'code', 'is_active', 'created_at', 'users_count'])
             ->defaultSort('-created_at')
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
