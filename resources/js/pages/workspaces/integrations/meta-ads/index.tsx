@@ -971,6 +971,8 @@ export default function MetaAdsManager({
                                     moment(dates[0]).format('YYYY-MM-DD'),
                                     moment(dates[1]).format('YYYY-MM-DD'),
                                 );
+                            } else if (dates.length === 0) {
+                                onDateRange(dateRange.since, dateRange.until);
                             }
                         }}
                         defaultDate={

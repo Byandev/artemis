@@ -125,8 +125,7 @@ export default function Analytics({ workspace, records, query }: Props) {
                 ),
                 // Fall back to the pancake_user_id when the user has no synced
                 // name (e.g. assignees not yet pulled into pancake_users).
-                cell: ({ row }) =>
-                    row.original.name,
+                cell: ({ row }) => row.original.name,
                 size: 220,
             },
             {
@@ -254,8 +253,17 @@ export default function Analytics({ workspace, records, query }: Props) {
                         onChange={(dates) => {
                             if (dates.length === 2) {
                                 navigate({
-                                    from: format(dates[0] as Date, 'yyyy-MM-dd'),
+                                    from: format(
+                                        dates[0] as Date,
+                                        'yyyy-MM-dd',
+                                    ),
                                     to: format(dates[1] as Date, 'yyyy-MM-dd'),
+                                    page: 1,
+                                });
+                            } else if (dates.length === 0) {
+                                navigate({
+                                    from: undefined,
+                                    to: undefined,
                                     page: 1,
                                 });
                             }

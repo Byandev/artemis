@@ -24,7 +24,7 @@ class CheckParcelUpdateNotification implements ShouldQueue
      */
     public function handle(): void
     {
-        $response = Http::get('https://api.myinfotxt.com/v2/status.php', [
+        $response = Http::get(rtrim((string) config('services.infotxt.base_url'), '/').'/status.php', [
             'smsid' => $this->parcelJourneyNotification->sms_id,
         ]);
 

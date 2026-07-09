@@ -30,6 +30,7 @@ import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import {
     ChevronDown,
+    HelpCircle,
     MessageSquare,
     MoreHorizontal,
     Package,
@@ -580,6 +581,20 @@ export default function CreativesIndex({
                     title="Creative Tracker"
                     description="Track creatives from ideation through review and launch"
                 >
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <a
+                                href="https://drive.google.com/file/d/18ov38v52BFzI64dt3iyzxBlULJ9ZkBta/view?usp=sharing"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="Watch the setup tutorial"
+                                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-all hover:bg-stone-50 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-zinc-800 dark:hover:text-gray-100"
+                            >
+                                <HelpCircle className="h-5 w-5" />
+                            </a>
+                        </TooltipTrigger>
+                        <TooltipContent>Watch the setup tutorial</TooltipContent>
+                    </Tooltip>
                     {canCreate && (
                         <button
                             onClick={() => router.visit(`${baseUrl}/create`)}

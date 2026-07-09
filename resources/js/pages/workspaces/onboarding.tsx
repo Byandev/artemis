@@ -261,7 +261,7 @@ export default function Onboarding({
 
                 <div className="flex flex-col gap-1.5">
                     <a
-                        href="https://drive.google.com/file/d/17uzVBqY4N3VIu8lL2WRzTQXE6cUQjPBg/view?usp=sharing"
+                        href="https://drive.google.com/file/d/1R3BvJAuD7G22Pln_jCnpgy889FIHhXcS/view?usp=sharing"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group flex items-center gap-2.5 rounded-[8px] px-2 py-1.5 text-[12px] text-gray-700 transition-colors hover:bg-white dark:text-gray-300 dark:hover:bg-zinc-900"

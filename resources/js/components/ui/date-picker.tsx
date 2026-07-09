@@ -4,7 +4,7 @@ import "flatpickr/dist/flatpickr.css";
 import { Label } from "@/components/ui/label";
 import Hook = flatpickr.Options.Hook;
 import DateOption = flatpickr.Options.DateOption;
-import { CalendarDays, ArrowRight } from 'lucide-react';
+import { CalendarDays, ArrowRight, X } from 'lucide-react';
 
 type PropsType = {
     id: string;
@@ -14,13 +14,15 @@ type PropsType = {
     label?: string;
     placeholder?: string;
     fullWidth?: boolean;
+    /** Show a clear (×) button when a date is selected. Defaults to true. */
+    clearable?: boolean;
     compact?: boolean;
 };
 
 const fmt     = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtYear = (d: Date) => d.getFullYear().toString();
 
-export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact }: PropsType) {
+export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact, clearable = true }: PropsType) {
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -143,6 +145,35 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
                         )
                     )}
                 </div>
+
+                {/* Clear button — only when a date is selected. Clears flatpickr
+                    WITHOUT its own change event, then notifies the consumer's
+                    onChange with empty values so the actual filter resets (not just
+                    the visual display). */}
+                {clearable && hasStart && (
+                    <button
+                        type="button"
+                        aria-label="Clear date"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const inst = fpRef.current;
+                            inst?.clear(false);
+                            setSelectedDates([]);
+                            const empty: Date[] = [];
+                            if (typeof onChange === 'function') {
+                                onChange(empty, '', inst as flatpickr.Instance);
+                            } else if (Array.isArray(onChange)) {
+                                onChange.forEach((fn) =>
+                                    fn(empty, '', inst as flatpickr.Instance),
+                                );
+                            }
+                        }}
+                        className="relative z-10 pointer-events-auto ml-auto mr-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/10 dark:hover:text-gray-300 transition-colors"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
+                )}
             </div>
         </div>
     );

@@ -11,10 +11,10 @@ import {
     TransactionFormDialog,
 } from '@/components/finance/transaction-form-dialog';
 import {
-    TRANSACTION_TYPES,
-    TRANSACTION_TYPE_LABEL,
-    TRANSACTION_TYPE_STYLE,
-    TransactionType,
+    buildTransactionTypeOptions,
+    TransactionTypeItem,
+    transactionTypeLabel,
+    transactionTypeStyle,
 } from '@/components/finance/transaction-type';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
@@ -72,6 +72,7 @@ interface Props {
     workspace: Workspace;
     transactions: PaginatedData<Row>;
     accounts: AccountOpt[];
+    transactionTypes: TransactionTypeItem[];
     totals: Totals;
     query?: {
         sort?: string | null;
@@ -79,7 +80,7 @@ interface Props {
             search?: string;
             type?: 'in' | 'out';
             account_id?: string | number;
-            transaction_type?: string | string[];
+            transaction_type_id?: string | string[];
             sub_category?: string | string[];
             missing_type?: string | boolean;
             expenses_missing_sub?: string | boolean;
@@ -95,16 +96,32 @@ const fmt = (v: number | string) =>
         maximumFractionDigits: 2,
     });
 
+const STATUS_STYLE: Record<string, string> = {
+    pending:
+        'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+    approved: 'bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400',
+    posted: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
+};
+
 export default function TransactionsIndex({
     workspace,
     transactions,
     accounts,
+    transactionTypes,
     totals,
     query,
 }: Props) {
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
         [query?.sort],
+    );
+    const typeOptions = useMemo(
+        () => buildTransactionTypeOptions(transactionTypes),
+        [transactionTypes],
+    );
+    const typeNameById = useMemo(
+        () => new Map(transactionTypes.map((t) => [t.id, t.name])),
+        [transactionTypes],
     );
     const [createOpen, setCreateOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
@@ -120,10 +137,10 @@ export default function TransactionsIndex({
             : '',
     );
     const [txnTypeFilter, setTxnTypeFilter] = useState<string[]>(
-        query?.filter?.transaction_type
-            ? Array.isArray(query.filter.transaction_type)
-                ? query.filter.transaction_type
-                : [query.filter.transaction_type]
+        query?.filter?.transaction_type_id
+            ? Array.isArray(query.filter.transaction_type_id)
+                ? query.filter.transaction_type_id
+                : [query.filter.transaction_type_id]
             : [],
     );
     const [subCategoryFilter, setSubCategoryFilter] = useState<string[]>(
@@ -152,6 +169,11 @@ export default function TransactionsIndex({
         [],
     );
     const handleDateChange = (dates: Date[]) => {
+        if (dates.length === 0) {
+            setDateFrom(undefined);
+            setDateTo(undefined);
+            return;
+        }
         if (dates.length !== 2) return;
         const from = moment(dates[0]).format('YYYY-MM-DD');
         const to = moment(dates[1]).format('YYYY-MM-DD');
@@ -160,7 +182,7 @@ export default function TransactionsIndex({
         setDateTo(to);
     };
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-    const [bulkType, setBulkType] = useState<TransactionType | ''>('');
+    const [bulkType, setBulkType] = useState<string>('');
     const [bulkSubCategory, setBulkSubCategory] = useState<SubCategory | ''>(
         '',
     );
@@ -189,7 +211,7 @@ export default function TransactionsIndex({
         if (typeFilter) params.set('filter[type]', typeFilter);
         if (accountFilter) params.set('filter[account_id]', accountFilter);
         txnTypeFilter.forEach((v) =>
-            params.append('filter[transaction_type][]', v),
+            params.append('filter[transaction_type_id][]', v),
         );
         subCategoryFilter.forEach((v) =>
             params.append('filter[sub_category][]', v),
@@ -217,7 +239,7 @@ export default function TransactionsIndex({
             `${baseUrl}/bulk-update-type`,
             {
                 ids: selectedIds.map(Number),
-                transaction_type: bulkType === '' ? null : bulkType,
+                transaction_type_id: bulkType === '' ? null : bulkType,
             },
             {
                 preserveScroll: true,
@@ -272,7 +294,9 @@ export default function TransactionsIndex({
                         'filter[search]': s || undefined,
                         'filter[type]': t || undefined,
                         'filter[account_id]': a || undefined,
-                        'filter[transaction_type]': tt.length ? tt : undefined,
+                        'filter[transaction_type_id]': tt.length
+                            ? tt
+                            : undefined,
                         'filter[sub_category]': sc.length ? sc : undefined,
                         'filter[missing_type]': mt ? 1 : undefined,
                         'filter[expenses_missing_sub]': ems ? 1 : undefined,
@@ -365,7 +389,7 @@ export default function TransactionsIndex({
             accessorKey: 'date',
             enableSorting: true,
             header: ({ column }) => (
-                <SortableHeader column={column} title="Date" />
+                <SortableHeader column={column} title="Posted Date" />
             ),
             cell: ({ row }) => (
                 <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
@@ -377,7 +401,7 @@ export default function TransactionsIndex({
             id: 'account',
             header: () => (
                 <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase">
-                    Account
+                    Accounts
                 </div>
             ),
             cell: ({ row }) => (
@@ -391,7 +415,7 @@ export default function TransactionsIndex({
             enableSorting: false,
             header: () => (
                 <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase">
-                    Description
+                    Transaction
                 </div>
             ),
             cell: ({ row }) => (
@@ -415,26 +439,70 @@ export default function TransactionsIndex({
             ),
         },
         {
-            accessorKey: 'transaction_type',
+            id: 'requested_by',
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                    Requested By
+                </div>
+            ),
+            cell: ({ row }) => (
+                <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                    {row.original.requested_by || '—'}
+                </span>
+            ),
+        },
+        {
+            id: 'approved_by',
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                    Approved By
+                </div>
+            ),
+            cell: ({ row }) => (
+                <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                    {row.original.approved_by || '—'}
+                </span>
+            ),
+        },
+        {
+            id: 'department',
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                    Department
+                </div>
+            ),
+            cell: ({ row }) => (
+                <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                    {row.original.department || '—'}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'transaction_type_id',
             enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader
                     column={column}
-                    title="Txn Type"
+                    title="Type of Expense"
                     className="justify-center"
                 />
             ),
             cell: ({ row }) => {
-                if (!row.original.transaction_type)
+                // Prefer the dynamic type (via FK); fall back to the legacy
+                // enum value for un-linked rows.
+                const typeName =
+                    row.original.transaction_type_id != null
+                        ? (typeNameById.get(row.original.transaction_type_id) ??
+                          null)
+                        : row.original.transaction_type;
+                if (!typeName)
                     return (
                         <div className="text-center font-mono text-[10px] text-gray-300">
                             —
                         </div>
                     );
-                const key = row.original.transaction_type as TransactionType;
-                const s =
-                    TRANSACTION_TYPE_STYLE[key] ?? TRANSACTION_TYPE_STYLE.funds;
-                const label = TRANSACTION_TYPE_LABEL[key] ?? key;
+                const s = transactionTypeStyle(typeName);
+                const label = transactionTypeLabel(typeName);
                 return (
                     <div className="text-center">
                         <span
@@ -502,7 +570,7 @@ export default function TransactionsIndex({
             id: 'running_balance',
             header: () => (
                 <div className="text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase">
-                    Balance
+                    Running Balance
                 </div>
             ),
             cell: ({ row }) => {
@@ -515,6 +583,72 @@ export default function TransactionsIndex({
                     </div>
                 );
             },
+        },
+        {
+            id: 'reference_no',
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                    Reference No.
+                </div>
+            ),
+            cell: ({ row }) => (
+                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                    {row.original.reference_no || '—'}
+                </span>
+            ),
+        },
+        {
+            id: 'charge_to',
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                    Charge To
+                </div>
+            ),
+            cell: ({ row }) => (
+                <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                    {row.original.charge_to || '—'}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'status',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Status"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => {
+                const status = row.original.status ?? 'posted';
+                const s = STATUS_STYLE[status] ?? STATUS_STYLE.posted;
+                return (
+                    <div className="text-center">
+                        <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase ${s}`}
+                        >
+                            {status}
+                        </span>
+                    </div>
+                );
+            },
+        },
+        {
+            id: 'remarks',
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase">
+                    Remarks
+                </div>
+            ),
+            cell: ({ row }) => (
+                <span
+                    className="block max-w-[220px] truncate text-[12px] text-gray-600 dark:text-gray-400"
+                    title={row.original.notes ?? ''}
+                >
+                    {row.original.notes || '—'}
+                </span>
+            ),
         },
         ...(canUseTransactionActions
             ? [
@@ -551,12 +685,35 @@ export default function TransactionsIndex({
                                                       description:
                                                           row.original
                                                               .description,
+                                                      requested_by:
+                                                          row.original
+                                                              .requested_by,
+                                                      approved_by:
+                                                          row.original
+                                                              .approved_by,
+                                                      department:
+                                                          row.original
+                                                              .department,
+                                                      charge_to:
+                                                          row.original
+                                                              .charge_to,
                                                       type: row.original.type,
                                                       transaction_type:
                                                           row.original
                                                               .transaction_type,
+                                                      transaction_type_id:
+                                                          row.original
+                                                              .transaction_type_id,
                                                       amount: row.original
                                                           .amount,
+                                                      running_balance:
+                                                          row.original
+                                                              .running_balance,
+                                                      reference_no:
+                                                          row.original
+                                                              .reference_no,
+                                                      status: row.original
+                                                          .status,
                                                       position:
                                                           row.original.position,
                                                       sub_category:
@@ -657,7 +814,7 @@ export default function TransactionsIndex({
                         ))}
                     </select>
                     <MultiSelect
-                        options={TRANSACTION_TYPES}
+                        options={typeOptions}
                         selected={txnTypeFilter}
                         onChange={setTxnTypeFilter}
                         placeholder="All txn types"
@@ -730,13 +887,11 @@ export default function TransactionsIndex({
                         </span>
                         <select
                             value={bulkType}
-                            onChange={(e) =>
-                                setBulkType(e.target.value as typeof bulkType)
-                            }
+                            onChange={(e) => setBulkType(e.target.value)}
                             className="h-8 rounded-lg border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
                         >
                             <option value="">— clear —</option>
-                            {TRANSACTION_TYPES.map((t) => (
+                            {typeOptions.map((t) => (
                                 <option key={t.value} value={t.value}>
                                     {t.label}
                                 </option>
@@ -804,7 +959,7 @@ export default function TransactionsIndex({
                                     'filter[type]': typeFilter || undefined,
                                     'filter[account_id]':
                                         accountFilter || undefined,
-                                    'filter[transaction_type]':
+                                    'filter[transaction_type_id]':
                                         txnTypeFilter.length
                                             ? txnTypeFilter
                                             : undefined,
@@ -852,6 +1007,7 @@ export default function TransactionsIndex({
                         }}
                         transaction={editing}
                         accounts={accounts}
+                        transactionTypes={transactionTypes}
                         workspaceSlug={workspace.slug}
                     />
                 )}

@@ -26,8 +26,11 @@ export default function Edit({ workspace, page, users }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         name: page.name ?? '',
         botcake_token: page.botcake_token ?? '',
+        sms_provider: page.sms_provider ?? 'infotxt',
         infotxt_token: page.infotxt_token ?? '',
         infotxt_user_id: page.infotxt_user_id ?? '',
+        sendgate_api_key: page.sendgate_api_key ?? '',
+        sendgate_sim_id: page.sendgate_sim_id ?? '',
         pancake_token: page.pancake_token ?? '',
         parcel_journey_custom_field_id:
             page.parcel_journey_custom_field_id?.toString() ?? '',
@@ -170,40 +173,6 @@ export default function Edit({ workspace, page, users }: Props) {
                                 Integration Tokens
                             </p>
                             <div className="grid gap-5 sm:grid-cols-2">
-                                <div className={`${fieldClass} sm:col-span-2`}>
-                                    <label className={labelClass}>
-                                        Pancake Token
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className={inputClass}
-                                        placeholder="Enter Pancake token"
-                                        value={data.pancake_token}
-                                        onChange={(e) =>
-                                            setData(
-                                                'pancake_token',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    <ValidateTokenButton
-                                        url={`/workspaces/${workspace.slug}/pages/validate-pancake-token`}
-                                        payload={{
-                                            page_id: page.id.toString(),
-                                            token: data.pancake_token,
-                                        }}
-                                        disabledReason={
-                                            !data.pancake_token
-                                                ? 'Enter a token first'
-                                                : undefined
-                                        }
-                                    />
-                                    {errors.pancake_token && (
-                                        <p className={errorClass}>
-                                            {errors.pancake_token}
-                                        </p>
-                                    )}
-                                </div>
                                 <div className={`${fieldClass} sm:col-span-2`}>
                                     <label className={labelClass}>
                                         Botcake Token
@@ -351,71 +320,223 @@ export default function Edit({ workspace, page, users }: Props) {
                                             <p className="mb-4 font-mono text-[10px] font-semibold tracking-widest text-gray-400 uppercase dark:text-gray-500">
                                                 SMS
                                             </p>
-                                            <div className="grid gap-5 sm:grid-cols-2">
+                                            <div className="space-y-5">
                                                 <div className={fieldClass}>
                                                     <label
                                                         className={labelClass}
                                                     >
-                                                        Infotxt Token
+                                                        Provider
                                                     </label>
-                                                    <input
-                                                        type="text"
-                                                        className={inputClass}
-                                                        placeholder="Enter Infotxt token"
+                                                    <select
                                                         value={
-                                                            data.infotxt_token
+                                                            data.sms_provider
                                                         }
                                                         onChange={(e) =>
                                                             setData(
-                                                                'infotxt_token',
-                                                                e.target.value,
+                                                                'sms_provider',
+                                                                e.target
+                                                                    .value as
+                                                                    | 'infotxt'
+                                                                    | 'sendgate',
                                                             )
                                                         }
-                                                    />
-                                                    {errors.infotxt_token && (
+                                                        className={inputClass}
+                                                    >
+                                                        <option value="infotxt">
+                                                            InfoTxt
+                                                        </option>
+                                                        <option value="sendgate">
+                                                            SendGate
+                                                        </option>
+                                                    </select>
+                                                    {errors.sms_provider && (
                                                         <p
                                                             className={
                                                                 errorClass
                                                             }
                                                         >
                                                             {
-                                                                errors.infotxt_token
+                                                                errors.sms_provider
                                                             }
                                                         </p>
                                                     )}
                                                 </div>
-                                                <div className={fieldClass}>
-                                                    <label
-                                                        className={labelClass}
-                                                    >
-                                                        Infotxt User ID
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        className={inputClass}
-                                                        placeholder="Enter Infotxt user ID"
-                                                        value={
-                                                            data.infotxt_user_id
-                                                        }
-                                                        onChange={(e) =>
-                                                            setData(
-                                                                'infotxt_user_id',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                    {errors.infotxt_user_id && (
-                                                        <p
+
+                                                {data.sms_provider ===
+                                                    'infotxt' && (
+                                                    <div className="grid gap-5 sm:grid-cols-2">
+                                                        <div
                                                             className={
-                                                                errorClass
+                                                                fieldClass
                                                             }
                                                         >
-                                                            {
-                                                                errors.infotxt_user_id
+                                                            <label
+                                                                className={
+                                                                    labelClass
+                                                                }
+                                                            >
+                                                                Infotxt Token
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                className={
+                                                                    inputClass
+                                                                }
+                                                                placeholder="Enter Infotxt token"
+                                                                value={
+                                                                    data.infotxt_token
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setData(
+                                                                        'infotxt_token',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                            />
+                                                            {errors.infotxt_token && (
+                                                                <p
+                                                                    className={
+                                                                        errorClass
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        errors.infotxt_token
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div
+                                                            className={
+                                                                fieldClass
                                                             }
-                                                        </p>
-                                                    )}
-                                                </div>
+                                                        >
+                                                            <label
+                                                                className={
+                                                                    labelClass
+                                                                }
+                                                            >
+                                                                Infotxt User ID
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                className={
+                                                                    inputClass
+                                                                }
+                                                                placeholder="Enter Infotxt user ID"
+                                                                value={
+                                                                    data.infotxt_user_id
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setData(
+                                                                        'infotxt_user_id',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                            />
+                                                            {errors.infotxt_user_id && (
+                                                                <p
+                                                                    className={
+                                                                        errorClass
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        errors.infotxt_user_id
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {data.sms_provider ===
+                                                    'sendgate' && (
+                                                    <div className="grid gap-5 sm:grid-cols-2">
+                                                        <div
+                                                            className={
+                                                                fieldClass
+                                                            }
+                                                        >
+                                                            <label
+                                                                className={
+                                                                    labelClass
+                                                                }
+                                                            >
+                                                                SendGate API Key
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                className={
+                                                                    inputClass
+                                                                }
+                                                                placeholder="Enter SendGate API key"
+                                                                value={
+                                                                    data.sendgate_api_key
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setData(
+                                                                        'sendgate_api_key',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                            />
+                                                            {errors.sendgate_api_key && (
+                                                                <p
+                                                                    className={
+                                                                        errorClass
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        errors.sendgate_api_key
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div
+                                                            className={
+                                                                fieldClass
+                                                            }
+                                                        >
+                                                            <label
+                                                                className={
+                                                                    labelClass
+                                                                }
+                                                            >
+                                                                SendGate SIM ID
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                className={
+                                                                    inputClass
+                                                                }
+                                                                placeholder="Enter SendGate SIM ID"
+                                                                value={
+                                                                    data.sendgate_sim_id
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setData(
+                                                                        'sendgate_sim_id',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                            />
+                                                            {errors.sendgate_sim_id && (
+                                                                <p
+                                                                    className={
+                                                                        errorClass
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        errors.sendgate_sim_id
+                                                                    }
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </>

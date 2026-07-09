@@ -10,15 +10,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Models\ParcelJourneyNotification;
 
-function makeNotification(array $overrides = []): ParcelJourneyNotification
+function makeNotification(array $overrides = [], array $pageOverrides = []): ParcelJourneyNotification
 {
     $workspace = Workspace::factory()->create();
-    $page = Page::factory()->forWorkspace($workspace)->create([
+    $page = Page::factory()->forWorkspace($workspace)->create(array_merge([
         'infotxt_token' => 'INFOTOKEN',
         'infotxt_user_id' => 'INFOUSER',
         'botcake_token' => 'BOTCAKE-TOKEN',
         'parcel_journey_custom_field_id' => 1,
-    ]);
+    ], $pageOverrides));
     $order = Order::factory()->forPage($page)->create([
         'workspace_id' => $workspace->id,
         'fb_id' => '12345_67890',
@@ -113,6 +113,62 @@ test('does nothing when notifications are globally disabled', function () {
 
     Http::assertNothingSent();
     expect($notif->fresh()->status)->toBe('pending');
+});
+
+// SendGate provider
+
+test('SendGate SMS marks sent immediately on a successful send (no status polling)', function () {
+    Bus::fake();
+    config()->set('services.sendgate.base_url', 'https://sg.test');
+    Http::fake(['sg.test/*' => Http::response(['id' => 'MSG-123', 'status' => 'queued'], 201)]);
+
+    $notif = makeNotification([], [
+        'sms_provider' => 'sendgate',
+        'sendgate_api_key' => 'sg_live_test',
+        'sendgate_sim_id' => '1',
+    ]);
+    (new SendParcelUpdateNotification($notif))->handle();
+
+    expect($notif->fresh()->status)->toBe('sent');
+    expect($notif->fresh()->sms_id)->toBe('MSG-123');
+    Bus::assertNotDispatched(CheckParcelUpdateNotification::class);
+});
+
+test('SendGate SMS sends a bearer-authed JSON POST with sim_id, to and message', function () {
+    Bus::fake();
+    config()->set('services.sendgate.base_url', 'https://sg.test');
+    Http::fake(['sg.test/*' => Http::response(['id' => 'MSG-1'], 200)]);
+
+    $notif = makeNotification([], [
+        'sms_provider' => 'sendgate',
+        'sendgate_api_key' => 'sg_live_abc',
+        'sendgate_sim_id' => '7',
+    ]);
+    (new SendParcelUpdateNotification($notif))->handle();
+
+    Http::assertSent(function ($request) {
+        return str_contains($request->url(), '/api/v1/messages')
+            && $request->hasHeader('Authorization', 'Bearer sg_live_abc')
+            && $request['sim_id'] === '7'
+            && $request['to'] === '+639170000000'
+            && $request['message'] === 'Your parcel is on the way';
+    });
+});
+
+test('SendGate SMS marks failed when the send request fails', function () {
+    Bus::fake();
+    config()->set('services.sendgate.base_url', 'https://sg.test');
+    Http::fake(['sg.test/*' => Http::response(['message' => 'Unauthorized'], 401)]);
+
+    $notif = makeNotification([], [
+        'sms_provider' => 'sendgate',
+        'sendgate_api_key' => 'sg_live_bad',
+        'sendgate_sim_id' => '1',
+    ]);
+    (new SendParcelUpdateNotification($notif))->handle();
+
+    expect($notif->fresh()->status)->toBe('failed');
+    Bus::assertNotDispatched(CheckParcelUpdateNotification::class);
 });
 
 // CheckParcelUpdateNotification
