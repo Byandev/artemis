@@ -73,6 +73,7 @@ interface Props {
     transactions: PaginatedData<Row>;
     accounts: AccountOpt[];
     transactionTypes: TransactionTypeItem[];
+    users: { id: number; name: string }[];
     totals: Totals;
     query?: {
         sort?: string | null;
@@ -108,6 +109,7 @@ export default function TransactionsIndex({
     transactions,
     accounts,
     transactionTypes,
+    users,
     totals,
     query,
 }: Props) {
@@ -447,7 +449,7 @@ export default function TransactionsIndex({
             ),
             cell: ({ row }) => (
                 <span className="text-[12px] text-gray-700 dark:text-gray-200">
-                    {row.original.requested_by || '—'}
+                    {row.original.requester?.name || '—'}
                 </span>
             ),
         },
@@ -460,7 +462,7 @@ export default function TransactionsIndex({
             ),
             cell: ({ row }) => (
                 <span className="text-[12px] text-gray-700 dark:text-gray-200">
-                    {row.original.approved_by || '—'}
+                    {row.original.approver?.name || '—'}
                 </span>
             ),
         },
@@ -606,7 +608,7 @@ export default function TransactionsIndex({
             ),
             cell: ({ row }) => (
                 <span className="text-[12px] text-gray-700 dark:text-gray-200">
-                    {row.original.charge_to || '—'}
+                    {row.original.charge_to_user?.name || '—'}
                 </span>
             ),
         },
@@ -1008,6 +1010,7 @@ export default function TransactionsIndex({
                         transaction={editing}
                         accounts={accounts}
                         transactionTypes={transactionTypes}
+                        users={users}
                         workspaceSlug={workspace.slug}
                     />
                 )}
