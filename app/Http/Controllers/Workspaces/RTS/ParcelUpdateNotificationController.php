@@ -30,7 +30,7 @@ class ParcelUpdateNotificationController extends Controller
                     fn ($q) => $q->whereHas('order', fn ($o) => $o->visibleTo($request->user(), $workspace)),
                 )
         )
-            ->with(['order.page.product'])
+            ->with(['order.page.shop.product'])
             ->allowedFilters([
                 AllowedFilter::scope('page_name', 'filterByPageName'),
                 AllowedFilter::exact('type'),

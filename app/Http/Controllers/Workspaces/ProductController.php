@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Page;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\Workspace;
 use App\Services\PostHogService;
 use App\Support\TeamVisibility;
@@ -77,7 +77,7 @@ class ProductController extends Controller
     public function create(Workspace $workspace)
     {
         $this->authorize(Permission::CreateProducts->value, $workspace);
-        $pages = Page::ofWorkspace($workspace)
+        $shops = Shop::where('workspace_id', $workspace->id)
             ->visibleTo(auth()->user(), $workspace)
             ->select('id', 'name')
             ->orderBy('name')
@@ -85,7 +85,7 @@ class ProductController extends Controller
 
         return Inertia::render('workspaces/products/create', [
             'workspace' => $workspace,
-            'pages' => $pages,
+            'shops' => $shops,
         ]);
     }
 
@@ -100,8 +100,8 @@ class ProductController extends Controller
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'page_ids' => 'nullable|array',
-            'page_ids.*' => 'exists:pages,id',
+            'shop_ids' => 'nullable|array',
+            'shop_ids.*' => 'exists:shops,id',
         ]);
 
         $product = Product::create([
@@ -120,8 +120,8 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
-        if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
-            Page::whereIn('id', $request->page_ids)
+        if ($request->filled('shop_ids') && is_array($request->shop_ids) && count($request->shop_ids) > 0) {
+            Shop::whereIn('id', $request->shop_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }
@@ -142,20 +142,20 @@ class ProductController extends Controller
     public function edit(Workspace $workspace, Product $product)
     {
         $this->authorize(Permission::EditProducts->value, $workspace);
-        $pages = Page::ofWorkspace($workspace)
+        $shops = Shop::where('workspace_id', $workspace->id)
             ->visibleTo(auth()->user(), $workspace)
             ->select('id', 'name')
             ->orderBy('name')
             ->get();
 
-        $product->load(['pages' => function ($query) {
+        $product->load(['shops' => function ($query) {
             $query->select('id', 'name', 'product_id');
         }]);
 
         return Inertia::render('workspaces/products/edit', [
             'workspace' => $workspace,
             'product' => $product,
-            'pages' => $pages,
+            'shops' => $shops,
         ]);
     }
 
@@ -174,8 +174,8 @@ class ProductController extends Controller
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
-            'page_ids' => 'nullable|array',
-            'page_ids.*' => 'exists:pages,id',
+            'shop_ids' => 'nullable|array',
+            'shop_ids.*' => 'exists:shops,id',
         ]);
 
         $product->update([
@@ -193,13 +193,13 @@ class ProductController extends Controller
                 ->toMediaCollection('PRODUCT_IMAGE');
         }
 
-        // Remove all existing page connections for this product
-        Page::where('product_id', $product->id)
+        // Remove all existing shop connections for this product
+        Shop::where('product_id', $product->id)
             ->where('workspace_id', $workspace->id)
             ->update(['product_id' => null]);
 
-        if ($request->filled('page_ids') && is_array($request->page_ids) && count($request->page_ids) > 0) {
-            Page::whereIn('id', $request->page_ids)
+        if ($request->filled('shop_ids') && is_array($request->shop_ids) && count($request->shop_ids) > 0) {
+            Shop::whereIn('id', $request->shop_ids)
                 ->where('workspace_id', $workspace->id)
                 ->update(['product_id' => $product->id]);
         }

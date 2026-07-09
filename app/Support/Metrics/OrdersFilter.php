@@ -40,7 +40,7 @@ class OrdersFilter
 
     /**
      * Apply page_ids / shop_ids / user_ids / product_ids / team_ids filters when pages is already joined.
-     * Filters reference pages.id, pages.shop_id, pages.owner_id, pages.product_id, and team_user→pages.owner_id.
+     * Filters reference pages.id, pages.shop_id, pages.owner_id, pages.shop_id→shops.product_id, and team_user→pages.owner_id.
      */
     public static function applyToJoined(Builder $query, array $filter, string $ordersAlias = 'po'): void
     {
@@ -90,7 +90,11 @@ class OrdersFilter
         }
 
         if ($productIds) {
-            $query->whereIn('pages.product_id', $productIds);
+            // The product link now lives on the shop; match pages whose shop is
+            // assigned to one of the selected products.
+            $query->whereIn('pages.shop_id', function ($sub) use ($productIds) {
+                $sub->from('shops')->select('id')->whereIn('product_id', $productIds);
+            });
         }
 
         if ($teamIds) {

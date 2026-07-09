@@ -14,7 +14,8 @@ class ProductNameSort implements Sort
         return $query
             ->leftJoin('orders', 'orders.id', '=', 'parcel_journey_notifications.order_id')
             ->leftJoin('pages', 'pages.id', '=', 'orders.page_id')
-            ->leftJoin('products', 'products.id', '=', 'pages.product_id')
+            ->leftJoin('shops', 'shops.id', '=', 'pages.shop_id')
+            ->leftJoin('products', 'products.id', '=', 'shops.product_id')
             ->select('parcel_journey_notifications.*')
             ->orderBy('products.name', $direction);
     }

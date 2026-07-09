@@ -217,7 +217,11 @@ class UnitCodeController extends Controller
     /** Workspace-scoped query with the request's search filter applied. */
     private function filtered(Request $request, Workspace $workspace): Builder
     {
-        $query = InventoryUnitCode::query()->where('workspace_id', $workspace->id);
+        $query = InventoryUnitCode::query()
+            ->where('workspace_id', $workspace->id)
+            // Team scoping: a unit code is visible if any of its items maps (by SKU)
+            // to an inventory item in the user's team (no-op for unrestricted users).
+            ->visibleTo($request->user(), $workspace);
 
         if ($search = $request->input('filter.search')) {
             $query->where(function (Builder $q) use ($search) {

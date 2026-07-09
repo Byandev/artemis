@@ -2,6 +2,7 @@
 
 namespace Modules\GencysERP\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,8 @@ use Modules\Inventory\Models\InventoryItem;
  */
 class GencysSyncRun extends Model
 {
+    use ScopesToVisibleTeams;
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_SUCCESS = 'success';
@@ -38,6 +41,12 @@ class GencysSyncRun extends Model
         'rows_received' => 'integer',
         'rows_saved' => 'integer',
     ];
+
+    /** Team visibility flows through the run's inventory item. */
+    protected function visibilityTeamRelation(): string
+    {
+        return 'inventoryItem.product.shops.teams';
+    }
 
     public function workspace(): BelongsTo
     {

@@ -34,11 +34,6 @@ class Page extends Model
         return $this->belongsTo(Shop::class);
     }
 
-    public function product(): BelongsTo
-    {
-        return $this->belongsTo(Product::class);
-    }
-
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');

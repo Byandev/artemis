@@ -1,5 +1,4 @@
 import { User } from '@/types';
-import { Product } from '@/types/models/Product';
 import { Shop } from '@/types/models/Shop';
 
 export interface Page {
@@ -7,6 +6,7 @@ export interface Page {
     shop_id: number;
     workspace_id: number;
     owner_id: number;
+    // product_id removed — a page's product now lives on its shop (shops.product_id)
     name: string;
     facebook_url?: string;
     botcake_token?: string;
@@ -27,7 +27,6 @@ export interface Page {
 
     shop?: Shop;
     owner?: User;
-    product?: Product;
     latest_budget?: {
         budget: number | string | null;
         date: string;

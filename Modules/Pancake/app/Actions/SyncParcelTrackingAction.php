@@ -109,7 +109,7 @@ readonly class SyncParcelTrackingAction
                 ]);
             }
 
-            if ($this->isNotifiable($savedOrder, $journey)) {
+            if ($this->isNotifiable($savedOrder, $journey) && $page->parcel_journey_enabled) {
                 $latestNotifiable = $journey;
 
                 $notifier->notify($savedOrder, $latestNotifiable);
