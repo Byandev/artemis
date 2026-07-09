@@ -54,18 +54,9 @@ class InternController extends Controller
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
 
-        // Distinct company names power the company filter dropdown.
-        $companies = Intern::where('workspace_id', $workspace->id)
-            ->whereNotNull('company_name')
-            ->where('company_name', '!=', '')
-            ->distinct()
-            ->orderBy('company_name')
-            ->pluck('company_name');
-
         return Inertia::render('workspaces/gencys/interns/index', [
             'workspace' => $workspace,
             'interns' => $interns,
-            'companies' => $companies,
             'query' => [
                 'sort' => $request->input('sort', 'full_name'),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
