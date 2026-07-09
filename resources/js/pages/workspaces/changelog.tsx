@@ -12,6 +12,50 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.16.0',
+        date: '2026-07-09',
+        sections: [
+            {
+                title: 'Inventory — Dashboard (New)',
+                items: [
+                    'New Inventory Dashboard brings stock health, movement, purchase orders, and audit together on one page — KPI cards up top with focused panels below',
+                    'See fulfillment at a glance with a fulfilled-vs-unfulfilled donut, stock movement over time, purchase-order progress as a funnel, and shrinkage trends',
+                    'Spot problems fast — a stock-health table, top-discrepancies chart, an alerts feed, upcoming deliveries, and recent stock adjustments are all in view',
+                    'Panels load progressively so the page stays responsive while each section fills in, and a date-range picker scopes the whole view',
+                ],
+            },
+            {
+                title: 'Finance — Custom Transaction Types & Ledger Detail',
+                items: [
+                    'Define your own transaction types per workspace from the new Transaction Types page, instead of being limited to a fixed list — each type is reusable across transactions',
+                    'Transactions now capture full ledger detail — requested by, approved by, department, charge to, reference no., and a posted status — so each account reads like a proper ledger',
+                    'The transaction form and the account view were updated to enter and display these new fields',
+                ],
+            },
+            {
+                title: 'Parcel Journey — Choose Your SMS Provider',
+                items: [
+                    'Each page can now send parcel-journey text messages through either InfoTxt or SendGate — pick the provider on the page and enter its credentials',
+                    'Existing pages keep sending through InfoTxt exactly as before; nothing changes unless you deliberately switch a page to SendGate',
+                ],
+            },
+            {
+                title: 'Shops — Simpler Setup',
+                items: [
+                    'Adding a shop no longer requires a POS token up front, so you can connect a shop with fewer blockers',
+                    'Duplicate shops are now caught the moment you submit, instead of failing later after the POS call — clearer, faster feedback',
+                ],
+            },
+            {
+                title: 'Polish',
+                items: [
+                    'Date-range pickers now have a Clear button to remove the selection in one click',
+                    'Creative Tracker gained a setup-tutorial link for quicker onboarding',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.15.4',
         date: '2026-07-01',
         sections: [
