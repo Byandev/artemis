@@ -2,6 +2,7 @@
 
 namespace Modules\Inventory\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class InventoryItem extends Model
 {
+    use ScopesToVisibleTeams;
+
     protected $table = 'inventory_items';
 
     protected $fillable = [
@@ -45,6 +48,17 @@ class InventoryItem extends Model
             ->filter()
             ->values()
             ->all();
+    }
+
+    /**
+     * Team visibility flows through the item's product and that product's shops:
+     * a user sees an item if they share a team with a shop selling its product.
+     * Items with no product (e.g. Gencys-synced) have no team and are hidden from
+     * team-scoped users (fail-closed).
+     */
+    protected function visibilityTeamRelation(): string
+    {
+        return 'product.shops.teams';
     }
 
     public function workspace(): BelongsTo

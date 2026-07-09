@@ -2,6 +2,7 @@
 
 namespace Modules\Inventory\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PurchasedOrder extends Model
 {
+    use ScopesToVisibleTeams;
+
     protected $table = 'inventory_purchased_orders';
 
     protected $fillable = [
@@ -56,6 +59,15 @@ class PurchasedOrder extends Model
     public function getStatusLabelAttribute(): string
     {
         return self::STATUSES[$this->status] ?? 'Unknown';
+    }
+
+    /**
+     * Team visibility fans out through the order's line items: the order is
+     * visible if any of its items' inventory items reach the user's team.
+     */
+    protected function visibilityTeamRelation(): string
+    {
+        return 'items.inventoryItem.product.shops.teams';
     }
 
     public function workspace(): BelongsTo
