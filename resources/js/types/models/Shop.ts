@@ -3,6 +3,7 @@ export interface Shop {
     workspace_id: number;
     avatar_url: string;
     name: string;
+    pos_token?: string | null;
     orders_last_synced_at: string | null;
     created_at: string;
     updated_at: string;

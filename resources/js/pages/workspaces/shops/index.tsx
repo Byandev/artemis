@@ -43,6 +43,7 @@ import {
     LayoutGrid,
     ListChecks,
     MoreHorizontal,
+    Pencil,
     Plus,
     RefreshCw,
     Search,
@@ -113,19 +114,52 @@ const Shops = ({
     const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
     const [addOpen, setAddOpen] = useState(false);
     const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
+    const [shopToEdit, setShopToEdit] = useState<Shop | null>(null);
     const { post, processing } = useForm({});
     const { delete: destroy, processing: deleting } = useForm({});
     const canRefreshShops = usePermission(PERMISSIONS.RefreshShops);
     const canCreateShops = usePermission(PERMISSIONS.CreateShops);
+    const canEditShops = usePermission(PERMISSIONS.EditShops);
     const canDeleteShops = usePermission(PERMISSIONS.DeleteShops);
     const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
     const canUseShopActions =
-        canRefreshShops || canViewChecklist || canDeleteShops;
+        canRefreshShops || canViewChecklist || canEditShops || canDeleteShops;
 
     const addForm = useForm({
         shop_id: '',
         pos_token: '',
     });
+
+    const editForm = useForm({
+        name: '',
+        pos_token: '',
+    });
+
+    const openEdit = (shop: Shop) => {
+        setShopToEdit(shop);
+        editForm.setData({
+            name: shop.name ?? '',
+            pos_token: shop.pos_token ?? '',
+        });
+        editForm.clearErrors();
+    };
+
+    const submitEditShop = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!shopToEdit) return;
+        editForm.put(
+            workspaces.shops.update.url({ workspace, shop: shopToEdit }),
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShopToEdit(null);
+                    editForm.reset();
+                    toast.success('Shop updated.');
+                },
+                onError: () => toast.error('Failed to update shop.'),
+            },
+        );
+    };
 
     const submitAddShop = (e: React.FormEvent) => {
         e.preventDefault();
@@ -299,6 +333,14 @@ const Shops = ({
                                           >
                                               <RefreshCw className="mr-2 h-4 w-4" />
                                               Refresh orders
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditShops && (
+                                          <DropdownMenuItem
+                                              onClick={() => openEdit(shop)}
+                                          >
+                                              <Pencil className="mr-2 h-4 w-4" />
+                                              Edit shop
                                           </DropdownMenuItem>
                                       )}
                                       {canDeleteShops && (
@@ -522,6 +564,115 @@ const Shops = ({
                                         {addForm.processing
                                             ? 'Adding…'
                                             : 'Add Shop'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                )}
+
+                {canEditShops && (
+                    <Dialog
+                        open={!!shopToEdit}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setShopToEdit(null);
+                                editForm.clearErrors();
+                            }
+                        }}
+                    >
+                        <DialogContent>
+                            <form onSubmit={submitEditShop}>
+                                <DialogHeader>
+                                    <DialogTitle>Edit Shop</DialogTitle>
+                                    <DialogDescription>
+                                        Update the shop name or POS token. A
+                                        changed token is re-verified before
+                                        saving.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="space-y-5 py-4">
+                                    <div className="space-y-1.5">
+                                        <label className={labelClass}>
+                                            Name{' '}
+                                            <span className="text-red-400">
+                                                *
+                                            </span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            autoFocus
+                                            className={inputClass}
+                                            placeholder="Shop name"
+                                            value={editForm.data.name}
+                                            onChange={(e) =>
+                                                editForm.setData(
+                                                    'name',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        {editForm.errors.name && (
+                                            <p className={errorClass}>
+                                                {editForm.errors.name}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className={labelClass}>
+                                            POS Token
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className={inputClass}
+                                            placeholder="POS token"
+                                            value={editForm.data.pos_token}
+                                            onChange={(e) =>
+                                                editForm.setData(
+                                                    'pos_token',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        {shopToEdit && editForm.data.pos_token && (
+                                            <ValidateTokenButton
+                                                url={`/workspaces/${workspace.slug}/shops/validate-pos-token`}
+                                                payload={{
+                                                    shop_id: String(
+                                                        shopToEdit.id,
+                                                    ),
+                                                    token: editForm.data
+                                                        .pos_token,
+                                                }}
+                                            />
+                                        )}
+                                        {editForm.errors.pos_token && (
+                                            <p className={errorClass}>
+                                                {editForm.errors.pos_token}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <DialogFooter>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShopToEdit(null)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        disabled={editForm.processing}
+                                    >
+                                        {editForm.processing
+                                            ? 'Saving…'
+                                            : 'Save Changes'}
                                     </Button>
                                 </DialogFooter>
                             </form>

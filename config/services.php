@@ -48,4 +48,15 @@ return [
         'inventory_webhook_url' => env('INVENTORY_DISCORD_WEBHOOK_URL'),
     ],
 
+    // SMS providers for parcel-journey notifications. Credentials are stored
+    // per page; these are just the API base URLs so they can differ between
+    // environments (e.g. SendGate's test host vs production).
+    'infotxt' => [
+        'base_url' => env('INFOTXT_BASE_URL', 'https://api.myinfotxt.com/v2'),
+    ],
+
+    'sendgate' => [
+        'base_url' => env('SENDGATE_BASE_URL', 'https://sendgate-test.on-forge.com'),
+    ],
+
 ];

@@ -3,6 +3,7 @@
 namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -56,10 +57,13 @@ class IntegrationsController extends Controller
 
         $base = AdAccount::forWorkspace($workspace)
             ->visibleTo($request->user(), $workspace)
-            ->with(['metaUsers' => function ($q) use ($workspace) {
-                $q->whereHas('workspaces', fn ($w) => $w->where('workspaces.id', $workspace->id))
-                    ->select('meta_ads_users.id', 'meta_ads_users.name');
-            }])
+            ->with([
+                'metaUsers' => function ($q) use ($workspace) {
+                    $q->whereHas('workspaces', fn ($w) => $w->where('workspaces.id', $workspace->id))
+                        ->select('meta_ads_users.id', 'meta_ads_users.name');
+                },
+                'owner:id,name',
+            ])
             ->when(! $showAll, fn ($q) => $q->where('active_sync', true));
 
         $accounts = QueryBuilder::for($base)
@@ -71,6 +75,7 @@ class IntegrationsController extends Controller
                 AllowedFilter::callback('meta_user', function ($query, $value) {
                     $query->whereHas('metaUsers', fn ($q) => $q->where('meta_ads_users.id', $value));
                 }),
+                AllowedFilter::exact('owner', 'owner_id'),
             ])
             ->allowedSorts(['name', 'business_name', 'currency', 'country_code', 'account_status', 'last_synced_at'])
             ->defaultSort('name')
@@ -82,10 +87,20 @@ class IntegrationsController extends Controller
             ->orderBy('name')
             ->get(['meta_ads_users.id', 'meta_ads_users.name']);
 
+        // Workspace users (members + owner) who can be assigned as an account owner.
+        $ownerIds = $workspace->users()->pluck('users.id')
+            ->push($workspace->owner_id)
+            ->filter()
+            ->unique();
+        $owners = User::whereIn('id', $ownerIds)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('workspaces/integrations/meta-ad-accounts', [
             'workspace' => $workspace,
             'adAccounts' => $accounts,
             'metaUsers' => $metaUsers,
+            'owners' => $owners,
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),

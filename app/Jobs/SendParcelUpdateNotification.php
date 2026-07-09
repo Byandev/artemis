@@ -4,13 +4,13 @@ namespace App\Jobs;
 
 use App\Models\OutgoingApiLog;
 use App\Services\Botcake;
+use App\Services\Sms\SmsProviderFactory;
 use DateTime;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Models\ParcelJourneyNotification;
 
 class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
@@ -73,25 +73,32 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
         $this->parcelJourneyNotification->load('order.page');
 
         if ($this->parcelJourneyNotification->type === 'sms') {
-            $response = Http::get('https://api.myinfotxt.com/v2/send.php', [
-                'SMS' => $this->parcelJourneyNotification->message,
-                'ApiKey' => $this->parcelJourneyNotification->order->page->infotxt_token,
-                'Mobile' => $this->parcelJourneyNotification->receiver_identity,
-                'UserID' => $this->parcelJourneyNotification->order->page->infotxt_user_id,
-            ]);
+            $provider = app(SmsProviderFactory::class)->for($this->parcelJourneyNotification->order->page);
 
-            if ($response->successful()) {
-                $response = $response->json();
+            $result = $provider->send(
+                $this->parcelJourneyNotification->receiver_identity,
+                $this->parcelJourneyNotification->message,
+            );
 
-                if (isset($response['status']) && $response['status'] === '00') {
-                    $this->parcelJourneyNotification->update(['sms_id' => $response['smsid']]);
+            if ($result->accepted) {
+                if ($result->tracksDelivery) {
+                    // Provider gave us a message id to poll — record it and hand
+                    // off to CheckParcelUpdateNotification for the final status.
+                    $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
 
                     dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
                 } else {
-                    $this->parcelJourneyNotification->update(['remarks' => json_encode($response)]);
+                    // Provider doesn't expose delivery tracking — treat a
+                    // successful send as sent.
+                    $this->parcelJourneyNotification->update([
+                        'status' => 'sent',
+                        'sms_id' => $result->messageId,
+                    ]);
                 }
+            } elseif ($result->failed) {
+                $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $result->remarks]);
             } else {
-                $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => 'Request failed']);
+                $this->parcelJourneyNotification->update(['remarks' => $result->remarks]);
             }
 
         } elseif ($this->parcelJourneyNotification->type === 'chat') {

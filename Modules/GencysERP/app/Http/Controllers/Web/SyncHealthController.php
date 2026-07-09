@@ -30,9 +30,12 @@ class SyncHealthController extends Controller
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
         // All active items — used to label recent runs and for the active-items KPI.
+        // Parent items are placeholder groupings that never sync themselves, so
+        // they're excluded from the item views.
         $items = InventoryItem::query()
             ->where('workspace_id', $workspace->id)
             ->where('is_active', true)
+            ->where('is_parent', false)
             ->with('product:id,name')
             ->orderBy('sku')
             ->get(['id', 'product_id', 'sku']);
@@ -45,6 +48,7 @@ class SyncHealthController extends Controller
         $summary = InventoryItem::query()
             ->where('workspace_id', $workspace->id)
             ->where('is_active', true)
+            ->where('is_parent', false)
             ->when($itemSearch !== '', function ($query) use ($itemSearch) {
                 $query->where(function ($q) use ($itemSearch) {
                     $q->where('sku', 'like', "%{$itemSearch}%")

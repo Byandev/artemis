@@ -55,6 +55,7 @@ use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
 use Modules\Inventory\Http\Controllers\PurchaseOrderMonitoringController;
 use Modules\Inventory\Http\Controllers\UnitCodeController;
+use Modules\MetaAds\Http\Controllers\AdAccountOwnerController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsCalendarController;
@@ -64,6 +65,7 @@ use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 use Modules\MetaAds\Http\Controllers\OptimizationRuleController;
+use Modules\MetaAds\Http\Controllers\RemoveFbAccountController;
 use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
@@ -175,6 +177,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/workspaces/{workspace}/shops', [ShopController::class, 'index'])->name('workspaces.shops.index');
     Route::post('/workspaces/{workspace}/shops', [ShopController::class, 'store'])->name('workspaces.shops.store');
+    Route::put('/workspaces/{workspace}/shops/{shop}', [ShopController::class, 'update'])->name('workspaces.shops.update');
     Route::post('/workspaces/{workspace}/shops/validate-pos-token', [ShopController::class, 'validatePosToken'])->name('workspaces.shops.validate-pos-token');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-pages', [ShopController::class, 'refreshPages'])->name('workspaces.shops.refresh-pages');
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-users', [ShopController::class, 'refreshUsers'])->name('workspaces.shops.refresh-users');
@@ -296,9 +299,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/integrations/meta/users/{metaUser}/sync-ad-accounts', AdAccountSyncController::class)
         ->middleware('can:Manage Meta Ads Accounts,workspace')
         ->name('workspaces.metaads.sync-ad-accounts');
+    Route::delete('/workspaces/{workspace}/integrations/meta/users/{metaUser}', RemoveFbAccountController::class)
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.remove-fb-account');
     Route::patch('/workspaces/{workspace}/integrations/meta/ad-accounts/{adAccount}/toggle-sync', AdAccountToggleSyncController::class)
         ->middleware('can:Manage Meta Ads Accounts,workspace')
         ->name('workspaces.metaads.ad-accounts.toggle-sync');
+    Route::patch('/workspaces/{workspace}/integrations/meta/ad-accounts/{adAccount}/owner', AdAccountOwnerController::class)
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.ad-accounts.owner');
 
     // Meta Ads saved reports (SuperAds-style report builder)
     Route::get('/workspaces/{workspace}/integrations/meta/reports', [ReportController::class, 'index'])
