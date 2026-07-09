@@ -3,14 +3,14 @@
 namespace Modules\GencysERP\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Modules\GencysERP\Models\GencysIntern;
+use Modules\GencysERP\Models\Intern;
 
 /**
- * @extends Factory<GencysIntern>
+ * @extends Factory<Intern>
  */
-class GencysInternFactory extends Factory
+class InternFactory extends Factory
 {
-    protected $model = GencysIntern::class;
+    protected $model = Intern::class;
 
     public function definition(): array
     {

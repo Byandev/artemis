@@ -37,6 +37,6 @@ class GencysInternDailyRecord extends Model
 
     public function intern(): BelongsTo
     {
-        return $this->belongsTo(GencysIntern::class, 'gencys_intern_id');
+        return $this->belongsTo(Intern::class, 'gencys_intern_id');
     }
 }

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\WorkspaceApiKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\GencysERP\Models\GencysIntern;
+use Modules\GencysERP\Models\Intern;
 
 /**
  * Callback for the n8n interns sync. n8n posts { data: { workspace_id, api_key,
@@ -45,7 +45,7 @@ class InternController extends Controller
                 continue;
             }
 
-            $record = GencysIntern::updateOrCreate(
+            $record = Intern::updateOrCreate(
                 ['workspace_id' => $workspace->id, 'intern_id' => $internId],
                 [
                     'full_name' => $this->str($intern['fullName'] ?? $intern['full_name'] ?? null),

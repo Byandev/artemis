@@ -10,8 +10,8 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\GencysERP\Models\GencysIntern;
 use Modules\GencysERP\Models\GencysInternDailyRecord;
+use Modules\GencysERP\Models\Intern;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -70,7 +70,7 @@ class InternDailyRecordController extends Controller
             ->withQueryString();
 
         // Interns that actually have records, for the intern filter dropdown.
-        $interns = GencysIntern::where('gencys_interns.workspace_id', $workspace->id)
+        $interns = Intern::where('gencys_interns.workspace_id', $workspace->id)
             ->whereIn('id', GencysInternDailyRecord::where('workspace_id', $workspace->id)->select('gencys_intern_id'))
             ->orderBy('full_name')
             ->get(['id', 'full_name']);

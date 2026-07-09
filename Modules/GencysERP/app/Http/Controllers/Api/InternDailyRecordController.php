@@ -7,9 +7,9 @@ use App\Models\WorkspaceApiKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Modules\GencysERP\Models\GencysIntern;
 use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Models\Intern;
 
 /**
  * Callback for the n8n intern daily-records sync. n8n posts
@@ -47,7 +47,7 @@ class InternDailyRecordController extends Controller
         $workspace = $apiKey->workspace;
 
         // Map every referenced Gencys intern id to its local row id, once.
-        $internIdMap = GencysIntern::where('workspace_id', $workspace->id)
+        $internIdMap = Intern::where('workspace_id', $workspace->id)
             ->whereNotNull('intern_id')
             ->pluck('id', 'intern_id');
 

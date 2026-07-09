@@ -66,7 +66,7 @@ class TriggerFetchInternDailyRecordsCommand extends Command
             ->where('erp_username', '!=', '')
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
-            ->with(['apiKeys', 'gencysInterns' => function ($query) use ($internIds) {
+            ->with(['apiKeys', 'interns' => function ($query) use ($internIds) {
                 // Only interns pulled from the ERP (they have a Gencys intern id).
                 $query->whereNotNull('intern_id');
 
@@ -92,7 +92,7 @@ class TriggerFetchInternDailyRecordsCommand extends Command
         foreach ($workspaces as $workspace) {
             $apiKey = $workspace->apiKeys->first();
 
-            if ($workspace->gencysInterns->isEmpty()) {
+            if ($workspace->interns->isEmpty()) {
                 $this->warn("Skipping workspace {$workspace->id} — no synced interns.");
 
                 continue;
@@ -100,7 +100,7 @@ class TriggerFetchInternDailyRecordsCommand extends Command
 
             // One webhook call per intern: each intern gets its own job, its own
             // pending sync run, and its own payload carrying a single intern_id.
-            foreach ($workspace->gencysInterns as $intern) {
+            foreach ($workspace->interns as $intern) {
                 $run = GencysSyncRun::start(
                     $workspace->id,
                     null,

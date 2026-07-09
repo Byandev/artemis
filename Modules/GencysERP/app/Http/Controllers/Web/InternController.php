@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\GencysERP\Models\GencysIntern;
+use Modules\GencysERP\Models\Intern;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -36,7 +36,7 @@ class InternController extends Controller
         $this->authorize(Permission::ViewGencysInterns->value, $workspace);
 
         $interns = QueryBuilder::for(
-            GencysIntern::query()->where('workspace_id', $workspace->id)
+            Intern::query()->where('workspace_id', $workspace->id)
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', function (Builder $query, $value) {
@@ -55,7 +55,7 @@ class InternController extends Controller
             ->withQueryString();
 
         // Distinct company names power the company filter dropdown.
-        $companies = GencysIntern::where('workspace_id', $workspace->id)
+        $companies = Intern::where('workspace_id', $workspace->id)
             ->whereNotNull('company_name')
             ->where('company_name', '!=', '')
             ->distinct()

@@ -2,9 +2,9 @@
 
 use Illuminate\Support\Facades\Queue;
 use Modules\GencysERP\Jobs\FetchInternDailyRecordsJob;
-use Modules\GencysERP\Models\GencysIntern;
 use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Models\Intern;
 
 test('the trigger opens a pending sync run per synced intern and queues a fetch job', function () {
     config(['services.n8n.gencys_intern_daily_records_webhook_url' => 'https://n8n.test/webhook/records']);
@@ -14,9 +14,9 @@ test('the trigger opens a pending sync run per synced intern and queues a fetch 
     $workspace->update(['erp_username' => 'erp-user', 'erp_password' => 'erp-pass']);
     makeApiKey($workspace);
 
-    GencysIntern::factory()->for($workspace)->create(['intern_id' => 101]);
-    GencysIntern::factory()->for($workspace)->create(['intern_id' => 102]);
-    GencysIntern::factory()->for($workspace)->create(['intern_id' => null]); // never synced → excluded
+    Intern::factory()->for($workspace)->create(['intern_id' => 101]);
+    Intern::factory()->for($workspace)->create(['intern_id' => 102]);
+    Intern::factory()->for($workspace)->create(['intern_id' => null]); // never synced → excluded
 
     $this->artisan('gencys-erp:trigger-fetch-intern-daily-records', [
         '--force' => true,
@@ -41,8 +41,8 @@ test('the --intern option limits which interns are fetched', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     $workspace->update(['erp_username' => 'erp-user', 'erp_password' => 'erp-pass']);
     makeApiKey($workspace);
-    GencysIntern::factory()->for($workspace)->create(['intern_id' => 101]);
-    GencysIntern::factory()->for($workspace)->create(['intern_id' => 102]);
+    Intern::factory()->for($workspace)->create(['intern_id' => 101]);
+    Intern::factory()->for($workspace)->create(['intern_id' => 102]);
 
     $this->artisan('gencys-erp:trigger-fetch-intern-daily-records', [
         '--force' => true,
@@ -58,7 +58,7 @@ test('the callback upserts daily metrics per intern and resolves the sync run', 
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
 
-    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 101]);
+    $intern = Intern::factory()->for($workspace)->create(['intern_id' => 101]);
     $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_INTERN_DAILY_RECORDS, ['intern_id' => 101]);
 
     $payload = [
@@ -100,7 +100,7 @@ test('the callback upserts daily metrics per intern and resolves the sync run', 
 test('re-syncing the same intern and day updates rather than duplicates', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 101]);
+    $intern = Intern::factory()->for($workspace)->create(['intern_id' => 101]);
 
     $post = fn (string $sales) => $this->postJson('/api/v1/public/gencys/intern-daily-records', [
         'data' => [
@@ -120,7 +120,7 @@ test('re-syncing the same intern and day updates rather than duplicates', functi
 test('the callback accepts a single inline record (per-intern shape) with total_sales', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 3]);
+    $intern = Intern::factory()->for($workspace)->create(['intern_id' => 3]);
 
     // Exactly the shape n8n posts: fields inline under data, "total_sales" with
     // a currency symbol/commas, no records array, no date.
@@ -145,7 +145,7 @@ test('the callback accepts a single inline record (per-intern shape) with total_
 test('the callback accepts the array wrapper and the ads_spent field', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 24]);
+    $intern = Intern::factory()->for($workspace)->create(['intern_id' => 24]);
 
     // The exact n8n shape: top-level array, "ads_spent" (with the s), currency strings.
     $this->postJson('/api/v1/public/gencys/intern-daily-records', [[

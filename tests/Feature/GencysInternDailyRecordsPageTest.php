@@ -1,7 +1,7 @@
 <?php
 
-use Modules\GencysERP\Models\GencysIntern;
 use Modules\GencysERP\Models\GencysInternDailyRecord;
+use Modules\GencysERP\Models\Intern;
 
 function recordsUrl($workspace, array $query = []): string
 {
@@ -10,7 +10,7 @@ function recordsUrl($workspace, array $query = []): string
     return $query ? $url.'?'.http_build_query($query) : $url;
 }
 
-function makeRecord($workspace, GencysIntern $intern, array $attrs = []): GencysInternDailyRecord
+function makeRecord($workspace, Intern $intern, array $attrs = []): GencysInternDailyRecord
 {
     return GencysInternDailyRecord::create(array_merge([
         'workspace_id' => $workspace->id,
@@ -28,10 +28,10 @@ test('the page lists workspace records joined with the intern name', function ()
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 1, 'full_name' => 'Juan']);
+    $intern = Intern::factory()->for($workspace)->create(['intern_id' => 1, 'full_name' => 'Juan']);
     makeRecord($workspace, $intern);
 
-    $otherIntern = GencysIntern::factory()->for($other)->create(['intern_id' => 1]);
+    $otherIntern = Intern::factory()->for($other)->create(['intern_id' => 1]);
     makeRecord($other, $otherIntern);
 
     $this->actingAs($user)
@@ -47,8 +47,8 @@ test('the page lists workspace records joined with the intern name', function ()
 test('search matches the intern name / company / username', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    $a = GencysIntern::factory()->for($workspace)->create(['intern_id' => 1, 'full_name' => 'Alpha', 'company_name' => 'Acme']);
-    $b = GencysIntern::factory()->for($workspace)->create(['intern_id' => 2, 'full_name' => 'Beta', 'company_name' => 'Globex']);
+    $a = Intern::factory()->for($workspace)->create(['intern_id' => 1, 'full_name' => 'Alpha', 'company_name' => 'Acme']);
+    $b = Intern::factory()->for($workspace)->create(['intern_id' => 2, 'full_name' => 'Beta', 'company_name' => 'Globex']);
     makeRecord($workspace, $a);
     makeRecord($workspace, $b);
 
@@ -63,8 +63,8 @@ test('search matches the intern name / company / username', function () {
 
 test('the intern filter narrows to one intern', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $a = GencysIntern::factory()->for($workspace)->create(['intern_id' => 1]);
-    $b = GencysIntern::factory()->for($workspace)->create(['intern_id' => 2]);
+    $a = Intern::factory()->for($workspace)->create(['intern_id' => 1]);
+    $b = Intern::factory()->for($workspace)->create(['intern_id' => 2]);
     makeRecord($workspace, $a);
     makeRecord($workspace, $b);
 
@@ -76,7 +76,7 @@ test('the intern filter narrows to one intern', function () {
 
 test('the date range filter bounds records inclusively', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 1]);
+    $intern = Intern::factory()->for($workspace)->create(['intern_id' => 1]);
     makeRecord($workspace, $intern, ['record_date' => '2026-07-01', 'sales' => 111]);
     makeRecord($workspace, $intern, ['record_date' => '2026-07-06', 'sales' => 777]);
     makeRecord($workspace, $intern, ['record_date' => '2026-07-10', 'sales' => 999]);
@@ -92,7 +92,7 @@ test('the date range filter bounds records inclusively', function () {
 
 test('records can be sorted by sales and paginated', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $intern = GencysIntern::factory()->for($workspace)->create(['intern_id' => 1]);
+    $intern = Intern::factory()->for($workspace)->create(['intern_id' => 1]);
     makeRecord($workspace, $intern, ['record_date' => '2026-07-01', 'sales' => 300]);
     makeRecord($workspace, $intern, ['record_date' => '2026-07-02', 'sales' => 100]);
     makeRecord($workspace, $intern, ['record_date' => '2026-07-03', 'sales' => 200]);

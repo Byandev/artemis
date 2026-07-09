@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Http;
-use Modules\GencysERP\Models\GencysIntern;
+use Modules\GencysERP\Models\Intern;
 
 function internsUrl($workspace, array $query = []): string
 {
@@ -14,8 +14,8 @@ test('the interns index lists workspace-scoped interns for the owner', function 
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    GencysIntern::factory()->for($workspace)->count(3)->create();
-    GencysIntern::factory()->for($other)->create(['full_name' => 'Outsider']);
+    Intern::factory()->for($workspace)->count(3)->create();
+    Intern::factory()->for($other)->create(['full_name' => 'Outsider']);
 
     $this->actingAs($user)
         ->get(internsUrl($workspace))
@@ -30,9 +30,9 @@ test('the interns index lists workspace-scoped interns for the owner', function 
 test('search matches across name, company, username and contact', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    GencysIntern::factory()->for($workspace)->create(['full_name' => 'Alpha Reyes']);
-    GencysIntern::factory()->for($workspace)->create(['company_name' => 'Beta Corp']);
-    GencysIntern::factory()->for($workspace)->create(['username' => 'gamma_user']);
+    Intern::factory()->for($workspace)->create(['full_name' => 'Alpha Reyes']);
+    Intern::factory()->for($workspace)->create(['company_name' => 'Beta Corp']);
+    Intern::factory()->for($workspace)->create(['username' => 'gamma_user']);
 
     $this->actingAs($user)
         ->get(internsUrl($workspace, ['filter' => ['search' => 'Beta']]))
@@ -46,8 +46,8 @@ test('search matches across name, company, username and contact', function () {
 test('the company filter narrows results and exposes distinct companies', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    GencysIntern::factory()->for($workspace)->count(2)->create(['company_name' => 'Acme']);
-    GencysIntern::factory()->for($workspace)->create(['company_name' => 'Globex']);
+    Intern::factory()->for($workspace)->count(2)->create(['company_name' => 'Acme']);
+    Intern::factory()->for($workspace)->create(['company_name' => 'Globex']);
 
     $this->actingAs($user)
         ->get(internsUrl($workspace, ['filter' => ['company_name' => 'Acme']]))
@@ -61,9 +61,9 @@ test('the company filter narrows results and exposes distinct companies', functi
 test('results can be sorted and paginated', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    GencysIntern::factory()->for($workspace)->create(['full_name' => 'Zed']);
-    GencysIntern::factory()->for($workspace)->create(['full_name' => 'Ann']);
-    GencysIntern::factory()->for($workspace)->create(['full_name' => 'Mia']);
+    Intern::factory()->for($workspace)->create(['full_name' => 'Zed']);
+    Intern::factory()->for($workspace)->create(['full_name' => 'Ann']);
+    Intern::factory()->for($workspace)->create(['full_name' => 'Mia']);
 
     $this->actingAs($user)
         ->get(internsUrl($workspace, ['sort' => 'full_name', 'per_page' => 2]))
@@ -145,7 +145,7 @@ test('the public callback upserts interns keyed on the gencys row id', function 
         ->assertOk()
         ->assertJson(['created' => 1, 'updated' => 0, 'skipped' => 1]);
 
-    $intern = GencysIntern::where('workspace_id', $workspace->id)->where('intern_id', 12)->first();
+    $intern = Intern::where('workspace_id', $workspace->id)->where('intern_id', 12)->first();
     expect($intern)->not->toBeNull()
         ->and($intern->full_name)->toBe('Juan Dela Cruz')
         ->and($intern->contact_number)->toBe('09171234567')
@@ -165,7 +165,7 @@ test('the public callback upserts interns keyed on the gencys row id', function 
         ->assertOk()
         ->assertJson(['created' => 0, 'updated' => 1]);
 
-    expect(GencysIntern::where('workspace_id', $workspace->id)->where('intern_id', 12)->count())->toBe(1)
+    expect(Intern::where('workspace_id', $workspace->id)->where('intern_id', 12)->count())->toBe(1)
         ->and($intern->fresh()->company_name)->toBe('Globex');
 });
 
@@ -178,7 +178,7 @@ test('the public callback rejects an invalid api key', function () {
         ],
     ])->assertStatus(401);
 
-    expect(GencysIntern::count())->toBe(0);
+    expect(Intern::count())->toBe(0);
 });
 
 test('the public callback rejects an api key that does not own the workspace', function () {
@@ -195,5 +195,5 @@ test('the public callback rejects an api key that does not own the workspace', f
         ],
     ])->assertStatus(401);
 
-    expect(GencysIntern::count())->toBe(0);
+    expect(Intern::count())->toBe(0);
 });

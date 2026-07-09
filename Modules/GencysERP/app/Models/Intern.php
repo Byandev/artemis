@@ -6,9 +6,9 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\GencysERP\Database\Factories\GencysInternFactory;
+use Modules\GencysERP\Database\Factories\InternFactory;
 
-class GencysIntern extends Model
+class Intern extends Model
 {
     use HasFactory;
 
@@ -33,8 +33,8 @@ class GencysIntern extends Model
         return $this->belongsTo(Workspace::class);
     }
 
-    protected static function newFactory(): GencysInternFactory
+    protected static function newFactory(): InternFactory
     {
-        return GencysInternFactory::new();
+        return InternFactory::new();
     }
 }
