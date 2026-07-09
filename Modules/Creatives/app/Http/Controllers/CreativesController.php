@@ -59,6 +59,7 @@ class CreativesController extends Controller
                 AllowedFilter::exact('ads_status'),
                 AllowedFilter::exact('final_status'),
                 AllowedFilter::exact('creator_id'),
+                AllowedFilter::exact('approved_by'),
                 AllowedFilter::exact('product_id'),
                 AllowedFilter::callback('review_status', function ($query, $value) {
                     $query->whereHas('latestReview', fn ($q) => $q->where('status', $value));
@@ -109,10 +110,18 @@ class CreativesController extends Controller
 
         $creators = User::whereIn('id', $creatorIds)->select('id', 'name')->orderBy('name')->get();
 
+        $approverIds = Creative::where('workspace_id', $workspace->id)
+            ->whereNotNull('approved_by')
+            ->distinct()
+            ->pluck('approved_by');
+
+        $approvers = User::whereIn('id', $approverIds)->select('id', 'name')->orderBy('name')->get();
+
         return Inertia::render('workspaces/creatives/index', [
             'workspace' => $workspace,
             'creatives' => $creatives,
             'creators' => $creators,
+            'approvers' => $approvers,
             'products' => $this->products($workspace),
             'reviewers' => $this->reviewers($workspace),
             'query' => [
