@@ -45,6 +45,7 @@ use Modules\Finance\Http\Controllers\AccountController as FinanceAccountControll
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
+use Modules\Finance\Http\Controllers\RequestFundController as FinanceRequestFundController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
@@ -487,6 +488,12 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}/items', [FinanceRemittanceController::class, 'clearItems'])->name('remittances.items.clear');
         Route::put('/remittances/{remittance}', [FinanceRemittanceController::class, 'update'])->name('remittances.update');
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
+
+        Route::get('/request-funds', [FinanceRequestFundController::class, 'index'])->name('request-funds.index');
+        Route::post('/request-funds', [FinanceRequestFundController::class, 'store'])->name('request-funds.store');
+        Route::put('/request-funds/{requestFund}/status', [FinanceRequestFundController::class, 'updateStatus'])->name('request-funds.status');
+        Route::put('/request-funds/{requestFund}', [FinanceRequestFundController::class, 'update'])->name('request-funds.update');
+        Route::delete('/request-funds/{requestFund}', [FinanceRequestFundController::class, 'destroy'])->name('request-funds.destroy');
     });
 
     Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {

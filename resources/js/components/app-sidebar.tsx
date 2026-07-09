@@ -18,6 +18,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     ArrowLeftRight,
+    Banknote,
     BarChart2,
     BookOpenIcon,
     Box,
@@ -407,6 +408,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewFinanceAccounts,
                           PERMISSIONS.ViewFinanceTransactions,
                           PERMISSIONS.ViewFinanceRemittances,
+                          PERMISSIONS.ViewFinanceRequestFunds,
                       ],
                       items: [
                           {
@@ -444,6 +446,12 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
                               icon: Send,
                               permission: PERMISSIONS.ViewFinanceRemittances,
+                          },
+                          {
+                              title: 'Request Funds',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
+                              icon: Banknote,
+                              permission: PERMISSIONS.ViewFinanceRequestFunds,
                           },
                       ],
                   },
