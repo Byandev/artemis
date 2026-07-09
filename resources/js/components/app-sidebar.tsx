@@ -21,6 +21,7 @@ import {
     BarChart2,
     BookOpenIcon,
     Box,
+    Building2,
     CalendarDays,
     Check,
     Clapperboard,
@@ -139,6 +140,12 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        {
+            title: 'Departments',
+            href: `/workspaces/${slug}/departments`,
+            icon: Building2,
+            permission: PERMISSIONS.ViewDepartments,
+        },
         {
             title: 'Roles',
             href: `/workspaces/${slug}/roles`,

@@ -11,6 +11,7 @@ use App\Http\Controllers\Workspaces\AskDataController;
 use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
+use App\Http\Controllers\Workspaces\DepartmentController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
@@ -142,6 +143,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/members', [WorkspaceMemberController::class, 'index'])->name('workspaces.members.index');
     //    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');
     Route::put('/workspaces/{workspace:slug}/members/{user}', [WorkspaceMemberController::class, 'updateMember'])->name('workspaces.members.update');
+    Route::put('/workspaces/{workspace}/members/bulk/department', [WorkspaceMemberController::class, 'bulkAssignDepartment'])->name('workspaces.members.department.bulk');
+    Route::put('/workspaces/{workspace}/members/{user}/department', [WorkspaceMemberController::class, 'assignDepartment'])->name('workspaces.members.department.assign');
     Route::delete('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'destroy'])->name('workspaces.members.destroy');
     Route::post('/workspaces/{workspace}/members/{user}/reset-password', [WorkspaceMemberController::class, 'generatePasswordReset'])->name('workspaces.members.reset-password');
 
@@ -380,6 +383,12 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'destroy'])->name('workspaces.teams.destroy');
     Route::get('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'index'])->name('workspaces.teams.schedule');
     Route::put('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'update'])->name('workspaces.teams.schedule.update');
+
+    // Department routes
+    Route::get('/workspaces/{workspace}/departments', [DepartmentController::class, 'index'])->name('workspaces.departments.index');
+    Route::post('/workspaces/{workspace}/departments', [DepartmentController::class, 'store'])->name('workspaces.departments.store');
+    Route::put('/workspaces/{workspace}/departments/{department}', [DepartmentController::class, 'update'])->name('workspaces.departments.update');
+    Route::delete('/workspaces/{workspace}/departments/{department}', [DepartmentController::class, 'destroy'])->name('workspaces.departments.destroy');
 
     // Team data-access assignment (team-level visibility)
     Route::get('/workspaces/{workspace}/teams/{team}/shops', [TeamShopController::class, 'index'])->name('workspaces.teams.shops.index');
