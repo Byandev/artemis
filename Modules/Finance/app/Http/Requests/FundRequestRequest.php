@@ -6,7 +6,7 @@ use App\Models\Workspace;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class RequestFundRequest extends FormRequest
+class FundRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {

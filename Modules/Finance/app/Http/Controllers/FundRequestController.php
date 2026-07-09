@@ -9,13 +9,13 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Modules\Finance\Http\Requests\RequestFundRequest;
+use Modules\Finance\Http\Requests\FundRequestRequest;
 use Modules\Finance\Models\FundRequest;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class RequestFundController extends Controller
+class FundRequestController extends Controller
 {
     use AuthorizesRequests;
 
@@ -81,7 +81,7 @@ class RequestFundController extends Controller
         ]);
     }
 
-    public function store(RequestFundRequest $request, Workspace $workspace)
+    public function store(FundRequestRequest $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::CreateFinanceRequestFunds->value, $workspace);
@@ -100,7 +100,7 @@ class RequestFundController extends Controller
             ->with('success', 'Fund request created.');
     }
 
-    public function update(RequestFundRequest $request, Workspace $workspace, FundRequest $requestFund)
+    public function update(FundRequestRequest $request, Workspace $workspace, FundRequest $requestFund)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::EditFinanceRequestFunds->value, $workspace);
