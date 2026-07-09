@@ -26,10 +26,13 @@ export interface FinanceTransaction {
     account_id: number;
     date: string;
     description: string;
-    requested_by?: string | null;
-    approved_by?: string | null;
+    requested_by?: number | null;
+    approved_by?: number | null;
     department?: string | null;
-    charge_to?: string | null;
+    charge_to?: number | null;
+    requester?: { id: number; name: string } | null;
+    approver?: { id: number; name: string } | null;
+    charge_to_user?: { id: number; name: string } | null;
     type: 'in' | 'out';
     transaction_type: TransactionType | null;
     transaction_type_id?: number | null;
@@ -48,12 +51,18 @@ interface AccountOpt {
     currency: string;
 }
 
+interface UserOpt {
+    id: number;
+    name: string;
+}
+
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     transaction?: FinanceTransaction | null;
     accounts: AccountOpt[];
     transactionTypes: TransactionTypeItem[];
+    users: UserOpt[];
     defaults?: Partial<FinanceTransaction>;
     workspaceSlug: string;
 }
@@ -66,6 +75,7 @@ export function TransactionFormDialog({
     transaction,
     accounts,
     transactionTypes,
+    users,
     defaults,
     workspaceSlug,
 }: Props) {
@@ -78,10 +88,10 @@ export function TransactionFormDialog({
             account_id: '',
             date: today(),
             description: '',
-            requested_by: '',
-            approved_by: '',
+            requested_by: '' as number | '',
+            approved_by: '' as number | '',
             department: '',
-            charge_to: '',
+            charge_to: '' as number | '',
             type: 'in' as 'in' | 'out',
             transaction_type_id: defaultTypeId,
             amount: '',
@@ -104,6 +114,7 @@ export function TransactionFormDialog({
                     approved_by: transaction.approved_by ?? '',
                     department: transaction.department ?? '',
                     charge_to: transaction.charge_to ?? '',
+                    // (numeric user ids; see FinanceTransaction)
                     type: transaction.type,
                     transaction_type_id:
                         transaction.transaction_type_id != null
@@ -266,27 +277,49 @@ export function TransactionFormDialog({
                                 label="Requested By"
                                 error={errors.requested_by}
                             >
-                                <input
-                                    type="text"
+                                <select
                                     value={data.requested_by}
                                     onChange={(e) =>
-                                        setData('requested_by', e.target.value)
+                                        setData(
+                                            'requested_by',
+                                            e.target.value
+                                                ? Number(e.target.value)
+                                                : '',
+                                        )
                                     }
                                     className={inputCls}
-                                />
+                                >
+                                    <option value="">Select…</option>
+                                    {users.map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </Field>
                             <Field
                                 label="Approved By"
                                 error={errors.approved_by}
                             >
-                                <input
-                                    type="text"
+                                <select
                                     value={data.approved_by}
                                     onChange={(e) =>
-                                        setData('approved_by', e.target.value)
+                                        setData(
+                                            'approved_by',
+                                            e.target.value
+                                                ? Number(e.target.value)
+                                                : '',
+                                        )
                                     }
                                     className={inputCls}
-                                />
+                                >
+                                    <option value="">Select…</option>
+                                    {users.map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </Field>
                         </div>
 
@@ -302,14 +335,25 @@ export function TransactionFormDialog({
                                 />
                             </Field>
                             <Field label="Charge To" error={errors.charge_to}>
-                                <input
-                                    type="text"
+                                <select
                                     value={data.charge_to}
                                     onChange={(e) =>
-                                        setData('charge_to', e.target.value)
+                                        setData(
+                                            'charge_to',
+                                            e.target.value
+                                                ? Number(e.target.value)
+                                                : '',
+                                        )
                                     }
                                     className={inputCls}
-                                />
+                                >
+                                    <option value="">Select…</option>
+                                    {users.map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </Field>
                         </div>
 
