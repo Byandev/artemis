@@ -375,13 +375,30 @@ export function AppSidebar() {
                   {
                       title: 'Gencys ERP',
                       icon: Activity,
-                      anyOf: [PERMISSIONS.ViewDailySalesTracker],
+                      anyOf: [
+                          PERMISSIONS.ViewDailySalesTracker,
+                          PERMISSIONS.ViewGencysInterns,
+                          PERMISSIONS.ViewGencysInternDailyRecords,
+                      ],
                       items: [
                           {
                               title: 'Daily Sales Tracker',
                               href: `/workspaces/${slug}/gencys/daily-sales-tracker`,
                               icon: Activity,
                               permission: PERMISSIONS.ViewDailySalesTracker,
+                          },
+                          {
+                              title: 'Interns',
+                              href: `/workspaces/${slug}/gencys/interns`,
+                              icon: Users,
+                              permission: PERMISSIONS.ViewGencysInterns,
+                          },
+                          {
+                              title: 'Intern Daily Records',
+                              href: `/workspaces/${slug}/gencys/intern-daily-records`,
+                              icon: Activity,
+                              permission:
+                                  PERMISSIONS.ViewGencysInternDailyRecords,
                           },
                       ],
                   },

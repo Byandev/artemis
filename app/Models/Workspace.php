@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\GencysERP\Models\Intern;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\Inventory\Models\PurchasedOrder;
@@ -446,6 +447,11 @@ class Workspace extends Model
     public function inventoryItems(): HasMany|Workspace
     {
         return $this->hasMany(InventoryItem::class);
+    }
+
+    public function interns(): HasMany|Workspace
+    {
+        return $this->hasMany(Intern::class);
     }
 
     public function purchaseOrders(): HasMany|Workspace
