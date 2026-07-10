@@ -11,91 +11,170 @@ use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Models\Intern;
 
-/**
- * Callback for the n8n intern daily-records sync. n8n posts
- * { data: { workspace_id, api_key, records: [ { intern_id, sync_run_id, date, sales, ... } ] } };
- * the workspace is resolved from the api_key we sent, each record is matched to a
- * local intern (by Gencys intern id) and upserted per intern per day, and each
- * record's sync_run_id resolves its pending run.
- */
 class InternDailyRecordController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        // n8n posts { data: {...} }; tolerate a top-level [ { data: {...} } ] wrapper too.
         $data = $request->input('data');
+
         if (! is_array($data)) {
-            $first = $request->all()[0] ?? null;
-            $data = is_array($first) ? ($first['data'] ?? []) : [];
+            $payload = $request->all();
+            $first = $payload[0] ?? null;
+            $data = is_array($first)
+                ? ($first['data'] ?? $first)
+                : $payload;
         }
 
         $workspaceId = $data['workspace_id'] ?? null;
         $rawKey = $data['api_key'] ?? null;
 
-        // One record per intern inline under `data`; also accept a `records` array.
-        $records = (isset($data['records']) && is_array($data['records']) && $data['records'] !== [])
-            ? $data['records']
-            : [$data];
-
         $apiKey = $rawKey ? WorkspaceApiKey::findByRawKey($rawKey) : null;
 
         if (! $apiKey || ($workspaceId && (int) $apiKey->workspace_id !== (int) $workspaceId)) {
-            return response()->json(['message' => 'Invalid api_key for workspace.'], 401);
+            return response()->json([
+                'message' => 'Invalid api_key for workspace.',
+            ], 401);
         }
 
-        $apiKey->update(['last_used_at' => now()]);
+        $apiKey->update([
+            'last_used_at' => now(),
+        ]);
+
         $workspace = $apiKey->workspace;
 
-        // Map every referenced Gencys intern id to its local row id, once.
-        $internIdMap = Intern::where('workspace_id', $workspace->id)
-            ->whereNotNull('intern_id')
-            ->pluck('id', 'intern_id');
+        $parentInternId = $this->intOrNull(
+            $data['intern_id']
+            ?? $data['internId']
+            ?? null
+        );
+
+        if (! $parentInternId) {
+            return response()->json([
+                'message' => 'intern_id is required.',
+            ], 422);
+        }
+
+        $intern = Intern::where('workspace_id', $workspace->id)
+            ->where('intern_id', $parentInternId)
+            ->first();
+
+        if (! $intern) {
+            return response()->json([
+                'message' => "Intern {$parentInternId} not found.",
+            ], 422);
+        }
+
+        $gencysInternId = $intern->id;
+        
+        $records = collect(['records', 'rows'])
+            ->map(fn ($key) => $data[$key] ?? null)
+            ->first(fn ($rows) => is_array($rows) && ! empty($rows))
+            ?? [$data];
 
         $saved = 0;
         $skipped = 0;
         $rowsPerRun = [];
 
         foreach ($records as $record) {
-            $internId = $this->intOrNull($record['intern_id'] ?? $record['internId'] ?? $record['id'] ?? null);
-            $gencysInternId = $internId ? $internIdMap->get($internId) : null;
-
-            if (! $gencysInternId) {
-                $skipped++;
-
-                continue;
-            }
 
             GencysInternDailyRecord::updateOrCreate(
                 [
                     'workspace_id' => $workspace->id,
                     'gencys_intern_id' => $gencysInternId,
-                    // Fall back to today when n8n doesn't echo the record date.
-                    'record_date' => $this->date($record['date'] ?? $record['record_date'] ?? null)
-                        ?? now()->toDateString(),
+                    'record_date' => $this->date(
+                            $record['date']
+                            ?? $record['record_date']
+                            ?? null
+                        ) ?? now()->toDateString(),
                 ],
                 [
-                    'sales' => $this->decimalOrNull($record['total_sales'] ?? $record['sales'] ?? null),
-                    'roas' => $this->decimalOrNull($record['roas'] ?? null),
-                    'ad_spent' => $this->decimalOrNull($record['ads_spent'] ?? $record['ad_spent'] ?? $record['adSpent'] ?? null),
-                    'rts_rate' => $this->decimalOrNull($record['rts_rate'] ?? $record['rtsRate'] ?? null),
-                    'rts_amount' => $this->decimalOrNull($record['rts_amount'] ?? $record['rtsAmount'] ?? null),
-                ],
+                    'orders' => $this->countOrNull($record['orders'] ?? null),
+
+                    'sales' => $this->decimalOrNull(
+                        $record['total_sales']
+                        ?? $record['sales']
+                        ?? null
+                    ),
+
+                    'roas' => $this->decimalOrNull(
+                        $record['roas'] ?? null
+                    ),
+
+                    'ad_spent' => $this->decimalOrNull(
+                        $record['ads_spent']
+                        ?? $record['ad_spent']
+                        ?? $record['adSpent']
+                        ?? null
+                    ),
+
+                    'rts_rate' => $this->decimalOrNull(
+                        $record['rts_rate']
+                        ?? $record['rtsRate']
+                        ?? null
+                    ),
+
+                    'rts_amount' => $this->decimalOrNull(
+                        $record['rts_amount']
+                        ?? $record['rtsAmount']
+                        ?? null
+                    ),
+
+                    ...$this->monthToDate($record),
+                ]
             );
+
             $saved++;
 
-            if ($runId = $this->intOrNull($record['sync_run_id'] ?? $record['syncRunId'] ?? null)) {
+            if ($runId = $this->intOrNull(
+                $record['sync_run_id']
+                ?? $record['syncRunId']
+                ?? null
+            )) {
                 $rowsPerRun[$runId] = ($rowsPerRun[$runId] ?? 0) + 1;
             }
         }
 
         foreach ($rowsPerRun as $runId => $count) {
-            GencysSyncRun::succeedById($workspace->id, $runId, $count, $count);
+            GencysSyncRun::succeedById(
+                $workspace->id,
+                $runId,
+                $count,
+                $count
+            );
         }
 
         return response()->json([
             'saved' => $saved,
             'skipped' => $skipped,
+            'intern_id' => $parentInternId,
+            'gencys_intern_id' => $gencysInternId,
         ]);
+    }
+    /**
+     * The month-to-date block: four headline totals plus an RTS breakdown per
+     * stage. Every field is optional — the ERP omits them on some payloads.
+     *
+     * @return array<string, float|int|null>
+     */
+    private function monthToDate(array $record): array
+    {
+        $values = [
+            'date_to_month_sales' => $this->decimalOrNull($record['date_to_month_sales'] ?? null),
+            'date_to_month_orders' => $this->countOrNull($record['date_to_month_orders'] ?? null),
+            'date_to_month_ad_spent' => $this->decimalOrNull($record['date_to_month_ad_spent'] ?? null),
+            'date_to_month_roas' => $this->decimalOrNull($record['date_to_month_roas'] ?? null),
+        ];
+
+        foreach (['sales_order', 'parcel_status', 'shipped_out'] as $stage) {
+            $prefix = "date_to_month_{$stage}";
+
+            $values["{$prefix}_rts_rate"] = $this->decimalOrNull($record["{$prefix}_rts_rate"] ?? null);
+            $values["{$prefix}_delivered"] = $this->countOrNull($record["{$prefix}_delivered"] ?? null);
+            $values["{$prefix}_returned"] = $this->countOrNull($record["{$prefix}_returned"] ?? null);
+            $values["{$prefix}_for_return"] = $this->countOrNull($record["{$prefix}_for_return"] ?? null);
+        }
+
+        return $values;
     }
 
     private function date(mixed $value): ?string
@@ -134,5 +213,17 @@ class InternDailyRecordController extends Controller
     private function intOrNull(mixed $value): ?int
     {
         return ($value === null || $value === '') ? null : (int) $value;
+    }
+
+    /**
+     * Parse a formatted count: "382.00" → 382, "1,888" → 1888, "" → null. The ERP
+     * sends counts as decimal strings, so a plain (int) cast would truncate at the
+     * first separator ((int) "1,888" === 1).
+     */
+    private function countOrNull(mixed $value): ?int
+    {
+        $parsed = $this->decimalOrNull($value);
+
+        return $parsed === null ? null : (int) $parsed;
     }
 }
