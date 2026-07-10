@@ -294,7 +294,7 @@ class CreativesController extends Controller
         }
 
         return redirect()
-            ->route('workspaces.creatives.index', $workspace)
+            ->back()
             ->with('success', 'Creative updated successfully');
     }
 
