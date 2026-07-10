@@ -4,7 +4,23 @@ use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
 use App\Models\Shop;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+
+/**
+ * Seed a locally-synced Botcake flow for the given page.
+ */
+function seedBotcakeFlow(Page $page, int $flowId, bool $isRemoved = false): void
+{
+    DB::table('botcake_flows')->insert([
+        'id' => $flowId,
+        'page_id' => $page->id,
+        'is_removed' => $isRemoved,
+        'name' => "Flow {$flowId}",
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
 
 test('owner can view pages index', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
@@ -74,6 +90,115 @@ test('cannot update a page from a different workspace', function () {
             'status' => 'active',
         ])
         ->assertForbidden();
+});
+
+test('update rejects a flow ID that is not synced for the page', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->forOwner($owner)->create();
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/pages/{$page->id}/edit")
+        ->put("/workspaces/{$workspace->slug}/pages/{$page->id}", [
+            'name' => 'Renamed Page',
+            'parcel_journey_enabled' => true,
+            'parcel_journey_flow_id' => 424242,
+            'owner_id' => $owner->id,
+            'status' => 'active',
+        ])
+        ->assertSessionHasErrors('parcel_journey_flow_id');
+});
+
+test('update accepts a flow ID that is synced for the page', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->forOwner($owner)->create();
+    seedBotcakeFlow($page, 555);
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/pages/{$page->id}/edit")
+        ->put("/workspaces/{$workspace->slug}/pages/{$page->id}", [
+            'name' => 'Renamed Page',
+            'parcel_journey_enabled' => true,
+            'parcel_journey_flow_id' => 555,
+            'owner_id' => $owner->id,
+            'status' => 'active',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect((int) $page->fresh()->parcel_journey_flow_id)->toBe(555);
+});
+
+test('update rejects a flow ID that was removed upstream', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->forOwner($owner)->create();
+    seedBotcakeFlow($page, 777, isRemoved: true);
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/pages/{$page->id}/edit")
+        ->put("/workspaces/{$workspace->slug}/pages/{$page->id}", [
+            'name' => 'Renamed Page',
+            'parcel_journey_enabled' => true,
+            'parcel_journey_flow_id' => 777,
+            'owner_id' => $owner->id,
+            'status' => 'active',
+        ])
+        ->assertSessionHasErrors('parcel_journey_flow_id');
+});
+
+test('update saves a custom field ID without calling Botcake (local validation only)', function () {
+    Http::fake();
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->forOwner($owner)->create();
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/pages/{$page->id}/edit")
+        ->put("/workspaces/{$workspace->slug}/pages/{$page->id}", [
+            'name' => 'Renamed Page',
+            'parcel_journey_enabled' => true,
+            'parcel_journey_custom_field_id' => 999,
+            'botcake_token' => 'tok',
+            'owner_id' => $owner->id,
+            'status' => 'active',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    expect((int) $page->fresh()->parcel_journey_custom_field_id)->toBe(999);
+    Http::assertNothingSent();
+});
+
+test('update rejects a non-positive custom field ID', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->forOwner($owner)->create();
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/pages/{$page->id}/edit")
+        ->put("/workspaces/{$workspace->slug}/pages/{$page->id}", [
+            'name' => 'Renamed Page',
+            'parcel_journey_enabled' => true,
+            'parcel_journey_custom_field_id' => 0,
+            'owner_id' => $owner->id,
+            'status' => 'active',
+        ])
+        ->assertSessionHasErrors('parcel_journey_custom_field_id');
+});
+
+test('update skips parcel-journey ID validation while the feature is disabled', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->forOwner($owner)->create();
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/pages/{$page->id}/edit")
+        ->put("/workspaces/{$workspace->slug}/pages/{$page->id}", [
+            'name' => 'Renamed Page',
+            'parcel_journey_enabled' => false,
+            'parcel_journey_flow_id' => 424242,
+            'owner_id' => $owner->id,
+            'status' => 'active',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
 });
 
 test('archive deactivates the page; restore reactivates it', function () {
@@ -165,6 +290,97 @@ test('validateBotcakeToken returns valid:false on upstream failure', function ()
         ])
         ->assertOk()
         ->assertJsonPath('valid', false);
+});
+
+test('validateFlowId returns valid:true when the flow is synced for the page', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create();
+    seedBotcakeFlow($page, 321);
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/pages/validate-flow-id", [
+            'page_id' => (string) $page->id,
+            'flow_id' => '321',
+        ])
+        ->assertOk()
+        ->assertJsonPath('valid', true);
+});
+
+test('validateFlowId returns valid:false for an unknown flow', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/pages/validate-flow-id", [
+            'page_id' => (string) $page->id,
+            'flow_id' => '404404',
+        ])
+        ->assertOk()
+        ->assertJsonPath('valid', false);
+});
+
+test('validateCustomFieldId returns valid:true when Botcake confirms the field', function () {
+    Http::fake([
+        'botcake.io/api/public_api/v1/pages/*/custom_fields' => Http::response([
+            'data' => [['id' => 12], ['id' => 34]],
+            'success' => true,
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/pages/validate-custom-field-id", [
+            'page_id' => (string) $page->id,
+            'custom_field_id' => '34',
+            'token' => 'tok',
+        ])
+        ->assertOk()
+        ->assertJsonPath('valid', true);
+});
+
+test('validateCustomFieldId returns valid:false when the field is absent', function () {
+    Http::fake([
+        'botcake.io/api/public_api/v1/pages/*/custom_fields' => Http::response([
+            'data' => [['id' => 12]],
+            'success' => true,
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/pages/validate-custom-field-id", [
+            'page_id' => (string) $page->id,
+            'custom_field_id' => '99',
+            'token' => 'tok',
+        ])
+        ->assertOk()
+        ->assertJsonPath('valid', false);
+});
+
+test('validateCustomFieldId surfaces Botcake error message on rejection', function () {
+    Http::fake([
+        'botcake.io/api/public_api/v1/pages/*/custom_fields' => Http::response([
+            'message' => 'invalid_page_id',
+            'success' => false,
+        ], 400),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/pages/validate-custom-field-id", [
+            'page_id' => (string) $page->id,
+            'custom_field_id' => '34',
+            'token' => 'tok',
+        ])
+        ->assertOk()
+        ->assertJsonPath('valid', false)
+        ->assertJsonPath('message', 'Botcake: invalid_page_id');
 });
 
 test('guest is redirected to login from pages index', function () {

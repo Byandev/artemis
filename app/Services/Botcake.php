@@ -106,6 +106,29 @@ class Botcake
     }
 
     /**
+     * Fetch the page's custom field definitions from Botcake.
+     *
+     * On failure the thrown message carries Botcake's own reason (e.g.
+     * "invalid_page_id") when present, so callers can surface it verbatim.
+     *
+     * @throws ConnectionException
+     * @throws Exception
+     */
+    public function fetchCustomFields(): array
+    {
+        $response = Http::withHeader('access-token', $this->token)
+            ->get("https://botcake.io/api/public_api/v1/pages/$this->pageId/custom_fields");
+
+        $body = $response->json();
+
+        if ($response->failed() || ($body['success'] ?? true) === false) {
+            throw new Exception($body['message'] ?? 'Failed to fetch custom fields: '.$response->status());
+        }
+
+        return $response->json('data', []);
+    }
+
+    /**
      * @throws ConnectionException
      * @throws Exception
      */

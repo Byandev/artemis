@@ -7,7 +7,39 @@ import { Page } from '@/types/models/Page';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, BookOpen, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+function csrfFromCookie(): string {
+    const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
+async function checkValid(
+    url: string,
+    payload: Record<string, string>,
+): Promise<{ valid: boolean; message: string }> {
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-XSRF-TOKEN': csrfFromCookie(),
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = (await res.json()) as {
+            valid?: boolean;
+            message?: string;
+        };
+        return { valid: Boolean(data.valid), message: data.message ?? '' };
+    } catch {
+        return { valid: false, message: 'Network error. Try again.' };
+    }
+}
 
 interface Props {
     workspace: Workspace;
@@ -40,13 +72,44 @@ export default function Edit({ workspace, page, users }: Props) {
         status: page.status ?? 'active',
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    const [validating, setValidating] = useState(false);
+
+    const save = () => {
         put(workspaces.pages.update.url({ workspace, page }), {
             onError: () => {
                 toast.error('Failed to update page. Please check the form.');
             },
         });
+    };
+
+    // Validate the parcel-journey flow ID against the locally-synced flows
+    // before saving so a bad reference is caught here rather than only on the
+    // server round-trip. Custom field IDs have no local source to check against.
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (data.parcel_journey_enabled && data.parcel_journey_flow_id) {
+            setValidating(true);
+            try {
+                const result = await checkValid(
+                    `/workspaces/${workspace.slug}/pages/validate-flow-id`,
+                    {
+                        page_id: String(page.id),
+                        flow_id: data.parcel_journey_flow_id,
+                    },
+                );
+                if (!result.valid) {
+                    toast.error(
+                        `Flow ID: ${result.message || 'Invalid flow ID.'}`,
+                    );
+                    return;
+                }
+            } finally {
+                setValidating(false);
+            }
+        }
+
+        save();
     };
 
     return (
@@ -269,6 +332,24 @@ export default function Edit({ workspace, page, users }: Props) {
                                                             )
                                                         }
                                                     />
+                                                    <ValidateTokenButton
+                                                        url={`/workspaces/${workspace.slug}/pages/validate-custom-field-id`}
+                                                        payload={{
+                                                            page_id: String(
+                                                                page.id,
+                                                            ),
+                                                            custom_field_id:
+                                                                data.parcel_journey_custom_field_id,
+                                                            token: data.botcake_token,
+                                                        }}
+                                                        disabledReason={
+                                                            !data.parcel_journey_custom_field_id
+                                                                ? 'Enter a custom field ID first'
+                                                                : !data.botcake_token
+                                                                  ? 'Enter a Botcake token first'
+                                                                  : undefined
+                                                        }
+                                                    />
                                                     {errors.parcel_journey_custom_field_id && (
                                                         <p
                                                             className={
@@ -299,6 +380,21 @@ export default function Edit({ workspace, page, users }: Props) {
                                                                 'parcel_journey_flow_id',
                                                                 e.target.value,
                                                             )
+                                                        }
+                                                    />
+                                                    <ValidateTokenButton
+                                                        url={`/workspaces/${workspace.slug}/pages/validate-flow-id`}
+                                                        payload={{
+                                                            page_id: String(
+                                                                page.id,
+                                                            ),
+                                                            flow_id:
+                                                                data.parcel_journey_flow_id,
+                                                        }}
+                                                        disabledReason={
+                                                            !data.parcel_journey_flow_id
+                                                                ? 'Enter a flow ID first'
+                                                                : undefined
                                                         }
                                                     />
                                                     {errors.parcel_journey_flow_id && (
@@ -561,10 +657,14 @@ export default function Edit({ workspace, page, users }: Props) {
                             </button>
                             <button
                                 type="submit"
-                                disabled={processing}
+                                disabled={processing || validating}
                                 className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                             >
-                                {processing ? 'Saving…' : 'Save Changes'}
+                                {validating
+                                    ? 'Validating…'
+                                    : processing
+                                      ? 'Saving…'
+                                      : 'Save Changes'}
                             </button>
                         </div>
                     </form>
