@@ -1,50 +1,57 @@
 import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
-import InternMultiSelect, {
-    InternOption,
-} from '@/pages/workspaces/gencys/components/intern-multi-select';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import axios from 'axios';
+import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
+
+type Status = 'up' | 'down' | 'flat';
 
 interface Row {
     id: number;
     name: string | null;
-    orders: number | null;
-    status: 'up' | 'down' | 'flat';
-    latest_sales: number | null;
-    previous_sales: number | null;
-    change: number | null;
-    total_to_date: number | null;
+    orders: number;
+    sales: number;
+    yesterday_sales: number;
+    change: number;
+    status: Status;
+    month_sales: number;
     rank: number;
-    roas_a: number | null;
-    roas_b: number | null;
+    roas_yesterday: number | null;
+    roas_today: number | null;
 }
 
 interface Subtotal {
     orders: number;
-    latest_sales: number;
-    previous_sales: number;
+    sales: number;
+    yesterday_sales: number;
     change: number;
-    total_to_date: number;
-    roas_a: number;
-    roas_b: number;
+    status: Status;
+    month_sales: number;
+    roas_yesterday: number | null;
+    roas_today: number | null;
+}
+
+interface View {
+    date: string | null;
+    date_label: string | null;
+    prev_date: string | null;
+    prev_date_label: string | null;
+    rows: Row[];
+    subtotal: Subtotal | null;
+}
+
+interface Filters {
+    date: string | null;
 }
 
 interface Props {
     workspace: Workspace;
-    interns: InternOption[];
-    view: {
-        report_date: string | null;
-        report_label: string | null;
-        roas_a_label: string | null;
-        roas_b_label: string | null;
-        rows: Row[];
-        subtotal: Subtotal | null;
-    };
-    filters: { gencys_intern_id: string[]; date: string | null };
+    view: View;
+    filters: Filters;
 }
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -56,46 +63,49 @@ const peso = (v: number | null) =>
               maximumFractionDigits: 2,
           })}`;
 
-const roasText = (v: number | null) => (v === null ? '—' : v.toFixed(2));
+const int = (v: number) => v.toLocaleString('en-PH');
 
-// Theme-aware conditional text/fills (Artemis emerald / red / amber).
-const changeTone = (v: number | null) =>
-    v === null || v === 0
-        ? 'text-gray-500 dark:text-gray-400'
-        : v > 0
-          ? 'bg-emerald-500/[0.06] text-emerald-600 dark:text-emerald-400'
-          : 'bg-red-500/[0.06] text-red-600 dark:text-red-400';
+const roasText = (v: number | null) => (v === null ? '—' : v.toFixed(2));
 
 const roasTone = (v: number | null) =>
     v === null
         ? 'text-gray-400 dark:text-gray-600'
         : v >= 3
+          ? 'text-emerald-600 dark:text-emerald-400'
+          : 'text-red-600 dark:text-red-400';
+
+const changeTone = (v: number) =>
+    v === 0
+        ? 'text-gray-500 dark:text-gray-400'
+        : v > 0
           ? 'bg-emerald-500/[0.06] text-emerald-600 dark:text-emerald-400'
           : 'bg-red-500/[0.06] text-red-600 dark:text-red-400';
 
 // Shared cell chrome.
 const cell =
     'border-b border-black/5 px-3 py-2 whitespace-nowrap dark:border-white/5';
-const numCell = `${cell} text-right font-mono tabular-nums text-gray-700 dark:text-gray-300`;
+const num = `${cell} text-right font-mono tabular-nums text-gray-700 dark:text-gray-300`;
+const ctr = `${cell} text-center font-mono tabular-nums text-gray-700 dark:text-gray-300`;
 
 // ─── Presentational bits ────────────────────────────────────────────────────────
-function StatusPill({ status }: { status: Row['status'] }) {
+function Remark({ status }: { status: Status }) {
     if (status === 'flat')
         return <span className="text-gray-300 dark:text-gray-600">—</span>;
     const up = status === 'up';
     return (
         <span
-            className={`inline-flex h-5 w-5 items-center justify-center rounded-md ${
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ${
                 up
                     ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                     : 'bg-red-500/10 text-red-600 dark:text-red-400'
             }`}
         >
             {up ? (
-                <ArrowUp className="h-3.5 w-3.5" strokeWidth={2.5} />
+                <ArrowUp className="h-3 w-3" strokeWidth={2.5} />
             ) : (
-                <ArrowDown className="h-3.5 w-3.5" strokeWidth={2.5} />
+                <ArrowDown className="h-3 w-3" strokeWidth={2.5} />
             )}
+            {up ? 'UP' : 'DOWN'}
         </span>
     );
 }
@@ -150,47 +160,38 @@ function DataRow({ row }: { row: Row }) {
             >
                 {row.name ?? `#${row.id}`}
             </td>
-            <td
-                className={`${cell} text-center font-mono text-gray-600 tabular-nums dark:text-gray-400`}
-            >
-                {row.orders ?? '—'}
+            <td className={ctr}>{int(row.orders)}</td>
+            <td className={num}>{peso(row.sales)}</td>
+            <td className={`${num} text-gray-400 dark:text-gray-500`}>
+                {peso(row.yesterday_sales)}
             </td>
-            <td className={`${cell} text-center`}>
-                <StatusPill status={row.status} />
-            </td>
-            <td className={numCell}>{peso(row.latest_sales)}</td>
-            <td className={numCell}>{peso(row.previous_sales)}</td>
             <td
                 className={`${cell} text-right font-mono tabular-nums ${changeTone(row.change)}`}
             >
                 {peso(row.change)}
             </td>
+            <td className={`${cell} text-center`}>
+                <Remark status={row.status} />
+            </td>
             <td
                 className={`${cell} bg-amber-500/[0.05] text-right font-mono font-medium text-gray-800 tabular-nums dark:text-gray-200`}
             >
-                {peso(row.total_to_date)}
+                {peso(row.month_sales)}
             </td>
             <td className={`${cell} text-center`}>
                 <RankBadge rank={row.rank} />
             </td>
-            <td
-                className={`${cell} text-center font-mono font-medium tabular-nums ${roasTone(row.roas_a)}`}
-            >
-                {roasText(row.roas_a)}
+            <td className={`${ctr} opacity-60 ${roasTone(row.roas_yesterday)}`}>
+                {roasText(row.roas_yesterday)}
             </td>
-            <td
-                className={`${cell} text-center font-mono font-medium tabular-nums ${roasTone(row.roas_b)}`}
-            >
-                {roasText(row.roas_b)}
+            <td className={`${ctr} font-medium ${roasTone(row.roas_today)}`}>
+                {roasText(row.roas_today)}
             </td>
         </tr>
     );
 }
 
 function SubtotalRow({ st }: { st: Subtotal }) {
-    const darkCell =
-        'border-b border-black/5 bg-zinc-800 px-3 py-2 text-center font-mono text-[12px] font-semibold text-white tabular-nums dark:border-white/5 dark:bg-zinc-950';
-
     return (
         <tr className="bg-stone-50 dark:bg-white/2">
             <td
@@ -198,77 +199,89 @@ function SubtotalRow({ st }: { st: Subtotal }) {
             >
                 Sub-Total
             </td>
+            <td className={`${ctr} font-semibold`}>{int(st.orders)}</td>
+            <td className={`${num} font-semibold`}>{peso(st.sales)}</td>
             <td
-                className={`${cell} text-center font-mono font-semibold text-gray-700 tabular-nums dark:text-gray-300`}
+                className={`${num} font-semibold text-gray-400 dark:text-gray-500`}
             >
-                {st.orders.toLocaleString('en-PH')}
-            </td>
-            <td className={cell} />
-            <td className={`${numCell} font-semibold`}>
-                {peso(st.latest_sales)}
-            </td>
-            <td className={`${numCell} font-semibold`}>
-                {peso(st.previous_sales)}
+                {peso(st.yesterday_sales)}
             </td>
             <td
                 className={`${cell} text-right font-mono font-semibold tabular-nums ${changeTone(st.change)}`}
             >
                 {peso(st.change)}
             </td>
+            <td className={`${cell} text-center`}>
+                <Remark status={st.status} />
+            </td>
             <td
                 className={`${cell} bg-amber-500/[0.08] text-right font-mono font-semibold text-gray-800 tabular-nums dark:text-gray-100`}
             >
-                {peso(st.total_to_date)}
+                {peso(st.month_sales)}
             </td>
-            <td className={darkCell}>EXPO. ROAS</td>
-            <td className={darkCell}>{roasText(st.roas_a)}</td>
-            <td className={darkCell}>{roasText(st.roas_b)}</td>
+            <td className={cell} />
+            <td
+                className={`${ctr} font-semibold opacity-60 ${roasTone(st.roas_yesterday)}`}
+            >
+                {roasText(st.roas_yesterday)}
+            </td>
+            <td className={`${ctr} font-semibold ${roasTone(st.roas_today)}`}>
+                {roasText(st.roas_today)}
+            </td>
         </tr>
     );
 }
 
 export default function InternDashboard({
     workspace,
-    interns,
-    view,
+    view: initialView,
     filters,
 }: Props) {
-    const [internIds, setInternIds] = useState<string[]>(
-        filters.gencys_intern_id ?? [],
-    );
     const [date, setDate] = useState<string>(filters.date ?? '');
+    const [view, setView] = useState<View>(initialView);
+    const [loading, setLoading] = useState(false);
+
     const baseUrl = `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
 
-    const reload = (next: { gencys_intern_id?: string[]; date?: string }) => {
-        router.get(
-            baseUrl,
-            {
-                filter: {
-                    gencys_intern_id: next.gencys_intern_id ?? internIds,
-                    date: next.date ?? date,
-                },
-            },
-            {
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-                only: ['view', 'filters'],
-            },
+    // Persist the selected date in the URL so a refresh restores it — the
+    // controller reads filter.date on load. replaceState (not an Inertia visit)
+    // keeps this axios-driven; we preserve the existing history state so
+    // Inertia's page record isn't clobbered.
+    const syncUrl = (f: Filters) => {
+        const params = new URLSearchParams();
+        if (f.date) params.set('filter[date]', f.date);
+        const qs = params.toString();
+        window.history.replaceState(
+            window.history.state,
+            '',
+            qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
         );
     };
 
-    const applyInterns = (ids: string[]) => {
-        setInternIds(ids);
-        reload({ gencys_intern_id: ids });
-    };
-
+    // Fetch the table via the JSON endpoint (axios) whenever the date changes;
+    // reflect the server-resolved date back into the picker so the default day
+    // is visible.
     const applyDate = (value: string) => {
         setDate(value);
-        reload({ date: value });
+        setLoading(true);
+        axios
+            .get(`${baseUrl}/data`, { params: { filter: { date: value } } })
+            .then((res) => {
+                const data = res.data as { view: View; filters: Filters };
+                setView(data.view);
+                setDate(data.filters.date ?? '');
+                syncUrl(data.filters);
+            })
+            .catch(() => toast.error('Failed to load dashboard data.'))
+            .finally(() => setLoading(false));
     };
 
     const headCell =
         'border-b border-black/6 bg-stone-50 px-3 py-2.5 text-center align-middle font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:border-white/6 dark:bg-white/2 dark:text-gray-500';
+
+    const dateLabel = view.date_label
+        ? `Sales / ROAS · ${view.date_label} vs ${view.prev_date_label}`
+        : 'Per-intern sales & ROAS from Gencys ERP';
 
     return (
         <AppLayout>
@@ -277,18 +290,9 @@ export default function InternDashboard({
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
                     title="Interns Quick Data View"
-                    description={
-                        view.report_label
-                            ? `Sales / ROAS · report date ${view.report_label}`
-                            : 'Per-intern sales & ROAS from Gencys ERP'
-                    }
+                    description={dateLabel}
                     stackActionsOnMobile
                 >
-                    <InternMultiSelect
-                        interns={interns}
-                        selected={internIds}
-                        onApply={applyInterns}
-                    />
                     <DatePicker
                         id="intern-dashboard-date"
                         key={date}
@@ -301,31 +305,41 @@ export default function InternDashboard({
                     />
                 </PageHeader>
 
-                <div className="mt-4 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                <div className="relative mt-4 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                    {loading && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
+                            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                        </div>
+                    )}
                     <table className="w-full min-w-[1080px] border-collapse text-[12px] text-gray-800 dark:text-gray-200">
                         <thead>
                             <tr>
                                 <th className={`${headCell} text-left`}>
                                     Name
                                 </th>
-                                <th className={headCell}>Latest Orders</th>
-                                <th className={headCell}>Status</th>
-                                <th className={headCell}>Latest Sales</th>
-                                <th className={headCell}>Prev. Day Sales</th>
-                                <th className={headCell}>Change (+/-)</th>
+                                <th className={headCell}>Orders</th>
+                                <th className={headCell}>Sales</th>
                                 <th className={headCell}>
-                                    Total Sales To-Date
+                                    Yesterday Sales
+                                    {view.prev_date_label && (
+                                        <span className="mt-0.5 block text-[9px] font-normal tracking-normal text-gray-300 normal-case dark:text-gray-600">
+                                            {view.prev_date_label}
+                                        </span>
+                                    )}
                                 </th>
+                                <th className={headCell}>Change</th>
+                                <th className={headCell}>Remarks</th>
+                                <th className={headCell}>Day to Month Sales</th>
                                 <th className={headCell}>Top Sales Ranking</th>
                                 <th
                                     className={`${headCell} text-emerald-600/70 dark:text-emerald-400/60`}
                                 >
-                                    {view.roas_a_label ?? '—'} ROAS
+                                    ROAS Yesterday
                                 </th>
                                 <th
                                     className={`${headCell} text-emerald-600/70 dark:text-emerald-400/60`}
                                 >
-                                    {view.roas_b_label ?? '—'} ROAS
+                                    ROAS Today
                                 </th>
                             </tr>
                         </thead>
@@ -346,7 +360,7 @@ export default function InternDashboard({
                                 <DataRow key={row.id} row={row} />
                             ))}
 
-                            {view.subtotal && (
+                            {view.subtotal && view.rows.length > 0 && (
                                 <SubtotalRow st={view.subtotal} />
                             )}
                         </tbody>

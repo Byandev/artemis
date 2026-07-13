@@ -454,6 +454,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
         Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
         Route::get('/intern-dashboard', [GencysInternDashboardController::class, 'index'])->name('intern-dashboard.index');
+        Route::get('/intern-dashboard/data', [GencysInternDashboardController::class, 'data'])->name('intern-dashboard.data');
         Route::get('/interns', [GencysInternController::class, 'index'])->name('interns.index');
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');
         Route::patch('/interns/{intern}/toggle-active', [GencysInternController::class, 'toggleActive'])->name('interns.toggle-active');

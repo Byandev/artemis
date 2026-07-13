@@ -9,13 +9,11 @@ use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\Intern;
 
 /**
- * Builds the "Interns Quick Data View (Sales/ROAS)" table.
+ * Builds the "Interns Quick Data View (Sales/ROAS)" table for a single date.
  *
- * Everything hangs off a single report date — the latest record date in the
- * workspace. Latest-day figures come from that date, "previous day" from the
- * day before, and the two ROAS columns from the two days before the report
- * date (the ROAS for the latest day only finalises the next day). All records
- * are pulled in one query and grouped in memory — no N+1.
+ * Per intern the day's orders / sales / ad_spent are shown, with ROAS
+ * (sales ÷ ad_spent) and a change vs the previous day's sales. Interns are
+ * ranked globally by sales. Only active interns appear.
  */
 class InternDashboardQuery
 {
@@ -25,7 +23,7 @@ class InternDashboardQuery
     public function __construct(
         private readonly Workspace $workspace,
         array $internIds = [],
-        private readonly ?string $anchorDate = null,
+        private readonly ?string $date = null,
     ) {
         $this->internIds = array_values(array_filter(
             array_map('intval', $internIds),
@@ -35,140 +33,143 @@ class InternDashboardQuery
 
     public function get(): array
     {
-        $reportDate = $this->reportDate();
+        $date = $this->resolveDate();
 
-        if (! $reportDate) {
+        if (! $date) {
             return [
-                'report_date' => null,
-                'report_label' => null,
-                'roas_a_label' => null,
-                'roas_b_label' => null,
+                'date' => null,
+                'date_label' => null,
+                'prev_date' => null,
+                'prev_date_label' => null,
                 'rows' => [],
                 'subtotal' => null,
             ];
         }
 
-        $dLatest = $reportDate->toDateString();
-        $dPrev = $reportDate->copy()->subDay()->toDateString();   // previous day / ROAS B
-        $dRoasA = $reportDate->copy()->subDays(2)->toDateString(); // ROAS A
+        $prevDate = $date->copy()->subDay();
 
-        // One query for every cell in the table.
-        $records = GencysInternDailyRecord::query()
-            ->where('workspace_id', $this->workspace->id)
-            ->whereIn('record_date', [$dRoasA, $dPrev, $dLatest])
-            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
-            ->get(['gencys_intern_id', 'record_date', 'orders', 'sales', 'ad_spent', 'roas', 'date_to_month_sales']);
+        // At most one record per intern per date (unique key), so index by intern.
+        // "today" = the selected date, "yesterday" = the day before.
+        $today = $this->recordsFor($date->toDateString())->keyBy('gencys_intern_id');
+        $yesterday = $this->recordsFor($prevDate->toDateString())->keyBy('gencys_intern_id');
 
-        // Index by [intern_id][Y-m-d] for O(1) lookups while building rows.
-        $byIntern = [];
-        foreach ($records as $r) {
-            $byIntern[$r->gencys_intern_id][$r->record_date->toDateString()] = $r;
-        }
+        // Month-to-date sales per intern: summed daily sales from the 1st of the
+        // selected date's month through that date. (The ERP's own
+        // date_to_month_sales snapshot isn't populated, so we derive it.)
+        $monthToDate = $this->monthToDateSales($date);
 
         $interns = Intern::where('workspace_id', $this->workspace->id)
-            ->whereIn('id', array_keys($byIntern))
+            ->where('active', true)
+            ->whereIn('id', $today->keys()->all())
             ->orderBy('intern_id')
             ->get(['id', 'full_name', 'company_name']);
 
-        // Build one flat row per intern first so ranking is global across groups.
-        $rows = $interns->map(function (Intern $intern) use ($byIntern, $dLatest, $dPrev, $dRoasA) {
-            $days = $byIntern[$intern->id] ?? [];
-            $latest = $days[$dLatest] ?? null;
-            $prev = $days[$dPrev] ?? null;
-            $roasA = $days[$dRoasA] ?? null;
-            $roasB = $prev; // ROAS B is the previous day
+        $rows = $interns->map(function (Intern $intern) use ($today, $yesterday, $monthToDate) {
+            $t = $today->get($intern->id);
+            $y = $yesterday->get($intern->id);
 
-            $latestSales = (float) ($latest->sales ?? 0);
-            $previousSales = (float) ($prev->sales ?? 0);
+            $tSales = (float) ($t->sales ?? 0);
+            $ySales = (float) ($y->sales ?? 0);
+            $tSpend = (float) ($t->ad_spent ?? 0);
+            $ySpend = (float) ($y->ad_spent ?? 0);
+            $change = $tSales - $ySales;
 
             return [
                 'id' => $intern->id,
                 'name' => $intern->full_name,
-                'company' => $intern->company_name ?: 'UNGROUPED',
-                'orders' => $latest ? (int) $latest->orders : null,
-                'latest_sales' => $latest ? $latestSales : null,
-                'previous_sales' => $prev ? $previousSales : null,
-                'change' => $latest || $prev ? $latestSales - $previousSales : null,
-                'total_to_date' => $latest ? (float) $latest->date_to_month_sales : null,
-                'roas_a' => $roasA ? (float) $roasA->roas : null,
-                'roas_b' => $roasB ? (float) $roasB->roas : null,
-                // Retained for subtotal ROAS (blended = ΣSales ÷ ΣAdSpend).
-                '_sales_a' => (float) ($roasA->sales ?? 0),
-                '_spend_a' => (float) ($roasA->ad_spent ?? 0),
-                '_sales_b' => (float) ($roasB->sales ?? 0),
-                '_spend_b' => (float) ($roasB->ad_spent ?? 0),
+                'orders' => (int) ($t->orders ?? 0),
+                'sales' => $tSales,
+                'yesterday_sales' => $ySales,
+                'change' => round($change, 2),
+                // Up/down remark: today's sales vs yesterday's.
+                'status' => $change > 0 ? 'up' : ($change < 0 ? 'down' : 'flat'),
+                // Month-to-date sales as of the selected date (running total).
+                'month_sales' => (float) ($monthToDate[$intern->id] ?? 0),
+                'roas_yesterday' => $ySpend > 0 ? round($ySales / $ySpend, 2) : null,
+                'roas_today' => $tSpend > 0 ? round($tSales / $tSpend, 2) : null,
+                // Internal — kept for blended subtotal ROAS, stripped below.
+                '_t_spend' => $tSpend,
+                '_y_spend' => $ySpend,
             ];
         });
 
-        // Global ranking by total sales to-date (1 = highest).
-        $ranked = $rows->sortByDesc('total_to_date')->values();
-        $rankById = [];
-        foreach ($ranked as $i => $row) {
-            $rankById[$row['id']] = $i + 1;
-        }
+        // Rank by month-to-date sales (1 = highest) and return rows in that order.
+        $ranked = $rows->sortByDesc('month_sales')->values();
 
         return [
-            'report_date' => $reportDate->toDateString(),
-            'report_label' => $reportDate->format('F j'),
-            'roas_a_label' => $reportDate->copy()->subDays(2)->format('F j'),
-            'roas_b_label' => $reportDate->copy()->subDay()->format('F j'),
-            'rows' => $rows
-                ->map(fn (array $row) => $this->publicRow($row, $rankById[$row['id']]))
+            'date' => $date->toDateString(),
+            'date_label' => $date->format('M j'),
+            'prev_date' => $prevDate->toDateString(),
+            'prev_date_label' => $prevDate->format('M j'),
+            'rows' => $ranked
+                ->map(function (array $row, int $i) {
+                    $row['rank'] = $i + 1;
+                    unset($row['_t_spend'], $row['_y_spend']);
+
+                    return $row;
+                })
                 ->values()
                 ->all(),
             'subtotal' => $this->subtotal($rows),
         ];
     }
 
-    /** The anchor date drives every column; defaults to the latest record date. */
-    private function reportDate(): ?Carbon
+    /** Daily records for the given date, scoped to workspace + selected interns. */
+    private function recordsFor(string $date): Collection
     {
-        if ($this->anchorDate) {
-            return Carbon::parse($this->anchorDate);
+        return GencysInternDailyRecord::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('record_date', $date)
+            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
+            ->get(['gencys_intern_id', 'orders', 'sales', 'ad_spent']);
+    }
+
+    /**
+     * intern id => summed daily sales from the 1st of $date's month through
+     * $date (month-to-date), scoped to workspace + selected interns.
+     */
+    private function monthToDateSales(Carbon $date): Collection
+    {
+        return GencysInternDailyRecord::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->whereBetween('record_date', [$date->copy()->startOfMonth()->toDateString(), $date->toDateString()])
+            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
+            ->groupBy('gencys_intern_id')
+            ->selectRaw('gencys_intern_id, SUM(COALESCE(sales, 0)) as mtd_sales')
+            ->pluck('mtd_sales', 'gencys_intern_id');
+    }
+
+    /** The report date; defaults to the latest record date in the workspace. */
+    private function resolveDate(): ?Carbon
+    {
+        if ($this->date) {
+            return Carbon::parse($this->date);
         }
 
-        $max = GencysInternDailyRecord::where('workspace_id', $this->workspace->id)
+        $latest = GencysInternDailyRecord::where('workspace_id', $this->workspace->id)
             ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
             ->max('record_date');
 
-        return $max ? Carbon::parse($max) : null;
-    }
-
-    /** Strip the internal ΣSales/ΣSpend fields and attach the rank/status. */
-    private function publicRow(array $row, int $rank): array
-    {
-        $change = $row['change'];
-
-        return [
-            'id' => $row['id'],
-            'name' => $row['name'],
-            'orders' => $row['orders'],
-            'status' => $change === null ? 'flat' : ($change > 0 ? 'up' : ($change < 0 ? 'down' : 'flat')),
-            'latest_sales' => $row['latest_sales'],
-            'previous_sales' => $row['previous_sales'],
-            'change' => $change,
-            'total_to_date' => $row['total_to_date'],
-            'rank' => $rank,
-            'roas_a' => $row['roas_a'],
-            'roas_b' => $row['roas_b'],
-        ];
+        return $latest ? Carbon::parse($latest) : null;
     }
 
     private function subtotal(Collection $rows): array
     {
-        $salesA = $rows->sum('_sales_a');
-        $spendA = $rows->sum('_spend_a');
-        $salesB = $rows->sum('_sales_b');
-        $spendB = $rows->sum('_spend_b');
+        $tSales = (float) $rows->sum('sales');
+        $ySales = (float) $rows->sum('yesterday_sales');
+        $tSpend = (float) $rows->sum('_t_spend');
+        $ySpend = (float) $rows->sum('_y_spend');
+        $change = $tSales - $ySales;
 
         return [
             'orders' => (int) $rows->sum('orders'),
-            'latest_sales' => (float) $rows->sum('latest_sales'),
-            'previous_sales' => (float) $rows->sum('previous_sales'),
-            'change' => (float) $rows->sum('change'),
-            'total_to_date' => (float) $rows->sum('total_to_date'),
-            'roas_a' => $spendA > 0 ? round($salesA / $spendA, 2) : 0.0,
-            'roas_b' => $spendB > 0 ? round($salesB / $spendB, 2) : 0.0,
+            'sales' => $tSales,
+            'yesterday_sales' => $ySales,
+            'change' => round($change, 2),
+            'status' => $change > 0 ? 'up' : ($change < 0 ? 'down' : 'flat'),
+            'month_sales' => (float) $rows->sum('month_sales'),
+            'roas_yesterday' => $ySpend > 0 ? round($ySales / $ySpend, 2) : null,
+            'roas_today' => $tSpend > 0 ? round($tSales / $tSpend, 2) : null,
         ];
     }
 }
