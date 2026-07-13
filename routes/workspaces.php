@@ -169,6 +169,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/pages/import', [PageController::class, 'import'])->name('workspaces.pages.import');
     Route::post('/workspaces/{workspace}/pages/validate-pancake-token', [PageController::class, 'validatePancakeToken'])->name('workspaces.pages.validate-pancake-token');
     Route::post('/workspaces/{workspace}/pages/validate-botcake-token', [PageController::class, 'validateBotcakeToken'])->name('workspaces.pages.validate-botcake-token');
+    Route::post('/workspaces/{workspace}/pages/validate-flow-id', [PageController::class, 'validateFlowId'])->name('workspaces.pages.validate-flow-id');
+    Route::post('/workspaces/{workspace}/pages/validate-custom-field-id', [PageController::class, 'validateCustomFieldId'])->name('workspaces.pages.validate-custom-field-id');
     Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::put('/workspaces/{workspace}/pages/{page}/budget', [PageController::class, 'updateBudget'])->name('workspaces.pages.update-budget');
