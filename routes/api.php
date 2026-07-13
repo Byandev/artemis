@@ -78,6 +78,12 @@ Route::post('v1/public/gencys/intern-daily-records', [GencysInternDailyRecordApi
 Route::post('v1/public/gencys/pages', [GencysPageApiController::class, 'store'])
     ->name('api.v1.public.gencys.pages.store');
 
+// GencysERP page-detail callback. n8n posts the scraped detail (Pancake shop id,
+// api token, fb page id, url) for a single page, keyed on gencys_pages.page_id,
+// authenticating with the api_key embedded in the body.
+Route::post('v1/public/gencys/page-details', [GencysPageApiController::class, 'storeDetails'])
+    ->name('api.v1.public.gencys.page-details.store');
+
 // v2 — new mobile app (login with users.id, filter by assignee_user_id)
 Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' => ['api.key']], function () {
     Route::post('/rmo-orders/login', [RmoOrderV2Controller::class, 'login'])->name('rmo-orders.login');

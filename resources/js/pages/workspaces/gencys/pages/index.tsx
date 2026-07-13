@@ -30,6 +30,10 @@ interface GencysPage {
     gencys_intern_id: number | null;
     status: string | null;
     platform: string | null;
+    page_url: string | null;
+    fb_page_id: string | null;
+    shop_id: string | null;
+    pos_token: string | null;
 }
 
 interface Filter {
@@ -206,6 +210,57 @@ export default function GencysPagesIndex({
                 ),
                 cell: ({ row }) => (
                     <PlatformBadge value={row.original.platform} />
+                ),
+            },
+            {
+                accessorKey: 'fb_page_id',
+                enableSorting: false,
+                header: () => <span className="text-[12px]">FB Page ID</span>,
+                cell: ({ row }) => (
+                    <span className="font-mono text-[12px] text-gray-600 dark:text-gray-400">
+                        {row.original.fb_page_id ?? '—'}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'page_url',
+                enableSorting: false,
+                header: () => <span className="text-[12px]">Page URL</span>,
+                cell: ({ row }) =>
+                    row.original.page_url ? (
+                        <a
+                            href={row.original.page_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-[12px] text-emerald-600 hover:underline dark:text-emerald-400"
+                        >
+                            Open
+                        </a>
+                    ) : (
+                        <span className="text-[12px] text-gray-400">—</span>
+                    ),
+            },
+            {
+                accessorKey: 'shop_id',
+                enableSorting: false,
+                header: () => <span className="text-[12px]">Shop ID</span>,
+                cell: ({ row }) => (
+                    <span className="font-mono text-[12px] text-gray-600 dark:text-gray-400">
+                        {row.original.shop_id || '—'}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'pos_token',
+                enableSorting: false,
+                header: () => <span className="text-[12px]">POS Token</span>,
+                cell: ({ row }) => (
+                    <span
+                        className="block max-w-[180px] truncate font-mono text-[12px] text-gray-600 dark:text-gray-400"
+                        title={row.original.pos_token ?? undefined}
+                    >
+                        {row.original.pos_token || '—'}
+                    </span>
                 ),
             },
         ],

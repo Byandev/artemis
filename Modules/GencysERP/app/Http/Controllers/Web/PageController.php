@@ -52,6 +52,7 @@ class PageController extends Controller
                 ->select([
                     'id', 'page_id', 'date_created', 'name', 'owner',
                     'intern_and_brand', 'gencys_intern_id', 'status', 'platform',
+                    'page_url', 'fb_page_id', 'shop_id', 'pos_token',
                 ])
         )
             ->allowedFilters([

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\GencysERP\Models\Intern;
+use Modules\GencysERP\Models\Page as GencysPage;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\Inventory\Models\PurchasedOrder;
@@ -481,6 +482,11 @@ class Workspace extends Model
     public function interns(): HasMany|Workspace
     {
         return $this->hasMany(Intern::class);
+    }
+
+    public function gencysPages(): HasMany|Workspace
+    {
+        return $this->hasMany(GencysPage::class);
     }
 
     public function purchaseOrders(): HasMany|Workspace

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Modules\GencysERP\Models\Page;
 use Modules\GencysERP\Support\InternResolver;
+use Modules\GencysERP\Support\PageDetailsSync;
 
 /**
  * Callback for the n8n pages sync. n8n posts { data: { workspace_id, api_key,
@@ -43,6 +44,7 @@ class PageController extends Controller
         $created = 0;
         $updated = 0;
         $skipped = 0;
+        $pageIds = [];
 
         foreach ($pages as $page) {
 
@@ -53,6 +55,8 @@ class PageController extends Controller
 
                 continue;
             }
+
+            $pageIds[] = $pageId;
 
             $internAndBrand = trim(
                 $page['intern_and_brand']
@@ -103,11 +107,86 @@ class PageController extends Controller
             }
         }
 
+        // Now that the pages themselves have landed, chain straight into fetching
+        // each page's detail (POS token, shop id, etc.) — one queued n8n trigger
+        // per page, staggered so we don't hammer the ERP.
+        $detailsTriggered = app(PageDetailsSync::class)
+            ->dispatchForWorkspace($workspace, $pageIds);
+
         return response()->json([
             'created' => $created,
             'updated' => $updated,
             'skipped' => $skipped,
+            'details_triggered' => count($detailsTriggered),
         ]);
+    }
+
+    /**
+     * Callback for the n8n page-detail sync. n8n posts a flat body for a single
+     * page: { workspace_id, api_key, page_id, fb_page_id, pancake_shop_id,
+     * pancake_api, page_url }. The page is matched on gencys_pages.page_id and its
+     * detail columns (POS token, shop id, fb id, url) are filled in.
+     */
+    public function storeDetails(Request $request): JsonResponse
+    {
+        $workspaceId = $request->input('workspace_id');
+        $rawKey = $request->input('api_key');
+        $pageId = (int) ($request->input('page_id') ?? 0);
+
+        $apiKey = $rawKey
+            ? WorkspaceApiKey::findByRawKey($rawKey)
+            : null;
+
+        if (! $apiKey || (int) $apiKey->workspace_id !== (int) $workspaceId) {
+            return response()->json([
+                'message' => 'Invalid api_key for workspace.',
+            ], 401);
+        }
+
+        $apiKey->update([
+            'last_used_at' => now(),
+        ]);
+
+        if ($pageId <= 0) {
+            return response()->json([
+                'message' => 'A valid page_id is required.',
+            ], 422);
+        }
+
+        $page = Page::query()
+            ->where('workspace_id', $apiKey->workspace_id)
+            ->where('page_id', $pageId)
+            ->first();
+
+        if (! $page) {
+            return response()->json([
+                'message' => "No page found for page_id {$pageId}.",
+            ], 404);
+        }
+
+        $page->fill([
+            'fb_page_id' => $this->str($request->input('fb_page_id')),
+            'shop_id' => $this->str($request->input('pancake_shop_id')) ?? '',
+            'pos_token' => $this->str($request->input('pancake_api')) ?? '',
+            'page_url' => $this->str($request->input('page_url')),
+        ])->save();
+
+        return response()->json([
+            'updated' => true,
+            'page_id' => $pageId,
+        ]);
+    }
+
+    /** Trim to a string, treating empty/blank as null. */
+    private function str(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 
     /** ERP date formats vary; an unparseable value is stored as null, not an error. */

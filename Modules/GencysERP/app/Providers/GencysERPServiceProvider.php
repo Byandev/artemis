@@ -9,6 +9,7 @@ use Modules\GencysERP\Console\Commands\TriggerFetchDailySalesTrackerCommand;
 use Modules\GencysERP\Console\Commands\TriggerFetchERPPurchaseOrders;
 use Modules\GencysERP\Console\Commands\TriggerFetchERPTransactionHistory;
 use Modules\GencysERP\Console\Commands\TriggerFetchInternDailyRecordsCommand;
+use Modules\GencysERP\Console\Commands\TriggerFetchPageDetailsCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class GencysERPServiceProvider extends ModuleServiceProvider
@@ -33,6 +34,7 @@ class GencysERPServiceProvider extends ModuleServiceProvider
         TriggerFetchERPPurchaseOrders::class,
         TriggerFetchERPTransactionHistory::class,
         TriggerFetchInternDailyRecordsCommand::class,
+        TriggerFetchPageDetailsCommand::class,
         ExpireStaleSyncRuns::class,
         SyncInventoryFromGencysOrders::class,
     ];
