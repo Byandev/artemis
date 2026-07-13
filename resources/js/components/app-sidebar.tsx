@@ -383,6 +383,13 @@ export function AppSidebar() {
                       ],
                       items: [
                           {
+                              title: 'Intern Dashboard',
+                              href: `/workspaces/${slug}/gencys/intern-dashboard`,
+                              icon: LayoutDashboard,
+                              permission:
+                                  PERMISSIONS.ViewGencysInternDailyRecords,
+                          },
+                          {
                               title: 'Daily Sales Tracker',
                               href: `/workspaces/${slug}/gencys/daily-sales-tracker`,
                               icon: Activity,
