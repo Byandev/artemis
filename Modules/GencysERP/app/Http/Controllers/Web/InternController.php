@@ -4,12 +4,14 @@ namespace Modules\GencysERP\Http\Controllers\Web;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\GencysERP\Models\Intern;
@@ -36,8 +38,14 @@ class InternController extends Controller
     {
         $this->authorize(Permission::ViewGencysInterns->value, $workspace);
 
+        // Default to active interns only; show_all=1 widens to every status.
+        $showAll = $request->boolean('show_all');
+
         $interns = QueryBuilder::for(
-            Intern::query()->where('workspace_id', $workspace->id)
+            Intern::query()
+                ->where('workspace_id', $workspace->id)
+                ->with('user:id,name')
+                ->when(! $showAll, fn (Builder $q) => $q->where('active', true))
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', function (Builder $query, $value) {
@@ -47,12 +55,7 @@ class InternController extends Controller
                         }
                     });
                 }),
-                // filter[active]=1 → active only; absent/empty → all statuses.
-                AllowedFilter::callback('active', function (Builder $query, $value) {
-                    if ($value !== null && $value !== '') {
-                        $query->where('active', (bool) $value);
-                    }
-                }),
+                AllowedFilter::exact('user_id'),
                 AllowedFilter::exact('company_name'),
             ])
             ->allowedSorts(self::SORTABLE)
@@ -64,12 +67,49 @@ class InternController extends Controller
         return Inertia::render('workspaces/gencys/interns/index', [
             'workspace' => $workspace,
             'interns' => $interns,
+            'assignableUsers' => $this->assignableUsers($workspace),
             'query' => [
                 'sort' => $request->input('sort', 'full_name'),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
+                'showAll' => $showAll,
             ],
         ]);
+    }
+
+    /** Assign (or unassign) the workspace user this intern belongs to. */
+    public function assignUser(Request $request, Workspace $workspace, Intern $intern): RedirectResponse
+    {
+        $this->authorize(Permission::ViewGencysInterns->value, $workspace);
+
+        abort_unless($intern->workspace_id === $workspace->id, 404);
+
+        $data = $request->validate([
+            'user_id' => [
+                'nullable', 'integer',
+                Rule::in($this->assignableUserIds($workspace)),
+            ],
+        ]);
+
+        $intern->update(['user_id' => $data['user_id'] ?? null]);
+
+        return back();
+    }
+
+    /** Workspace users (members + owner) who can be assigned to an intern. */
+    private function assignableUsers(Workspace $workspace)
+    {
+        return User::whereIn('id', $this->assignableUserIds($workspace))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    private function assignableUserIds(Workspace $workspace)
+    {
+        return $workspace->users()->pluck('users.id')
+            ->push($workspace->owner_id)
+            ->filter()
+            ->unique();
     }
 
     /** Toggle an intern's active status. */

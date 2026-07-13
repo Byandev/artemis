@@ -13,7 +13,7 @@ class TriggerFetchInternDailyRecordsCommand extends Command
     protected $signature = 'gencys-erp:trigger-fetch-intern-daily-records
         {--date= : The record date in Y-m-d format (defaults to yesterday)}
         {--intern=* : Limit to specific Gencys intern id(s); repeat (--intern=1 --intern=2) or comma-separate. Omit for all interns}
-        {--delay=300 : Seconds to stagger each queued chunk by}
+        {--delay=120 : Seconds to stagger each queued chunk by}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
         {--sync : POST to the webhook immediately in-process instead of queueing (use for an n8n test-mode webhook)}
         {--force : Run outside production (by default this command only runs on production)}';

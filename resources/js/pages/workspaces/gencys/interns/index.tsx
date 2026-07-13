@@ -6,6 +6,10 @@ import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { cn } from '@/lib/utils';
+import {
+    InlineOwner,
+    OwnerOption,
+} from '@/pages/workspaces/integrations/components/inline-owner';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -23,22 +27,27 @@ interface Intern {
     contact_number: string | null;
     email: string | null;
     active: boolean;
+    user_id: number | null;
+    user?: OwnerOption | null;
 }
 
 interface Props {
     workspace: Workspace;
     interns: PaginatedData<Intern>;
+    assignableUsers: OwnerOption[];
     companies: string[];
     query: {
         sort: string;
         perPage: number | null;
-        filter: { search?: string; active?: string };
+        filter: { search?: string };
+        showAll: boolean;
     };
 }
 
 export default function GencysInternsIndex({
     workspace,
     interns,
+    assignableUsers,
     query,
 }: Props) {
     const { flash } = usePage().props as {
@@ -47,17 +56,18 @@ export default function GencysInternsIndex({
     const canSync = usePermission(PERMISSIONS.ViewGencysInterns);
 
     const [searchValue, setSearchValue] = useState(query.filter?.search ?? '');
-    const [activeOnly, setActiveOnly] = useState(query.filter?.active === '1');
+    // The list shows active interns by default; show_all=1 widens to every status.
+    const [showAll, setShowAll] = useState(query.showAll ?? false);
     const [syncing, setSyncing] = useState(false);
 
     const baseUrl = `/workspaces/${workspace.slug}/gencys/interns`;
 
-    // Shared filter payload so search, the status filter, and paging agree.
-    const filterParams = (
-        over: { search?: string; activeOnly?: boolean } = {},
+    // Shared request params so search, the status filter, and paging agree.
+    const requestParams = (
+        over: { search?: string; showAll?: boolean } = {},
     ) => ({
-        search: (over.search ?? searchValue) || undefined,
-        active: (over.activeOnly ?? activeOnly) ? 1 : undefined,
+        filter: { search: (over.search ?? searchValue) || undefined },
+        show_all: (over.showAll ?? showAll) ? 1 : undefined,
     });
 
     useEffect(() => {
@@ -87,7 +97,7 @@ export default function GencysInternsIndex({
         router.get(
             baseUrl,
             {
-                filter: filterParams(),
+                ...requestParams(),
                 sort: query.sort,
                 per_page: query.perPage ?? interns.per_page ?? undefined,
                 ...overrides,
@@ -96,9 +106,9 @@ export default function GencysInternsIndex({
         );
     };
 
-    const handleActiveFilter = (next: boolean) => {
-        setActiveOnly(next);
-        fetchData({ page: 1, filter: filterParams({ activeOnly: next }) });
+    const handleShowAll = (next: boolean) => {
+        setShowAll(next);
+        fetchData({ page: 1, ...requestParams({ showAll: next }) });
     };
 
     const debouncedFetch = useMemo(
@@ -190,8 +200,27 @@ export default function GencysInternsIndex({
                     </span>
                 ),
             },
+            {
+                id: 'assigned',
+                meta: { headerClassName: 'w-20', cellClassName: 'w-20' },
+                header: ({ column }) => (
+                    <SortableHeader
+                        column={column}
+                        title="Assigned"
+                        enabled={false}
+                    />
+                ),
+                cell: ({ row }) => (
+                    <InternUserAssign
+                        baseUrl={baseUrl}
+                        intern={row.original}
+                        users={assignableUsers}
+                        canEdit={canSync}
+                    />
+                ),
+            },
         ],
-        [baseUrl],
+        [baseUrl, assignableUsers, canSync],
     );
 
     return (
@@ -234,17 +263,17 @@ export default function GencysInternsIndex({
                     <div className="inline-flex h-9 items-center rounded-[10px] border border-black/6 bg-stone-100 p-0.5 dark:border-white/6 dark:bg-zinc-800">
                         {(
                             [
-                                { label: 'All', value: false },
-                                { label: 'Active only', value: true },
+                                { label: 'Active only', value: false },
+                                { label: 'All', value: true },
                             ] as const
                         ).map((opt) => (
                             <button
                                 key={opt.label}
                                 type="button"
-                                onClick={() => handleActiveFilter(opt.value)}
+                                onClick={() => handleShowAll(opt.value)}
                                 className={cn(
                                     'h-8 rounded-[8px] px-3 font-mono! text-[12px]! font-medium transition-all',
-                                    activeOnly === opt.value
+                                    showAll === opt.value
                                         ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-700 dark:text-gray-100'
                                         : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200',
                                 )}
@@ -266,7 +295,7 @@ export default function GencysInternsIndex({
                                 baseUrl,
                                 {
                                     sort: params?.sort,
-                                    filter: filterParams(),
+                                    ...requestParams(),
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??
@@ -328,6 +357,62 @@ function InternActiveToggle({
             disabled={saving}
             onCheckedChange={toggle}
             aria-label="Toggle active status"
+        />
+    );
+}
+
+/**
+ * Assign-user avatar circle for one intern (mirrors the ad-account owner UI).
+ * Optimistically sets the assignee, PATCHes the server, and reverts on error.
+ */
+function InternUserAssign({
+    baseUrl,
+    intern,
+    users,
+    canEdit,
+}: {
+    baseUrl: string;
+    intern: Intern;
+    users: OwnerOption[];
+    canEdit: boolean;
+}) {
+    const [assigned, setAssigned] = useState<OwnerOption | null>(
+        intern.user ?? null,
+    );
+    const [saving, setSaving] = useState(false);
+
+    // Reconcile when server data changes (paging/sorting/reload).
+    useEffect(() => setAssigned(intern.user ?? null), [intern.user]);
+
+    const assign = (userId: number | null) => {
+        const prev = assigned;
+        const next = userId
+            ? (users.find((u) => u.id === userId) ?? null)
+            : null;
+        setAssigned(next);
+        router.patch(
+            `${baseUrl}/${intern.id}/assign-user`,
+            { user_id: userId },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onError: () => {
+                    setAssigned(prev);
+                    toast.error('Failed to update assignee.');
+                },
+            },
+        );
+    };
+
+    return (
+        <InlineOwner
+            owner={assigned}
+            users={users}
+            canEdit={canEdit}
+            saving={saving}
+            onAssign={assign}
         />
     );
 }

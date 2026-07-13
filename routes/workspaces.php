@@ -457,6 +457,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/interns', [GencysInternController::class, 'index'])->name('interns.index');
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');
         Route::patch('/interns/{intern}/toggle-active', [GencysInternController::class, 'toggleActive'])->name('interns.toggle-active');
+        Route::patch('/interns/{intern}/assign-user', [GencysInternController::class, 'assignUser'])->name('interns.assign-user');
         Route::get('/intern-daily-records', [GencysInternDailyRecordController::class, 'index'])->name('intern-daily-records.index');
         Route::get('/unit-codes', [UnitCodeController::class, 'index'])->name('unit-codes.index');
         Route::post('/unit-codes/sync', [UnitCodeController::class, 'sync'])->name('unit-codes.sync');

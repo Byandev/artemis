@@ -2,6 +2,7 @@
 
 namespace Modules\GencysERP\Models;
 
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,7 @@ class Intern extends Model
         'contact_number',
         'email',
         'active',
+        'user_id',
     ];
 
     protected $casts = [
@@ -33,6 +35,12 @@ class Intern extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    /** The workspace user this intern is assigned to. */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     protected static function newFactory(): InternFactory
