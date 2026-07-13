@@ -9,6 +9,7 @@ use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
+use Modules\Finance\Http\Controllers\Api\FinanceDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
@@ -57,6 +58,19 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/leaderboard', [VideoEditorDashboardController::class, 'leaderboard'])->name('leaderboard');
             Route::get('/recent-activity', [VideoEditorDashboardController::class, 'recentActivity'])->name('recent-activity');
             Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
+        });
+
+        // Finance dashboard — one endpoint per statistic so each widget loads,
+        // skeletons and refreshes independently. See FinanceDashboardStatsController.
+        Route::prefix('finance/dashboard')->name('finance.dashboard.')->group(function () {
+            Route::get('/kpis', [FinanceDashboardStatsController::class, 'kpis'])->name('kpis');
+            Route::get('/cash-flow', [FinanceDashboardStatsController::class, 'cashFlow'])->name('cash-flow');
+            Route::get('/balance-history', [FinanceDashboardStatsController::class, 'balanceHistory'])->name('balance-history');
+            Route::get('/expense-breakdown', [FinanceDashboardStatsController::class, 'expenseBreakdown'])->name('expense-breakdown');
+            Route::get('/income-breakdown', [FinanceDashboardStatsController::class, 'incomeBreakdown'])->name('income-breakdown');
+            Route::get('/top-movements', [FinanceDashboardStatsController::class, 'topMovements'])->name('top-movements');
+            Route::get('/reconciliation', [FinanceDashboardStatsController::class, 'reconciliation'])->name('reconciliation');
+            Route::get('/profitability', [FinanceDashboardStatsController::class, 'profitability'])->name('profitability');
         });
 
         // Inventory dashboard — one endpoint per widget so each loads, skeletons

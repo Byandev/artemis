@@ -9,7 +9,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Finance\Models\Account;
-use Modules\Finance\Models\Remittance;
 use Modules\Finance\Models\Transaction;
 
 class DashboardController extends Controller
@@ -51,29 +50,12 @@ class DashboardController extends Controller
             ];
         });
 
-        // Compute totals via aggregate (exclude transfers)
-        $totals = Transaction::where('workspace_id', $workspace->id)
-            ->where(function ($q) {
-                $q->whereNull('transaction_type')
-                    ->orWhereNotIn('transaction_type', ['transfer']);
-            })
-            ->where(function ($q) {
-                $q->whereNull('sub_category')
-                    ->orWhereNotIn('sub_category', ['transfer_fee']);
-            })
-            ->selectRaw("
-                SUM(CASE WHEN type = 'in' THEN amount ELSE 0 END) as total_in,
-                SUM(CASE WHEN type = 'out' THEN amount ELSE 0 END) as total_out
-            ")
-            ->first();
-
+        // KPI totals (cash in/out, unreconciled) now load lazily via the
+        // per-statistic endpoints in FinanceDashboardStatsController; this shell
+        // only provides the accounts list the page renders directly.
         return Inertia::render('workspaces/finance/dashboard', [
             'workspace' => $workspace,
             'accounts' => $accountsData,
-            'totalIn' => round((float) ($totals->total_in ?? 0), 2),
-            'totalOut' => round((float) ($totals->total_out ?? 0), 2),
-            'unreconciledCount' => Remittance::where('workspace_id', $workspace->id)
-                ->whereNull('transaction_id')->count(),
         ]);
     }
 }

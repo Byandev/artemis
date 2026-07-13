@@ -1,16 +1,23 @@
 import PageHeader from '@/components/common/PageHeader';
+import {
+    BalanceHistorySection,
+    CashFlowSection,
+    ExpenseBreakdownSection,
+    IncomeBreakdownSection,
+    KpiSection,
+    ProfitabilitySection,
+    ReconciliationSection,
+    TopMovementsSection,
+} from '@/components/finance/dashboard/sections';
+import { type DashboardRange } from '@/components/finance/dashboard/use-finance-stat';
+import DatePicker from '@/components/ui/date-picker';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    ArrowDownRight,
-    ArrowUpRight,
-    Wallet,
-} from 'lucide-react';
-import { useMemo } from 'react';
+import { format, startOfMonth } from 'date-fns';
+import { useEffect, useMemo, useState } from 'react';
 
 interface AccountRow {
     id: number;
@@ -24,9 +31,6 @@ interface AccountRow {
 interface Props {
     workspace: Workspace;
     accounts: AccountRow[];
-    totalIn: number;
-    totalOut: number;
-    unreconciledCount: number;
 }
 
 const fmt = (v: number) =>
@@ -35,27 +39,51 @@ const fmt = (v: number) =>
         maximumFractionDigits: 2,
     });
 
-export default function FinanceDashboard({
-    workspace,
-    accounts,
-    totalIn,
-    totalOut,
-    unreconciledCount,
-}: Props) {
+const today = () => format(new Date(), 'yyyy-MM-dd');
+const monthStart = () => format(startOfMonth(new Date()), 'yyyy-MM-dd');
+const isDate = (v: unknown): v is string =>
+    typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+export default function FinanceDashboard({ workspace, accounts }: Props) {
     const base = `/workspaces/${workspace.slug}/finance`;
-    const canViewRemittances = usePermission(
-        PERMISSIONS.ViewFinanceRemittances,
-    );
     const canViewAccounts = usePermission(PERMISSIONS.ViewFinanceAccounts);
 
     const active = useMemo(
         () => accounts.filter((a) => a.is_active),
         [accounts],
     );
-    const totalBalance = useMemo(
-        () => active.reduce((s, a) => s + a.balance, 0),
-        [active],
+
+    // Persist the picked range per workspace so a refresh keeps the filter
+    // instead of snapping back to month-to-date. Computed once so the picker's
+    // defaultDate stays referentially stable.
+    const storageKey = `finance-dashboard-range:${workspace.slug}`;
+    const initialRange = useMemo<DashboardRange>(() => {
+        try {
+            const saved = JSON.parse(
+                localStorage.getItem(storageKey) ?? 'null',
+            );
+            if (saved && isDate(saved.start) && isDate(saved.end)) {
+                return { start: saved.start, end: saved.end };
+            }
+        } catch {
+            // Ignore unavailable / malformed storage.
+        }
+        return { start: monthStart(), end: today() };
+    }, [storageKey]);
+
+    const [range, setRange] = useState<DashboardRange>(initialRange);
+    const defaultDate = useMemo(
+        () => [initialRange.start, initialRange.end] as never,
+        [initialRange],
     );
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(range));
+        } catch {
+            // Ignore storage errors (quota / private mode).
+        }
+    }, [storageKey, range]);
 
     return (
         <AppLayout>
@@ -64,50 +92,64 @@ export default function FinanceDashboard({
                 <PageHeader
                     title="Live Cashflow"
                     description="Overview of accounts, activity, and unreconciled remittances."
-                />
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard
-                        icon={<Wallet className="h-4 w-4" />}
-                        label="Total Balance"
-                        value={fmt(totalBalance)}
-                    />
-                    <StatCard
-                        icon={
-                            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-                        }
-                        label="Total IN"
-                        value={fmt(totalIn)}
-                    />
-                    <StatCard
-                        icon={
-                            <ArrowDownRight className="h-4 w-4 text-red-500" />
-                        }
-                        label="Total OUT"
-                        value={fmt(totalOut)}
-                    />
-                    {canViewRemittances ? (
-                        <Link
-                            href={`${base}/remittances?filter[unreconciled]=1`}
-                            className="block"
-                        >
-                            <StatCard
-                                icon={
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                }
-                                label="Unreconciled Remittances"
-                                value={String(unreconciledCount)}
-                            />
-                        </Link>
-                    ) : (
-                        <StatCard
-                            icon={
-                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    stackActionsOnMobile
+                >
+                    <DatePicker
+                        id="finance-dashboard-range"
+                        mode="range"
+                        defaultDate={defaultDate}
+                        onChange={(dates: Date[]) => {
+                            if (dates.length === 2) {
+                                setRange({
+                                    start: format(dates[0], 'yyyy-MM-dd'),
+                                    end: format(dates[1], 'yyyy-MM-dd'),
+                                });
                             }
-                            label="Unreconciled Remittances"
-                            value={String(unreconciledCount)}
+                        }}
+                    />
+                </PageHeader>
+
+                <KpiSection slug={workspace.slug} range={range} />
+
+                {/* Section 2 — trends */}
+                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <CashFlowSection slug={workspace.slug} range={range} />
+                    <BalanceHistorySection
+                        slug={workspace.slug}
+                        range={range}
+                    />
+                </div>
+
+                {/* Section 5 — profitability (cross-domain) */}
+                <div className="mt-3">
+                    <ProfitabilitySection slug={workspace.slug} range={range} />
+                </div>
+
+                {/* Section 3 — breakdowns */}
+                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <ExpenseBreakdownSection
+                        slug={workspace.slug}
+                        range={range}
+                    />
+                    <IncomeBreakdownSection
+                        slug={workspace.slug}
+                        range={range}
+                    />
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    <div className="lg:col-span-2">
+                        <TopMovementsSection
+                            slug={workspace.slug}
+                            range={range}
                         />
-                    )}
+                    </div>
+                    {/* Section 4 — reconciliation */}
+                    <ReconciliationSection
+                        slug={workspace.slug}
+                        range={range}
+                        remittancesUrl={`${base}/remittances?filter[unreconciled]=1`}
+                    />
                 </div>
 
                 <div className="mt-6 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -162,27 +204,5 @@ function AccountRowContent({ account }: { account: AccountRow }) {
                 {fmt(account.balance)}
             </span>
         </>
-    );
-}
-
-function StatCard({
-    icon,
-    label,
-    value,
-}: {
-    icon: React.ReactNode;
-    label: string;
-    value: string;
-}) {
-    return (
-        <div className="rounded-[14px] border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
-            <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                {icon}
-                <span>{label}</span>
-            </div>
-            <div className="mt-2 font-mono text-[20px] font-semibold text-gray-800 dark:text-gray-100">
-                {value}
-            </div>
-        </div>
     );
 }
