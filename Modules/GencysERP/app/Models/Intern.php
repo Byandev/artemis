@@ -22,10 +22,12 @@ class Intern extends Model
         'username',
         'contact_number',
         'email',
+        'active',
     ];
 
     protected $casts = [
         'intern_id' => 'integer',
+        'active' => 'boolean',
     ];
 
     public function workspace(): BelongsTo

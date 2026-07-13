@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -21,6 +22,7 @@ interface Intern {
     username: string | null;
     contact_number: string | null;
     email: string | null;
+    active: boolean;
 }
 
 interface Props {
@@ -30,7 +32,7 @@ interface Props {
     query: {
         sort: string;
         perPage: number | null;
-        filter: { search?: string };
+        filter: { search?: string; active?: string };
     };
 }
 
@@ -45,9 +47,18 @@ export default function GencysInternsIndex({
     const canSync = usePermission(PERMISSIONS.ViewGencysInterns);
 
     const [searchValue, setSearchValue] = useState(query.filter?.search ?? '');
+    const [activeOnly, setActiveOnly] = useState(query.filter?.active === '1');
     const [syncing, setSyncing] = useState(false);
 
     const baseUrl = `/workspaces/${workspace.slug}/gencys/interns`;
+
+    // Shared filter payload so search, the status filter, and paging agree.
+    const filterParams = (
+        over: { search?: string; activeOnly?: boolean } = {},
+    ) => ({
+        search: (over.search ?? searchValue) || undefined,
+        active: (over.activeOnly ?? activeOnly) ? 1 : undefined,
+    });
 
     useEffect(() => {
         if (flash?.success) toast.success(flash.success);
@@ -76,15 +87,18 @@ export default function GencysInternsIndex({
         router.get(
             baseUrl,
             {
-                filter: {
-                    search: searchValue || undefined,
-                },
+                filter: filterParams(),
                 sort: query.sort,
                 per_page: query.perPage ?? interns.per_page ?? undefined,
                 ...overrides,
             },
             { preserveState: true, preserveScroll: true, replace: true },
         );
+    };
+
+    const handleActiveFilter = (next: boolean) => {
+        setActiveOnly(next);
+        fetchData({ page: 1, filter: filterParams({ activeOnly: next }) });
     };
 
     const debouncedFetch = useMemo(
@@ -101,6 +115,20 @@ export default function GencysInternsIndex({
 
     const columns = useMemo<ColumnDef<Intern>[]>(
         () => [
+            {
+                accessorKey: 'active',
+                enableSorting: true,
+                meta: { headerClassName: 'w-16', cellClassName: 'w-16' },
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Status" />
+                ),
+                cell: ({ row }) => (
+                    <InternActiveToggle
+                        baseUrl={baseUrl}
+                        intern={row.original}
+                    />
+                ),
+            },
             {
                 accessorKey: 'intern_id',
                 enableSorting: true,
@@ -163,7 +191,7 @@ export default function GencysInternsIndex({
                 ),
             },
         ],
-        [],
+        [baseUrl],
     );
 
     return (
@@ -202,6 +230,29 @@ export default function GencysInternsIndex({
                             aria-label="Search interns"
                         />
                     </div>
+
+                    <div className="inline-flex h-9 items-center rounded-[10px] border border-black/6 bg-stone-100 p-0.5 dark:border-white/6 dark:bg-zinc-800">
+                        {(
+                            [
+                                { label: 'All', value: false },
+                                { label: 'Active only', value: true },
+                            ] as const
+                        ).map((opt) => (
+                            <button
+                                key={opt.label}
+                                type="button"
+                                onClick={() => handleActiveFilter(opt.value)}
+                                className={cn(
+                                    'h-8 rounded-[8px] px-3 font-mono! text-[12px]! font-medium transition-all',
+                                    activeOnly === opt.value
+                                        ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-700 dark:text-gray-100'
+                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200',
+                                )}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -215,9 +266,7 @@ export default function GencysInternsIndex({
                                 baseUrl,
                                 {
                                     sort: params?.sort,
-                                    filter: {
-                                        search: searchValue || undefined,
-                                    },
+                                    filter: filterParams(),
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??
@@ -235,5 +284,50 @@ export default function GencysInternsIndex({
                 </div>
             </div>
         </AppLayout>
+    );
+}
+
+/**
+ * Active/inactive toggle for one intern. Optimistically flips the switch, then
+ * PATCHes the server; the fresh server prop reconciles it on reload.
+ */
+function InternActiveToggle({
+    baseUrl,
+    intern,
+}: {
+    baseUrl: string;
+    intern: Intern;
+}) {
+    const [active, setActive] = useState(intern.active);
+    const [saving, setSaving] = useState(false);
+
+    // Keep in sync when server data changes (e.g. paging/sorting reloads).
+    useEffect(() => setActive(intern.active), [intern.active]);
+
+    const toggle = (next: boolean) => {
+        setActive(next);
+        router.patch(
+            `${baseUrl}/${intern.id}/toggle-active`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onError: () => {
+                    setActive(!next);
+                    toast.error('Failed to update status.');
+                },
+            },
+        );
+    };
+
+    return (
+        <Switch
+            checked={active}
+            disabled={saving}
+            onCheckedChange={toggle}
+            aria-label="Toggle active status"
+        />
     );
 }

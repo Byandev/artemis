@@ -484,6 +484,11 @@ class Workspace extends Model
         return $this->hasMany(Intern::class);
     }
 
+    public function activeInterns(): HasMany|Workspace
+    {
+        return $this->hasMany(Intern::class)->where('active', true);
+    }
+
     public function purchaseOrders(): HasMany|Workspace
     {
         return $this->hasMany(PurchasedOrder::class);

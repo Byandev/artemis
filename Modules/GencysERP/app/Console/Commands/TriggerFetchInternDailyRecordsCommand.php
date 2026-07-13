@@ -68,7 +68,7 @@ class TriggerFetchInternDailyRecordsCommand extends Command
             ->whereHas('apiKeys')
             ->with(['apiKeys', 'interns' => function ($query) use ($internIds) {
                 // Only interns pulled from the ERP (they have a Gencys intern id).
-                $query->whereNotNull('intern_id');
+                $query->where('active', true)->whereNotNull('intern_id');
 
                 if (! empty($internIds)) {
                     $query->whereIn('intern_id', $internIds);

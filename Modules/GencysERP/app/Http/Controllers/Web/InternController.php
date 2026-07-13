@@ -29,6 +29,7 @@ class InternController extends Controller
         'username',
         'contact_number',
         'email',
+        'active',
     ];
 
     public function index(Request $request, Workspace $workspace): Response
@@ -45,6 +46,12 @@ class InternController extends Controller
                             $q->orWhere($column, 'like', "%{$value}%");
                         }
                     });
+                }),
+                // filter[active]=1 → active only; absent/empty → all statuses.
+                AllowedFilter::callback('active', function (Builder $query, $value) {
+                    if ($value !== null && $value !== '') {
+                        $query->where('active', (bool) $value);
+                    }
                 }),
                 AllowedFilter::exact('company_name'),
             ])
@@ -63,6 +70,18 @@ class InternController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    /** Toggle an intern's active status. */
+    public function toggleActive(Request $request, Workspace $workspace, Intern $intern): RedirectResponse
+    {
+        $this->authorize(Permission::ViewGencysInterns->value, $workspace);
+
+        abort_unless($intern->workspace_id === $workspace->id, 404);
+
+        $intern->update(['active' => ! $intern->active]);
+
+        return back();
     }
 
     /** Fire the n8n webhook that scrapes interns and posts them back to the callback. */
