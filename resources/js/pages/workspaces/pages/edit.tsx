@@ -390,11 +390,14 @@ export default function Edit({ workspace, page, users }: Props) {
                                                             ),
                                                             flow_id:
                                                                 data.parcel_journey_flow_id,
+                                                            token: data.botcake_token,
                                                         }}
                                                         disabledReason={
                                                             !data.parcel_journey_flow_id
                                                                 ? 'Enter a flow ID first'
-                                                                : undefined
+                                                                : !data.botcake_token
+                                                                  ? 'Enter a Botcake token first'
+                                                                  : undefined
                                                         }
                                                     />
                                                     {errors.parcel_journey_flow_id && (
