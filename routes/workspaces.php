@@ -45,6 +45,7 @@ use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
+use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
@@ -498,6 +499,12 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/remittances/{remittance}/items', [FinanceRemittanceController::class, 'clearItems'])->name('remittances.items.clear');
         Route::put('/remittances/{remittance}', [FinanceRemittanceController::class, 'update'])->name('remittances.update');
         Route::delete('/remittances/{remittance}', [FinanceRemittanceController::class, 'destroy'])->name('remittances.destroy');
+
+        Route::get('/request-funds', [FinanceFundRequestController::class, 'index'])->name('request-funds.index');
+        Route::post('/request-funds', [FinanceFundRequestController::class, 'store'])->name('request-funds.store');
+        Route::put('/request-funds/{requestFund}/status', [FinanceFundRequestController::class, 'updateStatus'])->name('request-funds.status');
+        Route::put('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'update'])->name('request-funds.update');
+        Route::delete('/request-funds/{requestFund}', [FinanceFundRequestController::class, 'destroy'])->name('request-funds.destroy');
     });
 
     Route::prefix('/workspaces/{workspace:slug}/creatives')->name('workspaces.creatives.')->group(function () {

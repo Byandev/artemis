@@ -108,6 +108,11 @@ export const PERMISSIONS = {
     CreateFinanceRemittances: 'Create Finance Remittances',
     EditFinanceRemittances: 'Edit Finance Remittances',
     DeleteFinanceRemittances: 'Delete Finance Remittances',
+    ViewFinanceRequestFunds: 'View Finance Request Funds',
+    CreateFinanceRequestFunds: 'Create Finance Request Funds',
+    EditFinanceRequestFunds: 'Edit Finance Request Funds',
+    DeleteFinanceRequestFunds: 'Delete Finance Request Funds',
+    ApproveFinanceRequestFunds: 'Approve Finance Request Funds',
 
     // Page Daily Budget Records
     ViewPageDailyBudgetRecords: 'View Page Daily Budget Records',
