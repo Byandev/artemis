@@ -10,7 +10,7 @@ class TriggerFetchPageDetailsCommand extends Command
 {
     protected $signature = 'gencys-erp:trigger-fetch-page-details
         {--page=* : Limit to specific Gencys page id(s); repeat (--page=1 --page=2) or comma-separate. Omit for all pages}
-        {--delay=300 : Seconds to stagger each queued page by}
+        {--delay=30 : Seconds to stagger each queued page by}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
         {--sync : POST to the webhook immediately in-process instead of queueing (use for an n8n test-mode webhook)}
         {--force : Run outside production (by default this command only runs on production)}';

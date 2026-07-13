@@ -25,7 +25,7 @@ class PageDetailsSync
         Workspace $workspace,
         array $pageIds = [],
         bool $sync = false,
-        int $delay = 300,
+        int $delay = 30,
         ?string $webhookOverride = null,
     ): array {
         $webhookUrl = $webhookOverride
