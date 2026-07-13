@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\GencysERP\Models\GencysPage;
+use Modules\GencysERP\Models\Page;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -46,7 +46,7 @@ class PageController extends Controller
         $this->authorize(Permission::ViewGencysPages->value, $workspace);
 
         $pages = QueryBuilder::for(
-            GencysPage::query()
+            Page::query()
                 ->where('workspace_id', $workspace->id)
                 // Only what the table renders — no SELECT *.
                 ->select([
@@ -127,7 +127,7 @@ class PageController extends Controller
      */
     private function distinctValues(Workspace $workspace, string $column): array
     {
-        return GencysPage::query()
+        return Page::query()
             ->where('workspace_id', $workspace->id)
             ->whereNotNull($column)
             ->distinct()

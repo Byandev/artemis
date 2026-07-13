@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Http;
-use Modules\GencysERP\Models\GencysPage;
 use Modules\GencysERP\Models\Intern;
+use Modules\GencysERP\Models\Page;
 
 function gencysPagesUrl($workspace, array $query = []): string
 {
@@ -15,8 +15,8 @@ test('the pages index lists workspace-scoped pages for the owner', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    GencysPage::factory()->for($workspace)->count(3)->create();
-    GencysPage::factory()->for($other)->create(['name' => 'Outsider']);
+    Page::factory()->for($workspace)->count(3)->create();
+    Page::factory()->for($other)->create(['name' => 'Outsider']);
 
     $this->actingAs($user)
         ->get(gencysPagesUrl($workspace))
@@ -31,9 +31,9 @@ test('the pages index lists workspace-scoped pages for the owner', function () {
 test('search matches across name, owner, intern and brand', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    GencysPage::factory()->for($workspace)->create(['name' => 'Alpha Store']);
-    GencysPage::factory()->for($workspace)->create(['owner' => 'Beta Reyes']);
-    GencysPage::factory()->for($workspace)->create(['intern_and_brand' => 'Gamma - Acme']);
+    Page::factory()->for($workspace)->create(['name' => 'Alpha Store']);
+    Page::factory()->for($workspace)->create(['owner' => 'Beta Reyes']);
+    Page::factory()->for($workspace)->create(['intern_and_brand' => 'Gamma - Acme']);
 
     $this->actingAs($user)
         ->get(gencysPagesUrl($workspace, ['filter' => ['search' => 'Beta']]))
@@ -47,10 +47,10 @@ test('search matches across name, owner, intern and brand', function () {
 test('the status and platform filters narrow results and expose distinct values', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    GencysPage::factory()->for($workspace)->count(2)->create([
+    Page::factory()->for($workspace)->count(2)->create([
         'status' => 'Active', 'platform' => 'Facebook',
     ]);
-    GencysPage::factory()->for($workspace)->create([
+    Page::factory()->for($workspace)->create([
         'status' => 'Inactive', 'platform' => 'TikTok',
     ]);
 
@@ -72,9 +72,9 @@ test('the status and platform filters narrow results and expose distinct values'
 test('results default to newest first and can be sorted and paginated', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    GencysPage::factory()->for($workspace)->create(['name' => 'Zed', 'date_created' => '2026-01-01']);
-    GencysPage::factory()->for($workspace)->create(['name' => 'Ann', 'date_created' => '2026-03-01']);
-    GencysPage::factory()->for($workspace)->create(['name' => 'Mia', 'date_created' => '2026-02-01']);
+    Page::factory()->for($workspace)->create(['name' => 'Zed', 'date_created' => '2026-01-01']);
+    Page::factory()->for($workspace)->create(['name' => 'Ann', 'date_created' => '2026-03-01']);
+    Page::factory()->for($workspace)->create(['name' => 'Mia', 'date_created' => '2026-02-01']);
 
     // Default sort is -date_created.
     $this->actingAs($user)
@@ -163,7 +163,7 @@ test('the public callback upserts pages keyed on the gencys page id', function (
         ->assertOk()
         ->assertJson(['created' => 1, 'updated' => 0, 'skipped' => 1]);
 
-    $page = GencysPage::where('workspace_id', $workspace->id)->where('page_id', 12)->first();
+    $page = Page::where('workspace_id', $workspace->id)->where('page_id', 12)->first();
     expect($page)->not->toBeNull()
         ->and($page->name)->toBe('Acme Skincare PH')
         ->and($page->owner)->toBe('Maria Santos')
@@ -182,7 +182,7 @@ test('the public callback upserts pages keyed on the gencys page id', function (
         ->assertOk()
         ->assertJson(['created' => 0, 'updated' => 1]);
 
-    expect(GencysPage::where('workspace_id', $workspace->id)->where('page_id', 12)->count())->toBe(1)
+    expect(Page::where('workspace_id', $workspace->id)->where('page_id', 12)->count())->toBe(1)
         ->and($page->fresh()->status)->toBe('Inactive');
 });
 
@@ -207,9 +207,9 @@ test('the callback links a page to the intern named in intern_and_brand', functi
         ],
     ])->assertOk();
 
-    $byName = GencysPage::where('page_id', 1)->first();
-    $byUsername = GencysPage::where('page_id', 2)->first();
-    $unmatched = GencysPage::where('page_id', 3)->first();
+    $byName = Page::where('page_id', 1)->first();
+    $byUsername = Page::where('page_id', 2)->first();
+    $unmatched = Page::where('page_id', 3)->first();
 
     expect($byName->gencys_intern_id)->toBe($intern->id)
         ->and($byUsername->gencys_intern_id)->toBe($intern->id)
@@ -233,7 +233,7 @@ test('an intern from another workspace is never linked', function () {
         ],
     ])->assertOk();
 
-    expect(GencysPage::where('page_id', 1)->first()->gencys_intern_id)->toBeNull();
+    expect(Page::where('page_id', 1)->first()->gencys_intern_id)->toBeNull();
 });
 
 test('the public callback rejects an invalid api key', function () {
@@ -245,7 +245,7 @@ test('the public callback rejects an invalid api key', function () {
         ],
     ])->assertStatus(401);
 
-    expect(GencysPage::count())->toBe(0);
+    expect(Page::count())->toBe(0);
 });
 
 test('the public callback rejects an api key that does not own the workspace', function () {
@@ -262,5 +262,5 @@ test('the public callback rejects an api key that does not own the workspace', f
         ],
     ])->assertStatus(401);
 
-    expect(GencysPage::count())->toBe(0);
+    expect(Page::count())->toBe(0);
 });

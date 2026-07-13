@@ -3,14 +3,14 @@
 namespace Modules\GencysERP\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Modules\GencysERP\Models\GencysPage;
+use Modules\GencysERP\Models\Page;
 
 /**
- * @extends Factory<GencysPage>
+ * @extends Factory<Page>
  */
-class GencysPageFactory extends Factory
+class PageFactory extends Factory
 {
-    protected $model = GencysPage::class;
+    protected $model = Page::class;
 
     public function definition(): array
     {
@@ -22,6 +22,10 @@ class GencysPageFactory extends Factory
             'intern_and_brand' => $this->faker->name().' - '.$this->faker->company(),
             'status' => $this->faker->randomElement(['Active', 'Inactive']),
             'platform' => $this->faker->randomElement(['Facebook', 'TikTok']),
+            'page_url' => $this->faker->url(),
+            'fb_page_id' => (string) $this->faker->numerify('##############'),
+            'shop_id' => (string) $this->faker->numberBetween(1000, 99999),
+            'pos_token' => $this->faker->sha256(),
         ];
     }
 }

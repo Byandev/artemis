@@ -6,9 +6,9 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Modules\GencysERP\Database\Factories\GencysPageFactory;
+use Modules\GencysERP\Database\Factories\PageFactory;
 
-class GencysPage extends Model
+class Page extends Model
 {
     use HasFactory;
 
@@ -24,6 +24,10 @@ class GencysPage extends Model
         'gencys_intern_id',
         'status',
         'platform',
+        'page_url',
+        'fb_page_id',
+        'shop_id',
+        'pos_token',
     ];
 
     protected $casts = [
@@ -41,8 +45,8 @@ class GencysPage extends Model
         return $this->belongsTo(Intern::class, 'gencys_intern_id');
     }
 
-    protected static function newFactory(): GencysPageFactory
+    protected static function newFactory(): PageFactory
     {
-        return GencysPageFactory::new();
+        return PageFactory::new();
     }
 }

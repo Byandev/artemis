@@ -7,7 +7,7 @@ use App\Models\WorkspaceApiKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Modules\GencysERP\Models\GencysPage;
+use Modules\GencysERP\Models\Page;
 use Modules\GencysERP\Support\InternResolver;
 
 /**
@@ -50,6 +50,7 @@ class PageController extends Controller
 
             if ($pageId <= 0) {
                 $skipped++;
+
                 continue;
             }
 
@@ -77,7 +78,7 @@ class PageController extends Controller
                 }
             }
 
-            $record = GencysPage::updateOrCreate(
+            $record = Page::updateOrCreate(
                 [
                     'workspace_id' => $workspace->id,
                     'page_id' => $pageId,
