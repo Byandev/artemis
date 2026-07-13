@@ -65,7 +65,7 @@ class InternDailyRecordController extends Controller
         }
 
         $gencysInternId = $intern->id;
-        
+
         $records = collect(['records', 'rows'])
             ->map(fn ($key) => $data[$key] ?? null)
             ->first(fn ($rows) => is_array($rows) && ! empty($rows))
@@ -82,10 +82,10 @@ class InternDailyRecordController extends Controller
                     'workspace_id' => $workspace->id,
                     'gencys_intern_id' => $gencysInternId,
                     'record_date' => $this->date(
-                            $record['date']
-                            ?? $record['record_date']
-                            ?? null
-                        ) ?? now()->toDateString(),
+                        $record['date']
+                        ?? $record['record_date']
+                        ?? null
+                    ) ?? now()->toDateString(),
                 ],
                 [
                     'orders' => $this->countOrNull($record['orders'] ?? null),
@@ -113,8 +113,25 @@ class InternDailyRecordController extends Controller
                         ?? null
                     ),
 
-                    'rts_amount' => $this->decimalOrNull(
-                        $record['rts_amount']
+                    'delivered' => $this->countOrNull(
+                        $record['delivered'] ?? null
+                    ),
+
+                    'delivered_amount' => $this->decimalOrNull(
+                        $record['delivered_amount']
+                        ?? $record['delivered_amt']
+                        ?? null
+                    ),
+
+                    'returned' => $this->countOrNull(
+                        $record['returned'] ?? null
+                    ),
+
+                    // rts_amount was the returned amount — accept the legacy keys here.
+                    'returned_amount' => $this->decimalOrNull(
+                        $record['returned_amount']
+                        ?? $record['returned_amt']
+                        ?? $record['rts_amount']
                         ?? $record['rtsAmount']
                         ?? null
                     ),
@@ -150,6 +167,7 @@ class InternDailyRecordController extends Controller
             'gencys_intern_id' => $gencysInternId,
         ]);
     }
+
     /**
      * The month-to-date block: four headline totals plus an RTS breakdown per
      * stage. Every field is optional — the ERP omits them on some payloads.
@@ -192,7 +210,10 @@ class InternDailyRecordController extends Controller
         }
 
         try {
-            return Carbon::parse($value)->toDateString();
+            // ISO datetimes arrive as a UTC instant (the ERP serialises a local
+            // midnight Date to e.g. "…T16:00:00.000Z"). Normalise to the app
+            // timezone before truncating, otherwise the date lands a day early.
+            return Carbon::parse($value)->setTimezone(config('app.timezone'))->toDateString();
         } catch (\Throwable) {
             return null;
         }

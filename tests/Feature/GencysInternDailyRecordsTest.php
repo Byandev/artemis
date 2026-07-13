@@ -91,7 +91,7 @@ test('the callback upserts daily metrics per intern and resolves the sync run', 
         ->and((float) $record->roas)->toBe(2.35)
         ->and((float) $record->ad_spent)->toBe(640.0)
         ->and((float) $record->rts_rate)->toBe(12.5)
-        ->and((float) $record->rts_amount)->toBe(320.0)
+        ->and((float) $record->returned_amount)->toBe(320.0)
         ->and($record->record_date->toDateString())->toBe('2026-07-06');
 
     expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS);
@@ -138,7 +138,7 @@ test('the callback accepts a single inline record (per-intern shape) with total_
     $record = GencysInternDailyRecord::where('gencys_intern_id', $intern->id)->first();
     expect($record)->not->toBeNull()
         ->and((float) $record->sales)->toBe(131088.0)
-        ->and((float) $record->rts_amount)->toBe(0.0)
+        ->and((float) $record->returned_amount)->toBe(0.0)
         ->and($record->record_date)->not->toBeNull();
 });
 

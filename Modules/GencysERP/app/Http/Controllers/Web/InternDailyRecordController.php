@@ -61,7 +61,10 @@ class InternDailyRecordController extends Controller
                 AllowedSort::field('roas', 'gencys_intern_daily_records.roas'),
                 AllowedSort::field('ad_spent', 'gencys_intern_daily_records.ad_spent'),
                 AllowedSort::field('rts_rate', 'gencys_intern_daily_records.rts_rate'),
-                AllowedSort::field('rts_amount', 'gencys_intern_daily_records.rts_amount'),
+                AllowedSort::field('delivered', 'gencys_intern_daily_records.delivered'),
+                AllowedSort::field('delivered_amount', 'gencys_intern_daily_records.delivered_amount'),
+                AllowedSort::field('returned', 'gencys_intern_daily_records.returned'),
+                AllowedSort::field('returned_amount', 'gencys_intern_daily_records.returned_amount'),
                 AllowedSort::field('intern_name', 'gencys_interns.full_name'),
             ])
             ->defaultSort('-record_date')

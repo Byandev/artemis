@@ -17,7 +17,10 @@ interface DailyRecord {
     roas: string | null;
     ad_spent: string | null;
     rts_rate: string | null;
-    rts_amount: string | null;
+    delivered: number | null;
+    delivered_amount: string | null;
+    returned: number | null;
+    returned_amount: string | null;
     intern_id: number | null;
     intern_name: string | null;
     intern_company: string | null;
@@ -48,6 +51,9 @@ const peso = (v: string | null) =>
 // ROAS and RTS rate arrive already as percentages — just append the sign.
 const percent = (v: string | null) =>
     v === null || v === '' ? '—' : `${Number(v).toFixed(2)}%`;
+
+const count = (v: number | null) =>
+    v === null ? '—' : Number(v).toLocaleString('en-PH');
 
 const fmtDate = (d: string | null) => (d ? d.slice(0, 10) : '—');
 
@@ -146,7 +152,7 @@ export default function InternDailyRecordsIndex({
 
     const columns = useMemo<ColumnDef<DailyRecord>[]>(() => {
         const money = (
-            key: 'sales' | 'ad_spent' | 'rts_amount',
+            key: 'sales' | 'ad_spent' | 'delivered_amount' | 'returned_amount',
             title: string,
         ): ColumnDef<DailyRecord> => ({
             accessorKey: key,
@@ -165,6 +171,30 @@ export default function InternDailyRecordsIndex({
             cell: ({ row }) => (
                 <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
                     {peso(row.original[key])}
+                </span>
+            ),
+        });
+
+        const counter = (
+            key: 'delivered' | 'returned',
+            title: string,
+        ): ColumnDef<DailyRecord> => ({
+            accessorKey: key,
+            enableSorting: true,
+            meta: {
+                headerClassName: 'text-right',
+                cellClassName: 'text-right',
+            },
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title={title}
+                    className="justify-end"
+                />
+            ),
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                    {count(row.original[key])}
                 </span>
             ),
         });
@@ -244,7 +274,10 @@ export default function InternDailyRecordsIndex({
                     </span>
                 ),
             },
-            money('rts_amount', 'RTS Amount'),
+            counter('delivered', 'Delivered'),
+            money('delivered_amount', 'Delivered Amt'),
+            counter('returned', 'Returned'),
+            money('returned_amount', 'Returned Amt'),
         ];
     }, []);
 
