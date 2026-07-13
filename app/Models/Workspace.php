@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Modules\GencysERP\Models\Intern;
 use Modules\Inventory\Models\InventoryItem;
+use Modules\Inventory\Models\InventoryNotificationSetting;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\MetaAds\Models\User as MetaUser;
@@ -491,5 +492,10 @@ class Workspace extends Model
     public function deliveredPurchaseOrders(): HasMany|Workspace
     {
         return $this->hasMany(PurchasedOrder::class)->where('status', 7);
+    }
+
+    public function inventoryNotificationSetting(): HasOne
+    {
+        return $this->hasOne(InventoryNotificationSetting::class);
     }
 }
