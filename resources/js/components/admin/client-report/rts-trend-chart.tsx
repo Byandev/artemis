@@ -86,8 +86,28 @@ export default function RtsTrendChart({ data }: { data: RtsMonthlyPoint[] }) {
         legend: { show: false },
         fill: { opacity: 1 },
         tooltip: {
-            theme: 'light', // white background so it stays legible in dark mode
-            y: { formatter: (val) => asPercent(val / 100) },
+            // Custom HTML with explicit white bg + shadow so it stays legible in
+            // dark mode regardless of ApexCharts theme CSS.
+            custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                const label = w.globals.labels[dataPointIndex];
+                const val = series[seriesIndex][dataPointIndex];
+                return `
+                    <div style="
+                        background:#ffffff;
+                        border:1px solid #e5e7eb;
+                        border-radius:8px;
+                        box-shadow:0 4px 12px rgba(0,0,0,0.15);
+                        padding:8px 12px;
+                        font-family:'DM Sans, sans-serif';
+                    ">
+                        <div style="font-size:11px;color:#6b7280;margin-bottom:2px;">${label}</div>
+                        <div style="font-size:13px;font-weight:600;color:#111827;">
+                            <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${COLOR};margin-right:6px;"></span>
+                            RTS Rate: ${asPercent(val / 100)}
+                        </div>
+                    </div>
+                `;
+            },
         },
     };
 
