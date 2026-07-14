@@ -193,6 +193,12 @@ export default function CreativesIndex({
     const navigate = useCallback(
         (params: Record<string, string | number | null | undefined>) => {
             const q = queryRef.current;
+            // Carry over EVERY active filter (not a hardcoded subset) so nothing —
+            // e.g. final_status — is dropped when paginating, sorting or searching.
+            const filters: Record<string, string | undefined> = {};
+            Object.entries(q.filter ?? {}).forEach(([key, value]) => {
+                filters[`filter[${key}]`] = value || undefined;
+            });
             router.get(
                 baseUrl,
                 {

@@ -30,9 +30,13 @@ class SyncHealthController extends Controller
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
         // All active items — used to label recent runs and for the active-items KPI.
+        // Parent items are placeholder groupings that never sync themselves, so
+        // they're excluded from the item views.
         $items = InventoryItem::query()
             ->where('workspace_id', $workspace->id)
             ->where('is_active', true)
+            ->where('is_parent', false)
+            ->visibleTo($request->user(), $workspace)
             ->with('product:id,name')
             ->orderBy('sku')
             ->get(['id', 'product_id', 'sku']);
@@ -45,6 +49,8 @@ class SyncHealthController extends Controller
         $summary = InventoryItem::query()
             ->where('workspace_id', $workspace->id)
             ->where('is_active', true)
+            ->where('is_parent', false)
+            ->visibleTo($request->user(), $workspace)
             ->when($itemSearch !== '', function ($query) use ($itemSearch) {
                 $query->where(function ($q) use ($itemSearch) {
                     $q->where('sku', 'like', "%{$itemSearch}%")
@@ -106,6 +112,7 @@ class SyncHealthController extends Controller
         // Recent runs — paginated, filterable feed.
         $recent = QueryBuilder::for(
             GencysSyncRun::query()->where('workspace_id', $workspace->id)
+                ->visibleTo($request->user(), $workspace)
         )
             ->allowedFilters([
                 AllowedFilter::exact('status'),
@@ -129,7 +136,9 @@ class SyncHealthController extends Controller
 
         // 24h KPIs.
         $since = now()->subDay();
-        $base = fn () => GencysSyncRun::query()->where('workspace_id', $workspace->id);
+        $base = fn () => GencysSyncRun::query()
+            ->where('workspace_id', $workspace->id)
+            ->visibleTo($request->user(), $workspace);
 
         $totalRuns24h = $base()->where('started_at', '>=', $since)->count();
         $successRuns24h = $base()->where('status', GencysSyncRun::STATUS_SUCCESS)->where('started_at', '>=', $since)->count();

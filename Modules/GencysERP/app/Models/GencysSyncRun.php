@@ -2,6 +2,7 @@
 
 namespace Modules\GencysERP\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,8 @@ use Modules\Inventory\Models\InventoryItem;
  */
 class GencysSyncRun extends Model
 {
+    use ScopesToVisibleTeams;
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_SUCCESS = 'success';
@@ -26,6 +29,8 @@ class GencysSyncRun extends Model
     public const TYPE_TRANSACTION_HISTORY = 'transaction_history';
 
     public const TYPE_PURCHASE_ORDER = 'purchase_order';
+
+    public const TYPE_INTERN_DAILY_RECORDS = 'intern_daily_records';
 
     protected $table = 'gencys_sync_runs';
 
@@ -39,6 +44,12 @@ class GencysSyncRun extends Model
         'rows_saved' => 'integer',
     ];
 
+    /** Team visibility flows through the run's inventory item. */
+    protected function visibilityTeamRelation(): string
+    {
+        return 'inventoryItem.product.shops.teams';
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
@@ -49,8 +60,11 @@ class GencysSyncRun extends Model
         return $this->belongsTo(InventoryItem::class);
     }
 
-    /** Open a pending run for one item + sync type. */
-    public static function start(int $workspaceId, int $inventoryItemId, string $syncType, array $meta = []): self
+    /**
+     * Open a pending run for one sync type. $inventoryItemId is the subject for
+     * inventory syncs; intern syncs pass null and keep the intern id in $meta.
+     */
+    public static function start(int $workspaceId, ?int $inventoryItemId, string $syncType, array $meta = []): self
     {
         return self::create([
             'workspace_id' => $workspaceId,

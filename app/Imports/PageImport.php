@@ -24,7 +24,6 @@ class PageImport implements ToCollection, WithHeadingRow
      */
     private const COLUMN_MAP = [
         'shop_id' => 'shop_id',
-        'product_id' => 'product_id',
         'status' => 'status',
         'name' => 'name',
         'botcake_token' => 'botcake_token',

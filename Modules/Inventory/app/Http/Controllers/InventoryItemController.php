@@ -99,7 +99,10 @@ class InventoryItemController extends Controller
             // Parent placeholders carry no stock of their own — their children do.
             // The flat list rolls nothing up, so a parent would show as an empty
             // row; only the summarize view surfaces the group. Hide them here.
-            ->where('inventory_items.is_parent', false);
+            ->where('inventory_items.is_parent', false)
+            // Team scoping: only items whose product's shop is in the user's team
+            // (no-op for unrestricted users). Unlinked items are hidden from scoped users.
+            ->visibleTo($request->user(), $workspace);
         $this->applyActiveFilter($request, $base);
 
         // Parent's SKU for child rows, so the flat list can show what each SKU is
@@ -175,6 +178,7 @@ class InventoryItemController extends Controller
         // children roll into them). The is_active filter still applies.
         $inner = InventoryItem::query()
             ->where('inventory_items.workspace_id', $workspace->id)
+            ->visibleTo($request->user(), $workspace)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.unfulfilled_count, inventory_items.three_days_average, products.name as product_name')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")

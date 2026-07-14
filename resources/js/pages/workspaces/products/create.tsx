@@ -2,14 +2,14 @@ import PageHeader from '@/components/common/PageHeader';
 import { MultiSelect } from '@/components/ui/multi-select';
 import AppLayout from '@/layouts/app-layout';
 import workspaces from '@/routes/workspaces';
-import { Page } from '@/types/models/Page';
+import { Shop } from '@/types/models/Shop';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 
 interface PageProps {
     workspace: Workspace;
-    pages: Page[];
+    shops: Shop[];
 }
 
 const inputClass =
@@ -22,14 +22,14 @@ const errorClass = 'font-mono text-[11px] text-red-500';
 const statuses = ['Testing', 'Scaling', 'Failed', 'Inactive'] as const;
 type Status = (typeof statuses)[number];
 
-const Create = ({ workspace, pages }: PageProps) => {
+const Create = ({ workspace, shops }: PageProps) => {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         code: '',
         category: '',
         status: 'Testing' as Status,
         description: '',
-        page_ids: [] as number[],
+        shop_ids: [] as number[],
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -171,26 +171,26 @@ const Create = ({ workspace, pages }: PageProps) => {
                         </div>
                     </div>
 
-                    {/* Pages */}
+                    {/* Shops */}
                     <div className="rounded-2xl border border-black/6 bg-white p-6 dark:border-white/6 dark:bg-zinc-900">
                         <p className="mb-5 font-mono text-[10px] font-semibold tracking-widest text-gray-300 uppercase dark:text-gray-600">
-                            Pages
+                            Shops
                         </p>
                         <div className={fieldClass}>
-                            <label className={labelClass}>Linked Pages</label>
+                            <label className={labelClass}>Linked Shops</label>
                             <MultiSelect
-                                options={pages.map((page) => ({
-                                    value: page.id.toString(),
-                                    label: page.name,
+                                options={shops.map((shop) => ({
+                                    value: shop.id.toString(),
+                                    label: shop.name,
                                 }))}
-                                selected={data.page_ids.map(String)}
+                                selected={data.shop_ids.map(String)}
                                 onChange={(selected) =>
-                                    setData('page_ids', selected.map(Number))
+                                    setData('shop_ids', selected.map(Number))
                                 }
-                                placeholder="Select pages for this product..."
+                                placeholder="Select shops for this product..."
                             />
-                            {errors.page_ids && (
-                                <p className={errorClass}>{errors.page_ids}</p>
+                            {errors.shop_ids && (
+                                <p className={errorClass}>{errors.shop_ids}</p>
                             )}
                         </div>
                     </div>

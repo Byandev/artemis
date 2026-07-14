@@ -2,6 +2,7 @@
 
 use App\Models\Page;
 use App\Models\Shop;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
@@ -260,6 +261,79 @@ test('store creates a shop, stores the POS token, and auto-fetches its pages', f
     expect(Page::where('id', 9002)->where('shop_id', 123)->exists())->toBeTrue();
     Bus::assertDispatched(FetchShopOrders::class);
     Bus::assertDispatched(FetchShopUsers::class);
+});
+
+test('store auto-attaches the new shop to the connecting user single team', function () {
+    Bus::fake();
+    Http::fake([
+        'pos.pages.fm/*' => Http::response([
+            'shop' => ['id' => 123, 'name' => 'My Shop', 'pages' => []],
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $team = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $owner->teams()->attach($team);
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspace->slug}/shops")
+        ->post("/workspaces/{$workspace->slug}/shops", [
+            'shop_id' => 123,
+            'pos_token' => 'valid-pos-token',
+        ])
+        ->assertRedirect("/workspaces/{$workspace->slug}/shops");
+
+    expect(Shop::find(123)->teams()->pluck('teams.id')->all())->toBe([$team->id]);
+});
+
+test('store auto-attaches the new shop to ALL of the connecting user teams in the workspace', function () {
+    Bus::fake();
+    Http::fake([
+        'pos.pages.fm/*' => Http::response([
+            'shop' => ['id' => 123, 'name' => 'My Shop', 'pages' => []],
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $owner->teams()->attach([$teamA->id, $teamB->id]);
+
+    // A team the user is NOT on, and a team in another workspace: neither should attach.
+    Team::factory()->create(['workspace_id' => $workspace->id]);
+    $otherWorkspaceTeam = Team::factory()->create();
+    $owner->teams()->attach($otherWorkspaceTeam);
+
+    $this->actingAs($owner)
+        ->post("/workspaces/{$workspace->slug}/shops", [
+            'shop_id' => 123,
+            'pos_token' => 'valid-pos-token',
+        ])
+        ->assertRedirect();
+
+    expect(Shop::find(123)->teams()->pluck('teams.id')->sort()->values()->all())
+        ->toBe(collect([$teamA->id, $teamB->id])->sort()->values()->all());
+});
+
+test('store creates the shop with no team when the connecting user is on no team', function () {
+    Bus::fake();
+    Http::fake([
+        'pos.pages.fm/*' => Http::response([
+            'shop' => ['id' => 123, 'name' => 'My Shop', 'pages' => []],
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($owner)
+        ->post("/workspaces/{$workspace->slug}/shops", [
+            'shop_id' => 123,
+            'pos_token' => 'valid-pos-token',
+        ])
+        ->assertRedirect();
+
+    expect(Shop::find(123))->not->toBeNull()
+        ->and(Shop::find(123)->teams()->count())->toBe(0);
 });
 
 test('store rejects an invalid POS token', function () {

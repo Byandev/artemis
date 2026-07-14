@@ -21,7 +21,6 @@ class PageExport implements FromCollection, WithHeadings, WithMapping
     public const COLUMNS = [
         'id',
         'shop_id',
-        'product_id',
         'workspace_id',
         'status',
         'name',

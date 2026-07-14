@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\Page;
 use App\Models\Product;
+use App\Models\Shop;
 use App\Models\User;
 
 test('owner can view products index', function () {
@@ -125,16 +125,16 @@ test('store rejects code longer than 10 characters', function () {
         ->assertSessionHasErrors('code');
 });
 
-test('store rejects when page_ids contains an unknown page id', function () {
+test('store rejects when shop_ids contains an unknown shop id', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/products/create")
         ->post("/workspaces/{$workspace->slug}/products", [
             'name' => 'P', 'code' => 'P1', 'category' => 'C', 'status' => 'Scaling',
-            'page_ids' => [999999],
+            'shop_ids' => [999999],
         ])
-        ->assertSessionHasErrors('page_ids.0');
+        ->assertSessionHasErrors('shop_ids.0');
 });
 
 test('non-member cannot delete a product', function () {
@@ -242,23 +242,23 @@ test('products index combines filter[category] and sort=code', function () {
     expect($names)->toBe(['Y', 'Z']);
 });
 
-test('store attaches selected pages from same workspace and ignores foreign pages', function () {
+test('store attaches selected shops from same workspace and ignores foreign shops', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    $myPage = Page::factory()->forWorkspace($workspace)->create();
-    $foreignPage = Page::factory()->forWorkspace($other)->create();
+    $myShop = Shop::factory()->forWorkspace($workspace)->create();
+    $foreignShop = Shop::factory()->forWorkspace($other)->create();
 
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/products/create")
         ->post("/workspaces/{$workspace->slug}/products", [
             'name' => 'P', 'code' => 'P1', 'category' => 'C', 'status' => 'Scaling',
-            'page_ids' => [$myPage->id, $foreignPage->id],
+            'shop_ids' => [$myShop->id, $foreignShop->id],
         ])
         ->assertRedirect();
 
     $product = Product::where('code', 'P1')->first();
-    expect($myPage->fresh()->product_id)->toBe($product->id);
-    // Foreign page should NOT have been linked
-    expect($foreignPage->fresh()->product_id)->not->toBe($product->id);
+    expect($myShop->fresh()->product_id)->toBe($product->id);
+    // Foreign shop should NOT have been linked
+    expect($foreignShop->fresh()->product_id)->not->toBe($product->id);
 });
