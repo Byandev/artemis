@@ -245,7 +245,7 @@ return [
             'queue' => ['pancake'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses' => 3,
+            'maxProcesses' => 6,
             'balanceMaxShift' => 1,
             'balanceCooldown' => 3,
             'maxTime' => 0,
