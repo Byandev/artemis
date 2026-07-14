@@ -35,6 +35,22 @@ interface Subtotal {
     roas_today: number | null;
 }
 
+interface AdRtsRow {
+    id: number;
+    name: string | null;
+    actual_ad_spent: number;
+    avg_ad_spent: number;
+    rts_rate: number | null;
+    rts_amount: number | null;
+}
+
+interface AdRtsSubtotal {
+    actual_ad_spent: number;
+    avg_ad_spent: number;
+    rts_rate: number | null;
+    rts_amount: number | null;
+}
+
 interface View {
     date: string | null;
     date_label: string | null;
@@ -42,6 +58,7 @@ interface View {
     prev_date_label: string | null;
     rows: Row[];
     subtotal: Subtotal | null;
+    ad_rts: { rows: AdRtsRow[]; subtotal: AdRtsSubtotal | null };
 }
 
 interface Filters {
@@ -64,6 +81,8 @@ const peso = (v: number | null) =>
           })}`;
 
 const int = (v: number) => v.toLocaleString('en-PH');
+
+const pct = (v: number | null) => (v === null ? '—' : `${v.toFixed(2)}%`);
 
 const roasText = (v: number | null) => (v === null ? '—' : v.toFixed(2));
 
@@ -232,6 +251,40 @@ function SubtotalRow({ st }: { st: Subtotal }) {
     );
 }
 
+function AdRtsDataRow({ row }: { row: AdRtsRow }) {
+    return (
+        <tr className="transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.02]">
+            <td
+                className={`${cell} font-medium text-gray-800 uppercase dark:text-gray-200`}
+            >
+                {row.name ?? `#${row.id}`}
+            </td>
+            <td className={num}>{peso(row.actual_ad_spent)}</td>
+            <td className={num}>{peso(row.avg_ad_spent)}</td>
+            <td className={ctr}>{pct(row.rts_rate)}</td>
+            <td className={num}>{peso(row.rts_amount)}</td>
+        </tr>
+    );
+}
+
+function AdRtsSubtotalRow({ st }: { st: AdRtsSubtotal }) {
+    return (
+        <tr className="bg-stone-50 dark:bg-white/2">
+            <td
+                className={`${cell} font-mono text-[11px] font-semibold text-gray-500 italic dark:text-gray-400`}
+            >
+                Sub-Total
+            </td>
+            <td className={`${num} font-semibold`}>
+                {peso(st.actual_ad_spent)}
+            </td>
+            <td className={`${num} font-semibold`}>{peso(st.avg_ad_spent)}</td>
+            <td className={ctr} />
+            <td className={`${num} font-semibold`}>{peso(st.rts_amount)}</td>
+        </tr>
+    );
+}
+
 export default function InternDashboard({
     workspace,
     view: initialView,
@@ -363,6 +416,63 @@ export default function InternDashboard({
                             {view.subtotal && view.rows.length > 0 && (
                                 <SubtotalRow st={view.subtotal} />
                             )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Second table — ad spend & month-to-date RTS */}
+                <h2 className="mt-8 mb-2 px-1 font-mono text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                    Ad Spend &amp; RTS
+                </h2>
+                <div className="relative overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                    {loading && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
+                            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                        </div>
+                    )}
+                    <table className="w-full min-w-[720px] border-collapse text-[12px] text-gray-800 dark:text-gray-200">
+                        <thead>
+                            <tr>
+                                <th className={`${headCell} text-left`}>
+                                    Intern
+                                </th>
+                                <th className={headCell}>Actual Ad Spent</th>
+                                <th className={headCell}>
+                                    3 Days Average Ad Spent
+                                </th>
+                                <th className={headCell}>
+                                    RTS to Date
+                                    {view.date_label && (
+                                        <span className="mt-0.5 block text-[9px] font-normal tracking-normal text-gray-300 normal-case dark:text-gray-600">
+                                            as of {view.date_label}
+                                        </span>
+                                    )}
+                                </th>
+                                <th className={headCell}>RTS Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {view.ad_rts.rows.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={5}
+                                        className="px-3 py-16 text-center text-[12px] text-gray-400 dark:text-gray-500"
+                                    >
+                                        No intern records for this date.
+                                    </td>
+                                </tr>
+                            )}
+
+                            {view.ad_rts.rows.map((row) => (
+                                <AdRtsDataRow key={row.id} row={row} />
+                            ))}
+
+                            {view.ad_rts.subtotal &&
+                                view.ad_rts.rows.length > 0 && (
+                                    <AdRtsSubtotalRow
+                                        st={view.ad_rts.subtotal}
+                                    />
+                                )}
                         </tbody>
                     </table>
                 </div>

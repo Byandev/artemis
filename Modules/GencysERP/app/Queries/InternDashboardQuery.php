@@ -43,6 +43,7 @@ class InternDashboardQuery
                 'prev_date_label' => null,
                 'rows' => [],
                 'subtotal' => null,
+                'ad_rts' => ['rows' => [], 'subtotal' => null],
             ];
         }
 
@@ -111,7 +112,92 @@ class InternDashboardQuery
                 ->values()
                 ->all(),
             'subtotal' => $this->subtotal($rows),
+            // Second table: ad spend + month-to-date RTS per intern.
+            'ad_rts' => $this->adRtsRows($date, $interns),
         ];
+    }
+
+    /**
+     * Second table's rows: actual ad spend, 3-day average ad spend, and the
+     * month-to-date RTS rate + amount per intern.
+     *
+     * @return array{rows: array, subtotal: array}
+     */
+    private function adRtsRows(Carbon $date, Collection $interns): array
+    {
+        // Selected-day ad spend per intern.
+        $spendToday = $this->recordsFor($date->toDateString())->keyBy('gencys_intern_id');
+
+        // 3-day ad spend sum: selected day + the two days before it.
+        $spend3d = GencysInternDailyRecord::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->whereBetween('record_date', [$date->copy()->subDays(2)->toDateString(), $date->toDateString()])
+            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
+            ->groupBy('gencys_intern_id')
+            ->selectRaw('gencys_intern_id, SUM(COALESCE(ad_spent, 0)) as spend')
+            ->pluck('spend', 'gencys_intern_id');
+
+        // Month-to-date RTS snapshot: taken from the latest record in the
+        // selected date's month (the ERP stamps date_to_month_* only on its most
+        // recent day), so it reflects month-to-date as of the selected date.
+        $rts = $this->monthToDateRts($date);
+
+        $rows = $interns
+            ->map(function (Intern $intern) use ($spendToday, $spend3d, $rts) {
+                $rec = $spendToday->get($intern->id);
+                $r = $rts->get($intern->id);
+
+                $rate = $r && $r->date_to_month_sales_order_rts_rate !== null
+                    ? (float) $r->date_to_month_sales_order_rts_rate
+                    : null;
+                $returned = (float) ($r->date_to_month_sales_order_returned ?? 0);
+                $forReturn = (float) ($r->date_to_month_sales_order_for_return ?? 0);
+                $hasRts = $rate !== null || $returned != 0.0 || $forReturn != 0.0;
+
+                return [
+                    'id' => $intern->id,
+                    'name' => $intern->full_name,
+                    'actual_ad_spent' => (float) ($rec->ad_spent ?? 0),
+                    'avg_ad_spent' => round((float) ($spend3d[$intern->id] ?? 0) / 3, 2),
+                    'rts_rate' => $rate,
+                    'rts_amount' => $hasRts ? $returned + $forReturn : null,
+                ];
+            })
+            ->sortByDesc('actual_ad_spent')
+            ->values();
+
+        return [
+            'rows' => $rows->all(),
+            'subtotal' => [
+                'actual_ad_spent' => (float) $rows->sum('actual_ad_spent'),
+                'avg_ad_spent' => (float) $rows->sum('avg_ad_spent'),
+                // RTS rate is a percentage — not summable, so no subtotal.
+                'rts_rate' => null,
+                'rts_amount' => (float) $rows->sum(fn ($r) => $r['rts_amount'] ?? 0),
+            ],
+        ];
+    }
+
+    /**
+     * intern id => the latest record within [start of $date's month, $date],
+     * carrying its date_to_month_sales_order_* RTS snapshot.
+     */
+    private function monthToDateRts(Carbon $date): Collection
+    {
+        return GencysInternDailyRecord::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->whereBetween('record_date', [$date->copy()->startOfMonth()->toDateString(), $date->toDateString()])
+            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
+            ->orderBy('record_date')
+            ->get([
+                'gencys_intern_id',
+                'record_date',
+                'date_to_month_sales_order_rts_rate',
+                'date_to_month_sales_order_returned',
+                'date_to_month_sales_order_for_return',
+            ])
+            ->groupBy('gencys_intern_id')
+            ->map(fn ($group) => $group->last());
     }
 
     /** Daily records for the given date, scoped to workspace + selected interns. */
