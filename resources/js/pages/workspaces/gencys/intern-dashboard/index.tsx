@@ -7,6 +7,7 @@ import axios from 'axios';
 import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import DashboardCharts, { ChartsData, DashboardKpis } from './charts';
 
 type Status = 'up' | 'down' | 'flat';
 
@@ -39,6 +40,7 @@ interface AdRtsRow {
     id: number;
     name: string | null;
     actual_ad_spent: number;
+    target_ad_spent: number | null;
     avg_ad_spent: number;
     rts_rate: number | null;
     rts_amount: number | null;
@@ -46,6 +48,7 @@ interface AdRtsRow {
 
 interface AdRtsSubtotal {
     actual_ad_spent: number;
+    target_ad_spent: number;
     avg_ad_spent: number;
     rts_rate: number | null;
     rts_amount: number | null;
@@ -59,6 +62,7 @@ interface View {
     rows: Row[];
     subtotal: Subtotal | null;
     ad_rts: { rows: AdRtsRow[]; subtotal: AdRtsSubtotal | null };
+    charts: ChartsData;
 }
 
 interface Filters {
@@ -69,6 +73,9 @@ interface Props {
     workspace: Workspace;
     view: View;
     filters: Filters;
+    // Base path for the page's data endpoint / URL sync. Defaults to the gencys
+    // route; the S&M dashboard passes its own so this page can serve both.
+    baseUrl?: string;
 }
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -251,6 +258,55 @@ function SubtotalRow({ st }: { st: Subtotal }) {
     );
 }
 
+// Budget verdict: actual vs target ad spend, within a ±2,000 tolerance band.
+const BUDGET_TOLERANCE = 2000;
+type BudgetVerdict = 'over' | 'under' | 'within';
+
+function budgetVerdict(
+    actual: number,
+    target: number | null,
+): BudgetVerdict | null {
+    if (target == null) return null;
+    const diff = actual - target;
+    if (diff > BUDGET_TOLERANCE) return 'over';
+    if (diff < -BUDGET_TOLERANCE) return 'under';
+    return 'within';
+}
+
+const BUDGET_REMARK: Record<BudgetVerdict, { label: string; cls: string }> = {
+    over: {
+        label: 'Overspending',
+        cls: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    },
+    under: {
+        label: 'Underspending',
+        cls: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    },
+    within: {
+        label: 'Within Budget',
+        cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    },
+};
+
+function BudgetRemark({
+    actual,
+    target,
+}: {
+    actual: number;
+    target: number | null;
+}) {
+    const v = budgetVerdict(actual, target);
+    if (!v) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+    const c = BUDGET_REMARK[v];
+    return (
+        <span
+            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${c.cls}`}
+        >
+            {c.label}
+        </span>
+    );
+}
+
 function AdRtsDataRow({ row }: { row: AdRtsRow }) {
     return (
         <tr className="transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.02]">
@@ -260,6 +316,13 @@ function AdRtsDataRow({ row }: { row: AdRtsRow }) {
                 {row.name ?? `#${row.id}`}
             </td>
             <td className={num}>{peso(row.actual_ad_spent)}</td>
+            <td className={num}>{peso(row.target_ad_spent)}</td>
+            <td className={`${cell} text-center`}>
+                <BudgetRemark
+                    actual={row.actual_ad_spent}
+                    target={row.target_ad_spent}
+                />
+            </td>
             <td className={num}>{peso(row.avg_ad_spent)}</td>
             <td className={ctr}>{pct(row.rts_rate)}</td>
             <td className={num}>{peso(row.rts_amount)}</td>
@@ -278,6 +341,10 @@ function AdRtsSubtotalRow({ st }: { st: AdRtsSubtotal }) {
             <td className={`${num} font-semibold`}>
                 {peso(st.actual_ad_spent)}
             </td>
+            <td className={`${num} font-semibold`}>
+                {peso(st.target_ad_spent)}
+            </td>
+            <td className={ctr} />
             <td className={`${num} font-semibold`}>{peso(st.avg_ad_spent)}</td>
             <td className={ctr} />
             <td className={`${num} font-semibold`}>{peso(st.rts_amount)}</td>
@@ -289,12 +356,14 @@ export default function InternDashboard({
     workspace,
     view: initialView,
     filters,
+    baseUrl: baseUrlProp,
 }: Props) {
     const [date, setDate] = useState<string>(filters.date ?? '');
     const [view, setView] = useState<View>(initialView);
     const [loading, setLoading] = useState(false);
 
-    const baseUrl = `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
+    const baseUrl =
+        baseUrlProp ?? `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
 
     // Persist the selected date in the URL so a refresh restores it — the
     // controller reads filter.date on load. replaceState (not an Inertia visit)
@@ -342,7 +411,7 @@ export default function InternDashboard({
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Interns Quick Data View"
+                    title="Interns Dashboard"
                     description={dateLabel}
                     stackActionsOnMobile
                 >
@@ -358,7 +427,12 @@ export default function InternDashboard({
                     />
                 </PageHeader>
 
-                <div className="relative mt-4 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                {/* Summary statistics on top */}
+                <div className="mt-4">
+                    <DashboardKpis kpis={view.charts.kpis} />
+                </div>
+
+                <div className="relative mt-6 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     {loading && (
                         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
                             <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
@@ -437,6 +511,8 @@ export default function InternDashboard({
                                     Intern
                                 </th>
                                 <th className={headCell}>Actual Ad Spent</th>
+                                <th className={headCell}>Target Ad Spent</th>
+                                <th className={headCell}>Remarks</th>
                                 <th className={headCell}>
                                     3 Days Average Ad Spent
                                 </th>
@@ -455,7 +531,7 @@ export default function InternDashboard({
                             {view.ad_rts.rows.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={5}
+                                        colSpan={7}
                                         className="px-3 py-16 text-center text-[12px] text-gray-400 dark:text-gray-500"
                                     >
                                         No intern records for this date.
@@ -480,6 +556,12 @@ export default function InternDashboard({
                 <p className="mt-3 font-mono text-[11px] text-gray-400 dark:text-gray-500">
                     REMARKS: —
                 </p>
+
+                {/* Analytics — KPI tiles + trend / efficiency charts */}
+                <h2 className="mt-8 mb-3 px-1 font-mono text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                    Analytics
+                </h2>
+                <DashboardCharts data={view.charts} loading={loading} />
             </div>
         </AppLayout>
     );

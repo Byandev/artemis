@@ -5,6 +5,7 @@ namespace Modules\GencysERP\Queries;
 use App\Models\Workspace;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\Intern;
 
@@ -44,6 +45,15 @@ class InternDashboardQuery
                 'rows' => [],
                 'subtotal' => null,
                 'ad_rts' => ['rows' => [], 'subtotal' => null],
+                'charts' => [
+                    'kpis' => [
+                        'total_sales' => 0.0, 'total_ad_spent' => 0.0, 'roas' => null,
+                        'total_orders' => 0, 'avg_rts_rate' => null,
+                    ],
+                    'sales_trend' => ['dates' => [], 'series' => []],
+                    'ad_spend_trend' => ['dates' => [], 'series' => []],
+                    'ad_spend_share' => [],
+                ],
             ];
         }
 
@@ -114,6 +124,113 @@ class InternDashboardQuery
             'subtotal' => $this->subtotal($rows),
             // Second table: ad spend + month-to-date RTS per intern.
             'ad_rts' => $this->adRtsRows($date, $interns),
+            // Chart data (month-to-date daily series + per-intern aggregates).
+            'charts' => $this->charts($date, $interns),
+        ];
+    }
+
+    /**
+     * Chart datasets, all month-to-date through the selected date:
+     *  - kpis: workspace totals (sales, ad spend, blended ROAS, orders, avg RTS)
+     *  - sales_trend: daily sales per intern (one series each)
+     *  - ad_spend_trend: daily ad spend per intern (one series each)
+     *  - ad_spend_share: per-intern MTD ad spend total (for the pie)
+     */
+    private function charts(Carbon $date, Collection $interns): array
+    {
+        $empty = [
+            'kpis' => [
+                'total_sales' => 0.0, 'total_ad_spent' => 0.0, 'roas' => null,
+                'total_orders' => 0, 'avg_rts_rate' => null,
+            ],
+            'sales_trend' => ['dates' => [], 'series' => []],
+            'ad_spend_trend' => ['dates' => [], 'series' => []],
+            'ad_spend_share' => [],
+        ];
+
+        $internIds = $interns->pluck('id')->all();
+        if (empty($internIds)) {
+            return $empty;
+        }
+
+        $nameById = $interns->pluck('full_name', 'id');
+        $monthStart = $date->copy()->startOfMonth();
+
+        $records = GencysInternDailyRecord::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->whereIn('gencys_intern_id', $internIds)
+            ->whereBetween('record_date', [$monthStart->toDateString(), $date->toDateString()])
+            ->get(['gencys_intern_id', 'record_date', 'sales', 'ad_spent', 'orders']);
+
+        // The month-to-date day axis, and an [intern][date] lookup.
+        $dates = [];
+        for ($d = $monthStart->copy(); $d->lte($date); $d->addDay()) {
+            $dates[] = $d->toDateString();
+        }
+        $byIntern = [];
+        foreach ($records as $r) {
+            $byIntern[$r->gencys_intern_id][$r->record_date->toDateString()] = $r;
+        }
+
+        // Per-intern daily sales & ad spend series (same shape, one series each)
+        // + per-intern MTD ad spend total for the pie.
+        $salesSeries = [];
+        $adSpendSeries = [];
+        $adSpendShare = [];
+        $totSales = 0.0;
+        $totSpend = 0.0;
+        $totOrders = 0;
+        foreach ($internIds as $id) {
+            $salesByDay = [];
+            $adByDay = [];
+            $s = 0.0;
+            $sp = 0.0;
+            $o = 0;
+            foreach ($dates as $dt) {
+                $rec = $byIntern[$id][$dt] ?? null;
+                $salesByDay[] = (float) ($rec->sales ?? 0);
+                $adByDay[] = (float) ($rec->ad_spent ?? 0);
+                $s += (float) ($rec->sales ?? 0);
+                $sp += (float) ($rec->ad_spent ?? 0);
+                $o += (int) ($rec->orders ?? 0);
+            }
+            $name = $nameById[$id] ?? "#{$id}";
+            $salesSeries[] = ['name' => $name, 'data' => $salesByDay];
+            $adSpendSeries[] = ['name' => $name, 'data' => $adByDay];
+            $adSpendShare[] = ['name' => $name, 'ad_spent' => round($sp, 2)];
+            $totSales += $s;
+            $totSpend += $sp;
+            $totOrders += $o;
+        }
+
+        // Blended RTS rate from the month-to-date snapshot (latest record per
+        // intern in the month), summed across interns:
+        //   (Σfor_return + Σreturned) / (Σfor_return + Σreturned + Σdelivered)
+        $rts = $this->monthToDateRts($date);
+        $rtsDelivered = 0.0;
+        $rtsReturned = 0.0;
+        $rtsForReturn = 0.0;
+        foreach ($rts as $r) {
+            $rtsDelivered += (float) ($r->date_to_month_sales_order_delivered ?? 0);
+            $rtsReturned += (float) ($r->date_to_month_sales_order_returned ?? 0);
+            $rtsForReturn += (float) ($r->date_to_month_sales_order_for_return ?? 0);
+        }
+        $rtsDenom = $rtsForReturn + $rtsReturned + $rtsDelivered;
+        $rtsRate = $rtsDenom > 0
+            ? round(($rtsForReturn + $rtsReturned) / $rtsDenom * 100, 2)
+            : null;
+
+        return [
+            'kpis' => [
+                'total_sales' => round($totSales, 2),
+                'total_ad_spent' => round($totSpend, 2),
+                'roas' => $totSpend > 0 ? round($totSales / $totSpend, 2) : null,
+                'total_orders' => $totOrders,
+                'avg_rts_rate' => $rtsRate,
+            ],
+            'sales_trend' => ['dates' => $dates, 'series' => $salesSeries],
+            'ad_spend_trend' => ['dates' => $dates, 'series' => $adSpendSeries],
+            'ad_spend_share' => $adSpendShare,
         ];
     }
 
@@ -142,8 +259,12 @@ class InternDashboardQuery
         // recent day), so it reflects month-to-date as of the selected date.
         $rts = $this->monthToDateRts($date);
 
+        // Target ad spend per intern: the selected day's page daily budgets for
+        // the pages owned by the intern's linked user.
+        $target = $this->targetAdSpend($date, $interns->pluck('id')->all());
+
         $rows = $interns
-            ->map(function (Intern $intern) use ($spendToday, $spend3d, $rts) {
+            ->map(function (Intern $intern) use ($spendToday, $spend3d, $rts, $target) {
                 $rec = $spendToday->get($intern->id);
                 $r = $rts->get($intern->id);
 
@@ -153,11 +274,13 @@ class InternDashboardQuery
                 $returned = (float) ($r->date_to_month_sales_order_returned ?? 0);
                 $forReturn = (float) ($r->date_to_month_sales_order_for_return ?? 0);
                 $hasRts = $rate !== null || $returned != 0.0 || $forReturn != 0.0;
+                $tgt = $target->get($intern->id);
 
                 return [
                     'id' => $intern->id,
                     'name' => $intern->full_name,
                     'actual_ad_spent' => (float) ($rec->ad_spent ?? 0),
+                    'target_ad_spent' => $tgt !== null ? (float) $tgt : null,
                     'avg_ad_spent' => round((float) ($spend3d[$intern->id] ?? 0) / 3, 2),
                     'rts_rate' => $rate,
                     'rts_amount' => $hasRts ? $returned + $forReturn : null,
@@ -170,12 +293,51 @@ class InternDashboardQuery
             'rows' => $rows->all(),
             'subtotal' => [
                 'actual_ad_spent' => (float) $rows->sum('actual_ad_spent'),
+                'target_ad_spent' => (float) $rows->sum(fn ($r) => $r['target_ad_spent'] ?? 0),
                 'avg_ad_spent' => (float) $rows->sum('avg_ad_spent'),
                 // RTS rate is a percentage — not summable, so no subtotal.
                 'rts_rate' => null,
                 'rts_amount' => (float) $rows->sum(fn ($r) => $r['rts_amount'] ?? 0),
             ],
         ];
+    }
+
+    /**
+     * intern id => target ad spend for $date: the sum of page daily budgets for
+     * pages owned by the intern's linked user
+     * (gencys_interns.user_id → pages.owner_id → page_daily_budget_records).
+     *
+     * Each page uses its latest budget recorded ON OR BEFORE $date, so a budget
+     * carries forward on days it wasn't re-recorded.
+     *
+     * @param  array<int, int>  $internIds
+     */
+    private function targetAdSpend(Carbon $date, array $internIds): Collection
+    {
+        if (empty($internIds)) {
+            return collect();
+        }
+
+        // Per page: the date of its most recent budget on or before $date.
+        $latestPerPage = DB::table('page_daily_budget_records')
+            ->where('workspace_id', $this->workspace->id)
+            ->where('date', '<=', $date->toDateString())
+            ->groupBy('page_id')
+            ->selectRaw('page_id, MAX(date) as latest_date');
+
+        return DB::table('gencys_interns as gi')
+            ->join('pages as p', 'p.owner_id', '=', 'gi.user_id')
+            ->joinSub($latestPerPage, 'lp', 'lp.page_id', '=', 'p.id')
+            ->join('page_daily_budget_records as b', function ($join) {
+                $join->on('b.page_id', '=', 'lp.page_id')
+                    ->on('b.date', '=', 'lp.latest_date');
+            })
+            ->where('gi.workspace_id', $this->workspace->id)
+            ->whereIn('gi.id', $internIds)
+            ->whereNotNull('gi.user_id')
+            ->groupBy('gi.id')
+            ->selectRaw('gi.id, SUM(b.budget) as target')
+            ->pluck('target', 'gi.id');
     }
 
     /**
@@ -193,6 +355,7 @@ class InternDashboardQuery
                 'gencys_intern_id',
                 'record_date',
                 'date_to_month_sales_order_rts_rate',
+                'date_to_month_sales_order_delivered',
                 'date_to_month_sales_order_returned',
                 'date_to_month_sales_order_for_return',
             ])
@@ -225,7 +388,11 @@ class InternDashboardQuery
             ->pluck('mtd_sales', 'gencys_intern_id');
     }
 
-    /** The report date; defaults to the latest record date in the workspace. */
+    /**
+     * The report date. Defaults to yesterday (today's data is still coming in),
+     * falling back to the most recent record on or before yesterday so there's
+     * always data to show.
+     */
     private function resolveDate(): ?Carbon
     {
         if ($this->date) {
@@ -233,6 +400,7 @@ class InternDashboardQuery
         }
 
         $latest = GencysInternDailyRecord::where('workspace_id', $this->workspace->id)
+            ->where('record_date', '<=', Carbon::yesterday()->toDateString())
             ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
             ->max('record_date');
 
