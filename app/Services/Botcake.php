@@ -98,11 +98,71 @@ class Botcake
         $response = Http::withHeader('access-token', $this->token)
             ->get("https://botcake.io/api/public_api/v1/pages/$this->pageId/flows/");
 
-        if ($response->failed()) {
-            throw new Exception('Failed to fetch flows: '.$response->status());
+        $body = $response->json();
+
+        if ($response->failed() || ($body['success'] ?? true) === false) {
+            throw new Exception($body['message'] ?? 'Failed to fetch flows: '.$response->status());
         }
 
         return $response->json('data.flows', []);
+    }
+
+    /**
+     * Fetch the page's custom field definitions from Botcake.
+     *
+     * On failure the thrown message carries Botcake's own reason (e.g.
+     * "invalid_page_id") when present, so callers can surface it verbatim.
+     *
+     * @throws ConnectionException
+     * @throws Exception
+     */
+    public function fetchCustomFields(): array
+    {
+        $url = "https://botcake.io/api/public_api/v1/pages/$this->pageId/custom_fields";
+
+        // The endpoint is paginated (?page=0,1,2,…). Walk pages until one comes
+        // back empty (or stops adding new fields) so we return the full list.
+        $all = [];
+        $seen = [];
+
+        for ($page = 0; $page < 100; $page++) {
+            $response = Http::withHeader('access-token', $this->token)
+                ->get($url, ['page' => $page]);
+
+            $body = $response->json();
+
+            if ($response->failed() || ($body['success'] ?? true) === false) {
+                throw new Exception($body['message'] ?? 'Failed to fetch custom fields: '.$response->status());
+            }
+
+            $data = $response->json('data', []);
+
+            if (empty($data)) {
+                break;
+            }
+
+            $added = 0;
+            foreach ($data as $field) {
+                $id = $field['id'] ?? null;
+
+                if ($id === null) {
+                    $all[] = $field;
+                    $added++;
+                } elseif (! isset($seen[$id])) {
+                    $seen[$id] = true;
+                    $all[] = $field;
+                    $added++;
+                }
+            }
+
+            // Guard against endpoints that ignore ?page and keep returning the
+            // same records: stop once a page contributes nothing new.
+            if ($added === 0) {
+                break;
+            }
+        }
+
+        return $all;
     }
 
     /**

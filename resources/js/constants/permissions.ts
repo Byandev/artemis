@@ -41,6 +41,12 @@ export const PERMISSIONS = {
     DeleteTeams: 'Delete Teams',
     ManageSchedule: 'Manage Schedule',
 
+    // Departments
+    ViewDepartments: 'View Departments',
+    CreateDepartments: 'Create Departments',
+    EditDepartments: 'Edit Departments',
+    DeleteDepartments: 'Delete Departments',
+
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
     ViewRtsAiChat: 'View RTS AI Chat',
@@ -70,6 +76,8 @@ export const PERMISSIONS = {
 
     // Gencys ERP
     ViewDailySalesTracker: 'View Daily Sales Tracker',
+    ViewGencysInterns: 'View Gencys Interns',
+    ViewGencysInternDailyRecords: 'View Gencys Intern Daily Records',
     ViewUnitCode: 'View Unit Code',
     CreateUnitCode: 'Create Unit Code',
     EditUnitCode: 'Edit Unit Code',
@@ -100,6 +108,11 @@ export const PERMISSIONS = {
     CreateFinanceRemittances: 'Create Finance Remittances',
     EditFinanceRemittances: 'Edit Finance Remittances',
     DeleteFinanceRemittances: 'Delete Finance Remittances',
+    ViewFinanceRequestFunds: 'View Finance Request Funds',
+    CreateFinanceRequestFunds: 'Create Finance Request Funds',
+    EditFinanceRequestFunds: 'Edit Finance Request Funds',
+    DeleteFinanceRequestFunds: 'Delete Finance Request Funds',
+    ApproveFinanceRequestFunds: 'Approve Finance Request Funds',
 
     // Page Daily Budget Records
     ViewPageDailyBudgetRecords: 'View Page Daily Budget Records',

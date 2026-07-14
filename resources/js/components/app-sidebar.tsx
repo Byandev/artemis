@@ -18,9 +18,11 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     ArrowLeftRight,
+    Banknote,
     BarChart2,
     BookOpenIcon,
     Box,
+    Building2,
     CalendarDays,
     Check,
     Clapperboard,
@@ -139,6 +141,12 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        {
+            title: 'Departments',
+            href: `/workspaces/${slug}/departments`,
+            icon: Building2,
+            permission: PERMISSIONS.ViewDepartments,
+        },
         {
             title: 'Roles',
             href: `/workspaces/${slug}/roles`,
@@ -369,13 +377,37 @@ export function AppSidebar() {
                   {
                       title: 'Gencys ERP',
                       icon: Activity,
-                      anyOf: [PERMISSIONS.ViewDailySalesTracker],
+                      anyOf: [
+                          PERMISSIONS.ViewDailySalesTracker,
+                          PERMISSIONS.ViewGencysInterns,
+                          PERMISSIONS.ViewGencysInternDailyRecords,
+                      ],
                       items: [
+                          {
+                              title: 'Intern Dashboard',
+                              href: `/workspaces/${slug}/gencys/intern-dashboard`,
+                              icon: LayoutDashboard,
+                              permission:
+                                  PERMISSIONS.ViewGencysInternDailyRecords,
+                          },
                           {
                               title: 'Daily Sales Tracker',
                               href: `/workspaces/${slug}/gencys/daily-sales-tracker`,
                               icon: Activity,
                               permission: PERMISSIONS.ViewDailySalesTracker,
+                          },
+                          {
+                              title: 'Interns',
+                              href: `/workspaces/${slug}/gencys/interns`,
+                              icon: Users,
+                              permission: PERMISSIONS.ViewGencysInterns,
+                          },
+                          {
+                              title: 'Intern Daily Records',
+                              href: `/workspaces/${slug}/gencys/intern-daily-records`,
+                              icon: Activity,
+                              permission:
+                                  PERMISSIONS.ViewGencysInternDailyRecords,
                           },
                       ],
                   },
@@ -401,6 +433,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewFinanceAccounts,
                           PERMISSIONS.ViewFinanceTransactions,
                           PERMISSIONS.ViewFinanceRemittances,
+                          PERMISSIONS.ViewFinanceRequestFunds,
                       ],
                       items: [
                           {
@@ -438,6 +471,12 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
                               icon: Send,
                               permission: PERMISSIONS.ViewFinanceRemittances,
+                          },
+                          {
+                              title: 'Request Funds',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
+                              icon: Banknote,
+                              permission: PERMISSIONS.ViewFinanceRequestFunds,
                           },
                       ],
                   },

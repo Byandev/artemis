@@ -131,6 +131,16 @@ class ShopController extends Controller
 
         $createdPages = $this->syncShopPages($shop, $workspace, $resJson, $request->user()->id);
 
+        // Auto-attach the new shop to every team the connecting user belongs to
+        // in this workspace so their teammates can see it without a manual step.
+        $userTeamIds = $request->user()->teams()
+            ->where('teams.workspace_id', $workspace->id)
+            ->pluck('teams.id');
+
+        if ($userTeamIds->isNotEmpty()) {
+            $shop->teams()->syncWithoutDetaching($userTeamIds);
+        }
+
         dispatch(new FetchShopUsers($shop))->onQueue('pancake');
         dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
 

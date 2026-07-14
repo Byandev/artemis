@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\GencysERP\Models\Intern;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryNotificationSetting;
 use Modules\Inventory\Models\InventoryTransaction;
@@ -311,6 +312,30 @@ class Workspace extends Model
         ]);
     }
 
+    /**
+     * Assign (or clear, when null) a member's department within this workspace.
+     */
+    public function assignMemberDepartment(User $user, ?int $departmentId): int
+    {
+        return $this->users()->updateExistingPivot($user->id, [
+            'department_id' => $departmentId,
+        ]);
+    }
+
+    /**
+     * Bulk assign (or clear, when null) the department for many members at once.
+     *
+     * @param  array<int>  $userIds
+     */
+    public function assignMembersDepartment(array $userIds, ?int $departmentId): int
+    {
+        return $this->users()
+            ->newPivotStatement()
+            ->where('workspace_id', $this->id)
+            ->whereIn('user_id', $userIds)
+            ->update(['department_id' => $departmentId]);
+    }
+
     public function parcelJourneyNotificationTemplates(): HasMany
     {
         return $this->hasMany(ParcelJourneyNotificationTemplate::class);
@@ -341,6 +366,11 @@ class Workspace extends Model
     public function teams(): HasMany
     {
         return $this->hasMany(Team::class);
+    }
+
+    public function departments(): HasMany
+    {
+        return $this->hasMany(Department::class);
     }
 
     public function roles()
@@ -447,6 +477,16 @@ class Workspace extends Model
     public function inventoryItems(): HasMany|Workspace
     {
         return $this->hasMany(InventoryItem::class);
+    }
+
+    public function interns(): HasMany|Workspace
+    {
+        return $this->hasMany(Intern::class);
+    }
+
+    public function activeInterns(): HasMany|Workspace
+    {
+        return $this->hasMany(Intern::class)->where('active', true);
     }
 
     public function purchaseOrders(): HasMany|Workspace
