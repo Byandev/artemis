@@ -2,6 +2,7 @@
 
 namespace Modules\MetaAds\Models;
 
+use App\Models\Page;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,5 +39,10 @@ class AdSet extends Model
     public function ads(): HasMany
     {
         return $this->hasMany(Ad::class, 'meta_ads_set_id');
+    }
+
+    public function page()
+    {
+        return $this->belongsTo(Page::class, 'meta_page_id');
     }
 }
