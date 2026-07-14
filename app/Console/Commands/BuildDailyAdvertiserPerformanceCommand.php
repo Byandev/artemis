@@ -3,12 +3,13 @@
 namespace App\Console\Commands;
 
 use App\Models\AdvertiserPerformanceDailyRecord;
-use App\Models\Order;
+
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Modules\MetaAds\Models\Insight;
+use Modules\Pancake\Models\Order;
 
 /**
  * Build Artemis-source advertiser performance rows, one per app user per day,
