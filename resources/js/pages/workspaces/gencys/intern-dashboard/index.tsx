@@ -40,6 +40,7 @@ interface AdRtsRow {
     id: number;
     name: string | null;
     actual_ad_spent: number;
+    target_ad_spent: number | null;
     avg_ad_spent: number;
     rts_rate: number | null;
     rts_amount: number | null;
@@ -47,6 +48,7 @@ interface AdRtsRow {
 
 interface AdRtsSubtotal {
     actual_ad_spent: number;
+    target_ad_spent: number;
     avg_ad_spent: number;
     rts_rate: number | null;
     rts_amount: number | null;
@@ -71,6 +73,9 @@ interface Props {
     workspace: Workspace;
     view: View;
     filters: Filters;
+    // Base path for the page's data endpoint / URL sync. Defaults to the gencys
+    // route; the S&M dashboard passes its own so this page can serve both.
+    baseUrl?: string;
 }
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -253,6 +258,55 @@ function SubtotalRow({ st }: { st: Subtotal }) {
     );
 }
 
+// Budget verdict: actual vs target ad spend, within a ±2,000 tolerance band.
+const BUDGET_TOLERANCE = 2000;
+type BudgetVerdict = 'over' | 'under' | 'within';
+
+function budgetVerdict(
+    actual: number,
+    target: number | null,
+): BudgetVerdict | null {
+    if (target == null) return null;
+    const diff = actual - target;
+    if (diff > BUDGET_TOLERANCE) return 'over';
+    if (diff < -BUDGET_TOLERANCE) return 'under';
+    return 'within';
+}
+
+const BUDGET_REMARK: Record<BudgetVerdict, { label: string; cls: string }> = {
+    over: {
+        label: 'Overspending',
+        cls: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    },
+    under: {
+        label: 'Underspending',
+        cls: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    },
+    within: {
+        label: 'Within Budget',
+        cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    },
+};
+
+function BudgetRemark({
+    actual,
+    target,
+}: {
+    actual: number;
+    target: number | null;
+}) {
+    const v = budgetVerdict(actual, target);
+    if (!v) return <span className="text-gray-300 dark:text-gray-600">—</span>;
+    const c = BUDGET_REMARK[v];
+    return (
+        <span
+            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${c.cls}`}
+        >
+            {c.label}
+        </span>
+    );
+}
+
 function AdRtsDataRow({ row }: { row: AdRtsRow }) {
     return (
         <tr className="transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.02]">
@@ -262,6 +316,13 @@ function AdRtsDataRow({ row }: { row: AdRtsRow }) {
                 {row.name ?? `#${row.id}`}
             </td>
             <td className={num}>{peso(row.actual_ad_spent)}</td>
+            <td className={num}>{peso(row.target_ad_spent)}</td>
+            <td className={`${cell} text-center`}>
+                <BudgetRemark
+                    actual={row.actual_ad_spent}
+                    target={row.target_ad_spent}
+                />
+            </td>
             <td className={num}>{peso(row.avg_ad_spent)}</td>
             <td className={ctr}>{pct(row.rts_rate)}</td>
             <td className={num}>{peso(row.rts_amount)}</td>
@@ -280,6 +341,10 @@ function AdRtsSubtotalRow({ st }: { st: AdRtsSubtotal }) {
             <td className={`${num} font-semibold`}>
                 {peso(st.actual_ad_spent)}
             </td>
+            <td className={`${num} font-semibold`}>
+                {peso(st.target_ad_spent)}
+            </td>
+            <td className={ctr} />
             <td className={`${num} font-semibold`}>{peso(st.avg_ad_spent)}</td>
             <td className={ctr} />
             <td className={`${num} font-semibold`}>{peso(st.rts_amount)}</td>
@@ -291,12 +356,14 @@ export default function InternDashboard({
     workspace,
     view: initialView,
     filters,
+    baseUrl: baseUrlProp,
 }: Props) {
     const [date, setDate] = useState<string>(filters.date ?? '');
     const [view, setView] = useState<View>(initialView);
     const [loading, setLoading] = useState(false);
 
-    const baseUrl = `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
+    const baseUrl =
+        baseUrlProp ?? `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
 
     // Persist the selected date in the URL so a refresh restores it — the
     // controller reads filter.date on load. replaceState (not an Inertia visit)
@@ -344,7 +411,7 @@ export default function InternDashboard({
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Interns Quick Data View"
+                    title="Interns Dashboard"
                     description={dateLabel}
                     stackActionsOnMobile
                 >
@@ -444,6 +511,8 @@ export default function InternDashboard({
                                     Intern
                                 </th>
                                 <th className={headCell}>Actual Ad Spent</th>
+                                <th className={headCell}>Target Ad Spent</th>
+                                <th className={headCell}>Remarks</th>
                                 <th className={headCell}>
                                     3 Days Average Ad Spent
                                 </th>
@@ -462,7 +531,7 @@ export default function InternDashboard({
                             {view.ad_rts.rows.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={5}
+                                        colSpan={7}
                                         className="px-3 py-16 text-center text-[12px] text-gray-400 dark:text-gray-500"
                                     >
                                         No intern records for this date.

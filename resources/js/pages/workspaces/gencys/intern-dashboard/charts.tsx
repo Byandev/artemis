@@ -322,7 +322,7 @@ export function DashboardKpis({ kpis }: { kpis: ChartsData['kpis'] }) {
                 value={kpis.total_orders.toLocaleString('en-PH')}
             />
             <Kpi
-                label="Avg RTS Rate"
+                label="RTS Rate"
                 value={
                     kpis.avg_rts_rate != null
                         ? `${kpis.avg_rts_rate.toFixed(2)}%`

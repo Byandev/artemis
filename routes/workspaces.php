@@ -122,7 +122,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/activity-logs', [ActivityLogController::class, 'index'])->name('workspace.activity-logs.index');
 
     // Role-specific dashboards (scaffold — gated by granular permissions)
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard', SalesMarketingDashboardController::class)->name('workspaces.sales-marketing.dashboard');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/data', [SalesMarketingDashboardController::class, 'data'])->name('workspaces.sales-marketing.dashboard.data');
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
     // Workspace CRUD routes

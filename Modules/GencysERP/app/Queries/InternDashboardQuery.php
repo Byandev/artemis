@@ -5,6 +5,7 @@ namespace Modules\GencysERP\Queries;
 use App\Models\Workspace;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\Intern;
 
@@ -202,12 +203,22 @@ class InternDashboardQuery
             $totOrders += $o;
         }
 
-        // Avg RTS rate from the month-to-date snapshot (latest record in month).
+        // Blended RTS rate from the month-to-date snapshot (latest record per
+        // intern in the month), summed across interns:
+        //   (Σfor_return + Σreturned) / (Σfor_return + Σreturned + Σdelivered)
         $rts = $this->monthToDateRts($date);
-        $rtsRates = collect($internIds)
-            ->map(fn ($id) => optional($rts->get($id))->date_to_month_sales_order_rts_rate)
-            ->filter(fn ($v) => $v !== null)
-            ->map(fn ($v) => (float) $v);
+        $rtsDelivered = 0.0;
+        $rtsReturned = 0.0;
+        $rtsForReturn = 0.0;
+        foreach ($rts as $r) {
+            $rtsDelivered += (float) ($r->date_to_month_sales_order_delivered ?? 0);
+            $rtsReturned += (float) ($r->date_to_month_sales_order_returned ?? 0);
+            $rtsForReturn += (float) ($r->date_to_month_sales_order_for_return ?? 0);
+        }
+        $rtsDenom = $rtsForReturn + $rtsReturned + $rtsDelivered;
+        $rtsRate = $rtsDenom > 0
+            ? round(($rtsForReturn + $rtsReturned) / $rtsDenom * 100, 2)
+            : null;
 
         return [
             'kpis' => [
@@ -215,7 +226,7 @@ class InternDashboardQuery
                 'total_ad_spent' => round($totSpend, 2),
                 'roas' => $totSpend > 0 ? round($totSales / $totSpend, 2) : null,
                 'total_orders' => $totOrders,
-                'avg_rts_rate' => $rtsRates->isNotEmpty() ? round($rtsRates->avg(), 2) : null,
+                'avg_rts_rate' => $rtsRate,
             ],
             'sales_trend' => ['dates' => $dates, 'series' => $salesSeries],
             'ad_spend_trend' => ['dates' => $dates, 'series' => $adSpendSeries],
@@ -248,8 +259,12 @@ class InternDashboardQuery
         // recent day), so it reflects month-to-date as of the selected date.
         $rts = $this->monthToDateRts($date);
 
+        // Target ad spend per intern: the selected day's page daily budgets for
+        // the pages owned by the intern's linked user.
+        $target = $this->targetAdSpend($date, $interns->pluck('id')->all());
+
         $rows = $interns
-            ->map(function (Intern $intern) use ($spendToday, $spend3d, $rts) {
+            ->map(function (Intern $intern) use ($spendToday, $spend3d, $rts, $target) {
                 $rec = $spendToday->get($intern->id);
                 $r = $rts->get($intern->id);
 
@@ -259,11 +274,13 @@ class InternDashboardQuery
                 $returned = (float) ($r->date_to_month_sales_order_returned ?? 0);
                 $forReturn = (float) ($r->date_to_month_sales_order_for_return ?? 0);
                 $hasRts = $rate !== null || $returned != 0.0 || $forReturn != 0.0;
+                $tgt = $target->get($intern->id);
 
                 return [
                     'id' => $intern->id,
                     'name' => $intern->full_name,
                     'actual_ad_spent' => (float) ($rec->ad_spent ?? 0),
+                    'target_ad_spent' => $tgt !== null ? (float) $tgt : null,
                     'avg_ad_spent' => round((float) ($spend3d[$intern->id] ?? 0) / 3, 2),
                     'rts_rate' => $rate,
                     'rts_amount' => $hasRts ? $returned + $forReturn : null,
@@ -276,12 +293,51 @@ class InternDashboardQuery
             'rows' => $rows->all(),
             'subtotal' => [
                 'actual_ad_spent' => (float) $rows->sum('actual_ad_spent'),
+                'target_ad_spent' => (float) $rows->sum(fn ($r) => $r['target_ad_spent'] ?? 0),
                 'avg_ad_spent' => (float) $rows->sum('avg_ad_spent'),
                 // RTS rate is a percentage — not summable, so no subtotal.
                 'rts_rate' => null,
                 'rts_amount' => (float) $rows->sum(fn ($r) => $r['rts_amount'] ?? 0),
             ],
         ];
+    }
+
+    /**
+     * intern id => target ad spend for $date: the sum of page daily budgets for
+     * pages owned by the intern's linked user
+     * (gencys_interns.user_id → pages.owner_id → page_daily_budget_records).
+     *
+     * Each page uses its latest budget recorded ON OR BEFORE $date, so a budget
+     * carries forward on days it wasn't re-recorded.
+     *
+     * @param  array<int, int>  $internIds
+     */
+    private function targetAdSpend(Carbon $date, array $internIds): Collection
+    {
+        if (empty($internIds)) {
+            return collect();
+        }
+
+        // Per page: the date of its most recent budget on or before $date.
+        $latestPerPage = DB::table('page_daily_budget_records')
+            ->where('workspace_id', $this->workspace->id)
+            ->where('date', '<=', $date->toDateString())
+            ->groupBy('page_id')
+            ->selectRaw('page_id, MAX(date) as latest_date');
+
+        return DB::table('gencys_interns as gi')
+            ->join('pages as p', 'p.owner_id', '=', 'gi.user_id')
+            ->joinSub($latestPerPage, 'lp', 'lp.page_id', '=', 'p.id')
+            ->join('page_daily_budget_records as b', function ($join) {
+                $join->on('b.page_id', '=', 'lp.page_id')
+                    ->on('b.date', '=', 'lp.latest_date');
+            })
+            ->where('gi.workspace_id', $this->workspace->id)
+            ->whereIn('gi.id', $internIds)
+            ->whereNotNull('gi.user_id')
+            ->groupBy('gi.id')
+            ->selectRaw('gi.id, SUM(b.budget) as target')
+            ->pluck('target', 'gi.id');
     }
 
     /**
@@ -299,6 +355,7 @@ class InternDashboardQuery
                 'gencys_intern_id',
                 'record_date',
                 'date_to_month_sales_order_rts_rate',
+                'date_to_month_sales_order_delivered',
                 'date_to_month_sales_order_returned',
                 'date_to_month_sales_order_for_return',
             ])
