@@ -3,10 +3,10 @@
 namespace Modules\GencysERP\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\WorkspaceApiKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Models\Intern;
 
@@ -18,7 +18,7 @@ class InternDailyRecordController extends Controller
         $apiKey = WorkspaceApiKey::findByRawKey($request->input('api_key'));
         $workspaceId = (int) $request->input('workspace_id');
 
-        if (!$apiKey || (int) $apiKey->workspace_id !== $workspaceId) {
+        if (! $apiKey || (int) $apiKey->workspace_id !== $workspaceId) {
             return response()->json(['message' => 'Invalid api_key for workspace.'], 401);
         }
 
@@ -31,7 +31,7 @@ class InternDailyRecordController extends Controller
             ->where('intern_id', $parentInternId)
             ->first();
 
-        if (!$intern) {
+        if (! $intern) {
             return response()->json(['message' => "Intern {$parentInternId} not found."], 422);
         }
 
@@ -40,15 +40,10 @@ class InternDailyRecordController extends Controller
         $rowsPerRun = [];
 
         foreach ($records as $record) {
-            GencysInternDailyRecord::updateOrCreate(
-                [
-                    'workspace_id'     => $workspace->id,
-                    'gencys_intern_id' => $intern->id,
-                    'record_date'      => $record['date'],
-                ],
-                $record
+            // Write straight to the unified advertiser performance table.
+            AdvertiserPerformanceDailyRecord::upsertGencysDaily(
+                $workspace->id, $intern->id, $intern->full_name, $record
             );
-
         }
 
         // 4. Update sync run success counts
@@ -57,9 +52,9 @@ class InternDailyRecordController extends Controller
         }
 
         return response()->json([
-            'saved'            => count($records),
-            'skipped'          => 0,
-            'intern_id'        => $parentInternId,
+            'saved' => count($records),
+            'skipped' => 0,
+            'intern_id' => $parentInternId,
             'gencys_intern_id' => $intern->id,
         ]);
     }
