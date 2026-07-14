@@ -38,6 +38,8 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->with(['users' => fn ($query) => $query->has('pages')])
             ->get()
             ->each(function (Workspace $workspace) use ($dates, &$total) {
+                $this->line($workspace->name);
+                $this->line($workspace->users->count());
                 foreach ($dates as $date) {
                     foreach ($workspace->users as $user) {
                         $this->buildForWorkspaceDate($workspace, $user->id, $date);
