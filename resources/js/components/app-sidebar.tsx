@@ -79,6 +79,16 @@ export function AppSidebar() {
             icon: LayoutDashboard,
             permission: PERMISSIONS.ViewMainDashboard,
         },
+        ...(currentWorkspace.gencys_module_enabled
+            ? [
+                  {
+                      title: 'Intern Dashboard',
+                      href: `/workspaces/${slug}/gencys/intern-dashboard`,
+                      icon: LayoutDashboard,
+                      permission: PERMISSIONS.ViewGencysInternDailyRecords,
+                  },
+              ]
+            : []),
         ...(currentWorkspace.sales_marketing_dashboard_module_enabled
             ? [
                   {
@@ -383,13 +393,6 @@ export function AppSidebar() {
                           PERMISSIONS.ViewGencysInternDailyRecords,
                       ],
                       items: [
-                          {
-                              title: 'Intern Dashboard',
-                              href: `/workspaces/${slug}/gencys/intern-dashboard`,
-                              icon: LayoutDashboard,
-                              permission:
-                                  PERMISSIONS.ViewGencysInternDailyRecords,
-                          },
                           {
                               title: 'Daily Sales Tracker',
                               href: `/workspaces/${slug}/gencys/daily-sales-tracker`,

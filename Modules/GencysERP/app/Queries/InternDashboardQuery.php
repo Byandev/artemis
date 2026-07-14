@@ -44,6 +44,15 @@ class InternDashboardQuery
                 'rows' => [],
                 'subtotal' => null,
                 'ad_rts' => ['rows' => [], 'subtotal' => null],
+                'charts' => [
+                    'kpis' => [
+                        'total_sales' => 0.0, 'total_ad_spent' => 0.0, 'roas' => null,
+                        'total_orders' => 0, 'avg_rts_rate' => null,
+                    ],
+                    'sales_trend' => ['dates' => [], 'series' => []],
+                    'ad_spend_trend' => ['dates' => [], 'series' => []],
+                    'ad_spend_share' => [],
+                ],
             ];
         }
 
@@ -114,6 +123,103 @@ class InternDashboardQuery
             'subtotal' => $this->subtotal($rows),
             // Second table: ad spend + month-to-date RTS per intern.
             'ad_rts' => $this->adRtsRows($date, $interns),
+            // Chart data (month-to-date daily series + per-intern aggregates).
+            'charts' => $this->charts($date, $interns),
+        ];
+    }
+
+    /**
+     * Chart datasets, all month-to-date through the selected date:
+     *  - kpis: workspace totals (sales, ad spend, blended ROAS, orders, avg RTS)
+     *  - sales_trend: daily sales per intern (one series each)
+     *  - ad_spend_trend: daily ad spend per intern (one series each)
+     *  - ad_spend_share: per-intern MTD ad spend total (for the pie)
+     */
+    private function charts(Carbon $date, Collection $interns): array
+    {
+        $empty = [
+            'kpis' => [
+                'total_sales' => 0.0, 'total_ad_spent' => 0.0, 'roas' => null,
+                'total_orders' => 0, 'avg_rts_rate' => null,
+            ],
+            'sales_trend' => ['dates' => [], 'series' => []],
+            'ad_spend_trend' => ['dates' => [], 'series' => []],
+            'ad_spend_share' => [],
+        ];
+
+        $internIds = $interns->pluck('id')->all();
+        if (empty($internIds)) {
+            return $empty;
+        }
+
+        $nameById = $interns->pluck('full_name', 'id');
+        $monthStart = $date->copy()->startOfMonth();
+
+        $records = GencysInternDailyRecord::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->whereIn('gencys_intern_id', $internIds)
+            ->whereBetween('record_date', [$monthStart->toDateString(), $date->toDateString()])
+            ->get(['gencys_intern_id', 'record_date', 'sales', 'ad_spent', 'orders']);
+
+        // The month-to-date day axis, and an [intern][date] lookup.
+        $dates = [];
+        for ($d = $monthStart->copy(); $d->lte($date); $d->addDay()) {
+            $dates[] = $d->toDateString();
+        }
+        $byIntern = [];
+        foreach ($records as $r) {
+            $byIntern[$r->gencys_intern_id][$r->record_date->toDateString()] = $r;
+        }
+
+        // Per-intern daily sales & ad spend series (same shape, one series each)
+        // + per-intern MTD ad spend total for the pie.
+        $salesSeries = [];
+        $adSpendSeries = [];
+        $adSpendShare = [];
+        $totSales = 0.0;
+        $totSpend = 0.0;
+        $totOrders = 0;
+        foreach ($internIds as $id) {
+            $salesByDay = [];
+            $adByDay = [];
+            $s = 0.0;
+            $sp = 0.0;
+            $o = 0;
+            foreach ($dates as $dt) {
+                $rec = $byIntern[$id][$dt] ?? null;
+                $salesByDay[] = (float) ($rec->sales ?? 0);
+                $adByDay[] = (float) ($rec->ad_spent ?? 0);
+                $s += (float) ($rec->sales ?? 0);
+                $sp += (float) ($rec->ad_spent ?? 0);
+                $o += (int) ($rec->orders ?? 0);
+            }
+            $name = $nameById[$id] ?? "#{$id}";
+            $salesSeries[] = ['name' => $name, 'data' => $salesByDay];
+            $adSpendSeries[] = ['name' => $name, 'data' => $adByDay];
+            $adSpendShare[] = ['name' => $name, 'ad_spent' => round($sp, 2)];
+            $totSales += $s;
+            $totSpend += $sp;
+            $totOrders += $o;
+        }
+
+        // Avg RTS rate from the month-to-date snapshot (latest record in month).
+        $rts = $this->monthToDateRts($date);
+        $rtsRates = collect($internIds)
+            ->map(fn ($id) => optional($rts->get($id))->date_to_month_sales_order_rts_rate)
+            ->filter(fn ($v) => $v !== null)
+            ->map(fn ($v) => (float) $v);
+
+        return [
+            'kpis' => [
+                'total_sales' => round($totSales, 2),
+                'total_ad_spent' => round($totSpend, 2),
+                'roas' => $totSpend > 0 ? round($totSales / $totSpend, 2) : null,
+                'total_orders' => $totOrders,
+                'avg_rts_rate' => $rtsRates->isNotEmpty() ? round($rtsRates->avg(), 2) : null,
+            ],
+            'sales_trend' => ['dates' => $dates, 'series' => $salesSeries],
+            'ad_spend_trend' => ['dates' => $dates, 'series' => $adSpendSeries],
+            'ad_spend_share' => $adSpendShare,
         ];
     }
 
@@ -225,7 +331,11 @@ class InternDashboardQuery
             ->pluck('mtd_sales', 'gencys_intern_id');
     }
 
-    /** The report date; defaults to the latest record date in the workspace. */
+    /**
+     * The report date. Defaults to yesterday (today's data is still coming in),
+     * falling back to the most recent record on or before yesterday so there's
+     * always data to show.
+     */
     private function resolveDate(): ?Carbon
     {
         if ($this->date) {
@@ -233,6 +343,7 @@ class InternDashboardQuery
         }
 
         $latest = GencysInternDailyRecord::where('workspace_id', $this->workspace->id)
+            ->where('record_date', '<=', Carbon::yesterday()->toDateString())
             ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
             ->max('record_date');
 

@@ -7,6 +7,7 @@ import axios from 'axios';
 import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import DashboardCharts, { ChartsData, DashboardKpis } from './charts';
 
 type Status = 'up' | 'down' | 'flat';
 
@@ -59,6 +60,7 @@ interface View {
     rows: Row[];
     subtotal: Subtotal | null;
     ad_rts: { rows: AdRtsRow[]; subtotal: AdRtsSubtotal | null };
+    charts: ChartsData;
 }
 
 interface Filters {
@@ -358,7 +360,12 @@ export default function InternDashboard({
                     />
                 </PageHeader>
 
-                <div className="relative mt-4 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                {/* Summary statistics on top */}
+                <div className="mt-4">
+                    <DashboardKpis kpis={view.charts.kpis} />
+                </div>
+
+                <div className="relative mt-6 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     {loading && (
                         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
                             <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
@@ -480,6 +487,12 @@ export default function InternDashboard({
                 <p className="mt-3 font-mono text-[11px] text-gray-400 dark:text-gray-500">
                     REMARKS: —
                 </p>
+
+                {/* Analytics — KPI tiles + trend / efficiency charts */}
+                <h2 className="mt-8 mb-3 px-1 font-mono text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                    Analytics
+                </h2>
+                <DashboardCharts data={view.charts} loading={loading} />
             </div>
         </AppLayout>
     );
