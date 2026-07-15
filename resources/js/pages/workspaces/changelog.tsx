@@ -12,6 +12,49 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.19.0',
+        date: '2026-07-15',
+        sections: [
+            {
+                title: 'Sales & Marketing Dashboard — Now Tabbed',
+                items: [
+                    'The Sales & Marketing dashboard is now organised into tabs — Daily Report (the default), Page ROAS Tracker, Ad Spend Goals, and Ad Spent Summary — so everything lives on one screen instead of scattered links',
+                    'The old standalone Page ROAS Tracker, Ad Spend Goals, and Meta Ad Spent Summary links now redirect straight to their new tab, so existing bookmarks keep working',
+                ],
+            },
+            {
+                title: 'Page ROAS Tracker',
+                items: [
+                    'A day-by-day grid with dates down the side and an Orders / Sales / Ad Spend / ROAS column group for each page, plus per-page Total and Average rows so you can compare performance across pages at a glance',
+                    'Filter by page, shop, or advertiser, and the view respects your team visibility — you see only the pages for the teams you belong to, and the “viewing as team” switcher narrows it further',
+                    'Figures come from a new nightly per-page rollup that combines Pancake POS sales with Meta Ads spend',
+                ],
+            },
+            {
+                title: 'Ad Spend Goals (New)',
+                items: [
+                    'Set a daily ad-spend target for a team over a date range, with optional stepping-stone milestones on the way to it (for example ₱300k en route to a ₱500k/day goal)',
+                    'Each goal shows live status — measured against the most recent complete day (yesterday) and the team’s best day within the window — on both a list view and a detail page with a progress graph',
+                    'Two new role permissions — View Ad Spend Goals and Manage Ad Spend Goals — and goals respect team visibility so scoped users only see and set goals for their own teams',
+                ],
+            },
+            {
+                title: 'Ad Spent Summary',
+                items: [
+                    'One row per day across the selected range showing total orders, sales, ad spend, and ROAS (sales ÷ ad spend), rolled up across advertisers you can see',
+                    'Filter by advertiser and date range; the tab is gated behind a new View Adspent Summary permission',
+                ],
+            },
+            {
+                title: 'Under the Hood',
+                items: [
+                    'A new nightly rollup (1:15am) builds per-page performance from Pancake sales and Meta Ads spend, rebuilding the last 3 days each run so late Meta attribution is captured',
+                    'Fixed the Gencys ERP transaction-history sync so its 9am run fires on schedule again',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.18.0',
         date: '2026-07-15',
         sections: [
