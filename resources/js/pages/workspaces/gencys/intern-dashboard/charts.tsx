@@ -1,28 +1,32 @@
 import { ApexOptions } from 'apexcharts';
-import { Loader2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Chart from 'react-apexcharts';
+
+type Delta = { pct: number | null; status: 'up' | 'down' | 'flat' };
 
 interface Kpis {
     total_sales: number;
     total_ad_spent: number;
     roas: number | null;
     total_orders: number;
-    avg_rts_rate: number | null;
+    deltas: {
+        total_sales: Delta;
+        total_ad_spent: Delta;
+        roas: Delta;
+        total_orders: Delta;
+    };
 }
-
-type Trend = { dates: string[]; series: { name: string; data: number[] }[] };
 
 export interface ChartsData {
     kpis: Kpis;
-    sales_trend: Trend;
-    ad_spend_trend: Trend;
-    ad_spend_share: { name: string; ad_spent: number }[];
+    // Per-advertiser sales & ad spend for the selected day (highest sales first).
+    by_advertiser: { name: string; sales: number; ad_spent: number }[];
 }
 
 // Categorical series palette — validated colorblind-safe (see dataviz skill).
 // Fixed order; hues assigned by position, never cycled. Colors follow the
-// intern, so each person keeps their hue across every chart.
+// advertiser, so each person keeps their hue across every chart.
 const SERIES_LIGHT = [
     '#2a78d6',
     '#1baf7a',
@@ -38,21 +42,6 @@ const SERIES_DARK = [
     '#9085e9',
     '#008300',
     '#e66767',
-];
-
-const MONTHS = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
 ];
 
 /** Reactively track the app's dark theme (toggled as a class on <html>). */
@@ -81,11 +70,6 @@ const pesoCompact = (v: number) => {
     if (a >= 1e6) return `₱${(v / 1e6).toFixed(1)}M`;
     if (a >= 1e3) return `₱${(v / 1e3).toFixed(0)}K`;
     return `₱${v.toFixed(0)}`;
-};
-
-const shortDate = (iso: string) => {
-    const [, m, d] = iso.split('-');
-    return `${MONTHS[+m - 1]} ${+d}`;
 };
 
 export default function DashboardCharts({
@@ -120,24 +104,23 @@ export default function DashboardCharts({
         colors: axisColor,
     };
 
-    // Shared multi-line options — used identically for sales & ad spend so the
-    // two charts read as a matched pair (peso y-axis, one line per intern).
-    const lineOptions = (dates: string[]): ApexOptions => ({
-        chart: { ...baseChart, type: 'line' },
+    const names = data.by_advertiser.map((a) => a.name);
+
+    // Shared bar options — one distributed bar per advertiser so each keeps its
+    // own colour. Used identically for sales & ad spend so the two charts read
+    // as a matched pair (peso y-axis, one bar per advertiser).
+    const barOptions = (): ApexOptions => ({
+        chart: { ...baseChart, type: 'bar' },
         theme: { mode: themeMode },
         colors,
-        stroke: { curve: 'smooth', width: 2 },
-        legend: {
-            position: 'top',
-            horizontalAlign: 'right',
-            fontSize: '12px',
-            fontFamily: 'DM Sans, sans-serif',
-            fontWeight: 500,
-            labels: { colors: axisColor },
-            markers: { size: 6, strokeWidth: 0 },
-            itemMargin: { horizontal: 10 },
+        plotOptions: {
+            bar: {
+                distributed: true,
+                borderRadius: 4,
+                columnWidth: '55%',
+            },
         },
-        markers: { size: 0, hover: { size: 5 } },
+        legend: { show: false },
         dataLabels: { enabled: false },
         grid: {
             borderColor: gridColor,
@@ -146,8 +129,6 @@ export default function DashboardCharts({
             padding: { top: 0, right: 12, bottom: 0, left: 8 },
         },
         tooltip: {
-            shared: true,
-            intersect: false,
             custom: ({
                 dataPointIndex,
                 w,
@@ -155,38 +136,30 @@ export default function DashboardCharts({
                 dataPointIndex: number;
                 w: {
                     globals: {
-                        seriesNames: string[];
+                        labels: string[];
                         series: number[][];
                         colors: string[];
-                        categoryLabels?: string[];
-                        labels?: string[];
                     };
                 };
             }) => {
                 const g = w.globals;
-                const label =
-                    g.categoryLabels?.[dataPointIndex] ??
-                    g.labels?.[dataPointIndex] ??
-                    '';
-                const rows = g.seriesNames
-                    .map((name, i) => {
-                        const val = g.series[i]?.[dataPointIndex];
-                        if (val == null) return '';
-                        return `<div style="display:flex;align-items:center;gap:6px;margin-top:4px;"><span style="width:8px;height:8px;border-radius:50%;background:${g.colors[i]};flex-shrink:0;"></span><span style="flex:1;color:${axisColor};">${name}</span><span style="font-weight:600;font-family:'DM Mono',monospace;margin-left:14px;color:${tipText};">${pesoFull(val)}</span></div>`;
-                    })
-                    .join('');
-                return `<div style="${tipShell}min-width:196px;"><div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:${axisColor};margin-bottom:2px;">${label}</div>${rows}</div>`;
+                const name = g.labels[dataPointIndex] ?? '';
+                const val = g.series[0]?.[dataPointIndex] ?? 0;
+                const dot = g.colors[dataPointIndex] ?? colors[0];
+                return `<div style="${tipShell}"><div style="display:flex;align-items:center;gap:6px;font-weight:600;color:${tipText};"><span style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0;"></span>${name}</div><div style="margin-top:3px;font-family:'DM Mono',monospace;color:${tipText};">${pesoFull(val)}</div></div>`;
             },
         },
         xaxis: {
-            categories: dates.map(shortDate),
+            categories: names,
             axisBorder: { show: false },
             axisTicks: { show: false },
             tooltip: { enabled: false },
             labels: {
                 style: axisLabelStyle,
-                rotate: 0,
-                hideOverlappingLabels: true,
+                rotate: -35,
+                rotateAlways: names.length > 4,
+                trim: true,
+                hideOverlappingLabels: false,
             },
         },
         yaxis: {
@@ -195,16 +168,20 @@ export default function DashboardCharts({
         },
     });
 
-    const salesOptions = lineOptions(data.sales_trend.dates);
-    const adOptions = lineOptions(data.ad_spend_trend.dates);
+    const salesSeries = [
+        { name: 'Sales', data: data.by_advertiser.map((a) => a.sales) },
+    ];
+    const adSeries = [
+        { name: 'Ad spend', data: data.by_advertiser.map((a) => a.ad_spent) },
+    ];
 
-    // ── Ad spend share (donut) ──────────────────────────────────────────────
-    const pieTotal = data.ad_spend_share.reduce((a, s) => a + s.ad_spent, 0);
+    // ── Ad spend share (donut), selected day ────────────────────────────────
+    const pieTotal = data.by_advertiser.reduce((a, s) => a + s.ad_spent, 0);
     const pieOptions: ApexOptions = {
         chart: { ...baseChart, type: 'donut' },
         theme: { mode: themeMode },
         colors,
-        labels: data.ad_spend_share.map((s) => s.name),
+        labels: names,
         legend: {
             position: 'right',
             fontSize: '12px',
@@ -214,6 +191,20 @@ export default function DashboardCharts({
             markers: { size: 6, strokeWidth: 0 },
             itemMargin: { vertical: 3 },
         },
+        // On narrow screens a right-side legend starves the donut of width and
+        // shrinks it to a dot — drop the legend below the donut instead.
+        responsive: [
+            {
+                breakpoint: 640,
+                options: {
+                    legend: {
+                        position: 'bottom',
+                        horizontalAlign: 'center',
+                        itemMargin: { horizontal: 6, vertical: 3 },
+                    },
+                },
+            },
+        ],
         stroke: { width: 2, colors: [surface] },
         dataLabels: {
             enabled: true,
@@ -245,7 +236,7 @@ export default function DashboardCharts({
         },
         tooltip: {
             custom: ({ seriesIndex }: { seriesIndex: number }) => {
-                const s = data.ad_spend_share[seriesIndex];
+                const s = data.by_advertiser[seriesIndex];
                 if (!s) return '';
                 const share =
                     pieTotal > 0
@@ -255,7 +246,7 @@ export default function DashboardCharts({
             },
         },
     };
-    const pieSeries = data.ad_spend_share.map((s) => s.ad_spent);
+    const pieSeries = data.by_advertiser.map((s) => s.ad_spent);
 
     return (
         <div className="relative space-y-4">
@@ -265,28 +256,28 @@ export default function DashboardCharts({
                 </div>
             )}
 
-            {/* Sales trend */}
+            {/* Sales by advertiser */}
             <ChartCard
-                title="Sales trend"
-                subtitle="Daily sales per intern (month-to-date)"
+                title="Sales by advertiser"
+                subtitle="Each advertiser's sales for the selected day"
             >
                 <Chart
-                    options={salesOptions}
-                    series={data.sales_trend.series}
-                    type="line"
+                    options={barOptions()}
+                    series={salesSeries}
+                    type="bar"
                     height={320}
                 />
             </ChartCard>
 
-            {/* Ad spend trend — same treatment as sales */}
+            {/* Ad spend by advertiser — same treatment as sales */}
             <ChartCard
-                title="Ad spend trend"
-                subtitle="Daily ad spend per intern (month-to-date)"
+                title="Ad spend by advertiser"
+                subtitle="Each advertiser's ad spend for the selected day"
             >
                 <Chart
-                    options={adOptions}
-                    series={data.ad_spend_trend.series}
-                    type="line"
+                    options={barOptions()}
+                    series={adSeries}
+                    type="bar"
                     height={320}
                 />
             </ChartCard>
@@ -294,7 +285,7 @@ export default function DashboardCharts({
             {/* Ad spend share — donut */}
             <ChartCard
                 title="Ad spend share"
-                subtitle="Each intern's share of total ad spend (month-to-date)"
+                subtitle="Each advertiser's share of ad spend (selected day)"
             >
                 <Chart
                     options={pieOptions}
@@ -309,40 +300,85 @@ export default function DashboardCharts({
 
 /** Summary stat tiles — rendered at the top of the dashboard. */
 export function DashboardKpis({ kpis }: { kpis: ChartsData['kpis'] }) {
+    const d = kpis.deltas;
     return (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <Kpi label="Total Sales" value={pesoFull(kpis.total_sales)} />
-            <Kpi label="Total Ad Spend" value={pesoFull(kpis.total_ad_spent)} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Kpi
+                label="Total Sales"
+                value={pesoFull(kpis.total_sales)}
+                delta={d.total_sales}
+            />
+            <Kpi
+                label="Total Ad Spend"
+                value={pesoFull(kpis.total_ad_spent)}
+                delta={d.total_ad_spent}
+            />
             <Kpi
                 label="Blended ROAS"
                 value={kpis.roas != null ? kpis.roas.toFixed(2) : '—'}
+                delta={d.roas}
             />
             <Kpi
                 label="Total Orders"
                 value={kpis.total_orders.toLocaleString('en-PH')}
-            />
-            <Kpi
-                label="RTS Rate"
-                value={
-                    kpis.avg_rts_rate != null
-                        ? `${kpis.avg_rts_rate.toFixed(2)}%`
-                        : '—'
-                }
+                delta={d.total_orders}
             />
         </div>
     );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function Kpi({
+    label,
+    value,
+    delta,
+}: {
+    label: string;
+    value: string;
+    delta?: Delta;
+}) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white px-4 py-3 dark:border-white/6 dark:bg-zinc-900">
             <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                 {label}
             </p>
-            <p className="mt-1 font-mono text-lg font-semibold text-gray-800 tabular-nums dark:text-gray-100">
-                {value}
-            </p>
+            <div className="mt-1 flex items-baseline justify-between gap-2">
+                <p className="font-mono text-lg font-semibold text-gray-800 tabular-nums dark:text-gray-100">
+                    {value}
+                </p>
+                {delta && <KpiDelta delta={delta} />}
+            </div>
         </div>
+    );
+}
+
+/** Up/down arrow + % change vs the previous day. */
+function KpiDelta({ delta }: { delta: Delta }) {
+    if (delta.status === 'flat') {
+        return (
+            <span
+                title="vs previous day"
+                className="shrink-0 font-mono text-[11px] font-medium text-gray-300 dark:text-gray-600"
+            >
+                —
+            </span>
+        );
+    }
+    const up = delta.status === 'up';
+    const cls = up
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-red-600 dark:text-red-400';
+    return (
+        <span
+            title="vs previous day"
+            className={`inline-flex shrink-0 items-center gap-0.5 font-mono text-[11px] font-semibold ${cls}`}
+        >
+            {up ? (
+                <ArrowUp className="h-3 w-3" strokeWidth={2.5} />
+            ) : (
+                <ArrowDown className="h-3 w-3" strokeWidth={2.5} />
+            )}
+            {delta.pct != null ? `${Math.abs(delta.pct).toFixed(1)}%` : ''}
+        </span>
     );
 }
 
