@@ -10,9 +10,10 @@ import {
 import { InventoryTransaction } from '@/types/models/InventoryTransaction';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
+import axios from 'axios';
 import { format } from 'date-fns';
 import { X } from 'lucide-react';
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -64,6 +65,79 @@ const InventoryFormDialog = ({
     });
 
     const isEditing = useMemo(() => !!inventory, [inventory]);
+
+    // Carry-over remaining quantity from the last transaction dated before the
+    // selected date for the chosen item. `null` = not yet loaded (don't auto-compute).
+    const [baseRemaining, setBaseRemaining] = useState<number | null>(null);
+    const [baseRemainingLoading, setBaseRemainingLoading] = useState(false);
+    const [baseRemainingFound, setBaseRemainingFound] = useState(false);
+
+    // Fetch the last remaining quantity whenever the item or date changes.
+    useEffect(() => {
+        if (!open || !data.inventory_item_id || !data.date) {
+            setBaseRemaining(null);
+            setBaseRemainingFound(false);
+            return;
+        }
+
+        const controller = new AbortController();
+        setBaseRemainingLoading(true);
+
+        axios
+            .get(
+                `/workspaces/${workspace.slug}/inventory/transactions/last-remaining`,
+                {
+                    params: {
+                        inventory_item_id: data.inventory_item_id,
+                        date: data.date,
+                        exclude_id: inventory?.id,
+                    },
+                    signal: controller.signal,
+                },
+            )
+            .then((res) => {
+                setBaseRemaining(Number(res.data.remaining_qty) || 0);
+                setBaseRemainingFound(!!res.data.found);
+            })
+            .catch((err) => {
+                if (!axios.isCancel(err)) {
+                    setBaseRemaining(0);
+                    setBaseRemainingFound(false);
+                }
+            })
+            .finally(() => setBaseRemainingLoading(false));
+
+        return () => controller.abort();
+    }, [open, data.inventory_item_id, data.date, inventory?.id, workspace.slug]);
+
+    // Auto-compute the remaining quantity from the carry-over plus this entry's flows:
+    // last remaining + PO in + RTS goods in − PO out − RTS goods out − RTS bad − loss.
+    const computedRemaining = useMemo(() => {
+        if (baseRemaining === null) return null;
+        return (
+            baseRemaining +
+            data.po_qty_in +
+            data.rts_goods_in -
+            data.po_qty_out -
+            data.rts_goods_out -
+            data.rts_bad -
+            data.lost
+        );
+    }, [
+        baseRemaining,
+        data.po_qty_in,
+        data.rts_goods_in,
+        data.po_qty_out,
+        data.rts_goods_out,
+        data.rts_bad,
+        data.lost,
+    ]);
+
+    useEffect(() => {
+        if (computedRemaining !== null) {
+            setData('remaining_qty', computedRemaining);
+        }
+    }, [computedRemaining]);
 
     useEffect(() => {
         if (inventory) {
@@ -392,21 +466,28 @@ const InventoryFormDialog = ({
                             <div className="space-y-1.5">
                                 <label className={labelClass}>
                                     Remaining Quantity{' '}
-                                    <span className="text-red-400">*</span>
+                                    <span className="text-gray-300 dark:text-gray-600">
+                                        (auto)
+                                    </span>
                                 </label>
                                 <input
                                     type="number"
-                                    min="0"
-                                    value={numValue(data.remaining_qty)}
-                                    placeholder="0"
-                                    onChange={(e) =>
-                                        handleNumericChange(
-                                            'remaining_qty',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className={inputClass}
+                                    value={data.remaining_qty}
+                                    readOnly
+                                    tabIndex={-1}
+                                    className={`${inputClass} cursor-not-allowed opacity-70`}
                                 />
+                                <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                                    {!data.inventory_item_id || !data.date
+                                        ? 'Select an item and date to compute.'
+                                        : baseRemainingLoading
+                                          ? 'Computing…'
+                                          : `Last remaining ${baseRemaining ?? 0}${
+                                                baseRemainingFound
+                                                    ? ''
+                                                    : ' (no prior transaction)'
+                                            } + in − out.`}
+                                </p>
                                 {errors.remaining_qty && (
                                     <p className="text-[11px] text-red-500">
                                         {errors.remaining_qty}

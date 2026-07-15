@@ -3,12 +3,13 @@
 namespace App\Console\Commands;
 
 use App\Models\AdvertiserPerformanceDailyRecord;
-use App\Models\Order;
+
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Modules\MetaAds\Models\Insight;
+use Modules\Pancake\Models\Order;
 
 /**
  * Build Artemis-source advertiser performance rows, one per app user per day,
@@ -38,6 +39,8 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->with(['users' => fn ($query) => $query->has('pages')])
             ->get()
             ->each(function (Workspace $workspace) use ($dates, &$total) {
+                $this->line($workspace->name);
+                $this->line($workspace->users->count());
                 foreach ($dates as $date) {
                     foreach ($workspace->users as $user) {
                         $this->buildForWorkspaceDate($workspace, $user->id, $date);
