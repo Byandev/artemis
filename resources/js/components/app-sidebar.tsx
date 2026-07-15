@@ -18,6 +18,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     ArrowLeftRight,
+    Banknote,
     BarChart2,
     BookOpenIcon,
     Box,
@@ -397,13 +398,6 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewGencysInterns,
                           },
                           {
-                              title: 'Intern Daily Records',
-                              href: `/workspaces/${slug}/gencys/intern-daily-records`,
-                              icon: Activity,
-                              permission:
-                                  PERMISSIONS.ViewGencysInternDailyRecords,
-                          },
-                          {
                               title: 'Pages',
                               href: `/workspaces/${slug}/gencys/pages`,
                               icon: FileText,
@@ -433,6 +427,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewFinanceAccounts,
                           PERMISSIONS.ViewFinanceTransactions,
                           PERMISSIONS.ViewFinanceRemittances,
+                          PERMISSIONS.ViewFinanceRequestFunds,
                       ],
                       items: [
                           {
@@ -470,6 +465,12 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
                               icon: Send,
                               permission: PERMISSIONS.ViewFinanceRemittances,
+                          },
+                          {
+                              title: 'Request Funds',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
+                              icon: Banknote,
+                              permission: PERMISSIONS.ViewFinanceRequestFunds,
                           },
                       ],
                   },

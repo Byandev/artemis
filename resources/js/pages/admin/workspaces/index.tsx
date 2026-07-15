@@ -10,6 +10,7 @@ import debounce from 'lodash/debounce';
 import {
     ArrowUpRight,
     Boxes,
+    ChartColumnBig,
     CreditCard,
     Files,
     LayoutGrid,
@@ -410,6 +411,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
             ),
             cell: ({ row }) => (
                 <div className="flex items-center justify-end gap-1 text-right">
+                    <Link
+                        href={`/admin/workspaces/${row.original.slug}/report`}
+                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                        title="View client report"
+                    >
+                        <ChartColumnBig className="h-4 w-4" />
+                    </Link>
                     <Link
                         href={`/workspaces/${row.original.slug}/dashboard`}
                         className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"

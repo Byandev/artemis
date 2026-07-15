@@ -97,13 +97,16 @@ class PurchasedOrderController extends Controller
         return Excel::download(new PurchasedOrderExport($this->buildQuery($request, $workspace)), $filename);
     }
 
-    public function create(Workspace $workspace)
+    public function create(Request $request, Workspace $workspace)
     {
         $this->authorize('Create Purchased Orders', $workspace);
 
         return Inertia::render('workspaces/inventory/purchased-orders/create', [
             'workspace' => $workspace,
-            'items' => InventoryItem::where('workspace_id', $workspace->id)->with('product')->get(),
+            'items' => InventoryItem::where('workspace_id', $workspace->id)
+                ->visibleTo($request->user(), $workspace)
+                ->with('product')
+                ->get(),
         ]);
     }
 
@@ -147,14 +150,17 @@ class PurchasedOrderController extends Controller
             ->with('success', 'Purchased order created successfully.');
     }
 
-    public function edit(Workspace $workspace, PurchasedOrder $purchasedOrder)
+    public function edit(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder)
     {
         $this->authorize('Edit Purchased Orders', $workspace);
 
         return Inertia::render('workspaces/inventory/purchased-orders/edit', [
             'workspace' => $workspace,
             'order' => $purchasedOrder->load('items.inventoryItem.product'),
-            'items' => InventoryItem::where('workspace_id', $workspace->id)->with('product')->get(),
+            'items' => InventoryItem::where('workspace_id', $workspace->id)
+                ->visibleTo($request->user(), $workspace)
+                ->with('product')
+                ->get(),
         ]);
     }
 

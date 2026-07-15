@@ -1,15 +1,11 @@
 import { Checkbox } from '@/components/ui/checkbox';
-import DatePicker from '@/components/ui/date-picker';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import flatpickr from 'flatpickr';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
-import moment from 'moment';
 import { useMemo, useState } from 'react';
-import DateOption = flatpickr.Options.DateOption;
 
 export interface InternOption {
     id: number;
@@ -18,29 +14,23 @@ export interface InternOption {
 
 interface Props {
     interns: InternOption[];
-    search: string;
-    internIds: string[];
-    dateStart: string;
-    dateEnd: string;
-    onSearchChange: (value: string) => void;
-    onInternsApply: (ids: string[]) => void;
-    onDateRangeChange: (start: string, end: string) => void;
+    selected: string[];
+    onApply: (ids: string[]) => void;
+    label?: string;
 }
 
 /**
  * Popover multi-select for interns, styled to match the app's Filters control
  * (sliders trigger + checkbox list + Apply / Clear). Selections are staged
- * locally and only committed on "Apply Changes".
+ * locally and only committed on "Apply Changes". Shared across the intern
+ * daily-records table and the intern dashboard.
  */
-function InternFilter({
+export default function InternMultiSelect({
     interns,
     selected,
     onApply,
-}: {
-    interns: InternOption[];
-    selected: string[];
-    onApply: (ids: string[]) => void;
-}) {
+    label = 'Interns',
+}: Props) {
     const [open, setOpen] = useState(false);
     const [local, setLocal] = useState<string[]>(selected);
     const [term, setTerm] = useState('');
@@ -105,7 +95,7 @@ function InternFilter({
                                     : 'text-gray-500 dark:text-gray-400',
                             ].join(' ')}
                         >
-                            Interns
+                            {label}
                         </span>
                         {selected.length > 0 && (
                             <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500/[0.10] px-1 text-[10px] font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
@@ -122,7 +112,7 @@ function InternFilter({
             >
                 <div className="flex items-center justify-between border-b border-black/6 px-4 py-3 dark:border-white/6">
                     <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100">
-                        Interns
+                        {label}
                     </span>
                     <button
                         onClick={() => setLocal([])}
@@ -204,59 +194,5 @@ function InternFilter({
                 </div>
             </PopoverContent>
         </Popover>
-    );
-}
-
-export default function DailyRecordFilters({
-    interns,
-    search,
-    internIds,
-    dateStart,
-    dateEnd,
-    onSearchChange,
-    onInternsApply,
-    onDateRangeChange,
-}: Props) {
-    return (
-        <div className="mt-4 mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="relative w-full sm:w-64">
-                <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                <input
-                    className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
-                    placeholder="Search intern, company or username…"
-                    value={search}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    aria-label="Search intern daily records"
-                />
-            </div>
-
-            <InternFilter
-                interns={interns}
-                selected={internIds}
-                onApply={onInternsApply}
-            />
-
-            <DatePicker
-                id={`daily-records-range-${dateStart}-${dateEnd}`}
-                key={`${dateStart}-${dateEnd}`}
-                mode="range"
-                placeholder="Any date"
-                defaultDate={
-                    (dateStart && dateEnd
-                        ? [dateStart, dateEnd]
-                        : undefined) as never as DateOption
-                }
-                onChange={(dates) => {
-                    if (dates.length === 2) {
-                        onDateRangeChange(
-                            moment(dates[0]).format('YYYY-MM-DD'),
-                            moment(dates[1]).format('YYYY-MM-DD'),
-                        );
-                    } else if (dates.length === 0) {
-                        onDateRangeChange('', '');
-                    }
-                }}
-            />
-        </div>
     );
 }

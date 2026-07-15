@@ -20,7 +20,7 @@ function makeRecord($workspace, Intern $intern, array $attrs = []): GencysIntern
         'roas' => 2,
         'ad_spent' => 500,
         'rts_rate' => 10,
-        'rts_amount' => 100,
+        'returned_amount' => 100,
     ], $attrs));
 }
 

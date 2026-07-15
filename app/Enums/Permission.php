@@ -114,6 +114,11 @@ enum Permission: string
     case CreateFinanceRemittances = 'Create Finance Remittances';
     case EditFinanceRemittances = 'Edit Finance Remittances';
     case DeleteFinanceRemittances = 'Delete Finance Remittances';
+    case ViewFinanceRequestFunds = 'View Finance Request Funds';
+    case CreateFinanceRequestFunds = 'Create Finance Request Funds';
+    case EditFinanceRequestFunds = 'Edit Finance Request Funds';
+    case DeleteFinanceRequestFunds = 'Delete Finance Request Funds';
+    case ApproveFinanceRequestFunds = 'Approve Finance Request Funds';
 
     // Pancake
     case ViewCourierShipments = 'View Courier Shipments';
@@ -252,7 +257,12 @@ enum Permission: string
             self::ViewFinanceRemittances,
             self::CreateFinanceRemittances,
             self::EditFinanceRemittances,
-            self::DeleteFinanceRemittances => 'Finance',
+            self::DeleteFinanceRemittances,
+            self::ViewFinanceRequestFunds,
+            self::CreateFinanceRequestFunds,
+            self::EditFinanceRequestFunds,
+            self::DeleteFinanceRequestFunds,
+            self::ApproveFinanceRequestFunds => 'Finance',
 
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',

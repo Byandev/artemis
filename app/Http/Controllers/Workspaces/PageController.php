@@ -13,6 +13,7 @@ use App\Imports\PageImport;
 use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
 use App\Models\Workspace;
+use App\Services\Botcake;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -221,6 +222,106 @@ class PageController extends Controller
                 'message' => 'Could not reach Pancake API.',
             ]);
         }
+    }
+
+    public function validateFlowId(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'page_id' => 'required|integer',
+            'flow_id' => 'required|integer',
+            'token' => 'nullable|string',
+        ]);
+
+        $page = Page::where('id', $validated['page_id'])
+            ->where('workspace_id', $workspace->id)
+            ->first();
+
+        if (! $page) {
+            return response()->json(['valid' => false, 'message' => 'Page not found in this workspace.']);
+        }
+
+        $token = $validated['token'] ?: $page->botcake_token;
+
+        if (blank($token)) {
+            return response()->json(['valid' => false, 'message' => 'Enter a Botcake token first.']);
+        }
+
+        try {
+            $flows = (new Botcake((string) $page->id, $token))->fetchFlows();
+        } catch (\Throwable $e) {
+            $message = str_contains($e->getMessage(), 'invalid_page_id')
+                ? "Botcake rejected this page (invalid_page_id). The Botcake access token doesn't match this page's ID — re-copy the access token from Botcake for this exact page."
+                : 'Botcake: '.$e->getMessage();
+
+            return response()->json(['valid' => false, 'message' => $message]);
+        }
+
+        // A flow is valid if it exists on the page and hasn't been removed.
+        $found = collect($flows)->contains(
+            fn ($flow) => (int) ($flow['id'] ?? 0) === (int) $validated['flow_id']
+                && ! ($flow['is_removed'] ?? false),
+        );
+
+        return response()->json([
+            'valid' => $found,
+            'message' => $found
+                ? 'Flow ID is valid.'
+                : 'Flow ID not found on this page.',
+        ]);
+    }
+
+    public function validateCustomFieldId(Request $request, Workspace $workspace)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $validated = $request->validate([
+            'page_id' => 'required|integer',
+            'custom_field_id' => 'required|integer',
+            'token' => 'nullable|string',
+        ]);
+
+        $page = Page::where('id', $validated['page_id'])
+            ->where('workspace_id', $workspace->id)
+            ->first();
+
+        if (! $page) {
+            return response()->json(['valid' => false, 'message' => 'Page not found in this workspace.']);
+        }
+
+        $token = $validated['token'] ?: $page->botcake_token;
+
+        if (blank($token)) {
+            return response()->json(['valid' => false, 'message' => 'Enter a Botcake token first.']);
+        }
+
+        try {
+            $fields = (new Botcake((string) $page->id, $token))->fetchCustomFields();
+        } catch (\Throwable $e) {
+            // Botcake returns "invalid_page_id" when the access token isn't
+            // authorized for this page id — point the user at the real fix.
+            $message = str_contains($e->getMessage(), 'invalid_page_id')
+                ? "Botcake rejected this page (invalid_page_id). The Botcake access token doesn't match this page's ID — re-copy the access token from Botcake for this exact page."
+                : 'Botcake: '.$e->getMessage();
+
+            return response()->json(['valid' => false, 'message' => $message]);
+        }
+
+        $found = collect($fields)->contains(
+            fn ($field) => (int) ($field['id'] ?? 0) === (int) $validated['custom_field_id'],
+        );
+
+        return response()->json([
+            'valid' => $found,
+            'message' => $found
+                ? 'Custom field ID is valid.'
+                : 'Custom field ID not found on this page.',
+        ]);
     }
 
     public function validateBotcakeToken(Request $request, Workspace $workspace)
