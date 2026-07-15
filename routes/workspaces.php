@@ -16,7 +16,6 @@ use App\Http\Controllers\Workspaces\DepartmentController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
-use App\Http\Controllers\Workspaces\PancakeOrderController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
@@ -73,6 +72,7 @@ use Modules\MetaAds\Http\Controllers\RemoveFbAccountController;
 use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
+use Modules\Pancake\Http\Controllers\OrderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -431,7 +431,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
     });
 
-    Route::get('/workspaces/{workspace}/pancake/orders', [PancakeOrderController::class, 'index'])
+    Route::get('/workspaces/{workspace}/pancake/orders', [OrderController::class, 'index'])
         ->name('workspaces.pancake.orders.index');
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {

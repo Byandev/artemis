@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace Modules\Pancake\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
@@ -13,7 +13,7 @@ use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
-class PancakeOrderController extends Controller
+class OrderController extends Controller
 {
     use AuthorizesRequests;
 
