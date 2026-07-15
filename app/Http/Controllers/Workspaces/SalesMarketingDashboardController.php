@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Workspaces;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use App\Queries\AdvertiserDashboardQuery;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\GencysERP\Queries\AdvertiserDashboardQuery;
 
 /**
  * The Sales & Marketing dashboard is the intern performance dashboard — it

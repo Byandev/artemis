@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminActivityLogController;
+use App\Http\Controllers\Admin\AdminClientReportController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminUserController;
@@ -51,8 +52,7 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\InternController as GencysInternController;
-use Modules\GencysERP\Http\Controllers\Web\InternDailyRecordController as GencysInternDailyRecordController;
-use Modules\GencysERP\Http\Controllers\Web\InternDashboardController as GencysInternDashboardController;
+use Modules\GencysERP\Http\Controllers\Web\PageController as GencysPageController;
 use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
@@ -455,13 +455,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
         Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
-        Route::get('/intern-dashboard', [GencysInternDashboardController::class, 'index'])->name('intern-dashboard.index');
-        Route::get('/intern-dashboard/data', [GencysInternDashboardController::class, 'data'])->name('intern-dashboard.data');
         Route::get('/interns', [GencysInternController::class, 'index'])->name('interns.index');
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');
         Route::patch('/interns/{intern}/toggle-active', [GencysInternController::class, 'toggleActive'])->name('interns.toggle-active');
         Route::patch('/interns/{intern}/assign-user', [GencysInternController::class, 'assignUser'])->name('interns.assign-user');
-        Route::get('/intern-daily-records', [GencysInternDailyRecordController::class, 'index'])->name('intern-daily-records.index');
+        Route::get('/pages', [GencysPageController::class, 'index'])->name('pages.index');
+        Route::post('/pages/sync', [GencysPageController::class, 'sync'])->name('pages.sync');
         Route::get('/unit-codes', [UnitCodeController::class, 'index'])->name('unit-codes.index');
         Route::post('/unit-codes/sync', [UnitCodeController::class, 'sync'])->name('unit-codes.sync');
         Route::post('/unit-codes', [UnitCodeController::class, 'store'])->name('unit-codes.store');
@@ -564,6 +563,10 @@ Route::middleware(['auth', 'verified', 'admin'])
         // Workspace Management
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
+
+        // Per-client (workspace) report dashboard
+        Route::get('/workspaces/{workspace}/report', [AdminClientReportController::class, 'show'])
+            ->name('workspaces.report');
 
         Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
             ->name('workspaces.update-subscription');

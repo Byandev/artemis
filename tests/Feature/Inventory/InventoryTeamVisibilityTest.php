@@ -96,6 +96,27 @@ it('scopes every inventory feature to the teams a user belongs to', function () 
     expect($visible(GencysSyncRun::class))->toContain($a['gsr']->id)->not->toContain($b['gsr']->id);
 });
 
+it('scopes the product picker to the teams a user belongs to', function () {
+    $workspace = Workspace::factory()->create();
+    $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    $a = inventoryChainForTeams($workspace, [$teamA], 'A-1');
+    $b = inventoryChainForTeams($workspace, [$teamB], 'B-1');
+
+    // A product with no shop -> no path to any team.
+    $orphanProduct = Product::factory()->create(['workspace_id' => $workspace->id]);
+
+    $user = scopedInventoryMember($workspace, [$teamA]);
+
+    $visibleProductIds = Product::query()->visibleTo($user, $workspace)->pluck('id')->all();
+
+    expect($visibleProductIds)
+        ->toContain($a['item']->product_id)
+        ->not->toContain($b['item']->product_id)
+        ->not->toContain($orphanProduct->id);
+});
+
 it('shows all inventory records to the workspace owner (unrestricted)', function () {
     $workspace = Workspace::factory()->create();
     $owner = User::find($workspace->owner_id);

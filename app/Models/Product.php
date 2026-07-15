@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\ScopesToVisibleTeams;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,18 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Product extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia;
+    use HasFactory, InteractsWithMedia, ScopesToVisibleTeams;
+
+    /**
+     * A product reaches its teams through the shops that sell it
+     * (shops.product_id -> shops.teams), the same path InventoryItem uses via
+     * `product.shops.teams`. Lets `visibleTo()` scope the product list to the
+     * active team.
+     */
+    protected function visibilityTeamRelation(): string
+    {
+        return 'shops.teams';
+    }
 
     protected $fillable = [
         'workspace_id',
