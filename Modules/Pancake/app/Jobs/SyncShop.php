@@ -78,8 +78,8 @@ class SyncShop implements ShouldQueue
             }
         }
 
-//        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
-//        dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
+        dispatch(new FetchShopUsers($shop))->onQueue('pancake');
+        dispatch(new FetchShopOrders($shop, 1, Carbon::now()->subMonths(2)->unix(), Carbon::now()->unix()))->onQueue('pancake');
     }
 
     /**
