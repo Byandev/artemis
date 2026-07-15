@@ -134,6 +134,7 @@ Route::middleware(['auth'])->group(function () {
     // registered before the {tab?} catch-all so they aren't swallowed by it.
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('workspaces.sales-marketing.dashboard.page-roas-tracker');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spend-goals');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spent-summary');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
@@ -271,8 +272,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/budget-tracker', [BudgetTrackerController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.budget-tracker');
-    Route::get('/workspaces/{workspace}/integrations/meta/ad-spent-summary', [AdSpentSummaryController::class, 'index'])
-        ->middleware('can:View Adspent Summary,workspace')
+    // Moved to the S&M dashboard's "Ad Spent Summary" tab — keep the old Meta
+    // Ads URL working by redirecting to the new tab route.
+    Route::get('/workspaces/{workspace}/integrations/meta/ad-spent-summary', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.dashboard.ad-spent-summary', $workspace))
         ->name('workspaces.metaads.ad-spent-summary');
 
     // Meta Ads optimization rules

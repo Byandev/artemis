@@ -5,7 +5,7 @@ namespace App\Queries;
 use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Support\TeamVisibility;
+use App\Support\AdvertiserVisibility;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -53,54 +53,9 @@ class AdvertiserDashboardQuery
             ? AdvertiserPerformanceDailyRecord::SOURCE_GENCYS
             : AdvertiserPerformanceDailyRecord::SOURCE_ARTEMIS;
 
-        $this->visibleAdvertiserIds = $this->resolveVisibleAdvertiserIds($viewer);
-    }
-
-    /**
-     * Advertiser ids visible to $viewer under team scoping, or null for "no
-     * restriction". Scoped users only see advertisers on the team(s) they can
-     * see, and the "viewing as team" switcher narrows everyone to one team.
-     * For gencys the advertiser is an Intern linked to a user; for artemis the
-     * advertiser id IS the user id.
-     *
-     * @return array<int, int>|null
-     */
-    private function resolveVisibleAdvertiserIds(?User $viewer): ?array
-    {
-        if (! $viewer) {
-            return null;
-        }
-
-        $teamIds = TeamVisibility::scopeTeamIds($viewer, $this->workspace);
-
-        if ($teamIds === null) {
-            return null; // unrestricted (and no "viewing as team") → see everything
-        }
-
-        if (empty($teamIds)) {
-            return []; // scoped but on no team → nothing (fail closed)
-        }
-
-        $memberUserIds = DB::table('team_user')
-            ->whereIn('team_id', $teamIds)
-            ->pluck('user_id')
-            ->unique()
-            ->values()
-            ->all();
-
-        if (empty($memberUserIds)) {
-            return [];
-        }
-
-        if ($this->source === AdvertiserPerformanceDailyRecord::SOURCE_GENCYS) {
-            return Intern::where('workspace_id', $this->workspace->id)
-                ->whereIn('user_id', $memberUserIds)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-        }
-
-        return array_map('intval', $memberUserIds);
+        // Team visibility: scoped users only see advertisers on the team(s) they
+        // can see; the "viewing as team" switcher narrows everyone to one team.
+        $this->visibleAdvertiserIds = AdvertiserVisibility::visibleIds($viewer, $workspace, $this->source);
     }
 
     public function get(): array
