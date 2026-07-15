@@ -148,6 +148,7 @@ export const PERMISSIONS = {
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
+    ManageDiscordNotifications: 'Manage Discord Notifications',
 } as const;
 
 export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
