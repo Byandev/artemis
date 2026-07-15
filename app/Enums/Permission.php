@@ -46,6 +46,10 @@ enum Permission: string
     case DeleteTeams = 'Delete Teams';
     case ManageSchedule = 'Manage Schedule';
 
+    // Ad Spend Goals
+    case ViewAdSpendGoals = 'View Ad Spend Goals';
+    case ManageAdSpendGoals = 'Manage Ad Spend Goals';
+
     // Departments
     case ViewDepartments = 'View Departments';
     case CreateDepartments = 'Create Departments';
@@ -159,6 +163,7 @@ enum Permission: string
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
     case ViewOptimizationLogs = 'View Optimization Logs';
+    case ViewAdSpentSummary = 'View Adspent Summary';
 
     // Data Access
     case ViewAllWorkspaceData = 'View All Workspace Data';
@@ -201,6 +206,9 @@ enum Permission: string
             self::EditTeams,
             self::DeleteTeams,
             self::ManageSchedule => 'Teams',
+
+            self::ViewAdSpendGoals,
+            self::ManageAdSpendGoals => 'Ad Spend Goals',
 
             self::ViewDepartments,
             self::CreateDepartments,
@@ -298,7 +306,8 @@ enum Permission: string
             self::ViewOptimizationRules,
             self::ManageOptimizationRules,
             self::ApproveOptimizationRules,
-            self::ViewOptimizationLogs => 'Meta Ads',
+            self::ViewOptimizationLogs,
+            self::ViewAdSpentSummary => 'Meta Ads',
 
             self::ViewAllWorkspaceData => 'Data Access',
         };

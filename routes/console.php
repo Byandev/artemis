@@ -5,11 +5,13 @@ Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
 // Build Artemis-source advertiser performance (Pancake POS + Meta Ads) daily,
 // rebuilding a trailing 3-day window to absorb late Meta attribution.
 Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00')->withoutOverlapping();
+// Same Pancake/Meta data, aggregated per page instead of per advertiser.
+Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
 // Gencys ERP
-Schedule::command('gencys-erp:trigger-fetch-erp-transaction-    history')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('16:00')->withoutOverlapping();
 
 Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('10:00')->withoutOverlapping();
