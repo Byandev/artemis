@@ -395,13 +395,6 @@ export function AppSidebar() {
                               icon: Users,
                               permission: PERMISSIONS.ViewGencysInterns,
                           },
-                          {
-                              title: 'Intern Daily Records',
-                              href: `/workspaces/${slug}/gencys/intern-daily-records`,
-                              icon: Activity,
-                              permission:
-                                  PERMISSIONS.ViewGencysInternDailyRecords,
-                          },
                       ],
                   },
               ]
