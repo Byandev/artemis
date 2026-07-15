@@ -111,6 +111,9 @@ class PageController extends Controller
             'erp_username' => $workspace->erp_username,
             'erp_password' => $workspace->erp_password,
             'webhook_url' => "{$callbackBase}/api/v1/public/gencys/pages",
+            'pages' => $workspace->pages->map(function (\App\Models\Page $page) {
+                return $page->id;
+            })->toArray(),
         ]);
 
         if (! $response->successful()) {

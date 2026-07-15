@@ -72,10 +72,11 @@ Route::post('v1/public/gencys/interns', [GencysInternApiController::class, 'stor
 Route::post('v1/public/gencys/intern-daily-records', [GencysInternDailyRecordApiController::class, 'store'])
     ->name('api.v1.public.gencys.intern-daily-records.store');
 
-// GencysERP pages callback. n8n posts the scraped pages here and authenticates
-// with the api_key embedded in the body (not a header), so this sits outside
-// the api.key middleware group.
+// GencysERP pages callback. n8n authenticates via the api_key header (the
+// api.key middleware resolves the workspace) and posts just the array of
+// scraped pages as the body.
 Route::post('v1/public/gencys/pages', [GencysPageApiController::class, 'store'])
+    ->middleware('api.key')
     ->name('api.v1.public.gencys.pages.store');
 
 // GencysERP page-detail callback. n8n posts the scraped detail (Pancake shop id,

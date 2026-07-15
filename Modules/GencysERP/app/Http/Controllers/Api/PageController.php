@@ -3,60 +3,45 @@
 namespace Modules\GencysERP\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Modules\GencysERP\Models\Page;
 use Modules\GencysERP\Support\InternResolver;
-use Modules\GencysERP\Support\PageDetailsSync;
 
 /**
- * Callback for the n8n pages sync. n8n posts { data: { workspace_id, api_key,
- * pages: [...] } } — the workspace is resolved from the api_key we sent in the
- * webhook, and its pages are upserted (keyed on Gencys' page id).
+ * Callback for the n8n pages sync. Auth is via the api_key header (the api.key
+ * middleware resolves the workspace); n8n posts just the array of scraped pages,
+ * which are upserted keyed on Gencys' page id (the sheet's "No." column).
  */
 class PageController extends Controller
 {
     public function store(Request $request): JsonResponse
     {
-        $workspaceId = $request->input('workspace_id');
-        $rawKey = $request->input('api_key');
-        $pages = $request->input('pages', []);
+        // Auth + workspace are resolved by the api.key middleware; the body is
+        // just the array of pages n8n scraped (tolerating a { pages: [...] } wrap).
+        /** @var Workspace $workspace */
+        $workspace = $request->attributes->get('workspace');
+        $pages = $request->input('pages', $request->all());
 
-        $apiKey = $rawKey
-            ? WorkspaceApiKey::findByRawKey($rawKey)
-            : null;
-
-        if (! $apiKey || (int) $apiKey->workspace_id !== (int) $workspaceId) {
-            return response()->json([
-                'message' => 'Invalid api_key for workspace.',
-            ], 401);
-        }
-
-        $apiKey->update([
-            'last_used_at' => now(),
-        ]);
-
-        $workspace = $apiKey->workspace;
         $interns = new InternResolver($workspace->id);
 
         $created = 0;
         $updated = 0;
         $skipped = 0;
-        $pageIds = [];
 
         foreach ($pages as $page) {
 
-            $pageId = (int) ($page['page_id'] ?? $page['pageId'] ?? $page['id'] ?? 0);
+            // Gencys' own row id — the sheet's "No." column — is the upsert key.
+            $pageId = (int) ($page['no'] ?? $page['page_id'] ?? $page['pageId'] ?? $page['id'] ?? 0);
 
             if ($pageId <= 0) {
                 $skipped++;
 
                 continue;
             }
-
-            $pageIds[] = $pageId;
 
             $internAndBrand = trim(
                 $page['intern_and_brand']
@@ -88,15 +73,17 @@ class PageController extends Controller
                     'page_id' => $pageId,
                 ],
                 [
-                    'fb_page_id' => $page['fb_page_id'] ?? null,
+                    'fb_page_id' => $this->str($page['fb_page_id'] ?? null),
                     'date_created' => $dateCreated,
                     'name' => trim($page['name'] ?? ''),
-                    'profile_url' => trim($page['profile_url'] ?? ''),
+                    'page_url' => $this->str($page['profile_url'] ?? $page['page_url'] ?? null),
                     'owner' => trim($page['owner'] ?? ''),
                     'intern_and_brand' => $internAndBrand,
                     'gencys_intern_id' => $interns->resolve($internAndBrand),
                     'status' => $page['status'] ?? '',
                     'platform' => trim($page['platform'] ?? ''),
+                    'shop_id' => $this->str($page['shop_id'] ?? null) ?? '',
+                    'pos_token' => $this->str($page['pos_token'] ?? null) ?? '',
                 ]
             );
 
@@ -107,17 +94,10 @@ class PageController extends Controller
             }
         }
 
-        // Now that the pages themselves have landed, chain straight into fetching
-        // each page's detail (POS token, shop id, etc.) — one queued n8n trigger
-        // per page, staggered so we don't hammer the ERP.
-        $detailsTriggered = app(PageDetailsSync::class)
-            ->dispatchForWorkspace($workspace, $pageIds);
-
         return response()->json([
             'created' => $created,
             'updated' => $updated,
             'skipped' => $skipped,
-            'details_triggered' => count($detailsTriggered),
         ]);
     }
 
