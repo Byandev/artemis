@@ -73,7 +73,9 @@ class SalesMarketingDashboardController extends Controller
     {
         $date = $request->input('filter.date') ?: null;
 
-        $data = (new AdvertiserDashboardQuery($workspace, [], $date))->get();
+        // Pass the viewer so the query applies team visibility (scoped users see
+        // only their team's advertisers; the "viewing as team" switcher narrows).
+        $data = (new AdvertiserDashboardQuery($workspace, [], $date, $request->user()))->get();
 
         return [$data, ['date' => $data['date']]];
     }

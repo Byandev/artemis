@@ -5,6 +5,7 @@ namespace App\Queries;
 use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -29,10 +30,19 @@ class AdvertiserDashboardQuery
     /** Which unified source this workspace reads ('gencys' | 'artemis'). */
     private string $source;
 
+    /**
+     * Advertiser ids the viewer may see under team scoping, or null for "no
+     * restriction". Applied to every record read via baseQuery().
+     *
+     * @var array<int, int>|null
+     */
+    private ?array $visibleAdvertiserIds;
+
     public function __construct(
         private readonly Workspace $workspace,
         array $internIds = [],
         private readonly ?string $date = null,
+        ?User $viewer = null,
     ) {
         $this->internIds = array_values(array_filter(
             array_map('intval', $internIds),
@@ -42,6 +52,55 @@ class AdvertiserDashboardQuery
         $this->source = $workspace->is_gencys_partner
             ? AdvertiserPerformanceDailyRecord::SOURCE_GENCYS
             : AdvertiserPerformanceDailyRecord::SOURCE_ARTEMIS;
+
+        $this->visibleAdvertiserIds = $this->resolveVisibleAdvertiserIds($viewer);
+    }
+
+    /**
+     * Advertiser ids visible to $viewer under team scoping, or null for "no
+     * restriction". Scoped users only see advertisers on the team(s) they can
+     * see, and the "viewing as team" switcher narrows everyone to one team.
+     * For gencys the advertiser is an Intern linked to a user; for artemis the
+     * advertiser id IS the user id.
+     *
+     * @return array<int, int>|null
+     */
+    private function resolveVisibleAdvertiserIds(?User $viewer): ?array
+    {
+        if (! $viewer) {
+            return null;
+        }
+
+        $teamIds = TeamVisibility::scopeTeamIds($viewer, $this->workspace);
+
+        if ($teamIds === null) {
+            return null; // unrestricted (and no "viewing as team") → see everything
+        }
+
+        if (empty($teamIds)) {
+            return []; // scoped but on no team → nothing (fail closed)
+        }
+
+        $memberUserIds = DB::table('team_user')
+            ->whereIn('team_id', $teamIds)
+            ->pluck('user_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($memberUserIds)) {
+            return [];
+        }
+
+        if ($this->source === AdvertiserPerformanceDailyRecord::SOURCE_GENCYS) {
+            return Intern::where('workspace_id', $this->workspace->id)
+                ->whereIn('user_id', $memberUserIds)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        return array_map('intval', $memberUserIds);
     }
 
     public function get(): array
@@ -419,7 +478,13 @@ class AdvertiserDashboardQuery
     {
         return AdvertiserPerformanceDailyRecord::query()
             ->where('workspace_id', $this->workspace->id)
-            ->where('source', $this->source);
+            ->where('source', $this->source)
+            // Team visibility: an empty set (scoped user with no visible
+            // advertisers) yields whereIn(..., []) → no rows, failing closed.
+            ->when(
+                $this->visibleAdvertiserIds !== null,
+                fn ($q) => $q->whereIn('advertiser_id', $this->visibleAdvertiserIds),
+            );
     }
 
     /**

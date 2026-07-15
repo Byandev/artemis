@@ -21,6 +21,7 @@ final class SalesMarketingDashboard
         return [
             ['key' => 'daily-report', 'label' => 'Daily Report', 'url' => $base],
             ['key' => 'page-roas-tracker', 'label' => 'Page ROAS Tracker', 'url' => "{$base}/page-roas-tracker"],
+            ['key' => 'ad-spend-goals', 'label' => 'Ad Spend Goals', 'url' => "{$base}/ad-spend-goals"],
         ];
     }
 }

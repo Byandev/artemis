@@ -129,9 +129,10 @@ Route::middleware(['auth'])->group(function () {
     // `data` route is registered before the `{tab?}` route so it isn't captured
     // as a tab. Daily Report is the default (bare dashboard path).
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/data', [SalesMarketingDashboardController::class, 'data'])->name('workspaces.sales-marketing.dashboard.data');
-    // Page ROAS Tracker is the dashboard's 2nd tab — its own URL, registered
-    // before the {tab?} catch-all so it isn't swallowed by it.
+    // Page ROAS Tracker and Ad Spend Goals are dashboard tabs — their own URLs,
+    // registered before the {tab?} catch-all so they aren't swallowed by it.
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('workspaces.sales-marketing.dashboard.page-roas-tracker');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spend-goals');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
@@ -402,7 +403,9 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'update'])->name('workspaces.teams.schedule.update');
 
     // Team ad-spend goal routes (daily target per team)
-    Route::get('/workspaces/{workspace}/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('workspaces.ad-spend-goals.index');
+    // Moved to the S&M dashboard's "Ad Spend Goals" tab — keep the old list URL
+    // working by redirecting to the new tab route.
+    Route::get('/workspaces/{workspace}/ad-spend-goals', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.dashboard.ad-spend-goals', $workspace))->name('workspaces.ad-spend-goals.index');
     Route::get('/workspaces/{workspace}/ad-spend-goals/{goal}', [TeamAdSpendGoalController::class, 'show'])->name('workspaces.ad-spend-goals.show');
     Route::post('/workspaces/{workspace}/ad-spend-goals', [TeamAdSpendGoalController::class, 'store'])->name('workspaces.ad-spend-goals.store');
     Route::put('/workspaces/{workspace}/ad-spend-goals/{goal}', [TeamAdSpendGoalController::class, 'update'])->name('workspaces.ad-spend-goals.update');
