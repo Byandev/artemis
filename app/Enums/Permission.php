@@ -46,6 +46,10 @@ enum Permission: string
     case DeleteTeams = 'Delete Teams';
     case ManageSchedule = 'Manage Schedule';
 
+    // Ad Spend Goals
+    case ViewAdSpendGoals = 'View Ad Spend Goals';
+    case ManageAdSpendGoals = 'Manage Ad Spend Goals';
+
     // Departments
     case ViewDepartments = 'View Departments';
     case CreateDepartments = 'Create Departments';
@@ -83,6 +87,7 @@ enum Permission: string
     case ViewDailySalesTracker = 'View Daily Sales Tracker';
     case ViewGencysInterns = 'View Gencys Interns';
     case ViewGencysInternDailyRecords = 'View Gencys Intern Daily Records';
+    case ViewGencysPages = 'View Gencys Pages';
     case ViewUnitCode = 'View Unit Code';
     case CreateUnitCode = 'Create Unit Code';
     case EditUnitCode = 'Edit Unit Code';
@@ -201,6 +206,9 @@ enum Permission: string
             self::DeleteTeams,
             self::ManageSchedule => 'Teams',
 
+            self::ViewAdSpendGoals,
+            self::ManageAdSpendGoals => 'Ad Spend Goals',
+
             self::ViewDepartments,
             self::CreateDepartments,
             self::EditDepartments,
@@ -233,6 +241,7 @@ enum Permission: string
             self::ViewDailySalesTracker,
             self::ViewGencysInterns,
             self::ViewGencysInternDailyRecords,
+            self::ViewGencysPages,
             self::ViewUnitCode,
             self::CreateUnitCode,
             self::EditUnitCode,

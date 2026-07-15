@@ -12,6 +12,65 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.18.0',
+        date: '2026-07-15',
+        sections: [
+            {
+                title: 'Finance — Request Funds (New)',
+                items: [
+                    'New Request Funds page under Finance — raise a fund request with the amount, purpose, who to charge it to, and the date it is needed; each request gets an auto-generated reference number and starts as Pending',
+                    'Approvers move a request through its lifecycle — Pending → Approved → Released, or Cancel it — with the approver and remarks recorded on the request',
+                    'Search by reference or purpose and filter by status, requester, or charge-to; five new role permissions (View, Create, Edit, Delete, and Approve Request Funds) control who can do what',
+                ],
+            },
+            {
+                title: 'Departments (New)',
+                items: [
+                    'New Departments page to define the departments in your workspace — create, edit, activate/deactivate, and delete them, each showing a live count of its members',
+                    'Assign members to a department from the Members page, one at a time or in bulk across a whole selection',
+                    'Four new role permissions — View, Create, Edit, and Delete Departments — assignable from the Roles screen',
+                ],
+            },
+            {
+                title: 'Sales & Marketing Dashboard (Now Live)',
+                items: [
+                    'The Sales & Marketing dashboard is now a full advertiser-performance view — per-advertiser sales today vs yesterday, month-to-date sales, live ranking, ad spend against target, ROAS, and RTS, with KPI cards and charts up top',
+                    'Figures come from a new nightly rollup (1am) that combines Pancake POS sales with Meta Ads spend, rebuilding the last 3 days each run so late Meta attribution is captured',
+                    'Enabled per workspace and gated behind the existing View Sales & Marketing Dashboard permission',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Interns & Pages',
+                items: [
+                    'New Interns page — interns sync in from Gencys, and you can assign each one to a workspace user, toggle them active/inactive, and re-sync on demand',
+                    'Intern daily records now capture per-day sales and order activity, including delivered and returned counts, collected automatically by a thrice-daily sync (9:30am, 6:30pm, 11:45pm)',
+                    'New Gencys Pages screen tracks each page with its POS details, syncable on demand',
+                    'Three new role permissions — View Gencys Interns, View Gencys Intern Daily Records, and View Gencys Pages',
+                ],
+            },
+            {
+                title: 'Admin — Client Report',
+                items: [
+                    'New per-workspace Client Report in the admin area — a last-three-months snapshot covering RTS rate (with a month-by-month trend), parcel-journey notifications sent, and RMO calls made plus total time on calls',
+                    'Every figure reuses the same source as the rest of the app, so the report matches what workspace owners see; open it from the Admin Workspaces list',
+                ],
+            },
+            {
+                title: 'Inventory — Team-Scoped Items & Faster Stock Entry',
+                items: [
+                    'The item pickers on Purchase Orders and Stock Transactions now list only the inventory items for the teams you can see, matching the team visibility already applied across the rest of Inventory',
+                    'Adding a stock transaction now auto-fills the remaining quantity from the item’s last recorded balance, so you no longer have to look it up and re-key it',
+                ],
+            },
+            {
+                title: 'Pages — Botcake ID Validation',
+                items: [
+                    'The page form can now check a Botcake Flow ID and Custom Field ID against Botcake before you save, so a mistyped ID is caught up front instead of failing quietly later',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.17.0',
         date: '2026-07-09',
         sections: [

@@ -31,6 +31,7 @@ import {
     Database,
     ExternalLink,
     Facebook,
+    FileText,
     History,
     Landmark,
     Layers,
@@ -141,6 +142,12 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        {
+            title: 'Ad Spend Goals',
+            href: `/workspaces/${slug}/ad-spend-goals`,
+            icon: Trophy,
+            permission: PERMISSIONS.ViewAdSpendGoals,
+        },
         {
             title: 'Departments',
             href: `/workspaces/${slug}/departments`,
@@ -381,6 +388,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewDailySalesTracker,
                           PERMISSIONS.ViewGencysInterns,
                           PERMISSIONS.ViewGencysInternDailyRecords,
+                          PERMISSIONS.ViewGencysPages,
                       ],
                       items: [
                           {
@@ -396,11 +404,10 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewGencysInterns,
                           },
                           {
-                              title: 'Intern Daily Records',
-                              href: `/workspaces/${slug}/gencys/intern-daily-records`,
-                              icon: Activity,
-                              permission:
-                                  PERMISSIONS.ViewGencysInternDailyRecords,
+                              title: 'Pages',
+                              href: `/workspaces/${slug}/gencys/pages`,
+                              icon: FileText,
+                              permission: PERMISSIONS.ViewGencysPages,
                           },
                       ],
                   },

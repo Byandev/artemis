@@ -1,4 +1,7 @@
-import PageHeader from '@/components/common/PageHeader';
+import {
+    DashboardTab,
+    DashboardTabNav,
+} from '@/components/sales-marketing/dashboard-tabs';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -76,6 +79,10 @@ interface Props {
     // Base path for the page's data endpoint / URL sync. Defaults to the gencys
     // route; the S&M dashboard passes its own so this page can serve both.
     baseUrl?: string;
+    // Route-based tabs (S&M dashboard). Each tab is its own URL. Absent on the
+    // gencys route, which then renders without a tab bar.
+    tabs?: DashboardTab[];
+    activeTab?: string;
 }
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -357,6 +364,8 @@ export default function InternDashboard({
     view: initialView,
     filters,
     baseUrl: baseUrlProp,
+    tabs,
+    activeTab,
 }: Props) {
     const [date, setDate] = useState<string>(filters.date ?? '');
     const [view, setView] = useState<View>(initialView);
@@ -365,13 +374,16 @@ export default function InternDashboard({
     const baseUrl =
         baseUrlProp ?? `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
 
+    const hasTabs = !!tabs && tabs.length > 0;
+
     // Persist the selected date in the URL so a refresh restores it — the
     // controller reads filter.date on load. replaceState (not an Inertia visit)
     // keeps this axios-driven; we preserve the existing history state so
-    // Inertia's page record isn't clobbered.
-    const syncUrl = (f: Filters) => {
+    // Inertia's page record isn't clobbered. The active tab lives in the route
+    // path, so it's carried by the pathname automatically.
+    const syncUrl = (dateVal: string | null) => {
         const params = new URLSearchParams();
-        if (f.date) params.set('filter[date]', f.date);
+        if (dateVal) params.set('filter[date]', dateVal);
         const qs = params.toString();
         window.history.replaceState(
             window.history.state,
@@ -392,176 +404,193 @@ export default function InternDashboard({
                 const data = res.data as { view: View; filters: Filters };
                 setView(data.view);
                 setDate(data.filters.date ?? '');
-                syncUrl(data.filters);
+                syncUrl(data.filters.date ?? null);
             })
             .catch(() => toast.error('Failed to load dashboard data.'))
             .finally(() => setLoading(false));
     };
 
+    const datePicker = (
+        <DatePicker
+            id="intern-dashboard-date"
+            key={date}
+            mode="single"
+            placeholder="Report date"
+            defaultDate={date || undefined}
+            onChange={(_dates, dateStr) => {
+                if (dateStr) applyDate(dateStr);
+            }}
+        />
+    );
+
     const headCell =
         'border-b border-black/6 bg-stone-50 px-3 py-2.5 text-center align-middle font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:border-white/6 dark:bg-white/2 dark:text-gray-500';
-
-    const dateLabel = view.date_label
-        ? `Sales / ROAS · ${view.date_label} vs ${view.prev_date_label}`
-        : 'Per-intern sales & ROAS from Gencys ERP';
 
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Intern Dashboard`} />
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                <PageHeader
-                    title="Interns Dashboard"
-                    description={dateLabel}
-                    stackActionsOnMobile
-                >
-                    <DatePicker
-                        id="intern-dashboard-date"
-                        key={date}
-                        mode="single"
-                        placeholder="Report date"
-                        defaultDate={date || undefined}
-                        onChange={(_dates, dateStr) => {
-                            if (dateStr) applyDate(dateStr);
-                        }}
-                    />
-                </PageHeader>
+                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
 
-                {/* Summary statistics on top */}
-                <div className="mt-4">
-                    <DashboardKpis kpis={view.charts.kpis} />
-                </div>
+                <div>
+                    {/* Page title on the left, report-date control on the right. */}
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                            Daily Report
+                        </h1>
+                        {datePicker}
+                    </div>
 
-                <div className="relative mt-6 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    {loading && (
-                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
-                            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                        </div>
-                    )}
-                    <table className="w-full min-w-[1080px] border-collapse text-[12px] text-gray-800 dark:text-gray-200">
-                        <thead>
-                            <tr>
-                                <th className={`${headCell} text-left`}>
-                                    Name
-                                </th>
-                                <th className={headCell}>Orders</th>
-                                <th className={headCell}>Sales</th>
-                                <th className={headCell}>
-                                    Yesterday Sales
-                                    {view.prev_date_label && (
-                                        <span className="mt-0.5 block text-[9px] font-normal tracking-normal text-gray-300 normal-case dark:text-gray-600">
-                                            {view.prev_date_label}
-                                        </span>
-                                    )}
-                                </th>
-                                <th className={headCell}>Change</th>
-                                <th className={headCell}>Remarks</th>
-                                <th className={headCell}>Day to Month Sales</th>
-                                <th className={headCell}>Top Sales Ranking</th>
-                                <th
-                                    className={`${headCell} text-emerald-600/70 dark:text-emerald-400/60`}
-                                >
-                                    ROAS Yesterday
-                                </th>
-                                <th
-                                    className={`${headCell} text-emerald-600/70 dark:text-emerald-400/60`}
-                                >
-                                    ROAS Today
-                                </th>
-                            </tr>
-                        </thead>
+                    {/* Summary statistics on top — for the selected day only */}
+                    <div className="mt-4">
+                        <p className="mb-2 px-1 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            {view.date_label
+                                ? `Totals for ${view.date_label}`
+                                : 'Totals for the selected day'}
+                        </p>
+                        <DashboardKpis kpis={view.charts.kpis} />
+                    </div>
 
-                        <tbody>
-                            {view.rows.length === 0 && (
+                    <div className="relative mt-6 overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                        {loading && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
+                                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                            </div>
+                        )}
+                        <table className="w-full min-w-[1080px] border-collapse text-[12px] text-gray-800 dark:text-gray-200">
+                            <thead>
                                 <tr>
-                                    <td
-                                        colSpan={10}
-                                        className="px-3 py-16 text-center text-[12px] text-gray-400 dark:text-gray-500"
+                                    <th className={`${headCell} text-left`}>
+                                        Name
+                                    </th>
+                                    <th className={headCell}>Orders</th>
+                                    <th className={headCell}>Sales</th>
+                                    <th className={headCell}>
+                                        Yesterday Sales
+                                        {view.prev_date_label && (
+                                            <span className="mt-0.5 block text-[9px] font-normal tracking-normal text-gray-300 normal-case dark:text-gray-600">
+                                                {view.prev_date_label}
+                                            </span>
+                                        )}
+                                    </th>
+                                    <th className={headCell}>Change</th>
+                                    <th className={headCell}>Remarks</th>
+                                    <th className={headCell}>
+                                        Day to Month Sales
+                                    </th>
+                                    <th className={headCell}>
+                                        Top Sales Ranking
+                                    </th>
+                                    <th
+                                        className={`${headCell} text-emerald-600/70 dark:text-emerald-400/60`}
                                     >
-                                        No intern records for this date.
-                                    </td>
-                                </tr>
-                            )}
-
-                            {view.rows.map((row) => (
-                                <DataRow key={row.id} row={row} />
-                            ))}
-
-                            {view.subtotal && view.rows.length > 0 && (
-                                <SubtotalRow st={view.subtotal} />
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Second table — ad spend & month-to-date RTS */}
-                <h2 className="mt-8 mb-2 px-1 font-mono text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
-                    Ad Spend &amp; RTS
-                </h2>
-                <div className="relative overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    {loading && (
-                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
-                            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                        </div>
-                    )}
-                    <table className="w-full min-w-[720px] border-collapse text-[12px] text-gray-800 dark:text-gray-200">
-                        <thead>
-                            <tr>
-                                <th className={`${headCell} text-left`}>
-                                    Intern
-                                </th>
-                                <th className={headCell}>Actual Ad Spent</th>
-                                <th className={headCell}>Target Ad Spent</th>
-                                <th className={headCell}>Remarks</th>
-                                <th className={headCell}>
-                                    3 Days Average Ad Spent
-                                </th>
-                                <th className={headCell}>
-                                    RTS to Date
-                                    {view.date_label && (
-                                        <span className="mt-0.5 block text-[9px] font-normal tracking-normal text-gray-300 normal-case dark:text-gray-600">
-                                            as of {view.date_label}
-                                        </span>
-                                    )}
-                                </th>
-                                <th className={headCell}>RTS Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {view.ad_rts.rows.length === 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={7}
-                                        className="px-3 py-16 text-center text-[12px] text-gray-400 dark:text-gray-500"
+                                        ROAS Yesterday
+                                    </th>
+                                    <th
+                                        className={`${headCell} text-emerald-600/70 dark:text-emerald-400/60`}
                                     >
-                                        No intern records for this date.
-                                    </td>
+                                        ROAS Today
+                                    </th>
                                 </tr>
-                            )}
+                            </thead>
 
-                            {view.ad_rts.rows.map((row) => (
-                                <AdRtsDataRow key={row.id} row={row} />
-                            ))}
-
-                            {view.ad_rts.subtotal &&
-                                view.ad_rts.rows.length > 0 && (
-                                    <AdRtsSubtotalRow
-                                        st={view.ad_rts.subtotal}
-                                    />
+                            <tbody>
+                                {view.rows.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={10}
+                                            className="px-3 py-16 text-center text-[12px] text-gray-400 dark:text-gray-500"
+                                        >
+                                            No intern records for this date.
+                                        </td>
+                                    </tr>
                                 )}
-                        </tbody>
-                    </table>
+
+                                {view.rows.map((row) => (
+                                    <DataRow key={row.id} row={row} />
+                                ))}
+
+                                {view.subtotal && view.rows.length > 0 && (
+                                    <SubtotalRow st={view.subtotal} />
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Second table — ad spend & month-to-date RTS */}
+                    <h2 className="mt-8 mb-2 px-1 font-mono text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                        Ad Spend &amp; RTS
+                    </h2>
+                    <div className="relative overflow-x-auto rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                        {loading && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-zinc-900/60">
+                                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                            </div>
+                        )}
+                        <table className="w-full min-w-[720px] border-collapse text-[12px] text-gray-800 dark:text-gray-200">
+                            <thead>
+                                <tr>
+                                    <th className={`${headCell} text-left`}>
+                                        Intern
+                                    </th>
+                                    <th className={headCell}>
+                                        Actual Ad Spent
+                                    </th>
+                                    <th className={headCell}>
+                                        Target Ad Spent
+                                    </th>
+                                    <th className={headCell}>Remarks</th>
+                                    <th className={headCell}>
+                                        3 Days Average Ad Spent
+                                    </th>
+                                    <th className={headCell}>
+                                        RTS to Date
+                                        {view.date_label && (
+                                            <span className="mt-0.5 block text-[9px] font-normal tracking-normal text-gray-300 normal-case dark:text-gray-600">
+                                                as of {view.date_label}
+                                            </span>
+                                        )}
+                                    </th>
+                                    <th className={headCell}>RTS Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {view.ad_rts.rows.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={7}
+                                            className="px-3 py-16 text-center text-[12px] text-gray-400 dark:text-gray-500"
+                                        >
+                                            No intern records for this date.
+                                        </td>
+                                    </tr>
+                                )}
+
+                                {view.ad_rts.rows.map((row) => (
+                                    <AdRtsDataRow key={row.id} row={row} />
+                                ))}
+
+                                {view.ad_rts.subtotal &&
+                                    view.ad_rts.rows.length > 0 && (
+                                        <AdRtsSubtotalRow
+                                            st={view.ad_rts.subtotal}
+                                        />
+                                    )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p className="mt-3 font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                        REMARKS: —
+                    </p>
+
+                    {/* Analytics — KPI tiles + trend / efficiency charts */}
+                    <h2 className="mt-8 mb-3 px-1 font-mono text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                        Analytics
+                    </h2>
+                    <DashboardCharts data={view.charts} loading={loading} />
                 </div>
-
-                <p className="mt-3 font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                    REMARKS: —
-                </p>
-
-                {/* Analytics — KPI tiles + trend / efficiency charts */}
-                <h2 className="mt-8 mb-3 px-1 font-mono text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
-                    Analytics
-                </h2>
-                <DashboardCharts data={view.charts} loading={loading} />
             </div>
         </AppLayout>
     );

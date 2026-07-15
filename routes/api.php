@@ -16,6 +16,7 @@ use App\Http\Controllers\PublicApi\UserController;
 use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Api\InternController as GencysInternApiController;
 use Modules\GencysERP\Http\Controllers\Api\InternDailyRecordController as GencysInternDailyRecordApiController;
+use Modules\GencysERP\Http\Controllers\Api\PageController as GencysPageApiController;
 use Modules\GencysERP\Http\Controllers\Api\UnitCodeInventoryController as GencysUnitCodeInventoryApiController;
 use Modules\Inventory\Http\Controllers\Api\UnitCodeController as InventoryUnitCodeApiController;
 
@@ -70,6 +71,19 @@ Route::post('v1/public/gencys/interns', [GencysInternApiController::class, 'stor
 // daily records here, authenticating with the api_key embedded in the body.
 Route::post('v1/public/gencys/intern-daily-records', [GencysInternDailyRecordApiController::class, 'store'])
     ->name('api.v1.public.gencys.intern-daily-records.store');
+
+// GencysERP pages callback. n8n authenticates via the api_key header (the
+// api.key middleware resolves the workspace) and posts just the array of
+// scraped pages as the body.
+Route::post('v1/public/gencys/pages', [GencysPageApiController::class, 'store'])
+    ->middleware('api.key')
+    ->name('api.v1.public.gencys.pages.store');
+
+// GencysERP page-detail callback. n8n posts the scraped detail (Pancake shop id,
+// api token, fb page id, url) for a single page, keyed on gencys_pages.page_id,
+// authenticating with the api_key embedded in the body.
+Route::post('v1/public/gencys/page-details', [GencysPageApiController::class, 'storeDetails'])
+    ->name('api.v1.public.gencys.page-details.store');
 
 // v2 — new mobile app (login with users.id, filter by assignee_user_id)
 Route::group(['prefix' => 'v2/public', 'as' => 'api.v2.public.', 'middleware' => ['api.key']], function () {

@@ -132,7 +132,10 @@ class InventoryTransactionController extends Controller
         return Inertia::render('workspaces/inventory/inventory_transaction/index', [
             'workspace' => $workspace,
             'inventory' => $inventory,
-            'items' => InventoryItem::where('workspace_id', $workspace->id)->with('product')->get(),
+            'items' => InventoryItem::where('workspace_id', $workspace->id)
+                ->visibleTo($request->user(), $workspace)
+                ->with('product')
+                ->get(),
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),

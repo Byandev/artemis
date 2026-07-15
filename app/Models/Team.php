@@ -66,6 +66,14 @@ class Team extends Model
         return $this->hasMany(TeamMemberSchedule::class);
     }
 
+    /**
+     * Daily ad-spend goals set for this team.
+     */
+    public function goals(): HasMany
+    {
+        return $this->hasMany(TeamAdSpendGoal::class);
+    }
+
     public function scopeOfWorkspace($query, Workspace $workspace)
     {
         return $query->where('workspace_id', $workspace->id);
