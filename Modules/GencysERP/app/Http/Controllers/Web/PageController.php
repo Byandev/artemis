@@ -90,6 +90,8 @@ class PageController extends Controller
     {
         $this->authorize(Permission::ViewGencysPages->value, $workspace);
 
+        $workspace->load('gencysPages');
+
         $webhookUrl = config('services.n8n.gencys_pages_webhook_url')
             ?: config('services.n8n.webhook_url');
 
@@ -111,8 +113,8 @@ class PageController extends Controller
             'erp_username' => $workspace->erp_username,
             'erp_password' => $workspace->erp_password,
             'webhook_url' => "{$callbackBase}/api/v1/public/gencys/pages",
-            'pages' => $workspace->pages->map(function (\App\Models\Page $page) {
-                return $page->id;
+            'pages' => $workspace->gencysPages->map(function (Page $page) {
+                return $page->page_id;
             })->toArray(),
         ]);
 

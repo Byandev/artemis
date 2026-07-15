@@ -3,6 +3,7 @@
 namespace Modules\GencysERP\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Shop;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
 use Illuminate\Http\JsonResponse;
@@ -10,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Modules\GencysERP\Models\Page;
 use Modules\GencysERP\Support\InternResolver;
+use Modules\Pancake\Jobs\SyncShop;
 
 /**
  * Callback for the n8n pages sync. Auth is via the api_key header (the api.key
@@ -35,7 +37,7 @@ class PageController extends Controller
         foreach ($pages as $page) {
 
             // Gencys' own row id — the sheet's "No." column — is the upsert key.
-            $pageId = (int) ($page['no'] ?? $page['page_id'] ?? $page['pageId'] ?? $page['id'] ?? 0);
+            $pageId = (int) ($page['page_id'] ?? 0);
 
             if ($pageId <= 0) {
                 $skipped++;
@@ -86,6 +88,10 @@ class PageController extends Controller
                     'pos_token' => $this->str($page['pos_token'] ?? null) ?? '',
                 ]
             );
+
+            if ($record->pos_token && $record->shop_id && Shop::where('id', $record->shop_id)->doesntExist() ) {
+                dispatch(new SyncShop($workspace->id, $record->shop_id, $record->pos_token, $record->gencys_intern_id))->onQueue('pancake');
+            }
 
             if ($record->wasRecentlyCreated) {
                 $created++;

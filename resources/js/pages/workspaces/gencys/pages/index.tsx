@@ -213,16 +213,6 @@ export default function GencysPagesIndex({
                 ),
             },
             {
-                accessorKey: 'fb_page_id',
-                enableSorting: false,
-                header: () => <span className="text-[12px]">FB Page ID</span>,
-                cell: ({ row }) => (
-                    <span className="font-mono text-[12px] text-gray-600 dark:text-gray-400">
-                        {row.original.fb_page_id ?? '—'}
-                    </span>
-                ),
-            },
-            {
                 accessorKey: 'page_url',
                 enableSorting: false,
                 header: () => <span className="text-[12px]">Page URL</span>,
@@ -239,29 +229,6 @@ export default function GencysPagesIndex({
                     ) : (
                         <span className="text-[12px] text-gray-400">—</span>
                     ),
-            },
-            {
-                accessorKey: 'shop_id',
-                enableSorting: false,
-                header: () => <span className="text-[12px]">Shop ID</span>,
-                cell: ({ row }) => (
-                    <span className="font-mono text-[12px] text-gray-600 dark:text-gray-400">
-                        {row.original.shop_id || '—'}
-                    </span>
-                ),
-            },
-            {
-                accessorKey: 'pos_token',
-                enableSorting: false,
-                header: () => <span className="text-[12px]">POS Token</span>,
-                cell: ({ row }) => (
-                    <span
-                        className="block max-w-[180px] truncate font-mono text-[12px] text-gray-600 dark:text-gray-400"
-                        title={row.original.pos_token ?? undefined}
-                    >
-                        {row.original.pos_token || '—'}
-                    </span>
-                ),
             },
         ],
         [],

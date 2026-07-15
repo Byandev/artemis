@@ -14,6 +14,9 @@ class Page extends Model
 
     protected $table = 'gencys_pages';
 
+    protected $hidden = [
+        'pos_token'
+    ];
     protected $fillable = [
         'workspace_id',
         'page_id',
