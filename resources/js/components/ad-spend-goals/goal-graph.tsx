@@ -21,6 +21,16 @@ export interface GoalStatus {
     // Ad spend on the goal's start date (0 if unrecorded). The yesterday-short,
     // ramp increment, and increase-since-start are derived on the frontend.
     starting_spend: number;
+    // Optional stepping-stone thresholds under the target, ascending.
+    milestones: Milestone[];
+}
+
+export interface Milestone {
+    id: number;
+    amount: number;
+    label: string | null;
+    reached: boolean;
+    reached_date: string | null;
 }
 
 export interface Goal {
@@ -116,11 +126,14 @@ export function GoalDonut({
     hit,
     hasData,
     size = 84,
+    markers = [],
 }: {
     pct: number;
     hit: boolean;
     hasData: boolean;
     size?: number;
+    /** Tick marks on the ring, e.g. milestones (% of target). */
+    markers?: { pct: number; reached: boolean }[];
 }) {
     // r chosen so the circumference ≈ 100 → the dash length is the percentage.
     const R = 15.9155;
@@ -175,6 +188,24 @@ export function GoalDonut({
                         }}
                     />
                 )}
+                {/* Milestone ticks — same clockwise-from-top frame as the arc. */}
+                {markers.map((mk, i) => {
+                    const a = (Math.min(100, mk.pct) / 100) * 2 * Math.PI;
+                    const cos = Math.cos(a);
+                    const sin = Math.sin(a);
+                    return (
+                        <line
+                            key={i}
+                            x1={18 + 13.6 * cos}
+                            y1={18 + 13.6 * sin}
+                            x2={18 + 18.4 * cos}
+                            y2={18 + 18.4 * sin}
+                            strokeWidth="0.9"
+                            strokeLinecap="round"
+                            stroke={mk.reached ? '#0d8264' : '#cbd5e1'}
+                        />
+                    );
+                })}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span
@@ -279,6 +310,13 @@ export function GoalGraph({
     const b = bestOf(s);
     const glow = b.hit ? '#10d3a1' : '#f79009'; // brand-500 / warning-500
 
+    const markers = s.daily_target
+        ? s.milestones.map((m) => ({
+              pct: (m.amount / s.daily_target) * 100,
+              reached: m.reached,
+          }))
+        : [];
+
     return (
         <div className="flex flex-col items-center gap-10 sm:flex-row sm:gap-12">
             <div className="relative shrink-0">
@@ -294,6 +332,7 @@ export function GoalGraph({
                     hit={b.hit}
                     hasData={b.hasData}
                     size={size}
+                    markers={markers}
                 />
             </div>
 

@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
+import { Plus, X } from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
@@ -15,12 +16,18 @@ interface TeamOption {
     name: string;
 }
 
+interface MilestoneInput {
+    amount: number | '';
+    label: string;
+}
+
 export interface Goal {
     id: number;
     team_id: number;
     daily_target: number;
     start_date: string;
     end_date: string;
+    milestones?: { amount: number; label: string | null }[];
 }
 
 interface GoalFormDialogProps {
@@ -46,12 +53,14 @@ export function GoalFormDialog({
 }: GoalFormDialogProps) {
     const isEditing = !!goal;
 
-    const { data, setData, post, put, processing, errors, reset } = useForm({
-        team_id: '' as number | '',
-        daily_target: '' as number | '',
-        start_date: '',
-        end_date: '',
-    });
+    const { data, setData, post, put, processing, errors, reset, transform } =
+        useForm({
+            team_id: '' as number | '',
+            daily_target: '' as number | '',
+            start_date: '',
+            end_date: '',
+            milestones: [] as MilestoneInput[],
+        });
 
     useEffect(() => {
         if (goal) {
@@ -60,6 +69,10 @@ export function GoalFormDialog({
                 daily_target: goal.daily_target,
                 start_date: goal.start_date,
                 end_date: goal.end_date,
+                milestones: (goal.milestones ?? []).map((m) => ({
+                    amount: m.amount,
+                    label: m.label ?? '',
+                })),
             });
         } else {
             reset();
@@ -69,8 +82,33 @@ export function GoalFormDialog({
 
     const baseUrl = `/workspaces/${workspace.slug}/ad-spend-goals`;
 
+    const addMilestone = () =>
+        setData('milestones', [...data.milestones, { amount: '', label: '' }]);
+
+    const updateMilestone = (i: number, patch: Partial<MilestoneInput>) =>
+        setData(
+            'milestones',
+            data.milestones.map((m, idx) =>
+                idx === i ? { ...m, ...patch } : m,
+            ),
+        );
+
+    const removeMilestone = (i: number) =>
+        setData(
+            'milestones',
+            data.milestones.filter((_, idx) => idx !== i),
+        );
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Drop empty milestone rows before sending.
+        transform((payload) => ({
+            ...payload,
+            milestones: payload.milestones.filter(
+                (m) => m.amount !== '' && m.amount !== null,
+            ),
+        }));
 
         const onSuccess = () => {
             toast.success(
@@ -110,7 +148,7 @@ export function GoalFormDialog({
                 </div>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="space-y-5 px-5 py-4">
+                    <div className="max-h-[65vh] space-y-5 overflow-y-auto px-5 py-4">
                         {/* Team */}
                         <div className="space-y-1.5">
                             <label className={labelClass}>
@@ -215,6 +253,93 @@ export function GoalFormDialog({
                                     </p>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Milestones (optional) */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label className={labelClass}>
+                                    Milestones (optional)
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={addMilestone}
+                                    className="flex items-center gap-1 font-mono text-[11px] font-medium text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                                >
+                                    <Plus className="h-3.5 w-3.5" /> Add
+                                </button>
+                            </div>
+
+                            {data.milestones.length === 0 ? (
+                                <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                    Stepping-stone daily amounts below the target
+                                    (e.g. 300000). Optional.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {data.milestones.map((m, i) => (
+                                        <div
+                                            key={i}
+                                            className="flex items-center gap-2"
+                                        >
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="Amount"
+                                                value={m.amount}
+                                                onChange={(e) =>
+                                                    updateMilestone(i, {
+                                                        amount:
+                                                            e.target.value === ''
+                                                                ? ''
+                                                                : Number(
+                                                                      e.target
+                                                                          .value,
+                                                                  ),
+                                                    })
+                                                }
+                                                className={`${inputClass} flex-1`}
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Label (optional)"
+                                                value={m.label}
+                                                onChange={(e) =>
+                                                    updateMilestone(i, {
+                                                        label: e.target.value,
+                                                    })
+                                                }
+                                                className={`${inputClass} flex-1`}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    removeMilestone(i)
+                                                }
+                                                className="flex h-10 w-9 shrink-0 items-center justify-center rounded-[10px] border border-black/8 text-gray-400 transition-all hover:bg-error-100 hover:text-error-600 dark:border-white/8 dark:hover:bg-error-500/10 dark:hover:text-error-400"
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {Object.keys(errors)
+                                .filter((k) => k.startsWith('milestones'))
+                                .map((k) => (
+                                    <p
+                                        key={k}
+                                        className="font-mono text-[11px] text-red-500"
+                                    >
+                                        {
+                                            (errors as Record<string, string>)[
+                                                k
+                                            ]
+                                        }
+                                    </p>
+                                ))}
                         </div>
                     </div>
 

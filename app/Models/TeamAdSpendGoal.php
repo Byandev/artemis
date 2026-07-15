@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A per-team daily ad-spend goal: the team should hit `daily_target` in ad spend
@@ -35,5 +36,14 @@ class TeamAdSpendGoal extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * Stepping-stone thresholds under the target, ascending (optional).
+     */
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(TeamAdSpendGoalMilestone::class, 'goal_id')
+            ->orderBy('amount');
     }
 }

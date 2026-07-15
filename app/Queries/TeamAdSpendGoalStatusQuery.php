@@ -107,6 +107,39 @@ class TeamAdSpendGoalStatusQuery
         // frontend as recent_spend − starting_spend.
         $startingSpend = (float) ($daily[$goal->start_date->toDateString()] ?? 0);
 
+        // Per-milestone progress. `reached` = the milestone was hit on any
+        // complete day (peak ≥ amount); `reached_date` is the first such day.
+        // The frontend derives "to go" / suggested increment from recent_spend.
+        $completeDaily = [];
+        foreach ($daily as $date => $sp) {
+            if (! Carbon::parse((string) $date)->gt($cutoff)) {
+                $completeDaily[(string) $date] = (float) $sp;
+            }
+        }
+        ksort($completeDaily); // chronological (YYYY-MM-DD sorts lexically)
+
+        $milestones = $goal->milestones
+            ->map(function ($m) use ($completeDaily, $peakSpend) {
+                $amount = (float) $m->amount;
+                $reachedDate = null;
+                foreach ($completeDaily as $date => $sp) {
+                    if ($sp >= $amount) {
+                        $reachedDate = $date;
+                        break;
+                    }
+                }
+
+                return [
+                    'id' => $m->id,
+                    'amount' => round($amount, 2),
+                    'label' => $m->label,
+                    'reached' => $peakSpend >= $amount,
+                    'reached_date' => $reachedDate,
+                ];
+            })
+            ->values()
+            ->all();
+
         return [
             'daily_target' => $target,
             'start_date' => $goal->start_date->toDateString(),
@@ -128,6 +161,8 @@ class TeamAdSpendGoalStatusQuery
             'status' => $this->deriveStatus($start, $today, $hitRecent, $hitEver),
             // Spend on the goal's start date (0 if unrecorded).
             'starting_spend' => round($startingSpend, 2),
+            // Optional stepping-stone thresholds, ascending.
+            'milestones' => $milestones,
         ];
     }
 

@@ -1,9 +1,11 @@
 import { DeleteGoalDialog } from '@/components/ad-spend-goals/delete-goal-dialog';
 import {
+    BRAND_GRAD,
     Goal,
     GoalGraph,
     STATUS_META,
     TeamOption,
+    WARN_GRAD,
     fmtDate,
 } from '@/components/ad-spend-goals/goal-graph';
 import {
@@ -74,6 +76,87 @@ function PaceTile({
                     {sub}
                 </p>
             )}
+        </div>
+    );
+}
+
+/** One rung of the milestone ladder: threshold, progress bar, reached / to-go. */
+function MilestoneRung({
+    amount,
+    label,
+    reached,
+    reachedDate,
+    yesterday,
+    hasRecent,
+    daysRemaining,
+    isTarget,
+}: {
+    amount: number;
+    label: string | null;
+    reached: boolean;
+    reachedDate: string | null;
+    yesterday: number;
+    hasRecent: boolean;
+    daysRemaining: number;
+    isTarget?: boolean;
+}) {
+    const toGo = Math.max(0, amount - yesterday);
+    const inc = daysRemaining > 0 && toGo > 0 ? toGo / daysRemaining : null;
+    const pct = amount > 0 ? Math.min(100, (yesterday / amount) * 100) : 0;
+
+    return (
+        <div className="flex items-center gap-3 sm:gap-4">
+            <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${reached ? 'bg-brand-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+            />
+            <div className="w-24 shrink-0 sm:w-28">
+                <p className="font-mono text-[13px] font-semibold text-gray-900 tabular-nums dark:text-gray-50">
+                    {currencyFormatter(amount)}
+                </p>
+                <p className="font-mono text-[9px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                    {isTarget ? 'Target' : label || 'Milestone'}
+                </p>
+            </div>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-100 dark:bg-zinc-800">
+                <div
+                    className="h-full rounded-full"
+                    style={{
+                        width: `${reached ? 100 : pct}%`,
+                        background: reached ? BRAND_GRAD : WARN_GRAD,
+                    }}
+                />
+            </div>
+            <div className="w-36 shrink-0 text-right sm:w-48">
+                {reached ? (
+                    <span className="inline-flex items-center gap-1 font-mono text-[11px] font-medium text-brand-600 dark:text-brand-400">
+                        Reached
+                        <Check className="h-3 w-3" />
+                        {reachedDate && (
+                            <span className="text-gray-400 dark:text-gray-500">
+                                {' '}
+                                · {fmtDate(reachedDate)}
+                            </span>
+                        )}
+                    </span>
+                ) : hasRecent ? (
+                    <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                        <span className="font-semibold text-warning-600 dark:text-warning-400">
+                            {currencyFormatter(toGo)}
+                        </span>{' '}
+                        to go
+                        {inc !== null && (
+                            <span className="text-gray-400 dark:text-gray-500">
+                                {' '}
+                                · +{currencyFormatter(inc)}/day
+                            </span>
+                        )}
+                    </span>
+                ) : (
+                    <span className="font-mono text-[11px] text-gray-300 dark:text-gray-600">
+                        —
+                    </span>
+                )}
+            </div>
         </div>
     );
 }
@@ -179,6 +262,10 @@ export default function AdSpendGoalShow({
         daily_target: goal.daily_target,
         start_date: goal.start_date,
         end_date: goal.end_date,
+        milestones: s.milestones.map((m) => ({
+            amount: m.amount,
+            label: m.label,
+        })),
     };
 
     return (
@@ -431,6 +518,40 @@ export default function AdSpendGoalShow({
                         </>
                     )}
                 </div>
+
+                {/* Milestones ladder (only when the goal has milestones) */}
+                {s.milestones.length > 0 && (
+                    <div className="mt-4 rounded-[18px] border border-black/6 bg-white p-6 shadow-sm md:p-8 dark:border-white/6 dark:bg-zinc-900">
+                        <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Milestones
+                        </p>
+                        <div className="mt-5 space-y-4">
+                            {s.milestones.map((m) => (
+                                <MilestoneRung
+                                    key={m.id}
+                                    amount={m.amount}
+                                    label={m.label}
+                                    reached={m.reached}
+                                    reachedDate={m.reached_date}
+                                    yesterday={yesterday}
+                                    hasRecent={hasRecent}
+                                    daysRemaining={s.days_remaining}
+                                />
+                            ))}
+                            {/* Final rung: the goal's own target. */}
+                            <MilestoneRung
+                                amount={target}
+                                label={null}
+                                reached={s.hit_ever}
+                                reachedDate={s.peak_date}
+                                yesterday={yesterday}
+                                hasRecent={hasRecent}
+                                daysRemaining={s.days_remaining}
+                                isTarget
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {canManageGoals && (

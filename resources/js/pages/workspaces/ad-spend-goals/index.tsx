@@ -107,6 +107,10 @@ export default function AdSpendGoalsIndex({
               daily_target: editingGoal.daily_target,
               start_date: editingGoal.start_date,
               end_date: editingGoal.end_date,
+              milestones: editingGoal.status.milestones.map((m) => ({
+                  amount: m.amount,
+                  label: m.label,
+              })),
           }
         : null;
 

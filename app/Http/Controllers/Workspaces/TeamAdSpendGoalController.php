@@ -22,7 +22,7 @@ class TeamAdSpendGoalController extends Controller
         $this->authorize(Permission::ViewAdSpendGoals->value, $workspace);
 
         $goals = TeamAdSpendGoal::where('workspace_id', $workspace->id)
-            ->with('team:id,name')
+            ->with(['team:id,name', 'milestones'])
             ->orderByDesc('start_date')
             ->orderByDesc('id')
             ->paginate($request->integer('per_page', 10))
@@ -54,7 +54,7 @@ class TeamAdSpendGoalController extends Controller
 
         $this->guardOwnership($workspace, $goal);
 
-        $goal->load('team:id,name');
+        $goal->load('team:id,name', 'milestones');
 
         $status = (new TeamAdSpendGoalStatusQuery($workspace))->statusFor($goal);
 
@@ -92,11 +92,15 @@ class TeamAdSpendGoalController extends Controller
         $this->authorize(Permission::ManageAdSpendGoals->value, $workspace);
 
         $validated = $this->validateGoal($request, $workspace);
+        $milestones = $validated['milestones'] ?? [];
+        unset($validated['milestones']);
 
-        TeamAdSpendGoal::create([
+        $goal = TeamAdSpendGoal::create([
             'workspace_id' => $workspace->id,
             ...$validated,
         ]);
+
+        $this->syncMilestones($goal, $milestones);
 
         return redirect()->back()->with('success', 'Ad spend goal created successfully.');
     }
@@ -108,10 +112,32 @@ class TeamAdSpendGoalController extends Controller
         $this->guardOwnership($workspace, $goal);
 
         $validated = $this->validateGoal($request, $workspace);
+        $milestones = $validated['milestones'] ?? [];
+        unset($validated['milestones']);
 
         $goal->update($validated);
 
+        $this->syncMilestones($goal, $milestones);
+
         return redirect()->back()->with('success', 'Ad spend goal updated successfully.');
+    }
+
+    /**
+     * Replace the goal's milestones with the submitted set (small list, so a
+     * delete-and-recreate keeps it simple).
+     *
+     * @param  array<int, array{amount: mixed, label?: string|null}>  $milestones
+     */
+    private function syncMilestones(TeamAdSpendGoal $goal, array $milestones): void
+    {
+        $goal->milestones()->delete();
+
+        foreach ($milestones as $milestone) {
+            $goal->milestones()->create([
+                'amount' => $milestone['amount'],
+                'label' => $milestone['label'] ?? null,
+            ]);
+        }
     }
 
     public function destroy(Request $request, Workspace $workspace, TeamAdSpendGoal $goal)
@@ -130,7 +156,7 @@ class TeamAdSpendGoalController extends Controller
     }
 
     /**
-     * @return array{team_id: int, daily_target: float, start_date: string, end_date: string}
+     * @return array<string, mixed>
      */
     private function validateGoal(Request $request, Workspace $workspace): array
     {
@@ -142,6 +168,10 @@ class TeamAdSpendGoalController extends Controller
             'daily_target' => ['required', 'numeric', 'min:0.01'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            // Optional stepping-stone thresholds, each below the daily target.
+            'milestones' => ['array'],
+            'milestones.*.amount' => ['required', 'numeric', 'gt:0', 'lt:daily_target'],
+            'milestones.*.label' => ['nullable', 'string', 'max:255'],
         ]);
     }
 
