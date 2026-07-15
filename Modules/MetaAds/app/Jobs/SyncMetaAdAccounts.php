@@ -21,7 +21,7 @@ class SyncMetaAdAccounts implements ShouldQueue
 
     public int $timeout = 300;
 
-    public int $tries = 8;
+    public int $tries = 3;
 
     /**
      * @param  bool  $cascade  When true, after the accounts are fetched, kick off

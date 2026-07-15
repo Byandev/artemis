@@ -2,24 +2,32 @@
 
 namespace Modules\GencysERP\Queries;
 
+use App\Models\AdvertiserPerformanceDailyRecord;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\Intern;
 
 /**
- * Builds the "Interns Quick Data View (Sales/ROAS)" table for a single date.
+ * Builds the advertiser performance "Quick Data View (Sales/ROAS)" table for a
+ * single date, reading the unified advertiser_performance_daily_records table.
  *
- * Per intern the day's orders / sales / ad_spent are shown, with ROAS
- * (sales ÷ ad_spent) and a change vs the previous day's sales. Interns are
- * ranked globally by sales. Only active interns appear.
+ * The source is chosen by the workspace: Gencys partners read the Gencys source
+ * (advertiser = Intern); everyone else reads the Artemis source
+ * (advertiser = User).
+ *
+ * Per advertiser the day's orders / sales / ad_spent are shown, with ROAS
+ * (sales ÷ ad_spent) and a change vs the previous day's sales, ranked by sales.
  */
-class InternDashboardQuery
+class AdvertiserDashboardQuery
 {
     /** @var array<int, int> */
     private array $internIds;
+
+    /** Which unified source this workspace reads ('gencys' | 'artemis'). */
+    private string $source;
 
     public function __construct(
         private readonly Workspace $workspace,
@@ -30,6 +38,10 @@ class InternDashboardQuery
             array_map('intval', $internIds),
             fn (int $id): bool => $id > 0,
         ));
+
+        $this->source = $workspace->is_gencys_partner
+            ? AdvertiserPerformanceDailyRecord::SOURCE_GENCYS
+            : AdvertiserPerformanceDailyRecord::SOURCE_ARTEMIS;
     }
 
     public function get(): array
@@ -69,13 +81,9 @@ class InternDashboardQuery
         // date_to_month_sales snapshot isn't populated, so we derive it.)
         $monthToDate = $this->monthToDateSales($date);
 
-        $interns = Intern::where('workspace_id', $this->workspace->id)
-            ->where('active', true)
-            ->whereIn('id', $today->keys()->all())
-            ->orderBy('intern_id')
-            ->get(['id', 'full_name', 'company_name']);
+        $interns = $this->advertisers($today->keys()->all());
 
-        $rows = $interns->map(function (Intern $intern) use ($today, $yesterday, $monthToDate) {
+        $rows = $interns->map(function ($intern) use ($today, $yesterday, $monthToDate) {
             $t = $today->get($intern->id);
             $y = $yesterday->get($intern->id);
 
@@ -156,11 +164,10 @@ class InternDashboardQuery
         $nameById = $interns->pluck('full_name', 'id');
         $monthStart = $date->copy()->startOfMonth();
 
-        $records = GencysInternDailyRecord::query()
-            ->where('workspace_id', $this->workspace->id)
-            ->whereIn('gencys_intern_id', $internIds)
-            ->whereBetween('record_date', [$monthStart->toDateString(), $date->toDateString()])
-            ->get(['gencys_intern_id', 'record_date', 'sales', 'ad_spent', 'orders']);
+        $records = $this->baseQuery()
+            ->whereIn('advertiser_id', $internIds)
+            ->whereBetween('date', [$monthStart->toDateString(), $date->toDateString()])
+            ->get(['advertiser_id as gencys_intern_id', 'date', 'sales', 'ad_spent', 'orders']);
 
         // The month-to-date day axis, and an [intern][date] lookup.
         $dates = [];
@@ -169,7 +176,7 @@ class InternDashboardQuery
         }
         $byIntern = [];
         foreach ($records as $r) {
-            $byIntern[$r->gencys_intern_id][$r->record_date->toDateString()] = $r;
+            $byIntern[$r->gencys_intern_id][$r->date->toDateString()] = $r;
         }
 
         // Per-intern daily sales & ad spend series (same shape, one series each)
@@ -246,13 +253,12 @@ class InternDashboardQuery
         $spendToday = $this->recordsFor($date->toDateString())->keyBy('gencys_intern_id');
 
         // 3-day ad spend sum: selected day + the two days before it.
-        $spend3d = GencysInternDailyRecord::query()
-            ->where('workspace_id', $this->workspace->id)
-            ->whereBetween('record_date', [$date->copy()->subDays(2)->toDateString(), $date->toDateString()])
-            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
-            ->groupBy('gencys_intern_id')
-            ->selectRaw('gencys_intern_id, SUM(COALESCE(ad_spent, 0)) as spend')
-            ->pluck('spend', 'gencys_intern_id');
+        $spend3d = $this->baseQuery()
+            ->whereBetween('date', [$date->copy()->subDays(2)->toDateString(), $date->toDateString()])
+            ->when($this->internIds, fn ($q) => $q->whereIn('advertiser_id', $this->internIds))
+            ->groupBy('advertiser_id')
+            ->selectRaw('advertiser_id, SUM(COALESCE(ad_spent, 0)) as spend')
+            ->pluck('spend', 'advertiser_id');
 
         // Month-to-date RTS snapshot: taken from the latest record in the
         // selected date's month (the ERP stamps date_to_month_* only on its most
@@ -264,7 +270,7 @@ class InternDashboardQuery
         $target = $this->targetAdSpend($date, $interns->pluck('id')->all());
 
         $rows = $interns
-            ->map(function (Intern $intern) use ($spendToday, $spend3d, $rts, $target) {
+            ->map(function ($intern) use ($spendToday, $spend3d, $rts, $target) {
                 $rec = $spendToday->get($intern->id);
                 $r = $rts->get($intern->id);
 
@@ -303,18 +309,19 @@ class InternDashboardQuery
     }
 
     /**
-     * intern id => target ad spend for $date: the sum of page daily budgets for
-     * pages owned by the intern's linked user
-     * (gencys_interns.user_id → pages.owner_id → page_daily_budget_records).
+     * advertiser id => target ad spend for $date: the sum of page daily budgets
+     * for the pages owned by the advertiser's user. Each page uses its latest
+     * budget recorded ON OR BEFORE $date (carries forward on un-recorded days).
      *
-     * Each page uses its latest budget recorded ON OR BEFORE $date, so a budget
-     * carries forward on days it wasn't re-recorded.
+     * Source-aware linkage to the owning user:
+     *   - gencys:  intern → gencys_interns.user_id → pages.owner_id
+     *   - artemis: advertiser_id IS the user id     → pages.owner_id
      *
-     * @param  array<int, int>  $internIds
+     * @param  array<int, int>  $advertiserIds
      */
-    private function targetAdSpend(Carbon $date, array $internIds): Collection
+    private function targetAdSpend(Carbon $date, array $advertiserIds): Collection
     {
-        if (empty($internIds)) {
+        if (empty($advertiserIds)) {
             return collect();
         }
 
@@ -325,19 +332,34 @@ class InternDashboardQuery
             ->groupBy('page_id')
             ->selectRaw('page_id, MAX(date) as latest_date');
 
-        return DB::table('gencys_interns as gi')
-            ->join('pages as p', 'p.owner_id', '=', 'gi.user_id')
+        $joinLatestBudget = function ($join) {
+            $join->on('b.page_id', '=', 'lp.page_id')
+                ->on('b.date', '=', 'lp.latest_date');
+        };
+
+        // Gencys: advertiser is an Intern → its user_id → pages.owner_id.
+        if ($this->source === AdvertiserPerformanceDailyRecord::SOURCE_GENCYS) {
+            return DB::table('gencys_interns as gi')
+                ->join('pages as p', 'p.owner_id', '=', 'gi.user_id')
+                ->joinSub($latestPerPage, 'lp', 'lp.page_id', '=', 'p.id')
+                ->join('page_daily_budget_records as b', $joinLatestBudget)
+                ->where('gi.workspace_id', $this->workspace->id)
+                ->whereIn('gi.id', $advertiserIds)
+                ->whereNotNull('gi.user_id')
+                ->groupBy('gi.id')
+                ->selectRaw('gi.id as id, SUM(b.budget) as target')
+                ->pluck('target', 'id');
+        }
+
+        // Artemis: advertiser_id is the user id → pages.owner_id directly.
+        return DB::table('pages as p')
             ->joinSub($latestPerPage, 'lp', 'lp.page_id', '=', 'p.id')
-            ->join('page_daily_budget_records as b', function ($join) {
-                $join->on('b.page_id', '=', 'lp.page_id')
-                    ->on('b.date', '=', 'lp.latest_date');
-            })
-            ->where('gi.workspace_id', $this->workspace->id)
-            ->whereIn('gi.id', $internIds)
-            ->whereNotNull('gi.user_id')
-            ->groupBy('gi.id')
-            ->selectRaw('gi.id, SUM(b.budget) as target')
-            ->pluck('target', 'gi.id');
+            ->join('page_daily_budget_records as b', $joinLatestBudget)
+            ->where('p.workspace_id', $this->workspace->id)
+            ->whereIn('p.owner_id', $advertiserIds)
+            ->groupBy('p.owner_id')
+            ->selectRaw('p.owner_id as id, SUM(b.budget) as target')
+            ->pluck('target', 'id');
     }
 
     /**
@@ -346,14 +368,13 @@ class InternDashboardQuery
      */
     private function monthToDateRts(Carbon $date): Collection
     {
-        return GencysInternDailyRecord::query()
-            ->where('workspace_id', $this->workspace->id)
-            ->whereBetween('record_date', [$date->copy()->startOfMonth()->toDateString(), $date->toDateString()])
-            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
-            ->orderBy('record_date')
+        return $this->baseQuery()
+            ->whereBetween('date', [$date->copy()->startOfMonth()->toDateString(), $date->toDateString()])
+            ->when($this->internIds, fn ($q) => $q->whereIn('advertiser_id', $this->internIds))
+            ->orderBy('date')
             ->get([
-                'gencys_intern_id',
-                'record_date',
+                'advertiser_id as gencys_intern_id',
+                'date',
                 'date_to_month_sales_order_rts_rate',
                 'date_to_month_sales_order_delivered',
                 'date_to_month_sales_order_returned',
@@ -363,14 +384,57 @@ class InternDashboardQuery
             ->map(fn ($group) => $group->last());
     }
 
+    /**
+     * Base query over the unified advertiser_performance_daily_records table,
+     * scoped to this workspace's rows for the resolved source.
+     */
+    private function baseQuery()
+    {
+        return AdvertiserPerformanceDailyRecord::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('source', $this->source);
+    }
+
+    /**
+     * The advertiser dimension for the given ids, source-aware:
+     *   - gencys: active Interns
+     *   - artemis: Users
+     * Returned rows expose ->id and ->full_name for source-agnostic reads.
+     *
+     * @param  array<int, int>  $ids
+     */
+    private function advertisers(array $ids): Collection
+    {
+        if (empty($ids)) {
+            return collect();
+        }
+
+        if ($this->source === AdvertiserPerformanceDailyRecord::SOURCE_GENCYS) {
+            return Intern::where('workspace_id', $this->workspace->id)
+                ->where('active', true)
+                ->whereIn('id', $ids)
+                ->orderBy('intern_id')
+                ->get(['id', 'full_name']);
+        }
+
+        // Artemis: only users who belong to this workspace (member or owner).
+        return User::whereIn('id', $ids)
+            ->where(function ($q) {
+                $q->whereHas('workspaces', fn ($w) => $w->where('workspaces.id', $this->workspace->id))
+                    ->orWhere('id', $this->workspace->owner_id);
+            })
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (User $u) => (object) ['id' => $u->id, 'full_name' => $u->name]);
+    }
+
     /** Daily records for the given date, scoped to workspace + selected interns. */
     private function recordsFor(string $date): Collection
     {
-        return GencysInternDailyRecord::query()
-            ->where('workspace_id', $this->workspace->id)
-            ->where('record_date', $date)
-            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
-            ->get(['gencys_intern_id', 'orders', 'sales', 'ad_spent']);
+        return $this->baseQuery()
+            ->where('date', $date)
+            ->when($this->internIds, fn ($q) => $q->whereIn('advertiser_id', $this->internIds))
+            ->get(['advertiser_id as gencys_intern_id', 'orders', 'sales', 'ad_spent']);
     }
 
     /**
@@ -379,13 +443,12 @@ class InternDashboardQuery
      */
     private function monthToDateSales(Carbon $date): Collection
     {
-        return GencysInternDailyRecord::query()
-            ->where('workspace_id', $this->workspace->id)
-            ->whereBetween('record_date', [$date->copy()->startOfMonth()->toDateString(), $date->toDateString()])
-            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
-            ->groupBy('gencys_intern_id')
-            ->selectRaw('gencys_intern_id, SUM(COALESCE(sales, 0)) as mtd_sales')
-            ->pluck('mtd_sales', 'gencys_intern_id');
+        return $this->baseQuery()
+            ->whereBetween('date', [$date->copy()->startOfMonth()->toDateString(), $date->toDateString()])
+            ->when($this->internIds, fn ($q) => $q->whereIn('advertiser_id', $this->internIds))
+            ->groupBy('advertiser_id')
+            ->selectRaw('advertiser_id, SUM(COALESCE(sales, 0)) as mtd_sales')
+            ->pluck('mtd_sales', 'advertiser_id');
     }
 
     /**
@@ -399,10 +462,10 @@ class InternDashboardQuery
             return Carbon::parse($this->date);
         }
 
-        $latest = GencysInternDailyRecord::where('workspace_id', $this->workspace->id)
-            ->where('record_date', '<=', Carbon::yesterday()->toDateString())
-            ->when($this->internIds, fn ($q) => $q->whereIn('gencys_intern_id', $this->internIds))
-            ->max('record_date');
+        $latest = $this->baseQuery()
+            ->where('date', '<=', Carbon::yesterday()->toDateString())
+            ->when($this->internIds, fn ($q) => $q->whereIn('advertiser_id', $this->internIds))
+            ->max('date');
 
         return $latest ? Carbon::parse($latest) : null;
     }

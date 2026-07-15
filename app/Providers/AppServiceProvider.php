@@ -2,14 +2,17 @@
 
 namespace App\Providers;
 
+use App\Models\User;
 use App\Models\Workspace;
 use App\Policies\MetricSettingPolicy;
 use App\Services\Logging\ActivityLogger;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Modules\GencysERP\Models\Intern;
 use PostHog\PostHog;
 
 class AppServiceProvider extends ServiceProvider
@@ -28,6 +31,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Short, rename-proof keys for the advertiser polymorphic relation
+        // (advertiser_performance_daily_records.advertiser_model).
+        Relation::morphMap([
+            'intern' => Intern::class,
+            'user' => User::class,
+        ]);
+
         if (! config('posthog.disabled') && config('posthog.api_key')) {
             PostHog::init(config('posthog.api_key'), [
                 'host' => config('posthog.host'),

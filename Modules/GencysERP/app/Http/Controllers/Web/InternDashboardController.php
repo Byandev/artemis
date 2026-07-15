@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\GencysERP\Queries\InternDashboardQuery;
+use Modules\GencysERP\Queries\AdvertiserDashboardQuery;
 
 class InternDashboardController extends Controller
 {
@@ -53,7 +53,7 @@ class InternDashboardController extends Controller
     {
         $date = $request->input('filter.date') ?: null;
 
-        $data = (new InternDashboardQuery($workspace, [], $date))->get();
+        $data = (new AdvertiserDashboardQuery($workspace, [], $date))->get();
 
         $filters = [
             // Echo the resolved date so the picker reflects what's shown.

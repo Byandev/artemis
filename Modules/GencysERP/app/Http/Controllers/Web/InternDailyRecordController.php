@@ -4,13 +4,13 @@ namespace Modules\GencysERP\Http\Controllers\Web;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Modules\GencysERP\Models\GencysInternDailyRecord;
 use Modules\GencysERP\Models\Intern;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
@@ -24,13 +24,20 @@ class InternDailyRecordController extends Controller
     {
         $this->authorize(Permission::ViewGencysInternDailyRecords->value, $workspace);
 
-        // Join the intern once so we can display/search/sort its name in the same
-        // query — no N+1, and the join columns are aliased for the frontend.
-        $base = GencysInternDailyRecord::query()
-            ->where('gencys_intern_daily_records.workspace_id', $workspace->id)
-            ->join('gencys_interns', 'gencys_interns.id', '=', 'gencys_intern_daily_records.gencys_intern_id')
+        // Reads from the unified advertiser_performance_daily_records table
+        // (source=gencys). Join the intern once so we can display/search/sort its
+        // name in the same query — no N+1, columns aliased for the frontend
+        // (date → record_date, advertiser_id → the intern).
+        $table = 'advertiser_performance_daily_records';
+
+        $base = AdvertiserPerformanceDailyRecord::query()
+            ->where("{$table}.workspace_id", $workspace->id)
+            ->where("{$table}.source", AdvertiserPerformanceDailyRecord::SOURCE_GENCYS)
+            ->where("{$table}.advertiser_model", 'intern')
+            ->join('gencys_interns', 'gencys_interns.id', '=', "{$table}.advertiser_id")
             ->select([
-                'gencys_intern_daily_records.*',
+                "{$table}.*",
+                "{$table}.date as record_date",
                 'gencys_interns.intern_id as intern_id',
                 'gencys_interns.full_name as intern_name',
                 'gencys_interns.company_name as intern_company',
@@ -46,35 +53,39 @@ class InternDailyRecordController extends Controller
                         }
                     });
                 }),
-                AllowedFilter::callback('gencys_intern_id', function (Builder $q, $value) {
+                AllowedFilter::callback('gencys_intern_id', function (Builder $q, $value) use ($table) {
                     $ids = array_filter((array) $value, fn ($id) => $id !== '' && $id !== null);
                     if (! empty($ids)) {
-                        $q->whereIn('gencys_intern_daily_records.gencys_intern_id', $ids);
+                        $q->whereIn("{$table}.advertiser_id", $ids);
                     }
                 }),
-                AllowedFilter::callback('date_start', fn (Builder $q, $value) => $q->whereDate('gencys_intern_daily_records.record_date', '>=', $value)),
-                AllowedFilter::callback('date_end', fn (Builder $q, $value) => $q->whereDate('gencys_intern_daily_records.record_date', '<=', $value)),
+                AllowedFilter::callback('date_start', fn (Builder $q, $value) => $q->whereDate("{$table}.date", '>=', $value)),
+                AllowedFilter::callback('date_end', fn (Builder $q, $value) => $q->whereDate("{$table}.date", '<=', $value)),
             ])
             ->allowedSorts([
-                AllowedSort::field('record_date', 'gencys_intern_daily_records.record_date'),
-                AllowedSort::field('sales', 'gencys_intern_daily_records.sales'),
-                AllowedSort::field('roas', 'gencys_intern_daily_records.roas'),
-                AllowedSort::field('ad_spent', 'gencys_intern_daily_records.ad_spent'),
-                AllowedSort::field('rts_rate', 'gencys_intern_daily_records.rts_rate'),
-                AllowedSort::field('delivered', 'gencys_intern_daily_records.delivered'),
-                AllowedSort::field('delivered_amount', 'gencys_intern_daily_records.delivered_amount'),
-                AllowedSort::field('returned', 'gencys_intern_daily_records.returned'),
-                AllowedSort::field('returned_amount', 'gencys_intern_daily_records.returned_amount'),
+                AllowedSort::field('record_date', "{$table}.date"),
+                AllowedSort::field('sales', "{$table}.sales"),
+                AllowedSort::field('roas', "{$table}.roas"),
+                AllowedSort::field('ad_spent', "{$table}.ad_spent"),
+                AllowedSort::field('rts_rate', "{$table}.rts_rate"),
+                AllowedSort::field('delivered', "{$table}.delivered"),
+                AllowedSort::field('delivered_amount', "{$table}.delivered_amount"),
+                AllowedSort::field('returned', "{$table}.returned"),
+                AllowedSort::field('returned_amount', "{$table}.returned_amount"),
                 AllowedSort::field('intern_name', 'gencys_interns.full_name'),
             ])
             ->defaultSort('-record_date')
-            ->orderBy('gencys_intern_daily_records.id', 'desc')
+            ->orderBy("{$table}.id", 'desc')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
 
         // Interns that actually have records, for the intern filter dropdown.
         $interns = Intern::where('gencys_interns.workspace_id', $workspace->id)
-            ->whereIn('id', GencysInternDailyRecord::where('workspace_id', $workspace->id)->select('gencys_intern_id'))
+            ->whereIn('id', AdvertiserPerformanceDailyRecord::query()
+                ->where('workspace_id', $workspace->id)
+                ->where('source', AdvertiserPerformanceDailyRecord::SOURCE_GENCYS)
+                ->where('advertiser_model', 'intern')
+                ->select('advertiser_id'))
             ->orderBy('full_name')
             ->get(['id', 'full_name']);
 

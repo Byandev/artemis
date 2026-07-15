@@ -68,6 +68,7 @@ export interface PageProps {
     workspace: Workspace;
     creatives: PaginatedData<Creative>;
     creators: Creator[];
+    approvers: Creator[];
     products: Product[];
     reviewers: Reviewer[];
     query: {
@@ -80,6 +81,7 @@ export interface PageProps {
             ads_status?: string;
             final_status?: string;
             creator_id?: string;
+            approved_by?: string;
             product_id?: string;
             creative_date_from?: string;
             creative_date_to?: string;

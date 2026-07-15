@@ -2,6 +2,7 @@
 
 namespace Modules\MetaAds\Console\Commands;
 
+use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
 use App\Models\Team;
 use App\Services\DiscordNotifier;
@@ -27,7 +28,7 @@ class ReportTeamBudgetsToDiscordCommand extends Command
         $teams = Team::query()
             ->whereNotNull('discord_webhook_url')
             ->where('discord_webhook_url', '!=', '')
-            ->with(['pages:id,name'])
+            ->with(['shops.pages:id,shop_id,name'])
             ->get();
 
         if ($teams->isEmpty()) {
@@ -39,7 +40,10 @@ class ReportTeamBudgetsToDiscordCommand extends Command
         $sentCount = 0;
 
         foreach ($teams as $team) {
-            $pageIds = $team->pages->pluck('id');
+            // Team ownership now flows through shops (team_shop), so a team's pages
+            // are the pages of every shop assigned to it.
+            $pages = $team->shops->flatMap->pages;
+            $pageIds = $pages->pluck('id');
 
             $records = $pageIds->isEmpty()
                 ? collect()
@@ -50,7 +54,7 @@ class ReportTeamBudgetsToDiscordCommand extends Command
 
             $sent = $discord->send("📊 {$team->name} — daily ad budget", [
                 'title' => "{$team->name} budgets — {$today}",
-                'description' => $this->buildDescription($team, $records, $today, $yesterday),
+                'description' => $this->buildDescription($team, $pages, $records, $today, $yesterday),
                 'color' => 0xFAA61A,
                 'footer' => ['text' => 'metaads:report-team-budgets'],
             ], $team->discord_webhook_url);
@@ -68,21 +72,23 @@ class ReportTeamBudgetsToDiscordCommand extends Command
     }
 
     /**
-     * Per-page budget table for a single team: each of the team's pages with its
-     * budget today and the delta vs yesterday, plus a total row, wrapped in a
-     * Discord code fence so columns align. Capped to Discord's 4096-char limit.
+     * Per-page budget table for a single team: each of the team's pages (across
+     * all of its shops) with its budget today and the delta vs yesterday, plus a
+     * total row, wrapped in a Discord code fence so columns align. Capped to
+     * Discord's 4096-char limit.
      *
+     * @param  Collection<int, Page>  $teamPages
      * @param  Collection<int, PageDailyBudgetRecord>  $records
      */
-    private function buildDescription(Team $team, $records, string $today, string $yesterday): string
+    private function buildDescription(Team $team, $teamPages, $records, string $today, string $yesterday): string
     {
-        if ($team->pages->isEmpty()) {
+        if ($teamPages->isEmpty()) {
             return "No pages are assigned to **{$team->name}** yet.";
         }
 
         // Seed every team page at 0 so pages with no record still appear.
         $pages = [];
-        foreach ($team->pages as $page) {
+        foreach ($teamPages as $page) {
             $pages[$page->id] = [
                 'name' => $page->name ?: 'Untitled page',
                 'today' => 0.0,
