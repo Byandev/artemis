@@ -1,5 +1,9 @@
 import { DeleteGoalDialog } from '@/components/ad-spend-goals/delete-goal-dialog';
 import {
+    GoalFormDialog,
+    Goal as GoalFormShape,
+} from '@/components/ad-spend-goals/goal-form-dialog';
+import {
     BRAND_GRAD,
     Goal,
     STATUS_META,
@@ -9,10 +13,9 @@ import {
     fmtDate,
 } from '@/components/ad-spend-goals/goal-graph';
 import {
-    Goal as GoalFormShape,
-    GoalFormDialog,
-} from '@/components/ad-spend-goals/goal-form-dialog';
-import PageHeader from '@/components/common/PageHeader';
+    DashboardTab,
+    DashboardTabNav,
+} from '@/components/sales-marketing/dashboard-tabs';
 import { DataTable } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -45,6 +48,9 @@ interface Props {
     goals: PaginatedData<Goal>;
     teams: TeamOption[];
     canManage: boolean;
+    // S&M dashboard tabs — this page is the "Ad Spend Goals" tab.
+    tabs?: DashboardTab[];
+    activeTab?: string;
 }
 
 /** Small colored dot keyed to a goal's status. */
@@ -80,8 +86,7 @@ function BestIndicator({ goal }: { goal: Goal }) {
             <span
                 className={`flex shrink-0 items-center gap-0.5 font-mono text-[11px] font-semibold tabular-nums ${b.hit ? 'text-brand-600 dark:text-brand-400' : 'text-warning-600 dark:text-warning-400'}`}
             >
-                {Math.round(b.pct)}%
-                {b.hit && <Check className="h-3 w-3" />}
+                {Math.round(b.pct)}%{b.hit && <Check className="h-3 w-3" />}
             </span>
         </div>
     );
@@ -92,9 +97,12 @@ export default function AdSpendGoalsIndex({
     goals,
     teams,
     canManage,
+    tabs,
+    activeTab,
 }: Props) {
     const canManageGoals =
         usePermission(PERMISSIONS.ManageAdSpendGoals) || canManage;
+    const hasTabs = !!tabs && tabs.length > 0;
 
     const [createOpen, setCreateOpen] = useState(false);
     const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
@@ -247,11 +255,14 @@ export default function AdSpendGoalsIndex({
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Ad Spend Goals`} />
-            <div className="w-full px-4 py-4 md:px-6 md:py-6">
-                <PageHeader
-                    title="Ad Spend Goals"
-                    description="Set a daily ad-spend target per team and track how they're hitting it"
-                >
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
+
+                {/* Page title on the left, actions on the right. */}
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                        Ad Spend Goals
+                    </h1>
                     {canManageGoals && (
                         <button
                             onClick={() => setCreateOpen(true)}
@@ -261,10 +272,10 @@ export default function AdSpendGoalsIndex({
                             New Goal
                         </button>
                     )}
-                </PageHeader>
+                </div>
 
                 {goals.total === 0 ? (
-                    <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-black/8 bg-white py-20 dark:border-white/8 dark:bg-zinc-900">
+                    <div className="mt-4 flex flex-col items-center justify-center rounded-[16px] border border-dashed border-black/8 bg-white py-20 dark:border-white/8 dark:bg-zinc-900">
                         <div className="rounded-2xl bg-stone-100 p-3.5 dark:bg-zinc-800">
                             <Target className="h-7 w-7 text-gray-400 dark:text-gray-500" />
                         </div>
@@ -276,7 +287,7 @@ export default function AdSpendGoalsIndex({
                         </p>
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-[16px] border border-black/6 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900">
+                    <div className="mt-4 overflow-hidden rounded-[16px] border border-black/6 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900">
                         <DataTable
                             columns={columns}
                             data={goals.data}
@@ -284,7 +295,7 @@ export default function AdSpendGoalsIndex({
                             onRowClick={(goal) => router.visit(showUrl(goal))}
                             onFetch={(params) =>
                                 router.get(
-                                    `/workspaces/${workspace.slug}/ad-spend-goals`,
+                                    `/workspaces/${workspace.slug}/sales-marketing/dashboard/ad-spend-goals`,
                                     {
                                         page: params?.page ?? 1,
                                         per_page: params?.per_page ?? undefined,

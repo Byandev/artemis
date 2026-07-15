@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Workspaces;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
+use App\Models\User;
 use App\Models\Workspace;
 use App\Support\SalesMarketingDashboard;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -36,15 +38,23 @@ class PageRoasTrackerController extends Controller
         [$start, $end] = $this->resolveRange($request);
         $dates = $this->datesInRange($start, $end);
 
+        $user = $request->user();
         $selectedPages = $this->ids($request->input('pages'));
         $selectedShops = $this->ids($request->input('shops'));
         $selectedUsers = $this->ids($request->input('users'));
 
-        // Page / Shop / User combine (AND across facets) into a set of eligible
-        // Pancake page ids; null means "no page scoping — show every page".
-        $eligiblePageIds = ($selectedPages || $selectedShops || $selectedUsers)
+        // Team visibility: scoped users only see their team(s)' pages, and the
+        // "viewing as team" switcher narrows everyone to the chosen team.
+        $scoped = TeamVisibility::shouldScope($user, $workspace);
+        $hasFilters = $selectedPages || $selectedShops || $selectedUsers;
+
+        // Page / Shop / User facets combine (AND) with team visibility into a set
+        // of eligible Pancake page ids; null means "no page scoping — every page"
+        // (only possible for unrestricted users with no facet filter applied).
+        $eligiblePageIds = ($scoped || $hasFilters)
             ? Page::query()
                 ->where('workspace_id', $workspace->id)
+                ->when($scoped, fn ($q) => $q->visibleTo($user, $workspace))
                 ->when($selectedPages, fn ($q) => $q->whereIn('id', $selectedPages))
                 ->when($selectedShops, fn ($q) => $q->whereIn('shop_id', $selectedShops))
                 ->when($selectedUsers, fn ($q) => $q->whereIn('owner_id', $selectedUsers))
@@ -111,7 +121,7 @@ class PageRoasTrackerController extends Controller
             'workspace' => $workspace,
             'dates' => $dates,
             'pages' => $pages,
-            'filterOptions' => $this->filterOptions($workspace),
+            'filterOptions' => $this->filterOptions($workspace, $user),
             'query' => [
                 'start' => $start,
                 'end' => $end,
@@ -146,14 +156,19 @@ class PageRoasTrackerController extends Controller
      *
      * @return array{pages: mixed, shops: mixed, users: mixed}
      */
-    private function filterOptions(Workspace $workspace): array
+    private function filterOptions(Workspace $workspace, User $user): array
     {
+        // Only offer pages/shops the viewer can actually see under team scoping.
+        $scoped = TeamVisibility::shouldScope($user, $workspace);
+
         return [
             'pages' => $workspace->pages()
+                ->when($scoped, fn ($q) => $q->visibleTo($user, $workspace))
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn ($p) => ['key' => (string) $p->id, 'label' => $p->name ?: ('Page '.$p->id)]),
             'shops' => $workspace->shops()
+                ->when($scoped, fn ($q) => $q->visibleTo($user, $workspace))
                 ->orderBy('name')
                 ->get(['id', 'name'])
                 ->map(fn ($s) => ['key' => (string) $s->id, 'label' => $s->name ?: ('Shop '.$s->id)]),

@@ -143,12 +143,6 @@ export function AppSidebar() {
               ]
             : []),
         {
-            title: 'Ad Spend Goals',
-            href: `/workspaces/${slug}/ad-spend-goals`,
-            icon: Trophy,
-            permission: PERMISSIONS.ViewAdSpendGoals,
-        },
-        {
             title: 'Departments',
             href: `/workspaces/${slug}/departments`,
             icon: Building2,

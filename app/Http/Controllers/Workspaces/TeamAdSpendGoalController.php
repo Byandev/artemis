@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Team;
 use App\Models\TeamAdSpendGoal;
 use App\Models\Workspace;
 use App\Queries\TeamAdSpendGoalStatusQuery;
+use App\Support\SalesMarketingDashboard;
+use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,9 +20,20 @@ class TeamAdSpendGoalController extends Controller
 
     public function index(Request $request, Workspace $workspace)
     {
-        $this->authorize(Permission::ViewAdSpendGoals->value, $workspace);
+        // Rendered as the "Ad Spend Goals" tab of the S&M dashboard, so it
+        // shares that dashboard's gating (module flag + permission).
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
+        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+
+        // Team visibility: scoped users see only their team(s)' goals; the
+        // "viewing as team" switcher narrows everyone to the chosen team. A null
+        // scope means unrestricted; an empty array yields whereIn(..., []) → no
+        // rows, failing closed.
+        $teamIds = TeamVisibility::scopeTeamIds($request->user(), $workspace);
 
         $goals = TeamAdSpendGoal::where('workspace_id', $workspace->id)
+            ->when($teamIds !== null, fn ($q) => $q->whereIn('team_id', $teamIds))
             ->with(['team:id,name', 'milestones'])
             ->orderByDesc('start_date')
             ->orderByDesc('id')
@@ -36,15 +48,17 @@ class TeamAdSpendGoalController extends Controller
             fn (TeamAdSpendGoal $goal) => $this->presentGoal($goal, $statuses[$goal->id]),
         );
 
-        $teams = Team::ofWorkspace($workspace)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        // Team picker for the create/edit form — the teams the user may set a
+        // goal for (all for unrestricted, own teams for scoped users).
+        $teams = TeamVisibility::selectableTeams($request->user(), $workspace);
 
         return Inertia::render('workspaces/ad-spend-goals/index', [
             'workspace' => $workspace,
             'goals' => $goals,
             'teams' => $teams,
             'canManage' => $request->user()->hasPermission(Permission::ManageAdSpendGoals->value, $workspace),
+            'tabs' => SalesMarketingDashboard::tabs($workspace),
+            'activeTab' => 'ad-spend-goals',
         ]);
     }
 
@@ -58,9 +72,9 @@ class TeamAdSpendGoalController extends Controller
 
         $status = (new TeamAdSpendGoalStatusQuery($workspace))->statusFor($goal);
 
-        $teams = Team::ofWorkspace($workspace)
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        // Team picker for the create/edit form — the teams the user may set a
+        // goal for (all for unrestricted, own teams for scoped users).
+        $teams = TeamVisibility::selectableTeams($request->user(), $workspace);
 
         return Inertia::render('workspaces/ad-spend-goals/show', [
             'workspace' => $workspace,
@@ -148,10 +162,11 @@ class TeamAdSpendGoalController extends Controller
 
         $goal->delete();
 
-        // Redirect to the index (not back) so deleting from the detail page,
-        // whose URL no longer resolves, doesn't 404.
+        // Redirect to the list (not back) so deleting from the detail page,
+        // whose URL no longer resolves, doesn't 404. The list now lives on the
+        // S&M dashboard's Ad Spend Goals tab.
         return redirect()
-            ->route('workspaces.ad-spend-goals.index', $workspace)
+            ->route('workspaces.sales-marketing.dashboard.ad-spend-goals', $workspace)
             ->with('success', 'Ad spend goal deleted successfully.');
     }
 

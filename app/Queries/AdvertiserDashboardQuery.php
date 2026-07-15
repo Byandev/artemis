@@ -5,6 +5,7 @@ namespace App\Queries;
 use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\AdvertiserVisibility;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -29,10 +30,19 @@ class AdvertiserDashboardQuery
     /** Which unified source this workspace reads ('gencys' | 'artemis'). */
     private string $source;
 
+    /**
+     * Advertiser ids the viewer may see under team scoping, or null for "no
+     * restriction". Applied to every record read via baseQuery().
+     *
+     * @var array<int, int>|null
+     */
+    private ?array $visibleAdvertiserIds;
+
     public function __construct(
         private readonly Workspace $workspace,
         array $internIds = [],
         private readonly ?string $date = null,
+        ?User $viewer = null,
     ) {
         $this->internIds = array_values(array_filter(
             array_map('intval', $internIds),
@@ -42,6 +52,10 @@ class AdvertiserDashboardQuery
         $this->source = $workspace->is_gencys_partner
             ? AdvertiserPerformanceDailyRecord::SOURCE_GENCYS
             : AdvertiserPerformanceDailyRecord::SOURCE_ARTEMIS;
+
+        // Team visibility: scoped users only see advertisers on the team(s) they
+        // can see; the "viewing as team" switcher narrows everyone to one team.
+        $this->visibleAdvertiserIds = AdvertiserVisibility::visibleIds($viewer, $workspace, $this->source);
     }
 
     public function get(): array
@@ -419,7 +433,13 @@ class AdvertiserDashboardQuery
     {
         return AdvertiserPerformanceDailyRecord::query()
             ->where('workspace_id', $this->workspace->id)
-            ->where('source', $this->source);
+            ->where('source', $this->source)
+            // Team visibility: an empty set (scoped user with no visible
+            // advertisers) yields whereIn(..., []) → no rows, failing closed.
+            ->when(
+                $this->visibleAdvertiserIds !== null,
+                fn ($q) => $q->whereIn('advertiser_id', $this->visibleAdvertiserIds),
+            );
     }
 
     /**

@@ -191,6 +191,20 @@ export default function DashboardCharts({
             markers: { size: 6, strokeWidth: 0 },
             itemMargin: { vertical: 3 },
         },
+        // On narrow screens a right-side legend starves the donut of width and
+        // shrinks it to a dot — drop the legend below the donut instead.
+        responsive: [
+            {
+                breakpoint: 640,
+                options: {
+                    legend: {
+                        position: 'bottom',
+                        horizontalAlign: 'center',
+                        itemMargin: { horizontal: 6, vertical: 3 },
+                    },
+                },
+            },
+        ],
         stroke: { width: 2, colors: [surface] },
         dataLabels: {
             enabled: true,
