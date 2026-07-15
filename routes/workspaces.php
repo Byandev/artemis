@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminActivityLogController;
+use App\Http\Controllers\Admin\AdminClientReportController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminUserController;
@@ -559,6 +560,10 @@ Route::middleware(['auth', 'verified', 'admin'])
         // Workspace Management
         Route::get('/workspaces', [AdminWorkspaceController::class, 'index'])
             ->name('workspaces.index');
+
+        // Per-client (workspace) report dashboard
+        Route::get('/workspaces/{workspace}/report', [AdminClientReportController::class, 'show'])
+            ->name('workspaces.report');
 
         Route::put('/workspaces/{workspace}/subscription', [AdminWorkspaceController::class, 'updateSubscription'])
             ->name('workspaces.update-subscription');
