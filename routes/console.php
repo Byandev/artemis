@@ -5,6 +5,8 @@ Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
 // Build Artemis-source advertiser performance (Pancake POS + Meta Ads) daily,
 // rebuilding a trailing 3-day window to absorb late Meta attribution.
 Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00')->withoutOverlapping();
+// Same Pancake/Meta data, aggregated per page instead of per advertiser.
+Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 

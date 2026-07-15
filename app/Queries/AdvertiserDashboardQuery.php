@@ -58,13 +58,8 @@ class AdvertiserDashboardQuery
                 'subtotal' => null,
                 'ad_rts' => ['rows' => [], 'subtotal' => null],
                 'charts' => [
-                    'kpis' => [
-                        'total_sales' => 0.0, 'total_ad_spent' => 0.0, 'roas' => null,
-                        'total_orders' => 0, 'avg_rts_rate' => null,
-                    ],
-                    'sales_trend' => ['dates' => [], 'series' => []],
-                    'ad_spend_trend' => ['dates' => [], 'series' => []],
-                    'ad_spend_share' => [],
+                    'kpis' => $this->emptyKpis(),
+                    'by_advertiser' => [],
                 ],
             ];
         }
@@ -138,106 +133,138 @@ class AdvertiserDashboardQuery
     }
 
     /**
-     * Chart datasets, all month-to-date through the selected date:
-     *  - kpis: workspace totals (sales, ad spend, blended ROAS, orders, avg RTS)
-     *  - sales_trend: daily sales per intern (one series each)
-     *  - ad_spend_trend: daily ad spend per intern (one series each)
-     *  - ad_spend_share: per-intern MTD ad spend total (for the pie)
+     * Chart datasets for the SELECTED DATE:
+     *  - kpis: workspace totals with an up/down delta vs the previous day
+     *  - by_advertiser: each shown advertiser's sales & ad spend for the day —
+     *    drives the sales bar, ad spend bar, and ad spend share donut
      */
     private function charts(Carbon $date, Collection $interns): array
     {
-        $empty = [
-            'kpis' => [
-                'total_sales' => 0.0, 'total_ad_spent' => 0.0, 'roas' => null,
-                'total_orders' => 0, 'avg_rts_rate' => null,
-            ],
-            'sales_trend' => ['dates' => [], 'series' => []],
-            'ad_spend_trend' => ['dates' => [], 'series' => []],
-            'ad_spend_share' => [],
-        ];
-
         $internIds = $interns->pluck('id')->all();
+
         if (empty($internIds)) {
-            return $empty;
+            return ['kpis' => $this->emptyKpis(), 'by_advertiser' => []];
         }
 
-        $nameById = $interns->pluck('full_name', 'id');
-        $monthStart = $date->copy()->startOfMonth();
+        // The selected day's record per advertiser (at most one each).
+        $todayById = $this->recordsFor($date->toDateString())->keyBy('gencys_intern_id');
 
-        $records = $this->baseQuery()
-            ->whereIn('advertiser_id', $internIds)
-            ->whereBetween('date', [$monthStart->toDateString(), $date->toDateString()])
-            ->get(['advertiser_id as gencys_intern_id', 'date', 'sales', 'ad_spent', 'orders']);
+        $byAdvertiser = $interns
+            ->map(function ($intern) use ($todayById) {
+                $rec = $todayById->get($intern->id);
 
-        // The month-to-date day axis, and an [intern][date] lookup.
-        $dates = [];
-        for ($d = $monthStart->copy(); $d->lte($date); $d->addDay()) {
-            $dates[] = $d->toDateString();
-        }
-        $byIntern = [];
-        foreach ($records as $r) {
-            $byIntern[$r->gencys_intern_id][$r->date->toDateString()] = $r;
-        }
-
-        // Per-intern daily sales & ad spend series (same shape, one series each)
-        // + per-intern MTD ad spend total for the pie.
-        $salesSeries = [];
-        $adSpendSeries = [];
-        $adSpendShare = [];
-        $totSales = 0.0;
-        $totSpend = 0.0;
-        $totOrders = 0;
-        foreach ($internIds as $id) {
-            $salesByDay = [];
-            $adByDay = [];
-            $s = 0.0;
-            $sp = 0.0;
-            $o = 0;
-            foreach ($dates as $dt) {
-                $rec = $byIntern[$id][$dt] ?? null;
-                $salesByDay[] = (float) ($rec->sales ?? 0);
-                $adByDay[] = (float) ($rec->ad_spent ?? 0);
-                $s += (float) ($rec->sales ?? 0);
-                $sp += (float) ($rec->ad_spent ?? 0);
-                $o += (int) ($rec->orders ?? 0);
-            }
-            $name = $nameById[$id] ?? "#{$id}";
-            $salesSeries[] = ['name' => $name, 'data' => $salesByDay];
-            $adSpendSeries[] = ['name' => $name, 'data' => $adByDay];
-            $adSpendShare[] = ['name' => $name, 'ad_spent' => round($sp, 2)];
-            $totSales += $s;
-            $totSpend += $sp;
-            $totOrders += $o;
-        }
-
-        // Blended RTS rate from the month-to-date snapshot (latest record per
-        // intern in the month), summed across interns:
-        //   (Σfor_return + Σreturned) / (Σfor_return + Σreturned + Σdelivered)
-        $rts = $this->monthToDateRts($date);
-        $rtsDelivered = 0.0;
-        $rtsReturned = 0.0;
-        $rtsForReturn = 0.0;
-        foreach ($rts as $r) {
-            $rtsDelivered += (float) ($r->date_to_month_sales_order_delivered ?? 0);
-            $rtsReturned += (float) ($r->date_to_month_sales_order_returned ?? 0);
-            $rtsForReturn += (float) ($r->date_to_month_sales_order_for_return ?? 0);
-        }
-        $rtsDenom = $rtsForReturn + $rtsReturned + $rtsDelivered;
-        $rtsRate = $rtsDenom > 0
-            ? round(($rtsForReturn + $rtsReturned) / $rtsDenom * 100, 2)
-            : null;
+                return [
+                    'name' => $intern->full_name,
+                    'sales' => round((float) ($rec->sales ?? 0), 2),
+                    'ad_spent' => round((float) ($rec->ad_spent ?? 0), 2),
+                ];
+            })
+            // One shared order (highest sales first) so each advertiser keeps
+            // the same colour/position across all three charts.
+            ->sortByDesc('sales')
+            ->values()
+            ->all();
 
         return [
-            'kpis' => [
-                'total_sales' => round($totSales, 2),
-                'total_ad_spent' => round($totSpend, 2),
-                'roas' => $totSpend > 0 ? round($totSales / $totSpend, 2) : null,
-                'total_orders' => $totOrders,
-                'avg_rts_rate' => $rtsRate,
+            'kpis' => $this->dayKpis($date, $internIds),
+            'by_advertiser' => $byAdvertiser,
+        ];
+    }
+
+    /**
+     * Top KPI tiles for the selected date — workspace totals summed across the
+     * shown advertisers: sales, ad spend, blended ROAS, and orders. Each tile
+     * also carries a `deltas` entry comparing the selected day to the previous
+     * day (over the same advertiser set), for the up/down arrows.
+     *
+     * @param  array<int, int>  $internIds  the advertisers shown for the date
+     */
+    private function dayKpis(Carbon $date, array $internIds): array
+    {
+        if (empty($internIds)) {
+            return $this->emptyKpis();
+        }
+
+        $today = $this->dayTotals($date, $internIds);
+        $prev = $this->dayTotals($date->copy()->subDay(), $internIds);
+
+        return [
+            'total_sales' => $today['sales'],
+            'total_ad_spent' => $today['ad_spent'],
+            'roas' => $today['roas'],
+            'total_orders' => $today['orders'],
+            'deltas' => [
+                'total_sales' => $this->delta($today['sales'], $prev['sales']),
+                'total_ad_spent' => $this->delta($today['ad_spent'], $prev['ad_spent']),
+                'roas' => $this->delta($today['roas'], $prev['roas']),
+                'total_orders' => $this->delta($today['orders'], $prev['orders']),
             ],
-            'sales_trend' => ['dates' => $dates, 'series' => $salesSeries],
-            'ad_spend_trend' => ['dates' => $dates, 'series' => $adSpendSeries],
-            'ad_spend_share' => $adSpendShare,
+        ];
+    }
+
+    /**
+     * Summed sales / ad spend / orders (and blended ROAS) for one date across
+     * the given advertisers.
+     *
+     * @param  array<int, int>  $internIds
+     * @return array{sales: float, ad_spent: float, orders: int, roas: float|null}
+     */
+    private function dayTotals(Carbon $date, array $internIds): array
+    {
+        $agg = $this->baseQuery()
+            ->where('date', $date->toDateString())
+            ->whereIn('advertiser_id', $internIds)
+            ->selectRaw('
+                SUM(COALESCE(sales, 0)) as sales,
+                SUM(COALESCE(ad_spent, 0)) as ad_spent,
+                SUM(COALESCE(orders, 0)) as orders
+            ')
+            ->first();
+
+        $sales = (float) ($agg->sales ?? 0);
+        $spend = (float) ($agg->ad_spent ?? 0);
+
+        return [
+            'sales' => round($sales, 2),
+            'ad_spent' => round($spend, 2),
+            'orders' => (int) ($agg->orders ?? 0),
+            'roas' => $spend > 0 ? round($sales / $spend, 2) : null,
+        ];
+    }
+
+    /**
+     * Direction + percentage change of $cur vs $prev (nulls treated as 0). The
+     * percentage is null when there's no previous value to compare against.
+     *
+     * @return array{pct: float|null, status: 'up'|'down'|'flat'}
+     */
+    private function delta(int|float|null $cur, int|float|null $prev): array
+    {
+        $c = (float) ($cur ?? 0);
+        $p = (float) ($prev ?? 0);
+
+        return [
+            'pct' => $p != 0.0 ? round(($c - $p) / abs($p) * 100, 1) : null,
+            'status' => $c > $p ? 'up' : ($c < $p ? 'down' : 'flat'),
+        ];
+    }
+
+    /** Zeroed KPI payload (no data / no advertisers), with flat deltas. */
+    private function emptyKpis(): array
+    {
+        $flat = ['pct' => null, 'status' => 'flat'];
+
+        return [
+            'total_sales' => 0.0,
+            'total_ad_spent' => 0.0,
+            'roas' => null,
+            'total_orders' => 0,
+            'deltas' => [
+                'total_sales' => $flat,
+                'total_ad_spent' => $flat,
+                'roas' => $flat,
+                'total_orders' => $flat,
+            ],
         ];
     }
 
@@ -452,8 +479,10 @@ class AdvertiserDashboardQuery
     }
 
     /**
-     * The report date — defaults to yesterday (today's data is still coming in),
-     * so the picker always lands on yesterday even before that day's data lands.
+     * The report date. An explicit date always wins. Otherwise default to
+     * yesterday (today's data is still coming in) — but if yesterday has no
+     * rows yet, fall back to the most recent earlier date that does, so the
+     * day-scoped KPIs and table don't open empty while older days hold data.
      */
     private function resolveDate(): ?Carbon
     {
@@ -461,7 +490,17 @@ class AdvertiserDashboardQuery
             return Carbon::parse($this->date);
         }
 
-        return Carbon::yesterday();
+        $yesterday = Carbon::yesterday();
+
+        if ($this->baseQuery()->where('date', $yesterday->toDateString())->exists()) {
+            return $yesterday;
+        }
+
+        $latest = $this->baseQuery()
+            ->where('date', '<=', $yesterday->toDateString())
+            ->max('date');
+
+        return $latest ? Carbon::parse($latest) : $yesterday;
     }
 
     private function subtotal(Collection $rows): array
