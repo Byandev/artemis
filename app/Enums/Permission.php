@@ -163,6 +163,7 @@ enum Permission: string
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
     case ViewOptimizationLogs = 'View Optimization Logs';
+    case ViewAdSpentSummary = 'View Adspent Summary';
 
     // Data Access
     case ViewAllWorkspaceData = 'View All Workspace Data';
@@ -305,7 +306,8 @@ enum Permission: string
             self::ViewOptimizationRules,
             self::ManageOptimizationRules,
             self::ApproveOptimizationRules,
-            self::ViewOptimizationLogs => 'Meta Ads',
+            self::ViewOptimizationLogs,
+            self::ViewAdSpentSummary => 'Meta Ads',
 
             self::ViewAllWorkspaceData => 'Data Access',
         };
