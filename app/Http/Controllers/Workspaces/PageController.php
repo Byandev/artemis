@@ -244,7 +244,7 @@ class PageController extends Controller
             return response()->json(['valid' => false, 'message' => 'Page not found in this workspace.']);
         }
 
-        $token = $validated['token'] ?: $page->botcake_token;
+        $token = ($validated['token'] ?? null) ?: $page->botcake_token;
 
         if (blank($token)) {
             return response()->json(['valid' => false, 'message' => 'Enter a Botcake token first.']);
@@ -253,11 +253,7 @@ class PageController extends Controller
         try {
             $flows = (new Botcake((string) $page->id, $token))->fetchFlows();
         } catch (\Throwable $e) {
-            $message = str_contains($e->getMessage(), 'invalid_page_id')
-                ? "Botcake rejected this page (invalid_page_id). The Botcake access token doesn't match this page's ID — re-copy the access token from Botcake for this exact page."
-                : 'Botcake: '.$e->getMessage();
-
-            return response()->json(['valid' => false, 'message' => $message]);
+            return response()->json(['valid' => false, 'message' => Botcake::describeError($e)]);
         }
 
         // A flow is valid if it exists on the page and hasn't been removed.
@@ -294,7 +290,7 @@ class PageController extends Controller
             return response()->json(['valid' => false, 'message' => 'Page not found in this workspace.']);
         }
 
-        $token = $validated['token'] ?: $page->botcake_token;
+        $token = ($validated['token'] ?? null) ?: $page->botcake_token;
 
         if (blank($token)) {
             return response()->json(['valid' => false, 'message' => 'Enter a Botcake token first.']);
@@ -303,13 +299,7 @@ class PageController extends Controller
         try {
             $fields = (new Botcake((string) $page->id, $token))->fetchCustomFields();
         } catch (\Throwable $e) {
-            // Botcake returns "invalid_page_id" when the access token isn't
-            // authorized for this page id — point the user at the real fix.
-            $message = str_contains($e->getMessage(), 'invalid_page_id')
-                ? "Botcake rejected this page (invalid_page_id). The Botcake access token doesn't match this page's ID — re-copy the access token from Botcake for this exact page."
-                : 'Botcake: '.$e->getMessage();
-
-            return response()->json(['valid' => false, 'message' => $message]);
+            return response()->json(['valid' => false, 'message' => Botcake::describeError($e)]);
         }
 
         $found = collect($fields)->contains(

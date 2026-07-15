@@ -12,6 +12,20 @@ class Botcake
     public function __construct(public string $pageId, public string $token) {}
 
     /**
+     * Turn a failed Botcake call into a message worth showing a user.
+     *
+     * Botcake answers "invalid_page_id" when the access token isn't authorized
+     * for the page id it was sent with, which reads as a page problem but is
+     * always a token mismatch — name the actual fix instead of the raw code.
+     */
+    public static function describeError(\Throwable $e): string
+    {
+        return str_contains($e->getMessage(), 'invalid_page_id')
+            ? "Botcake rejected this page (invalid_page_id). The Botcake access token doesn't match this page's ID — re-copy the access token from Botcake for this exact page."
+            : 'Botcake: '.$e->getMessage();
+    }
+
+    /**
      * @throws ConnectionException
      * @throws Exception
      */
