@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\GencysERP\Queries;
+namespace App\Queries;
 
 use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\User;
@@ -452,9 +452,8 @@ class AdvertiserDashboardQuery
     }
 
     /**
-     * The report date. Defaults to yesterday (today's data is still coming in),
-     * falling back to the most recent record on or before yesterday so there's
-     * always data to show.
+     * The report date — defaults to yesterday (today's data is still coming in),
+     * so the picker always lands on yesterday even before that day's data lands.
      */
     private function resolveDate(): ?Carbon
     {
@@ -462,12 +461,7 @@ class AdvertiserDashboardQuery
             return Carbon::parse($this->date);
         }
 
-        $latest = $this->baseQuery()
-            ->where('date', '<=', Carbon::yesterday()->toDateString())
-            ->when($this->internIds, fn ($q) => $q->whereIn('advertiser_id', $this->internIds))
-            ->max('date');
-
-        return $latest ? Carbon::parse($latest) : null;
+        return Carbon::yesterday();
     }
 
     private function subtotal(Collection $rows): array
