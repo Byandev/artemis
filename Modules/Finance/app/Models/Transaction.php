@@ -2,6 +2,7 @@
 
 namespace Modules\Finance\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -38,6 +39,27 @@ class Transaction extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    /*
+     * Relations use non-colliding names so they don't overwrite the same-named
+     * foreign-key columns on serialization (a requestedBy() relation would
+     * serialize to "requested_by" and clobber the integer FK the forms read).
+     */
+
+    public function requester(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function chargeToUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'charge_to');
     }
 
     public function transactionType(): BelongsTo

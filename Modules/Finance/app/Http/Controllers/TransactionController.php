@@ -87,7 +87,7 @@ class TransactionController extends Controller
         $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
         $transactions = $this->buildQuery($workspace)
-            ->with(['account', 'remittance'])
+            ->with(['account', 'remittance', 'requester:id,name', 'approver:id,name', 'chargeToUser:id,name'])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->paginate((int) $request->input('per_page', 100))
@@ -105,6 +105,7 @@ class TransactionController extends Controller
                 ->orderBy('name')->get(['id', 'name', 'currency']),
             'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
                 ->orderBy('name')->get(['id', 'name']),
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
             'totals' => [
                 'credit' => (float) $totals->total_credit,
                 'debit' => (float) $totals->total_debit,
@@ -178,10 +179,9 @@ class TransactionController extends Controller
             'rows.*.type' => ['required', 'in:in,out'],
             'rows.*.transaction_type' => ['nullable', 'in:funds,profit_share,expenses,transfer,remittance,loan,loan_payment,refund,voided,courier_damaged_settlement,capex,interest,interest_fee'],
             'rows.*.transaction_type_id' => ['nullable', Rule::exists('finance_transaction_types', 'id')->where('workspace_id', $workspace->id)],
-            'rows.*.requested_by' => ['nullable', 'string', 'max:255'],
-            'rows.*.approved_by' => ['nullable', 'string', 'max:255'],
+            // requested_by / approved_by / charge_to are user references now, so
+            // they are not accepted from free-text spreadsheet imports.
             'rows.*.department' => ['nullable', 'string', 'max:255'],
-            'rows.*.charge_to' => ['nullable', 'string', 'max:255'],
             'rows.*.reference_no' => ['nullable', 'string', 'max:255'],
             'rows.*.status' => ['nullable', Rule::in(['pending', 'approved', 'posted'])],
             'rows.*.amount' => ['required', 'numeric', 'min:0'],
@@ -215,6 +215,9 @@ class TransactionController extends Controller
                 $positionCounters[$key]++;
                 $r['position'] = $positionCounters[$key];
             }
+
+            // User-linked columns aren't part of the free-text import.
+            unset($r['requested_by'], $r['approved_by'], $r['charge_to']);
 
             return [
                 ...$r,
@@ -271,7 +274,7 @@ class TransactionController extends Controller
 
         $transactions = QueryBuilder::for(
             Transaction::where('workspace_id', $workspace->id)
-                ->with(['account', 'transactionType'])
+                ->with(['account', 'transactionType', 'requester:id,name', 'approver:id,name', 'chargeToUser:id,name'])
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
@@ -323,15 +326,15 @@ class TransactionController extends Controller
                     $txn->date,
                     $txn->account?->name ?? '',
                     $txn->description,
-                    $txn->requested_by ?? '',
-                    $txn->approved_by ?? '',
+                    $txn->requester?->name ?? '',
+                    $txn->approver?->name ?? '',
                     $txn->department ?? '',
                     $txn->transactionType?->name ?? $txn->transaction_type ?? '',
                     $txn->type === 'out' ? $txn->amount : '',
                     $txn->type === 'in' ? $txn->amount : '',
                     $txn->running_balance ?? '',
                     $txn->reference_no ?? '',
-                    $txn->charge_to ?? '',
+                    $txn->chargeToUser?->name ?? '',
                     $txn->status ?? '',
                     $txn->sub_category ?? '',
                     $txn->notes ?? '',

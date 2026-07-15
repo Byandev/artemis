@@ -18,6 +18,7 @@ export interface CreativesFilterValue {
     ads_statuses: string[];
     final_statuses: string[];
     creator_ids: string[];
+    approver_ids: string[];
     product_ids: string[];
 }
 
@@ -32,6 +33,7 @@ interface Props {
     adsStatusOptions: Option[];
     finalStatusOptions: Option[];
     creatorOptions: Option[];
+    approverOptions: Option[];
     productOptions: Option[];
     onApply: (value: CreativesFilterValue) => void;
 }
@@ -126,6 +128,7 @@ export default function CreativesFilter({
     adsStatusOptions,
     finalStatusOptions,
     creatorOptions,
+    approverOptions,
     productOptions,
     onApply,
 }: Props) {
@@ -140,6 +143,7 @@ export default function CreativesFilter({
         if (value.ads_statuses.length > 0) count++;
         if (value.final_statuses.length > 0) count++;
         if (value.creator_ids.length > 0) count++;
+        if (value.approver_ids.length > 0) count++;
         if (value.product_ids.length > 0) count++;
         return count;
     }, [value]);
@@ -170,6 +174,7 @@ export default function CreativesFilter({
             ads_statuses: [],
             final_statuses: [],
             creator_ids: [],
+            approver_ids: [],
             product_ids: [],
         });
         setHasChanges(true);
@@ -280,6 +285,12 @@ export default function CreativesFilter({
                         options={creatorOptions}
                         selected={localValue.creator_ids}
                         onToggle={(id) => toggle('creator_ids', id)}
+                    />
+                    <MultiSelectGroup
+                        name="Approver"
+                        options={approverOptions}
+                        selected={localValue.approver_ids}
+                        onToggle={(id) => toggle('approver_ids', id)}
                     />
                     <MultiSelectGroup
                         name="Product"

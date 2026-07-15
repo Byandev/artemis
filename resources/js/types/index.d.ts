@@ -57,6 +57,8 @@ export interface User {
     pivot?: {
         role_id: number | null;
         role: string | null;
+        department_id: number | null;
+        department: string | null;
         created_at: string;
     };
 }

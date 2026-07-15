@@ -51,6 +51,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
 import {
+    Building2,
     KeyRound,
     Link,
     MoreHorizontal,
@@ -62,6 +63,9 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { AssignDepartmentDialog } from '@/components/members/assign-department-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import type { RowSelectionState } from '@tanstack/react-table';
 
 interface Invitation {
     id: number;
@@ -74,10 +78,16 @@ interface Invitation {
     };
 }
 
+interface DepartmentOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     workspace: Workspace;
     members: PaginatedData<User>;
     roles: Role[];
+    departments: DepartmentOption[];
     pendingInvitations: PaginatedData<Invitation>;
     isAdmin: boolean;
     query?: {
@@ -99,6 +109,7 @@ export default function WorkspaceMembers({
     isAdmin,
     query,
     roles,
+    departments,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
     const isOwner = auth?.user?.id === workspace.owner_id;
@@ -131,6 +142,11 @@ export default function WorkspaceMembers({
     const [memberToUpdateRole, setMemberToUpdateRole] = useState<User | null>(
         null,
     );
+    const [memberToAssignDept, setMemberToAssignDept] = useState<User | null>(
+        null,
+    );
+    const [bulkDeptOpen, setBulkDeptOpen] = useState(false);
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [invitationToRevoke, setInvitationToRevoke] =
         useState<Invitation | null>(null);
     const [copiedMemberId, setCopiedMemberId] = useState<number | null>(null);
@@ -299,7 +315,46 @@ export default function WorkspaceMembers({
         return () => clearTimeout(timer);
     }, [searchValue]);
 
+    const selectedMemberIds = useMemo(
+        () =>
+            Object.keys(rowSelection)
+                .filter((key) => rowSelection[key])
+                .map((key) => members.data?.[Number(key)]?.id)
+                .filter((id): id is number => typeof id === 'number'),
+        [rowSelection, members.data],
+    );
+
     const membersColumns: ColumnDef<User>[] = [
+        ...(canEditMembers
+            ? [
+                  {
+                      id: 'select',
+                      enableSorting: false,
+                      header: ({ table }) => (
+                          <Checkbox
+                              checked={
+                                  table.getIsAllPageRowsSelected() ||
+                                  (table.getIsSomePageRowsSelected() &&
+                                      'indeterminate')
+                              }
+                              onCheckedChange={(value) =>
+                                  table.toggleAllPageRowsSelected(!!value)
+                              }
+                              aria-label="Select all"
+                          />
+                      ),
+                      cell: ({ row }) => (
+                          <Checkbox
+                              checked={row.getIsSelected()}
+                              onCheckedChange={(value) =>
+                                  row.toggleSelected(!!value)
+                              }
+                              aria-label="Select row"
+                          />
+                      ),
+                  } as ColumnDef<User>,
+              ]
+            : []),
         {
             accessorKey: 'id',
             header: ({ column }) => (
@@ -328,6 +383,20 @@ export default function WorkspaceMembers({
                 <SortableHeader column={column} title={'Role'} />
             ),
             cell: ({ row }) => row.original?.pivot?.role ?? 'Owner',
+        },
+        {
+            id: 'department',
+            accessorFn: (row) => row.pivot?.department,
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Department'} />
+            ),
+            cell: ({ row }) =>
+                row.original?.pivot?.department ?? (
+                    <span className="text-gray-300 dark:text-gray-600">
+                        Unassigned
+                    </span>
+                ),
         },
         {
             accessorKey: 'pivot.created_at',
@@ -370,6 +439,16 @@ export default function WorkspaceMembers({
                                           >
                                               <UserCog className="mr-2 h-4 w-4" />
                                               Change Role
+                                          </DropdownMenuItem>
+                                      )}
+                                      {canEditMembers && (
+                                          <DropdownMenuItem
+                                              onClick={() =>
+                                                  setMemberToAssignDept(member)
+                                              }
+                                          >
+                                              <Building2 className="mr-2 h-4 w-4" />
+                                              Assign Department
                                           </DropdownMenuItem>
                                       )}
                                       {canResetPassword && (
@@ -653,6 +732,29 @@ export default function WorkspaceMembers({
                         </div>
                     </div>
 
+                    {canEditMembers && selectedMemberIds.length > 0 && (
+                        <div className="mb-3 flex items-center justify-between gap-3 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                            <span className="font-mono text-[12px] font-medium text-emerald-700 dark:text-emerald-400">
+                                {selectedMemberIds.length} selected
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setBulkDeptOpen(true)}
+                                    className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                                >
+                                    <Building2 className="h-3.5 w-3.5" />
+                                    Assign Department
+                                </button>
+                                <button
+                                    onClick={() => setRowSelection({})}
+                                    className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                         <DataTable
                             columns={membersColumns}
@@ -660,6 +762,8 @@ export default function WorkspaceMembers({
                             data={members.data || []}
                             initialSorting={initialSorting}
                             meta={{ ...omit(members, ['data']) }}
+                            rowSelection={rowSelection}
+                            onRowSelectionChange={setRowSelection}
                             onFetch={(params) => {
                                 router.get(
                                     `/workspaces/${workspace.slug}/members`,
@@ -884,6 +988,27 @@ export default function WorkspaceMembers({
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {/* Assign Department (single member) */}
+            <AssignDepartmentDialog
+                workspace={workspace}
+                departments={departments}
+                open={!!memberToAssignDept}
+                onOpenChange={(open) => {
+                    if (!open) setMemberToAssignDept(null);
+                }}
+                member={memberToAssignDept}
+            />
+
+            {/* Assign Department (bulk) */}
+            <AssignDepartmentDialog
+                workspace={workspace}
+                departments={departments}
+                open={bulkDeptOpen}
+                onOpenChange={setBulkDeptOpen}
+                memberIds={selectedMemberIds}
+                onSuccess={() => setRowSelection({})}
+            />
 
             {/* Revoke Invitation Confirmation Dialog */}
             <AlertDialog
