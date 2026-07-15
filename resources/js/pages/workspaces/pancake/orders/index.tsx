@@ -59,6 +59,7 @@ interface Props {
             status?: string;
             date_from?: string;
             date_to?: string;
+            rider?: string;
         };
     };
 }
@@ -126,6 +127,7 @@ export default function PancakeOrdersIndex({
 
     const [search, setSearch] = useState(query?.filter?.search ?? '');
     const [status, setStatus] = useState<string>(query?.filter?.status ?? '');
+    const [rider, setRider] = useState<string>(query?.filter?.rider ?? '');
     const [dateFrom, setDateFrom] = useState<string>(
         query?.filter?.date_from ?? '',
     );
@@ -138,31 +140,41 @@ export default function PancakeOrdersIndex({
         [],
     );
 
-    const buildFilter = (s: string, st: string, df: string, dt: string) => ({
+    const buildFilter = (
+        s: string,
+        st: string,
+        df: string,
+        dt: string,
+        r: string,
+    ) => ({
         search: s || undefined,
         status: st || undefined,
         date_from: df || undefined,
         date_to: dt || undefined,
+        rider: r || undefined,
     });
 
     const reload = useCallback(
-        debounce((s: string, st: string, df: string, dt: string) => {
-            router.get(
-                baseUrl,
-                {
-                    sort: query?.sort,
-                    filter: buildFilter(s, st, df, dt),
-                    page: 1,
-                    per_page: query?.perPage ?? orders.per_page,
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['orders', 'statusCounts', 'totalCount', 'query'],
-                },
-            );
-        }, 400),
+        debounce(
+            (s: string, st: string, df: string, dt: string, r: string) => {
+                router.get(
+                    baseUrl,
+                    {
+                        sort: query?.sort,
+                        filter: buildFilter(s, st, df, dt, r),
+                        page: 1,
+                        per_page: query?.perPage ?? orders.per_page,
+                    },
+                    {
+                        preserveState: true,
+                        replace: true,
+                        preserveScroll: true,
+                        only: ['orders', 'statusCounts', 'totalCount', 'query'],
+                    },
+                );
+            },
+            400,
+        ),
         [baseUrl, query?.sort, query?.perPage, orders.per_page],
     );
 
@@ -172,9 +184,9 @@ export default function PancakeOrdersIndex({
             initialMount.current = false;
             return;
         }
-        reload(search, status, dateFrom, dateTo);
+        reload(search, status, dateFrom, dateTo, rider);
         return () => reload.cancel();
-    }, [search, status, dateFrom, dateTo]);
+    }, [search, status, dateFrom, dateTo, rider]);
 
     const tabs = useMemo(() => {
         const known = TAB_ORDER.filter((s) => s in statusCounts);
@@ -380,11 +392,24 @@ export default function PancakeOrdersIndex({
                             }
                         }}
                     />
-                    {(search || status || dateFrom || dateTo) && (
+                    {rider && (
+                        <span className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-emerald-300 bg-emerald-50 px-3 font-mono! text-[12px]! text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-400">
+                            Rider: {rider}
+                            <button
+                                onClick={() => setRider('')}
+                                className="rounded-full p-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-500/20"
+                                title="Remove rider filter"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </span>
+                    )}
+                    {(search || status || dateFrom || dateTo || rider) && (
                         <button
                             onClick={() => {
                                 setSearch('');
                                 setStatus('');
+                                setRider('');
                                 setDateFrom('');
                                 setDateTo('');
                             }}
@@ -413,6 +438,7 @@ export default function PancakeOrdersIndex({
                                         status,
                                         dateFrom,
                                         dateTo,
+                                        rider,
                                     ),
                                     page: params?.page ?? 1,
                                     per_page:

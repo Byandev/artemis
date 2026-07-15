@@ -37,6 +37,26 @@ class OrderController extends Controller
         });
     }
 
+    /**
+     * Limit to orders delivered by a given rider. Mirrors RtsRiderQuery: the rider
+     * is the rider_name on the latest "On Delivery" parcel journey for the order,
+     * so this matches exactly the set counted in the RTS "By Rider" breakdown.
+     */
+    private function applyRider($query, string $rider)
+    {
+        return $query->whereIn('pancake_orders.id', function ($sub) use ($rider) {
+            $sub->from('parcel_journeys')
+                ->select('order_id')
+                ->where('rider_name', $rider)
+                ->whereIn('id', function ($latest) {
+                    $latest->from('parcel_journeys')
+                        ->selectRaw('MAX(id)')
+                        ->where('status', 'On Delivery')
+                        ->groupBy('order_id');
+                });
+        });
+    }
+
     public function index(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
@@ -59,7 +79,14 @@ class OrderController extends Controller
                 AllowedFilter::callback('search', fn ($q, $v) => $this->applySearch($q, $v)),
                 AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('pancake_orders.inserted_at', '>=', $v)),
                 AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('pancake_orders.inserted_at', '<=', $v)),
-                AllowedFilter::exact('status', 'status_name'),
+                // Read the raw request value, not Spatie's — it splits on commas,
+                // which would break rider names that legitimately contain one.
+                AllowedFilter::callback('rider', fn ($q) => $this->applyRider($q, (string) $request->input('filter.rider'))),
+                // Accepts one status or a comma-separated list (e.g. returning,returned).
+                AllowedFilter::callback('status', fn ($q, $v) => $q->whereIn(
+                    'pancake_orders.status_name',
+                    is_array($v) ? $v : explode(',', $v),
+                )),
             ])
             ->allowedSorts(['order_number', 'total_amount', 'inserted_at', 'updated_at', 'confirmed_at', 'status_name'])
             ->defaultSort('-inserted_at')
@@ -74,6 +101,7 @@ class OrderController extends Controller
             ->when(($filter['search'] ?? null), fn ($q, $v) => $this->applySearch($q, $v))
             ->when(($filter['date_from'] ?? null), fn ($q, $v) => $q->whereDate('pancake_orders.inserted_at', '>=', $v))
             ->when(($filter['date_to'] ?? null), fn ($q, $v) => $q->whereDate('pancake_orders.inserted_at', '<=', $v))
+            ->when(($filter['rider'] ?? null), fn ($q, $v) => $this->applyRider($q, (string) $v))
             ->selectRaw('status_name, COUNT(*) as total')
             ->groupBy('status_name')
             ->pluck('total', 'status_name');
