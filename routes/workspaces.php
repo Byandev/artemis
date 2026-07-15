@@ -52,6 +52,7 @@ use Modules\Finance\Http\Controllers\TransactionController as FinanceTransaction
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\InternController as GencysInternController;
+use Modules\GencysERP\Http\Controllers\Web\PageController as GencysPageController;
 use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
@@ -458,6 +459,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');
         Route::patch('/interns/{intern}/toggle-active', [GencysInternController::class, 'toggleActive'])->name('interns.toggle-active');
         Route::patch('/interns/{intern}/assign-user', [GencysInternController::class, 'assignUser'])->name('interns.assign-user');
+        Route::get('/pages', [GencysPageController::class, 'index'])->name('pages.index');
+        Route::post('/pages/sync', [GencysPageController::class, 'sync'])->name('pages.sync');
         Route::get('/unit-codes', [UnitCodeController::class, 'index'])->name('unit-codes.index');
         Route::post('/unit-codes/sync', [UnitCodeController::class, 'sync'])->name('unit-codes.sync');
         Route::post('/unit-codes', [UnitCodeController::class, 'store'])->name('unit-codes.store');

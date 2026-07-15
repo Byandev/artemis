@@ -31,6 +31,7 @@ import {
     Database,
     ExternalLink,
     Facebook,
+    FileText,
     History,
     Landmark,
     Layers,
@@ -381,6 +382,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewDailySalesTracker,
                           PERMISSIONS.ViewGencysInterns,
                           PERMISSIONS.ViewGencysInternDailyRecords,
+                          PERMISSIONS.ViewGencysPages,
                       ],
                       items: [
                           {
@@ -394,6 +396,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/gencys/interns`,
                               icon: Users,
                               permission: PERMISSIONS.ViewGencysInterns,
+                          },
+                          {
+                              title: 'Pages',
+                              href: `/workspaces/${slug}/gencys/pages`,
+                              icon: FileText,
+                              permission: PERMISSIONS.ViewGencysPages,
                           },
                       ],
                   },
