@@ -143,6 +143,37 @@ class InventoryTransactionController extends Controller
         ]);
     }
 
+    /**
+     * Return the "carry-over" remaining quantity for an item: the remaining_qty of the
+     * last transaction dated strictly before the given date (falling back to the same
+     * date but an earlier id when editing). Used by the form to auto-compute the new
+     * remaining quantity.
+     */
+    public function lastRemaining(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Transaction Logs', $workspace);
+
+        $validated = $request->validate([
+            'inventory_item_id' => 'required|exists:inventory_items,id',
+            'date' => ['required', 'date'],
+            'exclude_id' => 'nullable|integer',
+        ]);
+
+        $last = InventoryTransaction::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('inventory_item_id', $validated['inventory_item_id'])
+            ->whereDate('date', '<', $validated['date'])
+            ->when($validated['exclude_id'] ?? null, fn ($q, $id) => $q->where('id', '!=', $id))
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->first();
+
+        return response()->json([
+            'remaining_qty' => $last?->remaining_qty ?? 0,
+            'found' => (bool) $last,
+        ]);
+    }
+
     public function store(Request $request, Workspace $workspace)
     {
         $this->authorize('Create Transaction Logs', $workspace);
