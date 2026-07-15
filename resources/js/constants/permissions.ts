@@ -21,6 +21,9 @@ export const PERMISSIONS = {
     RefreshPages: 'Refresh Pages',
     UpdatePageBudget: 'Update Page Budget',
 
+    // Orders (Pancake)
+    ViewOrders: 'View Orders',
+
     // Shops
     ViewShops: 'View Shops',
     CreateShops: 'Create Shops',

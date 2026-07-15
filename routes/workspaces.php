@@ -16,6 +16,7 @@ use App\Http\Controllers\Workspaces\DepartmentController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
+use App\Http\Controllers\Workspaces\PancakeOrderController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
@@ -429,6 +430,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
     });
+
+    Route::get('/workspaces/{workspace}/pancake/orders', [PancakeOrderController::class, 'index'])
+        ->name('workspaces.pancake.orders.index');
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');

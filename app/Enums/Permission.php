@@ -120,6 +120,7 @@ enum Permission: string
     case ApproveFinanceRequestFunds = 'Approve Finance Request Funds';
 
     // Pancake
+    case ViewOrders = 'View Orders';
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
@@ -262,6 +263,7 @@ enum Permission: string
             self::DeleteFinanceRequestFunds,
             self::ApproveFinanceRequestFunds => 'Finance',
 
+            self::ViewOrders,
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
 
