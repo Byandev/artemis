@@ -5,20 +5,32 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { currencyFormatter } from '@/lib/utils';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
 import { Plus, X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
+interface TeamMember {
+    id: number;
+    name: string;
+}
 
 interface TeamOption {
     id: number;
     name: string;
+    members?: TeamMember[];
 }
 
 interface MilestoneInput {
     amount: number | '';
     label: string;
+}
+
+interface MemberInput {
+    user_id: number;
+    daily_target: number | '';
 }
 
 export interface Goal {
@@ -28,6 +40,7 @@ export interface Goal {
     start_date: string;
     end_date: string;
     milestones?: { amount: number; label: string | null }[];
+    members?: { user_id: number; daily_target: number }[];
 }
 
 interface GoalFormDialogProps {
@@ -52,6 +65,7 @@ export function GoalFormDialog({
     goal,
 }: GoalFormDialogProps) {
     const isEditing = !!goal;
+    const [splitMembers, setSplitMembers] = useState(false);
 
     const { data, setData, post, put, processing, errors, reset, transform } =
         useForm({
@@ -60,6 +74,7 @@ export function GoalFormDialog({
             start_date: '',
             end_date: '',
             milestones: [] as MilestoneInput[],
+            members: [] as MemberInput[],
         });
 
     useEffect(() => {
@@ -73,14 +88,76 @@ export function GoalFormDialog({
                     amount: m.amount,
                     label: m.label ?? '',
                 })),
+                members: (goal.members ?? []).map((m) => ({
+                    user_id: m.user_id,
+                    daily_target: m.daily_target,
+                })),
             });
+            setSplitMembers((goal.members?.length ?? 0) > 0);
         } else {
             reset();
+            setSplitMembers(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [goal, open]);
 
     const baseUrl = `/workspaces/${workspace.slug}/ad-spend-goals`;
+
+    const selectedTeam = teams.find((t) => t.id === data.team_id);
+    const teamMembers = selectedTeam?.members ?? [];
+    const targetNum = data.daily_target === '' ? 0 : Number(data.daily_target);
+    const membersTotal = data.members.reduce(
+        (sum, m) => sum + (m.daily_target === '' ? 0 : Number(m.daily_target)),
+        0,
+    );
+    const meetsTarget = membersTotal + 0.01 >= targetNum;
+
+    // Even split of the target across the given members (last one absorbs the
+    // rounding remainder so the slices sum to exactly the target).
+    const evenSplitFor = (members: TeamMember[]): MemberInput[] => {
+        const n = members.length;
+        if (!n || targetNum <= 0) {
+            return members.map((m) => ({ user_id: m.id, daily_target: '' }));
+        }
+        const each = Math.round((targetNum / n) * 100) / 100;
+        return members.map((m, i) => ({
+            user_id: m.id,
+            daily_target:
+                i === n - 1
+                    ? Math.round((targetNum - each * (n - 1)) * 100) / 100
+                    : each,
+        }));
+    };
+
+    const applyEvenSplit = () => setData('members', evenSplitFor(teamMembers));
+
+    const memberTargetOf = (userId: number): number | '' =>
+        data.members.find((m) => m.user_id === userId)?.daily_target ?? '';
+
+    const setMemberTarget = (userId: number, value: number | '') =>
+        setData(
+            'members',
+            data.members.some((m) => m.user_id === userId)
+                ? data.members.map((m) =>
+                      m.user_id === userId ? { ...m, daily_target: value } : m,
+                  )
+                : [...data.members, { user_id: userId, daily_target: value }],
+        );
+
+    const onTeamChange = (val: number | '') => {
+        setData('team_id', val);
+        const nextMembers = teams.find((t) => t.id === val)?.members ?? [];
+        setData('members', splitMembers ? evenSplitFor(nextMembers) : []);
+    };
+
+    const toggleSplit = (on: boolean) => {
+        setSplitMembers(on);
+        if (!on) {
+            setData('members', []);
+        } else if (data.members.length === 0) {
+            applyEvenSplit();
+        }
+    };
 
     const addMilestone = () =>
         setData('milestones', [...data.milestones, { amount: '', label: '' }]);
@@ -102,12 +179,18 @@ export function GoalFormDialog({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Drop empty milestone rows before sending.
+        // Drop empty milestone rows; send member slices only when splitting.
         transform((payload) => ({
             ...payload,
             milestones: payload.milestones.filter(
                 (m) => m.amount !== '' && m.amount !== null,
             ),
+            members: splitMembers
+                ? payload.members.map((m) => ({
+                      user_id: m.user_id,
+                      daily_target: m.daily_target === '' ? 0 : m.daily_target,
+                  }))
+                : [],
         }));
 
         const onSuccess = () => {
@@ -157,8 +240,7 @@ export function GoalFormDialog({
                             <select
                                 value={data.team_id}
                                 onChange={(e) =>
-                                    setData(
-                                        'team_id',
+                                    onTeamChange(
                                         e.target.value === ''
                                             ? ''
                                             : Number(e.target.value),
@@ -340,6 +422,119 @@ export function GoalFormDialog({
                                         }
                                     </p>
                                 ))}
+                        </div>
+
+                        {/* Per-member goals (optional) */}
+                        <div className="space-y-2">
+                            <label className="flex cursor-pointer items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={splitMembers}
+                                    onChange={(e) =>
+                                        toggleSplit(e.target.checked)
+                                    }
+                                    className="h-3.5 w-3.5 accent-brand-600"
+                                />
+                                <span className="font-mono text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400">
+                                    Split target across team members
+                                </span>
+                            </label>
+
+                            {splitMembers && (
+                                <div className="space-y-2 rounded-[12px] border border-black/6 bg-stone-50/50 p-3 dark:border-white/6 dark:bg-zinc-800/30">
+                                    {data.team_id === '' ? (
+                                        <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                            Select a team first.
+                                        </p>
+                                    ) : teamMembers.length === 0 ? (
+                                        <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                            This team has no members.
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-mono text-[9px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                                    {teamMembers.length} members
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={applyEvenSplit}
+                                                    className="font-mono text-[11px] font-medium text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                                                >
+                                                    Even split
+                                                </button>
+                                            </div>
+                                            {teamMembers.map((m) => (
+                                                <div
+                                                    key={m.id}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <span className="flex-1 truncate font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                                                        {m.name}
+                                                    </span>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="0"
+                                                        value={memberTargetOf(
+                                                            m.id,
+                                                        )}
+                                                        onChange={(e) =>
+                                                            setMemberTarget(
+                                                                m.id,
+                                                                e.target
+                                                                    .value === ''
+                                                                    ? ''
+                                                                    : Number(
+                                                                          e.target
+                                                                              .value,
+                                                                      ),
+                                                            )
+                                                        }
+                                                        className={`${inputClass} w-32`}
+                                                    />
+                                                </div>
+                                            ))}
+                                            <div className="flex items-center justify-between border-t border-black/6 pt-2 dark:border-white/6">
+                                                <span className="font-mono text-[9px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                                    Total
+                                                </span>
+                                                <span
+                                                    className={`font-mono text-[12px] font-semibold tabular-nums ${meetsTarget ? 'text-brand-600 dark:text-brand-400' : 'text-warning-600 dark:text-warning-400'}`}
+                                                >
+                                                    {currencyFormatter(
+                                                        membersTotal,
+                                                    )}{' '}
+                                                    /{' '}
+                                                    {currencyFormatter(
+                                                        targetNum,
+                                                    )}
+                                                    {meetsTarget ? ' ✓' : ''}
+                                                </span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {Object.keys(errors)
+                                        .filter((k) => k.startsWith('members'))
+                                        .map((k) => (
+                                            <p
+                                                key={k}
+                                                className="font-mono text-[11px] text-red-500"
+                                            >
+                                                {
+                                                    (
+                                                        errors as Record<
+                                                            string,
+                                                            string
+                                                        >
+                                                    )[k]
+                                                }
+                                            </p>
+                                        ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 

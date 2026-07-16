@@ -12,6 +12,7 @@ use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class TeamAdSpendGoalController extends Controller
@@ -34,7 +35,7 @@ class TeamAdSpendGoalController extends Controller
 
         $goals = TeamAdSpendGoal::where('workspace_id', $workspace->id)
             ->when($teamIds !== null, fn ($q) => $q->whereIn('team_id', $teamIds))
-            ->with(['team:id,name', 'milestones'])
+            ->with(['team:id,name', 'milestones', 'members.user:id,name'])
             ->orderByDesc('start_date')
             ->orderByDesc('id')
             ->paginate($request->integer('per_page', 10))
@@ -49,8 +50,10 @@ class TeamAdSpendGoalController extends Controller
         );
 
         // Team picker for the create/edit form — the teams the user may set a
-        // goal for (all for unrestricted, own teams for scoped users).
-        $teams = TeamVisibility::selectableTeams($request->user(), $workspace);
+        // goal for (all for unrestricted, own teams for scoped users), each with
+        // its members for the per-member allocation UI.
+        $teams = TeamVisibility::selectableTeams($request->user(), $workspace)
+            ->load('members:id,name');
 
         return Inertia::render('workspaces/ad-spend-goals/index', [
             'workspace' => $workspace,
@@ -68,13 +71,15 @@ class TeamAdSpendGoalController extends Controller
 
         $this->guardOwnership($workspace, $goal);
 
-        $goal->load('team:id,name', 'milestones');
+        $goal->load('team:id,name', 'milestones', 'members.user:id,name');
 
         $status = (new TeamAdSpendGoalStatusQuery($workspace))->statusFor($goal);
 
         // Team picker for the create/edit form — the teams the user may set a
-        // goal for (all for unrestricted, own teams for scoped users).
-        $teams = TeamVisibility::selectableTeams($request->user(), $workspace);
+        // goal for (all for unrestricted, own teams for scoped users), each with
+        // its members for the per-member allocation UI.
+        $teams = TeamVisibility::selectableTeams($request->user(), $workspace)
+            ->load('members:id,name');
 
         return Inertia::render('workspaces/ad-spend-goals/show', [
             'workspace' => $workspace,
@@ -107,7 +112,8 @@ class TeamAdSpendGoalController extends Controller
 
         $validated = $this->validateGoal($request, $workspace);
         $milestones = $validated['milestones'] ?? [];
-        unset($validated['milestones']);
+        $members = $validated['members'] ?? [];
+        unset($validated['milestones'], $validated['members']);
 
         $goal = TeamAdSpendGoal::create([
             'workspace_id' => $workspace->id,
@@ -115,6 +121,7 @@ class TeamAdSpendGoalController extends Controller
         ]);
 
         $this->syncMilestones($goal, $milestones);
+        $this->syncMembers($goal, $members);
 
         return redirect()->back()->with('success', 'Ad spend goal created successfully.');
     }
@@ -127,11 +134,13 @@ class TeamAdSpendGoalController extends Controller
 
         $validated = $this->validateGoal($request, $workspace);
         $milestones = $validated['milestones'] ?? [];
-        unset($validated['milestones']);
+        $members = $validated['members'] ?? [];
+        unset($validated['milestones'], $validated['members']);
 
         $goal->update($validated);
 
         $this->syncMilestones($goal, $milestones);
+        $this->syncMembers($goal, $members);
 
         return redirect()->back()->with('success', 'Ad spend goal updated successfully.');
     }
@@ -150,6 +159,23 @@ class TeamAdSpendGoalController extends Controller
             $goal->milestones()->create([
                 'amount' => $milestone['amount'],
                 'label' => $milestone['label'] ?? null,
+            ]);
+        }
+    }
+
+    /**
+     * Replace the goal's per-member target slices with the submitted set.
+     *
+     * @param  array<int, array{user_id: int, daily_target: mixed}>  $members
+     */
+    private function syncMembers(TeamAdSpendGoal $goal, array $members): void
+    {
+        $goal->members()->delete();
+
+        foreach ($members as $member) {
+            $goal->members()->create([
+                'user_id' => $member['user_id'],
+                'daily_target' => $member['daily_target'],
             ]);
         }
     }
@@ -175,7 +201,7 @@ class TeamAdSpendGoalController extends Controller
      */
     private function validateGoal(Request $request, Workspace $workspace): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'team_id' => [
                 'required',
                 Rule::exists('teams', 'id')->where('workspace_id', $workspace->id),
@@ -187,7 +213,33 @@ class TeamAdSpendGoalController extends Controller
             'milestones' => ['array'],
             'milestones.*.amount' => ['required', 'numeric', 'gt:0', 'lt:daily_target'],
             'milestones.*.label' => ['nullable', 'string', 'max:255'],
+            // Optional per-member target slices. Each member must belong to the
+            // selected team; the slices must sum to at least the daily target.
+            'members' => ['array'],
+            'members.*.user_id' => [
+                'required',
+                'integer',
+                Rule::exists('team_user', 'user_id')
+                    ->where('team_id', $request->input('team_id')),
+            ],
+            'members.*.daily_target' => ['required', 'numeric', 'gte:0'],
         ]);
+
+        $members = $validated['members'] ?? [];
+        if (! empty($members)) {
+            $sum = array_sum(array_map(fn ($m) => (float) $m['daily_target'], $members));
+            $target = (float) $validated['daily_target'];
+
+            // Allow a hair of float slack.
+            if ($sum + 0.01 < $target) {
+                throw ValidationException::withMessages([
+                    'members' => 'Member targets must add up to at least the goal’s daily target of ₱'
+                        .number_format($target, 2).' (currently ₱'.number_format($sum, 2).').',
+                ]);
+            }
+        }
+
+        return $validated;
     }
 
     private function guardOwnership(Workspace $workspace, TeamAdSpendGoal $goal): void

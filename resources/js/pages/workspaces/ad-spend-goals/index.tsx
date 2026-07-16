@@ -119,6 +119,10 @@ export default function AdSpendGoalsIndex({
                   amount: m.amount,
                   label: m.label,
               })),
+              members: editingGoal.status.members.map((m) => ({
+                  user_id: m.user_id,
+                  daily_target: m.daily_target,
+              })),
           }
         : null;
 
