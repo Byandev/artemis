@@ -12,6 +12,20 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.19.1',
+        date: '2026-07-16',
+        sections: [
+            {
+                title: 'Ad Spend Goals — Per-Member Targets',
+                items: [
+                    'A team’s daily ad-spend goal can now be split across its members — give each member their own slice of the target right on the create/edit form; the slices must add up to at least the team’s daily target',
+                    'The goal detail page shows a per-member breakdown — each member’s target, their spend so far (yesterday and their best day), progress since the goal started, and a bar showing how close they are, with a tick once they’ve hit their slice',
+                    'Each member’s spend is measured the same way as the team total, so the per-member figures always reconcile with the overall goal',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.19.0',
         date: '2026-07-15',
         sections: [

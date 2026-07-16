@@ -5,7 +5,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { currencyFormatter } from '@/lib/utils';
+import { cn, currencyFormatter } from '@/lib/utils';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
 import { Plus, X } from 'lucide-react';
@@ -96,7 +96,8 @@ export function GoalFormDialog({
             setSplitMembers((goal.members?.length ?? 0) > 0);
         } else {
             reset();
-            setSplitMembers(false);
+            // New goals default to per-member targets so it's front-and-centre.
+            setSplitMembers(true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [goal, open]);
@@ -469,7 +470,7 @@ export function GoalFormDialog({
                                                     key={m.id}
                                                     className="flex items-center gap-2"
                                                 >
-                                                    <span className="flex-1 truncate font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                                                    <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-gray-700 dark:text-gray-300">
                                                         {m.name}
                                                     </span>
                                                     <input
@@ -492,7 +493,10 @@ export function GoalFormDialog({
                                                                       ),
                                                             )
                                                         }
-                                                        className={`${inputClass} w-32`}
+                                                        className={cn(
+                                                            inputClass,
+                                                            'w-28 shrink-0',
+                                                        )}
                                                     />
                                                 </div>
                                             ))}
