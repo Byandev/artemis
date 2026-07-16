@@ -38,6 +38,7 @@ export default function PitchDeck() {
     const { auth } = usePage<SharedData>().props;
     const [current, setCurrent] = useState(0);
     const [navOpen, setNavOpen] = useState(false);
+    const [gencysPartner, setGencysPartner] = useState(false);
     const isAnimating = useRef(false);
 
     const goTo = useCallback((idx: number) => {
@@ -733,12 +734,39 @@ export default function PitchDeck() {
                                                 Pick the plan that fits your
                                                 order volume.{' '}
                                                 <span className="font-semibold text-gray-700 dark:text-gray-300">
-                                                    Parcel Journey + SMS bundled
-                                                    into every plan
+                                                    Call Logs Sync Mobile App
+                                                    bundled into every plan
                                                 </span>{' '}
                                                 — no add-ons, no usage fees, no
                                                 surprises.
                                             </p>
+                                        </Reveal>
+                                        <Reveal active={a === 6} delay={250}>
+                                            <div className="mb-5 flex items-center gap-3 sm:mb-8">
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={gencysPartner}
+                                                    onClick={() =>
+                                                        setGencysPartner(
+                                                            (v) => !v,
+                                                        )
+                                                    }
+                                                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${gencysPartner ? 'bg-brand-500' : 'bg-gray-200 dark:bg-white/10'}`}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${gencysPartner ? 'translate-x-6' : 'translate-x-1'}`}
+                                                    />
+                                                </button>
+                                                <span className="text-xs font-semibold text-gray-700 sm:text-sm dark:text-gray-200">
+                                                    Gencys Partner pricing
+                                                </span>
+                                                {gencysPartner && (
+                                                    <span className="rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 font-mono text-[8px] font-bold tracking-[0.15em] text-brand-700 uppercase dark:border-brand-500/20 dark:bg-brand-500/10 dark:text-brand-400">
+                                                        Applied
+                                                    </span>
+                                                )}
+                                            </div>
                                         </Reveal>
                                         <Reveal active={a === 6} delay={300}>
                                             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-4 md:grid-cols-4">
@@ -746,28 +774,35 @@ export default function PitchDeck() {
                                                     {
                                                         name: 'Free Trial',
                                                         price: '₱0',
+                                                        gencysPrice: '₱0',
                                                         period: '30 days',
                                                         orders: '10,000',
                                                         pages: '1',
                                                         ret: '6 mo',
                                                         pj: '✅ Included',
-                                                        sup: 'Priority',
+                                                        sup: 'Chat',
                                                         f: false,
+                                                        note: '',
+                                                        gencysNote: '',
                                                     },
                                                     {
-                                                        name: 'Starter',
-                                                        price: '₱2,999',
+                                                        name: 'Solo',
+                                                        price: '₱4,499',
+                                                        gencysPrice: '₱3,999',
                                                         period: '/mo',
                                                         orders: '3,000',
                                                         pages: '5',
                                                         ret: '3 mo',
                                                         pj: '✅ Included',
-                                                        sup: 'Chat',
+                                                        sup: 'Priority',
                                                         f: false,
+                                                        note: '',
+                                                        gencysNote: '',
                                                     },
                                                     {
-                                                        name: 'Growth',
-                                                        price: '₱5,999',
+                                                        name: 'Pro',
+                                                        price: '₱8,999',
+                                                        gencysPrice: '₱7,999',
                                                         period: '/mo',
                                                         orders: '10,000',
                                                         pages: '25',
@@ -775,17 +810,22 @@ export default function PitchDeck() {
                                                         pj: '✅ Included',
                                                         sup: 'Priority',
                                                         f: true,
+                                                        note: '',
+                                                        gencysNote: '',
                                                     },
                                                     {
-                                                        name: 'Scale',
-                                                        price: '₱14,999',
+                                                        name: 'Business',
+                                                        price: '₱13,499',
+                                                        gencysPrice: '₱11,999',
                                                         period: '/mo',
-                                                        orders: '30,000',
+                                                        orders: '20,000',
                                                         pages: '100',
                                                         ret: '12 mo',
                                                         pj: '✅ Included',
                                                         sup: 'Dedicated',
                                                         f: false,
+                                                        note: '+₱4,500 per additional 10,000 orders/mo',
+                                                        gencysNote: '+₱3,000 per additional 10,000 orders/mo',
                                                     },
                                                 ].map((t) => (
                                                     <div
@@ -810,8 +850,17 @@ export default function PitchDeck() {
                                                             <span
                                                                 className={`text-xl font-bold tracking-tight sm:text-3xl ${t.f ? 'text-brand-600 dark:text-brand-400' : ''}`}
                                                             >
-                                                                {t.price}
+                                                                {gencysPartner
+                                                                    ? t.gencysPrice
+                                                                    : t.price}
                                                             </span>
+                                                            {gencysPartner &&
+                                                                t.gencysPrice !==
+                                                                    t.price && (
+                                                                    <span className="text-[10px] text-gray-400 line-through sm:text-xs">
+                                                                        {t.price}
+                                                                    </span>
+                                                                )}
                                                             <span className="text-[10px] text-gray-400 sm:text-xs">
                                                                 {t.period}
                                                             </span>
@@ -831,7 +880,7 @@ export default function PitchDeck() {
                                                                     t.ret,
                                                                 ],
                                                                 [
-                                                                    'Parcel Journey + SMS',
+                                                                    'Call Logs Sync Mobile App',
                                                                     t.pj,
                                                                 ],
                                                                 [
@@ -854,6 +903,15 @@ export default function PitchDeck() {
                                                                 </div>
                                                             ))}
                                                         </div>
+                                                        {(gencysPartner
+                                                            ? t.gencysNote
+                                                            : t.note) && (
+                                                            <p className="mt-3 border-t border-gray-100 pt-3 text-[9px] leading-relaxed font-medium text-brand-600 sm:text-[10px] dark:border-white/5 dark:text-brand-400">
+                                                                {gencysPartner
+                                                                    ? t.gencysNote
+                                                                    : t.note}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
@@ -890,25 +948,25 @@ export default function PitchDeck() {
                                             <div className="grid gap-2 sm:grid-cols-3 sm:gap-4">
                                                 {[
                                                     {
-                                                        plan: 'Starter',
+                                                        plan: 'Solo',
                                                         orders: '3,000 orders',
                                                         bleed: '₱316,800',
-                                                        cost: '₱2,999/mo',
-                                                        be: '0.95%',
+                                                        cost: '₱4,499/mo',
+                                                        be: '1.42%',
                                                     },
                                                     {
-                                                        plan: 'Growth',
+                                                        plan: 'Pro',
                                                         orders: '10,000 orders',
                                                         bleed: '₱1,056,000',
-                                                        cost: '₱5,999/mo',
-                                                        be: '0.57%',
+                                                        cost: '₱8,999/mo',
+                                                        be: '0.85%',
                                                     },
                                                     {
-                                                        plan: 'Scale',
-                                                        orders: '30,000 orders',
-                                                        bleed: '₱3,168,000',
-                                                        cost: '₱14,999/mo',
-                                                        be: '0.47%',
+                                                        plan: 'Business',
+                                                        orders: '20,000 orders',
+                                                        bleed: '₱2,112,000',
+                                                        cost: '₱13,499/mo',
+                                                        be: '0.64%',
                                                     },
                                                 ].map((r, ri) => (
                                                     <div
@@ -985,7 +1043,7 @@ export default function PitchDeck() {
                                                         ic: 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244',
                                                     },
                                                     {
-                                                        t: 'Full Growth experience for 30 days',
+                                                        t: 'Full Pro experience for 30 days',
                                                         ic: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5',
                                                     },
                                                     {

@@ -255,6 +255,20 @@ export default function PancakeOrdersIndex({
             ),
         },
         {
+            accessorKey: 'tracking_code',
+            enableSorting: false,
+            header: () => (
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    Tracking code
+                </span>
+            ),
+            cell: ({ row }) => (
+                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                    {row.original.tracking_code || '—'}
+                </span>
+            ),
+        },
+        {
             accessorKey: 'total_amount',
             enableSorting: true,
             header: ({ column }) => (

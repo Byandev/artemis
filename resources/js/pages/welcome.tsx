@@ -261,6 +261,12 @@ export default function Welcome() {
                                 How it works
                             </a>
                             <Link
+                                href="/pricing"
+                                className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 md:block dark:text-gray-400 dark:hover:text-brand-400"
+                            >
+                                Pricing
+                            </Link>
+                            <Link
                                 href="/rts-calculator"
                                 className="hidden text-[13px] text-gray-500 transition-colors hover:text-brand-500 md:block dark:text-gray-400 dark:hover:text-brand-400"
                             >
@@ -902,6 +908,12 @@ export default function Welcome() {
                                     >
                                         FAQ
                                     </a>
+                                    <Link
+                                        href="/pricing"
+                                        className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
+                                    >
+                                        Pricing
+                                    </Link>
                                     <Link
                                         href="/rts-calculator"
                                         className="text-sm text-gray-600 transition-colors hover:text-brand-500 dark:text-gray-300"
