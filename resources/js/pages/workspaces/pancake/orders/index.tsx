@@ -12,6 +12,14 @@ import { debounce, omit } from 'lodash';
 import { Search, X } from 'lucide-react';
 import moment from 'moment';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// The Columns menu lives with the Meta Ads page but is table-agnostic. Imported
+// rather than duplicated; worth relocating to components/ui if a third table
+// wants it.
+import {
+    ColumnOption,
+    ColumnVisibilityMenu,
+    useColumnPresets,
+} from '../../integrations/meta-ads/_shared';
 import DateOption = flatpickr.Options.DateOption;
 
 interface OrderItem {
@@ -100,6 +108,21 @@ const prettyDate = (iso: string | null) => {
     return m.isValid() ? m.format('DD MMM, h:mm a') : '—';
 };
 
+// Column ids double as the sort keys sent to the backend, so they must match the
+// accessorKeys the server sorts on. Order here is the default column order.
+const COLUMN_OPTIONS: ColumnOption[] = [
+    { id: 'order_number', label: 'ID', category: 'Order', required: true },
+    { id: 'customer', label: 'Customer', category: 'Customer' },
+    { id: 'phone_number', label: 'Phone number', category: 'Customer' },
+    { id: 'delivery', label: 'Delivery', category: 'Customer' },
+    { id: 'tracking_code', label: 'Tracking code', category: 'Fulfilment' },
+    { id: 'total_amount', label: 'Total amount', category: 'Order' },
+    { id: 'products', label: 'Products', category: 'Order' },
+    { id: 'inserted_at', label: 'Created at', category: 'Order' },
+    { id: 'updated_at', label: 'Status updated at', category: 'Fulfilment' },
+    { id: 'status_name', label: 'Status', category: 'Fulfilment' },
+];
+
 // Tab order mirrors the Pancake POS lifecycle; only statuses that exist show up.
 const TAB_ORDER = [
     'new',
@@ -155,26 +178,23 @@ export default function PancakeOrdersIndex({
     });
 
     const reload = useCallback(
-        debounce(
-            (s: string, st: string, df: string, dt: string, r: string) => {
-                router.get(
-                    baseUrl,
-                    {
-                        sort: query?.sort,
-                        filter: buildFilter(s, st, df, dt, r),
-                        page: 1,
-                        per_page: query?.perPage ?? orders.per_page,
-                    },
-                    {
-                        preserveState: true,
-                        replace: true,
-                        preserveScroll: true,
-                        only: ['orders', 'statusCounts', 'totalCount', 'query'],
-                    },
-                );
-            },
-            400,
-        ),
+        debounce((s: string, st: string, df: string, dt: string, r: string) => {
+            router.get(
+                baseUrl,
+                {
+                    sort: query?.sort,
+                    filter: buildFilter(s, st, df, dt, r),
+                    page: 1,
+                    per_page: query?.perPage ?? orders.per_page,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['orders', 'statusCounts', 'totalCount', 'query'],
+                },
+            );
+        }, 400),
         [baseUrl, query?.sort, query?.perPage, orders.per_page],
     );
 
@@ -188,6 +208,24 @@ export default function PancakeOrdersIndex({
         return () => reload.cancel();
     }, [search, status, dateFrom, dateTo, rider]);
 
+    const {
+        visibility: columnVisibility,
+        setVisibility: setColumnVisibility,
+        columnOrder,
+        setColumnOrder,
+        presets,
+        savePreset,
+        deletePreset,
+        loadPreset,
+        resetToDefault,
+    } = useColumnPresets(
+        'pancake-orders-cols',
+        Object.fromEntries(
+            COLUMN_OPTIONS.map((o) => [o.id, !o.hiddenByDefault]),
+        ),
+        COLUMN_OPTIONS.map((o) => o.id),
+    );
+
     const tabs = useMemo(() => {
         const known = TAB_ORDER.filter((s) => s in statusCounts);
         const extras = Object.keys(statusCounts).filter(
@@ -199,6 +237,7 @@ export default function PancakeOrdersIndex({
     const columns: ColumnDef<Order>[] = [
         {
             accessorKey: 'order_number',
+            id: 'order_number',
             enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title="ID" />
@@ -211,6 +250,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'shipping_address.full_name',
+            id: 'customer',
             enableSorting: false,
             header: () => (
                 <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
@@ -225,6 +265,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'phone_number',
+            id: 'phone_number',
             enableSorting: false,
             header: () => (
                 <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
@@ -239,6 +280,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'delivery',
+            id: 'delivery',
             enableSorting: false,
             header: () => (
                 <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
@@ -256,6 +298,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'tracking_code',
+            id: 'tracking_code',
             enableSorting: false,
             header: () => (
                 <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
@@ -270,6 +313,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'total_amount',
+            id: 'total_amount',
             enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title="Total amount" />
@@ -282,6 +326,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'products',
+            id: 'products',
             enableSorting: false,
             header: () => (
                 <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
@@ -312,6 +357,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'inserted_at',
+            id: 'inserted_at',
             enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title="Created at" />
@@ -324,6 +370,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'updated_at',
+            id: 'updated_at',
             enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title="Status updated at" />
@@ -336,6 +383,7 @@ export default function PancakeOrdersIndex({
         },
         {
             accessorKey: 'status_name',
+            id: 'status_name',
             enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader column={column} title="Status" />
@@ -399,7 +447,9 @@ export default function PancakeOrdersIndex({
                                 setDateFrom(
                                     moment(dates[0]).format('YYYY-MM-DD'),
                                 );
-                                setDateTo(moment(dates[1]).format('YYYY-MM-DD'));
+                                setDateTo(
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                );
                             } else if (dates.length === 0) {
                                 setDateFrom('');
                                 setDateTo('');
@@ -433,6 +483,21 @@ export default function PancakeOrdersIndex({
                             Clear
                         </button>
                     )}
+
+                    <div className="md:flex-1" />
+
+                    <ColumnVisibilityMenu
+                        options={COLUMN_OPTIONS}
+                        value={columnVisibility}
+                        onChange={setColumnVisibility}
+                        columnOrder={columnOrder}
+                        onColumnOrderChange={setColumnOrder}
+                        presets={presets}
+                        onSavePreset={savePreset}
+                        onDeletePreset={deletePreset}
+                        onLoadPreset={loadPreset}
+                        onReset={resetToDefault}
+                    />
                 </div>
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -442,6 +507,10 @@ export default function PancakeOrdersIndex({
                         data={orders.data || []}
                         initialSorting={initialSorting}
                         meta={{ ...omit(orders, ['data']) }}
+                        columnVisibility={columnVisibility}
+                        onColumnVisibilityChange={setColumnVisibility}
+                        columnOrder={columnOrder}
+                        onColumnOrderChange={setColumnOrder}
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
