@@ -24,6 +24,7 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import { queryStringOf } from '@/lib/url';
 import { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
@@ -42,13 +43,13 @@ import {
     X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AssigneePicker } from './components/assignee-picker';
 import {
     AdsBadge,
     FinalBadge,
     FormatBadge,
     InitialAvatar,
 } from './components/atoms';
-import { AssigneePicker } from './components/assignee-picker';
 import { CreativeDetailSheet } from './components/creative-detail-sheet';
 import CreativesDateFilter from './components/creatives-date-filter';
 import CreativesFilter, {
@@ -121,8 +122,13 @@ export default function CreativesIndex({
     reviewers,
     query,
 }: PageProps) {
-    const { auth } = usePage<SharedData>().props;
-    const currentUserId = auth?.user?.id ?? 0;
+    const { props, url } = usePage<SharedData>();
+    const currentUserId = props.auth?.user?.id ?? 0;
+
+    // The active filters live in this page's query string. Carry them onto the
+    // edit url so the edit page can send the user back to the list they came
+    // from instead of an unfiltered one.
+    const listQuery = queryStringOf(url);
 
     const canCreate = usePermission(PERMISSIONS.CreateCreatives);
     const canEdit = usePermission(PERMISSIONS.EditCreatives);
@@ -175,6 +181,7 @@ export default function CreativesIndex({
             : null;
 
     const baseUrl = `/workspaces/${workspace.slug}/creatives`;
+    const editUrl = (id: number) => `${baseUrl}/${id}/edit${listQuery}`;
     const initialSorting = useMemo(
         () => toFrontendSort(query.sort ?? null),
         [query.sort],
@@ -205,26 +212,7 @@ export default function CreativesIndex({
                     sort: q.sort,
                     page: 1,
                     per_page: q.per_page,
-                    'filter[search]': q.filter?.search || undefined,
-                    'filter[format]': q.filter?.format || undefined,
-                    'filter[ads_status]': q.filter?.ads_status || undefined,
-                    'filter[final_status]':
-                        q.filter?.final_status || undefined,
-                    'filter[creator_id]': q.filter?.creator_id || undefined,
-                    'filter[approved_by]': q.filter?.approved_by || undefined,
-                    'filter[product_id]': q.filter?.product_id || undefined,
-                    'filter[creative_date_from]':
-                        q.filter?.creative_date_from || undefined,
-                    'filter[creative_date_to]':
-                        q.filter?.creative_date_to || undefined,
-                    'filter[created_at_from]':
-                        q.filter?.created_at_from || undefined,
-                    'filter[created_at_to]':
-                        q.filter?.created_at_to || undefined,
-                    'filter[approved_at_from]':
-                        q.filter?.approved_at_from || undefined,
-                    'filter[approved_at_to]':
-                        q.filter?.approved_at_to || undefined,
+                    ...filters,
                     ...params,
                 },
                 { preserveState: true, replace: true, preserveScroll: true },
@@ -514,7 +502,7 @@ export default function CreativesIndex({
                                     className="font-mono text-[12px]"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        router.visit(`${baseUrl}/${c.id}/edit`);
+                                        router.visit(editUrl(c.id));
                                     }}
                                 >
                                     <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
@@ -609,7 +597,9 @@ export default function CreativesIndex({
                                 <HelpCircle className="h-5 w-5" />
                             </a>
                         </TooltipTrigger>
-                        <TooltipContent>Watch the setup tutorial</TooltipContent>
+                        <TooltipContent>
+                            Watch the setup tutorial
+                        </TooltipContent>
                     </Tooltip>
                     {canCreate && (
                         <button
@@ -731,9 +721,7 @@ export default function CreativesIndex({
                     currentUserId={currentUserId}
                     canEdit={canEdit}
                     canReview={canReview}
-                    onEdit={() =>
-                        router.visit(`${baseUrl}/${detailCreative.id}/edit`)
-                    }
+                    onEdit={() => router.visit(editUrl(detailCreative.id))}
                     onClose={() => setDetailCreativeId(null)}
                 />
             )}
