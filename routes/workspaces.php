@@ -76,6 +76,7 @@ use Modules\MetaAds\Http\Controllers\RemoveFbAccountController;
 use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
+use Modules\Pancake\Http\Controllers\OrderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -458,6 +459,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
     });
+
+    Route::get('/workspaces/{workspace}/pancake/orders', [OrderController::class, 'index'])
+        ->name('workspaces.pancake.orders.index');
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
