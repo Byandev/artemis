@@ -215,7 +215,6 @@ export function AppSidebar() {
                           PERMISSIONS.ViewOptimizationRules,
                           PERMISSIONS.ApproveOptimizationRules,
                           PERMISSIONS.ViewOptimizationLogs,
-                          PERMISSIONS.ViewAdSpentSummary,
                       ],
                       items: [
                           {
@@ -253,12 +252,6 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
                               icon: Wallet,
                               permission: PERMISSIONS.ViewMetaAds,
-                          },
-                          {
-                              title: 'Ad Spent Summary',
-                              href: `/workspaces/${slug}/integrations/meta/ad-spent-summary`,
-                              icon: PieChart,
-                              permission: PERMISSIONS.ViewAdSpentSummary,
                           },
                           {
                               title: 'Optimization Rules',

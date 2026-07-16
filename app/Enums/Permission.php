@@ -46,6 +46,10 @@ enum Permission: string
     case DeleteTeams = 'Delete Teams';
     case ManageSchedule = 'Manage Schedule';
 
+    // Ad Spend Goals
+    case ViewAdSpendGoals = 'View Ad Spend Goals';
+    case ManageAdSpendGoals = 'Manage Ad Spend Goals';
+
     // Departments
     case ViewDepartments = 'View Departments';
     case CreateDepartments = 'Create Departments';
@@ -204,6 +208,9 @@ enum Permission: string
             self::EditTeams,
             self::DeleteTeams,
             self::ManageSchedule => 'Teams',
+
+            self::ViewAdSpendGoals,
+            self::ManageAdSpendGoals => 'Ad Spend Goals',
 
             self::ViewDepartments,
             self::CreateDepartments,

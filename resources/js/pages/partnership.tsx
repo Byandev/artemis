@@ -463,19 +463,19 @@ export default function Partnership() {
                                                     <div className="space-y-3 px-4 py-5 sm:px-6">
                                                         {[
                                                             {
-                                                                plan: 'Starter',
-                                                                price: '₱2,999/mo',
+                                                                plan: 'Solo',
+                                                                price: '₱4,499/mo',
                                                                 orders: '3,000 orders',
                                                             },
                                                             {
-                                                                plan: 'Growth',
-                                                                price: '₱5,999/mo',
+                                                                plan: 'Pro',
+                                                                price: '₱8,999/mo',
                                                                 orders: '10,000 orders',
                                                             },
                                                             {
-                                                                plan: 'Scale',
-                                                                price: '₱14,999/mo',
-                                                                orders: '30,000 orders',
+                                                                plan: 'Business',
+                                                                price: '₱13,499/mo',
+                                                                orders: '20,000 orders',
                                                             },
                                                             {
                                                                 plan: 'Enterprise',
@@ -566,7 +566,7 @@ export default function Partnership() {
                                                         {
                                                             label: 'Customer mix',
                                                             value: '65 / 25 / 10%',
-                                                            sub: 'Starter / Growth / Scale',
+                                                            sub: 'Solo / Pro / Business',
                                                         },
                                                         {
                                                             label: 'Trial conversion',

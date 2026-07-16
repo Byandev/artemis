@@ -42,6 +42,10 @@ export const PERMISSIONS = {
     CreateTeams: 'Create Teams',
     EditTeams: 'Edit Teams',
     DeleteTeams: 'Delete Teams',
+
+    // Ad Spend Goals
+    ViewAdSpendGoals: 'View Ad Spend Goals',
+    ManageAdSpendGoals: 'Manage Ad Spend Goals',
     ManageSchedule: 'Manage Schedule',
 
     // Departments

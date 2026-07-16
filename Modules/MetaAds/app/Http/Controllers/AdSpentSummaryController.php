@@ -2,9 +2,12 @@
 
 namespace Modules\MetaAds\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\Workspace;
+use App\Support\AdvertiserVisibility;
+use App\Support\SalesMarketingDashboard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -19,7 +22,13 @@ class AdSpentSummaryController extends Controller
      */
     public function index(Request $request, Workspace $workspace): Response
     {
-        abort_unless($request->user()->isMemberOf($workspace), 403);
+        // Rendered as the "Ad Spent Summary" tab of the S&M dashboard, so it
+        // shares that dashboard's gating (module flag + permission).
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+        abort_unless(
+            $request->user()->hasPermission(Permission::ViewSalesMarketingDashboard->value, $workspace),
+            403,
+        );
 
         // Default to the trailing 7 days (inclusive).
         $end = ($request->date('end_date') ?? now())->startOfDay();
@@ -36,9 +45,41 @@ class AdSpentSummaryController extends Controller
             ? AdvertiserPerformanceDailyRecord::SOURCE_GENCYS
             : AdvertiserPerformanceDailyRecord::SOURCE_ARTEMIS;
 
+        // Team visibility: scoped users only see their team's advertisers; the
+        // "viewing as team" switcher narrows everyone. Null = no restriction; an
+        // empty set yields whereIn(..., []) → no rows (fail closed).
+        $visibleIds = AdvertiserVisibility::visibleIds($request->user(), $workspace, $source);
+
+        // Advertiser filter options: the advertisers present in this source,
+        // scoped to what the viewer may see (labels are denormalised on the row).
+        $advertiserOptions = AdvertiserPerformanceDailyRecord::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('source', $source)
+            ->when($visibleIds !== null, fn ($q) => $q->whereIn('advertiser_id', $visibleIds))
+            ->whereNotNull('advertiser_name')
+            ->select('advertiser_id', 'advertiser_name')
+            ->distinct()
+            ->orderBy('advertiser_name')
+            ->get()
+            ->unique('advertiser_id')
+            ->map(fn ($r) => ['value' => (string) $r->advertiser_id, 'label' => $r->advertiser_name])
+            ->values()
+            ->all();
+
+        // Selected advertiser ids from the filter, normalised to ints. The query
+        // AND's this with the visible set, so a scoped user can't widen it.
+        $selectedAdvertisers = collect((array) $request->input('advertisers'))
+            ->map(fn ($v) => (int) $v)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         $daily = AdvertiserPerformanceDailyRecord::query()
             ->where('workspace_id', $workspace->id)
             ->where('source', $source)
+            ->when($visibleIds !== null, fn ($q) => $q->whereIn('advertiser_id', $visibleIds))
+            ->when($selectedAdvertisers, fn ($q) => $q->whereIn('advertiser_id', $selectedAdvertisers))
             ->whereBetween('date', [$startDate, $endDate])
             ->groupBy('date')
             ->get([
@@ -71,8 +112,13 @@ class AdSpentSummaryController extends Controller
             'filters' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
+                // String ids so they round-trip into the multi-select's value model.
+                'advertisers' => array_map('strval', $selectedAdvertisers),
             ],
+            'advertiserOptions' => $advertiserOptions,
             'rows' => $rows,
+            'tabs' => SalesMarketingDashboard::tabs($workspace),
+            'activeTab' => 'ad-spent-summary',
         ]);
     }
 }

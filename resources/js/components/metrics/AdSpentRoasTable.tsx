@@ -15,12 +15,15 @@ const num = (v: number | null | undefined, dp = 2) =>
         maximumFractionDigits: dp,
     });
 
+/** Peso-formatted amount (sales / ad spend). */
+const peso = (v: number | null | undefined, dp = 2) => `₱${num(v, dp)}`;
+
 const roas = (v: number | null) => (v == null ? '—' : num(v, 2));
 
 const colHead =
-    'border-b border-black/6 bg-stone-50 px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap dark:border-white/6 dark:bg-zinc-800/40';
+    'border-b border-black/6 bg-stone-50 px-4 py-2.5 text-center font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap dark:border-white/6 dark:bg-zinc-800/40';
 const cell =
-    'border-b border-black/5 px-4 py-2.5 text-center text-[12px] tabular-nums text-gray-700 dark:border-white/5 dark:text-gray-300';
+    'border-b border-black/5 px-4 py-2.5 text-center font-mono text-[12px] tabular-nums text-gray-700 dark:border-white/5 dark:text-gray-300';
 
 /**
  * ADSPENT ROAS SUMMARY table in the Artemis card style — orders, sales, amount
@@ -86,8 +89,8 @@ export default function AdSpentRoasTable({ rows }: { rows: RoasRow[] }) {
                                     {r.date}
                                 </td>
                                 <td className={cell}>{num(r.orders, 0)}</td>
-                                <td className={cell}>{num(r.sales)}</td>
-                                <td className={cell}>{num(r.ad_spent)}</td>
+                                <td className={cell}>{peso(r.sales)}</td>
+                                <td className={cell}>{peso(r.ad_spent)}</td>
                                 <td
                                     className={`${cell} font-semibold text-brand-600 dark:text-brand-400`}
                                 >
@@ -106,15 +109,15 @@ export default function AdSpentRoasTable({ rows }: { rows: RoasRow[] }) {
                             Total
                         </td>
                         <td className={cell}>{num(totals.orders, 0)}</td>
-                        <td className={cell}>{num(totals.sales)}</td>
-                        <td className={cell}>{num(totals.spent)}</td>
+                        <td className={cell}>{peso(totals.sales)}</td>
+                        <td className={cell}>{peso(totals.spent)}</td>
                         <td className={cell}>{roas(totals.roas)}</td>
                     </tr>
                     <tr className="bg-stone-100 font-semibold text-gray-700 dark:bg-zinc-800 dark:text-gray-200">
                         <td className={`${cell} text-left`}>Average</td>
                         <td className={cell}>{num(totals.avg.orders)}</td>
-                        <td className={cell}>{num(totals.avg.sales)}</td>
-                        <td className={cell}>{num(totals.avg.spent)}</td>
+                        <td className={cell}>{peso(totals.avg.sales)}</td>
+                        <td className={cell}>{peso(totals.avg.spent)}</td>
                         <td className={cell} />
                     </tr>
                 </tfoot>

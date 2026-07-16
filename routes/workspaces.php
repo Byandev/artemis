@@ -16,6 +16,7 @@ use App\Http\Controllers\Workspaces\DepartmentController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
+use App\Http\Controllers\Workspaces\PageRoasTrackerController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Workspaces\SalesMarketingDashboardController;
 use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamAdAccountController;
+use App\Http\Controllers\Workspaces\TeamAdSpendGoalController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
 use App\Http\Controllers\Workspaces\TeamShopController;
@@ -125,8 +127,16 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/activity-logs', [ActivityLogController::class, 'index'])->name('workspace.activity-logs.index');
 
     // Role-specific dashboards (scaffold — gated by granular permissions)
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
+    // The S&M dashboard is tabbed; each tab is its own URL segment. The JSON
+    // `data` route is registered before the `{tab?}` route so it isn't captured
+    // as a tab. Daily Report is the default (bare dashboard path).
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/data', [SalesMarketingDashboardController::class, 'data'])->name('workspaces.sales-marketing.dashboard.data');
+    // Page ROAS Tracker and Ad Spend Goals are dashboard tabs — their own URLs,
+    // registered before the {tab?} catch-all so they aren't swallowed by it.
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('workspaces.sales-marketing.dashboard.page-roas-tracker');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spend-goals');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spent-summary');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
     // Workspace CRUD routes
@@ -196,6 +206,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/shops/{shop}/refresh-orders', [ShopController::class, 'refreshOrders'])->name('workspaces.shops.refresh-orders');
     Route::delete('/workspaces/{workspace}/shops/{shop}', [ShopController::class, 'destroy'])->name('workspaces.shops.destroy');
 
+    // Moved to the S&M dashboard's "Page ROAS Tracker" tab — keep the old URL
+    // working by redirecting to the new tab route.
+    Route::get('/workspaces/{workspace}/page-roas-tracker', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.dashboard.page-roas-tracker', $workspace))->name('workspaces.page-roas-tracker.index');
+
     // Product routes
     // Redirect to analytics by default for navigation item active state
     Route::get('/workspaces/{workspace}/products', function (Workspace $workspace) {
@@ -259,8 +273,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/budget-tracker', [BudgetTrackerController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.budget-tracker');
-    Route::get('/workspaces/{workspace}/integrations/meta/ad-spent-summary', [AdSpentSummaryController::class, 'index'])
-        ->middleware('can:View Adspent Summary,workspace')
+    // Moved to the S&M dashboard's "Ad Spent Summary" tab — keep the old Meta
+    // Ads URL working by redirecting to the new tab route.
+    Route::get('/workspaces/{workspace}/integrations/meta/ad-spent-summary', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.dashboard.ad-spent-summary', $workspace))
         ->name('workspaces.metaads.ad-spent-summary');
 
     // Meta Ads optimization rules
@@ -393,6 +408,15 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/workspaces/{workspace}/teams/{team}', [TeamController::class, 'destroy'])->name('workspaces.teams.destroy');
     Route::get('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'index'])->name('workspaces.teams.schedule');
     Route::put('/workspaces/{workspace}/teams/{team}/schedule', [TeamScheduleController::class, 'update'])->name('workspaces.teams.schedule.update');
+
+    // Team ad-spend goal routes (daily target per team)
+    // Moved to the S&M dashboard's "Ad Spend Goals" tab — keep the old list URL
+    // working by redirecting to the new tab route.
+    Route::get('/workspaces/{workspace}/ad-spend-goals', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.dashboard.ad-spend-goals', $workspace))->name('workspaces.ad-spend-goals.index');
+    Route::get('/workspaces/{workspace}/ad-spend-goals/{goal}', [TeamAdSpendGoalController::class, 'show'])->name('workspaces.ad-spend-goals.show');
+    Route::post('/workspaces/{workspace}/ad-spend-goals', [TeamAdSpendGoalController::class, 'store'])->name('workspaces.ad-spend-goals.store');
+    Route::put('/workspaces/{workspace}/ad-spend-goals/{goal}', [TeamAdSpendGoalController::class, 'update'])->name('workspaces.ad-spend-goals.update');
+    Route::delete('/workspaces/{workspace}/ad-spend-goals/{goal}', [TeamAdSpendGoalController::class, 'destroy'])->name('workspaces.ad-spend-goals.destroy');
 
     // Department routes
     Route::get('/workspaces/{workspace}/departments', [DepartmentController::class, 'index'])->name('workspaces.departments.index');
