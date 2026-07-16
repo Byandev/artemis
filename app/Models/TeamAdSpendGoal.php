@@ -46,4 +46,12 @@ class TeamAdSpendGoal extends Model
         return $this->hasMany(TeamAdSpendGoalMilestone::class, 'goal_id')
             ->orderBy('amount');
     }
+
+    /**
+     * Per-member slices of the daily target (optional).
+     */
+    public function members(): HasMany
+    {
+        return $this->hasMany(TeamAdSpendGoalMember::class, 'goal_id');
+    }
 }

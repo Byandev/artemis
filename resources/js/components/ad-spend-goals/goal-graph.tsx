@@ -23,6 +23,8 @@ export interface GoalStatus {
     starting_spend: number;
     // Optional stepping-stone thresholds under the target, ascending.
     milestones: Milestone[];
+    // Optional per-member target slices with their actual spend.
+    members: GoalMember[];
 }
 
 export interface Milestone {
@@ -31,6 +33,16 @@ export interface Milestone {
     label: string | null;
     reached: boolean;
     reached_date: string | null;
+}
+
+export interface GoalMember {
+    user_id: number;
+    name: string | null;
+    daily_target: number;
+    starting_spend: number;
+    recent_spend: number;
+    peak_spend: number;
+    reached: boolean;
 }
 
 export interface Goal {
@@ -46,6 +58,7 @@ export interface Goal {
 export interface TeamOption {
     id: number;
     name: string;
+    members?: { id: number; name: string }[];
 }
 
 const MONTHS = [
