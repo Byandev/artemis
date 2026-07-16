@@ -2,9 +2,11 @@
 
 namespace Modules\Inventory\Http\Controllers\Settings;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use App\Rules\DiscordWebhookUrl;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
@@ -14,9 +16,12 @@ use Modules\Inventory\Models\InventoryNotificationSetting;
 
 class NotificationSettingsController extends Controller
 {
+    use AuthorizesRequests;
+
     public function edit(Request $request, Workspace $workspace): Response
     {
         $this->ensureMember($request, $workspace);
+        $this->authorize(Permission::ManageDiscordNotifications->value, $workspace);
 
         $setting = InventoryNotificationSetting::forWorkspace($workspace->id);
 
@@ -37,6 +42,7 @@ class NotificationSettingsController extends Controller
     public function update(Request $request, Workspace $workspace): RedirectResponse
     {
         $this->ensureMember($request, $workspace);
+        $this->authorize(Permission::ManageDiscordNotifications->value, $workspace);
 
         $validated = $request->validate([
             'deliveries_webhook_url' => ['nullable', 'string', 'max:512', new DiscordWebhookUrl],

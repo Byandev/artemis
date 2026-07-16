@@ -155,6 +155,7 @@ enum Permission: string
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
+    case ManageDiscordNotifications = 'Manage Discord Notifications';
 
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
@@ -292,7 +293,8 @@ enum Permission: string
             self::ViewCsrDashboard => 'Dashboards',
 
             self::EditWorkspaceSettings,
-            self::ManageApiKeys => 'Settings',
+            self::ManageApiKeys,
+            self::ManageDiscordNotifications => 'Settings',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,
