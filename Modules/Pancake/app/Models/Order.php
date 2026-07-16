@@ -3,10 +3,12 @@
 namespace Modules\Pancake\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
+use App\Models\OrderTag;
 use App\Models\Page;
 use App\Models\ParcelJourney;
 use App\Models\ShippingAddress;
 use App\Models\Shop;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -65,5 +67,17 @@ class Order extends Model
     public function items()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function tags(): HasMany
+    {
+        return $this->hasMany(OrderTag::class);
+    }
+
+    public function scopeOfWorkspace($builder, Workspace $workspace)
+    {
+        $table = $builder->getModel()->getTable();
+
+        return $builder->where("{$table}.workspace_id", $workspace->id);
     }
 }

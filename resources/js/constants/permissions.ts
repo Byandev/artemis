@@ -21,6 +21,9 @@ export const PERMISSIONS = {
     RefreshPages: 'Refresh Pages',
     UpdatePageBudget: 'Update Page Budget',
 
+    // Orders (Pancake)
+    ViewOrders: 'View Orders',
+
     // Shops
     ViewShops: 'View Shops',
     CreateShops: 'Create Shops',
@@ -153,6 +156,7 @@ export const PERMISSIONS = {
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
+    ManageDiscordNotifications: 'Manage Discord Notifications',
 } as const;
 
 export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
