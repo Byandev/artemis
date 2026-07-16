@@ -122,6 +122,12 @@ export function AppSidebar() {
             icon: BookOpenIcon,
             permission: PERMISSIONS.ViewPages,
         },
+        {
+            title: 'Orders',
+            href: `/workspaces/${slug}/pancake/orders`,
+            icon: ShoppingCart,
+            permission: PERMISSIONS.ViewOrders,
+        },
         ...(currentWorkspace.products_module_enabled
             ? [
                   {
