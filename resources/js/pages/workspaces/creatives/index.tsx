@@ -116,6 +116,7 @@ export default function CreativesIndex({
     workspace,
     creatives,
     creators,
+    approvers,
     products,
     reviewers,
     query,
@@ -192,6 +193,12 @@ export default function CreativesIndex({
     const navigate = useCallback(
         (params: Record<string, string | number | null | undefined>) => {
             const q = queryRef.current;
+            // Carry over EVERY active filter (not a hardcoded subset) so nothing —
+            // e.g. final_status — is dropped when paginating, sorting or searching.
+            const filters: Record<string, string | undefined> = {};
+            Object.entries(q.filter ?? {}).forEach(([key, value]) => {
+                filters[`filter[${key}]`] = value || undefined;
+            });
             router.get(
                 baseUrl,
                 {
@@ -201,7 +208,10 @@ export default function CreativesIndex({
                     'filter[search]': q.filter?.search || undefined,
                     'filter[format]': q.filter?.format || undefined,
                     'filter[ads_status]': q.filter?.ads_status || undefined,
+                    'filter[final_status]':
+                        q.filter?.final_status || undefined,
                     'filter[creator_id]': q.filter?.creator_id || undefined,
+                    'filter[approved_by]': q.filter?.approved_by || undefined,
                     'filter[product_id]': q.filter?.product_id || undefined,
                     'filter[creative_date_from]':
                         q.filter?.creative_date_from || undefined,
@@ -539,6 +549,7 @@ export default function CreativesIndex({
             ads_statuses: parseList(query.filter?.ads_status),
             final_statuses: parseList(query.filter?.final_status),
             creator_ids: parseList(query.filter?.creator_id),
+            approver_ids: parseList(query.filter?.approved_by),
             product_ids: parseList(query.filter?.product_id),
         }),
         [query.filter],
@@ -558,6 +569,10 @@ export default function CreativesIndex({
         key: String(c.id),
         label: c.name,
     }));
+    const approverOptions = approvers.map((a) => ({
+        key: String(a.id),
+        label: a.name,
+    }));
     const productOptions = products.map((p) => ({
         key: String(p.id),
         label: p.title,
@@ -569,6 +584,7 @@ export default function CreativesIndex({
             'filter[ads_status]': v.ads_statuses.join(',') || undefined,
             'filter[final_status]': v.final_statuses.join(',') || undefined,
             'filter[creator_id]': v.creator_ids.join(',') || undefined,
+            'filter[approved_by]': v.approver_ids.join(',') || undefined,
             'filter[product_id]': v.product_ids.join(',') || undefined,
             page: 1,
         });
@@ -630,6 +646,7 @@ export default function CreativesIndex({
                         adsStatusOptions={adsStatusOptions}
                         finalStatusOptions={finalStatusOptions}
                         creatorOptions={creatorOptions}
+                        approverOptions={approverOptions}
                         productOptions={productOptions}
                         onApply={applyFilters}
                     />

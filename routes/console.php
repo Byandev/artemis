@@ -1,6 +1,12 @@
 <?php
 
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
+
+// Build Artemis-source advertiser performance (Pancake POS + Meta Ads) daily,
+// rebuilding a trailing 3-day window to absorb late Meta attribution.
+Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00')->withoutOverlapping();
+// Same Pancake/Meta data, aggregated per page instead of per advertiser.
+Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
@@ -22,6 +28,11 @@ Schedule::command('trigger-fetch-shops-users')->daily(7);
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('08:00')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('12:00')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('15:00')->withoutOverlapping();
+
+// GencysERP intern daily records — one payload per chunk of interns, per day.
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('18:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('23:45')->withoutOverlapping();
 
 // Recompute inventory demand (3-day average + unfulfilled) from Gencys orders,
 // after the day's orders have been fetched above.

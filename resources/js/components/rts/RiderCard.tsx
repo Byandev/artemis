@@ -1,6 +1,7 @@
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
+import { Link } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
 import { useEffect, useMemo, useState } from 'react';
@@ -55,6 +56,15 @@ export default function RiderCard({
         fetchPage(1, sort, 10, true);
     }, [workspaceSlug, JSON.stringify(queryParams)]);
 
+    // Deep-links a rider to the Orders table, pre-filtered to their returned
+    // orders (statuses returning + returned = the RTS "Returned" count).
+    const returnedOrdersHref = (riderName: string | null) =>
+        riderName
+            ? `/workspaces/${workspaceSlug}/pancake/orders?filter[rider]=${encodeURIComponent(
+                  riderName,
+              )}&filter[status]=returning,returned`
+            : null;
+
     const columns: ColumnDef<RiderRow>[] = useMemo(
         () => [
             {
@@ -89,23 +99,46 @@ export default function RiderCard({
                 header: ({ column }) => (
                     <SortableHeader column={column} title="Returned" />
                 ),
-                cell: ({ row }) => (
-                    <span className="text-red-500">
-                        {row.original.returned_count}
-                    </span>
-                ),
+                cell: ({ row }) => {
+                    const href = returnedOrdersHref(row.original.rider_name);
+                    return href ? (
+                        <Link
+                            href={href}
+                            className="font-medium text-red-500 underline-offset-2 hover:underline"
+                            title="View this rider's returned orders"
+                        >
+                            {row.original.returned_count}
+                        </Link>
+                    ) : (
+                        <span className="text-red-500">
+                            {row.original.returned_count}
+                        </span>
+                    );
+                },
             },
             {
                 accessorKey: 'rts_rate_percentage',
                 header: ({ column }) => (
                     <SortableHeader column={column} title="RTS Rate" />
                 ),
-                cell: ({ row }) => (
-                    <RtsCell value={row.original.rts_rate_percentage} />
-                ),
+                cell: ({ row }) => {
+                    const href = returnedOrdersHref(row.original.rider_name);
+                    return href ? (
+                        <Link
+                            href={href}
+                            className="inline-block underline-offset-2 hover:underline"
+                            title="View this rider's returned orders"
+                        >
+                            <RtsCell value={row.original.rts_rate_percentage} />
+                        </Link>
+                    ) : (
+                        <RtsCell value={row.original.rts_rate_percentage} />
+                    );
+                },
             },
         ],
-        [],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [workspaceSlug],
     );
 
     return (

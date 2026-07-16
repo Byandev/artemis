@@ -30,6 +30,10 @@ class GencysSyncRun extends Model
 
     public const TYPE_PURCHASE_ORDER = 'purchase_order';
 
+    public const TYPE_INTERN_DAILY_RECORDS = 'intern_daily_records';
+
+    public const TYPE_PAGE_DETAILS = 'page_details';
+
     protected $table = 'gencys_sync_runs';
 
     protected $guarded = [];
@@ -58,8 +62,11 @@ class GencysSyncRun extends Model
         return $this->belongsTo(InventoryItem::class);
     }
 
-    /** Open a pending run for one item + sync type. */
-    public static function start(int $workspaceId, int $inventoryItemId, string $syncType, array $meta = []): self
+    /**
+     * Open a pending run for one sync type. $inventoryItemId is the subject for
+     * inventory syncs; intern syncs pass null and keep the intern id in $meta.
+     */
+    public static function start(int $workspaceId, ?int $inventoryItemId, string $syncType, array $meta = []): self
     {
         return self::create([
             'workspace_id' => $workspaceId,

@@ -46,6 +46,16 @@ enum Permission: string
     case DeleteTeams = 'Delete Teams';
     case ManageSchedule = 'Manage Schedule';
 
+    // Ad Spend Goals
+    case ViewAdSpendGoals = 'View Ad Spend Goals';
+    case ManageAdSpendGoals = 'Manage Ad Spend Goals';
+
+    // Departments
+    case ViewDepartments = 'View Departments';
+    case CreateDepartments = 'Create Departments';
+    case EditDepartments = 'Edit Departments';
+    case DeleteDepartments = 'Delete Departments';
+
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
     case ViewRtsAiChat = 'View RTS AI Chat';
@@ -75,6 +85,9 @@ enum Permission: string
 
     // Gencys ERP
     case ViewDailySalesTracker = 'View Daily Sales Tracker';
+    case ViewGencysInterns = 'View Gencys Interns';
+    case ViewGencysInternDailyRecords = 'View Gencys Intern Daily Records';
+    case ViewGencysPages = 'View Gencys Pages';
     case ViewUnitCode = 'View Unit Code';
     case CreateUnitCode = 'Create Unit Code';
     case EditUnitCode = 'Edit Unit Code';
@@ -105,8 +118,14 @@ enum Permission: string
     case CreateFinanceRemittances = 'Create Finance Remittances';
     case EditFinanceRemittances = 'Edit Finance Remittances';
     case DeleteFinanceRemittances = 'Delete Finance Remittances';
+    case ViewFinanceRequestFunds = 'View Finance Request Funds';
+    case CreateFinanceRequestFunds = 'Create Finance Request Funds';
+    case EditFinanceRequestFunds = 'Edit Finance Request Funds';
+    case DeleteFinanceRequestFunds = 'Delete Finance Request Funds';
+    case ApproveFinanceRequestFunds = 'Approve Finance Request Funds';
 
     // Pancake
+    case ViewOrders = 'View Orders';
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
@@ -140,11 +159,13 @@ enum Permission: string
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
+    case ManageDiscordNotifications = 'Manage Discord Notifications';
 
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
     case ViewOptimizationLogs = 'View Optimization Logs';
+    case ViewAdSpentSummary = 'View Adspent Summary';
 
     // Data Access
     case ViewAllWorkspaceData = 'View All Workspace Data';
@@ -188,6 +209,14 @@ enum Permission: string
             self::DeleteTeams,
             self::ManageSchedule => 'Teams',
 
+            self::ViewAdSpendGoals,
+            self::ManageAdSpendGoals => 'Ad Spend Goals',
+
+            self::ViewDepartments,
+            self::CreateDepartments,
+            self::EditDepartments,
+            self::DeleteDepartments => 'Departments',
+
             self::ViewRtsAnalytics,
             self::ViewRtsAiChat,
             self::ViewRmoManagement,
@@ -213,6 +242,9 @@ enum Permission: string
             self::DeletePurchasedOrders => 'Inventory',
 
             self::ViewDailySalesTracker,
+            self::ViewGencysInterns,
+            self::ViewGencysInternDailyRecords,
+            self::ViewGencysPages,
             self::ViewUnitCode,
             self::CreateUnitCode,
             self::EditUnitCode,
@@ -235,8 +267,14 @@ enum Permission: string
             self::ViewFinanceRemittances,
             self::CreateFinanceRemittances,
             self::EditFinanceRemittances,
-            self::DeleteFinanceRemittances => 'Finance',
+            self::DeleteFinanceRemittances,
+            self::ViewFinanceRequestFunds,
+            self::CreateFinanceRequestFunds,
+            self::EditFinanceRequestFunds,
+            self::DeleteFinanceRequestFunds,
+            self::ApproveFinanceRequestFunds => 'Finance',
 
+            self::ViewOrders,
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
 
@@ -262,7 +300,8 @@ enum Permission: string
             self::ViewCsrDashboard => 'Dashboards',
 
             self::EditWorkspaceSettings,
-            self::ManageApiKeys => 'Settings',
+            self::ManageApiKeys,
+            self::ManageDiscordNotifications => 'Settings',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,
@@ -271,7 +310,8 @@ enum Permission: string
             self::ViewOptimizationRules,
             self::ManageOptimizationRules,
             self::ApproveOptimizationRules,
-            self::ViewOptimizationLogs => 'Meta Ads',
+            self::ViewOptimizationLogs,
+            self::ViewAdSpentSummary => 'Meta Ads',
 
             self::ViewAllWorkspaceData => 'Data Access',
         };

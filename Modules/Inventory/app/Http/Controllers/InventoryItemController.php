@@ -268,7 +268,12 @@ class InventoryItemController extends Controller
 
         return Inertia::render('workspaces/inventory/items/index', [
             'items' => $items,
-            'products' => Product::where('workspace_id', $workspace->id)->get(),
+            // Scope the "Select Product" picker to the active team the same way the
+            // item list is scoped (product.shops.teams) — a team-scoped user, or
+            // anyone viewing as a team, only sees that team's products.
+            'products' => Product::where('workspace_id', $workspace->id)
+                ->visibleTo($request->user(), $workspace)
+                ->get(),
             // Existing parent items, to populate the "group under parent" picker.
             'parents' => InventoryItem::where('workspace_id', $workspace->id)
                 ->where('is_parent', true)

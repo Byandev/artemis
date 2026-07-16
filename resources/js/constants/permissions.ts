@@ -21,6 +21,9 @@ export const PERMISSIONS = {
     RefreshPages: 'Refresh Pages',
     UpdatePageBudget: 'Update Page Budget',
 
+    // Orders (Pancake)
+    ViewOrders: 'View Orders',
+
     // Shops
     ViewShops: 'View Shops',
     CreateShops: 'Create Shops',
@@ -39,7 +42,17 @@ export const PERMISSIONS = {
     CreateTeams: 'Create Teams',
     EditTeams: 'Edit Teams',
     DeleteTeams: 'Delete Teams',
+
+    // Ad Spend Goals
+    ViewAdSpendGoals: 'View Ad Spend Goals',
+    ManageAdSpendGoals: 'Manage Ad Spend Goals',
     ManageSchedule: 'Manage Schedule',
+
+    // Departments
+    ViewDepartments: 'View Departments',
+    CreateDepartments: 'Create Departments',
+    EditDepartments: 'Edit Departments',
+    DeleteDepartments: 'Delete Departments',
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
@@ -70,6 +83,9 @@ export const PERMISSIONS = {
 
     // Gencys ERP
     ViewDailySalesTracker: 'View Daily Sales Tracker',
+    ViewGencysInterns: 'View Gencys Interns',
+    ViewGencysInternDailyRecords: 'View Gencys Intern Daily Records',
+    ViewGencysPages: 'View Gencys Pages',
     ViewUnitCode: 'View Unit Code',
     CreateUnitCode: 'Create Unit Code',
     EditUnitCode: 'Edit Unit Code',
@@ -100,6 +116,11 @@ export const PERMISSIONS = {
     CreateFinanceRemittances: 'Create Finance Remittances',
     EditFinanceRemittances: 'Edit Finance Remittances',
     DeleteFinanceRemittances: 'Delete Finance Remittances',
+    ViewFinanceRequestFunds: 'View Finance Request Funds',
+    CreateFinanceRequestFunds: 'Create Finance Request Funds',
+    EditFinanceRequestFunds: 'Edit Finance Request Funds',
+    DeleteFinanceRequestFunds: 'Delete Finance Request Funds',
+    ApproveFinanceRequestFunds: 'Approve Finance Request Funds',
 
     // Page Daily Budget Records
     ViewPageDailyBudgetRecords: 'View Page Daily Budget Records',
@@ -124,6 +145,7 @@ export const PERMISSIONS = {
     ManageOptimizationRules: 'Manage Optimization Rules',
     ApproveOptimizationRules: 'Approve Optimization Rules',
     ViewOptimizationLogs: 'View Optimization Logs',
+    ViewAdSpentSummary: 'View Adspent Summary',
 
     // Dashboards
     ViewMainDashboard: 'View Main Dashboard',
@@ -134,6 +156,7 @@ export const PERMISSIONS = {
     // Settings
     EditWorkspaceSettings: 'Edit Workspace Settings',
     ManageApiKeys: 'Manage API Keys',
+    ManageDiscordNotifications: 'Manage Discord Notifications',
 } as const;
 
 export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

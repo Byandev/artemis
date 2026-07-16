@@ -12,6 +12,122 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.19.1',
+        date: '2026-07-16',
+        sections: [
+            {
+                title: 'Ad Spend Goals — Per-Member Targets',
+                items: [
+                    'A team’s daily ad-spend goal can now be split across its members — give each member their own slice of the target right on the create/edit form; the slices must add up to at least the team’s daily target',
+                    'The goal detail page shows a per-member breakdown — each member’s target, their spend so far (yesterday and their best day), progress since the goal started, and a bar showing how close they are, with a tick once they’ve hit their slice',
+                    'Each member’s spend is measured the same way as the team total, so the per-member figures always reconcile with the overall goal',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.19.0',
+        date: '2026-07-15',
+        sections: [
+            {
+                title: 'Sales & Marketing Dashboard — Now Tabbed',
+                items: [
+                    'The Sales & Marketing dashboard is now organised into tabs — Daily Report (the default), Page ROAS Tracker, Ad Spend Goals, and Ad Spent Summary — so everything lives on one screen instead of scattered links',
+                    'The old standalone Page ROAS Tracker, Ad Spend Goals, and Meta Ad Spent Summary links now redirect straight to their new tab, so existing bookmarks keep working',
+                ],
+            },
+            {
+                title: 'Page ROAS Tracker',
+                items: [
+                    'A day-by-day grid with dates down the side and an Orders / Sales / Ad Spend / ROAS column group for each page, plus per-page Total and Average rows so you can compare performance across pages at a glance',
+                    'Filter by page, shop, or advertiser, and the view respects your team visibility — you see only the pages for the teams you belong to, and the “viewing as team” switcher narrows it further',
+                    'Figures come from a new nightly per-page rollup that combines Pancake POS sales with Meta Ads spend',
+                ],
+            },
+            {
+                title: 'Ad Spend Goals (New)',
+                items: [
+                    'Set a daily ad-spend target for a team over a date range, with optional stepping-stone milestones on the way to it (for example ₱300k en route to a ₱500k/day goal)',
+                    'Each goal shows live status — measured against the most recent complete day (yesterday) and the team’s best day within the window — on both a list view and a detail page with a progress graph',
+                    'Two new role permissions — View Ad Spend Goals and Manage Ad Spend Goals — and goals respect team visibility so scoped users only see and set goals for their own teams',
+                ],
+            },
+            {
+                title: 'Ad Spent Summary',
+                items: [
+                    'One row per day across the selected range showing total orders, sales, ad spend, and ROAS (sales ÷ ad spend), rolled up across advertisers you can see',
+                    'Filter by advertiser and date range; the tab is gated behind a new View Adspent Summary permission',
+                ],
+            },
+            {
+                title: 'Under the Hood',
+                items: [
+                    'A new nightly rollup (1:15am) builds per-page performance from Pancake sales and Meta Ads spend, rebuilding the last 3 days each run so late Meta attribution is captured',
+                    'Fixed the Gencys ERP transaction-history sync so its 9am run fires on schedule again',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.18.0',
+        date: '2026-07-15',
+        sections: [
+            {
+                title: 'Finance — Request Funds (New)',
+                items: [
+                    'New Request Funds page under Finance — raise a fund request with the amount, purpose, who to charge it to, and the date it is needed; each request gets an auto-generated reference number and starts as Pending',
+                    'Approvers move a request through its lifecycle — Pending → Approved → Released, or Cancel it — with the approver and remarks recorded on the request',
+                    'Search by reference or purpose and filter by status, requester, or charge-to; five new role permissions (View, Create, Edit, Delete, and Approve Request Funds) control who can do what',
+                ],
+            },
+            {
+                title: 'Departments (New)',
+                items: [
+                    'New Departments page to define the departments in your workspace — create, edit, activate/deactivate, and delete them, each showing a live count of its members',
+                    'Assign members to a department from the Members page, one at a time or in bulk across a whole selection',
+                    'Four new role permissions — View, Create, Edit, and Delete Departments — assignable from the Roles screen',
+                ],
+            },
+            {
+                title: 'Sales & Marketing Dashboard (Now Live)',
+                items: [
+                    'The Sales & Marketing dashboard is now a full advertiser-performance view — per-advertiser sales today vs yesterday, month-to-date sales, live ranking, ad spend against target, ROAS, and RTS, with KPI cards and charts up top',
+                    'Figures come from a new nightly rollup (1am) that combines Pancake POS sales with Meta Ads spend, rebuilding the last 3 days each run so late Meta attribution is captured',
+                    'Enabled per workspace and gated behind the existing View Sales & Marketing Dashboard permission',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Interns & Pages',
+                items: [
+                    'New Interns page — interns sync in from Gencys, and you can assign each one to a workspace user, toggle them active/inactive, and re-sync on demand',
+                    'Intern daily records now capture per-day sales and order activity, including delivered and returned counts, collected automatically by a thrice-daily sync (9:30am, 6:30pm, 11:45pm)',
+                    'New Gencys Pages screen tracks each page with its POS details, syncable on demand',
+                    'Three new role permissions — View Gencys Interns, View Gencys Intern Daily Records, and View Gencys Pages',
+                ],
+            },
+            {
+                title: 'Admin — Client Report',
+                items: [
+                    'New per-workspace Client Report in the admin area — a last-three-months snapshot covering RTS rate (with a month-by-month trend), parcel-journey notifications sent, and RMO calls made plus total time on calls',
+                    'Every figure reuses the same source as the rest of the app, so the report matches what workspace owners see; open it from the Admin Workspaces list',
+                ],
+            },
+            {
+                title: 'Inventory — Team-Scoped Items & Faster Stock Entry',
+                items: [
+                    'The item pickers on Purchase Orders and Stock Transactions now list only the inventory items for the teams you can see, matching the team visibility already applied across the rest of Inventory',
+                    'Adding a stock transaction now auto-fills the remaining quantity from the item’s last recorded balance, so you no longer have to look it up and re-key it',
+                ],
+            },
+            {
+                title: 'Pages — Botcake ID Validation',
+                items: [
+                    'The page form can now check a Botcake Flow ID and Custom Field ID against Botcake before you save, so a mistyped ID is caught up front instead of failing quietly later',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.17.0',
         date: '2026-07-09',
         sections: [

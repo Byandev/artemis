@@ -4,6 +4,7 @@ namespace Modules\Finance\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 
 class TransactionRequest extends FormRequest
 {
@@ -29,10 +30,11 @@ class TransactionRequest extends FormRequest
                 'nullable',
                 Rule::exists('finance_transaction_types', 'id')->where('workspace_id', $workspaceId),
             ],
-            'requested_by' => ['nullable', 'string', 'max:255'],
-            'approved_by' => ['nullable', 'string', 'max:255'],
+            // requested_by / approved_by / charge_to reference workspace members.
+            'requested_by' => ['nullable', $this->memberRule($workspaceId)],
+            'approved_by' => ['nullable', $this->memberRule($workspaceId)],
             'department' => ['nullable', 'string', 'max:255'],
-            'charge_to' => ['nullable', 'string', 'max:255'],
+            'charge_to' => ['nullable', $this->memberRule($workspaceId)],
             'reference_no' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::in(['pending', 'approved', 'posted'])],
             'amount' => ['required', 'numeric', 'min:0'],
@@ -44,5 +46,14 @@ class TransactionRequest extends FormRequest
             ])],
             'notes' => ['nullable', 'string'],
         ];
+    }
+
+    /**
+     * Rule ensuring a user id belongs to the given workspace.
+     */
+    private function memberRule(?int $workspaceId): Exists
+    {
+        return Rule::exists('workspace_user', 'user_id')
+            ->where(fn ($q) => $q->where('workspace_id', $workspaceId));
     }
 }
