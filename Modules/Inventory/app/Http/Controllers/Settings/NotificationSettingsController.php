@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers\Settings;
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use App\Rules\DiscordWebhookUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,8 +45,8 @@ class NotificationSettingsController extends Controller
         $this->authorize(Permission::ManageDiscordNotifications->value, $workspace);
 
         $validated = $request->validate([
-            'deliveries_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
-            'awaiting_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
+            'deliveries_webhook_url' => ['nullable', 'string', 'max:512', new DiscordWebhookUrl],
+            'awaiting_webhook_url' => ['nullable', 'string', 'max:512', new DiscordWebhookUrl],
             'deliveries_enabled' => ['required', 'boolean'],
             // Whole-hour send times only (HH:00) — the scheduler runs hourly,
             // so a non-:00 minute would never match and silently never send.

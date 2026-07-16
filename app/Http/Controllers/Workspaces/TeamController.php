@@ -6,6 +6,7 @@ use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\Workspace;
+use App\Rules\DiscordWebhookUrl;
 use App\Services\PostHogService;
 use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -71,7 +72,7 @@ class TeamController extends Controller
                     return $query->where('workspace_id', $workspace->id);
                 }),
             ],
-            'discord_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
+            'discord_webhook_url' => ['nullable', 'string', 'max:512', new DiscordWebhookUrl],
             'members' => ['array'],
             'members.*' => ['exists:users,id'],
         ]);
@@ -110,7 +111,7 @@ class TeamController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'discord_webhook_url' => ['nullable', 'string', 'url', 'max:512'],
+            'discord_webhook_url' => ['nullable', 'string', 'max:512', new DiscordWebhookUrl],
             'members' => ['array'],
             'members.*' => ['exists:users,id'],
         ]);

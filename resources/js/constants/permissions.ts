@@ -21,6 +21,9 @@ export const PERMISSIONS = {
     RefreshPages: 'Refresh Pages',
     UpdatePageBudget: 'Update Page Budget',
 
+    // Orders (Pancake)
+    ViewOrders: 'View Orders',
+
     // Shops
     ViewShops: 'View Shops',
     CreateShops: 'Create Shops',
@@ -138,6 +141,7 @@ export const PERMISSIONS = {
     ManageOptimizationRules: 'Manage Optimization Rules',
     ApproveOptimizationRules: 'Approve Optimization Rules',
     ViewOptimizationLogs: 'View Optimization Logs',
+    ViewAdSpentSummary: 'View Adspent Summary',
 
     // Dashboards
     ViewMainDashboard: 'View Main Dashboard',

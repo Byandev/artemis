@@ -121,6 +121,7 @@ enum Permission: string
     case ApproveFinanceRequestFunds = 'Approve Finance Request Funds';
 
     // Pancake
+    case ViewOrders = 'View Orders';
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
@@ -160,6 +161,7 @@ enum Permission: string
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
     case ViewOptimizationLogs = 'View Optimization Logs';
+    case ViewAdSpentSummary = 'View Adspent Summary';
 
     // Data Access
     case ViewAllWorkspaceData = 'View All Workspace Data';
@@ -265,6 +267,7 @@ enum Permission: string
             self::DeleteFinanceRequestFunds,
             self::ApproveFinanceRequestFunds => 'Finance',
 
+            self::ViewOrders,
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
 
@@ -300,7 +303,8 @@ enum Permission: string
             self::ViewOptimizationRules,
             self::ManageOptimizationRules,
             self::ApproveOptimizationRules,
-            self::ViewOptimizationLogs => 'Meta Ads',
+            self::ViewOptimizationLogs,
+            self::ViewAdSpentSummary => 'Meta Ads',
 
             self::ViewAllWorkspaceData => 'Data Access',
         };

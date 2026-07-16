@@ -64,6 +64,7 @@ use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
 use Modules\MetaAds\Http\Controllers\AdsCalendarController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
+use Modules\MetaAds\Http\Controllers\AdSpentSummaryController;
 use Modules\MetaAds\Http\Controllers\BudgetTrackerController;
 use Modules\MetaAds\Http\Controllers\CustomBreakdownController;
 use Modules\MetaAds\Http\Controllers\IntegrationsController;
@@ -73,6 +74,7 @@ use Modules\MetaAds\Http\Controllers\RemoveFbAccountController;
 use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
+use Modules\Pancake\Http\Controllers\OrderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -257,6 +259,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/budget-tracker', [BudgetTrackerController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.budget-tracker');
+    Route::get('/workspaces/{workspace}/integrations/meta/ad-spent-summary', [AdSpentSummaryController::class, 'index'])
+        ->middleware('can:View Adspent Summary,workspace')
+        ->name('workspaces.metaads.ad-spent-summary');
 
     // Meta Ads optimization rules
     Route::get('/workspaces/{workspace}/integrations/meta/optimization-rules', [OptimizationRuleController::class, 'index'])
@@ -430,6 +435,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
     });
+
+    Route::get('/workspaces/{workspace}/pancake/orders', [OrderController::class, 'index'])
+        ->name('workspaces.pancake.orders.index');
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
