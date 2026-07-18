@@ -15,6 +15,7 @@ use App\Models\PageDailyBudgetRecord;
 use App\Models\Workspace;
 use App\Services\Botcake;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -264,34 +265,28 @@ class PageController extends Controller
             return response()->json(['valid' => false, 'message' => 'Page not found in this workspace.']);
         }
 
-        $token = $validated['token'] ?: $page->botcake_token;
+        $token = ($validated['token'] ?? null) ?: $page->botcake_token;
 
         if (blank($token)) {
             return response()->json(['valid' => false, 'message' => 'Enter a Botcake token first.']);
         }
 
+        // Validate by asking Botcake for this specific flow's statistics. The
+        // endpoint only succeeds when the flow exists on the page, so a clean
+        // response means valid and any failure means it does not.
         try {
-            $flows = (new Botcake((string) $page->id, $token))->fetchFlows();
+            (new Botcake((string) $page->id, $token))->fetchFlowStatistics((string) $validated['flow_id']);
+        } catch (ConnectionException $e) {
+            return response()->json(['valid' => false, 'message' => 'Could not reach Botcake. Please try again.']);
         } catch (\Throwable $e) {
             $message = str_contains($e->getMessage(), 'invalid_page_id')
                 ? "Botcake rejected this page (invalid_page_id). The Botcake access token doesn't match this page's ID — re-copy the access token from Botcake for this exact page."
-                : 'Botcake: '.$e->getMessage();
+                : 'Flow ID not found on this page.';
 
             return response()->json(['valid' => false, 'message' => $message]);
         }
 
-        // A flow is valid if it exists on the page and hasn't been removed.
-        $found = collect($flows)->contains(
-            fn ($flow) => (int) ($flow['id'] ?? 0) === (int) $validated['flow_id']
-                && ! ($flow['is_removed'] ?? false),
-        );
-
-        return response()->json([
-            'valid' => $found,
-            'message' => $found
-                ? 'Flow ID is valid.'
-                : 'Flow ID not found on this page.',
-        ]);
+        return response()->json(['valid' => true, 'message' => 'Flow ID is valid.']);
     }
 
     public function validateCustomFieldId(Request $request, Workspace $workspace)
