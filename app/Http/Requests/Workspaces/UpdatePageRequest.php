@@ -3,9 +3,10 @@
 namespace App\Http\Requests\Workspaces;
 
 use App\Models\Page;
+use App\Services\Botcake;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Validation\Validator;
 
 class UpdatePageRequest extends FormRequest
@@ -61,43 +62,52 @@ class UpdatePageRequest extends FormRequest
     }
 
     /**
-     * Validate the parcel-journey flow ID against the locally-synced Botcake
-     * flows for this page. Only enforced while the feature is enabled, and only
-     * when a flow ID was actually supplied.
+     * Validate the parcel-journey flow ID against the live Botcake API. Only
+     * enforced while the feature is enabled, and only when a flow ID was
+     * actually supplied.
      *
-     * Custom field IDs have no local mirror, so they are only format-checked
-     * (see rules()); there is nothing local to verify their existence against.
+     * Validation asks Botcake for the specific flow's statistics — the same
+     * single-flow check used by PageController::validateFlowId — so the save
+     * gate agrees with the pre-save check and never rejects a flow that exists
+     * upstream (as the lagging local sync mirror could).
+     *
+     * Custom field IDs are only format-checked (see rules()).
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
-            if (! $this->boolean('parcel_journey_enabled')) {
+            if (! $this->boolean('parcel_journey_enabled') || ! $this->filled('parcel_journey_flow_id')) {
                 return;
             }
 
             /** @var Page $page */
             $page = $this->route('page');
 
-            if ($this->filled('parcel_journey_flow_id')
-                && ! $this->flowBelongsToPage($page, (int) $this->input('parcel_journey_flow_id'))) {
+            // Check against the token being saved, not the stored one, so a
+            // token and flow ID changed together validate as a pair.
+            $token = $this->input('botcake_token') ?: $page->botcake_token;
+
+            if (blank($token)) {
                 $validator->errors()->add(
                     'parcel_journey_flow_id',
-                    'The selected flow ID is invalid or does not belong to this page.',
+                    'Enter a Botcake token before setting a flow ID.',
                 );
+
+                return;
+            }
+
+            try {
+                (new Botcake((string) $page->id, $token))
+                    ->fetchFlowStatistics((string) $this->input('parcel_journey_flow_id'));
+            } catch (ConnectionException $e) {
+                $validator->errors()->add('parcel_journey_flow_id', 'Could not reach Botcake. Please try again.');
+            } catch (\Throwable $e) {
+                $message = str_contains($e->getMessage(), 'invalid_page_id')
+                    ? "Botcake rejected this page (invalid_page_id). The Botcake access token doesn't match this page's ID — re-copy the access token from Botcake for this exact page."
+                    : 'Flow ID not found on this page.';
+
+                $validator->errors()->add('parcel_journey_flow_id', $message);
             }
         });
-    }
-
-    /**
-     * A flow is valid when it is present in the locally-synced Botcake flows
-     * for this page and has not been removed upstream.
-     */
-    protected function flowBelongsToPage(Page $page, int $flowId): bool
-    {
-        return DB::table('botcake_flows')
-            ->where('page_id', $page->id)
-            ->where('id', $flowId)
-            ->where('is_removed', false)
-            ->exists();
     }
 }
