@@ -19,6 +19,10 @@ Route::get('/changelog', function () {
     return Inertia::render('workspaces/changelog');
 })->name('changelog');
 
+Route::get('/pricing', function () {
+    return Inertia::render('pricing');
+})->name('pricing');
+
 Route::get('/calculator', function () {
     return Inertia::render('calculator');
 })->name('calculator');

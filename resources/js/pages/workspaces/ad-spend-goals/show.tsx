@@ -80,6 +80,97 @@ function PaceTile({
     );
 }
 
+/** One member's row: their target slice, actual (yesterday), and progress. */
+function MemberRow({
+    name,
+    target,
+    recent,
+    starting,
+    reached,
+    daysRemaining,
+}: {
+    name: string;
+    target: number;
+    recent: number;
+    starting: number;
+    reached: boolean;
+    daysRemaining: number;
+}) {
+    const pct = target > 0 ? Math.min(100, (recent / target) * 100) : 0;
+    const since = recent - starting;
+    const toGo = Math.max(0, target - recent);
+    const inc = daysRemaining > 0 && toGo > 0 ? toGo / daysRemaining : null;
+
+    return (
+        <div>
+            <div className="flex items-center gap-3 sm:gap-4">
+                <span
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${reached ? 'bg-brand-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                />
+                <span className="w-24 shrink-0 truncate text-[13px] font-medium text-gray-800 sm:w-40 dark:text-gray-100">
+                    {name}
+                </span>
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-100 dark:bg-zinc-800">
+                    <div
+                        className="h-full rounded-full"
+                        style={{
+                            width: `${reached ? 100 : pct}%`,
+                            background: reached ? BRAND_GRAD : WARN_GRAD,
+                        }}
+                    />
+                </div>
+                <div className="w-32 shrink-0 text-right font-mono text-[11px] tabular-nums sm:w-44">
+                    <span className="font-semibold text-gray-900 dark:text-gray-50">
+                        {currencyFormatter(recent)}
+                    </span>
+                    <span className="text-gray-400 dark:text-gray-500">
+                        {' '}
+                        / {currencyFormatter(target)}
+                    </span>
+                    {reached ? (
+                        <Check className="ml-1 inline h-3 w-3 text-brand-500" />
+                    ) : (
+                        <span className="ml-1 text-warning-600 dark:text-warning-400">
+                            {Math.round(pct)}%
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* progress since start · gap from yesterday to target */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-[22px] font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                <span>start {currencyFormatter(starting)}</span>
+                <span aria-hidden>·</span>
+                <span
+                    className={
+                        since > 0
+                            ? 'text-brand-600 dark:text-brand-400'
+                            : since < 0
+                              ? 'text-warning-600 dark:text-warning-400'
+                              : ''
+                    }
+                >
+                    {since > 0 ? '+' : since < 0 ? '−' : ''}
+                    {currencyFormatter(Math.abs(since))} since start
+                </span>
+                {toGo > 0 && (
+                    <>
+                        <span aria-hidden>·</span>
+                        <span className="text-warning-600 dark:text-warning-400">
+                            {currencyFormatter(toGo)} to go
+                        </span>
+                        {inc !== null && (
+                            <span className="text-brand-600 dark:text-brand-400">
+                                · +{currencyFormatter(inc)}/day
+                            </span>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}
+
 /** One rung of the milestone ladder: threshold, progress bar, reached / to-go. */
 function MilestoneRung({
     amount,
@@ -265,6 +356,10 @@ export default function AdSpendGoalShow({
         milestones: s.milestones.map((m) => ({
             amount: m.amount,
             label: m.label,
+        })),
+        members: s.members.map((m) => ({
+            user_id: m.user_id,
+            daily_target: m.daily_target,
         })),
     };
 
@@ -518,6 +613,52 @@ export default function AdSpendGoalShow({
                         </>
                     )}
                 </div>
+
+                {/* Per-member breakdown (only when the goal splits by member) */}
+                {s.members.length > 0 && (
+                    <div className="mt-4 rounded-[18px] border border-black/6 bg-white p-6 shadow-sm md:p-8 dark:border-white/6 dark:bg-zinc-900">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                Members
+                            </p>
+                            {(() => {
+                                const memberRecent = s.members.reduce(
+                                    (sum, m) => sum + m.recent_spend,
+                                    0,
+                                );
+                                const meets = memberRecent + 0.01 >= target;
+                                return (
+                                    <p className="font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                                        Team{' '}
+                                        <span
+                                            className={
+                                                meets
+                                                    ? 'font-semibold text-brand-600 dark:text-brand-400'
+                                                    : 'font-semibold text-warning-600 dark:text-warning-400'
+                                            }
+                                        >
+                                            {currencyFormatter(memberRecent)}
+                                        </span>{' '}
+                                        / {currencyFormatter(target)} target
+                                    </p>
+                                );
+                            })()}
+                        </div>
+                        <div className="mt-5 space-y-4">
+                            {s.members.map((m) => (
+                                <MemberRow
+                                    key={m.user_id}
+                                    name={m.name ?? 'Unknown'}
+                                    target={m.daily_target}
+                                    recent={m.recent_spend}
+                                    starting={m.starting_spend}
+                                    reached={m.reached}
+                                    daysRemaining={s.days_remaining}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Milestones ladder (only when the goal has milestones) */}
                 {s.milestones.length > 0 && (

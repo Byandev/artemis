@@ -18,6 +18,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -164,6 +165,25 @@ class PageController extends Controller
         return redirect()
             ->route('workspaces.pages.index', $workspace)
             ->with('success', 'Page budget updated successfully.');
+    }
+
+    /** Assign (or unassign) the owner of a page inline from the pages table. */
+    public function assignOwner(Request $request, Workspace $workspace, Page $page)
+    {
+        $this->authorize(Permission::EditPages->value, $workspace);
+
+        abort_unless($page->workspace_id === $workspace->id, 404);
+
+        $data = $request->validate([
+            'owner_id' => [
+                'nullable', 'integer',
+                Rule::in($workspace->users()->pluck('users.id')->all()),
+            ],
+        ]);
+
+        $page->update(['owner_id' => $data['owner_id'] ?? null]);
+
+        return back();
     }
 
     public function archive(Request $request, Workspace $workspace, Page $page)

@@ -100,8 +100,13 @@ class ParcelUpdateNotificationTemplateController extends Controller
         })->whereBetween('created_at', [$startDate, $endDate.' 23:59:59']);
 
         $notifTrackedOrders = (clone $notifBase)->distinct('order_id')->count('order_id');
-        $notifSmsSent = (clone $notifBase)->where('type', 'sms')->whereIn('status', ['sent', 'delivered'])->count();
-        $notifChatSent = (clone $notifBase)->where('type', 'chat')->whereIn('status', ['sent', 'delivered'])->count();
+        $notifSmsSent = (clone $notifBase)->where('type', 'sms')
+//            ->whereIn('status', ['sent', 'delivered'])
+            ->count();
+        $notifChatSent = (clone $notifBase)
+            ->where('type', 'chat')
+//            ->whereIn('status', ['sent', 'delivered'])
+            ->count();
 
         $trackedOrders = $logsTrackedOrders + $notifTrackedOrders;
         $smsSent = $logsSmsSent + $notifSmsSent;
@@ -116,7 +121,7 @@ class ParcelUpdateNotificationTemplateController extends Controller
         $notifAgg = DB::table('parcel_journey_notifications as pjn')
             ->join('pancake_orders as po', 'po.id', '=', 'pjn.order_id')
             ->whereBetween('pjn.created_at', [$startDate.' 00:00:00', $endDate.' 23:59:59'])
-            ->whereIn('pjn.status', ['sent', 'delivered'])
+//            ->whereIn('pjn.status', ['sent', 'delivered'])
             ->selectRaw('po.shop_id, MIN(DATE(pjn.created_at)) as first_date, COUNT(DISTINCT pjn.order_id) as tracked_orders, SUM(pjn.type = "sms") as sms_sent, SUM(pjn.type = "chat") as chat_sent')
             ->groupBy('po.shop_id');
 

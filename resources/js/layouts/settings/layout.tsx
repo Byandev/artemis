@@ -1,4 +1,6 @@
 import Heading from '@/components/heading';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import { cn } from '@/lib/utils';
 import { edit as editPassword } from '@/routes/password';
 import { edit } from '@/routes/profile';
@@ -25,6 +27,10 @@ export default function SettingsLayout({
     children,
     workspace,
 }: PropsWithChildren<{ workspace?: Workspace | null }>) {
+    const canManageDiscordNotifications = usePermission(
+        PERMISSIONS.ManageDiscordNotifications,
+    );
+
     const groups: SettingsNavGroup[] = [
         {
             label: 'Account',
@@ -61,16 +67,18 @@ export default function SettingsLayout({
             ],
         });
 
-        groups.push({
-            label: 'Notifications',
-            items: [
-                {
-                    title: 'Discord Notifications',
-                    href: `/workspaces/${workspace.slug}/settings/notifications`,
-                    icon: Bell,
-                },
-            ],
-        });
+        if (canManageDiscordNotifications) {
+            groups.push({
+                label: 'Notifications',
+                items: [
+                    {
+                        title: 'Discord Notifications',
+                        href: `/workspaces/${workspace.slug}/settings/notifications`,
+                        icon: Bell,
+                    },
+                ],
+            });
+        }
     }
 
     // When server-side rendering, we only render the layout on the client...
@@ -91,7 +99,10 @@ export default function SettingsLayout({
                 <aside className="w-full lg:w-60 lg:shrink-0">
                     <nav className="flex flex-col gap-5">
                         {groups.map((group) => (
-                            <div key={group.label} className="flex flex-col gap-1">
+                            <div
+                                key={group.label}
+                                className="flex flex-col gap-1"
+                            >
                                 <p className="px-3 pb-1 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                                     {group.label}
                                 </p>
@@ -128,7 +139,9 @@ export default function SettingsLayout({
                 </aside>
 
                 <div className="mt-8 flex-1 lg:mt-0 lg:max-w-2xl">
-                    <section className="max-w-xl space-y-12">{children}</section>
+                    <section className="max-w-xl space-y-12">
+                        {children}
+                    </section>
                 </div>
             </div>
         </div>

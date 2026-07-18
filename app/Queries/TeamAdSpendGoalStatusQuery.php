@@ -140,6 +140,38 @@ class TeamAdSpendGoalStatusQuery
             ->values()
             ->all();
 
+        // Per-member progress: each member's slice of the target, plus their own
+        // spend on the start date, the reference day (recent), and their best day.
+        $memberDaily = $this->memberDailySpend($goal); // [user_id][date] => spend
+        $startDateStr = $goal->start_date->toDateString();
+        $members = $goal->members
+            ->map(function ($gm) use ($memberDaily, $recentDate, $cutoff, $startDateStr) {
+                $days = $memberDaily[$gm->user_id] ?? [];
+                $recent = $recentDate !== null ? (float) ($days[$recentDate] ?? 0) : 0.0;
+                $starting = (float) ($days[$startDateStr] ?? 0);
+
+                $peak = 0.0;
+                foreach ($days as $date => $sp) {
+                    if (! Carbon::parse((string) $date)->gt($cutoff)) {
+                        $peak = max($peak, (float) $sp);
+                    }
+                }
+
+                $memberTarget = (float) $gm->daily_target;
+
+                return [
+                    'user_id' => $gm->user_id,
+                    'name' => $gm->user?->name,
+                    'daily_target' => round($memberTarget, 2),
+                    'starting_spend' => round($starting, 2),
+                    'recent_spend' => round($recent, 2),
+                    'peak_spend' => round($peak, 2),
+                    'reached' => $peak >= $memberTarget,
+                ];
+            })
+            ->values()
+            ->all();
+
         return [
             'daily_target' => $target,
             'start_date' => $goal->start_date->toDateString(),
@@ -163,6 +195,8 @@ class TeamAdSpendGoalStatusQuery
             'starting_spend' => round($startingSpend, 2),
             // Optional stepping-stone thresholds, ascending.
             'milestones' => $milestones,
+            // Optional per-member target slices with their actual spend.
+            'members' => $members,
         ];
     }
 
@@ -198,6 +232,46 @@ class TeamAdSpendGoalStatusQuery
             ->selectRaw('apdr.date as date, SUM(COALESCE(apdr.ad_spent, 0)) as spend')
             ->pluck('spend', 'date')
             ->all();
+    }
+
+    /**
+     * user id => (date => that member's ad spend), over the goal window. Same
+     * source-aware linkage as the team roll-up, grouped by the member (user).
+     *
+     * @return array<int, array<string, float>>
+     */
+    private function memberDailySpend(TeamAdSpendGoal $goal): array
+    {
+        $query = DB::table('advertiser_performance_daily_records as apdr')
+            ->where('apdr.workspace_id', $this->workspace->id)
+            ->where('apdr.source', $this->source)
+            ->whereBetween('apdr.date', [
+                $goal->start_date->toDateString(),
+                $goal->end_date->toDateString(),
+            ]);
+
+        if ($this->source === AdvertiserPerformanceDailyRecord::SOURCE_GENCYS) {
+            $query->join('gencys_interns as gi', function ($join) {
+                $join->on('gi.id', '=', 'apdr.advertiser_id')
+                    ->where('gi.workspace_id', '=', $this->workspace->id);
+            })
+                ->join('team_user as tu', 'tu.user_id', '=', 'gi.user_id')
+                ->where('tu.team_id', $goal->team_id)
+                ->groupBy('gi.user_id', 'apdr.date')
+                ->selectRaw('gi.user_id as user_id, apdr.date as date, SUM(COALESCE(apdr.ad_spent, 0)) as spend');
+        } else {
+            $query->join('team_user as tu', 'tu.user_id', '=', 'apdr.advertiser_id')
+                ->where('tu.team_id', $goal->team_id)
+                ->groupBy('apdr.advertiser_id', 'apdr.date')
+                ->selectRaw('apdr.advertiser_id as user_id, apdr.date as date, SUM(COALESCE(apdr.ad_spent, 0)) as spend');
+        }
+
+        $map = [];
+        foreach ($query->get() as $row) {
+            $map[(int) $row->user_id][(string) $row->date] = (float) $row->spend;
+        }
+
+        return $map;
     }
 
     private function deriveStatus(Carbon $start, Carbon $today, bool $hitRecent, bool $hitEver): string

@@ -125,6 +125,7 @@ enum Permission: string
     case ApproveFinanceRequestFunds = 'Approve Finance Request Funds';
 
     // Pancake
+    case ViewOrders = 'View Orders';
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
@@ -158,6 +159,7 @@ enum Permission: string
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
     case ManageApiKeys = 'Manage API Keys';
+    case ManageDiscordNotifications = 'Manage Discord Notifications';
 
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
@@ -272,6 +274,7 @@ enum Permission: string
             self::DeleteFinanceRequestFunds,
             self::ApproveFinanceRequestFunds => 'Finance',
 
+            self::ViewOrders,
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
 
@@ -297,7 +300,8 @@ enum Permission: string
             self::ViewCsrDashboard => 'Dashboards',
 
             self::EditWorkspaceSettings,
-            self::ManageApiKeys => 'Settings',
+            self::ManageApiKeys,
+            self::ManageDiscordNotifications => 'Settings',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,
