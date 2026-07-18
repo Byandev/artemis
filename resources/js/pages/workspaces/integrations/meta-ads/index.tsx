@@ -8,17 +8,27 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Sheet,
     SheetContent,
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import axios from 'axios';
 import clsx from 'clsx';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
@@ -32,9 +42,19 @@ import {
     Loader2,
     Play,
     Search,
+    UserPlus,
+    X,
 } from 'lucide-react';
 import moment from 'moment';
-import { ReactNode, useEffect, useState } from 'react';
+import {
+    Dispatch,
+    ReactNode,
+    SetStateAction,
+    useEffect,
+    useMemo,
+    useState,
+} from 'react';
+import { InlineOwner, OwnerOption } from '../components/inline-owner';
 import {
     ColumnVisibilityMenu,
     INSIGHTS_OPTIONS,
@@ -86,6 +106,9 @@ interface Row extends InsightsMetrics {
     // entity, not the insights aggregate). Bigint-safe so kept as string|number.
     daily_budget?: number | string | null;
     lifetime_budget?: number | string | null;
+    // Internal creator tag — only sent for the `ad` (single-ad) grouping.
+    creator_id?: number | null;
+    creator_name?: string | null;
 }
 
 /**
@@ -107,6 +130,7 @@ interface AccountOption {
 interface Props {
     workspace: Workspace;
     accounts: AccountOption[];
+    members: OwnerOption[];
     selectedAccounts: string[];
     dateRange: { since: string; until: string };
     query?: {
@@ -127,6 +151,209 @@ function adDetailUrl(slug: string, adId: number | string) {
 
 function dataUrl(slug: string) {
     return `/workspaces/${slug}/integrations/meta/ads-manager/data`;
+}
+
+function creatorUrl(slug: string, adId: string) {
+    return `/workspaces/${slug}/integrations/meta/ads-manager/ads/${adId}/creator`;
+}
+
+function bulkCreatorUrl(slug: string) {
+    return `/workspaces/${slug}/integrations/meta/ads-manager/ads/creator/bulk`;
+}
+
+const creatorOf = (row: Row): OwnerOption | null =>
+    row.creator_id != null
+        ? { id: row.creator_id, name: row.creator_name ?? '' }
+        : null;
+
+/**
+ * Inline + bulk creator tagging against a rows-in-state table. Optimistically
+ * patches the given rows setter, then persists via the single / bulk endpoints,
+ * rolling back on failure. Shared by the main grid and the ads-in-group modal.
+ */
+function useCreatorTagging(
+    slug: string,
+    members: OwnerOption[],
+    setRows: Dispatch<SetStateAction<PaginatedData<Row> | null>>,
+) {
+    const [saving, setSaving] = useState<Record<string, boolean>>({});
+
+    const patchRows = (ids: Set<string>, creator: OwnerOption | null) =>
+        setRows((prev) =>
+            prev
+                ? {
+                      ...prev,
+                      data: prev.data.map((r) =>
+                          ids.has(r.id)
+                              ? {
+                                    ...r,
+                                    creator_id: creator?.id ?? null,
+                                    creator_name: creator?.name ?? null,
+                                }
+                              : r,
+                      ),
+                  }
+                : prev,
+        );
+
+    const assign = (row: Row, creatorId: number | null) => {
+        const next = creatorId
+            ? (members.find((m) => m.id === creatorId) ?? null)
+            : null;
+        const prev = creatorOf(row);
+        patchRows(new Set([row.id]), next);
+        setSaving((s) => ({ ...s, [row.id]: true }));
+        axios
+            .patch(creatorUrl(slug, row.id), { creator_id: creatorId })
+            .catch(() => patchRows(new Set([row.id]), prev))
+            .finally(() => setSaving((s) => ({ ...s, [row.id]: false })));
+    };
+
+    const bulkAssign = (
+        ids: string[],
+        creatorId: number | null,
+        onDone?: () => void,
+    ) => {
+        if (ids.length === 0) return;
+        const next = creatorId
+            ? (members.find((m) => m.id === creatorId) ?? null)
+            : null;
+        let snapshot: PaginatedData<Row> | null = null;
+        setRows((prev) => {
+            snapshot = prev;
+            return prev
+                ? {
+                      ...prev,
+                      data: prev.data.map((r) =>
+                          ids.includes(r.id)
+                              ? {
+                                    ...r,
+                                    creator_id: next?.id ?? null,
+                                    creator_name: next?.name ?? null,
+                                }
+                              : r,
+                      ),
+                  }
+                : prev;
+        });
+        axios
+            .post(bulkCreatorUrl(slug), { ad_ids: ids, creator_id: creatorId })
+            .catch(() => setRows(snapshot))
+            .finally(() => onDone?.());
+    };
+
+    return { saving, assign, bulkAssign };
+}
+
+/** Local multi-select state for the ad grid / modal, keyed by ad id. */
+function useRowSelection() {
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const toggleRow = (id: string) =>
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+
+    const toggleAll = (ids: string[], checked: boolean) =>
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+            return next;
+        });
+
+    const clear = () => setSelectedIds(new Set());
+
+    return { selectedIds, toggleRow, toggleAll, clear };
+}
+
+/**
+ * Compact bulk-creator control for the selection bar: assign any member or
+ * clear the creator across the currently selected ads.
+ */
+function BulkCreatorControl({
+    members,
+    onAssign,
+}: {
+    members: OwnerOption[];
+    onAssign: (creatorId: number | null) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return q
+            ? members.filter((m) => m.name.toLowerCase().includes(q))
+            : members;
+    }, [members, search]);
+
+    const pick = (id: number | null) => {
+        onAssign(id);
+        setOpen(false);
+    };
+
+    return (
+        <Popover
+            open={open}
+            onOpenChange={(o) => {
+                setOpen(o);
+                if (o) setSearch('');
+            }}
+        >
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className="flex h-7 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-50 px-2.5 font-mono text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+                >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Set creator
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-0">
+                <div className="flex items-center gap-2 border-b border-black/8 px-3 dark:border-white/8">
+                    <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                    <input
+                        autoFocus
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search people..."
+                        className="h-10 w-full bg-transparent font-mono text-[12px] text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
+                    />
+                </div>
+                <div className="max-h-[280px] overflow-y-auto p-1.5">
+                    {filtered.length === 0 ? (
+                        <p className="px-2 py-4 text-center font-mono text-[12px] text-gray-400 dark:text-gray-600">
+                            No people found.
+                        </p>
+                    ) : (
+                        filtered.map((m) => (
+                            <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => pick(m.id)}
+                                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left font-mono text-[13px] text-gray-800 transition-colors hover:bg-stone-100 dark:text-gray-100 dark:hover:bg-white/5"
+                            >
+                                {m.name}
+                            </button>
+                        ))
+                    )}
+                </div>
+                <div className="border-t border-black/8 p-1.5 dark:border-white/8">
+                    <button
+                        type="button"
+                        onClick={() => pick(null)}
+                        className="flex h-9 w-full items-center justify-center rounded-lg border border-black/8 px-3 font-mono text-[12px] font-medium text-rose-600 transition-colors hover:bg-rose-50 dark:border-white/8 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                    >
+                        Clear creator
+                    </button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
 }
 
 /* ───────────────── Ads-in-group modal ───────────────── */
@@ -152,6 +379,18 @@ function GridTable({
     onFetch,
     onSelectAd,
     onOpenGroup,
+    // Creator tagging (only wired for the `ad` grouping + the ads-in-group modal).
+    showCreator = false,
+    members = [],
+    canEditCreator = false,
+    creatorSaving = {},
+    onAssignCreator,
+    // Bulk selection.
+    selectedIds,
+    onToggleRow,
+    onToggleAll,
+    onClearSelection,
+    onBulkAssignCreator,
 }: {
     groupBy: GroupBy;
     groupLabel: string;
@@ -161,6 +400,16 @@ function GridTable({
     onFetch: (params?: { [key: string]: string | number | null }) => void;
     onSelectAd: (ad: Row) => void;
     onOpenGroup?: (row: Row) => void;
+    showCreator?: boolean;
+    members?: OwnerOption[];
+    canEditCreator?: boolean;
+    creatorSaving?: Record<string, boolean>;
+    onAssignCreator?: (row: Row, creatorId: number | null) => void;
+    selectedIds?: Set<string>;
+    onToggleRow?: (id: string) => void;
+    onToggleAll?: (ids: string[], checked: boolean) => void;
+    onClearSelection?: () => void;
+    onBulkAssignCreator?: (creatorId: number | null) => void;
 }) {
     const showThumbnail = groupBy === 'ad';
     const showStatus = HAS_STATUS[groupBy];
@@ -168,6 +417,12 @@ function GridTable({
     // Budget lives on the campaign / ad-set entity (daily or lifetime), so it's
     // only meaningful — and only sent by the server — for those two dimensions.
     const showBudget = groupBy === 'campaign' || groupBy === 'ad_set';
+    // Selection is only offered alongside creator tagging.
+    const selectable = showCreator && !!onToggleRow;
+
+    const pageIds = rows?.data.map((r) => r.id) ?? [];
+    const selectedCount = pageIds.filter((id) => selectedIds?.has(id)).length;
+    const allSelected = pageIds.length > 0 && selectedCount === pageIds.length;
 
     const COLUMN_OPTIONS = [
         { id: 'name', label: groupLabel, category: 'General', required: true },
@@ -176,6 +431,9 @@ function GridTable({
             : []),
         ...(showBudget
             ? [{ id: 'budget', label: 'Budget', category: 'General' }]
+            : []),
+        ...(showCreator
+            ? [{ id: 'creator', label: 'Creator', category: 'General' }]
             : []),
         ...INSIGHTS_OPTIONS,
     ];
@@ -201,11 +459,41 @@ function GridTable({
         {
             accessorKey: 'name',
             enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title={groupLabel} />
-            ),
+            header: ({ column }) =>
+                selectable ? (
+                    <div className="flex items-center gap-2.5">
+                        <input
+                            type="checkbox"
+                            aria-label="Select all ads on this page"
+                            checked={allSelected}
+                            ref={(el) => {
+                                if (el)
+                                    el.indeterminate =
+                                        selectedCount > 0 && !allSelected;
+                            }}
+                            onChange={(e) =>
+                                onToggleAll?.(pageIds, e.target.checked)
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-3.5 w-3.5 shrink-0 rounded border-gray-300 accent-emerald-500"
+                        />
+                        <SortableHeader column={column} title={groupLabel} />
+                    </div>
+                ) : (
+                    <SortableHeader column={column} title={groupLabel} />
+                ),
             cell: ({ row }) => (
                 <div className="flex items-start gap-3">
+                    {selectable && (
+                        <input
+                            type="checkbox"
+                            aria-label="Select ad"
+                            checked={selectedIds?.has(row.original.id) ?? false}
+                            onChange={() => onToggleRow?.(row.original.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-gray-300 accent-emerald-500"
+                        />
+                    )}
                     {showThumbnail && (
                         <button
                             type="button"
@@ -304,6 +592,31 @@ function GridTable({
                   } as ColumnDef<Row>,
               ]
             : []),
+        ...(showCreator
+            ? [
+                  {
+                      id: 'creator',
+                      enableSorting: false,
+                      header: () => (
+                          <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                              Creator
+                          </span>
+                      ),
+                      cell: ({ row }: { row: { original: Row } }) => (
+                          <InlineOwner
+                              label="Creator"
+                              owner={creatorOf(row.original)}
+                              users={members}
+                              canEdit={canEditCreator}
+                              saving={creatorSaving[row.original.id] ?? false}
+                              onAssign={(id) =>
+                                  onAssignCreator?.(row.original, id)
+                              }
+                          />
+                      ),
+                  } as ColumnDef<Row>,
+              ]
+            : []),
         ...buildInsightsColumns<Row>(),
     ];
 
@@ -316,10 +629,32 @@ function GridTable({
     return (
         <div className="relative overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
             <div className="flex items-center justify-between gap-2 border-b border-black/6 px-3 py-2.5 dark:border-white/6">
-                <span className="font-mono text-[10px] tracking-wide text-gray-400 dark:text-gray-500">
-                    {(rows?.total ?? 0).toLocaleString()} {groupLabel}
-                    {(rows?.total ?? 0) === 1 ? '' : 's'}
-                </span>
+                {selectable && selectedCount > 0 ? (
+                    <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                            {selectedCount} selected
+                        </span>
+                        {canEditCreator && onBulkAssignCreator && (
+                            <BulkCreatorControl
+                                members={members}
+                                onAssign={onBulkAssignCreator}
+                            />
+                        )}
+                        <button
+                            type="button"
+                            onClick={onClearSelection}
+                            className="flex h-7 items-center gap-1 rounded-lg px-2 font-mono text-[11px] text-gray-500 transition-colors hover:bg-stone-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                        >
+                            <X className="h-3 w-3" />
+                            Clear
+                        </button>
+                    </div>
+                ) : (
+                    <span className="font-mono text-[10px] tracking-wide text-gray-400 dark:text-gray-500">
+                        {(rows?.total ?? 0).toLocaleString()} {groupLabel}
+                        {(rows?.total ?? 0) === 1 ? '' : 's'}
+                    </span>
+                )}
                 <ColumnVisibilityMenu
                     options={COLUMN_OPTIONS}
                     value={columnVisibility}
@@ -362,6 +697,8 @@ function GroupAdsModal({
     dateRange,
     selectedAccounts,
     accountsTotal,
+    members,
+    canEditCreator,
     onClose,
     onSelectAd,
 }: {
@@ -370,6 +707,8 @@ function GroupAdsModal({
     dateRange: { since: string; until: string };
     selectedAccounts: string[];
     accountsTotal: number;
+    members: OwnerOption[];
+    canEditCreator: boolean;
     onClose: () => void;
     onSelectAd: (ad: Row) => void;
 }) {
@@ -380,11 +719,20 @@ function GroupAdsModal({
     const [page, setPage] = useState(1);
     const [perPage, setPerPage] = useState(25);
 
-    // Reset paging whenever a new group opens.
+    const {
+        saving: creatorSaving,
+        assign: assignCreator,
+        bulkAssign: bulkAssignCreator,
+    } = useCreatorTagging(slug, members, setRows);
+    const { selectedIds, toggleRow, toggleAll, clear } = useRowSelection();
+
+    // Reset paging + selection whenever a new group opens.
     useEffect(() => {
         setSort(null);
         setPage(1);
         setPerPage(25);
+        clear();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [target?.groupBy, target?.group]);
 
     useEffect(() => {
@@ -458,6 +806,18 @@ function GroupAdsModal({
                                 setPerPage(Number(p.per_page) || 25);
                         }}
                         onSelectAd={onSelectAd}
+                        showCreator
+                        members={members}
+                        canEditCreator={canEditCreator}
+                        creatorSaving={creatorSaving}
+                        onAssignCreator={assignCreator}
+                        selectedIds={selectedIds}
+                        onToggleRow={toggleRow}
+                        onToggleAll={toggleAll}
+                        onClearSelection={clear}
+                        onBulkAssignCreator={(id) =>
+                            bulkAssignCreator([...selectedIds], id, clear)
+                        }
                     />
                 </div>
             </DialogContent>
@@ -826,10 +1186,13 @@ function GroupBySelect({
 export default function MetaAdsManager({
     workspace,
     accounts,
+    members,
     selectedAccounts,
     dateRange,
     query,
 }: Props) {
+    const canEditCreator = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
+
     const [groupBy, setGroupBy] = useState<GroupBy>(
         query?.groupBy ?? 'ad_name',
     );
@@ -839,6 +1202,8 @@ export default function MetaAdsManager({
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() =>
         deserializeMetricFilters(query?.metricFilters),
     );
+    // Creator filter: '' (all), 'unassigned', or a member id as string.
+    const [creatorFilter, setCreatorFilter] = useState<string>('');
     const [sort, setSort] = useState<string | null>(query?.sort ?? null);
     const [page, setPage] = useState<number>(Number(query?.page ?? 1) || 1);
     const [perPage, setPerPage] = useState<number>(
@@ -849,6 +1214,16 @@ export default function MetaAdsManager({
     const [loading, setLoading] = useState(true);
     const [previewAd, setPreviewAd] = useState<Row | null>(null);
     const [groupTarget, setGroupTarget] = useState<GroupTarget | null>(null);
+
+    const {
+        saving: creatorSaving,
+        assign: assignCreator,
+        bulkAssign: bulkAssignCreator,
+    } = useCreatorTagging(workspace.slug, members, setRows);
+    const { selectedIds, toggleRow, toggleAll, clear } = useRowSelection();
+
+    // The creator column, filter, and selection are only meaningful per-ad.
+    const showCreator = groupBy === 'ad';
 
     const groupLabel =
         GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Ad Name';
@@ -874,6 +1249,10 @@ export default function MetaAdsManager({
         if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
         const mf = serializeMetricFilters(metricFilters);
         if (mf) qs.set('metric_filters', mf);
+        // Creator filter is ad-level only.
+        if (groupBy === 'ad' && creatorFilter) {
+            qs.set('creator_id', creatorFilter);
+        }
         qs.set('page', String(page));
         qs.set('per_page', String(perPage));
 
@@ -908,6 +1287,7 @@ export default function MetaAdsManager({
         page,
         perPage,
         metricFilters,
+        creatorFilter,
         debouncedSearch,
         accounts.length,
         workspace.slug,
@@ -920,6 +1300,14 @@ export default function MetaAdsManager({
     const onGroupBy = (next: GroupBy) => {
         setGroupBy(next);
         setPage(1);
+        clear();
+        // The creator filter only applies to the ad grouping.
+        if (next !== 'ad') setCreatorFilter('');
+    };
+    const onCreatorFilter = (value: string) => {
+        setCreatorFilter(value === 'all' ? '' : value);
+        setPage(1);
+        clear();
     };
     const onDateRange = (since: string, until: string) => {
         setRange({ since, until });
@@ -999,6 +1387,32 @@ export default function MetaAdsManager({
                         />
                     </div>
                     <div className="ml-auto flex items-center gap-2">
+                        {showCreator && (
+                            <Select
+                                value={creatorFilter || 'all'}
+                                onValueChange={onCreatorFilter}
+                            >
+                                <SelectTrigger className="h-9 w-[180px] font-mono text-[11px]">
+                                    <SelectValue placeholder="All creators" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All creators
+                                    </SelectItem>
+                                    <SelectItem value="unassigned">
+                                        Unassigned
+                                    </SelectItem>
+                                    {members.map((m) => (
+                                        <SelectItem
+                                            key={m.id}
+                                            value={String(m.id)}
+                                        >
+                                            {m.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
                         <InsightFilterBuilder
                             filters={metricFilters}
                             onChange={onMetricFilters}
@@ -1025,6 +1439,18 @@ export default function MetaAdsManager({
                             label: row.name ?? '',
                         })
                     }
+                    showCreator={showCreator}
+                    members={members}
+                    canEditCreator={canEditCreator}
+                    creatorSaving={creatorSaving}
+                    onAssignCreator={assignCreator}
+                    selectedIds={selectedIds}
+                    onToggleRow={toggleRow}
+                    onToggleAll={toggleAll}
+                    onClearSelection={clear}
+                    onBulkAssignCreator={(id) =>
+                        bulkAssignCreator([...selectedIds], id, clear)
+                    }
                 />
             </div>
 
@@ -1040,6 +1466,8 @@ export default function MetaAdsManager({
                 dateRange={range}
                 selectedAccounts={selected}
                 accountsTotal={accounts.length}
+                members={members}
+                canEditCreator={canEditCreator}
                 onClose={() => setGroupTarget(null)}
                 onSelectAd={(ad) => setPreviewAd(ad)}
             />

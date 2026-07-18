@@ -2,6 +2,7 @@
 
 namespace Modules\MetaAds\Models;
 
+use App\Models\User as AppUser;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,6 +39,15 @@ class Ad extends Model
     public function creative(): BelongsTo
     {
         return $this->belongsTo(Creative::class, 'meta_ads_creative_id');
+    }
+
+    /**
+     * The app user tagged as this ad's internal creator. Nullable and assigned
+     * manually — Meta doesn't provide it.
+     */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(AppUser::class, 'creator_id');
     }
 
     public function insights(): HasMany
