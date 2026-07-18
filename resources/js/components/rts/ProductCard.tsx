@@ -64,7 +64,7 @@ export default function ProductCard({
                 ),
                 cell: ({ row }) =>
                     row.original.item_name ? (
-                        row.original.item_name
+                       'Sample Product'
                     ) : (
                         <span className="text-gray-400">Unknown</span>
                     ),
