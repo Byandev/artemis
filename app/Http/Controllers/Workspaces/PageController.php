@@ -309,7 +309,7 @@ class PageController extends Controller
             return response()->json(['valid' => false, 'message' => 'Page not found in this workspace.']);
         }
 
-        $token = $validated['token'] ?: $page->botcake_token;
+        $token = ($validated['token'] ?? null) ?: $page->botcake_token;
 
         if (blank($token)) {
             return response()->json(['valid' => false, 'message' => 'Enter a Botcake token first.']);
