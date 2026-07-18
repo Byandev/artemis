@@ -10,6 +10,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -25,15 +26,12 @@ import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
 import {
     Check,
-    ChevronDown,
-    ChevronRight,
     Download,
     MoreHorizontal,
     Pencil,
     Plus,
     Search,
     Trash2,
-    Truck,
 } from 'lucide-react';
 import moment from 'moment';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -63,6 +61,10 @@ interface PurchasedOrderItem {
 }
 
 const FULFILLMENT_BADGE: Record<string, { label: string; color: string }> = {
+    waiting: {
+        label: 'Waiting',
+        color: 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400',
+    },
     partial: {
         label: 'Partial',
         color: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
@@ -134,6 +136,34 @@ interface PurchasedOrder {
     items: PurchasedOrderItem[];
 }
 
+/**
+ * Columns are deliberately independent lists rather than row-for-row aligned
+ * blocks: item names stack once per line item, deliveries stack once per
+ * delivery, and balance/status are single PO-level values. Pinning the columns
+ * to each other made every item name look like it belonged to one delivery.
+ */
+const LINE_CLASS = 'flex h-6 items-center';
+
+/**
+ * Every delivery on the PO, flattened across line items, oldest first. The
+ * owning line item travels with each delivery because editing one still has to
+ * target the item it belongs to.
+ */
+const orderDeliveries = (order: PurchasedOrder) =>
+    order.items
+        .flatMap((item) =>
+            item.deliveries.map((delivery) => ({ delivery, item })),
+        )
+        .sort((a, b) =>
+            (a.delivery.delivery_date ?? '').localeCompare(
+                b.delivery.delivery_date ?? '',
+            ),
+        );
+
+/** Total quantity still owed across the whole PO. */
+const orderBalance = (order: PurchasedOrder) =>
+    order.items.reduce((sum, item) => sum + item.balance, 0);
+
 interface Totals {
     delivery_fee: number;
     cogs: number;
@@ -162,7 +192,8 @@ export default function PurchasedOrderIndex({
         null,
     );
     const [deliveryFor, setDeliveryFor] = useState<{
-        item: PurchasedOrderItem;
+        itemId: number;
+        balance: number;
         delivery: DeliveryTarget | null;
     } | null>(null);
     const initialSorting = useMemo(
@@ -234,111 +265,25 @@ export default function PurchasedOrderIndex({
     const columns = useMemo<ColumnDef<PurchasedOrder>[]>(() => {
         const cols: ColumnDef<PurchasedOrder>[] = [
             {
-                id: 'expander',
-                enableSorting: false,
-                meta: {
-                    headerClassName: 'w-0 px-0',
-                    cellClassName: 'w-0 px-0',
-                },
-                header: () => null,
-                cell: ({ row }) => (
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            row.toggleExpanded();
-                        }}
-                        aria-label={
-                            row.getIsExpanded()
-                                ? 'Collapse order items'
-                                : 'Expand order items'
-                        }
-                        className="flex h-6 w-5 items-center justify-center text-gray-400 transition-all hover:text-gray-600 dark:hover:text-gray-300"
-                    >
-                        <ChevronRight
-                            className={`h-3.5 w-3.5 transition-transform ${
-                                row.getIsExpanded() ? 'rotate-90' : ''
-                            }`}
-                        />
-                    </button>
-                ),
-            },
-            {
                 accessorKey: 'issue_date',
                 enableSorting: true,
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Issue Date" />
+                    <SortableHeader column={column} title="PO Date (Paid)" />
                 ),
                 cell: ({ row }) => (
-                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                    <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 dark:text-gray-400">
                         {row.original.issue_date
-                            ? row.original.issue_date.slice(0, 10)
+                            ? moment(row.original.issue_date).format('MMM D')
                             : '—'}
                     </span>
                 ),
-            },
-            {
-                accessorKey: 'cust_po_no',
-                enableSorting: true,
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="PO No." />
-                ),
-                cell: ({ row }) => (
-                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                        {row.original.cust_po_no || '—'}
-                    </span>
-                ),
-            },
-            {
-                accessorKey: 'items',
-                enableSorting: false,
-                header: () => (
-                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                        Items
-                    </span>
-                ),
-                cell: ({ row }) => (
-                    <div className="flex flex-col">
-                        {[...row.original.items].map((i, index) => (
-                            <span
-                                key={`${row.original.id}-${i.inventory_item?.sku}-${index}`}
-                            >
-                                {i.inventory_item?.sku}
-                            </span>
-                        ))}
-                    </div>
-                ),
-            },
-
-            {
-                id: 'delivered_count',
-                enableSorting: false,
-                header: () => (
-                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                        Delivered
-                    </span>
-                ),
-                cell: ({ row }) => {
-                    const deliveredQty = row.original.items.reduce(
-                        (sum, i) => sum + i.delivered_qty,
-                        0,
-                    );
-
-                    return (
-                        <span
-                            className={`font-mono text-[11px] text-gray-600 dark:text-gray-400`}
-                        >
-                            {deliveredQty.toLocaleString()}
-                        </span>
-                    );
-                },
             },
             {
                 id: 'total_qty',
                 enableSorting: false,
                 header: () => (
                     <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                        Total Count
+                        Total PO Qty
                     </span>
                 ),
                 cell: ({ row }) => {
@@ -347,125 +292,196 @@ export default function PurchasedOrderIndex({
                         0,
                     );
                     return (
-                        <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                        <span className="font-mono text-[11px] text-gray-600 tabular-nums dark:text-gray-400">
                             {totalQty.toLocaleString()}
                         </span>
                     );
                 },
             },
             {
-                id: 'subtotal',
+                accessorKey: 'cust_po_no',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="PO #" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 dark:text-gray-400">
+                        {row.original.cust_po_no || '—'}
+                    </span>
+                ),
+            },
+            {
+                id: 'item_name',
                 enableSorting: false,
+                meta: { cellClassName: 'min-w-[240px]' },
                 header: () => (
                     <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                        Subtotal
+                        Item Name
+                    </span>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex flex-col">
+                        {row.original.items.map((item) => (
+                            <div
+                                key={item.id}
+                                className={`group/item gap-2 ${LINE_CLASS}`}
+                            >
+                                <span
+                                    className="truncate font-mono text-[11px] text-gray-800 dark:text-gray-200"
+                                    title={item.inventory_item?.sku}
+                                >
+                                    {item.inventory_item?.product?.name ??
+                                        item.inventory_item?.sku ??
+                                        '—'}
+                                </span>
+                                {canEditPurchasedOrders && (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setDeliveryFor({
+                                                itemId: item.id,
+                                                balance: item.balance,
+                                                delivery: null,
+                                            })
+                                        }
+                                        aria-label="Record delivery"
+                                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-emerald-600 opacity-0 transition-all group-hover/item:opacity-100 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                                    >
+                                        <Plus className="h-3 w-3" />
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ),
+            },
+            {
+                id: 'deliveries',
+                enableSorting: false,
+                meta: { cellClassName: 'min-w-[250px]' },
+                header: () => (
+                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                        Delivered
                     </span>
                 ),
                 cell: ({ row }) => {
-                    const subtotal =
-                        Number(row.original.total_amount) -
-                        Number(row.original.delivery_fee);
+                    const deliveries = orderDeliveries(row.original);
+
+                    if (deliveries.length === 0) {
+                        return (
+                            <span className="font-mono text-[11px] text-gray-300 dark:text-gray-600">
+                                —
+                            </span>
+                        );
+                    }
+
                     return (
-                        <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                            ₱
-                            {subtotal.toLocaleString('en-PH', {
-                                minimumFractionDigits: 2,
-                            })}
+                        <div
+                            className={
+                                // A rail groups repeat attempts without the
+                                // noise of a rule under every line.
+                                deliveries.length > 1
+                                    ? 'flex flex-col border-l border-black/8 pl-2.5 dark:border-white/10'
+                                    : 'flex flex-col'
+                            }
+                        >
+                            {deliveries.map(({ delivery: d, item }) => (
+                                <div
+                                    key={d.id}
+                                    className={`group/delivery -mx-1 gap-2.5 rounded px-1 font-mono text-[11px] transition-colors hover:bg-stone-100/70 dark:hover:bg-zinc-800/60 ${LINE_CLASS}`}
+                                >
+                                    <span className="w-12 shrink-0 font-medium text-gray-700 dark:text-gray-300">
+                                        {d.delivery_date
+                                            ? moment(d.delivery_date).format(
+                                                  'MMM D',
+                                              )
+                                            : '—'}
+                                    </span>
+                                    <span className="w-20 shrink-0 truncate text-[10px] text-gray-400 dark:text-gray-500">
+                                        {d.delivery_no || '—'}
+                                    </span>
+                                    <span className="w-14 shrink-0 text-right font-medium text-gray-800 tabular-nums dark:text-gray-200">
+                                        {d.qty.toLocaleString()}
+                                    </span>
+                                    {canEditPurchasedOrders && (
+                                        <span className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/delivery:opacity-100">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setDeliveryFor({
+                                                        itemId: item.id,
+                                                        // Editing re-spends this
+                                                        // delivery's qty, so add
+                                                        // it back to the cap.
+                                                        balance:
+                                                            item.balance +
+                                                            d.qty,
+                                                        delivery: d,
+                                                    })
+                                                }
+                                                className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-stone-100 hover:text-gray-600 dark:hover:bg-zinc-800"
+                                                aria-label="Edit delivery"
+                                            >
+                                                <Pencil className="h-3 w-3" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    deleteDelivery(d)
+                                                }
+                                                className="flex h-5 w-5 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
+                                                aria-label="Delete delivery"
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </button>
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                },
+            },
+            {
+                id: 'balance',
+                enableSorting: false,
+                header: () => (
+                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                        Balance
+                    </span>
+                ),
+                cell: ({ row }) => {
+                    const balance = orderBalance(row.original);
+                    return (
+                        <span
+                            className={`rounded px-1.5 py-0.5 font-mono text-[11px] tabular-nums ${
+                                balance === 0
+                                    ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400'
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                            }`}
+                        >
+                            {balance.toLocaleString()}
                         </span>
                     );
                 },
             },
             {
-                accessorKey: 'delivery_fee',
-                enableSorting: true,
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Delivery Fee" />
-                ),
-                cell: ({ row }) => (
-                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                        ₱
-                        {Number(row.original.delivery_fee).toLocaleString(
-                            'en-PH',
-                            {
-                                minimumFractionDigits: 2,
-                            },
-                        )}
+                id: 'fulfillment_status',
+                enableSorting: false,
+                header: () => (
+                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                        Status
                     </span>
-                ),
-            },
-            {
-                accessorKey: 'total_amount',
-                enableSorting: true,
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Total Amount" />
-                ),
-                cell: ({ row }) => (
-                    <span className="font-mono text-[12px] font-semibold text-gray-800 dark:text-gray-200">
-                        ₱
-                        {Number(row.original.total_amount).toLocaleString(
-                            'en-PH',
-                            {
-                                minimumFractionDigits: 2,
-                            },
-                        )}
-                    </span>
-                ),
-            },
-            {
-                accessorKey: 'status',
-                enableSorting: true,
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Status" />
                 ),
                 cell: ({ row }) => {
-                    const order = row.original;
-                    const s = STATUSES[order.status] ?? STATUSES[1];
-                    const badgeClass = `inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${s.color}`;
-
-                    if (!canEditPurchasedOrders) {
-                        return <span className={badgeClass}>{s.label}</span>;
-                    }
-
+                    const badge =
+                        FULFILLMENT_BADGE[row.original.fulfillment_status];
                     return (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button
-                                    type="button"
-                                    className={`${badgeClass} cursor-pointer transition-opacity hover:opacity-80`}
-                                >
-                                    {s.label}
-                                    <ChevronDown className="h-3 w-3 opacity-60" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-44">
-                                {Object.entries(STATUSES).map(
-                                    ([value, info]) => {
-                                        const num = Number(value);
-                                        return (
-                                            <DropdownMenuItem
-                                                key={value}
-                                                onClick={() =>
-                                                    updateOrderStatus(
-                                                        order,
-                                                        num,
-                                                    )
-                                                }
-                                                className="text-[12px]"
-                                            >
-                                                <Check
-                                                    className={`mr-2 h-3.5 w-3.5 ${
-                                                        num === order.status
-                                                            ? 'opacity-100'
-                                                            : 'opacity-0'
-                                                    }`}
-                                                />
-                                                {info.label}
-                                            </DropdownMenuItem>
-                                        );
-                                    },
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-medium whitespace-nowrap ${badge.color}`}
+                        >
+                            {badge.label}
+                        </span>
                     );
                 },
             },
@@ -477,43 +493,56 @@ export default function PurchasedOrderIndex({
                 ),
                 cell: ({ row }) => {
                     const order = row.original;
-                    const tBadge = order.delivery_timeliness
-                        ? TIMELINESS_BADGE[order.delivery_timeliness]
+                    return canEditPurchasedOrders ? (
+                        <DatePicker
+                            id={`expected-${order.id}`}
+                            mode="single"
+                            compact
+                            placeholder="Set date"
+                            defaultDate={
+                                order.expected_delivery_date?.slice(0, 10) ||
+                                undefined
+                            }
+                            onChange={(_dates, dateStr) =>
+                                updateOrderExpectedDate(order, dateStr)
+                            }
+                        />
+                    ) : (
+                        <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 dark:text-gray-400">
+                            {order.expected_delivery_date
+                                ? moment(order.expected_delivery_date).format(
+                                      'MMM D',
+                                  )
+                                : '—'}
+                        </span>
+                    );
+                },
+            },
+            {
+                id: 'timeliness',
+                enableSorting: false,
+                header: () => (
+                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                        Status
+                    </span>
+                ),
+                cell: ({ row }) => {
+                    const badge = row.original.delivery_timeliness
+                        ? TIMELINESS_BADGE[row.original.delivery_timeliness]
                         : null;
+                    if (!badge) {
+                        return (
+                            <span className="font-mono text-[11px] text-gray-300 dark:text-gray-600">
+                                —
+                            </span>
+                        );
+                    }
                     return (
-                        <div className="flex items-center gap-2">
-                            {canEditPurchasedOrders ? (
-                                <DatePicker
-                                    id={`expected-${order.id}`}
-                                    mode="single"
-                                    compact
-                                    placeholder="Set date"
-                                    defaultDate={
-                                        order.expected_delivery_date?.slice(
-                                            0,
-                                            10,
-                                        ) || undefined
-                                    }
-                                    onChange={(_dates, dateStr) =>
-                                        updateOrderExpectedDate(order, dateStr)
-                                    }
-                                />
-                            ) : (
-                                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                                    {order.expected_delivery_date?.slice(
-                                        0,
-                                        10,
-                                    ) ?? '—'}
-                                </span>
-                            )}
-                            {tBadge && (
-                                <span
-                                    className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-medium ${tBadge.color}`}
-                                >
-                                    {tBadge.label}
-                                </span>
-                            )}
-                        </div>
+                        <span
+                            className={`inline-flex w-fit items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-medium whitespace-nowrap ${badge.color}`}
+                        >
+                            {badge.label}
+                        </span>
                     );
                 },
             },
@@ -536,8 +565,43 @@ export default function PurchasedOrderIndex({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
                                     align="end"
-                                    className="w-36"
+                                    className="w-44"
                                 >
+                                    {canEditPurchasedOrders && (
+                                        <>
+                                            <DropdownMenuLabel className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                                                PO Status
+                                            </DropdownMenuLabel>
+                                            {Object.entries(STATUSES).map(
+                                                ([value, info]) => {
+                                                    const num = Number(value);
+                                                    return (
+                                                        <DropdownMenuItem
+                                                            key={value}
+                                                            onClick={() =>
+                                                                updateOrderStatus(
+                                                                    order,
+                                                                    num,
+                                                                )
+                                                            }
+                                                            className="text-[12px]"
+                                                        >
+                                                            <Check
+                                                                className={`mr-2 h-3.5 w-3.5 ${
+                                                                    num ===
+                                                                    order.status
+                                                                        ? 'opacity-100'
+                                                                        : 'opacity-0'
+                                                                }`}
+                                                            />
+                                                            {info.label}
+                                                        </DropdownMenuItem>
+                                                    );
+                                                },
+                                            )}
+                                            <DropdownMenuSeparator />
+                                        </>
+                                    )}
                                     {canEditPurchasedOrders && (
                                         <DropdownMenuItem
                                             onClick={() =>
@@ -588,7 +652,8 @@ export default function PurchasedOrderIndex({
             { expected_delivery_date: value || null },
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Expected delivery date updated'),
+                onSuccess: () =>
+                    toast.success('Expected delivery date updated'),
                 onError: () => toast.error('Failed to update expected date'),
             },
         );
@@ -619,114 +684,6 @@ export default function PurchasedOrderIndex({
             },
         );
     };
-
-    const renderOrderItems = (order: PurchasedOrder) => (
-        <div className="space-y-2 px-4 py-3">
-            {order.items.map((item) => {
-                const badge =
-                    item.fulfillment_status === 'waiting'
-                        ? null
-                        : FULFILLMENT_BADGE[item.fulfillment_status];
-                return (
-                    <div
-                        key={item.id}
-                        className="rounded-[10px] border border-black/6 bg-white p-3 dark:border-white/8 dark:bg-zinc-900"
-                    >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <span className="font-mono text-[12px] font-medium text-gray-800 dark:text-gray-200">
-                                    {item.inventory_item?.sku ?? '—'}
-                                </span>
-                                {item.inventory_item?.product && (
-                                    <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                                        {item.inventory_item.product.name}
-                                    </span>
-                                )}
-                                {badge && (
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-medium ${badge.color}`}
-                                    >
-                                        {badge.label}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                                    {item.delivered_qty} / {item.count} delivered
-                                    {item.balance > 0 && (
-                                        <span className="text-amber-600 dark:text-amber-400">
-                                            {' '}
-                                            · {item.balance} left
-                                        </span>
-                                    )}
-                                </span>
-                                {canEditPurchasedOrders && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setDeliveryFor({
-                                                item,
-                                                delivery: null,
-                                            })
-                                        }
-                                        className="flex h-7 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 font-mono! text-[11px]! font-medium text-white transition-all hover:bg-emerald-700"
-                                    >
-                                        <Plus className="h-3 w-3" />
-                                        Record Delivery
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {item.deliveries.length > 0 && (
-                            <div className="mt-2 space-y-1 border-t border-black/5 pt-2 dark:border-white/5">
-                                {item.deliveries.map((d) => (
-                                    <div
-                                        key={d.id}
-                                        className="flex items-center justify-between gap-3"
-                                    >
-                                        <div className="flex items-center gap-3 font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                                            <Truck className="h-3 w-3 text-gray-400" />
-                                            <span>{d.delivery_date?.slice(0, 10)}</span>
-                                            <span className="text-gray-400">
-                                                {d.delivery_no || 'No DR'}
-                                            </span>
-                                            <span>{d.qty} unit{d.qty === 1 ? '' : 's'}</span>
-                                        </div>
-                                        {canEditPurchasedOrders && (
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setDeliveryFor({
-                                                            item,
-                                                            delivery: d,
-                                                        })
-                                                    }
-                                                    className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-stone-100 hover:text-gray-600 dark:hover:bg-zinc-800"
-                                                    aria-label="Edit delivery"
-                                                >
-                                                    <Pencil className="h-3 w-3" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => deleteDelivery(d)}
-                                                    className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
-                                                    aria-label="Delete delivery"
-                                                >
-                                                    <Trash2 className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
 
     return (
         <AppLayout>
@@ -800,7 +757,6 @@ export default function PurchasedOrderIndex({
                         enableInternalPagination={false}
                         data={orders.data || []}
                         initialSorting={initialSorting}
-                        renderSubRow={(row) => renderOrderItems(row.original)}
                         meta={{ ...omit(orders, ['data']) }}
                         onFetch={(params) => {
                             router.get(
@@ -853,8 +809,8 @@ export default function PurchasedOrderIndex({
 
                 <RecordDeliveryDialog
                     workspace={workspace}
-                    itemId={deliveryFor?.item.id ?? null}
-                    itemBalance={deliveryFor?.item.balance}
+                    itemId={deliveryFor?.itemId ?? null}
+                    itemBalance={deliveryFor?.balance}
                     delivery={deliveryFor?.delivery}
                     open={deliveryFor !== null}
                     onClose={() => setDeliveryFor(null)}
