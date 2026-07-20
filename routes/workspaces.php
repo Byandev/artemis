@@ -44,6 +44,8 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Botcake\Http\Controllers\Web\FlowController;
 use Modules\Botcake\Http\Controllers\Web\SequenceController;
+use Modules\SimGateway\Http\Controllers\ScheduledMessageController;
+use Modules\SimGateway\Http\Controllers\SmsController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
 use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
@@ -560,6 +562,17 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{creative}/reviews', [CreativesController::class, 'addReview'])->name('reviews.store');
         Route::put('/{creative}/reviews/{review}', [CreativesController::class, 'updateReview'])->name('reviews.update');
         Route::put('/{creative}/ads-campaign', [CreativesController::class, 'updateAdsCampaign'])->name('ads-campaign.update');
+    });
+
+    Route::prefix('/workspaces/{workspace:slug}/sms')->name('workspaces.sms.')->group(function () {
+        Route::get('/send', [SmsController::class, 'create'])->name('send');
+        Route::post('/send', [SmsController::class, 'store'])->name('store');
+        Route::post('/bulk', [SmsController::class, 'bulkStore'])->name('bulk');
+        Route::get('/inbox', [SmsController::class, 'inbox'])->name('inbox');
+        Route::get('/outbox', [SmsController::class, 'outbox'])->name('outbox');
+        Route::get('/scheduled', [ScheduledMessageController::class, 'index'])->name('scheduled.index');
+        Route::post('/scheduled', [ScheduledMessageController::class, 'store'])->name('scheduled.store');
+        Route::delete('/scheduled/{message}', [ScheduledMessageController::class, 'destroy'])->name('scheduled.destroy');
     });
 
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');

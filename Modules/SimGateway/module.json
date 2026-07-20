@@ -1,0 +1,11 @@
+{
+    "name": "SimGateway",
+    "alias": "simgateway",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\SimGateway\\Providers\\SimGatewayServiceProvider"
+    ],
+    "files": []
+}
