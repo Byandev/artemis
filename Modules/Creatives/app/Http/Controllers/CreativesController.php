@@ -287,14 +287,18 @@ class CreativesController extends Controller
         }
 
         // Inline edits (e.g. the status dropdowns on the index) post partial
-        // payloads and expect to stay put; the full edit page posts the whole
-        // form and should return to the list.
-        if ($request->headers->get('X-Inertia-Partial-Component') || ! $request->has('name')) {
+        // payloads and expect to stay put — back() lands on the index they were
+        // sent from, filters and all.
+        if (! $request->has('name')) {
             return back()->with('success', 'Creative updated successfully');
         }
 
+        // The full edit form posts every field and returns to the list. back()
+        // would bounce to the edit page (it is the referer), so redirect to the
+        // index explicitly, carrying the list's filters — the form forwards them
+        // on the query string.
         return redirect()
-            ->back()
+            ->route('workspaces.creatives.index', [$workspace, ...$request->query()])
             ->with('success', 'Creative updated successfully');
     }
 

@@ -1,7 +1,8 @@
 import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
+import { queryStringOf } from '@/lib/url';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import { CreativeForm } from './components/creative-form';
 import { Creative, Product, Reviewer } from './types';
@@ -19,13 +20,17 @@ export default function CreativeEdit({
 }) {
     const baseUrl = `/workspaces/${workspace.slug}/creatives`;
 
+    // The index hands its filters over on our query string; keep them on every
+    // route back to the list so the user returns to the list they left.
+    const listQuery = queryStringOf(usePage().url);
+
     return (
         <AppLayout>
             <Head title={`Edit · ${creative.name}`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader title="Edit Creative" description={creative.name}>
                     <button
-                        onClick={() => router.visit(baseUrl)}
+                        onClick={() => router.visit(`${baseUrl}${listQuery}`)}
                         className="flex items-center gap-1.5 font-mono! text-[12px]! text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" /> Back to Creatives
@@ -36,6 +41,7 @@ export default function CreativeEdit({
                     creative={creative}
                     reviewers={reviewers}
                     products={products}
+                    listQuery={listQuery}
                 />
             </div>
         </AppLayout>

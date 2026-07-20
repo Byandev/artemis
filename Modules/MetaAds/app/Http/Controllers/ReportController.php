@@ -3,6 +3,7 @@
 namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,6 +67,7 @@ class ReportController extends Controller
             'reports' => $this->activeReports($workspace),
             'archivedReports' => $this->archivedReports($workspace),
             'accounts' => $this->accountsForWorkspace($request, $workspace),
+            'members' => $this->workspaceMembers($workspace),
             'customBreakdowns' => CustomBreakdown::where('workspace_id', $workspace->id)
                 ->orderBy('name')
                 ->get(['id', 'name'])
@@ -159,6 +161,25 @@ class ReportController extends Controller
             ->orderBy('meta_ads_accounts.name')
             ->get()
             ->map(fn ($a) => ['id' => (string) $a->id, 'name' => $a->name])
+            ->all();
+    }
+
+    /**
+     * Workspace members (users + owner) assignable as an ad's internal creator,
+     * so the report builder's creator filter can render names.
+     *
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function workspaceMembers(Workspace $workspace): array
+    {
+        $ids = $workspace->users()->pluck('users.id')
+            ->push($workspace->owner_id)
+            ->filter()
+            ->unique();
+
+        return User::whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name'])
             ->all();
     }
 }
