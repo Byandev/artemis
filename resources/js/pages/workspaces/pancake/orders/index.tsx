@@ -468,7 +468,7 @@ export default function PancakeOrdersIndex({
                         className="block max-w-[220px] truncate text-[12px] text-gray-700 dark:text-gray-300"
                         title={label}
                     >
-                        Sample Product
+                        {label}
                     </span>
                 );
             },

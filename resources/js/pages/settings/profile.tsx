@@ -97,32 +97,6 @@ export default function Profile({
                                     />
                                 </div>
 
-                                <div className="grid gap-2">
-                                    <Label htmlFor="gotyme_number">
-                                        GoTyme Number
-                                    </Label>
-
-                                    <Input
-                                        id="gotyme_number"
-                                        className="mt-1 block w-full"
-                                        defaultValue={
-                                            auth.user.gotyme_number ?? ''
-                                        }
-                                        name="gotyme_number"
-                                        placeholder="GoTyme account number"
-                                    />
-
-                                    <p className="text-sm text-muted-foreground">
-                                        Filled in automatically on your fund
-                                        requests.
-                                    </p>
-
-                                    <InputError
-                                        className="mt-2"
-                                        message={errors.gotyme_number}
-                                    />
-                                </div>
-
                                 {mustVerifyEmail &&
                                     auth.user.email_verified_at === null && (
                                         <div>
