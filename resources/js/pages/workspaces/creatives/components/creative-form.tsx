@@ -50,11 +50,14 @@ export function CreativeForm({
     creative,
     reviewers = [],
     products = [],
+    listQuery = '',
 }: {
     workspace: Workspace;
     creative?: Creative;
     reviewers?: Reviewer[];
     products?: Product[];
+    /** The list's `?filter[...]=` query string, so Cancel and Save return to it. */
+    listQuery?: string;
 }) {
     const isEdit = !!creative;
     const canUpdateStatus = usePermission(PERMISSIONS.UpdateCreativeStatus);
@@ -81,7 +84,9 @@ export function CreativeForm({
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         if (isEdit) {
-            put(`${baseUrl}/${creative!.id}`);
+            // The query string rides along so `update` can redirect back to the
+            // list with its filters intact.
+            put(`${baseUrl}/${creative!.id}${listQuery}`);
         } else {
             post(baseUrl);
         }
@@ -170,8 +175,7 @@ export function CreativeForm({
                         </div>
                         <div className="space-y-1.5">
                             <label htmlFor="cf-headline" className={fl}>
-                                Headline{' '}
-                                <span className="text-red-400">*</span>
+                                Headline <span className="text-red-400">*</span>
                             </label>
                             <input
                                 id="cf-headline"
@@ -188,8 +192,7 @@ export function CreativeForm({
                         </div>
                         <div className="col-span-2 space-y-1.5">
                             <label className={fl}>
-                                Product{' '}
-                                <span className="text-red-400">*</span>
+                                Product <span className="text-red-400">*</span>
                             </label>
                             <ProductPicker
                                 products={products}
@@ -250,8 +253,7 @@ export function CreativeForm({
                         )}
                         <div className="space-y-1.5">
                             <label htmlFor="cf-caption" className={fl}>
-                                Caption{' '}
-                                <span className="text-red-400">*</span>
+                                Caption <span className="text-red-400">*</span>
                             </label>
                             <textarea
                                 id="cf-caption"
@@ -436,7 +438,7 @@ export function CreativeForm({
                 <button
                     type="button"
                     disabled={processing}
-                    onClick={() => router.visit(baseUrl)}
+                    onClick={() => router.visit(`${baseUrl}${listQuery}`)}
                     className="flex h-9 items-center rounded-lg border border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
                 >
                     Cancel

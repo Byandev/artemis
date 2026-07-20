@@ -82,9 +82,11 @@ export default function Edit({ workspace, page, users }: Props) {
         });
     };
 
-    // Validate the parcel-journey flow ID against the locally-synced flows
-    // before saving so a bad reference is caught here rather than only on the
-    // server round-trip. Custom field IDs have no local source to check against.
+    // Validate the parcel-journey flow ID before saving so a bad reference is
+    // caught here rather than only on the server round-trip. The token being
+    // typed is sent along so a token and flow ID entered together validate as a
+    // pair — otherwise the check would run against the stored token and reject
+    // a valid flow. Custom field IDs have no local source to check against.
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -96,6 +98,7 @@ export default function Edit({ workspace, page, users }: Props) {
                     {
                         page_id: String(page.id),
                         flow_id: data.parcel_journey_flow_id,
+                        token: data.botcake_token,
                     },
                 );
                 if (!result.valid) {

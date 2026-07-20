@@ -65,6 +65,7 @@ use Modules\Inventory\Http\Controllers\UnitCodeController;
 use Modules\MetaAds\Http\Controllers\AdAccountOwnerController;
 use Modules\MetaAds\Http\Controllers\AdAccountSyncController;
 use Modules\MetaAds\Http\Controllers\AdAccountToggleSyncController;
+use Modules\MetaAds\Http\Controllers\AdCreatorController;
 use Modules\MetaAds\Http\Controllers\AdsCalendarController;
 use Modules\MetaAds\Http\Controllers\AdsManagerController;
 use Modules\MetaAds\Http\Controllers\AdSpentSummaryController;
@@ -266,6 +267,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/detail', [AdsManagerController::class, 'adDetail'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.detail');
+    Route::post('/workspaces/{workspace}/integrations/meta/ads-manager/ads/creator/bulk', [AdCreatorController::class, 'bulk'])
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.ads-manager.ads.creator.bulk');
+    Route::patch('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/creator', [AdCreatorController::class, 'update'])
+        ->middleware('can:Manage Meta Ads Accounts,workspace')
+        ->name('workspaces.metaads.ads-manager.ads.creator');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-calendar', [AdsCalendarController::class, 'index'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-calendar');
