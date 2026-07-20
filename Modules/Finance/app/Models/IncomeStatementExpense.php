@@ -11,6 +11,8 @@ class IncomeStatementExpense extends Model
 
     protected $fillable = [
         'income_statement_id',
+        'source',
+        'section',
         'transaction_type_id',
         'type_name',
         'amount',

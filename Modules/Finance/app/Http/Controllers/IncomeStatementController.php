@@ -4,7 +4,6 @@ namespace Modules\Finance\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Order;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -13,21 +12,36 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
+use Modules\GencysERP\Models\GencysDailySalesOrder;
 
 /**
- * Monthly income statement for non-gencys-partner workspaces.
+ * Monthly workspace-wide income statement for gencys-partner workspaces.
  *
- * Revenue is delivered Pancake orders; expenses are the month's finance
- * transactions grouped by transaction type. The user picks which types to
- * include, and a save snapshots the header + one breakdown row per included
- * type. Saved statements are frozen; Regenerate re-pulls the amounts while
- * keeping the previously-included types.
+ * Two-tier P&L:
+ *   Gross Profit = Delivered − Cost of Sales
+ *   Net Profit   = Gross Profit − Advisory Share − OPEX
+ *
+ * Cost of Sales = the auto lines (Shipping Fee, COD Fee, VAT) plus every
+ * transaction type flagged `is_gross_profit_deduction`. OPEX = every *other*
+ * outflow transaction type. Which side a line sits on is stored per breakdown row
+ * (`section`) so a later flag change doesn't reclassify a closed statement.
  */
 class IncomeStatementController extends Controller
 {
     use AuthorizesRequests;
+
+    /** gencys_orders.parcel_status value that counts as delivered revenue. */
+    private const DELIVERED_STATUS = 'DELIVERED';
+
+    /** Sentinel type_keys for the auto-computed cost-of-sales lines. */
+    private const SHIPPING_FEE_KEY = -1;
+
+    private const COD_FEE_KEY = -2;
+
+    private const VAT_KEY = -3;
 
     public function index(Request $request, Workspace $workspace)
     {
@@ -36,7 +50,7 @@ class IncomeStatementController extends Controller
 
         $statements = IncomeStatement::where('workspace_id', $workspace->id)
             ->orderByDesc('period_month')
-            ->get(['id', 'period_month', 'total_delivered', 'total_expenses', 'net_profit', 'status', 'generated_at']);
+            ->get(['id', 'period_month', 'total_delivered', 'gross_profit', 'total_expenses', 'net_profit', 'status', 'generated_at']);
 
         return Inertia::render('workspaces/finance/income-statements/index', [
             'workspace' => $workspace,
@@ -46,10 +60,9 @@ class IncomeStatementController extends Controller
     }
 
     /**
-     * Live preview for a month (nothing saved). Shows delivered revenue and every
-     * transaction type's expense total with a checkbox. If a saved statement
-     * already exists for the month, its included types are pre-checked; otherwise
-     * every type defaults to checked.
+     * Live preview for a month (nothing saved). Shows delivered revenue, the
+     * cost-of-sales lines and the OPEX transaction buckets, each with a checkbox
+     * and its section, plus the (default) rates.
      */
     public function preview(Request $request, Workspace $workspace)
     {
@@ -58,17 +71,22 @@ class IncomeStatementController extends Controller
 
         [$periodMonth, $from, $to] = $this->resolveMonth($request->input('month'));
 
-        $revenue = $this->deliveredRevenue($workspace, $from, $to);
-        $buckets = $this->expenseBuckets($workspace, $from, $to);
-
         $existing = IncomeStatement::with('breakdown')
             ->where('workspace_id', $workspace->id)
             ->whereDate('period_month', $periodMonth)
             ->first();
 
-        $includedKeys = $existing
-            ? $existing->breakdown->map(fn ($b) => (int) ($b->transaction_type_id ?? 0))->all()
-            : null; // null → all checked by default
+        [$defaultCod, $defaultVat, $defaultAdvisory] = $this->workspaceRates($workspace);
+        $codRate = (float) ($request->input('cod_rate') ?? $existing?->cod_fee_rate ?? $defaultCod);
+        $vatRate = (float) ($request->input('vat_rate') ?? $existing?->vat_rate ?? $defaultVat);
+        $advisoryRate = (float) ($request->input('advisory_rate') ?? $existing?->advisory_rate ?? $defaultAdvisory);
+
+        $revenue = $this->deliveredRevenue($workspace, $from, $to);
+        $lines = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate);
+
+        // Preview always defaults every line checked, so lines that appear after a
+        // statement was last saved (e.g. a newly-flagged type, or new transactions)
+        // are picked up on the next Save. Regenerate is the "keep my exact set" path.
 
         return Inertia::render('workspaces/finance/income-statements/show', [
             'workspace' => $workspace,
@@ -78,9 +96,13 @@ class IncomeStatementController extends Controller
                 'period_month' => $periodMonth,
                 'delivered' => $revenue['delivered'],
                 'orders' => $revenue['orders'],
-                'expenses' => $buckets->map(fn ($b) => [
-                    ...$b,
-                    'included' => $includedKeys === null || in_array($b['type_key'], $includedKeys, true),
+                'cod_fee_rate' => $codRate,
+                'vat_rate' => $vatRate,
+                'advisory_rate' => $advisoryRate,
+                'gencys_partner' => (bool) $workspace->is_gencys_partner,
+                'expenses' => $lines->map(fn ($l) => [
+                    ...$l,
+                    'included' => true,
                 ])->values(),
             ],
         ]);
@@ -95,9 +117,17 @@ class IncomeStatementController extends Controller
             'month' => ['required', 'date_format:Y-m'],
             'included_keys' => ['array'],
             'included_keys.*' => ['integer'],
+            'cod_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'vat_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'advisory_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
         ]);
 
         [$periodMonth, $from, $to] = $this->resolveMonth($validated['month']);
+
+        [$defaultCod, $defaultVat, $defaultAdvisory] = $this->workspaceRates($workspace);
+        $codRate = (float) ($validated['cod_rate'] ?? $defaultCod);
+        $vatRate = (float) ($validated['vat_rate'] ?? $defaultVat);
+        $advisoryRate = (float) ($validated['advisory_rate'] ?? $defaultAdvisory);
 
         $statement = $this->persist(
             $workspace,
@@ -105,6 +135,14 @@ class IncomeStatementController extends Controller
             $from,
             $to,
             collect($validated['included_keys'] ?? []),
+            $codRate,
+            $vatRate,
+            $advisoryRate,
+        );
+
+        IncomeStatementSetting::updateOrCreate(
+            ['workspace_id' => $workspace->id],
+            ['cod_fee_rate' => $codRate, 'vat_rate' => $vatRate, 'advisory_rate' => $advisoryRate],
         );
 
         return redirect()
@@ -128,20 +166,28 @@ class IncomeStatementController extends Controller
                 'period_month' => $incomeStatement->period_month->toDateString(),
                 'delivered' => (float) $incomeStatement->total_delivered,
                 'orders' => (int) $incomeStatement->delivered_orders,
+                'gross_profit' => (float) $incomeStatement->gross_profit,
                 'total_expenses' => (float) $incomeStatement->total_expenses,
                 'net_profit' => (float) $incomeStatement->net_profit,
+                'cod_fee_rate' => (float) $incomeStatement->cod_fee_rate,
+                'vat_rate' => (float) $incomeStatement->vat_rate,
+                'advisory_rate' => (float) $incomeStatement->advisory_rate,
+                'advisory_share' => (float) $incomeStatement->advisory_share,
+                'gencys_partner' => (bool) $workspace->is_gencys_partner,
                 'generated_at' => $incomeStatement->generated_at?->toIso8601String(),
                 'expenses' => $incomeStatement->breakdown->map(fn ($b) => [
-                    'type_key' => (int) ($b->transaction_type_id ?? 0),
+                    'type_key' => $this->keyForRow($b),
                     'type_name' => $b->type_name,
                     'amount' => (float) $b->amount,
+                    'source' => $b->source,
+                    'section' => $b->section,
                     'included' => true,
                 ])->values(),
             ],
         ]);
     }
 
-    /** Re-pull the month's numbers, keeping the same included types, and overwrite. */
+    /** Re-pull the month's numbers with the snapshotted rates + included lines. */
     public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
     {
         $this->guard($request, $workspace);
@@ -150,11 +196,18 @@ class IncomeStatementController extends Controller
 
         [$periodMonth, $from, $to] = $this->resolveMonth($incomeStatement->period_month->format('Y-m'));
 
-        $includedKeys = $incomeStatement->breakdown()
-            ->pluck('transaction_type_id')
-            ->map(fn ($id) => (int) ($id ?? 0));
+        $includedKeys = $incomeStatement->breakdown->map(fn ($b) => $this->keyForRow($b));
 
-        $this->persist($workspace, $periodMonth, $from, $to, $includedKeys);
+        $this->persist(
+            $workspace,
+            $periodMonth,
+            $from,
+            $to,
+            $includedKeys,
+            (float) $incomeStatement->cod_fee_rate,
+            (float) $incomeStatement->vat_rate,
+            (float) $incomeStatement->advisory_rate,
+        );
 
         return redirect()->back()->with('success', 'Income statement regenerated.');
     }
@@ -177,11 +230,20 @@ class IncomeStatementController extends Controller
             fputcsv($out, ['Total Delivered', $incomeStatement->total_delivered]);
             fputcsv($out, ['Delivered Orders', $incomeStatement->delivered_orders]);
             fputcsv($out, []);
-            fputcsv($out, ['Expenses by Type', 'Amount']);
-            foreach ($incomeStatement->breakdown as $row) {
+            fputcsv($out, ['Cost of Sales', 'Amount']);
+            foreach ($incomeStatement->breakdown->where('section', 'cost_of_sales') as $row) {
                 fputcsv($out, [$row->type_name, $row->amount]);
             }
-            fputcsv($out, ['Total Expenses', $incomeStatement->total_expenses]);
+            fputcsv($out, ['Gross Profit', $incomeStatement->gross_profit]);
+            fputcsv($out, []);
+            fputcsv($out, ['OPEX', 'Amount']);
+            foreach ($incomeStatement->breakdown->where('section', 'opex') as $row) {
+                fputcsv($out, [$row->type_name, $row->amount]);
+            }
+            if ($incomeStatement->advisory_share > 0) {
+                $label = 'Advisory Share ('.rtrim(rtrim(number_format((float) $incomeStatement->advisory_rate * 100, 2), '0'), '.').'%)';
+                fputcsv($out, [$label, $incomeStatement->advisory_share]);
+            }
             fputcsv($out, []);
             fputcsv($out, ['Net Profit', $incomeStatement->net_profit]);
 
@@ -203,29 +265,42 @@ class IncomeStatementController extends Controller
     }
 
     /**
-     * Recompute the month's revenue + included expense totals and (over)write the
-     * snapshot: the header plus one breakdown row per included type. Amounts are
-     * always recomputed server-side, never trusted from the client.
+     * Recompute the month's revenue, cost of sales, gross profit, advisory, OPEX
+     * and net profit for the included lines, and (over)write the snapshot.
      */
-    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys): IncomeStatement
+    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, float $codRate, float $vatRate, float $advisoryRate): IncomeStatement
     {
         $revenue = $this->deliveredRevenue($workspace, $from, $to);
 
-        $included = $this->expenseBuckets($workspace, $from, $to)
-            ->filter(fn ($b) => $includedKeys->contains($b['type_key']))
+        $included = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate)
+            ->filter(fn ($l) => $includedKeys->contains($l['type_key']))
             ->values();
 
-        $totalExpenses = (float) $included->sum('amount');
-        $netProfit = $revenue['delivered'] - $totalExpenses;
+        $costOfSales = (float) $included->where('section', 'cost_of_sales')->sum('amount');
+        $opex = (float) $included->where('section', 'opex')->sum('amount');
 
-        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $totalExpenses, $netProfit) {
+        $grossProfit = $revenue['delivered'] - $costOfSales;
+
+        // Advisory share: a % of positive Gross Profit, gencys-partner only.
+        $advisoryShare = ($workspace->is_gencys_partner && $grossProfit > 0)
+            ? round($grossProfit * $advisoryRate, 2)
+            : 0.0;
+
+        $netProfit = $grossProfit - $opex - $advisoryShare;
+
+        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $codRate, $vatRate, $advisoryRate, $advisoryShare) {
             $statement = IncomeStatement::updateOrCreate(
                 ['workspace_id' => $workspace->id, 'period_month' => $periodMonth],
                 [
                     'total_delivered' => $revenue['delivered'],
                     'delivered_orders' => $revenue['orders'],
-                    'total_expenses' => $totalExpenses,
+                    'total_expenses' => $costOfSales + $opex,
+                    'gross_profit' => $grossProfit,
                     'net_profit' => $netProfit,
+                    'cod_fee_rate' => $codRate,
+                    'vat_rate' => $vatRate,
+                    'advisory_rate' => $advisoryRate,
+                    'advisory_share' => $advisoryShare,
                     'status' => 'final',
                     'generated_at' => now(),
                 ],
@@ -233,11 +308,15 @@ class IncomeStatementController extends Controller
 
             $statement->breakdown()->delete();
 
-            foreach ($included as $b) {
+            foreach ($included as $l) {
                 $statement->breakdown()->create([
-                    'transaction_type_id' => $b['type_key'] === 0 ? null : $b['type_key'],
-                    'type_name' => $b['type_name'],
-                    'amount' => $b['amount'],
+                    'source' => $l['source'],
+                    'section' => $l['section'],
+                    'transaction_type_id' => ($l['source'] === 'transaction_type' && $l['type_key'] !== 0)
+                        ? $l['type_key']
+                        : null,
+                    'type_name' => $l['type_name'],
+                    'amount' => $l['amount'],
                 ]);
             }
 
@@ -245,13 +324,57 @@ class IncomeStatementController extends Controller
         });
     }
 
-    /** Delivered Pancake revenue + order count for the month (by delivered_at). */
+    /**
+     * All selectable expense lines for the month, each tagged with its section.
+     *
+     * @return Collection<int, array{type_key:int, type_name:string, amount:float, source:string, section:string}>
+     */
+    private function expenseLines(Workspace $workspace, Carbon $from, Carbon $to, float $delivered, float $codRate, float $vatRate): Collection
+    {
+        $buckets = $this->transactionBuckets($workspace, $from, $to);
+
+        $lines = collect();
+
+        // Auto cost-of-sales lines.
+        $shipping = $this->shippingFee($workspace, $from, $to);
+        if ($shipping > 0) {
+            $lines->push($this->line(self::SHIPPING_FEE_KEY, 'Shipping Fee', round($shipping, 2), 'shipping_fee', 'cost_of_sales'));
+        }
+
+        $codFee = round($delivered * $codRate, 2);
+        if ($delivered > 0) {
+            $lines->push($this->line(self::COD_FEE_KEY, 'COD Fee', $codFee, 'cod_fee', 'cost_of_sales'));
+        }
+
+        $vat = round($codFee * $vatRate, 2);
+        if ($codFee > 0) {
+            $lines->push($this->line(self::VAT_KEY, 'VAT', $vat, 'vat', 'cost_of_sales'));
+        }
+
+        // Flagged transaction types → cost of sales; the rest → OPEX.
+        foreach ($buckets->where('flagged', true) as $b) {
+            $lines->push($this->line($b['type_key'], $b['type_name'], $b['amount'], 'transaction_type', 'cost_of_sales'));
+        }
+        foreach ($buckets->where('flagged', false) as $b) {
+            $lines->push($this->line($b['type_key'], $b['type_name'], $b['amount'], 'transaction_type', 'opex'));
+        }
+
+        return $lines->values();
+    }
+
+    /** @return array{type_key:int, type_name:string, amount:float, source:string, section:string} */
+    private function line(int $key, string $name, float $amount, string $source, string $section): array
+    {
+        return ['type_key' => $key, 'type_name' => $name, 'amount' => $amount, 'source' => $source, 'section' => $section];
+    }
+
+    /** Delivered gencys revenue + order count for the month (by parcel_updated_date). */
     private function deliveredRevenue(Workspace $workspace, Carbon $from, Carbon $to): array
     {
-        $row = Order::where('workspace_id', $workspace->id)
-            ->whereNotNull('delivered_at')
-            ->whereBetween('delivered_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->selectRaw('COALESCE(SUM(final_amount), 0) as delivered, COUNT(*) as orders')
+        $row = GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->where('parcel_status', self::DELIVERED_STATUS)
+            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->selectRaw('COALESCE(SUM(price_final), 0) as delivered, COUNT(*) as orders')
             ->first();
 
         return [
@@ -260,15 +383,26 @@ class IncomeStatementController extends Controller
         ];
     }
 
-    /**
-     * The month's outflow transactions grouped by transaction type. Key 0 is the
-     * "Uncategorized" bucket (no transaction_type_id). Ordered by amount desc.
-     *
-     * @return Collection<int, array{type_key:int, type_name:string, amount:float}>
-     */
-    private function expenseBuckets(Workspace $workspace, Carbon $from, Carbon $to): Collection
+    /** Total shipping fee of gencys orders shipped out in the month. */
+    private function shippingFee(Workspace $workspace, Carbon $from, Carbon $to): float
     {
-        $typeNames = TransactionType::where('workspace_id', $workspace->id)->pluck('name', 'id');
+        return (float) GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->whereBetween('shipped_out_date', [$from->toDateString(), $to->toDateString()])
+            ->sum('shipping_fee');
+    }
+
+    /**
+     * The month's outflow finance transactions grouped by transaction type, each
+     * tagged with whether its type is a gross-profit deduction. Key 0 is the
+     * "Uncategorized" bucket (no transaction_type_id, never flagged).
+     *
+     * @return Collection<int, array{type_key:int, type_name:string, amount:float, flagged:bool}>
+     */
+    private function transactionBuckets(Workspace $workspace, Carbon $from, Carbon $to): Collection
+    {
+        $types = TransactionType::where('workspace_id', $workspace->id)
+            ->get(['id', 'name', 'is_gross_profit_deduction'])
+            ->keyBy('id');
 
         return Transaction::where('workspace_id', $workspace->id)
             ->where('type', 'out')
@@ -279,9 +413,33 @@ class IncomeStatementController extends Controller
             ->get()
             ->map(fn ($r) => [
                 'type_key' => (int) $r->type_key,
-                'type_name' => $r->type_key ? ($typeNames[$r->type_key] ?? 'Unknown') : 'Uncategorized',
+                'type_name' => $r->type_key ? ($types[$r->type_key]->name ?? 'Unknown') : 'Uncategorized',
                 'amount' => (float) $r->total,
+                'flagged' => $r->type_key ? (bool) ($types[$r->type_key]->is_gross_profit_deduction ?? false) : false,
             ]);
+    }
+
+    /** Map a saved breakdown row back to its preview type_key. */
+    private function keyForRow(object $row): int
+    {
+        return match ($row->source) {
+            'shipping_fee' => self::SHIPPING_FEE_KEY,
+            'cod_fee' => self::COD_FEE_KEY,
+            'vat' => self::VAT_KEY,
+            default => (int) ($row->transaction_type_id ?? 0),
+        };
+    }
+
+    /** Workspace default rates [cod, vat, advisory] as fractions, falling back to constants. */
+    private function workspaceRates(Workspace $workspace): array
+    {
+        $settings = IncomeStatementSetting::where('workspace_id', $workspace->id)->first();
+
+        return [
+            (float) ($settings?->cod_fee_rate ?? IncomeStatementSetting::DEFAULT_COD_FEE_RATE),
+            (float) ($settings?->vat_rate ?? IncomeStatementSetting::DEFAULT_VAT_RATE),
+            (float) ($settings?->advisory_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_RATE),
+        ];
     }
 
     /**

@@ -15,7 +15,7 @@ class TriggerFetchDailySalesTrackerCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'gencys-erp:trigger-fetch-daily-sales-tracker {--delay=30} {--date=} {--sync : POST to n8n immediately instead of queueing on the erp worker}';
+    protected $signature = 'gencys-erp:trigger-fetch-daily-sales-tracker {--delay=30} {--date=} {--start-date=} {--end-date=} {--sync : POST to n8n immediately instead of queueing on the erp worker}';
 
     /**
      * The console command description.
@@ -41,11 +41,9 @@ class TriggerFetchDailySalesTrackerCommand extends Command
         $delay = (int) $this->option('delay');
 
         try {
-            $date = $this->option('date')
-                ? Carbon::parse($this->option('date'))->format('m/d/Y')
-                : Carbon::yesterday()->format('m/d/Y');
-        } catch (\Exception) {
-            $this->error("Invalid date provided: {$this->option('date')}");
+            $dates = $this->resolveDates();
+        } catch (\InvalidArgumentException $e) {
+            $this->error($e->getMessage());
 
             return self::FAILURE;
         }
@@ -65,12 +63,16 @@ class TriggerFetchDailySalesTrackerCommand extends Command
 
         $sync = (bool) $this->option('sync');
 
+        $dateLabel = count($dates) === 1
+            ? "date: {$dates[0]}"
+            : count($dates).' dates: '.$dates[0].' → '.end($dates);
+
         $this->info($sync
-            ? "Sending {$workspaces->count()} workspace(s) synchronously for date: {$date}"
-            : "Dispatching {$workspaces->count()} workspace(s) with {$delay}s delay between jobs for date: {$date}");
+            ? "Sending {$workspaces->count()} workspace(s) synchronously for {$dateLabel}"
+            : "Dispatching {$workspaces->count()} workspace(s) with {$delay}s delay between jobs for {$dateLabel}");
 
         $callbackBase = rtrim(config('app.url'), '/');
-        $callbackUrl = "{$callbackBase}/api/v1/public/gencys/daily-sales-tracker";
+        $callbackUrl = "https://9692-152-32-104-235.ngrok-free.app/api/v1/public/gencys/daily-sales-tracker";
 
         $dispatched = 0;
         $skipped = 0;
@@ -85,37 +87,91 @@ class TriggerFetchDailySalesTrackerCommand extends Command
                 continue;
             }
 
-            $data = [
-                'workspace_id' => $workspace->id,
-                'workspace_slug' => $workspace->slug,
-                'workspace_api_key' => $apiKey->reveal(),
-                // ERP login the n8n pipeline authenticates with (password decrypted).
-                'erp_username' => $workspace->erp_username,
-                'erp_password' => $workspace->erp_password,
-                'date' => $date,
-                'webhook_url' => $callbackUrl,
-            ];
+            foreach ($dates as $date) {
+                $data = [
+                    'workspace_id' => $workspace->id,
+                    'workspace_slug' => $workspace->slug,
+                    'workspace_api_key' => $apiKey->reveal(),
+                    // ERP login the n8n pipeline authenticates with (password decrypted).
+                    'erp_username' => $workspace->erp_username,
+                    'erp_password' => $workspace->erp_password,
+                    'date' => $date,
+                    'webhook_url' => $callbackUrl,
+                ];
 
-            if ($sync) {
-                // Run inline so the webhook fires immediately — no erp worker needed.
-                FetchDailySalesTrackerJob::dispatchSync($webhookUrl, $data);
-                $this->info("Sent for workspace {$workspace->name} (ID: {$workspace->id})");
-            } else {
-                $jobDelaySeconds = $dispatched * $delay;
+                if ($sync) {
+                    // Run inline so the webhook fires immediately — no erp worker needed.
+                    FetchDailySalesTrackerJob::dispatchSync($webhookUrl, $data);
+                    $this->info("Sent for workspace {$workspace->name} (ID: {$workspace->id}) for {$date}");
+                } else {
+                    $jobDelaySeconds = $dispatched * $delay;
 
-                FetchDailySalesTrackerJob::dispatch($webhookUrl, $data)
-                    ->delay(now()->addSeconds($jobDelaySeconds));
+                    FetchDailySalesTrackerJob::dispatch($webhookUrl, $data)
+                        ->delay(now()->addSeconds($jobDelaySeconds));
 
-                $this->info("Dispatched for workspace {$workspace->name} (ID: {$workspace->id}) (delay: {$jobDelaySeconds}s)");
+                    $this->info("Dispatched for workspace {$workspace->name} (ID: {$workspace->id}) for {$date} (delay: {$jobDelaySeconds}s)");
+                }
+
+                $dispatched++;
             }
-
-            $dispatched++;
         }
 
         $this->newLine();
         $this->info("Done. Dispatched: {$dispatched}, Skipped: {$skipped}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Resolve the list of dates (formatted m/d/Y) to fetch.
+     *
+     * Supports a single --date, a --start-date/--end-date range (inclusive),
+     * or defaults to yesterday when none are given.
+     *
+     * @return array<int, string>
+     *
+     * @throws \InvalidArgumentException on invalid or inverted input
+     */
+    private function resolveDates(): array
+    {
+        $start = $this->option('start-date');
+        $end = $this->option('end-date');
+
+        // Range mode: both bounds required so the intent is unambiguous.
+        if ($start || $end) {
+            if (! $start || ! $end) {
+                throw new \InvalidArgumentException('Both --start-date and --end-date must be provided for a date range.');
+            }
+
+            try {
+                $startDate = Carbon::parse($start)->startOfDay();
+                $endDate = Carbon::parse($end)->startOfDay();
+            } catch (\Exception) {
+                throw new \InvalidArgumentException("Invalid date range provided: {$start} → {$end}");
+            }
+
+            if ($startDate->gt($endDate)) {
+                throw new \InvalidArgumentException("--start-date ({$start}) must not be after --end-date ({$end}).");
+            }
+
+            $dates = [];
+            for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
+                $dates[] = $date->format('m/d/Y');
+            }
+
+            return $dates;
+        }
+
+        // Single-date mode (backwards compatible): explicit --date or yesterday.
+        try {
+            $date = $this->option('date')
+                ? Carbon::parse($this->option('date'))
+                : Carbon::yesterday();
+        } catch (\Exception) {
+            throw new \InvalidArgumentException("Invalid date provided: {$this->option('date')}");
+        }
+
+        return [$date->format('m/d/Y')];
     }
 
     /** Workspaces wired for ERP automation. Kept for readability/testability. */

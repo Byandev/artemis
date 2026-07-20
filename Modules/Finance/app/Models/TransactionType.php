@@ -13,6 +13,11 @@ class TransactionType extends Model
     protected $fillable = [
         'workspace_id',
         'name',
+        'is_gross_profit_deduction',
+    ];
+
+    protected $casts = [
+        'is_gross_profit_deduction' => 'boolean',
     ];
 
     public function workspace(): BelongsTo
