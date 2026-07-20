@@ -360,9 +360,9 @@ export default function PurchasedOrderIndex({
                 enableSorting: false,
                 meta: { cellClassName: 'min-w-[250px]' },
                 header: () => (
-                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    <div className="text-right font-mono text-[10px] tracking-wider text-gray-400 uppercase">
                         Delivered
-                    </span>
+                    </div>
                 ),
                 cell: ({ row }) => {
                     const deliveries = orderDeliveries(row.original);
@@ -376,15 +376,7 @@ export default function PurchasedOrderIndex({
                     }
 
                     return (
-                        <div
-                            className={
-                                // A rail groups repeat attempts without the
-                                // noise of a rule under every line.
-                                deliveries.length > 1
-                                    ? 'flex flex-col border-l border-black/8 pl-2.5 dark:border-white/10'
-                                    : 'flex flex-col'
-                            }
-                        >
+                        <div className="flex flex-col">
                             {deliveries.map(({ delivery: d, item }) => (
                                 <div
                                     key={d.id}
@@ -399,9 +391,6 @@ export default function PurchasedOrderIndex({
                                     </span>
                                     <span className="w-20 shrink-0 truncate text-[10px] text-gray-400 dark:text-gray-500">
                                         {d.delivery_no || '—'}
-                                    </span>
-                                    <span className="w-14 shrink-0 text-right font-medium text-gray-800 tabular-nums dark:text-gray-200">
-                                        {d.qty.toLocaleString()}
                                     </span>
                                     {canEditPurchasedOrders && (
                                         <span className="ml-auto flex items-center gap-0.5 opacity-0 transition-opacity group-hover/delivery:opacity-100">
@@ -436,6 +425,9 @@ export default function PurchasedOrderIndex({
                                             </button>
                                         </span>
                                     )}
+                                    <span className="ml-auto w-14 shrink-0 text-right font-medium text-gray-800 tabular-nums dark:text-gray-200">
+                                        {d.qty.toLocaleString()}
+                                    </span>
                                 </div>
                             ))}
                         </div>
