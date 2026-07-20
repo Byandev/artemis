@@ -11,6 +11,7 @@ import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import {
     CreditCard,
+    FileText,
     Layers,
     ScrollText,
     TicketCheck,
@@ -35,6 +36,11 @@ export function AdminSidebar() {
             title: 'Subscription Plans',
             href: '/admin/subscription-plans',
             icon: CreditCard,
+        },
+        {
+            title: 'Invoices',
+            href: '/admin/invoices',
+            icon: FileText,
         },
         {
             title: 'Support Tickets',

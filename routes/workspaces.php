@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminActivityLogController;
 use App\Http\Controllers\Admin\AdminClientReportController;
+use App\Http\Controllers\Admin\AdminInvoiceController;
 use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminUserController;
@@ -189,6 +190,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/pages/{page}/edit', [PageController::class, 'edit'])->name('workspaces.pages.edit');
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::put('/workspaces/{workspace}/pages/{page}/budget', [PageController::class, 'updateBudget'])->name('workspaces.pages.update-budget');
+    Route::patch('/workspaces/{workspace}/pages/{page}/assign-owner', [PageController::class, 'assignOwner'])->name('workspaces.pages.assign-owner');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
 
@@ -649,4 +651,18 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('subscription-plans.update');
         Route::delete('/subscription-plans/{subscriptionPlan}', [AdminSubscriptionPlanController::class, 'destroy'])
             ->name('subscription-plans.destroy');
+
+        // Invoices
+        Route::get('/invoices', [AdminInvoiceController::class, 'index'])
+            ->name('invoices.index');
+        Route::get('/invoices/create', [AdminInvoiceController::class, 'create'])
+            ->name('invoices.create');
+        Route::post('/invoices', [AdminInvoiceController::class, 'store'])
+            ->name('invoices.store');
+        Route::get('/invoices/{invoice}/download', [AdminInvoiceController::class, 'download'])
+            ->name('invoices.download');
+        Route::patch('/invoices/{invoice}/status', [AdminInvoiceController::class, 'updateStatus'])
+            ->name('invoices.update-status');
+        Route::delete('/invoices/{invoice}', [AdminInvoiceController::class, 'destroy'])
+            ->name('invoices.destroy');
     });

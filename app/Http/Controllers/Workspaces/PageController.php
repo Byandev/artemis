@@ -19,6 +19,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -167,6 +168,25 @@ class PageController extends Controller
             ->with('success', 'Page budget updated successfully.');
     }
 
+    /** Assign (or unassign) the owner of a page inline from the pages table. */
+    public function assignOwner(Request $request, Workspace $workspace, Page $page)
+    {
+        $this->authorize(Permission::EditPages->value, $workspace);
+
+        abort_unless($page->workspace_id === $workspace->id, 404);
+
+        $data = $request->validate([
+            'owner_id' => [
+                'nullable', 'integer',
+                Rule::in($workspace->users()->pluck('users.id')->all()),
+            ],
+        ]);
+
+        $page->update(['owner_id' => $data['owner_id'] ?? null]);
+
+        return back();
+    }
+
     public function archive(Request $request, Workspace $workspace, Page $page)
     {
         $this->authorize(Permission::ArchivePages->value, $workspace);
@@ -289,7 +309,7 @@ class PageController extends Controller
             return response()->json(['valid' => false, 'message' => 'Page not found in this workspace.']);
         }
 
-        $token = $validated['token'] ?: $page->botcake_token;
+        $token = ($validated['token'] ?? null) ?: $page->botcake_token;
 
         if (blank($token)) {
             return response()->json(['valid' => false, 'message' => 'Enter a Botcake token first.']);
