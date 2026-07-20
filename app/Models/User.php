@@ -23,7 +23,16 @@ class User extends Authenticatable implements MustVerifyEmail
      *
      * @var list<string>
      */
-    protected $fillable = ['name', 'email', 'password', 'role', 'is_super_admin'];
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'role',
+        'is_super_admin',
+        'reminder_time',
+        'current_streak',
+        'longest_streak',
+    ];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -48,6 +57,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
+            'current_streak' => 'integer',
+            'longest_streak' => 'integer',
         ];
     }
 
@@ -164,6 +175,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function pancakeAccounts(): User|HasMany
     {
         return $this->hasMany(\Modules\Pancake\Models\User::class);
+    }
+
+    /**
+     * Daily Extreme Self-Care records logged by this employee.
+     */
+    public function dailyEscRecords(): HasMany
+    {
+        return $this->hasMany(DailyEscRecord::class);
     }
 
     /**

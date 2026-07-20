@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\PublicApi\AuthController;
 use App\Http\Controllers\PublicApi\CallLogController;
 use App\Http\Controllers\PublicApi\CallLogV2Controller;
 use App\Http\Controllers\PublicApi\CsrDailyRecordController;
+use App\Http\Controllers\PublicApi\DailyEscRecordController;
 use App\Http\Controllers\PublicApi\HealthController;
 use App\Http\Controllers\PublicApi\InventoryItemController;
 use App\Http\Controllers\PublicApi\PageController;
@@ -22,8 +24,10 @@ use Modules\Inventory\Http\Controllers\Api\UnitCodeController as InventoryUnitCo
 
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', HealthController::class)->name('health');
+
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/csr-daily-records', [CsrDailyRecordController::class, 'store'])->name('csr-daily-records.store');
+    Route::post('/esc-daily-records', [DailyEscRecordController::class, 'store'])->name('esc-daily-records.store');
     Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
     Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
     Route::post('/shops/scan-return', [ShopScanReturnController::class, 'scan'])->name('shops.scan-return');
@@ -48,6 +52,13 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     // key header — that alone identifies the workspace.
     Route::post('/inventory/unit-codes/bulk-sync', [InventoryUnitCodeApiController::class, 'bulkSync'])->name('inventory.unit-codes.bulk-sync');
 });
+
+// Credential check for first-party apps signing users in against Artemis.
+// No API key required — it verifies email + password globally. Throttled so it
+// can't be used as a password-guessing oracle.
+Route::post('v1/public/auth/login', [AuthController::class, 'login'])
+    ->middleware('throttle:public-api-login')
+    ->name('api.v1.public.auth.login');
 
 // GencysERP daily sales tracker callback. n8n posts the scraped rows here and
 // authenticates with the api_key embedded in the body (not a header), so this
