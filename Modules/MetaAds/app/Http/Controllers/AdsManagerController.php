@@ -49,6 +49,7 @@ class AdsManagerController extends Controller
         return Inertia::render('workspaces/integrations/meta-ads/index', [
             'workspace' => $workspace,
             'accounts' => $accounts,
+            'members' => $this->workspaceMembers($workspace),
             'selectedAccounts' => $selectedAccountIds->values(),
             'dateRange' => ['since' => $since, 'until' => $until],
             'query' => [
@@ -80,13 +81,18 @@ class AdsManagerController extends Controller
         $scopeBy = (string) $request->query('scope_by', '');
         $scopeValue = (string) $request->query('scope', '');
 
+        // Internal-creator filter (ad-level only). A member id, the literal
+        // "unassigned", or empty for all. Applied only to ad-grained groupings.
+        $creatorFilter = (string) $request->query('creator_id', '');
+        $creatorFilter = $creatorFilter === '' ? null : $creatorFilter;
+
         // Custom breakdown: group ads into the saved, rule-defined buckets
         // instead of a fixed dimension. Encoded as `group_by=custom:{id}`.
         $groupByRaw = (string) $request->query('group_by', '');
         if ($scopeBy === '' && str_starts_with($groupByRaw, 'custom:')) {
             $breakdownId = (int) substr($groupByRaw, 7);
             $rows = $this->aggregateCustomBreakdown(
-                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters
+                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters, $creatorFilter
             );
 
             return response()->json(['rows' => $rows]);
@@ -106,7 +112,7 @@ class AdsManagerController extends Controller
             $scope = null;
         }
 
-        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope);
+        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter);
 
         return response()->json(['rows' => $rows]);
     }
@@ -293,12 +299,18 @@ class AdsManagerController extends Controller
                 'insightKey' => 'meta_ads_ad_id',
                 'joinOn' => 'meta_ads_ads.id',
                 'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
-                'join' => fn ($q) => $q->leftJoin('meta_ads_creatives', 'meta_ads_creatives.id', '=', 'meta_ads_ads.meta_ads_creative_id'),
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_creatives', 'meta_ads_creatives.id', '=', 'meta_ads_ads.meta_ads_creative_id')
+                    // Internal creator tag (a workspace member). One row per ad, so
+                    // grouping by the creator columns is safe.
+                    ->leftJoin('users', 'users.id', '=', 'meta_ads_ads.creator_id'),
                 'selects' => [
                     'meta_ads_ads.id',
                     'meta_ads_ads.name',
                     'meta_ads_ads.status',
                     'meta_ads_ads.effective_status',
+                    'meta_ads_ads.creator_id',
+                    DB::raw('users.name AS creator_name'),
                     DB::raw('meta_ads_creatives.thumbnail_url AS thumbnail_url'),
                     DB::raw('meta_ads_creatives.image_url AS image_url'),
                     DB::raw('meta_ads_creatives.video_id AS video_id'),
@@ -309,6 +321,8 @@ class AdsManagerController extends Controller
                     'meta_ads_ads.name',
                     'meta_ads_ads.status',
                     'meta_ads_ads.effective_status',
+                    'meta_ads_ads.creator_id',
+                    'users.name',
                     'meta_ads_creatives.thumbnail_url',
                     'meta_ads_creatives.image_url',
                     'meta_ads_creatives.video_id',
@@ -412,7 +426,7 @@ class AdsManagerController extends Controller
         };
     }
 
-    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null): array
+    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null): array
     {
         $config = $this->groupByConfig($groupBy);
 
@@ -429,6 +443,12 @@ class AdsManagerController extends Controller
         // Optional extra constraint (e.g. limit ads to a single campaign/ad set).
         if ($scope) {
             $scope($base);
+        }
+
+        // Creator filter is ad-level only — apply it just for ad-grained
+        // groupings (ad / ad_name / ad_type), whose base table is meta_ads_ads.
+        if ($config['model'] === Ad::class) {
+            $this->applyCreatorFilter($base, $creatorFilter);
         }
 
         // Number of ads in each group — shown for every dimension except `ad`
@@ -511,7 +531,8 @@ class AdsManagerController extends Controller
         string $since,
         string $until,
         int $breakdownId,
-        array $metricFilters = []
+        array $metricFilters = [],
+        ?string $creatorFilter = null
     ): array {
         $breakdown = CustomBreakdown::where('workspace_id', $workspace->id)->findOrFail($breakdownId);
 
@@ -528,6 +549,7 @@ class AdsManagerController extends Controller
             ->leftJoinSub($insights, 'i', 'i.meta_ads_ad_id', '=', 'meta_ads_ads.id')
             ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds)
             ->whereRaw("({$case}) IS NOT NULL")
+            ->tap(fn ($q) => $this->applyCreatorFilter($q, $creatorFilter))
             ->select(array_merge(
                 [
                     DB::raw("({$case}) AS name"),
@@ -805,6 +827,47 @@ class AdsManagerController extends Controller
                 $query->havingRaw("({$expr}) {$sqlOp} ?", [$f['value']]);
             }
         }
+    }
+
+    /**
+     * Constrain an ads query by internal creator. Expects the query to have the
+     * meta_ads_ads table available. Values: a numeric member id, the literal
+     * "unassigned" (untagged ads), or null (no constraint).
+     */
+    private function applyCreatorFilter($query, ?string $creatorFilter): void
+    {
+        if ($creatorFilter === null || $creatorFilter === '') {
+            return;
+        }
+
+        if ($creatorFilter === 'unassigned') {
+            $query->whereNull('meta_ads_ads.creator_id');
+
+            return;
+        }
+
+        if (is_numeric($creatorFilter)) {
+            $query->where('meta_ads_ads.creator_id', (int) $creatorFilter);
+        }
+    }
+
+    /**
+     * Workspace members (users + owner) assignable as an ad's internal creator,
+     * for the inline selector and creator filter. Mirrors the owner list.
+     *
+     * @return array<int, array{id: int, name: string}>
+     */
+    private function workspaceMembers(Workspace $workspace): array
+    {
+        $ids = $workspace->users()->pluck('users.id')
+            ->push($workspace->owner_id)
+            ->filter()
+            ->unique();
+
+        return User::whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->all();
     }
 
     private function accountIdsForWorkspace(Workspace $workspace, ?User $user = null)
