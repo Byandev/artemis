@@ -14,6 +14,8 @@ class ScheduledMessage extends Model
     /** @use HasFactory<ScheduledMessageFactory> */
     use HasFactory;
 
+    protected $table = 'sim_gateway_scheduled_messages';
+
     protected $fillable = [
         'workspace_id',
         'sim_id',

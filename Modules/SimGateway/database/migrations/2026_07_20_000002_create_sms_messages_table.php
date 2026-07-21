@@ -8,10 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('sms_messages', function (Blueprint $table) {
+        Schema::create('sim_gateway_sms_messages', function (Blueprint $table) {
             $table->id();
             $table->foreignId('workspace_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('sim_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('sim_id')->constrained('sim_gateway_sims')->cascadeOnDelete();
             $table->string('direction');
             $table->string('from_number');
             $table->string('to_number');
@@ -32,6 +32,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('sms_messages');
+        Schema::dropIfExists('sim_gateway_sms_messages');
     }
 };

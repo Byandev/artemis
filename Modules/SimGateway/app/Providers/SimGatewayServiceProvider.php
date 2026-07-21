@@ -3,6 +3,7 @@
 namespace Modules\SimGateway\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\SimGateway\Console\Commands\SendTestSmsCommand;
 use Modules\SimGateway\Jobs\ProcessScheduledMessagesJob;
 use Modules\SimGateway\Services\Gateway\GatewayInterface;
 use Modules\SimGateway\Services\Gateway\StubGateway;
@@ -37,6 +38,10 @@ class SimGatewayServiceProvider extends ModuleServiceProvider
     public function register(): void
     {
         parent::register();
+
+        $this->commands([
+            SendTestSmsCommand::class,
+        ]);
 
         // Bind the active SMS gateway driver. Resolved lazily, so module config
         // (merged under the "simgateway" key) is available by resolution time.

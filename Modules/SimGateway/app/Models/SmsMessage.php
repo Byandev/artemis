@@ -16,6 +16,8 @@ class SmsMessage extends Model
     /** @use HasFactory<SmsMessageFactory> */
     use HasFactory;
 
+    protected $table = 'sim_gateway_sms_messages';
+
     protected $fillable = [
         'workspace_id',
         'sim_id',

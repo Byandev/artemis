@@ -18,6 +18,8 @@ class Sim extends Model
     /** @use HasFactory<SimFactory> */
     use HasFactory, SoftDeletes;
 
+    protected $table = 'sim_gateway_sims';
+
     protected $fillable = [
         'workspace_id',
         'iccid',

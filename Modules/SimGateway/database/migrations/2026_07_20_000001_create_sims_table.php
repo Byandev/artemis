@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('sims', function (Blueprint $table) {
+        Schema::create('sim_gateway_sims', function (Blueprint $table) {
             $table->id();
             $table->foreignId('workspace_id')->constrained()->cascadeOnDelete();
             $table->string('iccid')->unique();
@@ -26,6 +26,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('sims');
+        Schema::dropIfExists('sim_gateway_sims');
     }
 };
