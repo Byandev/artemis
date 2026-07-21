@@ -98,6 +98,7 @@ class ProductController extends Controller
             'code' => 'required|string|max:10|unique:products,code,NULL,id,workspace_id,'.$workspace->id,
             'category' => 'required|string|max:255',
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
+            'winning_date' => 'nullable|date',
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'shop_ids' => 'nullable|array',
@@ -112,6 +113,7 @@ class ProductController extends Controller
             'code' => $request->code,
             'category' => $request->category,
             'status' => $request->status,
+            'winning_date' => $request->winning_date ?: null,
             'description' => $request->description,
         ]);
 
@@ -172,6 +174,7 @@ class ProductController extends Controller
             'code' => 'required|string|max:10|unique:products,code,'.$product->id.',id,workspace_id,'.$workspace->id,
             'category' => 'required|string|max:255',
             'status' => 'required|in:Scaling,Testing,Failed,Inactive',
+            'winning_date' => 'nullable|date',
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'shop_ids' => 'nullable|array',
@@ -184,6 +187,7 @@ class ProductController extends Controller
             'code' => $request->code,
             'category' => $request->category,
             'status' => $request->status,
+            'winning_date' => $request->winning_date ?: null,
             'description' => $request->description,
         ]);
 

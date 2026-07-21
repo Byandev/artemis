@@ -59,8 +59,10 @@ interface Item {
     transaction_keywords: string;
     lead_time: number;
     unfulfilled_count: number;
-    product?: { id: number; name: string };
+    product?: { id: number; name: string; winning_date?: string | null };
     product_name?: string | null;
+    // Summary view: the group's product winning_date (flat view reads product.winning_date).
+    product_winning_date?: string | null;
     remaining_qty: number | null;
     unfulfilled: number | null;
     waiting_for_delivery_stocks: number | null;
@@ -106,6 +108,16 @@ const shortDate = (d: string | null | undefined) => {
     if (!d) return '';
     try {
         return format(parseISO(d), 'd MMM');
+    } catch {
+        return d;
+    }
+};
+
+// "JUNE 25, 2026" label for the date a product was marked a winning item.
+const winningDate = (d: string | null | undefined) => {
+    if (!d) return '';
+    try {
+        return format(parseISO(d), 'MMMM d, yyyy').toUpperCase();
     } catch {
         return d;
     }
@@ -370,6 +382,9 @@ export default function ItemIndex({
             cell: ({ row }) => {
                 const item = row.original;
                 const productName = item.product?.name ?? item.product_name;
+                const won = winningDate(
+                    item.product?.winning_date ?? item.product_winning_date,
+                );
                 const isGroup = !!item.is_group || !!item.is_parent;
                 return (
                     <div className="flex flex-col gap-0.5">
@@ -387,6 +402,7 @@ export default function ItemIndex({
                         {productName && (
                             <span className="text-[10px] text-gray-400 dark:text-gray-500">
                                 {productName}
+                                {won && ` (${won})`}
                             </span>
                         )}
                         {!summarize && item.parent_sku && (
