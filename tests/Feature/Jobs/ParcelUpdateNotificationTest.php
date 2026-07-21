@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Models\ParcelJourneyNotification;
+use Modules\SimGateway\Models\Sim;
+use Modules\SimGateway\Models\SmsMessage;
 
 function makeNotification(array $overrides = [], array $pageOverrides = []): ParcelJourneyNotification
 {
@@ -169,6 +171,40 @@ test('SendGate SMS marks failed when the send request fails', function () {
 
     expect($notif->fresh()->status)->toBe('failed');
     Bus::assertNotDispatched(CheckParcelUpdateNotification::class);
+});
+
+// Artemis SIM Gateway provider
+
+test('SIM Gateway SMS marks sent and records an outbound message on the SIM', function () {
+    Bus::fake();
+
+    $notif = makeNotification([], ['sms_provider' => 'sim_gateway']);
+    $page = $notif->order->page;
+    $sim = Sim::factory()->create([
+        'workspace_id' => $page->workspace_id,
+        'status' => 'active',
+    ]);
+    $page->update(['sim_gateway_sim_id' => $sim->id]);
+
+    (new SendParcelUpdateNotification($notif))->handle();
+
+    expect($notif->fresh()->status)->toBe('sent');
+    expect(
+        SmsMessage::where('sim_id', $sim->id)
+            ->where('direction', 'outbound')
+            ->where('to_number', '+639170000000')
+            ->exists()
+    )->toBeTrue();
+    Bus::assertNotDispatched(CheckParcelUpdateNotification::class);
+});
+
+test('SIM Gateway SMS marks failed when no SIM is selected', function () {
+    $notif = makeNotification([], ['sms_provider' => 'sim_gateway', 'sim_gateway_sim_id' => null]);
+
+    (new SendParcelUpdateNotification($notif))->handle();
+
+    expect($notif->fresh()->status)->toBe('failed');
+    expect($notif->fresh()->remarks)->toContain('No SIM selected');
 });
 
 // CheckParcelUpdateNotification
