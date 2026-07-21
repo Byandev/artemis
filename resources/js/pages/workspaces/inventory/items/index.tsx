@@ -2,6 +2,7 @@ import PageHeader from '@/components/common/PageHeader';
 import { AdjustCountDialog } from '@/components/inventory/adjust-count-dialog';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
 import { ItemFormDialog } from '@/components/inventory/item-form-dialog';
+import { WaitingForDeliveryDialog } from '@/components/inventory/waiting-for-delivery-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -144,6 +145,7 @@ export default function ItemIndex({
     const [editingItem, setEditingItem] = useState<Item | null>(null);
     const [adjustingItem, setAdjustingItem] = useState<Item | null>(null);
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
+    const [waitingItem, setWaitingItem] = useState<Item | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     // Default to active-only; only an explicit `all` shows inactive items too.
     const [activeOnly, setActiveOnly] = useState(
@@ -554,12 +556,27 @@ export default function ItemIndex({
                     className="justify-center"
                 />
             ),
+            // Clickable when there's anything outstanding — opens the PO breakdown.
             cell: ({ row }) => (
                 <div className="text-center">
-                    <MetricCell
-                        value={row.original.waiting_for_delivery_stocks}
-                        color="text-blue-500 dark:text-blue-400"
-                    />
+                    {row.original.waiting_for_delivery_stocks == null ? (
+                        <MetricCell
+                            value={null}
+                            color="text-blue-500 dark:text-blue-400"
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setWaitingItem(row.original)}
+                            title="View pending purchase orders"
+                            className="cursor-pointer rounded px-1 underline decoration-dotted underline-offset-4 transition-colors hover:bg-blue-500/10"
+                        >
+                            <MetricCell
+                                value={row.original.waiting_for_delivery_stocks}
+                                color="text-blue-500 dark:text-blue-400"
+                            />
+                        </button>
+                    )}
                 </div>
             ),
         },
@@ -1052,6 +1069,13 @@ export default function ItemIndex({
                         onClose={() => setItemToDelete(null)}
                     />
                 )}
+
+                <WaitingForDeliveryDialog
+                    open={waitingItem !== null}
+                    item={waitingItem}
+                    workspace={workspace}
+                    onClose={() => setWaitingItem(null)}
+                />
             </div>
         </AppLayout>
     );
