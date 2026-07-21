@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FundRequest extends Model
 {
@@ -19,8 +20,18 @@ class FundRequest extends Model
     /** Statuses that represent a decision made by an approver. */
     public const APPROVED_STATUSES = ['approved', 'released'];
 
+    /** A plain request. */
+    public const TEMPLATE_BLANK = 'blank';
+
+    /** Ad spend request: carries line items and derives its own amount. */
+    public const TEMPLATE_AD_SPENT = 'ad_spent';
+
+    public const TEMPLATES = [self::TEMPLATE_BLANK, self::TEMPLATE_AD_SPENT];
+
     protected $fillable = [
         'workspace_id',
+        'template',
+        'gotyme_number',
         'request_date',
         'reference_no',
         'requested_by',
@@ -42,6 +53,16 @@ class FundRequest extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(FundRequestItem::class, 'fund_request_id')->orderBy('sort_order');
+    }
+
+    public function isAdSpent(): bool
+    {
+        return $this->template === self::TEMPLATE_AD_SPENT;
     }
 
     /*

@@ -69,6 +69,8 @@ export type ReportConfig = {
     metrics: string[];
     sort: string;
     filters: ReportFilter[];
+    /** Internal-creator filter (ad-level). A member id, 'unassigned', or null. */
+    creator_id?: number | 'unassigned' | null;
     chart: ChartStyle;
     view: ReportView;
 };
@@ -217,6 +219,7 @@ export function defaultConfig(
         metrics: ['spend', 'clicks', 'impressions'],
         sort: '-spend',
         filters: [],
+        creator_id: null,
         chart: 'gallery',
         view: { ...DEFAULT_VIEW },
     };

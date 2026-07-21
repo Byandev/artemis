@@ -7,6 +7,7 @@ use App\Services\Botcake;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdatePageRequest extends FormRequest
@@ -34,11 +35,19 @@ class UpdatePageRequest extends FormRequest
             'name' => 'required|string|max:255',
             'facebook_url' => 'nullable|url|max:500',
             'botcake_token' => 'nullable|string|max:255',
-            'sms_provider' => 'nullable|in:infotxt,sendgate',
+            'sms_provider' => 'nullable|in:infotxt,sendgate,sim_gateway',
             'infotxt_token' => 'nullable|string|max:255',
             'infotxt_user_id' => 'nullable|string|max:255',
             'sendgate_api_key' => 'nullable|string|max:255',
             'sendgate_sim_id' => 'nullable|string|max:255',
+            'sim_gateway_sim_id' => [
+                'nullable',
+                'integer',
+                'required_if:sms_provider,sim_gateway',
+                // Must be a SIM assigned to this workspace.
+                Rule::exists('sim_gateway_sims', 'id')
+                    ->where('workspace_id', $this->route('workspace')->id),
+            ],
             'pancake_token' => 'nullable|string',
             'parcel_journey_custom_field_id' => 'nullable|integer|min:1',
             'parcel_journey_flow_id' => 'nullable|integer|min:1',
@@ -58,6 +67,8 @@ class UpdatePageRequest extends FormRequest
         return [
             'name.required' => 'The page name is required.',
             'facebook_url.url' => 'The Facebook URL must be a valid URL.',
+            'sim_gateway_sim_id.required_if' => 'Please choose which SIM to send from.',
+            'sim_gateway_sim_id.exists' => 'That SIM does not belong to this workspace.',
         ];
     }
 

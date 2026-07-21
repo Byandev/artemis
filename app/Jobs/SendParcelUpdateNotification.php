@@ -81,19 +81,23 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
             );
 
             if ($result->accepted) {
-                if ($result->tracksDelivery) {
-                    if ($result->messageId) {
-                        // Provider gave us a message id to poll — record it and hand
-                        // off to CheckParcelUpdateNotification for the final status.
-                        $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
+                if ($result->awaitsCallback) {
+                    // The SIM Gateway device pushes the final status to our
+                    // callback later — record the id and stay pending; the
+                    // callback flips this notification to sent/failed.
+                    $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
+                } elseif ($result->tracksDelivery) {
+                    // Provider gave us a message id to poll — record it and hand
+                    // off to CheckParcelUpdateNotification for the final status.
+                    $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
 
                         dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
                     } else {
                         $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $result->remarks]);
                     }
                 } else {
-                    // Provider doesn't expose delivery tracking — treat a
-                    // successful send as sent.
+                    // Provider doesn't expose delivery tracking (SendGate) — treat
+                    // a successful send as sent.
                     $this->parcelJourneyNotification->update([
                         'status' => 'sent',
                         'sms_id' => $result->messageId,
@@ -156,8 +160,10 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
      * Has this notification already been sent (or definitively failed) by an
      * earlier attempt? Used to short-circuit duplicate runs.
      *
-     * - SMS: presence of `sms_id` means we got a response back from Infotxt;
-     *   `CheckParcelUpdateNotification` will own the final status.
+     * - SMS: a non-null `sms_id` means a provider already accepted the message.
+     *   For Infotxt, `CheckParcelUpdateNotification` owns the final status; the
+     *   non-tracking providers (SIM Gateway, SendGate) also stamp `status` on
+     *   success, so a definitive `status` short-circuits too.
      * - Chat: `status` already reflects the outcome.
      */
     private function alreadyProcessed(): bool
