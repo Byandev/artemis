@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
+use Modules\Pancake\Models\ParcelJourneyNotification;
 use Modules\SimGateway\Enums\MessageDirection;
 use Modules\SimGateway\Enums\MessageStatus;
 use Modules\SimGateway\Models\Sim;
@@ -139,6 +140,7 @@ class CallbackController extends Controller
 
             if ($updates !== []) {
                 $sms->update($updates);
+                $this->syncParcelNotification($sms);
                 $updated++;
             }
         }
@@ -305,7 +307,36 @@ class CallbackController extends Controller
         }
 
         $sms->update($updates);
+        $this->syncParcelNotification($sms);
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Propagate a delivery-report outcome to the parcel-journey notification that
+     * was sent through this message, if any. A page using the SIM Gateway stores
+     * our provider_message_id as the notification's `sms_id`, so we match on that
+     * and flip the notification to sent/failed once the device reports back.
+     */
+    protected function syncParcelNotification(SmsMessage $sms): void
+    {
+        if ($sms->direction !== MessageDirection::Outbound || $sms->provider_message_id === null) {
+            return;
+        }
+
+        $notification = ParcelJourneyNotification::where('sms_id', $sms->provider_message_id)->first();
+
+        if (! $notification || in_array($notification->status, ['sent', 'failed'], true)) {
+            return;
+        }
+
+        if (in_array($sms->status, [MessageStatus::Sent, MessageStatus::Delivered], true)) {
+            $notification->update(['status' => 'sent']);
+        } elseif ($sms->status === MessageStatus::Failed) {
+            $notification->update([
+                'status' => 'failed',
+                'remarks' => $sms->error_message ?? 'Delivery failed.',
+            ]);
+        }
     }
 }

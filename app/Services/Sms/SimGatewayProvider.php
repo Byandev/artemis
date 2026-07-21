@@ -8,10 +8,10 @@ use Throwable;
 
 /**
  * Sends parcel-journey SMS through the in-house Artemis SIM Gateway module,
- * from a specific workspace SIM (chosen per page). Delivery is reported by the
- * device's push callbacks rather than polled here, so a successful hand-off is
- * treated as sent (`tracksDelivery: false`). The gateway also records the send
- * in its own Outbox.
+ * from a specific workspace SIM (chosen per page). The device reports the final
+ * status asynchronously by pushing a delivery report to our callback, so a
+ * successful hand-off leaves the notification pending (`awaitsCallback`) until
+ * that report lands. The gateway also records the send in its own Outbox.
  */
 class SimGatewayProvider implements SmsProvider
 {
@@ -35,7 +35,7 @@ class SimGatewayProvider implements SmsProvider
         }
 
         return $response->success
-            ? SmsSendResult::accepted($response->providerMessageId, tracksDelivery: false)
+            ? SmsSendResult::acceptedAwaitingCallback($response->providerMessageId)
             : SmsSendResult::failed($response->errorMessage ?? 'SIM Gateway rejected the message.');
     }
 }
