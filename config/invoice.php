@@ -34,7 +34,7 @@ return [
         "Please settle this invoice on or before the due date via bank transfer:\n\n".
         "Bank: Security Bank\n".
         "Account Name: Meta Digitrading Enterprise Co\n".
-        "Account Number: 0000071593190"
+        'Account Number: 0000071593190'
     ),
 
     'currency' => env('INVOICE_CURRENCY', 'PHP'),
