@@ -41,6 +41,7 @@ class SendGateProvider implements SmsProvider
         return SmsSendResult::accepted(
             $messageId !== null ? (string) $messageId : null,
             tracksDelivery: false,
+            remarks: ''
         );
     }
 }
