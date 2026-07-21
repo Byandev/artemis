@@ -79,7 +79,6 @@ use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use Modules\Pancake\Http\Controllers\OrderController;
 use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
-use Modules\SimGateway\Http\Controllers\ScheduledMessageController;
 use Modules\SimGateway\Http\Controllers\SmsController;
 
 /*
@@ -569,11 +568,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/send', [SmsController::class, 'create'])->name('send');
         Route::post('/send', [SmsController::class, 'store'])->name('store');
         Route::post('/bulk', [SmsController::class, 'bulkStore'])->name('bulk');
-        Route::get('/inbox', [SmsController::class, 'inbox'])->name('inbox');
         Route::get('/outbox', [SmsController::class, 'outbox'])->name('outbox');
-        Route::get('/scheduled', [ScheduledMessageController::class, 'index'])->name('scheduled.index');
-        Route::post('/scheduled', [ScheduledMessageController::class, 'store'])->name('scheduled.store');
-        Route::delete('/scheduled/{message}', [ScheduledMessageController::class, 'destroy'])->name('scheduled.destroy');
+        Route::get('/sims', [SmsController::class, 'sims'])->name('sims');
     });
 
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
