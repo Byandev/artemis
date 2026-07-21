@@ -71,7 +71,7 @@ class SendTestSmsCommand extends Command
             'task_num' => 1,
             'sr_cnt' => 1,
             'sr_prd' => 5,
-            'sr_url' => 'https://reunite-relax-empathy.ngrok-free.dev/gateway/callback/dlr?token='. config('simgateway.callback.token', ''),
+            'sr_url' => 'https://reunite-relax-empathy.ngrok-free.dev/gateway/callback/dlr?token='.config('simgateway.callback.token', ''),
             'tasks' => [[
                 'tid' => $tid,
                 'from' => $port,

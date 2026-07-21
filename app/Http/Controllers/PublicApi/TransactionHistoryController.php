@@ -106,7 +106,7 @@ class TransactionHistoryController extends Controller
                     'rts_goods_out' => (int) ($row['rts_goods_out'] ?? 0),
                     'rts_bad' => (int) ($row['rts_bad'] ?? 0),
                     'inventory_remaining_stock' => $remainingStock,
-                    'remaining_qty' => (int) round($remainingStock)
+                    'remaining_qty' => (int) round($remainingStock),
                 ],
             );
 

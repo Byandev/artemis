@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\OutgoingApiLog;
 use App\Services\Botcake;
 use App\Services\Sms\SmsProviderFactory;
 use DateTime;
@@ -45,20 +44,6 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         if (! config('settings.parcel_journey_notification_enabled')) {
-            if (config('settings.parcel_journey_notification_logs_enabled')) {
-                OutgoingApiLog::create([
-                    'service' => 'botcake',
-                    'action' => 'sendParcelUpdateNotification',
-                    'http_method' => 'POST',
-                    'url' => 'skipped',
-                    'request_payload' => ['notification_id' => $this->parcelJourneyNotification->id],
-                    'response_status' => null,
-                    'response_body' => null,
-                    'duration_ms' => null,
-                    'context' => ['reason' => 'parcel_journey_notification_enabled is false'],
-                ]);
-            }
-
             return;
         }
 
@@ -91,10 +76,7 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
                     // off to CheckParcelUpdateNotification for the final status.
                     $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
 
-                        dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
-                    } else {
-                        $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $result->remarks]);
-                    }
+                    dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
                 } else {
                     // Provider doesn't expose delivery tracking (SendGate) — treat
                     // a successful send as sent.
@@ -108,7 +90,6 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
             } else {
                 $this->parcelJourneyNotification->update(['remarks' => $result->remarks]);
             }
-
         } elseif ($this->parcelJourneyNotification->type === 'chat') {
             // Atomically claim the record — only the worker that flips status
             // from 'pending' to 'sent' gets to actually send. Any concurrent

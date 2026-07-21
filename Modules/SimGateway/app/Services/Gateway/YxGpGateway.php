@@ -39,9 +39,9 @@ class YxGpGateway implements GatewayInterface
         protected string $host,
         protected string $username,
         protected string $password,
-        protected string $charset = 'utf8',
-        protected int $timeoutSeconds = 10,
-        protected bool $verifyTls = true,
+        protected string $charset,
+        protected int $timeoutSeconds,
+        protected bool $verifyTls,
         protected string $token
     ) {
         if ($this->host === '') {
@@ -355,7 +355,6 @@ class YxGpGateway implements GatewayInterface
      */
     protected function statusReportUrl(): ?string
     {
-        return 'https://reunite-relax-empathy.ngrok-free.dev/gateway/callback/dlr?token='. config('simgateway.callback.token', '');
         $token = (string) config('simgateway.callback.token', '');
 
         return $token === '' ? null : route('gateway.callback.dlr', ['token' => $token]);
