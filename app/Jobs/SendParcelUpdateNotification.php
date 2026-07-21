@@ -82,11 +82,15 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
 
             if ($result->accepted) {
                 if ($result->tracksDelivery) {
-                    // Provider gave us a message id to poll — record it and hand
-                    // off to CheckParcelUpdateNotification for the final status.
-                    $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
+                    if ($result->messageId) {
+                        // Provider gave us a message id to poll — record it and hand
+                        // off to CheckParcelUpdateNotification for the final status.
+                        $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
 
-                    dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
+                        dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
+                    } else {
+                        $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $result->remarks]);
+                    }
                 } else {
                     // Provider doesn't expose delivery tracking — treat a
                     // successful send as sent.
