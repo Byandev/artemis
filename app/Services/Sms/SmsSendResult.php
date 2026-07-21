@@ -26,14 +26,14 @@ final class SmsSendResult
         public bool $awaitsCallback = false,
     ) {}
 
-    public static function accepted(?string $messageId, bool $tracksDelivery): self
+    public static function accepted(?string $messageId, bool $tracksDelivery, ?string $remarks): self
     {
         return new self(
             accepted: true,
             failed: false,
             messageId: $messageId,
             tracksDelivery: $tracksDelivery,
-            remarks: null,
+            remarks: $remarks,
         );
     }
 
