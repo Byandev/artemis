@@ -10,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\ThrottlesExceptions;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\ParcelJourneyNotification;
 
@@ -74,62 +73,37 @@ class SendParcelUpdateNotification implements ShouldBeUnique, ShouldQueue
         $this->parcelJourneyNotification->load('order.page');
 
         if ($this->parcelJourneyNotification->type === 'sms') {
-            // A successful SMS send can't be undone — and through the SIM Gateway
-            // it costs real money — while the non-tracking providers (SIM Gateway,
-            // SendGate) have no pre-send id to dedupe on. Hold a short lock and
-            // re-check state under it so two concurrent workers can't double-send
-            // the same notification, even if the ShouldBeUnique guard is bypassed.
-            $lock = Cache::lock('parcel-sms-send:'.$this->parcelJourneyNotification->id, 120);
+            $provider = app(SmsProviderFactory::class)->for($this->parcelJourneyNotification->order->page);
 
-            if (! $lock->get()) {
-                return;
-            }
+            $result = $provider->send(
+                $this->parcelJourneyNotification->receiver_identity,
+                $this->parcelJourneyNotification->message,
+            );
 
-            try {
-                // A concurrent worker may have completed the send between our
-                // earlier check and acquiring the lock — re-read the row (and the
-                // page's current provider config) and re-check before sending.
-                $this->parcelJourneyNotification->refresh()->load('order.page');
+            if ($result->accepted) {
+                if ($result->awaitsCallback) {
+                    // The SIM Gateway device pushes the final status to our
+                    // callback later — record the id and stay pending; the
+                    // callback flips this notification to sent/failed.
+                    $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
+                } elseif ($result->tracksDelivery) {
+                    // Provider gave us a message id to poll — record it and hand
+                    // off to CheckParcelUpdateNotification for the final status.
+                    $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
 
-                if ($this->alreadyProcessed()) {
-                    return;
-                }
-
-                $provider = app(SmsProviderFactory::class)->for($this->parcelJourneyNotification->order->page);
-
-                $result = $provider->send(
-                    $this->parcelJourneyNotification->receiver_identity,
-                    $this->parcelJourneyNotification->message,
-                );
-
-                if ($result->accepted) {
-                    if ($result->awaitsCallback) {
-                        // The SIM Gateway device pushes the final status to our
-                        // callback later — record the id and stay pending; the
-                        // callback flips this notification to sent/failed.
-                        $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
-                    } elseif ($result->tracksDelivery) {
-                        // Provider gave us a message id to poll — record it and
-                        // hand off to CheckParcelUpdateNotification for the final
-                        // status.
-                        $this->parcelJourneyNotification->update(['sms_id' => $result->messageId]);
-
-                        dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
-                    } else {
-                        // Provider doesn't expose delivery tracking (SendGate) —
-                        // treat a successful send as sent.
-                        $this->parcelJourneyNotification->update([
-                            'status' => 'sent',
-                            'sms_id' => $result->messageId,
-                        ]);
-                    }
-                } elseif ($result->failed) {
-                    $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $result->remarks]);
+                    dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
                 } else {
-                    $this->parcelJourneyNotification->update(['remarks' => $result->remarks]);
+                    // Provider doesn't expose delivery tracking (SendGate) — treat
+                    // a successful send as sent.
+                    $this->parcelJourneyNotification->update([
+                        'status' => 'sent',
+                        'sms_id' => $result->messageId,
+                    ]);
                 }
-            } finally {
-                $lock->release();
+            } elseif ($result->failed) {
+                $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => $result->remarks]);
+            } else {
+                $this->parcelJourneyNotification->update(['remarks' => $result->remarks]);
             }
 
         } elseif ($this->parcelJourneyNotification->type === 'chat') {

@@ -186,7 +186,9 @@ test('SIM Gateway SMS stays pending with the provider id, awaiting the delivery 
     ]);
     $page->update(['sim_gateway_sim_id' => $sim->id]);
 
-    (new SendParcelUpdateNotification($notif))->handle();
+    // Hand the job a fresh model (as the queue would via SerializesModels) so it
+    // reads the page config we just wrote, not the stale in-memory relation.
+    (new SendParcelUpdateNotification($notif->fresh()))->handle();
 
     // Not marked sent yet — the device pushes the final status to our callback.
     expect($notif->fresh()->status)->toBe('pending');
