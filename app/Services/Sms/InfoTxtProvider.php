@@ -34,7 +34,7 @@ class InfoTxtProvider implements SmsProvider
         $body = $response->json();
 
         if (isset($body['status']) && $body['status'] === '00') {
-            return SmsSendResult::accepted($body['smsid'] ?? null, tracksDelivery: true);
+            return SmsSendResult::accepted($body['smsid'] ?? null, tracksDelivery: true, remarks: '');
         }
 
         return SmsSendResult::rejected(json_encode($body));
