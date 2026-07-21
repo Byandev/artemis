@@ -15,6 +15,9 @@ class SmsProviderFactory
     public function for(Page $page): SmsProvider
     {
         return match ($page->sms_provider) {
+            'sim_gateway' => new SimGatewayProvider(
+                $page->sim_gateway_sim_id ? (int) $page->sim_gateway_sim_id : null,
+            ),
             'sendgate' => new SendGateProvider(
                 (string) $page->sendgate_api_key,
                 (string) $page->sendgate_sim_id,
