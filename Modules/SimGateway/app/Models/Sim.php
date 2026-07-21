@@ -22,7 +22,6 @@ class Sim extends Model
 
     protected $fillable = [
         'workspace_id',
-        'iccid',
         'phone_number',
         'carrier',
         'port_number',

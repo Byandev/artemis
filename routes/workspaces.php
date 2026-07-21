@@ -44,8 +44,6 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
 use Modules\Botcake\Http\Controllers\Web\FlowController;
 use Modules\Botcake\Http\Controllers\Web\SequenceController;
-use Modules\SimGateway\Http\Controllers\ScheduledMessageController;
-use Modules\SimGateway\Http\Controllers\SmsController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
 use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
@@ -80,6 +78,9 @@ use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use Modules\Pancake\Http\Controllers\OrderController;
+use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
+use Modules\SimGateway\Http\Controllers\ScheduledMessageController;
+use Modules\SimGateway\Http\Controllers\SmsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -671,4 +672,18 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('invoices.update-status');
         Route::delete('/invoices/{invoice}', [AdminInvoiceController::class, 'destroy'])
             ->name('invoices.destroy');
+
+        // Workspace SIM management (SimGateway module)
+        Route::get('/sims', [AdminSimController::class, 'index'])
+            ->name('sims.index');
+        Route::get('/sims/create', [AdminSimController::class, 'create'])
+            ->name('sims.create');
+        Route::post('/sims', [AdminSimController::class, 'store'])
+            ->name('sims.store');
+        Route::get('/sims/{sim}/edit', [AdminSimController::class, 'edit'])
+            ->name('sims.edit');
+        Route::put('/sims/{sim}', [AdminSimController::class, 'update'])
+            ->name('sims.update');
+        Route::delete('/sims/{sim}', [AdminSimController::class, 'destroy'])
+            ->name('sims.destroy');
     });

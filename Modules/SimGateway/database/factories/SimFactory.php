@@ -19,7 +19,6 @@ class SimFactory extends Factory
     {
         return [
             'workspace_id' => Workspace::factory(),
-            'iccid' => $this->faker->unique()->numerify('8963############'),
             'phone_number' => '09'.$this->faker->numerify('#########'),
             'carrier' => $this->faker->randomElement(SimCarrier::cases())->value,
             'port_number' => $this->faker->unique()->numberBetween(1, 512),
