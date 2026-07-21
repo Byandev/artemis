@@ -23,6 +23,7 @@ class Transaction extends Model
         'type',
         'transaction_type',
         'transaction_type_id',
+        'product',
         'amount',
         'running_balance',
         'reference_no',

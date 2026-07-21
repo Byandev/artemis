@@ -45,6 +45,10 @@ interface Props {
     workspace: Workspace;
     mode: 'preview' | 'saved';
     statement: Statement;
+    // When rendered for a scoped statement (per-product / per-user), the route
+    // prefix + the scope label and the extra params to send on save.
+    base?: string;
+    scope?: { label?: string; params?: Record<string, string | number> };
 }
 
 const AUTO = ['shipping_fee', 'cod_fee', 'vat'];
@@ -78,8 +82,11 @@ export default function IncomeStatementShow({
     workspace,
     mode,
     statement,
+    base: baseProp,
+    scope,
 }: Props) {
-    const base = `/workspaces/${workspace.slug}/finance/income-statements`;
+    const base =
+        baseProp ?? `/workspaces/${workspace.slug}/finance/income-statements`;
     const isPreview = mode === 'preview';
     const month = moment(statement.period_month).format('YYYY-MM');
     const monthLabel = moment(statement.period_month).format('MMMM YYYY');
@@ -190,6 +197,7 @@ export default function IncomeStatementShow({
             base,
             {
                 month,
+                ...(scope?.params ?? {}),
                 cod_rate: codRate,
                 vat_rate: vatRate,
                 included_keys: rows
@@ -324,7 +332,11 @@ export default function IncomeStatementShow({
             />
             <div className="w-full p-4 font-mono md:p-6">
                 <PageHeader
-                    title="Income Statement"
+                    title={
+                        scope?.label
+                            ? `Income Statement — ${scope.label}`
+                            : 'Income Statement'
+                    }
                     description={
                         isPreview
                             ? `${monthLabel} · preview — choose deductions, then save.`

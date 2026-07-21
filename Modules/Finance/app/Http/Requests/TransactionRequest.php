@@ -35,6 +35,9 @@ class TransactionRequest extends FormRequest
             'approved_by' => ['nullable', $this->memberRule($workspaceId)],
             'department' => ['nullable', 'string', 'max:255'],
             'charge_to' => ['nullable', $this->memberRule($workspaceId)],
+            // Optional product tag (normalized order_details name) for the
+            // per-product income statement.
+            'product' => ['nullable', 'string', 'max:191'],
             'reference_no' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', Rule::in(['pending', 'approved', 'posted'])],
             'amount' => ['required', 'numeric', 'min:0'],

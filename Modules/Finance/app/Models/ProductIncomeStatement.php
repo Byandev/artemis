@@ -7,16 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class IncomeStatement extends Model
+class ProductIncomeStatement extends Model
 {
-    protected $table = 'finance_income_statements';
+    protected $table = 'finance_product_income_statements';
 
     protected $fillable = [
         'workspace_id',
+        'income_statement_id',
+        'product',
         'period_month',
         'total_delivered',
         'delivered_orders',
-        'ad_spent',
         'total_expenses',
         'gross_profit',
         'net_profit',
@@ -32,7 +33,6 @@ class IncomeStatement extends Model
         'period_month' => 'date',
         'total_delivered' => 'decimal:2',
         'delivered_orders' => 'integer',
-        'ad_spent' => 'decimal:2',
         'total_expenses' => 'decimal:2',
         'gross_profit' => 'decimal:2',
         'net_profit' => 'decimal:2',
@@ -48,14 +48,14 @@ class IncomeStatement extends Model
         return $this->belongsTo(Workspace::class);
     }
 
-    public function breakdown(): HasMany
+    /** The parent monthly workspace income statement, if it exists. */
+    public function incomeStatement(): BelongsTo
     {
-        return $this->hasMany(IncomeStatementExpense::class, 'income_statement_id');
+        return $this->belongsTo(IncomeStatement::class, 'income_statement_id');
     }
 
-    /** Per-product breakdown statements for this month. */
-    public function productIncomeStatements(): HasMany
+    public function breakdown(): HasMany
     {
-        return $this->hasMany(ProductIncomeStatement::class, 'income_statement_id');
+        return $this->hasMany(ProductIncomeStatementExpense::class, 'product_income_statement_id');
     }
 }

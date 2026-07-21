@@ -42,6 +42,7 @@ export interface FinanceTransaction {
     status?: TransactionStatus | null;
     position?: number | null;
     sub_category: SubCategory | null;
+    product?: string | null;
     notes: string | null;
 }
 
