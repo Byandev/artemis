@@ -99,7 +99,7 @@ class WorkspaceMemberController extends Controller
         $pendingInvitations = QueryBuilder::for($workspace->pendingInvitations()->getQuery(), $invitationRequest)
             ->leftJoin('roles', 'roles.id', '=', 'workspace_invitations.role_id')
             ->select('workspace_invitations.*')
-            ->with(['inviter', 'role', 'team'])
+            ->with(['inviter', 'role', 'teams'])
             ->allowedFilters([AllowedFilter::partial('search', 'email')])
             ->allowedSorts([
                 'id',
@@ -141,17 +141,18 @@ class WorkspaceMemberController extends Controller
         $validated = $request->validate([
             'email' => 'required|email',
             'role_id' => 'required|exists:roles,id',
-            'team_id' => [
-                'nullable',
+            'team_ids' => ['nullable', 'array'],
+            'team_ids.*' => [
                 Rule::exists('teams', 'id')->where('workspace_id', $workspace->id),
             ],
         ]);
 
-        $workspace->invitations()->create([
+        $invitation = $workspace->invitations()->create([
             'email' => $validated['email'],
             'role_id' => $validated['role_id'],
-            'team_id' => $validated['team_id'] ?? null,
         ]);
+
+        $invitation->teams()->sync($validated['team_ids'] ?? []);
 
         return back()->with('success', 'Invitation sent.');
     }

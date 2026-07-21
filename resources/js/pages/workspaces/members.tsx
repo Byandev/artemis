@@ -12,6 +12,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
@@ -33,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
     Select,
     SelectContent,
@@ -67,14 +69,11 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-// Sentinel for "no team" — Radix Select cannot hold an empty string value.
-const NO_TEAM = 'none';
-
 interface Invitation {
     id: number;
     email: string;
     role: Role;
-    team?: TeamOption | null;
+    teams?: TeamOption[];
     token: string;
     expires_at: string;
     inviter: {
@@ -166,8 +165,17 @@ export default function WorkspaceMembers({
     const inviteForm = useForm({
         email: '',
         role_id: '',
-        team_id: NO_TEAM,
+        team_ids: [] as string[],
     });
+
+    const teamOptions = useMemo(
+        () =>
+            teams.map((team) => ({
+                value: team.id.toString(),
+                label: team.name,
+            })),
+        [teams],
+    );
 
     const updateRoleForm = useForm({
         role_id: '',
@@ -218,10 +226,6 @@ export default function WorkspaceMembers({
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
-        inviteForm.transform((data) => ({
-            ...data,
-            team_id: data.team_id === NO_TEAM ? null : data.team_id,
-        }));
         inviteForm.post(workspaces.invitations.store.url(workspace.slug), {
             preserveScroll: true,
             onSuccess: () => {
@@ -526,13 +530,27 @@ export default function WorkspaceMembers({
             cell: ({ row }) => row.original.role?.name,
         },
         {
-            id: 'team_name',
-            accessorFn: (row) => row.team?.name,
-            header: 'Team',
-            cell: ({ row }) =>
-                row.original.team?.name ?? (
-                    <span className="text-muted-foreground">—</span>
-                ),
+            id: 'team_names',
+            accessorFn: (row) =>
+                (row.teams ?? []).map((team) => team.name).join(', '),
+            header: 'Teams',
+            cell: ({ row }) => {
+                const teams = row.original.teams ?? [];
+
+                if (teams.length === 0) {
+                    return <span className="text-muted-foreground">—</span>;
+                }
+
+                return (
+                    <div className="flex flex-wrap gap-1">
+                        {teams.map((team) => (
+                            <Badge key={team.id} variant="secondary">
+                                {team.name}
+                            </Badge>
+                        ))}
+                    </div>
+                );
+            },
         },
         {
             id: 'inviter_name',
@@ -686,42 +704,27 @@ export default function WorkspaceMembers({
                                         </p>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="team">Team</Label>
+                                        <Label htmlFor="teams">Teams</Label>
 
-                                        <Select
-                                            value={inviteForm.data.team_id}
-                                            onValueChange={(value) =>
+                                        <MultiSelect
+                                            options={teamOptions}
+                                            selected={inviteForm.data.team_ids}
+                                            onChange={(selected) =>
                                                 inviteForm.setData(
-                                                    'team_id',
-                                                    value,
+                                                    'team_ids',
+                                                    selected,
                                                 )
                                             }
-                                        >
-                                            <SelectTrigger id="team">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value={NO_TEAM}>
-                                                    No team
-                                                </SelectItem>
-                                                {teams.map((team) => (
-                                                    <SelectItem
-                                                        key={team.id}
-                                                        value={team.id.toString()}
-                                                    >
-                                                        {team.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {inviteForm.errors.team_id && (
+                                            placeholder="No teams"
+                                        />
+                                        {inviteForm.errors.team_ids && (
                                             <p className="text-sm text-destructive">
-                                                {inviteForm.errors.team_id}
+                                                {inviteForm.errors.team_ids}
                                             </p>
                                         )}
                                         <p className="text-sm text-muted-foreground">
-                                            They join this team when they accept
-                                            the invitation
+                                            They join these teams when they
+                                            accept the invitation
                                         </p>
                                     </div>
                                 </div>

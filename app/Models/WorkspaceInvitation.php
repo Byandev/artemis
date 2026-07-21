@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Str;
 
 class WorkspaceInvitation extends Model
@@ -17,7 +18,6 @@ class WorkspaceInvitation extends Model
         'email',
         'token',
         'role_id',
-        'team_id',
         'expires_at',
         'accepted_at',
     ];
@@ -126,10 +126,11 @@ class WorkspaceInvitation extends Model
     }
 
     /**
-     * The team the invitee is added to when they accept (optional).
+     * The teams the invitee is added to when they accept (optional).
      */
-    public function team(): BelongsTo
+    public function teams(): BelongsToMany
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsToMany(Team::class, 'team_workspace_invitation')
+            ->withTimestamps();
     }
 }

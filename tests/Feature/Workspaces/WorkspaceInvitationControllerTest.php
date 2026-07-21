@@ -157,24 +157,26 @@ test('accept attaches the user to the workspace and marks accepted', function ()
     expect($invitation->fresh()->isAccepted())->toBeTrue();
 });
 
-test('owner can invite with a team assignment', function () {
+test('owner can invite with multiple team assignments', function () {
     Notification::fake();
 
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $role = Role::factory()->create(['workspace_id' => $workspace->id]);
-    $team = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teams = Team::factory()->count(2)->create(['workspace_id' => $workspace->id]);
 
     $this->actingAs($owner)
         ->from("/workspaces/{$workspace->slug}/members")
         ->post("/workspaces/{$workspace->slug}/invitations", [
             'email' => 'teamed@example.test',
             'role_id' => $role->id,
-            'team_id' => $team->id,
+            'team_ids' => $teams->pluck('id')->all(),
         ])
         ->assertRedirect();
 
-    expect(WorkspaceInvitation::where('email', 'teamed@example.test')->value('team_id'))
-        ->toBe($team->id);
+    $invitation = WorkspaceInvitation::where('email', 'teamed@example.test')->first();
+
+    expect($invitation->teams->pluck('id')->sort()->values()->all())
+        ->toBe($teams->pluck('id')->sort()->values()->all());
 });
 
 test('cannot invite with a team from another workspace', function () {
@@ -190,26 +192,28 @@ test('cannot invite with a team from another workspace', function () {
         ->post("/workspaces/{$workspace->slug}/invitations", [
             'email' => 'foreign@example.test',
             'role_id' => $role->id,
-            'team_id' => $foreignTeam->id,
+            'team_ids' => [$foreignTeam->id],
         ])
-        ->assertSessionHasErrors('team_id');
+        ->assertSessionHasErrors('team_ids.0');
 });
 
-test('accept adds the user to the invited team', function () {
+test('accept adds the user to every invited team', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     $role = Role::factory()->create(['workspace_id' => $workspace->id]);
-    $team = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teams = Team::factory()->count(2)->create(['workspace_id' => $workspace->id]);
     $invitee = User::factory()->create(['email' => 'teamjoin@example.test']);
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => $invitee->email,
         'role_id' => $role->id,
-        'team_id' => $team->id,
     ]);
+    $invitation->teams()->sync($teams->pluck('id')->all());
 
     $this->actingAs($invitee)
         ->get("/workspaces/invitations/{$invitation->token}/accept")
         ->assertRedirect();
 
-    expect($team->fresh()->members->contains($invitee))->toBeTrue();
+    foreach ($teams as $team) {
+        expect($team->fresh()->members->contains($invitee))->toBeTrue();
+    }
 });
