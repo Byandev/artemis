@@ -1,6 +1,7 @@
 import { Can } from '@/components/can';
 import ComponentCard from '@/components/common/ComponentCard';
 import PageHeader from '@/components/common/PageHeader';
+import { AssignDepartmentDialog } from '@/components/members/assign-department-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -12,6 +13,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     Dialog,
@@ -47,6 +49,7 @@ import { PaginatedData, SharedData, User } from '@/types';
 import { Role } from '@/types/models/Role';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import type { RowSelectionState } from '@tanstack/react-table';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
@@ -63,14 +66,15 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { AssignDepartmentDialog } from '@/components/members/assign-department-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import type { RowSelectionState } from '@tanstack/react-table';
+
+// Sentinel for "no team" — Radix Select cannot hold an empty string value.
+const NO_TEAM = 'none';
 
 interface Invitation {
     id: number;
     email: string;
     role: Role;
+    team?: TeamOption | null;
     token: string;
     expires_at: string;
     inviter: {
@@ -83,11 +87,17 @@ interface DepartmentOption {
     name: string;
 }
 
+interface TeamOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     workspace: Workspace;
     members: PaginatedData<User>;
     roles: Role[];
     departments: DepartmentOption[];
+    teams: TeamOption[];
     pendingInvitations: PaginatedData<Invitation>;
     isAdmin: boolean;
     query?: {
@@ -110,6 +120,7 @@ export default function WorkspaceMembers({
     query,
     roles,
     departments,
+    teams,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
     const isOwner = auth?.user?.id === workspace.owner_id;
@@ -155,6 +166,7 @@ export default function WorkspaceMembers({
     const inviteForm = useForm({
         email: '',
         role_id: '',
+        team_id: NO_TEAM,
     });
 
     const updateRoleForm = useForm({
@@ -206,6 +218,10 @@ export default function WorkspaceMembers({
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
+        inviteForm.transform((data) => ({
+            ...data,
+            team_id: data.team_id === NO_TEAM ? null : data.team_id,
+        }));
         inviteForm.post(workspaces.invitations.store.url(workspace.slug), {
             preserveScroll: true,
             onSuccess: () => {
@@ -510,6 +526,15 @@ export default function WorkspaceMembers({
             cell: ({ row }) => row.original.role?.name,
         },
         {
+            id: 'team_name',
+            accessorFn: (row) => row.team?.name,
+            header: 'Team',
+            cell: ({ row }) =>
+                row.original.team?.name ?? (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
             id: 'inviter_name',
             accessorKey: 'inviter.name',
             enableSorting: true,
@@ -658,6 +683,45 @@ export default function WorkspaceMembers({
                                         <p className="text-sm text-muted-foreground">
                                             Admins can manage members and
                                             settings
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="team">Team</Label>
+
+                                        <Select
+                                            value={inviteForm.data.team_id}
+                                            onValueChange={(value) =>
+                                                inviteForm.setData(
+                                                    'team_id',
+                                                    value,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger id="team">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value={NO_TEAM}>
+                                                    No team
+                                                </SelectItem>
+                                                {teams.map((team) => (
+                                                    <SelectItem
+                                                        key={team.id}
+                                                        value={team.id.toString()}
+                                                    >
+                                                        {team.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {inviteForm.errors.team_id && (
+                                            <p className="text-sm text-destructive">
+                                                {inviteForm.errors.team_id}
+                                            </p>
+                                        )}
+                                        <p className="text-sm text-muted-foreground">
+                                            They join this team when they accept
+                                            the invitation
                                         </p>
                                     </div>
                                 </div>

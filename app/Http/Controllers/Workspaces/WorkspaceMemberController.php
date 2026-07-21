@@ -8,6 +8,7 @@ use App\Http\Sorts\WorkspaceInvitation\InviterNameSort;
 use App\Http\Sorts\WorkspaceMember\RoleNameSort;
 use App\Models\Department;
 use App\Models\Role;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -98,7 +99,7 @@ class WorkspaceMemberController extends Controller
         $pendingInvitations = QueryBuilder::for($workspace->pendingInvitations()->getQuery(), $invitationRequest)
             ->leftJoin('roles', 'roles.id', '=', 'workspace_invitations.role_id')
             ->select('workspace_invitations.*')
-            ->with(['inviter', 'role'])
+            ->with(['inviter', 'role', 'team'])
             ->allowedFilters([AllowedFilter::partial('search', 'email')])
             ->allowedSorts([
                 'id',
@@ -117,6 +118,9 @@ class WorkspaceMemberController extends Controller
             'pendingInvitations' => $pendingInvitations,
             'isAdmin' => $request->user()->isAdminOf($workspace),
             'roles' => Role::where('workspace_id', $workspace->id)->get(),
+            'teams' => Team::ofWorkspace($workspace)
+                ->orderBy('name')
+                ->get(['id', 'name']),
             'departments' => Department::ofWorkspace($workspace)
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -134,14 +138,19 @@ class WorkspaceMemberController extends Controller
     {
         $this->authorize(Permission::InviteMembers->value, $workspace);
 
-        $request->validate([
+        $validated = $request->validate([
             'email' => 'required|email',
             'role_id' => 'required|exists:roles,id',
+            'team_id' => [
+                'nullable',
+                Rule::exists('teams', 'id')->where('workspace_id', $workspace->id),
+            ],
         ]);
 
         $workspace->invitations()->create([
-            'email' => $request->email,
-            'role_id' => $request->role_id,
+            'email' => $validated['email'],
+            'role_id' => $validated['role_id'],
+            'team_id' => $validated['team_id'] ?? null,
         ]);
 
         return back()->with('success', 'Invitation sent.');

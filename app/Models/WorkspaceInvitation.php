@@ -17,6 +17,7 @@ class WorkspaceInvitation extends Model
         'email',
         'token',
         'role_id',
+        'team_id',
         'expires_at',
         'accepted_at',
     ];
@@ -122,5 +123,13 @@ class WorkspaceInvitation extends Model
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * The team the invitee is added to when they accept (optional).
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
     }
 }
