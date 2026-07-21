@@ -79,6 +79,8 @@ use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use Modules\Pancake\Http\Controllers\OrderController;
+use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
+use Modules\SimGateway\Http\Controllers\SmsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -569,6 +571,14 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{creative}/ads-campaign', [CreativesController::class, 'updateAdsCampaign'])->name('ads-campaign.update');
     });
 
+    Route::prefix('/workspaces/{workspace:slug}/sms')->name('workspaces.sms.')->group(function () {
+        Route::get('/send', [SmsController::class, 'create'])->name('send');
+        Route::post('/send', [SmsController::class, 'store'])->name('store');
+        Route::post('/bulk', [SmsController::class, 'bulkStore'])->name('bulk');
+        Route::get('/outbox', [SmsController::class, 'outbox'])->name('outbox');
+        Route::get('/sims', [SmsController::class, 'sims'])->name('sims');
+    });
+
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
     Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');
     Route::patch('/workspaces/{workspace:slug}/support/{ticket}', [SupportTicketController::class, 'update'])->name('support.update');
@@ -665,4 +675,18 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('invoices.update-status');
         Route::delete('/invoices/{invoice}', [AdminInvoiceController::class, 'destroy'])
             ->name('invoices.destroy');
+
+        // Workspace SIM management (SimGateway module)
+        Route::get('/sims', [AdminSimController::class, 'index'])
+            ->name('sims.index');
+        Route::get('/sims/create', [AdminSimController::class, 'create'])
+            ->name('sims.create');
+        Route::post('/sims', [AdminSimController::class, 'store'])
+            ->name('sims.store');
+        Route::get('/sims/{sim}/edit', [AdminSimController::class, 'edit'])
+            ->name('sims.edit');
+        Route::put('/sims/{sim}', [AdminSimController::class, 'update'])
+            ->name('sims.update');
+        Route::delete('/sims/{sim}', [AdminSimController::class, 'destroy'])
+            ->name('sims.destroy');
     });

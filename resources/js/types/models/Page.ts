@@ -10,11 +10,12 @@ export interface Page {
     name: string;
     facebook_url?: string;
     botcake_token?: string;
-    sms_provider?: 'infotxt' | 'sendgate';
+    sms_provider?: 'infotxt' | 'sendgate' | 'sim_gateway';
     infotxt_token?: string;
     infotxt_user_id?: string;
     sendgate_api_key?: string;
     sendgate_sim_id?: string;
+    sim_gateway_sim_id?: number | string | null;
     orders_last_synced_at: string;
     status: 'active' | 'inactive';
     deleted_at: string | null; // SoftDeletes column
