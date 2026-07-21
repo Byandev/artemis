@@ -42,6 +42,7 @@ class YxGpGateway implements GatewayInterface
         protected string $charset = 'utf8',
         protected int $timeoutSeconds = 10,
         protected bool $verifyTls = true,
+        protected string $token
     ) {
         if ($this->host === '') {
             throw new GatewayException('YX GP gateway is misconfigured: SIMGATEWAY_YXGP_HOST is empty.');
@@ -87,7 +88,11 @@ class YxGpGateway implements GatewayInterface
         try {
             $response = Http::timeout($this->timeoutSeconds)
                 ->withOptions(['verify' => $this->verifyTls])
-                ->withHeaders(['Content-Type' => 'application/json;charset=utf-8', 'Accept' => 'application/json'])
+                ->withHeaders([
+                    'Content-Type' => 'application/json;charset=utf-8',
+                    'Accept' => 'application/json',
+                    'X-Api-Key' => $this->token,
+                ])
                 ->post($this->url('/goip_post_sms.html', [
                     'version' => '1.1',
                     'username' => $this->username,

@@ -101,7 +101,11 @@ class SendTestSmsCommand extends Command
         try {
             $response = Http::timeout((int) config('simgateway.yxgp.timeout_seconds', 10))
                 ->withOptions(['verify' => (bool) config('simgateway.yxgp.verify_tls', true)])
-                ->withHeaders(['Content-Type' => 'application/json;charset=utf-8', 'Accept' => 'application/json'])
+                ->withHeaders([
+                    'Content-Type' => 'application/json;charset=utf-8',
+                    'Accept' => 'application/json',
+                    'X-Api-Key' => config('simgateway.yxgp.auth_token'),
+                ])
                 ->post($url, $payload);
         } catch (ConnectionException|RequestException $e) {
             $this->error('Device unreachable: '.$this->maskPassword($e->getMessage()));

@@ -54,6 +54,7 @@ class SimGatewayServiceProvider extends ModuleServiceProvider
                     charset: (string) config('simgateway.yxgp.charset', 'utf8'),
                     timeoutSeconds: (int) config('simgateway.yxgp.timeout_seconds', 10),
                     verifyTls: (bool) config('simgateway.yxgp.verify_tls', true),
+                    token: (string) config('simgateway.yxgp.auth_token'),
                 ),
                 default => new StubGateway,
             };

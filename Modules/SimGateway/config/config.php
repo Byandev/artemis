@@ -35,6 +35,7 @@ return [
         'charset' => env('SIMGATEWAY_YXGP_CHARSET', 'utf8'),
         'timeout_seconds' => (int) env('SIMGATEWAY_YXGP_TIMEOUT', 10),
         'verify_tls' => (bool) env('SIMGATEWAY_YXGP_VERIFY_TLS', true),
+        'auth_token' => env('SIMGATEWAY_YXGP_AUTH_TOKEN', null),
     ],
 
     /*
