@@ -355,7 +355,6 @@ class YxGpGateway implements GatewayInterface
      */
     protected function statusReportUrl(): ?string
     {
-        return 'https://reunite-relax-empathy.ngrok-free.dev/gateway/callback/dlr?token='. config('simgateway.callback.token', '');
         $token = (string) config('simgateway.callback.token', '');
 
         return $token === '' ? null : route('gateway.callback.dlr', ['token' => $token]);
