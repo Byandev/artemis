@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use Modules\SimGateway\Enums\SimStatus;
+use Modules\SimGateway\Models\Sim;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -130,6 +132,11 @@ class PageController extends Controller
             'workspace' => $workspace,
             'page' => $page,
             'users' => $workspace->users()->get(['users.id', 'users.name']),
+            // Active SIMs the page can send parcel-journey SMS from via the
+            // Artemis SIM Gateway provider.
+            'sims' => Sim::where('workspace_id', $workspace->id)
+                ->where('status', SimStatus::Active)
+                ->get(['id', 'phone_number', 'label', 'carrier']),
         ]);
     }
 

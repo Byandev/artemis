@@ -50,6 +50,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'api.key' => AuthenticateApiKey::class,
         ]);
 
+        // The YX GP hardware device POSTs delivery receipts and inbound SMS to
+        // these routes with no session cookie — authorised by a shared token in
+        // VerifyGatewayCallback — so they must be exempt from CSRF.
+        $middleware->validateCsrfTokens(except: [
+            'gateway/callback/*',
+        ]);
+
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthorizationException|HttpExceptionInterface $exception, Request $request) {

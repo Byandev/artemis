@@ -61,6 +61,7 @@ interface Workspace {
     sales_marketing_dashboard_module_enabled: boolean;
     video_editor_dashboard_module_enabled: boolean;
     csr_dashboard_module_enabled: boolean;
+    sim_gateway_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -83,6 +84,7 @@ const MODULE_FIELDS: Array<{
         | 'sales_marketing_dashboard_module_enabled'
         | 'video_editor_dashboard_module_enabled'
         | 'csr_dashboard_module_enabled'
+        | 'sim_gateway_module_enabled'
     >;
     label: string;
     description: string;
@@ -167,6 +169,11 @@ const MODULE_FIELDS: Array<{
         label: 'CSR Dashboard',
         description: 'CSR personal dashboard',
     },
+    {
+        key: 'sim_gateway_module_enabled',
+        label: 'SMS Gateway',
+        description: 'Send/receive SMS through workspace SIMs',
+    },
 ];
 
 type ModuleKey = (typeof MODULE_FIELDS)[number]['key'];
@@ -202,6 +209,7 @@ const MODULE_GROUPS: {
             'meta_ads_module_enabled',
             'creatives_module_enabled',
             'botcake_module_enabled',
+            'sim_gateway_module_enabled',
         ],
     },
     {
@@ -779,6 +787,7 @@ function ModulesModal({
         video_editor_dashboard_module_enabled:
             workspace.video_editor_dashboard_module_enabled,
         csr_dashboard_module_enabled: workspace.csr_dashboard_module_enabled,
+        sim_gateway_module_enabled: workspace.sim_gateway_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {
