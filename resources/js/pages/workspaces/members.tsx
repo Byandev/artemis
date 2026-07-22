@@ -1,6 +1,7 @@
 import { Can } from '@/components/can';
 import ComponentCard from '@/components/common/ComponentCard';
 import PageHeader from '@/components/common/PageHeader';
+import { AssignDepartmentDialog } from '@/components/members/assign-department-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -11,7 +12,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     Dialog,
@@ -31,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
     Select,
     SelectContent,
@@ -47,6 +51,7 @@ import { PaginatedData, SharedData, User } from '@/types';
 import { Role } from '@/types/models/Role';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import type { RowSelectionState } from '@tanstack/react-table';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
@@ -63,14 +68,12 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { AssignDepartmentDialog } from '@/components/members/assign-department-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import type { RowSelectionState } from '@tanstack/react-table';
 
 interface Invitation {
     id: number;
     email: string;
     role: Role;
+    teams?: TeamOption[];
     token: string;
     expires_at: string;
     inviter: {
@@ -83,11 +86,17 @@ interface DepartmentOption {
     name: string;
 }
 
+interface TeamOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     workspace: Workspace;
     members: PaginatedData<User>;
     roles: Role[];
     departments: DepartmentOption[];
+    teams: TeamOption[];
     pendingInvitations: PaginatedData<Invitation>;
     isAdmin: boolean;
     query?: {
@@ -110,6 +119,7 @@ export default function WorkspaceMembers({
     query,
     roles,
     departments,
+    teams,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
     const isOwner = auth?.user?.id === workspace.owner_id;
@@ -155,7 +165,17 @@ export default function WorkspaceMembers({
     const inviteForm = useForm({
         email: '',
         role_id: '',
+        team_ids: [] as string[],
     });
+
+    const teamOptions = useMemo(
+        () =>
+            teams.map((team) => ({
+                value: team.id.toString(),
+                label: team.name,
+            })),
+        [teams],
+    );
 
     const updateRoleForm = useForm({
         role_id: '',
@@ -510,6 +530,29 @@ export default function WorkspaceMembers({
             cell: ({ row }) => row.original.role?.name,
         },
         {
+            id: 'team_names',
+            accessorFn: (row) =>
+                (row.teams ?? []).map((team) => team.name).join(', '),
+            header: 'Teams',
+            cell: ({ row }) => {
+                const teams = row.original.teams ?? [];
+
+                if (teams.length === 0) {
+                    return <span className="text-muted-foreground">—</span>;
+                }
+
+                return (
+                    <div className="flex flex-wrap gap-1">
+                        {teams.map((team) => (
+                            <Badge key={team.id} variant="secondary">
+                                {team.name}
+                            </Badge>
+                        ))}
+                    </div>
+                );
+            },
+        },
+        {
             id: 'inviter_name',
             accessorKey: 'inviter.name',
             enableSorting: true,
@@ -658,6 +701,30 @@ export default function WorkspaceMembers({
                                         <p className="text-sm text-muted-foreground">
                                             Admins can manage members and
                                             settings
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="teams">Teams</Label>
+
+                                        <MultiSelect
+                                            options={teamOptions}
+                                            selected={inviteForm.data.team_ids}
+                                            onChange={(selected) =>
+                                                inviteForm.setData(
+                                                    'team_ids',
+                                                    selected,
+                                                )
+                                            }
+                                            placeholder="No teams"
+                                        />
+                                        {inviteForm.errors.team_ids && (
+                                            <p className="text-sm text-destructive">
+                                                {inviteForm.errors.team_ids}
+                                            </p>
+                                        )}
+                                        <p className="text-sm text-muted-foreground">
+                                            They join these teams when they
+                                            accept the invitation
                                         </p>
                                     </div>
                                 </div>
