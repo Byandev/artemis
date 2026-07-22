@@ -8,15 +8,18 @@ use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -183,6 +186,80 @@ class User extends Authenticatable implements MustVerifyEmail
     public function dailyEscRecords(): HasMany
     {
         return $this->hasMany(DailyEscRecord::class);
+    }
+
+    /**
+     * This employee's ESC reminder settings (enabled, time, timezone, style).
+     */
+    public function escNotification(): HasOne
+    {
+        return $this->hasOne(EscNotification::class);
+    }
+
+    /**
+     * Recompute `current_streak` and `longest_streak` from the employee's ESC
+     * records and persist them. Called whenever a record is created or updated.
+     *
+     * A streak is a run of consecutive calendar days that each have a record.
+     * Because backfilling a missed day is allowed, we always recompute from the
+     * full history rather than incrementing — filling yesterday's gap should
+     * repair a broken streak, not just bump a counter.
+     *
+     * - `current_streak` counts back from today. If nothing is logged for today
+     *   yet, the streak is still alive from yesterday (you have the rest of the
+     *   day to log), so we start counting there. A gap of two or more days
+     *   resets it to 0.
+     * - `longest_streak` is the longest such run anywhere in the history, and it
+     *   never shrinks below the value already stored.
+     */
+    public function recalculateEscStreaks(): void
+    {
+        $dates = $this->dailyEscRecords()
+            ->orderBy('record_date')
+            ->pluck('record_date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->unique()
+            ->values();
+
+        if ($dates->isEmpty()) {
+            $this->forceFill(['current_streak' => 0])->save();
+
+            return;
+        }
+
+        $logged = array_flip($dates->all());
+
+        // Longest run of consecutive calendar days anywhere in the history.
+        $longestRun = 0;
+        $run = 0;
+        $previous = null;
+
+        foreach ($dates as $dateString) {
+            $date = Carbon::parse($dateString);
+            $run = $previous && $date->equalTo($previous->copy()->addDay()) ? $run + 1 : 1;
+            $longestRun = max($longestRun, $run);
+            $previous = $date;
+        }
+
+        // Current streak: walk back from today (or yesterday if today is not yet
+        // logged) for as long as each day has a record.
+        $cursor = Carbon::today();
+
+        if (! isset($logged[$cursor->toDateString()])) {
+            $cursor = $cursor->subDay();
+        }
+
+        $currentStreak = 0;
+
+        while (isset($logged[$cursor->toDateString()])) {
+            $currentStreak++;
+            $cursor = $cursor->subDay();
+        }
+
+        $this->forceFill([
+            'current_streak' => $currentStreak,
+            'longest_streak' => max((int) $this->longest_streak, $longestRun),
+        ])->save();
     }
 
     /**

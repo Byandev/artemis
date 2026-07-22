@@ -5,6 +5,7 @@ use App\Http\Controllers\PublicApi\CallLogController;
 use App\Http\Controllers\PublicApi\CallLogV2Controller;
 use App\Http\Controllers\PublicApi\CsrDailyRecordController;
 use App\Http\Controllers\PublicApi\DailyEscRecordController;
+use App\Http\Controllers\PublicApi\EscNotificationController;
 use App\Http\Controllers\PublicApi\HealthController;
 use App\Http\Controllers\PublicApi\InventoryItemController;
 use App\Http\Controllers\PublicApi\PageController;
@@ -27,7 +28,6 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
 
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/csr-daily-records', [CsrDailyRecordController::class, 'store'])->name('csr-daily-records.store');
-    Route::post('/esc-daily-records', [DailyEscRecordController::class, 'store'])->name('esc-daily-records.store');
     Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
     Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
     Route::post('/shops/scan-return', [ShopScanReturnController::class, 'scan'])->name('shops.scan-return');
@@ -53,12 +53,22 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::post('/inventory/unit-codes/bulk-sync', [InventoryUnitCodeApiController::class, 'bulkSync'])->name('inventory.unit-codes.bulk-sync');
 });
 
-// Credential check for first-party apps signing users in against Artemis.
-// No API key required — it verifies email + password globally. Throttled so it
-// can't be used as a password-guessing oracle.
-Route::post('v1/public/auth/login', [AuthController::class, 'login'])
-    ->middleware('throttle:public-api-login')
-    ->name('api.v1.public.auth.login');
+// WellSync (first-party app). No workspace API key here — users authenticate as
+Route::group(['prefix' => 'v1/public/esc', 'as' => 'api.v1.public.esc.'], function () {
+
+    Route::post('/auth/login', [AuthController::class, 'login'])
+        ->middleware('throttle:public-api-login')
+        ->name('auth.login');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
+        Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
+        Route::get('/daily-records', [DailyEscRecordController::class, 'index'])->name('daily-records.index');
+        Route::post('/daily-records', [DailyEscRecordController::class, 'store'])->name('daily-records.store');
+        Route::get('/notifications', [EscNotificationController::class, 'show'])->name('notifications.show');
+        Route::match(['put', 'patch'], '/notifications', [EscNotificationController::class, 'update'])->name('notifications.update');
+    });
+});
 
 // GencysERP daily sales tracker callback. n8n posts the scraped rows here and
 // authenticates with the api_key embedded in the body (not a header), so this

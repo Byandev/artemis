@@ -12,11 +12,11 @@ export default defineConfig({
             refresh: true,
         }),
         react(),
-        tailwindcss(),
-        wayfinder({
-            formVariants: true,
-             // command: 'docker compose exec -T laravel.test php artisan wayfinder:generate --with-form',
-        })
+        tailwindcss()
+        // wayfinder({
+        //     formVariants: true,
+        //      // command: 'docker compose exec -T laravel.test php artisan wayfinder:generate --with-form',
+        // })
     ],
     optimizeDeps: {
         include: ['maplibre-gl'],

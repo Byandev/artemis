@@ -32,6 +32,7 @@ import {
     ExternalLink,
     Facebook,
     FileText,
+    HeartPulse,
     History,
     Landmark,
     Layers,
@@ -153,6 +154,11 @@ export function AppSidebar() {
             href: `/workspaces/${slug}/departments`,
             icon: Building2,
             permission: PERMISSIONS.ViewDepartments,
+        },
+        {
+            title: 'ESC Tracker',
+            href: `/workspaces/${slug}/esc-tracker`,
+            icon: HeartPulse,
         },
         {
             title: 'Roles',

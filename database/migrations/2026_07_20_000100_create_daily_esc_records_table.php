@@ -21,7 +21,7 @@ return new class extends Migration
             $table->text('movement_text')->nullable();
             $table->string('movement_image_url')->nullable();
             $table->boolean('meditation_completed')->default(false);
-            $table->boolean('is_complete')->default(false);
+            $table->string('meditation_url')->nullable();
             $table->timestamp('submitted_at')->nullable();
             $table->timestamps();
 
