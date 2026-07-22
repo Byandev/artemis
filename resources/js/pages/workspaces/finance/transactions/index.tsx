@@ -6,10 +6,7 @@ import {
     SUB_CATEGORY_LABEL,
     SubCategory,
 } from '@/components/finance/sub-category';
-import {
-    FinanceTransaction,
-    TransactionFormDialog,
-} from '@/components/finance/transaction-form-dialog';
+import { FinanceTransaction } from '@/components/finance/transaction-form';
 import {
     buildTransactionTypeOptions,
     TransactionTypeItem,
@@ -33,7 +30,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
@@ -74,6 +71,7 @@ interface Props {
     accounts: AccountOpt[];
     transactionTypes: TransactionTypeItem[];
     users: { id: number; name: string }[];
+    products: string[];
     totals: Totals;
     query?: {
         sort?: string | null;
@@ -109,7 +107,6 @@ export default function TransactionsIndex({
     transactions,
     accounts,
     transactionTypes,
-    users,
     totals,
     query,
 }: Props) {
@@ -125,9 +122,7 @@ export default function TransactionsIndex({
         () => new Map(transactionTypes.map((t) => [t.id, t.name])),
         [transactionTypes],
     );
-    const [createOpen, setCreateOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
-    const [editing, setEditing] = useState<FinanceTransaction | null>(null);
     const [toDelete, setToDelete] = useState<Row | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
     const [typeFilter, setTypeFilter] = useState<'' | 'in' | 'out'>(
@@ -674,59 +669,13 @@ export default function TransactionsIndex({
                                       className="w-36"
                                   >
                                       {canEditTransactions && (
-                                          <DropdownMenuItem
-                                              onClick={() =>
-                                                  setEditing({
-                                                      id: row.original.id,
-                                                      account_id:
-                                                          row.original
-                                                              .account_id,
-                                                      date: String(
-                                                          row.original.date,
-                                                      ).slice(0, 10),
-                                                      description:
-                                                          row.original
-                                                              .description,
-                                                      requested_by:
-                                                          row.original
-                                                              .requested_by,
-                                                      approved_by:
-                                                          row.original
-                                                              .approved_by,
-                                                      department:
-                                                          row.original
-                                                              .department,
-                                                      charge_to:
-                                                          row.original
-                                                              .charge_to,
-                                                      type: row.original.type,
-                                                      transaction_type:
-                                                          row.original
-                                                              .transaction_type,
-                                                      transaction_type_id:
-                                                          row.original
-                                                              .transaction_type_id,
-                                                      amount: row.original
-                                                          .amount,
-                                                      running_balance:
-                                                          row.original
-                                                              .running_balance,
-                                                      reference_no:
-                                                          row.original
-                                                              .reference_no,
-                                                      status: row.original
-                                                          .status,
-                                                      position:
-                                                          row.original.position,
-                                                      sub_category:
-                                                          row.original
-                                                              .sub_category,
-                                                      notes: row.original.notes,
-                                                  })
-                                              }
-                                          >
-                                              <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
-                                              Edit
+                                          <DropdownMenuItem asChild>
+                                              <Link
+                                                  href={`${baseUrl}/${row.original.id}/edit`}
+                                              >
+                                                  <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
+                                                  Edit
+                                              </Link>
                                           </DropdownMenuItem>
                                       )}
                                       {canEditTransactions &&
@@ -777,12 +726,12 @@ export default function TransactionsIndex({
                             >
                                 <Upload className="h-3.5 w-3.5" /> Import CSV
                             </button>
-                            <button
-                                onClick={() => setCreateOpen(true)}
+                            <Link
+                                href={`${baseUrl}/create`}
                                 className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
                             >
                                 Add Transaction
-                            </button>
+                            </Link>
                         </>
                     )}
                 </PageHeader>
@@ -998,22 +947,6 @@ export default function TransactionsIndex({
                     </li>
                 </ul>
 
-                {(canCreateTransactions || canEditTransactions) && (
-                    <TransactionFormDialog
-                        open={createOpen || editing !== null}
-                        onOpenChange={(o) => {
-                            if (!o) {
-                                setCreateOpen(false);
-                                setEditing(null);
-                            }
-                        }}
-                        transaction={editing}
-                        accounts={accounts}
-                        transactionTypes={transactionTypes}
-                        users={users}
-                        workspaceSlug={workspace.slug}
-                    />
-                )}
                 {canCreateTransactions && (
                     <ImportTransactionsDialog
                         open={importOpen}

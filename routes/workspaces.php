@@ -533,7 +533,9 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/accounts/{account}', [FinanceAccountController::class, 'destroy'])->name('accounts.destroy');
 
         Route::get('/transactions', [FinanceTransactionController::class, 'index'])->name('transactions.index');
+        Route::get('/transactions/create', [FinanceTransactionController::class, 'create'])->name('transactions.create');
         Route::get('/transactions/export', [FinanceTransactionController::class, 'export'])->name('transactions.export');
+        Route::get('/transactions/{transaction}/edit', [FinanceTransactionController::class, 'edit'])->name('transactions.edit');
         Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
         Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
         Route::put('/transactions/bulk-update-type', [FinanceTransactionController::class, 'bulkUpdateType'])->name('transactions.bulk-update-type');

@@ -6,6 +6,7 @@ use App\Enums\Logging\LogCategory;
 use App\Enums\Permission;
 use App\Facades\Activity;
 use App\Http\Controllers\Controller;
+use App\Models\Department;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ use Modules\Finance\Http\Requests\TransactionRequest;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
+use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -101,11 +103,7 @@ class TransactionController extends Controller
         return Inertia::render('workspaces/finance/transactions/index', [
             'workspace' => $workspace,
             'transactions' => $transactions,
-            'accounts' => Account::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name', 'currency']),
-            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name']),
-            'users' => $workspace->users()->get(['users.id', 'users.name']),
+            ...$this->formOptions($workspace),
             'totals' => [
                 'credit' => (float) $totals->total_credit,
                 'debit' => (float) $totals->total_debit,
@@ -115,6 +113,78 @@ class TransactionController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    public function create(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateFinanceTransactions->value, $workspace);
+
+        return Inertia::render('workspaces/finance/transactions/create', [
+            'workspace' => $workspace,
+            ...$this->formOptions($workspace),
+            'defaultAccountId' => $request->integer('account_id') ?: null,
+            'returnTo' => $this->safeReturnTo($request, $workspace),
+        ]);
+    }
+
+    public function edit(Request $request, Workspace $workspace, Transaction $transaction)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
+        $this->ensureOwns($workspace, $transaction);
+
+        return Inertia::render('workspaces/finance/transactions/edit', [
+            'workspace' => $workspace,
+            'transaction' => $transaction,
+            ...$this->formOptions($workspace),
+            'returnTo' => $this->safeReturnTo($request, $workspace),
+        ]);
+    }
+
+    /**
+     * Shared option lists for the transaction form (account/type/user selects and
+     * the product datalist).
+     */
+    protected function formOptions(Workspace $workspace): array
+    {
+        return [
+            'accounts' => Account::where('workspace_id', $workspace->id)
+                ->orderBy('name')->get(['id', 'name', 'currency']),
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->orderBy('name')->get(['id', 'name']),
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
+            // Suggested product tags (normalized gencys order_details).
+            'products' => GencysDailySalesOrder::distinctProducts($workspace->id),
+            // The workspace's saved (active) departments, for the Department select.
+            'departments' => Department::ofWorkspace($workspace)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->pluck('name'),
+        ];
+    }
+
+    /**
+     * Where to send the user after a save. The form may pass a `return_to` path
+     * (the modal stays on its page); otherwise land on the transactions list.
+     * Restricted to this workspace's own paths to avoid an open redirect.
+     */
+    protected function redirectAfterSave(Request $request, Workspace $workspace)
+    {
+        return redirect($this->safeReturnTo($request, $workspace)
+            ?? route('workspaces.finance.transactions.index', $workspace->slug));
+    }
+
+    /**
+     * A `return_to` path from the request, but only when it points inside this
+     * workspace (guards against an open redirect). Null otherwise.
+     */
+    protected function safeReturnTo(Request $request, Workspace $workspace): ?string
+    {
+        $returnTo = $request->input('return_to');
+        $prefix = "/workspaces/{$workspace->slug}/";
+
+        return (is_string($returnTo) && str_starts_with($returnTo, $prefix)) ? $returnTo : null;
     }
 
     public function store(TransactionRequest $request, Workspace $workspace)
@@ -144,7 +214,7 @@ class TransactionController extends Controller
 
         Transaction::create([...$data, 'workspace_id' => $workspace->id]);
 
-        return redirect()->back()->with('success', 'Transaction created.');
+        return $this->redirectAfterSave($request, $workspace)->with('success', 'Transaction created.');
     }
 
     public function update(TransactionRequest $request, Workspace $workspace, Transaction $transaction)
@@ -163,7 +233,7 @@ class TransactionController extends Controller
 
         $transaction->update($data);
 
-        return redirect()->back()->with('success', 'Transaction updated.');
+        return $this->redirectAfterSave($request, $workspace)->with('success', 'Transaction updated.');
     }
 
     public function import(Request $request, Workspace $workspace)

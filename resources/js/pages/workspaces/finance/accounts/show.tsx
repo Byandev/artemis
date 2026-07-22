@@ -5,10 +5,6 @@ import {
     SubCategory,
 } from '@/components/finance/sub-category';
 import {
-    FinanceTransaction,
-    TransactionFormDialog,
-} from '@/components/finance/transaction-form-dialog';
-import {
     TransactionType,
     TransactionTypeItem,
     transactionTypeLabel,
@@ -82,11 +78,11 @@ export default function AccountShow({
         () => new Map(transactionTypes.map((t) => [t.id, t.name])),
         [transactionTypes],
     );
-    const [createOpen, setCreateOpen] = useState(false);
-    const [editing, setEditing] = useState<FinanceTransaction | null>(null);
     const [toDelete, setToDelete] = useState<Txn | null>(null);
 
     const base = `/workspaces/${workspace.slug}/finance`;
+    // Return here after add/edit on the dedicated transaction pages.
+    const returnTo = encodeURIComponent(`${base}/accounts/${account.id}`);
     const canCreateTransactions = usePermission(
         PERMISSIONS.CreateFinanceTransactions,
     );
@@ -146,12 +142,12 @@ export default function AccountShow({
                     description={`Opening: ${fmt(account.opening_balance)} · Current: ${fmt(currentBalance)}`}
                 >
                     {canCreateTransactions && (
-                        <button
-                            onClick={() => setCreateOpen(true)}
+                        <Link
+                            href={`${base}/transactions/create?account_id=${account.id}&return_to=${returnTo}`}
                             className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
                         >
                             Add Transaction
-                        </button>
+                        </Link>
                     )}
                 </PageHeader>
 
@@ -275,48 +271,14 @@ export default function AccountShow({
                                                         >
                                                             {canEditTransactions && (
                                                                 <DropdownMenuItem
-                                                                    onClick={() =>
-                                                                        setEditing(
-                                                                            {
-                                                                                id: r.id,
-                                                                                account_id:
-                                                                                    account.id,
-                                                                                date: String(
-                                                                                    r.date,
-                                                                                ).slice(
-                                                                                    0,
-                                                                                    10,
-                                                                                ),
-                                                                                description:
-                                                                                    r.description,
-                                                                                requested_by:
-                                                                                    r.requested_by,
-                                                                                approved_by:
-                                                                                    r.approved_by,
-                                                                                department:
-                                                                                    r.department,
-                                                                                charge_to:
-                                                                                    r.charge_to,
-                                                                                type: r.type,
-                                                                                transaction_type:
-                                                                                    r.transaction_type,
-                                                                                transaction_type_id:
-                                                                                    r.transaction_type_id,
-                                                                                amount: r.amount,
-                                                                                running_balance:
-                                                                                    r.running_balance,
-                                                                                reference_no:
-                                                                                    r.reference_no,
-                                                                                status: r.status,
-                                                                                sub_category:
-                                                                                    r.sub_category,
-                                                                                notes: r.notes,
-                                                                            },
-                                                                        )
-                                                                    }
+                                                                    asChild
                                                                 >
-                                                                    <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
-                                                                    Edit
+                                                                    <Link
+                                                                        href={`${base}/transactions/${r.id}/edit?return_to=${returnTo}`}
+                                                                    >
+                                                                        <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
+                                                                        Edit
+                                                                    </Link>
                                                                 </DropdownMenuItem>
                                                             )}
                                                             {canEditTransactions &&
@@ -348,28 +310,6 @@ export default function AccountShow({
                     </table>
                 </div>
 
-                {(canCreateTransactions || canEditTransactions) && (
-                    <TransactionFormDialog
-                        open={createOpen || editing !== null}
-                        onOpenChange={(o) => {
-                            if (!o) {
-                                setCreateOpen(false);
-                                setEditing(null);
-                            }
-                        }}
-                        transaction={editing}
-                        accounts={[
-                            {
-                                id: account.id,
-                                name: account.name,
-                                currency: account.currency,
-                            },
-                        ]}
-                        transactionTypes={transactionTypes}
-                        defaults={{ account_id: account.id }}
-                        workspaceSlug={workspace.slug}
-                    />
-                )}
                 {canDeleteTransactions && (
                     <FinanceDeleteDialog
                         open={!!toDelete}

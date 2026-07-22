@@ -64,6 +64,33 @@ class GencysDailySalesOrder extends Model
         'total_cog' => 'decimal:2',
     ];
 
+    /** SQL that normalizes order_details to a product name (strips "1x1X"/"2X" prefixes). */
+    public const PRODUCT_EXPR = "UPPER(TRIM(REGEXP_REPLACE(order_details, '^[0-9]+[xX][0-9]*[xX]? *', '')))";
+
+    /**
+     * Distinct normalized product names for a workspace, most-sold first. Used to
+     * suggest values when tagging a finance transaction (and to scope revenue on
+     * the income statement). The sku→product chain is empty in the data, so the
+     * normalized order_details text is the only working product key.
+     *
+     * @return array<int, string>
+     */
+    public static function distinctProducts(int $workspaceId, int $limit = 200): array
+    {
+        return static::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereNotNull('order_details')
+            ->where('order_details', '!=', '')
+            ->selectRaw(self::PRODUCT_EXPR.' as product, COUNT(*) as orders')
+            ->groupByRaw(self::PRODUCT_EXPR)
+            ->orderByDesc('orders')
+            ->limit($limit)
+            ->pluck('product')
+            ->filter(fn ($p) => filled($p))
+            ->values()
+            ->all();
+    }
+
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
