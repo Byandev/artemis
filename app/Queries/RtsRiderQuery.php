@@ -30,10 +30,20 @@ class RtsRiderQuery extends RtsBaseQuery
             ->select('pj.order_id', 'pj.rider_name')
             ->whereNotNull('pj.rider_name')
             ->whereIn('pj.id', function ($q) {
-                $q->from('parcel_journeys')
-                    ->selectRaw('MAX(id)')
-                    ->where('status', 'On Delivery')
-                    ->groupBy('order_id');
+                $q->from('parcel_journeys as pj2')
+                    ->join('pancake_orders as po', 'po.id', '=', 'pj2.order_id')
+                    ->selectRaw('MAX(pj2.id)')
+                    ->where('pj2.status', 'On Delivery')
+                    // Exclude the return leg: once an order is marked returning, any
+                    // later "On Delivery" entry is the rider carrying the parcel back
+                    // to the warehouse, not a delivery attempt. Attribute the order to
+                    // the last rider who tried to deliver it (on/before returning_at).
+                    // Delivered orders have a null returning_at, so all entries count.
+                    ->where(function ($w) {
+                        $w->whereNull('po.returning_at')
+                            ->orWhereColumn('pj2.created_at', '<=', 'po.returning_at');
+                    })
+                    ->groupBy('pj2.order_id');
             });
 
         return $this->query
