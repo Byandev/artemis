@@ -15,6 +15,8 @@ use Maatwebsite\Excel\Facades\Excel;
 use Modules\Inventory\Exports\InventoryItemExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryUnitCodeItem;
+use Modules\Inventory\Models\PurchasedOrder;
+use Modules\Inventory\Models\PurchasedOrderItem;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -49,12 +51,11 @@ class InventoryItemController extends Controller
         $latestCountedSql = '(SELECT counted_qty FROM inventory_item_discrepancies WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
         $latestDiscrepancyDateSql = '(SELECT date FROM inventory_item_discrepancies WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
 
-        // "Waiting for delivery" = the quantity still OWED on orders that are
-        // awaiting delivery (status 6) — i.e. the undelivered remainder per item
-        // (ordered count minus what has already been delivered), not the full
-        // ordered count. Fully-delivered lines contribute 0; NULLIF keeps items
-        // with nothing outstanding showing as "—" rather than 0.
-        $waitingStocksSql = '(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status not in (1,2,3,7,8)))';
+        // "Waiting for delivery" = the quantity still OWED on orders awaiting delivery —
+        // the undelivered remainder per item, not the full ordered count. Fully-delivered
+        // lines contribute 0; NULLIF keeps items with nothing outstanding showing as "—".
+        $awaitingStatuses = implode(',', PurchasedOrder::AWAITING_DELIVERY_STATUSES);
+        $waitingStocksSql = "(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status in ($awaitingStatuses)))";
         $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
         $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
@@ -435,6 +436,51 @@ class InventoryItemController extends Controller
 
         return response()->json([
             'remaining_qty' => $this->ledgerStockAsOf($item, $validated['date']),
+        ]);
+    }
+
+    /**
+     * The purchase orders behind an item's "Waiting for Delivery" figure: one row per
+     * order line still owing stock, newest issue date first. A parent fans out to its
+     * children's lines, matching the summary view's rolled-up total.
+     */
+    public function pendingPurchaseOrders(Request $request, Workspace $workspace, InventoryItem $item)
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        $itemIds = $item->is_parent
+            ? InventoryItem::where('parent_id', $item->id)->pluck('id')->push($item->id)->all()
+            : [$item->id];
+
+        $lines = PurchasedOrderItem::query()
+            ->whereIn('inventory_item_id', $itemIds)
+            ->whereHas('purchasedOrder', fn ($q) => $q->whereIn('status', PurchasedOrder::AWAITING_DELIVERY_STATUSES))
+            ->with(['purchasedOrder', 'inventoryItem:id,sku'])
+            ->withSum('deliveries as delivered_qty', 'qty')
+            ->get()
+            ->filter(fn (PurchasedOrderItem $line) => $line->balance > 0)
+            ->sortByDesc(fn (PurchasedOrderItem $line) => $line->purchasedOrder->issue_date)
+            ->values()
+            ->map(fn (PurchasedOrderItem $line) => [
+                'id' => $line->purchasedOrder->id,
+                'sku' => $line->inventoryItem?->sku,
+                'control_no' => $line->purchasedOrder->control_no,
+                'cust_po_no' => $line->purchasedOrder->cust_po_no,
+                'issue_date' => $line->purchasedOrder->issue_date?->toDateString(),
+                'expected_delivery_date' => $line->purchasedOrder->expected_delivery_date?->toDateString(),
+                'status' => $line->purchasedOrder->status,
+                'status_label' => $line->purchasedOrder->status_label,
+                'delivery_timeliness' => $line->purchasedOrder->delivery_timeliness,
+                'ordered_qty' => (int) $line->count,
+                'delivered_qty' => $line->delivered_qty,
+                'balance' => $line->balance,
+            ]);
+
+        return response()->json([
+            'orders' => $lines,
+            'total_balance' => $lines->sum('balance'),
         ]);
     }
 
