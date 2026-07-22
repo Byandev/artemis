@@ -61,10 +61,8 @@ interface Props {
     departments?: string[];
     defaults?: Partial<FinanceTransaction>;
     workspaceSlug: string;
-    /** When the form becomes active (e.g. a dialog opens), (re)populate it. */
+    /** When the form becomes active, (re)populate it from `transaction`. */
     active?: boolean;
-    /** Constrain height and scroll the fields — for the modal. Pages scroll naturally. */
-    scroll?: boolean;
     /** Where the server should send the user back to after saving. */
     returnTo?: string;
     onSuccess?: () => void;
@@ -72,6 +70,42 @@ interface Props {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * A titled group of fields — label/description on the left, a two-column field
+ * grid on the right. Defined at module scope so the inputs it wraps keep focus
+ * across re-renders.
+ */
+function Section({
+    title,
+    hint,
+    children,
+}: {
+    title: string;
+    hint: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="grid gap-x-8 gap-y-5 px-6 py-6 lg:grid-cols-3">
+            <div className="lg:pr-4">
+                <h3 className="font-mono text-[12px] font-semibold tracking-wide text-gray-800 uppercase dark:text-gray-100">
+                    {title}
+                </h3>
+                <p className="mt-1 font-mono text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
+                    {hint}
+                </p>
+            </div>
+            <div className="grid grid-cols-1 gap-x-5 gap-y-5 sm:grid-cols-2 lg:col-span-2">
+                {children}
+            </div>
+        </div>
+    );
+}
+
+/** Spans both columns of a Section's field grid. */
+function Wide({ children }: { children: React.ReactNode }) {
+    return <div className="sm:col-span-2">{children}</div>;
+}
 
 export function TransactionForm({
     transaction,
@@ -83,7 +117,6 @@ export function TransactionForm({
     defaults,
     workspaceSlug,
     active = true,
-    scroll = false,
     returnTo,
     onSuccess,
     onCancel,
@@ -182,27 +215,34 @@ export function TransactionForm({
 
     return (
         <form onSubmit={handleSubmit}>
-            <div
-                className={`space-y-5 px-5 py-4 ${
-                    scroll ? 'max-h-[70vh] overflow-y-auto' : ''
-                }`}
-            >
-                <Field label="Account" required error={errors.account_id}>
-                    <select
-                        value={data.account_id}
-                        onChange={(e) => setData('account_id', e.target.value)}
-                        className={inputCls}
-                    >
-                        <option value="">Select account...</option>
-                        {accounts.map((a) => (
-                            <option key={a.id} value={a.id}>
-                                {a.name} ({a.currency})
-                            </option>
-                        ))}
-                    </select>
-                </Field>
+            <div className="divide-y divide-black/6 dark:divide-white/6">
+                <Section
+                    title="Entry"
+                    hint="Where it posts, what it is, and the amount."
+                >
+                    <Wide>
+                        <Field
+                            label="Account"
+                            required
+                            error={errors.account_id}
+                        >
+                            <select
+                                value={data.account_id}
+                                onChange={(e) =>
+                                    setData('account_id', e.target.value)
+                                }
+                                className={inputCls}
+                            >
+                                <option value="">Select account...</option>
+                                {accounts.map((a) => (
+                                    <option key={a.id} value={a.id}>
+                                        {a.name} ({a.currency})
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                    </Wide>
 
-                <div className="grid grid-cols-2 gap-3">
                     <Field label="Posted Date" required error={errors.date}>
                         <input
                             type="date"
@@ -223,126 +263,80 @@ export function TransactionForm({
                             <option value="out">OUT (withdrawal)</option>
                         </select>
                     </Field>
-                </div>
 
-                <Field
-                    label="Type of Expense"
-                    required
-                    error={errors.transaction_type_id}
-                >
-                    <select
-                        value={data.transaction_type_id}
-                        onChange={(e) =>
-                            setData('transaction_type_id', e.target.value)
-                        }
-                        className={inputCls}
+                    <Wide>
+                        <Field
+                            label="Type of Expense"
+                            required
+                            error={errors.transaction_type_id}
+                        >
+                            <select
+                                value={data.transaction_type_id}
+                                onChange={(e) =>
+                                    setData(
+                                        'transaction_type_id',
+                                        e.target.value,
+                                    )
+                                }
+                                className={inputCls}
+                            >
+                                {typeOptions.length === 0 && (
+                                    <option value="">
+                                        No types — add one first
+                                    </option>
+                                )}
+                                {typeOptions.map((t) => (
+                                    <option key={t.value} value={t.value}>
+                                        {t.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                    </Wide>
+
+                    <Wide>
+                        <Field
+                            label="Transaction"
+                            required
+                            error={errors.description}
+                        >
+                            <input
+                                type="text"
+                                value={data.description}
+                                onChange={(e) =>
+                                    setData('description', e.target.value)
+                                }
+                                className={inputCls}
+                            />
+                        </Field>
+                    </Wide>
+
+                    <Field label="Amount" required error={errors.amount}>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={data.amount}
+                            onChange={(e) => setData('amount', e.target.value)}
+                            className={inputCls}
+                        />
+                    </Field>
+                    <Field
+                        label="Running Balance"
+                        error={errors.running_balance}
                     >
-                        {typeOptions.length === 0 && (
-                            <option value="">No types — add one first</option>
-                        )}
-                        {typeOptions.map((t) => (
-                            <option key={t.value} value={t.value}>
-                                {t.label}
-                            </option>
-                        ))}
-                    </select>
-                </Field>
-
-                <Field label="Transaction" required error={errors.description}>
-                    <input
-                        type="text"
-                        value={data.description}
-                        onChange={(e) => setData('description', e.target.value)}
-                        className={inputCls}
-                    />
-                </Field>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <Field label="Requested By" error={errors.requested_by}>
-                        <select
-                            value={data.requested_by}
+                        <input
+                            type="number"
+                            step="0.01"
+                            value={data.running_balance}
                             onChange={(e) =>
-                                setData(
-                                    'requested_by',
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : '',
-                                )
+                                setData('running_balance', e.target.value)
                             }
+                            placeholder="Optional"
                             className={inputCls}
-                        >
-                            <option value="">Select…</option>
-                            {users.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                    {u.name}
-                                </option>
-                            ))}
-                        </select>
+                        />
                     </Field>
-                    <Field label="Approved By" error={errors.approved_by}>
-                        <select
-                            value={data.approved_by}
-                            onChange={(e) =>
-                                setData(
-                                    'approved_by',
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : '',
-                                )
-                            }
-                            className={inputCls}
-                        >
-                            <option value="">Select…</option>
-                            {users.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                    {u.name}
-                                </option>
-                            ))}
-                        </select>
-                    </Field>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                    <Field label="Department" error={errors.department}>
-                        <select
-                            value={data.department}
-                            onChange={(e) =>
-                                setData('department', e.target.value)
-                            }
-                            className={inputCls}
-                        >
-                            <option value="">Select…</option>
-                            {departmentOptions.map((d) => (
-                                <option key={d} value={d}>
-                                    {d}
-                                </option>
-                            ))}
-                        </select>
-                    </Field>
-                    <Field label="Charge To" error={errors.charge_to}>
-                        <select
-                            value={data.charge_to}
-                            onChange={(e) =>
-                                setData(
-                                    'charge_to',
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : '',
-                                )
-                            }
-                            className={inputCls}
-                        >
-                            <option value="">Select…</option>
-                            {users.map((u) => (
-                                <option key={u.id} value={u.id}>
-                                    {u.name}
-                                </option>
-                            ))}
-                        </select>
-                    </Field>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                     <Field label="Reference No." error={errors.reference_no}>
                         <input
                             type="text"
@@ -369,71 +363,132 @@ export function TransactionForm({
                             <option value="posted">Posted</option>
                         </select>
                     </Field>
-                </div>
+                </Section>
 
-                <div className="grid grid-cols-2 gap-3">
-                    <Field label="Amount" required error={errors.amount}>
-                        <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={data.amount}
-                            onChange={(e) => setData('amount', e.target.value)}
-                            className={inputCls}
-                        />
-                    </Field>
-                    <Field
-                        label="Running Balance"
-                        error={errors.running_balance}
-                    >
-                        <input
-                            type="number"
-                            step="0.01"
-                            value={data.running_balance}
+                <Section
+                    title="Attribution"
+                    hint="Who handled it, its ordering, and the product or department it belongs to."
+                >
+                    <Field label="Requested By" error={errors.requested_by}>
+                        <select
+                            value={data.requested_by}
                             onChange={(e) =>
-                                setData('running_balance', e.target.value)
+                                setData(
+                                    'requested_by',
+                                    e.target.value ? Number(e.target.value) : '',
+                                )
                             }
-                            placeholder="Optional"
+                            className={inputCls}
+                        >
+                            <option value="">Select…</option>
+                            {users.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                    {u.name}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+                    <Field label="Approved By" error={errors.approved_by}>
+                        <select
+                            value={data.approved_by}
+                            onChange={(e) =>
+                                setData(
+                                    'approved_by',
+                                    e.target.value ? Number(e.target.value) : '',
+                                )
+                            }
+                            className={inputCls}
+                        >
+                            <option value="">Select…</option>
+                            {users.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                    {u.name}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+
+                    <Field label="Department" error={errors.department}>
+                        <select
+                            value={data.department}
+                            onChange={(e) =>
+                                setData('department', e.target.value)
+                            }
+                            className={inputCls}
+                        >
+                            <option value="">Select…</option>
+                            {departmentOptions.map((d) => (
+                                <option key={d} value={d}>
+                                    {d}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+                    <Field label="Charge To" error={errors.charge_to}>
+                        <select
+                            value={data.charge_to}
+                            onChange={(e) =>
+                                setData(
+                                    'charge_to',
+                                    e.target.value ? Number(e.target.value) : '',
+                                )
+                            }
+                            className={inputCls}
+                        >
+                            <option value="">Select…</option>
+                            {users.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                    {u.name}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+
+                    <Field label="Position" error={errors.position}>
+                        <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={data.position}
+                            onChange={(e) => setData('position', e.target.value)}
+                            placeholder="Auto"
                             className={inputCls}
                         />
                     </Field>
-                </div>
 
-                <Field label="Position" error={errors.position}>
-                    <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={data.position}
-                        onChange={(e) => setData('position', e.target.value)}
-                        placeholder="Auto"
-                        className={inputCls}
-                    />
-                </Field>
+                    <Wide>
+                        <Field label="Product" error={errors.product}>
+                            <SearchableSelect
+                                options={products}
+                                value={data.product}
+                                onChange={(v) => setData('product', v)}
+                                placeholder="No product"
+                                searchPlaceholder="Search products..."
+                                emptyText="No products found."
+                                icon={Package}
+                            />
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                Attribute this entry to a product for the
+                                per-product income statement.
+                            </p>
+                        </Field>
+                    </Wide>
+                </Section>
 
-                <Field label="Product" error={errors.product}>
-                    <SearchableSelect
-                        options={products}
-                        value={data.product}
-                        onChange={(v) => setData('product', v)}
-                        placeholder="No product"
-                        searchPlaceholder="Search products..."
-                        emptyText="No products found."
-                        icon={Package}
-                    />
-                    <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                        Attribute this entry to a product for the per-product
-                        income statement.
-                    </p>
-                </Field>
-
-                <Field label="Remarks" error={errors.notes}>
-                    <textarea
-                        value={data.notes ?? ''}
-                        onChange={(e) => setData('notes', e.target.value)}
-                        className={`${inputCls} min-h-[80px] resize-none py-2`}
-                    />
-                </Field>
+                <Section
+                    title="Notes"
+                    hint="Any additional remarks for this entry."
+                >
+                    <Wide>
+                        <Field label="Remarks" error={errors.notes}>
+                            <textarea
+                                value={data.notes ?? ''}
+                                onChange={(e) => setData('notes', e.target.value)}
+                                className={`${inputCls} min-h-[80px] resize-none py-2`}
+                            />
+                        </Field>
+                    </Wide>
+                </Section>
             </div>
 
             <Footer

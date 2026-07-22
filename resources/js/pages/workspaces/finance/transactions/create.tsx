@@ -37,7 +37,7 @@ export default function TransactionCreate({
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Add Transaction`} />
-            <div className="mx-auto w-full max-w-2xl p-4 md:p-6">
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
                     title="Add Transaction"
                     description="Record a new ledger entry."

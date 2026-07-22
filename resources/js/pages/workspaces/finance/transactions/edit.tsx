@@ -38,7 +38,7 @@ export default function TransactionEdit({
     return (
         <AppLayout>
             <Head title={`${workspace.name} - Edit Transaction`} />
-            <div className="mx-auto w-full max-w-2xl p-4 md:p-6">
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
                     title="Edit Transaction"
                     description="Update this ledger entry."
