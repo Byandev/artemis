@@ -214,46 +214,51 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function recalculateEscStreaks(): void
     {
-        $dates = $this->dailyEscRecords()
-            ->orderBy('record_date')
-            ->pluck('record_date')
-            ->map(fn ($date) => Carbon::parse($date)->toDateString())
-            ->unique()
-            ->values();
+        // Gaps-and-islands: subtracting a row number (in date order) from each
+        // date collapses every run of consecutive days to a constant, so
+        // grouping by it yields exactly one row per streak. This keeps the
+        // consecutive-day maths in the database and returns only a handful of
+        // rows, instead of shipping the user's entire history to PHP on every
+        // save. Runs on the (user_id, record_date) unique index.
+        $runs = DB::select(
+            'select count(*) as length, max(record_date) as ends_on
+               from (
+                    select record_date,
+                           date_sub(
+                               record_date,
+                               interval row_number() over (order by record_date) day
+                           ) as streak_group
+                      from daily_esc_records
+                     where user_id = ?
+               ) grouped
+              group by streak_group',
+            [$this->id],
+        );
 
-        if ($dates->isEmpty()) {
+        if ($runs === []) {
             $this->forceFill(['current_streak' => 0])->save();
 
             return;
         }
 
-        $logged = array_flip($dates->all());
+        $today = Carbon::today()->toDateString();
+        $yesterday = Carbon::yesterday()->toDateString();
 
-        // Longest run of consecutive calendar days anywhere in the history.
         $longestRun = 0;
-        $run = 0;
-        $previous = null;
-
-        foreach ($dates as $dateString) {
-            $date = Carbon::parse($dateString);
-            $run = $previous && $date->equalTo($previous->copy()->addDay()) ? $run + 1 : 1;
-            $longestRun = max($longestRun, $run);
-            $previous = $date;
-        }
-
-        // Current streak: walk back from today (or yesterday if today is not yet
-        // logged) for as long as each day has a record.
-        $cursor = Carbon::today();
-
-        if (! isset($logged[$cursor->toDateString()])) {
-            $cursor = $cursor->subDay();
-        }
-
         $currentStreak = 0;
 
-        while (isset($logged[$cursor->toDateString()])) {
-            $currentStreak++;
-            $cursor = $cursor->subDay();
+        foreach ($runs as $run) {
+            $length = (int) $run->length;
+            $longestRun = max($longestRun, $length);
+
+            // A streak is still "current" if it reaches today — or yesterday,
+            // when today simply hasn't been logged yet. Only one run can match,
+            // since a run touching both days would be a single run.
+            $endsOn = Carbon::parse($run->ends_on)->toDateString();
+
+            if ($endsOn === $today || $endsOn === $yesterday) {
+                $currentStreak = $length;
+            }
         }
 
         $this->forceFill([
