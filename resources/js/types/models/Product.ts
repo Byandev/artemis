@@ -9,6 +9,8 @@ export interface Product {
     code: string;
     category: string;
     status: 'Scaling' | 'Testing' | 'Failed' | 'Inactive';
+    /** Y-m-d date the product was marked a winning item. */
+    winning_date: string | null;
     description: string | null;
     created_at: string;
     updated_at: string;

@@ -37,7 +37,14 @@ class Product extends Model implements HasMedia
         'code',
         'category',
         'status',
+        'winning_date',
         'description',
+    ];
+
+    protected $casts = [
+        // Y-m-d so the JSON handed to the edit datepicker / inventory list is a
+        // plain calendar date, not an ISO timestamp.
+        'winning_date' => 'date:Y-m-d',
     ];
 
     public function workspace(): BelongsTo
