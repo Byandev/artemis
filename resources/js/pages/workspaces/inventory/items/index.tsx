@@ -2,6 +2,7 @@ import PageHeader from '@/components/common/PageHeader';
 import { AdjustCountDialog } from '@/components/inventory/adjust-count-dialog';
 import { DeleteItemDialog } from '@/components/inventory/delete-item-dialog';
 import { ItemFormDialog } from '@/components/inventory/item-form-dialog';
+import { WaitingForDeliveryDialog } from '@/components/inventory/waiting-for-delivery-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -59,8 +60,10 @@ interface Item {
     transaction_keywords: string;
     lead_time: number;
     unfulfilled_count: number;
-    product?: { id: number; name: string };
+    product?: { id: number; name: string; winning_date?: string | null };
     product_name?: string | null;
+    // Summary view: the group's product winning_date (flat view reads product.winning_date).
+    product_winning_date?: string | null;
     remaining_qty: number | null;
     unfulfilled: number | null;
     waiting_for_delivery_stocks: number | null;
@@ -89,7 +92,11 @@ interface Props {
         perPage?: number | string;
         page?: number | string;
         summarize?: boolean;
-        filter?: { search?: string; is_active?: string | number | boolean };
+        filter?: {
+            search?: string;
+            is_active?: string | number | boolean;
+            unassigned?: string | number | boolean;
+        };
     };
 }
 
@@ -106,6 +113,16 @@ const shortDate = (d: string | null | undefined) => {
     if (!d) return '';
     try {
         return format(parseISO(d), 'd MMM');
+    } catch {
+        return d;
+    }
+};
+
+// "JUNE 25, 2026" label for the date a product was marked a winning item.
+const winningDate = (d: string | null | undefined) => {
+    if (!d) return '';
+    try {
+        return format(parseISO(d), 'MMMM d, yyyy').toUpperCase();
     } catch {
         return d;
     }
@@ -144,10 +161,15 @@ export default function ItemIndex({
     const [editingItem, setEditingItem] = useState<Item | null>(null);
     const [adjustingItem, setAdjustingItem] = useState<Item | null>(null);
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
+    const [waitingItem, setWaitingItem] = useState<Item | null>(null);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     // Default to active-only; only an explicit `all` shows inactive items too.
     const [activeOnly, setActiveOnly] = useState(
         query?.filter?.is_active !== 'all',
+    );
+    // "Unassigned only": show just the items that have no linked product yet.
+    const [unassignedOnly, setUnassignedOnly] = useState(
+        !!query?.filter?.unassigned && query?.filter?.unassigned !== '0',
     );
     // Summarize rolls SKU variants up under their parent item and sums the values.
     const [summarize, setSummarize] = useState(!!query?.summarize);
@@ -180,6 +202,7 @@ export default function ItemIndex({
                     sort: query?.sort,
                     'filter[search]': search || undefined,
                     'filter[is_active]': activeOnly ? 1 : 'all',
+                    'filter[unassigned]': unassignedOnly ? 1 : undefined,
                     summarize: summarize ? 1 : undefined,
                     page: 1,
                     per_page: query?.perPage ?? items.per_page,
@@ -198,6 +221,7 @@ export default function ItemIndex({
             query?.perPage,
             items.per_page,
             activeOnly,
+            unassignedOnly,
             summarize,
         ],
     );
@@ -210,6 +234,29 @@ export default function ItemIndex({
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[is_active]': checked ? 1 : 'all',
+                'filter[unassigned]': unassignedOnly ? 1 : undefined,
+                summarize: summarize ? 1 : undefined,
+                page: 1,
+                per_page: query?.perPage ?? items.per_page,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['items'],
+            },
+        );
+    };
+
+    const handleUnassignedChange = (checked: boolean) => {
+        setUnassignedOnly(checked);
+        router.get(
+            baseUrl,
+            {
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[is_active]': activeOnly ? 1 : 'all',
+                'filter[unassigned]': checked ? 1 : undefined,
                 summarize: summarize ? 1 : undefined,
                 page: 1,
                 per_page: query?.perPage ?? items.per_page,
@@ -233,6 +280,7 @@ export default function ItemIndex({
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[is_active]': activeOnly ? 1 : 'all',
+                'filter[unassigned]': unassignedOnly ? 1 : undefined,
                 summarize: checked ? 1 : undefined,
                 page: 1,
                 per_page: query?.perPage ?? items.per_page,
@@ -370,6 +418,9 @@ export default function ItemIndex({
             cell: ({ row }) => {
                 const item = row.original;
                 const productName = item.product?.name ?? item.product_name;
+                const won = winningDate(
+                    item.product?.winning_date ?? item.product_winning_date,
+                );
                 const isGroup = !!item.is_group || !!item.is_parent;
                 return (
                     <div className="flex flex-col gap-0.5">
@@ -387,6 +438,7 @@ export default function ItemIndex({
                         {productName && (
                             <span className="text-[10px] text-gray-400 dark:text-gray-500">
                                 {productName}
+                                {won && ` (${won})`}
                             </span>
                         )}
                         {!summarize && item.parent_sku && (
@@ -554,12 +606,27 @@ export default function ItemIndex({
                     className="justify-center"
                 />
             ),
+            // Clickable when there's anything outstanding — opens the PO breakdown.
             cell: ({ row }) => (
                 <div className="text-center">
-                    <MetricCell
-                        value={row.original.waiting_for_delivery_stocks}
-                        color="text-blue-500 dark:text-blue-400"
-                    />
+                    {row.original.waiting_for_delivery_stocks == null ? (
+                        <MetricCell
+                            value={null}
+                            color="text-blue-500 dark:text-blue-400"
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setWaitingItem(row.original)}
+                            title="View pending purchase orders"
+                            className="cursor-pointer rounded px-1 underline decoration-dotted underline-offset-4 transition-colors hover:bg-blue-500/10"
+                        >
+                            <MetricCell
+                                value={row.original.waiting_for_delivery_stocks}
+                                color="text-blue-500 dark:text-blue-400"
+                            />
+                        </button>
+                    )}
                 </div>
             ),
         },
@@ -708,6 +775,9 @@ export default function ItemIndex({
                                     'filter[is_active]': activeOnly
                                         ? '1'
                                         : 'all',
+                                    'filter[unassigned]': unassignedOnly
+                                        ? '1'
+                                        : '',
                                     sort: query?.sort ?? '',
                                 }).filter(([, v]) => v !== ''),
                             ).toString()}`}
@@ -768,6 +838,16 @@ export default function ItemIndex({
                         />
                         <span className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-300">
                             Active only
+                        </span>
+                    </label>
+
+                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
+                        <Switch
+                            checked={unassignedOnly}
+                            onCheckedChange={handleUnassignedChange}
+                        />
+                        <span className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-300">
+                            No product assigned
                         </span>
                     </label>
 
@@ -1003,6 +1083,9 @@ export default function ItemIndex({
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     'filter[is_active]': activeOnly ? 1 : 'all',
+                                    'filter[unassigned]': unassignedOnly
+                                        ? 1
+                                        : undefined,
                                     summarize: summarize ? 1 : undefined,
                                     page: params?.page ?? 1,
                                     per_page:
@@ -1052,6 +1135,13 @@ export default function ItemIndex({
                         onClose={() => setItemToDelete(null)}
                     />
                 )}
+
+                <WaitingForDeliveryDialog
+                    open={waitingItem !== null}
+                    item={waitingItem}
+                    workspace={workspace}
+                    onClose={() => setWaitingItem(null)}
+                />
             </div>
         </AppLayout>
     );

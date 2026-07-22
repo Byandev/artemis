@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import DatePicker from '@/components/ui/date-picker';
 import { MultiSelect } from '@/components/ui/multi-select';
 import AppLayout from '@/layouts/app-layout';
 import workspaces from '@/routes/workspaces';
@@ -30,6 +31,7 @@ const Edit = ({ workspace, product, shops }: PageProps) => {
         code: product.code || '',
         category: product.category || '',
         status: product.status as Status,
+        winning_date: product.winning_date || '',
         description: product.description || '',
         shop_ids: product.shops?.map((s) => s.id) || ([] as number[]),
     });
@@ -148,6 +150,27 @@ const Edit = ({ workspace, product, shops }: PageProps) => {
                                 {errors.status && (
                                     <p className={errorClass}>
                                         {errors.status}
+                                    </p>
+                                )}
+                            </div>
+                            <div className={fieldClass}>
+                                <label className={labelClass}>
+                                    Winning Date
+                                </label>
+                                <DatePicker
+                                    id="winning_date"
+                                    fullWidth
+                                    placeholder="Not marked as winning"
+                                    defaultDate={
+                                        product.winning_date ?? undefined
+                                    }
+                                    onChange={(_dates, dateStr) =>
+                                        setData('winning_date', dateStr)
+                                    }
+                                />
+                                {errors.winning_date && (
+                                    <p className={errorClass}>
+                                        {errors.winning_date}
                                     </p>
                                 )}
                             </div>
