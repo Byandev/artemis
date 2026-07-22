@@ -24,10 +24,7 @@ class ReportLateDeliveriesToDiscordCommand extends Command
     {
         $date = $this->option('date') ?: Carbon::today()->toDateString();
         $force = (bool) $this->option('force');
-        // Match on the hour, not the exact minute: schedule:run fires the day's
-        // minute-:00 tasks sequentially, so a slow earlier task can push this
-        // command past :00 and an H:i match would silently never fire.
-        $nowHour = now()->format('H:00');
+        $nowHHMM = now()->format('H:i');
 
         $deliveries = PurchasedOrderItemDelivery::query()
             ->whereDate('delivery_date', $date)
@@ -64,7 +61,7 @@ class ReportLateDeliveriesToDiscordCommand extends Command
                 continue;
             }
 
-            if (! $force && $setting->awaiting_send_at !== $nowHour) {
+            if (! $force && $setting->awaiting_send_at !== $nowHHMM) {
                 continue;
             }
 

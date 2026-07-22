@@ -35,6 +35,10 @@ class WorkspaceInvitationController extends Controller
                 'required',
                 Rule::exists('roles', 'id')->where('workspace_id', $workspace->id),
             ],
+            'team_ids' => ['nullable', 'array'],
+            'team_ids.*' => [
+                Rule::exists('teams', 'id')->where('workspace_id', $workspace->id),
+            ],
         ]);
 
         // Check if user is already a member
@@ -62,6 +66,8 @@ class WorkspaceInvitationController extends Controller
             'email' => $validated['email'],
             'role_id' => $validated['role_id'],
         ]);
+
+        $invitation->teams()->sync($validated['team_ids'] ?? []);
 
         // Send the invitation email
         Notification::route('mail', $validated['email'])
@@ -192,6 +198,16 @@ class WorkspaceInvitationController extends Controller
                 'user_id' => $request->user()->id,
                 'role_id' => $invitation->role_id,
             ]);
+
+            // Add the user to the teams chosen at invite time, skipping any that
+            // were deleted or moved out of this workspace in the meantime.
+            $teams = $invitation->teams()
+                ->where('teams.workspace_id', $workspace->id)
+                ->get();
+
+            foreach ($teams as $team) {
+                $team->members()->syncWithoutDetaching([$request->user()->id]);
+            }
 
             // Mark invitation as accepted
             $invitation->markAsAccepted();
