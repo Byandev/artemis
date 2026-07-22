@@ -203,13 +203,12 @@ class LiveReader
         $spec = self::spec($column);
 
         return self::baseQuery($workspaceId, $dateRange, $filter, $spec, forceJoinPages: true)
-            ->join('shops', 'shops.id', '=', 'pages.shop_id')
+            ->join('shops', 'shops.id', '=', 'pancake_orders.shop_id')
             ->selectRaw('
                 shops.id AS shop_id,
                 shops.name AS shop_name,
                 COALESCE(SUM('.$spec['expr'].'), 0) AS value
             ')
-            ->whereNotNull('pages.shop_id')
             ->groupBy('shops.id', 'shops.name')
             ->orderByDesc('value')
             ->get();

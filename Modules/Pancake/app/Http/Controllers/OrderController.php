@@ -44,16 +44,8 @@ class OrderController extends Controller
      */
     private function applyRider($query, string $rider)
     {
-        return $query->whereIn('pancake_orders.id', function ($sub) use ($rider) {
-            $sub->from('parcel_journeys')
-                ->select('order_id')
-                ->where('rider_name', $rider)
-                ->whereIn('id', function ($latest) {
-                    $latest->from('parcel_journeys')
-                        ->selectRaw('MAX(id)')
-                        ->where('status', 'On Delivery')
-                        ->groupBy('order_id');
-                });
+        return $query->whereHas('parcelJourneys', function ($q) use ($rider) {
+            $q->where('rider_name', $rider);
         });
     }
 
