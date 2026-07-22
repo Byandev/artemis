@@ -67,12 +67,15 @@ export function InlineOwner({
     canEdit,
     saving = false,
     onAssign,
+    label = 'Owner',
 }: {
     owner: OwnerOption | null;
     users: OwnerOption[];
     canEdit: boolean;
     saving?: boolean;
     onAssign: (ownerId: number | null) => void;
+    /** Noun for the section header + empty-state title (e.g. "Owner", "Creator"). */
+    label?: string;
 }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -132,7 +135,7 @@ export function InlineOwner({
                         <button
                             type="button"
                             disabled={saving}
-                            title="Assign owner"
+                            title={`Assign ${label.toLowerCase()}`}
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-black/20 text-gray-400 transition-colors hover:border-emerald-500/50 hover:text-emerald-600 disabled:opacity-50 dark:border-white/20 dark:text-gray-500 dark:hover:text-emerald-400"
                         >
                             <UserPlus className="h-3.5 w-3.5" />
@@ -155,7 +158,7 @@ export function InlineOwner({
                     {/* People */}
                     <div className="max-h-[280px] overflow-y-auto p-1.5">
                         <p className="px-2 py-1.5 font-mono text-[10px] font-medium tracking-widest text-gray-400 uppercase dark:text-gray-600">
-                            Owner
+                            {label}
                         </p>
                         {filtered.length === 0 ? (
                             <p className="px-2 py-4 text-center font-mono text-[12px] text-gray-400 dark:text-gray-600">

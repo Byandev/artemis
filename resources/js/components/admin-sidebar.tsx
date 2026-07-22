@@ -14,6 +14,7 @@ import {
     FileText,
     Layers,
     ScrollText,
+    Smartphone,
     TicketCheck,
     Users,
 } from 'lucide-react';
@@ -36,6 +37,11 @@ export function AdminSidebar() {
             title: 'Subscription Plans',
             href: '/admin/subscription-plans',
             icon: CreditCard,
+        },
+        {
+            title: 'Workspace SIMs',
+            href: '/admin/sims',
+            icon: Smartphone,
         },
         {
             title: 'Invoices',

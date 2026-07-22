@@ -1,6 +1,13 @@
 import { Button } from '@/components/ui/button';
 import DatePicker from '@/components/ui/date-picker';
 import { MultiSelect } from '@/components/ui/multi-select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type PaginatedData } from '@/types';
@@ -8,6 +15,7 @@ import { Head, router } from '@inertiajs/react';
 import { X } from 'lucide-react';
 import moment from 'moment';
 import { useEffect, useMemo, useState } from 'react';
+import { OwnerOption } from '../../components/inline-owner';
 import { metricLabel } from '../_shared';
 import { BreakdownControl } from './components/BreakdownControl';
 import { GALLERY_GRID } from './components/chart-constants';
@@ -42,6 +50,7 @@ interface Props {
     reports: ReportListItem[];
     archivedReports: ReportListItem[];
     accounts: { id: string; name: string }[];
+    members?: OwnerOption[];
     customBreakdowns?: CustomBreakdownItem[];
 }
 
@@ -51,6 +60,7 @@ export default function ReportShow({
     reports,
     archivedReports,
     accounts,
+    members = [],
     customBreakdowns = [],
 }: Props) {
     const baseUrl = reportsUrl(workspace.slug);
@@ -113,6 +123,11 @@ export default function ReportShow({
         if (validMetricFilters.length > 0) {
             qs.set('metric_filters', JSON.stringify(validMetricFilters));
         }
+        // Creator filter (ad-level) — persisted in the report config; the engine
+        // applies it only to ad-grained breakdowns and ignores it otherwise.
+        if (config.creator_id != null) {
+            qs.set('creator_id', String(config.creator_id));
+        }
         qs.set('per_page', '48');
 
         fetch(`${adsManagerDataUrl(workspace.slug)}?${qs.toString()}`, {
@@ -136,6 +151,7 @@ export default function ReportShow({
         config.since,
         config.until,
         config.sort,
+        config.creator_id,
         accountsKey,
         filtersKey,
         workspace.slug,
@@ -304,6 +320,41 @@ export default function ReportShow({
                             filters={config.filters}
                             onChange={(filters) => patch({ filters })}
                         />
+
+                        <Select
+                            value={
+                                config.creator_id == null
+                                    ? 'all'
+                                    : String(config.creator_id)
+                            }
+                            onValueChange={(value) =>
+                                patch({
+                                    creator_id:
+                                        value === 'all'
+                                            ? null
+                                            : value === 'unassigned'
+                                              ? 'unassigned'
+                                              : Number(value),
+                                })
+                            }
+                        >
+                            <SelectTrigger className="h-9 w-[170px] text-xs">
+                                <SelectValue placeholder="All creators" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">
+                                    All creators
+                                </SelectItem>
+                                <SelectItem value="unassigned">
+                                    Unassigned
+                                </SelectItem>
+                                {members.map((m) => (
+                                    <SelectItem key={m.id} value={String(m.id)}>
+                                        {m.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Metrics + sort bar */}
