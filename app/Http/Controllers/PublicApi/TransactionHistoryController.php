@@ -93,13 +93,15 @@ class TransactionHistoryController extends Controller
         foreach ($rows as $row) {
             $remainingStock = (float) ($row['inventory_remaining_stock'] ?? 0);
 
-            InventoryTransaction::firstOrCreate(
+            InventoryTransaction::updateOrCreate(
                 [
                     'inventory_item_id' => $item->id,
                     'workspace_id' => $item->workspace_id,
                     'ref_no' => $row['ref_no'],
                     'number' => $row['number'] ?? null,
                     'date' => $row['date'] ?? null,
+                ],
+                [
                     'po_qty_in' => (int) ($row['po_qty_in'] ?? 0),
                     'po_qty_out' => (int) ($row['po_qty_out'] ?? 0),
                     'rts_goods_in' => (int) ($row['rts_goods_in'] ?? 0),
@@ -107,7 +109,7 @@ class TransactionHistoryController extends Controller
                     'rts_bad' => (int) ($row['rts_bad'] ?? 0),
                     'inventory_remaining_stock' => $remainingStock,
                     'remaining_qty' => (int) round($remainingStock),
-                ],
+                ]
             );
 
             $saved++;
