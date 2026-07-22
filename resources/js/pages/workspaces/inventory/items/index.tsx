@@ -92,7 +92,11 @@ interface Props {
         perPage?: number | string;
         page?: number | string;
         summarize?: boolean;
-        filter?: { search?: string; is_active?: string | number | boolean };
+        filter?: {
+            search?: string;
+            is_active?: string | number | boolean;
+            unassigned?: string | number | boolean;
+        };
     };
 }
 
@@ -163,6 +167,10 @@ export default function ItemIndex({
     const [activeOnly, setActiveOnly] = useState(
         query?.filter?.is_active !== 'all',
     );
+    // "Unassigned only": show just the items that have no linked product yet.
+    const [unassignedOnly, setUnassignedOnly] = useState(
+        !!query?.filter?.unassigned && query?.filter?.unassigned !== '0',
+    );
     // Summarize rolls SKU variants up under their parent item and sums the values.
     const [summarize, setSummarize] = useState(!!query?.summarize);
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -194,6 +202,7 @@ export default function ItemIndex({
                     sort: query?.sort,
                     'filter[search]': search || undefined,
                     'filter[is_active]': activeOnly ? 1 : 'all',
+                    'filter[unassigned]': unassignedOnly ? 1 : undefined,
                     summarize: summarize ? 1 : undefined,
                     page: 1,
                     per_page: query?.perPage ?? items.per_page,
@@ -212,6 +221,7 @@ export default function ItemIndex({
             query?.perPage,
             items.per_page,
             activeOnly,
+            unassignedOnly,
             summarize,
         ],
     );
@@ -224,6 +234,29 @@ export default function ItemIndex({
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[is_active]': checked ? 1 : 'all',
+                'filter[unassigned]': unassignedOnly ? 1 : undefined,
+                summarize: summarize ? 1 : undefined,
+                page: 1,
+                per_page: query?.perPage ?? items.per_page,
+            },
+            {
+                preserveState: true,
+                replace: true,
+                preserveScroll: true,
+                only: ['items'],
+            },
+        );
+    };
+
+    const handleUnassignedChange = (checked: boolean) => {
+        setUnassignedOnly(checked);
+        router.get(
+            baseUrl,
+            {
+                sort: query?.sort,
+                'filter[search]': searchValue || undefined,
+                'filter[is_active]': activeOnly ? 1 : 'all',
+                'filter[unassigned]': checked ? 1 : undefined,
                 summarize: summarize ? 1 : undefined,
                 page: 1,
                 per_page: query?.perPage ?? items.per_page,
@@ -247,6 +280,7 @@ export default function ItemIndex({
                 sort: query?.sort,
                 'filter[search]': searchValue || undefined,
                 'filter[is_active]': activeOnly ? 1 : 'all',
+                'filter[unassigned]': unassignedOnly ? 1 : undefined,
                 summarize: checked ? 1 : undefined,
                 page: 1,
                 per_page: query?.perPage ?? items.per_page,
@@ -741,6 +775,9 @@ export default function ItemIndex({
                                     'filter[is_active]': activeOnly
                                         ? '1'
                                         : 'all',
+                                    'filter[unassigned]': unassignedOnly
+                                        ? '1'
+                                        : '',
                                     sort: query?.sort ?? '',
                                 }).filter(([, v]) => v !== ''),
                             ).toString()}`}
@@ -801,6 +838,16 @@ export default function ItemIndex({
                         />
                         <span className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-300">
                             Active only
+                        </span>
+                    </label>
+
+                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
+                        <Switch
+                            checked={unassignedOnly}
+                            onCheckedChange={handleUnassignedChange}
+                        />
+                        <span className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-300">
+                            No product assigned
                         </span>
                     </label>
 
@@ -1036,6 +1083,9 @@ export default function ItemIndex({
                                     sort: params?.sort,
                                     'filter[search]': searchValue || undefined,
                                     'filter[is_active]': activeOnly ? 1 : 'all',
+                                    'filter[unassigned]': unassignedOnly
+                                        ? 1
+                                        : undefined,
                                     summarize: summarize ? 1 : undefined,
                                     page: params?.page ?? 1,
                                     per_page:

@@ -130,6 +130,13 @@ class InventoryItemController extends Controller
                     $query->where('sku', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('product_id'),
+                // "Unassigned only": items with no linked product. Off unless the
+                // toggle is on; a falsy value is a no-op so the key stays valid.
+                AllowedFilter::callback('unassigned', function ($query, $value) {
+                    if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                        $query->whereNull('inventory_items.product_id');
+                    }
+                }),
                 // is_active is applied manually to $base above; register it as a
                 // no-op here so QueryBuilder doesn't reject the filter key.
                 AllowedFilter::callback('is_active', function () {}),
@@ -196,6 +203,11 @@ class InventoryItemController extends Controller
 
         if ($productId = $request->input('filter.product_id')) {
             $inner->where('inventory_items.product_id', $productId);
+        }
+
+        // "Unassigned only": keep only items with no linked product.
+        if ($request->boolean('filter.unassigned')) {
+            $inner->whereNull('inventory_items.product_id');
         }
 
         // po_needed and days_it_can_last are non-additive — summing each child's
