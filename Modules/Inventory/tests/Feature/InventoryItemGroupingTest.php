@@ -1,5 +1,8 @@
 <?php
 
+use App\Models\Product;
+use App\Models\Shop;
+use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Inventory\Models\InventoryItem;
@@ -82,6 +85,52 @@ test('summarize view rolls children up under the parent and sums their stock', f
             expect((int) $row['is_group'])->toBe(1);
             expect((int) $row['child_count'])->toBe(2);
             expect((int) $row['current_stocks'])->toBe(42);
+        });
+});
+
+test('summarize view keeps the parent id/sku for a team-scoped view even though the parent has no product', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    // Build a parent group whose single child's product is visible to $team.
+    $groupForTeam = function (Team $team, string $parentSku, string $childSku, int $stock) use ($workspace) {
+        $product = Product::factory()->create(['workspace_id' => $workspace->id]);
+        $shop = Shop::factory()->forWorkspace($workspace)->create(['product_id' => $product->id]);
+        $shop->teams()->attach($team->id);
+
+        // The parent placeholder has no product of its own.
+        $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => $parentSku, 'is_parent' => true, 'is_active' => true]);
+        $child = InventoryItem::create([
+            'workspace_id' => $workspace->id, 'product_id' => $product->id,
+            'sku' => $childSku, 'parent_id' => $parent->id, 'is_active' => true,
+        ]);
+        stockItem($child, $stock);
+
+        return $parent;
+    };
+
+    $parentA = $groupForTeam($teamA, 'GROUP-A', 'SUP-A', 20);
+    $parentB = $groupForTeam($teamB, 'GROUP-B', 'SUP-B', 99);
+
+    // Owner "viewing as" team A -> team-scoped visibility applies. Before the fix the
+    // no-product parent was filtered out and the row fell back to the child's id.
+    $this->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace)."?summarize=1&team_id={$teamA->id}")
+        ->assertOk()
+        ->assertInertia(function (Assert $page) use ($parentA, $parentB) {
+            $rows = collect($page->toArray()['props']['items']['data']);
+
+            // Only team A's group is visible — team B's must not leak.
+            expect($rows)->toHaveCount(1);
+            expect($rows->pluck('id')->map('intval'))->not->toContain($parentB->id);
+
+            $row = $rows->first();
+            expect((int) $row['id'])->toBe($parentA->id);
+            expect($row['sku'])->toBe('GROUP-A');
+            expect((int) $row['is_group'])->toBe(1);
+            expect((int) $row['child_count'])->toBe(1);
+            expect((int) $row['current_stocks'])->toBe(20);
         });
 });
 

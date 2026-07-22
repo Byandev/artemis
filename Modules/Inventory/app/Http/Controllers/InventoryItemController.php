@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -85,6 +86,38 @@ class InventoryItemController extends Controller
         } elseif ($isActiveFilter !== 'all') {
             $query->where('inventory_items.is_active', filter_var($isActiveFilter, FILTER_VALIDATE_BOOLEAN));
         }
+    }
+
+    /**
+     * Team-visibility for the summary roll-up. Mirrors the model's visibleTo scope,
+     * but keeps a parent placeholder — which has no product of its own and would
+     * otherwise fail closed — whenever any of its children is visible, so the parent
+     * survives in the group and can supply the row's id/sku/lead time. Unrestricted
+     * users are untouched; a scoped user with no team sees nothing (fail-closed).
+     */
+    private function applySummaryVisibility(Request $request, $query, Workspace $workspace): void
+    {
+        $teamIds = TeamVisibility::scopeTeamIds($request->user(), $workspace);
+
+        // null -> unrestricted (or no "viewing as team"): see everything.
+        if ($teamIds === null) {
+            return;
+        }
+
+        // Scoped user with no team -> nothing.
+        if (empty($teamIds)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $inTeams = fn ($q) => $q->whereHas('product.shops.teams', fn ($t) => $t->whereIn('teams.id', $teamIds));
+
+        $query->where(function ($q) use ($inTeams) {
+            // The item itself is visible via its product's team, OR it's a parent
+            // whose children are (a parent has no product to scope on directly).
+            $inTeams($q)->orWhereHas('children', $inTeams);
+        });
     }
 
     /**
@@ -186,7 +219,6 @@ class InventoryItemController extends Controller
         // children roll into them). The is_active filter still applies.
         $inner = InventoryItem::query()
             ->where('inventory_items.workspace_id', $workspace->id)
-            ->visibleTo($request->user(), $workspace)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.unfulfilled_count, inventory_items.three_days_average, products.name as product_name, products.winning_date as product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
@@ -196,6 +228,7 @@ class InventoryItemController extends Controller
             ->selectRaw("{$sql['po_needed']} as po_needed");
 
         $this->applyActiveFilter($request, $inner);
+        $this->applySummaryVisibility($request, $inner, $workspace);
 
         if ($search = $request->input('filter.search')) {
             $inner->where('inventory_items.sku', 'like', "%{$search}%");
@@ -263,7 +296,7 @@ class InventoryItemController extends Controller
         if (in_array($column, $sortable, true)) {
             $outer->orderByRaw("$column ".($descending ? 'DESC' : 'ASC'));
         } else {
-            $outer->orderBy('sku');
+            $outer->orderBy('created_at', $descending ? 'DESC' : 'ASC');
         }
 
         return $outer;
