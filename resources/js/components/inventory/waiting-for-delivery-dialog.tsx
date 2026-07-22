@@ -8,12 +8,13 @@ import {
 } from '@/components/ui/dialog';
 import { Workspace } from '@/types/models/Workspace';
 import { format, parseISO } from 'date-fns';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface WaitingForDeliveryTarget {
     id: number;
     sku: string;
     is_group?: boolean | number;
+    parent_id?: number;
 }
 
 interface PendingOrder {
@@ -71,8 +72,9 @@ export function WaitingForDeliveryDialog({
         let cancelled = false;
         setLoading(true);
         setFailed(false);
+
         fetch(
-            `/workspaces/${workspace.slug}/inventory/items/${item.id}/pending-purchase-orders`,
+            `/workspaces/${workspace.slug}/inventory/items/${item?.parent_id ?? item.id}/pending-purchase-orders`,
             { headers: { Accept: 'application/json' } },
         )
             .then((r) => (r.ok ? r.json() : Promise.reject(r)))
@@ -94,7 +96,7 @@ export function WaitingForDeliveryDialog({
         return () => {
             cancelled = true;
         };
-    }, [open, item?.id, workspace.slug]);
+    }, [open, item?.id, item?.parent_id, workspace.slug]);
 
     const isGroup = !!item?.is_group;
 
