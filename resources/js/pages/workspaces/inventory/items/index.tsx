@@ -69,6 +69,7 @@ interface Item {
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
     remaining_after_fulfillment: number | null;
+    stocks_needed_for_lead_time: number | null;
     days_it_can_last: number | null;
     po_needed: number | null;
     current_stocks: number | null;
@@ -143,6 +144,105 @@ const MetricCell = ({
         {num(value, decimals)}
     </span>
 );
+
+// Lead-time cell with inline editing. Read-only users see the badge; editors can
+// click it to type a new value. Works in the summarize view too — there the row id
+// is the group's parent, so the PATCH updates the parent's lead time. Saves on Enter
+// or blur (only when changed), Escape cancels.
+const LeadTimeCell = ({
+    item,
+    editable,
+    baseUrl,
+}: {
+    item: Item;
+    editable: boolean;
+    baseUrl: string;
+}) => {
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState(String(item.lead_time ?? 0));
+    const [saving, setSaving] = useState(false);
+
+    // Resync when the row's value changes (e.g. after a reload).
+    useEffect(() => {
+        setValue(String(item.lead_time ?? 0));
+    }, [item.lead_time]);
+
+    const save = () => {
+        setEditing(false);
+        const parsed = parseInt(value, 10);
+        const next = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+        if (next === (item.lead_time ?? 0)) {
+            setValue(String(next));
+            return;
+        }
+        router.patch(
+            `${baseUrl}/${item.id}/lead-time`,
+            { lead_time: next },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onError: () => {
+                    toast.error('Failed to update lead time.');
+                    setValue(String(item.lead_time ?? 0));
+                },
+            },
+        );
+    };
+
+    if (!editable) {
+        return (
+            <div className="text-center">
+                <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
+                    {item.lead_time ?? 0}d
+                </span>
+            </div>
+        );
+    }
+
+    if (editing) {
+        return (
+            <div className="flex justify-center">
+                <input
+                    type="number"
+                    min={0}
+                    autoFocus
+                    value={value}
+                    disabled={saving}
+                    onChange={(e) => setValue(e.target.value)}
+                    onBlur={save}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') save();
+                        if (e.key === 'Escape') {
+                            setValue(String(item.lead_time ?? 0));
+                            setEditing(false);
+                        }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-7 w-16 rounded-md border border-emerald-500 bg-white px-2 text-center font-mono text-[11px] text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:bg-zinc-900 dark:text-gray-100"
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="text-center">
+            <button
+                type="button"
+                title="Edit lead time"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setEditing(true);
+                }}
+                className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 transition-colors hover:bg-stone-200 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700"
+            >
+                {item.lead_time ?? 0}d
+                <Pencil className="h-2.5 w-2.5 opacity-50" />
+            </button>
+        </div>
+    );
+};
 
 export default function ItemIndex({
     workspace,
@@ -485,10 +585,29 @@ export default function ItemIndex({
                 />
             ),
             cell: ({ row }) => (
+                <LeadTimeCell
+                    item={row.original}
+                    editable={canEditItems}
+                    baseUrl={baseUrl}
+                />
+            ),
+        },
+        {
+            accessorKey: 'three_days_average',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="3-Day Avg"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => (
                 <div className="text-center">
-                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-1 font-mono text-[11px] font-medium text-gray-600 dark:bg-zinc-800 dark:text-gray-400">
-                        {row.original.lead_time ?? 0}d
-                    </span>
+                    <MetricCell
+                        value={row.original.three_days_average}
+                        decimals={1}
+                    />
                 </div>
             ),
         },
@@ -508,6 +627,60 @@ export default function ItemIndex({
                         value={row.original.unfulfilled_count}
                         color="text-red-500 dark:text-red-400"
                     />
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'stocks_needed_for_lead_time',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Stocks Needed (Lead Time)"
+                    className="justify-center"
+                />
+            ),
+            // 3-day average × lead time — expected demand over the lead-time window.
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.stocks_needed_for_lead_time}
+                        color="text-amber-600 dark:text-amber-400"
+                    />
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'waiting_for_delivery_stocks',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Waiting for Delivery"
+                    className="justify-center"
+                />
+            ),
+            // Clickable when there's anything outstanding — opens the PO breakdown.
+            cell: ({ row }) => (
+                <div className="text-center">
+                    {row.original.waiting_for_delivery_stocks == null ? (
+                        <MetricCell
+                            value={null}
+                            color="text-blue-500 dark:text-blue-400"
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setWaitingItem(row.original)}
+                            title="View pending purchase orders"
+                            className="cursor-pointer rounded px-1 underline decoration-dotted underline-offset-4 transition-colors hover:bg-blue-500/10"
+                        >
+                            <MetricCell
+                                value={row.original.waiting_for_delivery_stocks}
+                                color="text-blue-500 dark:text-blue-400"
+                            />
+                        </button>
+                    )}
                 </div>
             ),
         },
@@ -555,11 +728,6 @@ export default function ItemIndex({
                         : d < 0
                           ? 'text-red-500 dark:text-red-400'
                           : 'text-gray-500 dark:text-gray-400';
-                const counted = row.original.discrepancy_counted_qty;
-                const date = shortDate(row.original.discrepancy_date);
-                const sub = [counted != null ? `cnt ${num(counted)}` : '', date]
-                    .filter(Boolean)
-                    .join(' · ');
                 return (
                     <div className="flex flex-col items-center gap-0.5">
                         <span
@@ -568,11 +736,6 @@ export default function ItemIndex({
                             {d > 0 ? '+' : ''}
                             {num(d)}
                         </span>
-                        {sub && (
-                            <span className="font-mono text-[9px] text-gray-400 dark:text-gray-500">
-                                {sub}
-                            </span>
-                        )}
                     </div>
                 );
             },
@@ -592,59 +755,6 @@ export default function ItemIndex({
                     <MetricCell
                         value={row.original.remaining_after_fulfillment}
                         color="text-amber-600 dark:text-amber-400"
-                    />
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'waiting_for_delivery_stocks',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="Waiting for Delivery"
-                    className="justify-center"
-                />
-            ),
-            // Clickable when there's anything outstanding — opens the PO breakdown.
-            cell: ({ row }) => (
-                <div className="text-center">
-                    {row.original.waiting_for_delivery_stocks == null ? (
-                        <MetricCell
-                            value={null}
-                            color="text-blue-500 dark:text-blue-400"
-                        />
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setWaitingItem(row.original)}
-                            title="View pending purchase orders"
-                            className="cursor-pointer rounded px-1 underline decoration-dotted underline-offset-4 transition-colors hover:bg-blue-500/10"
-                        >
-                            <MetricCell
-                                value={row.original.waiting_for_delivery_stocks}
-                                color="text-blue-500 dark:text-blue-400"
-                            />
-                        </button>
-                    )}
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'three_days_average',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="3-Day Avg"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => (
-                <div className="text-center">
-                    <MetricCell
-                        value={row.original.three_days_average}
-                        decimals={1}
                     />
                 </div>
             ),

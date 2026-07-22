@@ -58,7 +58,10 @@ class InventoryItemController extends Controller
         $awaitingStatuses = implode(',', PurchasedOrder::AWAITING_DELIVERY_STATUSES);
         $waitingStocksSql = "(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status in ($awaitingStatuses)))";
         $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
-        $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
+        // Stock needed to cover the lead time = expected demand over that window
+        // (daily-ish average × lead-time days). Same term that drives po_needed.
+        $stocksNeededForLeadTimeSql = '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
+        $poNeededSql = "GREATEST(0, $stocksNeededForLeadTimeSql - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
         return [
@@ -68,6 +71,7 @@ class InventoryItemController extends Controller
             'discrepancy_date' => $latestDiscrepancyDateSql,
             'waiting_for_delivery_stocks' => $waitingStocksSql,
             'remaining_after_fulfillment' => $remainingAfterFulfillmentSql,
+            'stocks_needed_for_lead_time' => $stocksNeededForLeadTimeSql,
             'po_needed' => $poNeededSql,
             'days_it_can_last' => $daysItCanLastSql,
         ];
@@ -155,6 +159,7 @@ class InventoryItemController extends Controller
             ->selectRaw("{$sql['discrepancy_counted_qty']} as discrepancy_counted_qty")
             ->selectRaw("{$sql['discrepancy_date']} as discrepancy_date")
             ->selectRaw("{$sql['remaining_after_fulfillment']} as remaining_after_fulfillment")
+            ->selectRaw("{$sql['stocks_needed_for_lead_time']} as stocks_needed_for_lead_time")
             ->selectRaw("{$sql['po_needed']} as po_needed")
             ->selectRaw("{$sql['days_it_can_last']} as days_it_can_last")
             // three_days_average is a stored column updated hourly by inventory:update-averages
@@ -194,6 +199,9 @@ class InventoryItemController extends Controller
                 }),
                 AllowedSort::callback('po_needed', function ($query, $descending) use ($sql) {
                     $query->orderByRaw("{$sql['po_needed']} ".($descending ? 'DESC' : 'ASC'));
+                }),
+                AllowedSort::callback('stocks_needed_for_lead_time', function ($query, $descending) use ($sql) {
+                    $query->orderByRaw("{$sql['stocks_needed_for_lead_time']} ".($descending ? 'DESC' : 'ASC'));
                 }),
                 AllowedSort::callback('discrepancy', function ($query, $descending) use ($sql) {
                     $query->orderByRaw("{$sql['discrepancy']} ".($descending ? 'DESC' : 'ASC'));
@@ -253,7 +261,10 @@ class InventoryItemController extends Controller
         $summedWaiting = 'COALESCE(SUM(sub.waiting_for_delivery_stocks), 0)';
         $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
 
-        $groupPoNeeded = "GREATEST(0, ($groupLeadTime * $summedThreeDayAvg) - $summedWaiting - $summedRemaining)";
+        // Stock needed to cover the lead time for the whole group: the group's
+        // representative lead time × its summed daily average (same term po_needed uses).
+        $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
+        $groupPoNeeded = "GREATEST(0, $groupStocksNeeded - $summedWaiting - $summedRemaining)";
         $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
 
         // Aggregate the per-item rows into one row per group. Representative
@@ -278,6 +289,7 @@ class InventoryItemController extends Controller
             ->selectRaw('NULL as discrepancy_counted_qty')
             ->selectRaw('NULL as discrepancy_date')
             ->selectRaw('SUM(sub.remaining_after_fulfillment) as remaining_after_fulfillment')
+            ->selectRaw("$groupStocksNeeded as stocks_needed_for_lead_time")
             ->selectRaw("$groupPoNeeded as po_needed")
             ->selectRaw("$summedThreeDayAvg as three_days_average")
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
@@ -287,7 +299,7 @@ class InventoryItemController extends Controller
         $sortable = [
             'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
             'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
-            'po_needed', 'three_days_average', 'days_it_can_last',
+            'stocks_needed_for_lead_time', 'po_needed', 'three_days_average', 'days_it_can_last',
         ];
         $sort = (string) $request->input('sort', 'sku');
         $descending = str_starts_with($sort, '-');
@@ -446,6 +458,27 @@ class InventoryItemController extends Controller
 
         return redirect()->back()
             ->with('success', 'Inventory Items record updated.');
+    }
+
+    /**
+     * Update just an item's lead time. Backs the inline lead-time editor on the list,
+     * including the summarize view — there the row's id is the group's parent, so an
+     * edit sets the parent's lead time, which is exactly the value the roll-up reads
+     * for the group's lead_time / stocks_needed_for_lead_time / po_needed.
+     */
+    public function updateLeadTime(Request $request, Workspace $workspace, InventoryItem $item)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        $validated = $request->validate([
+            'lead_time' => 'required|integer|min:0',
+        ]);
+
+        $item->update(['lead_time' => $validated['lead_time']]);
+
+        return redirect()->back()->with('success', 'Lead time updated.');
     }
 
     /**

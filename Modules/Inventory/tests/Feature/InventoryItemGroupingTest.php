@@ -88,6 +88,48 @@ test('summarize view rolls children up under the parent and sums their stock', f
         });
 });
 
+test('the list computes stocks needed for the lead time (3-day avg x lead time)', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = InventoryItem::create([
+        'workspace_id' => $workspace->id, 'sku' => 'X-1', 'is_active' => true,
+        'lead_time' => 5, 'three_days_average' => 4,
+    ]);
+
+    $this->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->assertOk()
+        ->assertInertia(function (Assert $page) use ($item) {
+            $row = collect($page->toArray()['props']['items']['data'])->firstWhere('id', $item->id);
+            expect((int) $row['stocks_needed_for_lead_time'])->toBe(20);
+        });
+});
+
+test('editing lead time updates the item and the summarize roll-up reads it from the parent', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true, 'lead_time' => 2]);
+    InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true, 'lead_time' => 1, 'three_days_average' => 3]);
+
+    // The summarize row's id is the parent — edit lead time there.
+    $this->actingAs($owner)
+        ->patch(route('workspaces.inventory.item.lead-time.update', ['workspace' => $workspace, 'item' => $parent->id]), ['lead_time' => 10])
+        ->assertRedirect();
+
+    expect($parent->fresh()->lead_time)->toBe(10);
+
+    // Roll-up: group lead time = parent's 10, stocks needed = 10 × summed 3-day avg (3).
+    $this->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=1')
+        ->assertOk()
+        ->assertInertia(function (Assert $page) use ($parent) {
+            $row = collect($page->toArray()['props']['items']['data'])->first();
+            expect((int) $row['id'])->toBe($parent->id);
+            expect((int) $row['lead_time'])->toBe(10);
+            expect((int) $row['stocks_needed_for_lead_time'])->toBe(30);
+        });
+});
+
 test('summarize view keeps the parent id/sku for a team-scoped view even though the parent has no product', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);

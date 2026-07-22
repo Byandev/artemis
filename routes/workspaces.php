@@ -458,6 +458,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{item}/stock-as-of', [InventoryItemController::class, 'stockAsOf'])->name('stock-as-of');
         Route::get('/{item}/pending-purchase-orders', [InventoryItemController::class, 'pendingPurchaseOrders'])->name('pending-purchase-orders');
         Route::post('/{item}/discrepancies', [InventoryItemController::class, 'adjustCount'])->name('discrepancies.store');
+        Route::patch('/{item}/lead-time', [InventoryItemController::class, 'updateLeadTime'])->name('lead-time.update');
         Route::put('/{item}', [InventoryItemController::class, 'update'])->name('update');
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
