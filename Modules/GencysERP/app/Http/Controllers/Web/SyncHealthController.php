@@ -119,6 +119,7 @@ class SyncHealthController extends Controller
                 AllowedFilter::exact('sync_type'),
                 AllowedFilter::exact('inventory_item_id'),
             ])
+            ->whereIn('sync_type', [GencysSyncRun::TYPE_PURCHASE_ORDER, GencysSyncRun::TYPE_TRANSACTION_HISTORY])
             ->allowedSorts(['started_at', 'finished_at', 'rows_received', 'sync_type', 'status'])
             ->defaultSort('-started_at')
             ->paginate($request->integer('per_page', 25))
