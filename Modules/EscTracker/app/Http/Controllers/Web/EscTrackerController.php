@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace Modules\EscTracker\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;

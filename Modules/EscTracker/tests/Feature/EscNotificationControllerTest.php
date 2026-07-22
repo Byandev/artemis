@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\EscNotification;
 use App\Models\User;
+use Modules\EscTracker\Models\EscNotification;
 
 /**
  * A user plus the Authorization header carrying their Sanctum token.

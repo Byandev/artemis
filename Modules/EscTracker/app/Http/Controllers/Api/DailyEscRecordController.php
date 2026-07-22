@@ -1,13 +1,14 @@
 <?php
 
-namespace App\Http\Controllers\PublicApi;
+namespace Modules\EscTracker\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\DailyEscRecord;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Modules\EscTracker\Models\DailyEscRecord;
+use Modules\EscTracker\Services\EscStreakCalculator;
 
 class DailyEscRecordController extends Controller
 {
@@ -77,7 +78,7 @@ class DailyEscRecordController extends Controller
      * (`movement_image`, saved to the public disk) or as an already-hosted URL
      * (`movement_image_url`).
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, EscStreakCalculator $streaks): JsonResponse
     {
         $user = $request->user();
 
@@ -159,7 +160,7 @@ class DailyEscRecordController extends Controller
 
         // Saving a record can extend, repair, or (via backfill) lengthen the
         // user's streaks, so recompute them from the full history now.
-        $user->recalculateEscStreaks();
+        $streaks->recalculateFor($user);
 
         return response()->json([
             'data' => $record,

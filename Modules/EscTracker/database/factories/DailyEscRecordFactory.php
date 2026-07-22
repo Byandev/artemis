@@ -1,10 +1,10 @@
 <?php
 
-namespace Database\Factories;
+namespace Modules\EscTracker\Database\Factories;
 
-use App\Models\DailyEscRecord;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Modules\EscTracker\Models\DailyEscRecord;
 
 /**
  * @extends Factory<DailyEscRecord>

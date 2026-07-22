@@ -1,11 +1,8 @@
 <?php
 
-use App\Http\Controllers\PublicApi\AuthController;
 use App\Http\Controllers\PublicApi\CallLogController;
 use App\Http\Controllers\PublicApi\CallLogV2Controller;
 use App\Http\Controllers\PublicApi\CsrDailyRecordController;
-use App\Http\Controllers\PublicApi\DailyEscRecordController;
-use App\Http\Controllers\PublicApi\EscNotificationController;
 use App\Http\Controllers\PublicApi\HealthController;
 use App\Http\Controllers\PublicApi\InventoryItemController;
 use App\Http\Controllers\PublicApi\PageController;
@@ -53,22 +50,8 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::post('/inventory/unit-codes/bulk-sync', [InventoryUnitCodeApiController::class, 'bulkSync'])->name('inventory.unit-codes.bulk-sync');
 });
 
-// WellSync (first-party app). No workspace API key here — users authenticate as
-Route::group(['prefix' => 'v1/public/esc', 'as' => 'api.v1.public.esc.'], function () {
-
-    Route::post('/auth/login', [AuthController::class, 'login'])
-        ->middleware('throttle:public-api-login')
-        ->name('auth.login');
-
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
-        Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
-        Route::get('/daily-records', [DailyEscRecordController::class, 'index'])->name('daily-records.index');
-        Route::post('/daily-records', [DailyEscRecordController::class, 'store'])->name('daily-records.store');
-        Route::get('/notifications', [EscNotificationController::class, 'show'])->name('notifications.show');
-        Route::match(['put', 'patch'], '/notifications', [EscNotificationController::class, 'update'])->name('notifications.update');
-    });
-});
+// The WellSync / ESC API lives in the EscTracker module:
+// Modules/EscTracker/routes/api.php
 
 // GencysERP daily sales tracker callback. n8n posts the scraped rows here and
 // authenticates with the api_key embedded in the body (not a header), so this

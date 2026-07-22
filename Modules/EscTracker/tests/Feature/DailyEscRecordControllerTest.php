@@ -1,10 +1,10 @@
 <?php
 
-use App\Models\DailyEscRecord;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Modules\EscTracker\Models\DailyEscRecord;
 
 /**
  * A user plus the Authorization header carrying their Sanctum token.

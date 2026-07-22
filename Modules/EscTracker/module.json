@@ -1,0 +1,11 @@
+{
+    "name": "EscTracker",
+    "alias": "esctracker",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\EscTracker\\Providers\\EscTrackerServiceProvider"
+    ],
+    "files": []
+}

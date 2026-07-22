@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\PublicApi;
+namespace Modules\EscTracker\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;

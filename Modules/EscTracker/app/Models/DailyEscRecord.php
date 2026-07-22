@@ -1,16 +1,27 @@
 <?php
 
-namespace App\Models;
+namespace Modules\EscTracker\Models;
 
-use Database\Factories\DailyEscRecordFactory;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\EscTracker\Database\Factories\DailyEscRecordFactory;
 
 class DailyEscRecord extends Model
 {
     /** @use HasFactory<DailyEscRecordFactory> */
     use HasFactory;
+
+    /**
+     * Laravel's convention resolves factories to `Database\Factories\...`, which
+     * doesn't hold inside a module — point it at the module's factory instead.
+     */
+    protected static function newFactory(): Factory
+    {
+        return DailyEscRecordFactory::new();
+    }
 
     /**
      * The attributes that are mass assignable.

@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\PublicApi;
+namespace Modules\EscTracker\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\EscNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Modules\EscTracker\Models\EscNotification;
 
 class EscNotificationController extends Controller
 {

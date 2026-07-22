@@ -13,7 +13,6 @@ use App\Http\Controllers\Workspaces\ChecklistController;
 use App\Http\Controllers\Workspaces\ChecklistProgressController;
 use App\Http\Controllers\Workspaces\CSRController;
 use App\Http\Controllers\Workspaces\DepartmentController;
-use App\Http\Controllers\Workspaces\EscTrackerController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
@@ -155,9 +154,8 @@ Route::middleware(['auth'])->group(function () {
     // Public-pages access password (gates public RMO management & leaderboard)
     Route::post('/workspaces/{workspace}/public-password', [WorkspaceController::class, 'updatePublicPassword'])->name('workspaces.public-password.update');
 
-    // Extreme Self-Care tracker — workspace-wide view of members' daily ESC
-    // records and streaks (records are logged via the WellSync public API).
-    Route::get('/workspaces/{workspace}/esc-tracker', [EscTrackerController::class, 'index'])->name('workspaces.esc-tracker.index');
+    // ESC Tracker page lives in the EscTracker module:
+    // Modules/EscTracker/routes/web.php
 
     // Member management routes
     Route::get('/workspaces/{workspace}/members', [WorkspaceMemberController::class, 'index'])->name('workspaces.members.index');
