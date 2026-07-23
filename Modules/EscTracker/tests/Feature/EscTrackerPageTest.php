@@ -60,6 +60,45 @@ test('days_logged counts only records inside the requested range', function () {
         );
 });
 
+test('each pillar is counted separately and only inside the range', function () {
+    [$owner, $workspace, $member] = escTrackerContext();
+
+    // Two days with meditation, one with learning, none with movement.
+    DailyEscRecord::factory()->create([
+        'user_id' => $member->id,
+        'record_date' => '2026-06-10',
+        'meditation_completed' => true,
+        'learning_completed' => true,
+        'movement_completed' => false,
+    ]);
+    DailyEscRecord::factory()->create([
+        'user_id' => $member->id,
+        'record_date' => '2026-06-11',
+        'meditation_completed' => true,
+        'learning_completed' => false,
+        'movement_completed' => false,
+    ]);
+
+    // Outside the range — must not be counted for any pillar.
+    DailyEscRecord::factory()->create([
+        'user_id' => $member->id,
+        'record_date' => '2026-07-01',
+        'meditation_completed' => true,
+        'learning_completed' => true,
+        'movement_completed' => true,
+    ]);
+
+    $this->actingAs($owner)
+        ->get("/workspaces/{$workspace->slug}/esc-tracker?from=2026-06-01&to=2026-06-30")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('members.1.days_logged', 2)
+            ->where('members.1.meditation_completed_count', 2)
+            ->where('members.1.learning_completed_count', 1)
+            ->where('members.1.movement_completed_count', 0)
+        );
+});
+
 test('switching the range returns different counts and is not served stale from cache', function () {
     [$owner, $workspace, $member] = escTrackerContext();
 

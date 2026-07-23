@@ -5,7 +5,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { Flame, Search, Trophy } from 'lucide-react';
+import { BookOpen, Brain, Dumbbell, Flame, Search, Trophy } from 'lucide-react';
 import moment from 'moment';
 import { useMemo, useState } from 'react';
 
@@ -15,12 +15,46 @@ interface EscMember {
     current_streak: number;
     longest_streak: number;
     days_logged: number;
+    meditation_completed_count: number;
+    learning_completed_count: number;
+    movement_completed_count: number;
 }
 
 interface Props {
     workspace: Workspace;
     members: EscMember[];
     range: { from: string; to: string; days: number };
+}
+
+/**
+ * One pillar's completed-day count, shown as "N / days in range" so it reads
+ * against the same denominator as Days Logged. Zero is greyed out — the point
+ * of the column is spotting who isn't logging a pillar at all.
+ */
+function PillarCount({
+    count,
+    total,
+    icon: Icon,
+    tone,
+}: {
+    count: number;
+    total: number;
+    icon: typeof Brain;
+    tone: string;
+}) {
+    return (
+        <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${
+                count > 0
+                    ? tone
+                    : 'bg-stone-100 text-gray-400 dark:bg-zinc-800 dark:text-gray-600'
+            }`}
+        >
+            <Icon className="h-3.5 w-3.5" />
+            {count}
+            <span className="opacity-60">/ {total}</span>
+        </span>
+    );
 }
 
 export default function EscTracker({ workspace, members, range }: Props) {
@@ -90,6 +124,51 @@ export default function EscTracker({ workspace, members, range }: Props) {
             ),
         },
         {
+            accessorKey: 'meditation_completed_count',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Meditation" />
+            ),
+            cell: ({ row }) => (
+                <PillarCount
+                    count={row.original.meditation_completed_count}
+                    total={range.days}
+                    icon={Brain}
+                    tone="bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400"
+                />
+            ),
+        },
+        {
+            accessorKey: 'learning_completed_count',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Learning" />
+            ),
+            cell: ({ row }) => (
+                <PillarCount
+                    count={row.original.learning_completed_count}
+                    total={range.days}
+                    icon={BookOpen}
+                    tone="bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400"
+                />
+            ),
+        },
+        {
+            accessorKey: 'movement_completed_count',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Movement" />
+            ),
+            cell: ({ row }) => (
+                <PillarCount
+                    count={row.original.movement_completed_count}
+                    total={range.days}
+                    icon={Dumbbell}
+                    tone="bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400"
+                />
+            ),
+        },
+        {
             accessorKey: 'current_streak',
             enableSorting: true,
             header: ({ column }) => (
@@ -151,8 +230,9 @@ export default function EscTracker({ workspace, members, range }: Props) {
                 </div>
 
                 <p className="mt-2 font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                    Days Logged covers {range.from} → {range.to}. Streaks are
-                    all-time and not affected by the date range.
+                    Days Logged and the meditation / learning / movement counts
+                    cover {range.from} → {range.to}. Streaks are all-time and
+                    not affected by the date range.
                 </p>
             </div>
         </AppLayout>
