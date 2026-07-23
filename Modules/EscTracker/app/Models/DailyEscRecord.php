@@ -32,8 +32,10 @@ class DailyEscRecord extends Model
         'user_id',
         'record_date',
         'learning_text',
+        'learning_completed',
         'movement_text',
         'movement_image_url',
+        'movement_completed',
         'meditation_completed',
         'meditation_url',
         'submitted_at',
@@ -46,6 +48,8 @@ class DailyEscRecord extends Model
     {
         return [
             'record_date' => 'date',
+            'learning_completed' => 'boolean',
+            'movement_completed' => 'boolean',
             'meditation_completed' => 'boolean',
             'submitted_at' => 'datetime',
         ];

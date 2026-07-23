@@ -33,6 +33,12 @@ Route::group(['prefix' => 'v1/public/esc', 'as' => 'v1.public.esc.'], function (
         Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
 
         Route::get('/daily-records', [DailyEscRecordController::class, 'index'])->name('daily-records.index');
+        // Today's record, for the "edit today" screen. Registered before the
+        // collection POST so `/today` is never mistaken for a record payload.
+        Route::get('/daily-records/today', [DailyEscRecordController::class, 'today'])->name('daily-records.today');
+        // Partial update: only the fields sent are touched, so saving one toggle
+        // won't blank the notes already stored.
+        Route::match(['put', 'patch'], '/daily-records/today', [DailyEscRecordController::class, 'updateToday'])->name('daily-records.today.update');
         Route::post('/daily-records', [DailyEscRecordController::class, 'store'])->name('daily-records.store');
 
         // Reminder settings for the token owner. PUT and PATCH behave the same —

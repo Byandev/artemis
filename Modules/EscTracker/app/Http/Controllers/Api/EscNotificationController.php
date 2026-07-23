@@ -6,10 +6,20 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Modules\EscTracker\Models\EscNotification;
 
 class EscNotificationController extends Controller
 {
+    /**
+     * How long a user's cached reminder settings live.
+     *
+     * Long, because settings change rarely and every write refreshes the entry
+     * itself (see `update`) — so the TTL is a safety net against a stray direct
+     * DB edit, not the mechanism keeping the cache correct.
+     */
+    private const CACHE_TTL_MINUTES = 60;
+
     /**
      * Read the authenticated employee's ESC reminder settings.
      *
@@ -18,12 +28,23 @@ class EscNotificationController extends Controller
      * the settings screen has no row yet, so one is materialised with the schema
      * defaults — that way the reminder scheduler sees every user, not only those
      * who happened to save once.
+     *
+     * Cached per user. Saving writes the fresh value straight back into the
+     * cache rather than just clearing it, so a user never reads back stale
+     * settings after changing them — the classic failure mode for cached
+     * per-user data.
      */
     public function show(Request $request): JsonResponse
     {
-        $settings = EscNotification::firstOrCreate(['user_id' => $request->user()->id]);
+        $userId = $request->user()->id;
 
-        return response()->json(['data' => $this->present($settings)]);
+        $data = Cache::remember(
+            $this->cacheKey($userId),
+            now()->addMinutes(self::CACHE_TTL_MINUTES),
+            fn () => $this->present(EscNotification::firstOrCreate(['user_id' => $userId])),
+        );
+
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -57,7 +78,28 @@ class EscNotificationController extends Controller
 
         $settings->fill($validated)->save();
 
-        return response()->json(['data' => $this->present($settings)]);
+        $data = $this->present($settings);
+
+        // Write-through: refresh the entry instead of forgetting it, so the next
+        // read is both correct and warm.
+        Cache::put(
+            $this->cacheKey($user->id),
+            $data,
+            now()->addMinutes(self::CACHE_TTL_MINUTES),
+        );
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Cache key for one user's reminder settings.
+     *
+     * Keyed by user id so one employee's settings can never be served to
+     * another — these are per-user rows behind a shared endpoint.
+     */
+    private function cacheKey(int $userId): string
+    {
+        return "esc:notifications:user:{$userId}";
     }
 
     /**

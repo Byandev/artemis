@@ -1,6 +1,7 @@
 import { Can } from '@/components/can';
 import ComponentCard from '@/components/common/ComponentCard';
 import PageHeader from '@/components/common/PageHeader';
+import { AssignDepartmentDialog } from '@/components/members/assign-department-dialog';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -12,6 +13,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     Dialog,
@@ -47,6 +49,7 @@ import { PaginatedData, SharedData, User } from '@/types';
 import { Role } from '@/types/models/Role';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import type { RowSelectionState } from '@tanstack/react-table';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
@@ -63,9 +66,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { AssignDepartmentDialog } from '@/components/members/assign-department-dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import type { RowSelectionState } from '@tanstack/react-table';
 
 interface Invitation {
     id: number;

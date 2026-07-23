@@ -588,7 +588,8 @@ export default function PurchasedOrderIndex({
             { expected_delivery_date: value || null },
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Expected delivery date updated'),
+                onSuccess: () =>
+                    toast.success('Expected delivery date updated'),
                 onError: () => toast.error('Failed to update expected date'),
             },
         );
@@ -652,7 +653,8 @@ export default function PurchasedOrderIndex({
                             </div>
                             <div className="flex items-center gap-3">
                                 <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                                    {item.delivered_qty} / {item.count} delivered
+                                    {item.delivered_qty} / {item.count}{' '}
+                                    delivered
                                     {item.balance > 0 && (
                                         <span className="text-amber-600 dark:text-amber-400">
                                             {' '}
@@ -687,11 +689,16 @@ export default function PurchasedOrderIndex({
                                     >
                                         <div className="flex items-center gap-3 font-mono text-[11px] text-gray-600 dark:text-gray-400">
                                             <Truck className="h-3 w-3 text-gray-400" />
-                                            <span>{d.delivery_date?.slice(0, 10)}</span>
+                                            <span>
+                                                {d.delivery_date?.slice(0, 10)}
+                                            </span>
                                             <span className="text-gray-400">
                                                 {d.delivery_no || 'No DR'}
                                             </span>
-                                            <span>{d.qty} unit{d.qty === 1 ? '' : 's'}</span>
+                                            <span>
+                                                {d.qty} unit
+                                                {d.qty === 1 ? '' : 's'}
+                                            </span>
                                         </div>
                                         {canEditPurchasedOrders && (
                                             <div className="flex items-center gap-1">
@@ -710,7 +717,9 @@ export default function PurchasedOrderIndex({
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => deleteDelivery(d)}
+                                                    onClick={() =>
+                                                        deleteDelivery(d)
+                                                    }
                                                     className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950"
                                                     aria-label="Delete delivery"
                                                 >

@@ -32,15 +32,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import clsx from 'clsx';
 import { omit } from 'lodash';
-import {
-    Download,
-    Edit,
-    ListChecks,
-    MoreHorizontal,
-    Search,
-    Upload,
-    Wallet,
-} from 'lucide-react';
+import { Edit, ListChecks, MoreHorizontal, Search, Wallet } from 'lucide-react';
 import {
     type ChangeEvent,
     type FormEvent,
@@ -243,7 +235,6 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
             },
         );
     };
-
 
     const openChecklist = (page: Page) => {
         setSelectedPage(page);

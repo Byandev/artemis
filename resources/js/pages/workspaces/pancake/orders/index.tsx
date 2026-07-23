@@ -155,26 +155,23 @@ export default function PancakeOrdersIndex({
     });
 
     const reload = useCallback(
-        debounce(
-            (s: string, st: string, df: string, dt: string, r: string) => {
-                router.get(
-                    baseUrl,
-                    {
-                        sort: query?.sort,
-                        filter: buildFilter(s, st, df, dt, r),
-                        page: 1,
-                        per_page: query?.perPage ?? orders.per_page,
-                    },
-                    {
-                        preserveState: true,
-                        replace: true,
-                        preserveScroll: true,
-                        only: ['orders', 'statusCounts', 'totalCount', 'query'],
-                    },
-                );
-            },
-            400,
-        ),
+        debounce((s: string, st: string, df: string, dt: string, r: string) => {
+            router.get(
+                baseUrl,
+                {
+                    sort: query?.sort,
+                    filter: buildFilter(s, st, df, dt, r),
+                    page: 1,
+                    per_page: query?.perPage ?? orders.per_page,
+                },
+                {
+                    preserveState: true,
+                    replace: true,
+                    preserveScroll: true,
+                    only: ['orders', 'statusCounts', 'totalCount', 'query'],
+                },
+            );
+        }, 400),
         [baseUrl, query?.sort, query?.perPage, orders.per_page],
     );
 
@@ -399,7 +396,9 @@ export default function PancakeOrdersIndex({
                                 setDateFrom(
                                     moment(dates[0]).format('YYYY-MM-DD'),
                                 );
-                                setDateTo(moment(dates[1]).format('YYYY-MM-DD'));
+                                setDateTo(
+                                    moment(dates[1]).format('YYYY-MM-DD'),
+                                );
                             } else if (dates.length === 0) {
                                 setDateFrom('');
                                 setDateTo('');

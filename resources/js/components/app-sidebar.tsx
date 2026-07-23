@@ -155,11 +155,16 @@ export function AppSidebar() {
             icon: Building2,
             permission: PERMISSIONS.ViewDepartments,
         },
-        {
-            title: 'ESC Tracker',
-            href: `/workspaces/${slug}/esc-tracker`,
-            icon: HeartPulse,
-        },
+        ...(currentWorkspace.esc_tracker_module_enabled
+            ? [
+                  {
+                      title: 'ESC Tracker',
+                      href: `/workspaces/${slug}/esc-tracker`,
+                      icon: HeartPulse,
+                      permission: PERMISSIONS.ViewEscTracker,
+                  },
+              ]
+            : []),
         {
             title: 'Roles',
             href: `/workspaces/${slug}/roles`,

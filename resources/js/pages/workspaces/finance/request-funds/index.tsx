@@ -4,6 +4,7 @@ import {
     RequestFund,
     RequestFundFormDialog,
 } from '@/components/finance/request-fund-form-dialog';
+import { StatusFilter } from '@/components/finance/status-filter';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -20,7 +21,6 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { StatusFilter } from '@/components/finance/status-filter';
 import { debounce, omit } from 'lodash';
 import {
     Check,
@@ -54,8 +54,7 @@ interface Props {
 const STATUS_STYLES: Record<string, string> = {
     pending:
         'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
-    approved:
-        'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
+    approved: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
     released:
         'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
     cancelled: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
@@ -119,7 +118,11 @@ export default function RequestFundsIndex({
         router.put(
             `${baseUrl}/${rf.id}/status`,
             { status: next },
-            { preserveScroll: true, preserveState: true, only: ['requestFunds'] },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['requestFunds'],
+            },
         );
     };
 
@@ -249,12 +252,17 @@ export default function RequestFundsIndex({
                     <div className="flex justify-center">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <button className={`${badgeCls} transition-all hover:opacity-80`}>
+                                <button
+                                    className={`${badgeCls} transition-all hover:opacity-80`}
+                                >
                                     {rf.status}
                                     <ChevronDown className="h-3 w-3 opacity-60" />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="center" className="w-40">
+                            <DropdownMenuContent
+                                align="center"
+                                className="w-40"
+                            >
                                 {statuses.map((s) => (
                                     <DropdownMenuItem
                                         key={s}

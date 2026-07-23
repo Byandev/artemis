@@ -255,7 +255,10 @@ export default function Edit({ workspace, order, items }: Props) {
                                         data.expected_delivery_date || undefined
                                     }
                                     onChange={(_dates, dateStr) =>
-                                        setData('expected_delivery_date', dateStr)
+                                        setData(
+                                            'expected_delivery_date',
+                                            dateStr,
+                                        )
                                     }
                                 />
                                 {errors.expected_delivery_date && (

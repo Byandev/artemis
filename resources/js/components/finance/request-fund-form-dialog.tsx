@@ -1,4 +1,9 @@
-import { Field, Footer, inputCls } from '@/components/finance/account-form-dialog';
+import {
+    Field,
+    Footer,
+    inputCls,
+} from '@/components/finance/account-form-dialog';
+import DatePicker from '@/components/ui/date-picker';
 import {
     Dialog,
     DialogContent,
@@ -6,7 +11,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import DatePicker from '@/components/ui/date-picker';
 import { SharedData } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
 import React, { useEffect, useMemo } from 'react';
@@ -58,9 +62,7 @@ export function RequestFundFormDialog({
     const orderedUsers = useMemo(() => {
         const me = users.find((u) => u.id === meId);
         const rest = users.filter((u) => u.id !== meId);
-        return me
-            ? [{ id: me.id, name: `${me.name} (Me)` }, ...rest]
-            : users;
+        return me ? [{ id: me.id, name: `${me.name} (Me)` }, ...rest] : users;
     }, [users, meId]);
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
@@ -76,7 +78,8 @@ export function RequestFundFormDialog({
 
     // Stable initial dates for the picker (only recomputed when the target record
     // changes), so selecting a date doesn't re-init flatpickr on every keystroke.
-    const initialRequestDate = requestFund?.request_date?.slice(0, 10) ?? today();
+    const initialRequestDate =
+        requestFund?.request_date?.slice(0, 10) ?? today();
     const initialDateNeeded = requestFund?.date_needed?.slice(0, 10) ?? '';
 
     useEffect(() => {
@@ -121,7 +124,9 @@ export function RequestFundFormDialog({
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            {isEditing ? 'Edit Fund Request' : 'New Fund Request'}
+                            {isEditing
+                                ? 'Edit Fund Request'
+                                : 'New Fund Request'}
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
                             {isEditing ? (

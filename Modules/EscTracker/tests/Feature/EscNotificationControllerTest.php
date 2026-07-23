@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Modules\EscTracker\Models\EscNotification;
 
 /**
@@ -130,4 +131,60 @@ test('settings are scoped to the token owner', function () {
 test('the settings endpoints require a token', function () {
     $this->getJson('/api/v1/public/esc/notifications')->assertStatus(401);
     $this->putJson('/api/v1/public/esc/notifications', [])->assertStatus(401);
+});
+
+test('a saved change is visible on the very next read (no stale cache)', function () {
+    [$user, $headers] = escSettingsActor();
+
+    // Warm the cache with the defaults.
+    $this->getJson('/api/v1/public/esc/notifications', $headers)
+        ->assertJsonPath('data.reminder_time', '20:00');
+
+    $this->putJson('/api/v1/public/esc/notifications', [
+        'reminder_time' => '06:15',
+        'reminder_enabled' => false,
+    ], $headers)->assertStatus(200);
+
+    // Must reflect the write, not the warmed-up defaults.
+    $this->getJson('/api/v1/public/esc/notifications', $headers)
+        ->assertStatus(200)
+        ->assertJsonPath('data.reminder_time', '06:15')
+        ->assertJsonPath('data.reminder_enabled', false);
+});
+
+test('one user never sees another user cached settings', function () {
+    [$alice, $aliceHeaders] = escSettingsActor();
+    [$bob, $bobHeaders] = escSettingsActor();
+
+    $this->putJson('/api/v1/public/esc/notifications', [
+        'reminder_time' => '05:00',
+        'reminder_style' => 'firm',
+    ], $aliceHeaders)->assertStatus(200);
+
+    // The test app instance is reused across requests, so the sanctum guard
+    // still holds Alice. Production gets a fresh instance per request; drop the
+    // cached guard so Bob's token is actually resolved.
+    $this->app['auth']->forgetGuards();
+
+    // Bob's read must not pick up Alice's entry.
+    $this->getJson('/api/v1/public/esc/notifications', $bobHeaders)
+        ->assertStatus(200)
+        ->assertJsonPath('data.reminder_time', '20:00')
+        ->assertJsonPath('data.reminder_style', 'gentle');
+});
+
+test('the settings read is served from cache on repeat calls', function () {
+    [$user, $headers] = escSettingsActor();
+
+    $this->getJson('/api/v1/public/esc/notifications', $headers)->assertStatus(200);
+
+    expect(Cache::has("esc:notifications:user:{$user->id}"))
+        ->toBeTrue();
+
+    // Change the row behind the API's back; the cached copy should still serve.
+    EscNotification::where('user_id', $user->id)
+        ->update(['reminder_style' => 'changed-directly']);
+
+    $this->getJson('/api/v1/public/esc/notifications', $headers)
+        ->assertJsonPath('data.reminder_style', 'gentle');
 });
