@@ -499,8 +499,8 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceDashboard,
                           },
                           {
-                              title: 'Product Income Statements',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/product-income-statements`,
+                              title: 'User Income Statements',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/user-income-statements`,
                               icon: FileText,
                               permission: PERMISSIONS.ViewFinanceDashboard,
                           },

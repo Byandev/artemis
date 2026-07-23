@@ -51,7 +51,7 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
 use Modules\Finance\Http\Controllers\IncomeStatementController as FinanceIncomeStatementController;
-use Modules\Finance\Http\Controllers\ProductIncomeStatementController as FinanceProductIncomeStatementController;
+use Modules\Finance\Http\Controllers\UserIncomeStatementController as FinanceUserIncomeStatementController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
@@ -551,13 +551,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/income-statements/{incomeStatement}/regenerate', [FinanceIncomeStatementController::class, 'regenerate'])->name('income-statements.regenerate');
         Route::delete('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'destroy'])->name('income-statements.destroy');
 
-        Route::get('/product-income-statements', [FinanceProductIncomeStatementController::class, 'index'])->name('product-income-statements.index');
-        Route::get('/product-income-statements/preview', [FinanceProductIncomeStatementController::class, 'preview'])->name('product-income-statements.preview');
-        Route::post('/product-income-statements', [FinanceProductIncomeStatementController::class, 'store'])->name('product-income-statements.store');
-        Route::get('/product-income-statements/{productIncomeStatement}', [FinanceProductIncomeStatementController::class, 'show'])->name('product-income-statements.show');
-        Route::get('/product-income-statements/{productIncomeStatement}/export', [FinanceProductIncomeStatementController::class, 'export'])->name('product-income-statements.export');
-        Route::post('/product-income-statements/{productIncomeStatement}/regenerate', [FinanceProductIncomeStatementController::class, 'regenerate'])->name('product-income-statements.regenerate');
-        Route::delete('/product-income-statements/{productIncomeStatement}', [FinanceProductIncomeStatementController::class, 'destroy'])->name('product-income-statements.destroy');
+        Route::get('/user-income-statements', [FinanceUserIncomeStatementController::class, 'index'])->name('user-income-statements.index');
+        Route::get('/user-income-statements/preview', [FinanceUserIncomeStatementController::class, 'preview'])->name('user-income-statements.preview');
+        Route::post('/user-income-statements', [FinanceUserIncomeStatementController::class, 'store'])->name('user-income-statements.store');
+        Route::get('/user-income-statements/{userIncomeStatement}', [FinanceUserIncomeStatementController::class, 'show'])->name('user-income-statements.show');
+        Route::get('/user-income-statements/{userIncomeStatement}/export', [FinanceUserIncomeStatementController::class, 'export'])->name('user-income-statements.export');
+        Route::post('/user-income-statements/{userIncomeStatement}/regenerate', [FinanceUserIncomeStatementController::class, 'regenerate'])->name('user-income-statements.regenerate');
+        Route::delete('/user-income-statements/{userIncomeStatement}', [FinanceUserIncomeStatementController::class, 'destroy'])->name('user-income-statements.destroy');
 
         Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
         Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');
