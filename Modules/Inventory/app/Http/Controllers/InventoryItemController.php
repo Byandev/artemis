@@ -264,7 +264,7 @@ class InventoryItemController extends Controller
         // Stock needed to cover the lead time for the whole group: the group's
         // representative lead time × its summed daily average (same term po_needed uses).
         $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
-        $groupPoNeeded = "GREATEST(0, $groupStocksNeeded - $summedWaiting - $summedRemaining)";
+        $groupPoNeeded = "GREATEST(0, $groupStocksNeeded - $summedRemaining)";
         $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
 
         // Aggregate the per-item rows into one row per group. Representative
