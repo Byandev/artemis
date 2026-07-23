@@ -207,7 +207,7 @@ class InventoryItemController extends Controller
                     $query->orderByRaw("{$sql['discrepancy']} ".($descending ? 'DESC' : 'ASC'));
                 }),
             ])
-            ->defaultSort('-created_at');
+            ->defaultSort('created_at');
     }
 
     /**
@@ -313,9 +313,6 @@ class InventoryItemController extends Controller
         if (in_array($column, $sortable, true)) {
             $outer->orderByRaw("$column ".($descending ? 'DESC' : 'ASC'));
         } else {
-            // Default: oldest group first. Ordered on the aggregate expression rather
-            // than the alias, and tie-broken on the group's id so bulk-created items
-            // sharing a timestamp keep a stable order across pages.
             $outer->orderByRaw("$groupCreatedAt ".($descending ? 'DESC' : 'ASC'));
         }
 
