@@ -889,6 +889,9 @@ export default function ItemIndex({
                                         ? '1'
                                         : '',
                                     sort: query?.sort ?? '',
+                                    // Export what's on screen: grouped rows when
+                                    // the summarize toggle is on.
+                                    summarize: summarize ? '1' : '',
                                 }).filter(([, v]) => v !== ''),
                             ).toString()}`}
                             className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800"
