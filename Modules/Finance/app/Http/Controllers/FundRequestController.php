@@ -250,15 +250,22 @@ class FundRequestController extends Controller
     }
 
     /**
-     * The signed-in user's own pages, each carrying its most recent daily budget
-     * so the form can auto-fill "budget per day" once a page is picked. A page
-     * reaches its product through its shop (shops.product_id), which is what lets
-     * the picker narrow pages down to the chosen product.
+     * The pages the signed-in user's team runs, each carrying its most recent
+     * daily budget so the form can auto-fill "budget per day" once a page is
+     * picked. A page reaches its product through its shop (shops.product_id),
+     * which is what lets the picker narrow pages down to the chosen product.
+     *
+     * Scoped by team rather than by `pages.owner_id`: ownership is a single
+     * user, and in practice pages are imported under one admin account, which
+     * left the picker empty for the media buyers actually filing requests.
+     * `visibleTo` is the same scope the product picker above uses — unrestricted
+     * users get every page in the workspace, a scoped user gets their team's
+     * pages, and a scoped user with no team gets none.
      */
     protected function assignedPageOptions(Request $request, Workspace $workspace)
     {
         return Page::ofWorkspace($workspace)
-            ->where('owner_id', $request->user()->id)
+            ->visibleTo($request->user(), $workspace)
             // latestBudget is a latestOfMany relation: it self-joins, so naming
             // columns here makes `page_id` ambiguous. Load the whole row.
             ->with(['shop:id,product_id', 'latestBudget'])

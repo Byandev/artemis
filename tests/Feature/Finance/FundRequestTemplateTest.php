@@ -1,11 +1,16 @@
 <?php
 
+use App\Enums\Permission as AppPermission;
 use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
+use App\Models\Permission;
 use App\Models\Product;
+use App\Models\Role;
 use App\Models\Shop;
+use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Support\Collection;
 use Modules\Finance\Models\FundRequest;
 
 beforeEach(function () {
@@ -157,7 +162,43 @@ it('rejects an item whose product belongs to another workspace', function () {
     expect(FundRequest::count())->toBe(0);
 });
 
-it('offers the signed-in user only their own pages, carrying the latest budget', function () {
+/** The page options the request-funds screen hands to the item picker. */
+function pageOptionsFor(User $user): Collection
+{
+    return collect(
+        test()->actingAs($user)->get(test()->url)
+            ->viewData('page')['props']['myPages']
+    );
+}
+
+/**
+ * A member scoped to their own team's data — no "View All Workspace Data" — but
+ * allowed to see the request-funds screen.
+ *
+ * @param  array<int, Team>  $teams
+ */
+function financeMember(Workspace $workspace, array $teams = []): User
+{
+    $user = User::factory()->create();
+
+    $role = Role::factory()->create(['workspace_id' => $workspace->id]);
+    $role->permissions()->attach(
+        Permission::whereIn('name', [
+            AppPermission::ViewFinanceRequestFunds->value,
+            AppPermission::CreateFinanceRequestFunds->value,
+        ])->pluck('id')
+    );
+
+    $user->workspaces()->attach($workspace, ['role_id' => $role->id]);
+
+    foreach ($teams as $team) {
+        $user->teams()->attach($team);
+    }
+
+    return $user;
+}
+
+it('carries the latest budget on each offered page', function () {
     // Two records so the picker is proven to take the most recent, not just any.
     PageDailyBudgetRecord::create([
         'workspace_id' => $this->workspace->id,
@@ -172,7 +213,65 @@ it('offers the signed-in user only their own pages, carrying the latest budget',
         'budget' => 200,
     ]);
 
-    // A page in the same workspace owned by somebody else must not be offered.
+    $pages = pageOptionsFor($this->user);
+
+    expect($pages)->toHaveCount(1)
+        ->and($pages[0]['name'])->toBe('PH Main')
+        ->and($pages[0]['product_id'])->toBe($this->product->id)
+        ->and((float) $pages[0]['budget_per_day'])->toBe(200.00)
+        ->and($pages[0]['budget_date'])->toBe('2026-05-14');
+});
+
+it('offers a scoped member the pages of their team, whoever owns them', function () {
+    $team = Team::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    // The page's shop belongs to the team; the page itself is owned by somebody
+    // else entirely — team membership is what decides now, not pages.owner_id.
+    $this->page->shop->teams()->attach($team);
+    $this->page->update(['owner_id' => User::factory()->create()->id]);
+
+    $member = financeMember($this->workspace, [$team]);
+
+    $pages = pageOptionsFor($member);
+
+    expect($pages)->toHaveCount(1)
+        ->and($pages[0]['name'])->toBe('PH Main');
+});
+
+it('hides pages belonging to a team the member is not in', function () {
+    $ourTeam = Team::factory()->create(['workspace_id' => $this->workspace->id]);
+    $theirTeam = Team::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $this->page->shop->teams()->attach($ourTeam);
+
+    $otherShop = Shop::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'product_id' => $this->product->id,
+    ]);
+    $otherShop->teams()->attach($theirTeam);
+    Page::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'shop_id' => $otherShop->id,
+        'owner_id' => $this->user->id,
+        'name' => 'Other Team Page',
+    ]);
+
+    $pages = pageOptionsFor(financeMember($this->workspace, [$ourTeam]));
+
+    expect($pages)->toHaveCount(1)
+        ->and($pages[0]['name'])->toBe('PH Main');
+});
+
+it('offers a scoped member with no team nothing', function () {
+    $this->page->shop->teams()->attach(
+        Team::factory()->create(['workspace_id' => $this->workspace->id])
+    );
+
+    expect(pageOptionsFor(financeMember($this->workspace)))->toBeEmpty();
+});
+
+it('offers an unrestricted user every page in the workspace', function () {
+    // The owner sees everything, including pages on shops with no team at all.
     Page::factory()->create([
         'workspace_id' => $this->workspace->id,
         'shop_id' => $this->page->shop_id,
@@ -180,13 +279,6 @@ it('offers the signed-in user only their own pages, carrying the latest budget',
         'name' => 'Not Mine',
     ]);
 
-    $response = $this->actingAs($this->user)->get($this->url);
-
-    $pages = collect($response->viewData('page')['props']['myPages']);
-
-    expect($pages)->toHaveCount(1)
-        ->and($pages[0]['name'])->toBe('PH Main')
-        ->and($pages[0]['product_id'])->toBe($this->product->id)
-        ->and((float) $pages[0]['budget_per_day'])->toBe(200.00)
-        ->and($pages[0]['budget_date'])->toBe('2026-05-14');
+    expect(pageOptionsFor($this->user)->pluck('name')->all())
+        ->toEqualCanonicalizing(['PH Main', 'Not Mine']);
 });

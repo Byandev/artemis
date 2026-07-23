@@ -81,7 +81,7 @@ export function AdSpentItems({
      * The pages offered for a product. A page is linked to a product only
      * through its shop (shops.product_id), and that link is often unset — so
      * rather than dead-ending on an empty dropdown, fall back to offering every
-     * page the user runs and say so.
+     * page the user can see and say so.
      */
     const pagesFor = (productId: number | '') => {
         if (!productId) return { options: [] as PageOption[], fallback: false };
@@ -203,7 +203,7 @@ export function AdSpentItems({
                                                     ? 'Pick a product first'
                                                     : options.length
                                                       ? 'Select…'
-                                                      : 'No pages assigned to you'}
+                                                      : 'No pages in your team'}
                                             </option>
 
                                             {options.map((p) => (
@@ -307,8 +307,8 @@ export function AdSpentItems({
                                 </p>
                             ) : fallback ? (
                                 <p className="mt-2 font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                    No page is linked to this product, so all
-                                    your pages are listed.
+                                    No page is linked to this product, so every
+                                    page you can see is listed.
                                 </p>
                             ) : null}
 
