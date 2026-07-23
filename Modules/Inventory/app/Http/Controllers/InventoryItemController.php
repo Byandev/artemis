@@ -359,7 +359,15 @@ class InventoryItemController extends Controller
 
         $filename = 'inventory-items-'.now()->format('Y-m-d-His').'.xlsx';
 
-        return Excel::download(new InventoryItemExport($this->buildQuery($request, $workspace)), $filename);
+        // Mirror whatever the list is showing: with the summarize toggle on, export the
+        // parent/child roll-up rather than the flat per-SKU rows.
+        $summarize = $request->boolean('summarize');
+
+        $query = $summarize
+            ? $this->buildSummaryQuery($request, $workspace)
+            : $this->buildQuery($request, $workspace);
+
+        return Excel::download(new InventoryItemExport($query, $summarize), $filename);
     }
 
     public function syncFromGencys(Workspace $workspace)

@@ -5,6 +5,8 @@ use App\Models\Shop;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Maatwebsite\Excel\Facades\Excel;
+use Modules\Inventory\Exports\InventoryItemExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Tests\TestCase;
@@ -210,4 +212,61 @@ test('the n8n keywords endpoint excludes parent items', function () {
 
     expect($ids)->toContain($child->id);
     expect($ids)->not->toContain($parent->id);
+});
+
+test('the export follows the summarize toggle and rolls children up into one row', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
+    $a = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true]);
+    $b = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-B', 'parent_id' => $parent->id, 'is_active' => true]);
+    stockItem($a, 30);
+    stockItem($b, 12);
+
+    Excel::fake();
+    Excel::matchByRegex();
+
+    $this->actingAs($owner)
+        ->get(route('workspaces.inventory.item.export', $workspace).'?summarize=1')
+        ->assertOk();
+
+    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemExport $export) {
+        $rows = iterator_to_array($export->generator());
+
+        // One row for the whole group, with the children's stock summed.
+        expect($rows)->toHaveCount(1);
+        expect($rows[0][0])->toBe('GROUP');
+        expect((int) $rows[0][2])->toBe(2);       // SKUs in Group
+        expect((int) $rows[0][6])->toBe(42);      // Remaining Qty (30 + 12)
+        expect($export->headings()[2])->toBe('SKUs in Group');
+
+        return true;
+    });
+});
+
+test('the export without the summarize toggle stays flat, one row per SKU', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
+    $a = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true]);
+    $b = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-B', 'parent_id' => $parent->id, 'is_active' => true]);
+    stockItem($a, 30);
+    stockItem($b, 12);
+
+    Excel::fake();
+    Excel::matchByRegex();
+
+    $this->actingAs($owner)
+        ->get(route('workspaces.inventory.item.export', $workspace))
+        ->assertOk();
+
+    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemExport $export) {
+        $rows = iterator_to_array($export->generator());
+
+        // Both children listed separately; the parent placeholder is not exported.
+        expect(collect($rows)->pluck(0)->all())->toEqualCanonicalizing(['SUP-A', 'SUP-B']);
+        expect($export->headings())->not->toContain('SKUs in Group');
+
+        return true;
+    });
 });
