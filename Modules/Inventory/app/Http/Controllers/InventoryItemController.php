@@ -228,7 +228,7 @@ class InventoryItemController extends Controller
         $inner = InventoryItem::query()
             ->where('inventory_items.workspace_id', $workspace->id)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.unfulfilled_count, inventory_items.three_days_average, products.name as product_name, products.winning_date as product_winning_date')
+            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
@@ -257,6 +257,10 @@ class InventoryItemController extends Controller
         // the per-item formulas in stockSql() but over the rolled-up totals. The group's
         // lead_time is the representative one (parent's, else the max).
         $groupLeadTime = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
+        // The group's creation date — the parent's when there is one, else the earliest
+        // item in the group. Drives the default ordering below, so it has to be an
+        // aggregate: the outer query is grouped and has no bare created_at column.
+        $groupCreatedAt = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.created_at END), MIN(sub.created_at))';
         $summedThreeDayAvg = 'SUM(sub.three_days_average)';
         $summedWaiting = 'COALESCE(SUM(sub.waiting_for_delivery_stocks), 0)';
         $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
@@ -293,6 +297,7 @@ class InventoryItemController extends Controller
             ->selectRaw("$groupPoNeeded as po_needed")
             ->selectRaw("$summedThreeDayAvg as three_days_average")
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
+            ->selectRaw("$groupCreatedAt as created_at")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
 
         // Sorting on the aggregated aliases; anything unknown falls back to SKU.
@@ -308,7 +313,11 @@ class InventoryItemController extends Controller
         if (in_array($column, $sortable, true)) {
             $outer->orderByRaw("$column ".($descending ? 'DESC' : 'ASC'));
         } else {
-            $outer->orderBy('created_at', $descending ? 'DESC' : 'ASC');
+            // Default: oldest group first. Ordered on the aggregate expression rather
+            // than the alias, and tie-broken on the group's id so bulk-created items
+            // sharing a timestamp keep a stable order across pages.
+            $outer->orderByRaw("$groupCreatedAt ".($descending ? 'DESC' : 'ASC'))
+                ->orderByRaw('id '.($descending ? 'DESC' : 'ASC'));
         }
 
         return $outer;
