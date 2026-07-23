@@ -90,6 +90,28 @@ test('summarize view rolls children up under the parent and sums their stock', f
         });
 });
 
+test('the list summarizes by parent by default, with no summarize param', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
+    InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true]);
+    InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-B', 'parent_id' => $parent->id, 'is_active' => true]);
+
+    $this->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->assertOk()
+        ->assertInertia(function (Assert $page) use ($parent) {
+            $props = $page->toArray()['props'];
+
+            expect($props['query']['summarize'])->toBeTrue();
+
+            $rows = collect($props['items']['data']);
+            expect($rows)->toHaveCount(1);
+            expect((int) $rows->first()['id'])->toBe($parent->id);
+            expect((int) $rows->first()['child_count'])->toBe(2);
+        });
+});
+
 test('the list computes stocks needed for the lead time (3-day avg x lead time)', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
@@ -99,7 +121,7 @@ test('the list computes stocks needed for the lead time (3-day avg x lead time)'
     ]);
 
     $this->actingAs($owner)
-        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=0')
         ->assertOk()
         ->assertInertia(function (Assert $page) use ($item) {
             $row = collect($page->toArray()['props']['items']['data'])->firstWhere('id', $item->id);
@@ -185,7 +207,7 @@ test('flat view lists the individual child SKUs, tagged with their parent', func
     $a = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true]);
 
     $this->actingAs($owner)
-        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=0')
         ->assertOk()
         ->assertInertia(function (Assert $page) use ($a) {
             $rows = collect($page->toArray()['props']['items']['data']);
@@ -244,7 +266,7 @@ test('the export follows the summarize toggle and rolls children up into one row
     });
 });
 
-test('the export without the summarize toggle stays flat, one row per SKU', function () {
+test('the export with the summarize toggle off stays flat, one row per SKU', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
@@ -257,7 +279,7 @@ test('the export without the summarize toggle stays flat, one row per SKU', func
     Excel::matchByRegex();
 
     $this->actingAs($owner)
-        ->get(route('workspaces.inventory.item.export', $workspace))
+        ->get(route('workspaces.inventory.item.export', $workspace).'?summarize=0')
         ->assertOk();
 
     Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemExport $export) {
