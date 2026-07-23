@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Enums\Permission;
+use App\Exports\RmoCallLogsExport;
 use App\Exports\RmoManagementExport;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
@@ -382,10 +383,15 @@ class ForDeliveryController extends Controller
         ]);
     }
 
-    public function publicExport(Request $request, Workspace $workspace)
+    /**
+     * The RMO list as the page currently has it filtered: delivery date, the
+     * "mine only" assignee/confirmee toggles, and the filter bar.
+     *
+     * Shared by the exports so a downloaded file always covers exactly the rows
+     * on screen — the two can't drift apart.
+     */
+    private function filteredRmoQuery(Request $request, Workspace $workspace, string $deliveryDate): QueryBuilder
     {
-        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
-
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
         if ($request->input('assignee_id')) {
@@ -396,32 +402,7 @@ class ForDeliveryController extends Controller
             $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
         }
 
-        $query = QueryBuilder::for($baseQuery)
-            ->addSelect([
-                'pancake_order_for_delivery.*',
-                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
-            ])
-            ->with([
-                'order' => function ($query) {
-                    $query
-                        ->selectRaw("
-                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
-                            (
-                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
-                                FROM pancake_order_phone_number_reports
-                                WHERE order_id = pancake_orders.id
-                                and pancake_order_phone_number_reports.type = 'latest'
-                            ) AS cx_rts_rate
-                        ")
-                        ->with([
-                            'shippingAddress' => function ($subQuery) {
-                                $subQuery->with(['cityOrderSummary']);
-                            },
-                        ]);
-                },
-                'conferrer:id,name',
-                'assignee:id,name',
-            ])
+        return QueryBuilder::for($baseQuery)
             ->allowedFilters([
                 AllowedFilter::callback('page_id', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -464,6 +445,38 @@ class ForDeliveryController extends Controller
                 }),
             ])
             ->whereDate('delivery_date', $deliveryDate);
+    }
+
+    public function publicExport(Request $request, Workspace $workspace)
+    {
+        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
+
+        $query = $this->filteredRmoQuery($request, $workspace, $deliveryDate)
+            ->addSelect([
+                'pancake_order_for_delivery.*',
+                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
+            ])
+            ->with([
+                'order' => function ($query) {
+                    $query
+                        ->selectRaw("
+                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
+                            (
+                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
+                                FROM pancake_order_phone_number_reports
+                                WHERE order_id = pancake_orders.id
+                                and pancake_order_phone_number_reports.type = 'latest'
+                            ) AS cx_rts_rate
+                        ")
+                        ->with([
+                            'shippingAddress' => function ($subQuery) {
+                                $subQuery->with(['cityOrderSummary']);
+                            },
+                        ]);
+                },
+                'conferrer:id,name',
+                'assignee:id,name',
+            ]);
 
         $columns = $request->input('columns', []);
         if (is_string($columns)) {
@@ -500,6 +513,38 @@ class ForDeliveryController extends Controller
             'delivered' => (int) ($row->delivered ?? 0),
             'returning' => (int) ($row->returning_count ?? 0),
         ]);
+    }
+
+    /**
+     * Every call log behind the RMO list for the selected delivery date, as one
+     * row per call, honouring the page's current filters.
+     *
+     * The per-order modal answers "who called this customer?"; this answers the
+     * same question for the whole filtered day in one file. A call belongs to an
+     * order when the CSR, date and phone all line up — the same rule the
+     * customer/rider call-log relations use for their on-screen counts — so a
+     * number shared by two orders is reported under both.
+     */
+    public function publicExportCallLogs(Request $request, Workspace $workspace)
+    {
+        // The page itself is behind the public password gate, so the bulk
+        // download is too — except for signed-in members of the workspace, who
+        // reach the same data through the authenticated CSR route.
+        $user = $request->user();
+        $isMember = $user && ($user->isSuperAdmin() || $user->isMemberOf($workspace));
+
+        if (! $isMember && ! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
+            abort(403);
+        }
+
+        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
+
+        $query = $this->filteredRmoQuery($request, $workspace, $deliveryDate)
+            ->with(['order:id,order_number,tracking_code', 'assignee:id,name', 'conferrer:id,name']);
+
+        $filename = 'rmo-call-logs-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
+
+        return Excel::download(new RmoCallLogsExport($query, $workspace->id, $deliveryDate), $filename);
     }
 
     public function callLogs(Workspace $workspace, Request $request)
