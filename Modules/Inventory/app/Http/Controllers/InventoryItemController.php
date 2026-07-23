@@ -61,7 +61,7 @@ class InventoryItemController extends Controller
         // Stock needed to cover the lead time = expected demand over that window
         // (daily-ish average × lead-time days). Same term that drives po_needed.
         $stocksNeededForLeadTimeSql = '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
-        $poNeededSql = "GREATEST(0, $stocksNeededForLeadTimeSql - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
+        $poNeededSql = "GREATEST(0, $stocksNeededForLeadTimeSql - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
         return [
