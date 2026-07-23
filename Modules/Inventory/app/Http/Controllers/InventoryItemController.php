@@ -301,7 +301,7 @@ class InventoryItemController extends Controller
             'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
             'stocks_needed_for_lead_time', 'po_needed', 'three_days_average', 'days_it_can_last',
         ];
-        $sort = (string) $request->input('sort', 'sku');
+        $sort = (string) $request->input('sort');
         $descending = str_starts_with($sort, '-');
         $column = ltrim($sort, '-');
 
