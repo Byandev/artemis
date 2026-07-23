@@ -137,7 +137,8 @@ class AdminWorkspaceController extends Controller
             'is_gencys_partner' => 'required|boolean',
             'sales_marketing_dashboard_module_enabled' => 'required|boolean',
             'video_editor_dashboard_module_enabled' => 'required|boolean',
-            'csr_dashboard_module_enabled' => 'required|boolean',
+            'csr_dashboard_module_enabled' => 'required|boolean,
+            'esc_tracker_module_enabled' => 'sometimes|boolean',
             'sim_gateway_module_enabled' => 'required|boolean',
         ]);
 

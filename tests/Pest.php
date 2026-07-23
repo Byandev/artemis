@@ -12,9 +12,12 @@ use Tests\TestCase;
 |--------------------------------------------------------------------------
 */
 
+// Module feature tests get the same base TestCase + RefreshDatabase as the root
+// suite. Without an explicit path they'd run as plain PHPUnit tests with no
+// application booted.
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
-    ->in('Feature');
+    ->in('Feature', '../Modules/EscTracker/tests/Feature');
 
 /*
 |--------------------------------------------------------------------------

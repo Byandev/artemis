@@ -86,10 +86,7 @@ export function AssignDepartmentDialog({
         };
 
         if (isBulk) {
-            put(
-                workspaces.members.department.bulk.url({ workspace }),
-                options,
-            );
+            put(workspaces.members.department.bulk.url({ workspace }), options);
         } else if (member) {
             put(
                 workspaces.members.department.assign.url({

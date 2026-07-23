@@ -14,8 +14,8 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils';
 import { toFrontendSort } from '@/lib/sort';
+import { cn } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import {
     ActivityLog,
@@ -24,9 +24,9 @@ import {
 } from '@/types/models/ActivityLog';
 import { router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { AlertTriangle, Clock, ListChecks, Search } from 'lucide-react';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
+import { AlertTriangle, Clock, ListChecks, Search } from 'lucide-react';
 import {
     useCallback,
     useEffect,
@@ -69,9 +69,12 @@ interface Props {
 }
 
 const STATUS_STYLES: Record<LogStatus, string> = {
-    success: 'border-emerald-200/60 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400',
-    failure: 'border-red-200/60 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400',
-    warning: 'border-amber-200/60 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400',
+    success:
+        'border-emerald-200/60 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400',
+    failure:
+        'border-red-200/60 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400',
+    warning:
+        'border-amber-200/60 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400',
     info: 'border-sky-200/60 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-400',
 };
 
@@ -108,8 +111,7 @@ export default function ActivityLogView({
                     page: 1,
                     per_page: query?.per_page,
                     'filter[search]': search || undefined,
-                    'filter[log_type]':
-                        logType === 'all' ? undefined : logType,
+                    'filter[log_type]': logType === 'all' ? undefined : logType,
                     'filter[category]':
                         category === 'all' ? undefined : category,
                     'filter[status]': status === 'all' ? undefined : status,
@@ -118,7 +120,15 @@ export default function ActivityLogView({
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [baseUrl, category, logType, query?.per_page, query?.sort, search, status],
+        [
+            baseUrl,
+            category,
+            logType,
+            query?.per_page,
+            query?.sort,
+            search,
+            status,
+        ],
     );
 
     const debouncedSearch = useMemo(
@@ -506,7 +516,12 @@ function SummaryCard({
                 {icon}
                 <span>{label}</span>
             </div>
-            <div className={cn('mt-2 font-mono text-[20px] font-semibold', accent)}>
+            <div
+                className={cn(
+                    'mt-2 font-mono text-[20px] font-semibold',
+                    accent,
+                )}
+            >
                 {value.toLocaleString()}
             </div>
         </div>

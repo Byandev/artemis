@@ -10,7 +10,12 @@ type PropsType = {
     id: string;
     mode?: "single" | "multiple" | "range" | "time";
     onChange?: Hook | Hook[];
-    defaultDate?: DateOption;
+    /**
+     * A single date, or `[from, to]` in `mode="range"`. The component already
+     * normalises an array at runtime, and flatpickr's own `defaultDate` accepts
+     * both — the type just used to say otherwise.
+     */
+    defaultDate?: DateOption | DateOption[];
     label?: string;
     placeholder?: string;
     fullWidth?: boolean;

@@ -93,6 +93,9 @@ enum Permission: string
     case EditUnitCode = 'Edit Unit Code';
     case DeleteUnitCode = 'Delete Unit Code';
 
+    // ESC Tracker
+    case ViewEscTracker = 'View ESC Tracker';
+
     // Checklist
     case ViewChecklist = 'View Checklist';
     case CreateChecklist = 'Create Checklist';
@@ -254,6 +257,8 @@ enum Permission: string
             self::CreateChecklist,
             self::EditChecklist,
             self::DeleteChecklist => 'Checklist',
+
+            self::ViewEscTracker => 'ESC Tracker',
 
             self::ViewFinanceDashboard,
             self::ViewFinanceAccounts,

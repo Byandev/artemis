@@ -61,6 +61,7 @@ interface Workspace {
     sales_marketing_dashboard_module_enabled: boolean;
     video_editor_dashboard_module_enabled: boolean;
     csr_dashboard_module_enabled: boolean;
+    esc_tracker_module_enabled: boolean;
     sim_gateway_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
@@ -84,6 +85,7 @@ const MODULE_FIELDS: Array<{
         | 'sales_marketing_dashboard_module_enabled'
         | 'video_editor_dashboard_module_enabled'
         | 'csr_dashboard_module_enabled'
+        | 'esc_tracker_module_enabled'
         | 'sim_gateway_module_enabled'
     >;
     label: string;
@@ -170,6 +172,11 @@ const MODULE_FIELDS: Array<{
         description: 'CSR personal dashboard',
     },
     {
+        key: 'esc_tracker_module_enabled',
+        label: 'ESC Tracker',
+        description: 'Extreme Self-Care daily records and streaks',
+    },
+    {
         key: 'sim_gateway_module_enabled',
         label: 'SMS Gateway',
         description: 'Send/receive SMS through workspace SIMs',
@@ -200,7 +207,11 @@ const MODULE_GROUPS: {
     {
         title: 'Team & CSR',
         description: 'People, assignments, and customer service',
-        keys: ['teams_module_enabled', 'csr_module_enabled'],
+        keys: [
+            'teams_module_enabled',
+            'csr_module_enabled',
+            'esc_tracker_module_enabled',
+        ],
     },
     {
         title: 'Marketing & Ads',
@@ -787,6 +798,7 @@ function ModulesModal({
         video_editor_dashboard_module_enabled:
             workspace.video_editor_dashboard_module_enabled,
         csr_dashboard_module_enabled: workspace.csr_dashboard_module_enabled,
+        esc_tracker_module_enabled: workspace.esc_tracker_module_enabled,
         sim_gateway_module_enabled: workspace.sim_gateway_module_enabled,
     });
 

@@ -92,6 +92,7 @@ export const PERMISSIONS = {
     DeleteUnitCode: 'Delete Unit Code',
 
     // Checklist
+    ViewEscTracker: 'View ESC Tracker',
     ViewChecklist: 'View Checklist',
     CreateChecklist: 'Create Checklist',
     EditChecklist: 'Edit Checklist',

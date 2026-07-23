@@ -158,6 +158,9 @@ Route::middleware(['auth'])->group(function () {
     // Public-pages access password (gates public RMO management & leaderboard)
     Route::post('/workspaces/{workspace}/public-password', [WorkspaceController::class, 'updatePublicPassword'])->name('workspaces.public-password.update');
 
+    // ESC Tracker page lives in the EscTracker module:
+    // Modules/EscTracker/routes/web.php
+
     // Member management routes
     Route::get('/workspaces/{workspace}/members', [WorkspaceMemberController::class, 'index'])->name('workspaces.members.index');
     //    Route::put('/workspaces/{workspace}/members/{user}', [WorkspaceMemberController::class, 'update'])->name('workspaces.members.update');

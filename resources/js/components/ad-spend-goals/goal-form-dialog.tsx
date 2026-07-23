@@ -222,7 +222,9 @@ export function GoalFormDialog({
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            {isEditing ? 'Edit Ad Spend Goal' : 'New Ad Spend Goal'}
+                            {isEditing
+                                ? 'Edit Ad Spend Goal'
+                                : 'New Ad Spend Goal'}
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
                             Set a daily ad-spend target for a team over a date
@@ -286,7 +288,8 @@ export function GoalFormDialog({
                                 className={inputClass}
                             />
                             <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                The ad-spend amount the team should hit each day.
+                                The ad-spend amount the team should hit each
+                                day.
                             </p>
                             {errors.daily_target && (
                                 <p className="font-mono text-[11px] text-red-500">
@@ -355,8 +358,8 @@ export function GoalFormDialog({
 
                             {data.milestones.length === 0 ? (
                                 <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                    Stepping-stone daily amounts below the target
-                                    (e.g. 300000). Optional.
+                                    Stepping-stone daily amounts below the
+                                    target (e.g. 300000). Optional.
                                 </p>
                             ) : (
                                 <div className="space-y-2">
@@ -374,7 +377,8 @@ export function GoalFormDialog({
                                                 onChange={(e) =>
                                                     updateMilestone(i, {
                                                         amount:
-                                                            e.target.value === ''
+                                                            e.target.value ===
+                                                            ''
                                                                 ? ''
                                                                 : Number(
                                                                       e.target
@@ -416,11 +420,7 @@ export function GoalFormDialog({
                                         key={k}
                                         className="font-mono text-[11px] text-red-500"
                                     >
-                                        {
-                                            (errors as Record<string, string>)[
-                                                k
-                                            ]
-                                        }
+                                        {(errors as Record<string, string>)[k]}
                                     </p>
                                 ))}
                         </div>
@@ -485,10 +485,12 @@ export function GoalFormDialog({
                                                             setMemberTarget(
                                                                 m.id,
                                                                 e.target
-                                                                    .value === ''
+                                                                    .value ===
+                                                                    ''
                                                                     ? ''
                                                                     : Number(
-                                                                          e.target
+                                                                          e
+                                                                              .target
                                                                               .value,
                                                                       ),
                                                             )

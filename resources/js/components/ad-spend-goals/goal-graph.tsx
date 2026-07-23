@@ -163,7 +163,10 @@ export function GoalDonut({
     const to = hit ? '#0eaa82' : '#dc6803'; // brand-600 / warning-600
 
     return (
-        <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <div
+            className="relative shrink-0"
+            style={{ width: size, height: size }}
+        >
             <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
                 <defs>
                     <linearGradient
@@ -288,7 +291,9 @@ function MetricBlock({
             <p
                 className={cn(
                     'mt-1 font-mono font-semibold tracking-tight text-gray-900 tabular-nums dark:text-gray-50',
-                    big ? 'text-[32px] leading-none' : 'text-[19px] leading-none',
+                    big
+                        ? 'text-[32px] leading-none'
+                        : 'text-[19px] leading-none',
                 )}
             >
                 {has ? currencyFormatter(value) : '—'}

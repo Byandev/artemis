@@ -101,8 +101,7 @@ export default function NotificationsSettings({
                             </p>
 
                             {NOTIFICATIONS.map((n) => {
-                                const enabledKey =
-                                    `${n.key}_enabled` as const;
+                                const enabledKey = `${n.key}_enabled` as const;
                                 const timeKey = `${n.key}_send_at` as const;
                                 const webhookKey =
                                     `${n.key}_webhook_url` as const;
