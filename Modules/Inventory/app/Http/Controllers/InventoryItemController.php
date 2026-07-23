@@ -316,8 +316,7 @@ class InventoryItemController extends Controller
             // Default: oldest group first. Ordered on the aggregate expression rather
             // than the alias, and tie-broken on the group's id so bulk-created items
             // sharing a timestamp keep a stable order across pages.
-            $outer->orderByRaw("$groupCreatedAt ".($descending ? 'DESC' : 'ASC'))
-                ->orderByRaw('id '.($descending ? 'DESC' : 'ASC'));
+            $outer->orderByRaw("$groupCreatedAt ".($descending ? 'DESC' : 'ASC'));
         }
 
         return $outer;
