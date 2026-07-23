@@ -24,6 +24,10 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import {
+    InlineOwner,
+    OwnerOption,
+} from '@/pages/workspaces/integrations/components/inline-owner';
 import workspaces from '@/routes/workspaces';
 import { PaginatedData } from '@/types';
 import { Page } from '@/types/models/Page';
@@ -151,6 +155,11 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
     });
     const ownerOptions = useMemo(
         () => users.map((u) => ({ value: String(u.id), label: u.name })),
+        [users],
+    );
+    // Same people, shaped for the inline owner avatar/picker in the table.
+    const ownerUsers = useMemo<OwnerOption[]>(
+        () => users.map((u) => ({ id: Number(u.id), name: u.name })),
         [users],
     );
     const [checklistDrawerOpen, setChecklistDrawerOpen] = useState(false);
@@ -290,7 +299,14 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Owner'} />
             ),
-            cell: ({ row }) => row.original.owner?.name || '-',
+            cell: ({ row }) => (
+                <PageOwnerAssign
+                    workspace={workspace}
+                    page={row.original}
+                    users={ownerUsers}
+                    canEdit={canEditPages}
+                />
+            ),
         },
         {
             accessorKey: 'latest_budget',
@@ -580,5 +596,65 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
         </AppLayout>
     );
 };
+
+/**
+ * Inline owner picker for one page row (mirrors the interns assignee UI).
+ * Optimistically sets the owner, PATCHes the server, and reverts on error.
+ */
+function PageOwnerAssign({
+    workspace,
+    page,
+    users,
+    canEdit,
+}: {
+    workspace: Workspace;
+    page: Page;
+    users: OwnerOption[];
+    canEdit: boolean;
+}) {
+    const [owner, setOwner] = useState<OwnerOption | null>(
+        page.owner ? { id: page.owner.id, name: page.owner.name } : null,
+    );
+    const [saving, setSaving] = useState(false);
+
+    // Reconcile when server data changes (paging/sorting/reload).
+    useEffect(() => {
+        setOwner(
+            page.owner ? { id: page.owner.id, name: page.owner.name } : null,
+        );
+    }, [page.owner]);
+
+    const assign = (ownerId: number | null) => {
+        const prev = owner;
+        const next = ownerId
+            ? (users.find((u) => u.id === ownerId) ?? null)
+            : null;
+        setOwner(next);
+        router.patch(
+            `/workspaces/${workspace.slug}/pages/${page.id}/assign-owner`,
+            { owner_id: ownerId },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onError: () => {
+                    setOwner(prev);
+                    toast.error('Failed to update owner.');
+                },
+            },
+        );
+    };
+
+    return (
+        <InlineOwner
+            owner={owner}
+            users={users}
+            canEdit={canEdit}
+            saving={saving}
+            onAssign={assign}
+        />
+    );
+}
 
 export default Pages;

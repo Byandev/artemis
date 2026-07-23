@@ -50,6 +50,7 @@ import {
     Shield,
     ShoppingCart,
     SlidersHorizontal,
+    Smartphone,
     Sparkles,
     Store,
     Tags,
@@ -210,6 +211,31 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/botcake/flows`,
                               icon: ClipboardList,
                               permission: PERMISSIONS.ViewBotcakeFlows,
+                          },
+                      ],
+                  },
+              ]
+            : []),
+        ...(currentWorkspace.sim_gateway_module_enabled
+            ? [
+                  {
+                      title: 'SMS',
+                      icon: MessageSquare,
+                      items: [
+                          {
+                              title: 'SIMs',
+                              href: `/workspaces/${slug}/sms/sims`,
+                              icon: Smartphone,
+                          },
+                          {
+                              title: 'Send SMS',
+                              href: `/workspaces/${slug}/sms/send`,
+                              icon: Send,
+                          },
+                          {
+                              title: 'Outbox',
+                              href: `/workspaces/${slug}/sms/outbox`,
+                              icon: MessageSquare,
                           },
                       ],
                   },

@@ -137,11 +137,9 @@ class AdminWorkspaceController extends Controller
             'is_gencys_partner' => 'required|boolean',
             'sales_marketing_dashboard_module_enabled' => 'required|boolean',
             'video_editor_dashboard_module_enabled' => 'required|boolean',
-            'csr_dashboard_module_enabled' => 'required|boolean',
-            // `sometimes`, not `required`: a browser running a cached bundle from
-            // before this module existed won't send the field, and that must not
-            // 422 the whole form and block every other toggle.
+            'csr_dashboard_module_enabled' => 'required|boolean,
             'esc_tracker_module_enabled' => 'sometimes|boolean',
+            'sim_gateway_module_enabled' => 'required|boolean',
         ]);
 
         $workspace->update($validated);

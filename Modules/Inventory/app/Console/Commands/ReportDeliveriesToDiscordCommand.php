@@ -24,17 +24,14 @@ class ReportDeliveriesToDiscordCommand extends Command
     {
         $date = $this->option('date') ?: Carbon::today()->toDateString();
         $force = (bool) $this->option('force');
-        // Match on the hour, not the exact minute: schedule:run fires the day's
-        // minute-:00 tasks sequentially, so a slow earlier task can push this
-        // command past :00 and an H:i match would silently never fire.
-        $nowHour = now()->format('H:00');
+        $nowHHMM = now()->format('H:i');
 
-        $workspaces = $this->workspacesDueNow($force, $nowHour);
+        $workspaces = $this->workspacesDueNow($force, $nowHHMM);
 
         if ($workspaces->isEmpty()) {
             $this->info($force
                 ? 'No workspace has the deliveries report enabled with a webhook to post to.'
-                : "No workspace is due a deliveries report at {$nowHour}.");
+                : "No workspace is due a deliveries report at {$nowHHMM}.");
 
             return self::SUCCESS;
         }
@@ -78,14 +75,14 @@ class ReportDeliveriesToDiscordCommand extends Command
      *
      * @return Collection<int, Workspace>
      */
-    private function workspacesDueNow(bool $force, string $nowHour): Collection
+    private function workspacesDueNow(bool $force, string $nowHHMM): Collection
     {
         return Workspace::query()
-            ->whereHas('inventoryNotificationSetting', function ($query) use ($force, $nowHour) {
+            ->whereHas('inventoryNotificationSetting', function ($query) use ($force, $nowHHMM) {
                 $query->where('deliveries_enabled', true)
                     ->whereNotNull('deliveries_webhook_url')
                     ->where('deliveries_webhook_url', '!=', '')
-                    ->unless($force, fn ($q) => $q->where('deliveries_send_at', $nowHour));
+                    ->unless($force, fn ($q) => $q->where('deliveries_send_at', $nowHHMM));
             })
             ->with('inventoryNotificationSetting:id,workspace_id,deliveries_webhook_url')
             ->get(['id', 'name'])

@@ -15,7 +15,14 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { ChevronRight, Pencil, RefreshCw, Search, Trash2 } from 'lucide-react';
+import {
+    ChevronRight,
+    Pencil,
+    Plus,
+    RefreshCw,
+    Search,
+    Trash2,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -284,19 +291,31 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                         description="Unit codes and their inventory item breakdown."
                     />
                     {canCreate && (
-                        <button
-                            onClick={handleSync}
-                            disabled={syncing}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <RefreshCw
-                                className={cn(
-                                    'h-4 w-4',
-                                    syncing && 'animate-spin',
-                                )}
-                            />
-                            {syncing ? 'Syncing…' : 'Sync from Gencys ERP'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    setEditing(null);
+                                    setFormOpen(true);
+                                }}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Add Unit Code
+                            </button>
+                            <button
+                                onClick={handleSync}
+                                disabled={syncing}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <RefreshCw
+                                    className={cn(
+                                        'h-4 w-4',
+                                        syncing && 'animate-spin',
+                                    )}
+                                />
+                                {syncing ? 'Syncing…' : 'Sync from Gencys ERP'}
+                            </button>
+                        </div>
                     )}
                 </div>
 

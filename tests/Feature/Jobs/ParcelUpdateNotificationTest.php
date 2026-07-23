@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Modules\Pancake\Models\ParcelJourneyNotification;
+use Modules\SimGateway\Models\Sim;
+use Modules\SimGateway\Models\SmsMessage;
 
 function makeNotification(array $overrides = [], array $pageOverrides = []): ParcelJourneyNotification
 {
@@ -169,6 +171,65 @@ test('SendGate SMS marks failed when the send request fails', function () {
 
     expect($notif->fresh()->status)->toBe('failed');
     Bus::assertNotDispatched(CheckParcelUpdateNotification::class);
+});
+
+// Artemis SIM Gateway provider
+
+test('SIM Gateway SMS stays pending with the provider id, awaiting the delivery callback', function () {
+    Bus::fake();
+
+    $notif = makeNotification([], ['sms_provider' => 'sim_gateway']);
+    $page = $notif->order->page;
+    $sim = Sim::factory()->create([
+        'workspace_id' => $page->workspace_id,
+        'status' => 'active',
+    ]);
+    $page->update(['sim_gateway_sim_id' => $sim->id]);
+
+    // Hand the job a fresh model (as the queue would via SerializesModels) so it
+    // reads the page config we just wrote, not the stale in-memory relation.
+    (new SendParcelUpdateNotification($notif->fresh()))->handle();
+
+    // Not marked sent yet — the device pushes the final status to our callback.
+    expect($notif->fresh()->status)->toBe('pending');
+    expect($notif->fresh()->sms_id)->not->toBeNull();
+    expect(
+        SmsMessage::where('sim_id', $sim->id)
+            ->where('direction', 'outbound')
+            ->where('to_number', '+639170000000')
+            ->exists()
+    )->toBeTrue();
+    Bus::assertNotDispatched(CheckParcelUpdateNotification::class);
+});
+
+test('a SIM Gateway delivery report marks the linked parcel notification sent', function () {
+    config()->set('simgateway.callback.token', 'secret-token');
+
+    // A page that sent via the SIM Gateway stored the provider id as sms_id.
+    $notif = makeNotification();
+    $notif->update(['sms_id' => 'yxgp:555']);
+
+    SmsMessage::factory()->create([
+        'direction' => 'outbound',
+        'provider_message_id' => 'yxgp:555',
+        'status' => 'queued',
+    ]);
+
+    $this->postJson('/gateway/callback/dlr?token=secret-token', [
+        'type' => 'status-report',
+        'rpts' => [['tid' => '555', 'sent' => 1, 'failed' => 0, 'sending' => 0]],
+    ])->assertOk();
+
+    expect($notif->fresh()->status)->toBe('sent');
+});
+
+test('SIM Gateway SMS marks failed when no SIM is selected', function () {
+    $notif = makeNotification([], ['sms_provider' => 'sim_gateway', 'sim_gateway_sim_id' => null]);
+
+    (new SendParcelUpdateNotification($notif))->handle();
+
+    expect($notif->fresh()->status)->toBe('failed');
+    expect($notif->fresh()->remarks)->toContain('No SIM selected');
 });
 
 // CheckParcelUpdateNotification

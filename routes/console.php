@@ -10,35 +10,34 @@ Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->wi
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
-// Gencys ERP
-Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('09:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('16:00')->withoutOverlapping();
 
-Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('10:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('16:30')->withoutOverlapping();
-
-// Flag inventory items whose ERP sync was dispatched but never reported back
-// (e.g. the ERP login failed inside n8n) so silent failures show up as failed.
-Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
-// GencysERP daily sales tracker — enable once the n8n flow + callback are ready.
+//Gencys ERP
+Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
+
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('08:00')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('12:00')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('15:00')->withoutOverlapping();
 
-// GencysERP intern daily records — one payload per chunk of interns, per day.
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('18:30')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('23:45')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('08:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('12:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('15:30')->withoutOverlapping();
 
-// Recompute inventory demand (3-day average + unfulfilled) from Gencys orders,
-// after the day's orders have been fetched above.
+Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('08:45')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('12:45')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('15:45')->withoutOverlapping();
+
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:15')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:15')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:15')->withoutOverlapping();
+
 Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('08:30')->withoutOverlapping();
 Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('12:30')->withoutOverlapping();
-Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('15:30')->withoutOverlapping();
+Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('16:30')->withoutOverlapping();
+
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');

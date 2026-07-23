@@ -41,10 +41,18 @@ async function checkValid(
     }
 }
 
+type WorkspaceSim = {
+    id: number;
+    phone_number: string;
+    label: string | null;
+    carrier: string | null;
+};
+
 interface Props {
     workspace: Workspace;
     page: Page;
     users: User[];
+    sims: WorkspaceSim[];
 }
 
 const inputClass =
@@ -54,7 +62,7 @@ const labelClass =
 const fieldClass = 'space-y-1.5';
 const errorClass = 'font-mono text-[11px] text-red-500';
 
-export default function Edit({ workspace, page, users }: Props) {
+export default function Edit({ workspace, page, users, sims }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         name: page.name ?? '',
         botcake_token: page.botcake_token ?? '',
@@ -63,6 +71,7 @@ export default function Edit({ workspace, page, users }: Props) {
         infotxt_user_id: page.infotxt_user_id ?? '',
         sendgate_api_key: page.sendgate_api_key ?? '',
         sendgate_sim_id: page.sendgate_sim_id ?? '',
+        sim_gateway_sim_id: page.sim_gateway_sim_id?.toString() ?? '',
         pancake_token: page.pancake_token ?? '',
         parcel_journey_custom_field_id:
             page.parcel_journey_custom_field_id?.toString() ?? '',
@@ -82,9 +91,11 @@ export default function Edit({ workspace, page, users }: Props) {
         });
     };
 
-    // Validate the parcel-journey flow ID against the locally-synced flows
-    // before saving so a bad reference is caught here rather than only on the
-    // server round-trip. Custom field IDs have no local source to check against.
+    // Validate the parcel-journey flow ID before saving so a bad reference is
+    // caught here rather than only on the server round-trip. The token being
+    // typed is sent along so a token and flow ID entered together validate as a
+    // pair — otherwise the check would run against the stored token and reject
+    // a valid flow. Custom field IDs have no local source to check against.
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -96,6 +107,7 @@ export default function Edit({ workspace, page, users }: Props) {
                     {
                         page_id: String(page.id),
                         flow_id: data.parcel_journey_flow_id,
+                        token: data.botcake_token,
                     },
                 );
                 if (!result.valid) {
@@ -436,16 +448,18 @@ export default function Edit({ workspace, page, users }: Props) {
                                                                 e.target
                                                                     .value as
                                                                     | 'infotxt'
-                                                                    | 'sendgate',
+                                                                    | 'sendgate'
+                                                                    | 'sim_gateway',
                                                             )
                                                         }
                                                         className={inputClass}
                                                     >
+                                                        <option value="sim_gateway">
+                                                            Artemis - Sim
+                                                            Gateway
+                                                        </option>
                                                         <option value="infotxt">
                                                             InfoTxt
-                                                        </option>
-                                                        <option value="sendgate">
-                                                            SendGate
                                                         </option>
                                                     </select>
                                                     {errors.sms_provider && (
@@ -460,6 +474,80 @@ export default function Edit({ workspace, page, users }: Props) {
                                                         </p>
                                                     )}
                                                 </div>
+
+                                                {data.sms_provider ===
+                                                    'sim_gateway' && (
+                                                    <div className={fieldClass}>
+                                                        <label
+                                                            className={
+                                                                labelClass
+                                                            }
+                                                        >
+                                                            SIM Card
+                                                        </label>
+                                                        {sims.length === 0 ? (
+                                                            <p className="font-mono text-[11px] text-gray-400">
+                                                                No active SIMs
+                                                                in this
+                                                                workspace. Ask
+                                                                an admin to
+                                                                provision one.
+                                                            </p>
+                                                        ) : (
+                                                            <select
+                                                                value={
+                                                                    data.sim_gateway_sim_id
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setData(
+                                                                        'sim_gateway_sim_id',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className={
+                                                                    inputClass
+                                                                }
+                                                            >
+                                                                <option value="">
+                                                                    Select a
+                                                                    SIM…
+                                                                </option>
+                                                                {sims.map(
+                                                                    (s) => (
+                                                                        <option
+                                                                            key={
+                                                                                s.id
+                                                                            }
+                                                                            value={s.id.toString()}
+                                                                        >
+                                                                            {
+                                                                                s.phone_number
+                                                                            }
+                                                                            {s.carrier
+                                                                                ? ` · ${s.carrier.toUpperCase()}`
+                                                                                : ''}
+                                                                            {s.label
+                                                                                ? ` · ${s.label}`
+                                                                                : ''}
+                                                                        </option>
+                                                                    ),
+                                                                )}
+                                                            </select>
+                                                        )}
+                                                        {errors.sim_gateway_sim_id && (
+                                                            <p
+                                                                className={
+                                                                    errorClass
+                                                                }
+                                                            >
+                                                                {
+                                                                    errors.sim_gateway_sim_id
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
 
                                                 {data.sms_provider ===
                                                     'infotxt' && (

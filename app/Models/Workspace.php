@@ -49,6 +49,7 @@ class Workspace extends Model
         'video_editor_dashboard_module_enabled',
         'csr_dashboard_module_enabled',
         'esc_tracker_module_enabled',
+        'sim_gateway_module_enabled',
         'inventory_sync',
         'public_password',
         'erp_username',
@@ -85,6 +86,7 @@ class Workspace extends Model
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
         'esc_tracker_module_enabled' => 'boolean',
+        'sim_gateway_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
         // Reversible encryption so the automation pipeline can read it back.
