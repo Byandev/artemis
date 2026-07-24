@@ -39,9 +39,9 @@ class YxGpGateway implements GatewayInterface
         protected string $host,
         protected string $username,
         protected string $password,
-        protected string $charset = 'utf8',
-        protected int $timeoutSeconds = 10,
-        protected bool $verifyTls = true,
+        protected string $charset,
+        protected int $timeoutSeconds,
+        protected bool $verifyTls,
         protected string $token
     ) {
         if ($this->host === '') {

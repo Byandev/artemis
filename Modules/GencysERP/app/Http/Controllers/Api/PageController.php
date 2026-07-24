@@ -89,7 +89,7 @@ class PageController extends Controller
                 ]
             );
 
-            if ($record->pos_token && $record->shop_id && Shop::where('id', $record->shop_id)->doesntExist() ) {
+            if ($record->pos_token && $record->shop_id && Shop::where('id', $record->shop_id)->doesntExist()) {
                 dispatch(new SyncShop($workspace->id, $record->shop_id, $record->pos_token, $record->gencys_intern_id))->onQueue('pancake');
             }
 

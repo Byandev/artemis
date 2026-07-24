@@ -56,6 +56,9 @@ class PurchasedOrder extends Model
         8 => 'Cancelled',
     ];
 
+    /** Statuses that leave an order still owing stock: past approval, not yet Delivered or Cancelled. */
+    public const AWAITING_DELIVERY_STATUSES = [1, 2, 3, 4, 5, 6];
+
     public function getStatusLabelAttribute(): string
     {
         return self::STATUSES[$this->status] ?? 'Unknown';

@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\AdvertiserPerformanceDailyRecord;
-
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Console\Command;

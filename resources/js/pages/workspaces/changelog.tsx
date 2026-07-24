@@ -12,6 +12,43 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.20.0',
+        date: '2026-07-21',
+        sections: [
+            {
+                title: 'SMS — Send From Your Own SIMs (New)',
+                items: [
+                    'A new SMS area (when enabled for your workspace) lets you send a text from one of your workspace’s SIMs — to a single recipient or a whole list at once — and every outbound message lands in an Outbox you can search, filter by status, and sort',
+                    'The SIMs tab lists the SIMs assigned to your workspace with their carrier, status, and inbound/outbound message counts; admins provision SIMs and assign them to workspaces from a new Workspace SIMs screen in the admin area',
+                    'Pages can now send their parcel-journey SMS through the Artemis SIM Gateway — choose which SIM to send from on the page’s settings, and the final delivery status flows back automatically',
+                ],
+            },
+            {
+                title: 'Finance — Ad Spent Fund Requests',
+                items: [
+                    'Fund requests now start from a template — keep the plain (blank) request, or pick the new Ad Spent template that adds a line-item table',
+                    'Each Ad Spent line captures a product, the page it runs on, how many creatives are running, the budget per day, and the number of days — and the request total is worked out from the lines automatically, so there is no amount to hand-key',
+                    'Picking one of your pages auto-fills its most recent daily budget, your saved GoTyme number carries onto the request, and you can filter the list by template to find them',
+                ],
+            },
+            {
+                title: 'Meta Ads — Tag an Ad’s Creator',
+                items: [
+                    'You can now tag each Meta ad with the workspace member who made it — one at a time, or in bulk across a selection — from the Ads Manager',
+                    'The report builder can filter by creator, so you can slice ad performance by who produced the creative',
+                ],
+            },
+            {
+                title: 'Smaller Improvements',
+                items: [
+                    'Pancake Orders — show or hide table columns from a new Columns menu, with your choice remembered in your browser',
+                    'Editing a creative now returns you to the exact list you came from, filters and all, instead of bouncing back to the edit page',
+                    'Add a GoTyme number to your profile from Settings, ready to reuse on fund requests',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.19.1',
         date: '2026-07-16',
         sections: [

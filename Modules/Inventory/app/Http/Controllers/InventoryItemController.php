@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -15,6 +16,8 @@ use Maatwebsite\Excel\Facades\Excel;
 use Modules\Inventory\Exports\InventoryItemExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryUnitCodeItem;
+use Modules\Inventory\Models\PurchasedOrder;
+use Modules\Inventory\Models\PurchasedOrderItem;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -49,14 +52,16 @@ class InventoryItemController extends Controller
         $latestCountedSql = '(SELECT counted_qty FROM inventory_item_discrepancies WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
         $latestDiscrepancyDateSql = '(SELECT date FROM inventory_item_discrepancies WHERE inventory_item_id = inventory_items.id ORDER BY date DESC, id DESC LIMIT 1)';
 
-        // "Waiting for delivery" = the quantity still OWED on orders that are
-        // awaiting delivery (status 6) — i.e. the undelivered remainder per item
-        // (ordered count minus what has already been delivered), not the full
-        // ordered count. Fully-delivered lines contribute 0; NULLIF keeps items
-        // with nothing outstanding showing as "—" rather than 0.
-        $waitingStocksSql = '(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status not in (1,2,3,7,8)))';
+        // "Waiting for delivery" = the quantity still OWED on orders awaiting delivery —
+        // the undelivered remainder per item, not the full ordered count. Fully-delivered
+        // lines contribute 0; NULLIF keeps items with nothing outstanding showing as "—".
+        $awaitingStatuses = implode(',', PurchasedOrder::AWAITING_DELIVERY_STATUSES);
+        $waitingStocksSql = "(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status in ($awaitingStatuses)))";
         $remainingAfterFulfillmentSql = "(COALESCE($currentStocksSql, 0) + COALESCE($waitingStocksSql, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
-        $poNeededSql = "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waitingStocksSql, 0) - $remainingAfterFulfillmentSql)";
+        // Stock needed to cover the lead time = expected demand over that window
+        // (daily-ish average × lead-time days). Same term that drives po_needed.
+        $stocksNeededForLeadTimeSql = '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
+        $poNeededSql = "GREATEST(0, $stocksNeededForLeadTimeSql - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
         return [
@@ -66,6 +71,7 @@ class InventoryItemController extends Controller
             'discrepancy_date' => $latestDiscrepancyDateSql,
             'waiting_for_delivery_stocks' => $waitingStocksSql,
             'remaining_after_fulfillment' => $remainingAfterFulfillmentSql,
+            'stocks_needed_for_lead_time' => $stocksNeededForLeadTimeSql,
             'po_needed' => $poNeededSql,
             'days_it_can_last' => $daysItCanLastSql,
         ];
@@ -84,6 +90,38 @@ class InventoryItemController extends Controller
         } elseif ($isActiveFilter !== 'all') {
             $query->where('inventory_items.is_active', filter_var($isActiveFilter, FILTER_VALIDATE_BOOLEAN));
         }
+    }
+
+    /**
+     * Team-visibility for the summary roll-up. Mirrors the model's visibleTo scope,
+     * but keeps a parent placeholder — which has no product of its own and would
+     * otherwise fail closed — whenever any of its children is visible, so the parent
+     * survives in the group and can supply the row's id/sku/lead time. Unrestricted
+     * users are untouched; a scoped user with no team sees nothing (fail-closed).
+     */
+    private function applySummaryVisibility(Request $request, $query, Workspace $workspace): void
+    {
+        $teamIds = TeamVisibility::scopeTeamIds($request->user(), $workspace);
+
+        // null -> unrestricted (or no "viewing as team"): see everything.
+        if ($teamIds === null) {
+            return;
+        }
+
+        // Scoped user with no team -> nothing.
+        if (empty($teamIds)) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $inTeams = fn ($q) => $q->whereHas('product.shops.teams', fn ($t) => $t->whereIn('teams.id', $teamIds));
+
+        $query->where(function ($q) use ($inTeams) {
+            // The item itself is visible via its product's team, OR it's a parent
+            // whose children are (a parent has no product to scope on directly).
+            $inTeams($q)->orWhereHas('children', $inTeams);
+        });
     }
 
     /**
@@ -121,6 +159,7 @@ class InventoryItemController extends Controller
             ->selectRaw("{$sql['discrepancy_counted_qty']} as discrepancy_counted_qty")
             ->selectRaw("{$sql['discrepancy_date']} as discrepancy_date")
             ->selectRaw("{$sql['remaining_after_fulfillment']} as remaining_after_fulfillment")
+            ->selectRaw("{$sql['stocks_needed_for_lead_time']} as stocks_needed_for_lead_time")
             ->selectRaw("{$sql['po_needed']} as po_needed")
             ->selectRaw("{$sql['days_it_can_last']} as days_it_can_last")
             // three_days_average is a stored column updated hourly by inventory:update-averages
@@ -129,6 +168,13 @@ class InventoryItemController extends Controller
                     $query->where('sku', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('product_id'),
+                // "Unassigned only": items with no linked product. Off unless the
+                // toggle is on; a falsy value is a no-op so the key stays valid.
+                AllowedFilter::callback('unassigned', function ($query, $value) {
+                    if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                        $query->whereNull('inventory_items.product_id');
+                    }
+                }),
                 // is_active is applied manually to $base above; register it as a
                 // no-op here so QueryBuilder doesn't reject the filter key.
                 AllowedFilter::callback('is_active', function () {}),
@@ -154,11 +200,14 @@ class InventoryItemController extends Controller
                 AllowedSort::callback('po_needed', function ($query, $descending) use ($sql) {
                     $query->orderByRaw("{$sql['po_needed']} ".($descending ? 'DESC' : 'ASC'));
                 }),
+                AllowedSort::callback('stocks_needed_for_lead_time', function ($query, $descending) use ($sql) {
+                    $query->orderByRaw("{$sql['stocks_needed_for_lead_time']} ".($descending ? 'DESC' : 'ASC'));
+                }),
                 AllowedSort::callback('discrepancy', function ($query, $descending) use ($sql) {
                     $query->orderByRaw("{$sql['discrepancy']} ".($descending ? 'DESC' : 'ASC'));
                 }),
             ])
-            ->defaultSort('-created_at');
+            ->defaultSort('created_at');
     }
 
     /**
@@ -178,9 +227,8 @@ class InventoryItemController extends Controller
         // children roll into them). The is_active filter still applies.
         $inner = InventoryItem::query()
             ->where('inventory_items.workspace_id', $workspace->id)
-            ->visibleTo($request->user(), $workspace)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.unfulfilled_count, inventory_items.three_days_average, products.name as product_name')
+            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
@@ -188,6 +236,7 @@ class InventoryItemController extends Controller
             ->selectRaw("{$sql['po_needed']} as po_needed");
 
         $this->applyActiveFilter($request, $inner);
+        $this->applySummaryVisibility($request, $inner, $workspace);
 
         if ($search = $request->input('filter.search')) {
             $inner->where('inventory_items.sku', 'like', "%{$search}%");
@@ -197,17 +246,29 @@ class InventoryItemController extends Controller
             $inner->where('inventory_items.product_id', $productId);
         }
 
+        // "Unassigned only": keep only items with no linked product.
+        if ($request->boolean('filter.unassigned')) {
+            $inner->whereNull('inventory_items.product_id');
+        }
+
         // po_needed and days_it_can_last are non-additive — summing each child's
         // per-item value would double-count the shared lead-time demand and average
         // wrongly. Recompute them from the group's summed components instead, mirroring
         // the per-item formulas in stockSql() but over the rolled-up totals. The group's
         // lead_time is the representative one (parent's, else the max).
         $groupLeadTime = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
+        // The group's creation date — the parent's when there is one, else the earliest
+        // item in the group. Drives the default ordering below, so it has to be an
+        // aggregate: the outer query is grouped and has no bare created_at column.
+        $groupCreatedAt = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.created_at END), MIN(sub.created_at))';
         $summedThreeDayAvg = 'SUM(sub.three_days_average)';
         $summedWaiting = 'COALESCE(SUM(sub.waiting_for_delivery_stocks), 0)';
         $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
 
-        $groupPoNeeded = "GREATEST(0, ($groupLeadTime * $summedThreeDayAvg) - $summedWaiting - $summedRemaining)";
+        // Stock needed to cover the lead time for the whole group: the group's
+        // representative lead time × its summed daily average (same term po_needed uses).
+        $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
+        $groupPoNeeded = "GREATEST(0, $groupStocksNeeded - $summedRemaining)";
         $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
 
         // Aggregate the per-item rows into one row per group. Representative
@@ -220,6 +281,7 @@ class InventoryItemController extends Controller
             ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
             ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_id END), MAX(sub.product_id)) as product_id')
             ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_winning_date END), MAX(sub.product_winning_date)) as product_winning_date')
             ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('MAX(sub.is_active) as is_active')
@@ -231,25 +293,27 @@ class InventoryItemController extends Controller
             ->selectRaw('NULL as discrepancy_counted_qty')
             ->selectRaw('NULL as discrepancy_date')
             ->selectRaw('SUM(sub.remaining_after_fulfillment) as remaining_after_fulfillment')
+            ->selectRaw("$groupStocksNeeded as stocks_needed_for_lead_time")
             ->selectRaw("$groupPoNeeded as po_needed")
             ->selectRaw("$summedThreeDayAvg as three_days_average")
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
+            ->selectRaw("$groupCreatedAt as created_at")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
 
         // Sorting on the aggregated aliases; anything unknown falls back to SKU.
         $sortable = [
             'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
             'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
-            'po_needed', 'three_days_average', 'days_it_can_last',
+            'stocks_needed_for_lead_time', 'po_needed', 'three_days_average', 'days_it_can_last',
         ];
-        $sort = (string) $request->input('sort', 'sku');
+        $sort = (string) $request->input('sort');
         $descending = str_starts_with($sort, '-');
         $column = ltrim($sort, '-');
 
         if (in_array($column, $sortable, true)) {
             $outer->orderByRaw("$column ".($descending ? 'DESC' : 'ASC'));
         } else {
-            $outer->orderBy('sku');
+            $outer->orderByRaw("$groupCreatedAt ".($descending ? 'DESC' : 'ASC'));
         }
 
         return $outer;
@@ -260,7 +324,9 @@ class InventoryItemController extends Controller
         $this->authorize('View Inventory Items', $workspace);
 
         $perPage = (int) $request->input('per_page', 100);
-        $summarize = $request->boolean('summarize');
+        // The roll-up is the default view; the toggle has to send an explicit 0
+        // to get the flat per-SKU list.
+        $summarize = $request->boolean('summarize', true);
 
         $items = $summarize
             ? $this->buildSummaryQuery($request, $workspace)->paginate($perPage)->withQueryString()
@@ -295,7 +361,15 @@ class InventoryItemController extends Controller
 
         $filename = 'inventory-items-'.now()->format('Y-m-d-His').'.xlsx';
 
-        return Excel::download(new InventoryItemExport($this->buildQuery($request, $workspace)), $filename);
+        // Mirror whatever the list is showing: with the summarize toggle on, export the
+        // parent/child roll-up rather than the flat per-SKU rows. Same default as index().
+        $summarize = $request->boolean('summarize', true);
+
+        $query = $summarize
+            ? $this->buildSummaryQuery($request, $workspace)
+            : $this->buildQuery($request, $workspace);
+
+        return Excel::download(new InventoryItemExport($query, $summarize), $filename);
     }
 
     public function syncFromGencys(Workspace $workspace)
@@ -402,6 +476,27 @@ class InventoryItemController extends Controller
     }
 
     /**
+     * Update just an item's lead time. Backs the inline lead-time editor on the list,
+     * including the summarize view — there the row's id is the group's parent, so an
+     * edit sets the parent's lead time, which is exactly the value the roll-up reads
+     * for the group's lead_time / stocks_needed_for_lead_time / po_needed.
+     */
+    public function updateLeadTime(Request $request, Workspace $workspace, InventoryItem $item)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        $validated = $request->validate([
+            'lead_time' => 'required|integer|min:0',
+        ]);
+
+        $item->update(['lead_time' => $validated['lead_time']]);
+
+        return redirect()->back()->with('success', 'Lead time updated.');
+    }
+
+    /**
      * The item's ledger stock as of a date: the remaining_qty of the latest transaction
      * dated on or before $date. Null when there's no transaction that early. This is the
      * reference a physical count is measured against, so a backdated count compares to the
@@ -434,6 +529,51 @@ class InventoryItemController extends Controller
 
         return response()->json([
             'remaining_qty' => $this->ledgerStockAsOf($item, $validated['date']),
+        ]);
+    }
+
+    /**
+     * The purchase orders behind an item's "Waiting for Delivery" figure: one row per
+     * order line still owing stock, newest issue date first. A parent fans out to its
+     * children's lines, matching the summary view's rolled-up total.
+     */
+    public function pendingPurchaseOrders(Request $request, Workspace $workspace, InventoryItem $item)
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        $itemIds = $item->is_parent
+            ? InventoryItem::where('parent_id', $item->id)->pluck('id')->push($item->id)->all()
+            : [$item->id];
+
+        $lines = PurchasedOrderItem::query()
+            ->whereIn('inventory_item_id', $itemIds)
+            ->whereHas('purchasedOrder', fn ($q) => $q->whereIn('status', PurchasedOrder::AWAITING_DELIVERY_STATUSES))
+            ->with(['purchasedOrder', 'inventoryItem:id,sku'])
+            ->withSum('deliveries as delivered_qty', 'qty')
+            ->get()
+            ->filter(fn (PurchasedOrderItem $line) => $line->balance > 0)
+            ->sortByDesc(fn (PurchasedOrderItem $line) => $line->purchasedOrder->issue_date)
+            ->values()
+            ->map(fn (PurchasedOrderItem $line) => [
+                'id' => $line->purchasedOrder->id,
+                'sku' => $line->inventoryItem?->sku,
+                'control_no' => $line->purchasedOrder->control_no,
+                'cust_po_no' => $line->purchasedOrder->cust_po_no,
+                'issue_date' => $line->purchasedOrder->issue_date?->toDateString(),
+                'expected_delivery_date' => $line->purchasedOrder->expected_delivery_date?->toDateString(),
+                'status' => $line->purchasedOrder->status,
+                'status_label' => $line->purchasedOrder->status_label,
+                'delivery_timeliness' => $line->purchasedOrder->delivery_timeliness,
+                'ordered_qty' => (int) $line->count,
+                'delivered_qty' => $line->delivered_qty,
+                'balance' => $line->balance,
+            ]);
+
+        return response()->json([
+            'orders' => $lines,
+            'total_balance' => $lines->sum('balance'),
         ]);
     }
 
