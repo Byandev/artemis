@@ -1,8 +1,9 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage, usePoll } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce } from 'lodash';
-import { Search } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import { Card } from '@/components/ui/card';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
@@ -40,6 +41,20 @@ interface Props {
 const selectClass =
     'rounded-md border border-border bg-background py-2 pr-8 pl-3 text-sm outline-none focus:ring-2 focus:ring-brand-500/20';
 
+/**
+ * Statuses that the gateway is still working through. A message lands here as
+ * `queued`, then moves to `sent`/`failed` when the gateway calls back — which
+ * happens after this page has already rendered, so the row would otherwise sit
+ * stale until a manual refresh.
+ *
+ * `sent` is deliberately excluded: it can still become `delivered`, but that
+ * depends on a delivery receipt the carrier may never send, so polling on it
+ * would never terminate.
+ */
+const IN_FLIGHT_STATUSES = new Set(['queued', 'sending']);
+
+const POLL_INTERVAL_MS = 5000;
+
 function formatTimestamp(value: string | null) {
     if (!value) return '—';
     return new Date(value).toLocaleString('en-PH', {
@@ -58,6 +73,45 @@ export default function SmsOutbox({
 }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [status, setStatus] = useState(filters.status || '');
+
+    // Sending redirects here with a flash message. Nothing renders flash
+    // globally, so surface it as a toast — otherwise a send looks like it did
+    // nothing at all.
+    const { flash } = usePage().props as {
+        flash?: { success?: string; error?: string };
+    };
+
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.success, flash?.error]);
+
+    // Keep refreshing while the gateway still has messages in flight, so
+    // "Queued" turns into "Sent" on its own. Only the `messages` prop is
+    // refetched; reloads preserve scroll and local state by definition, so
+    // typing in the search box is not disturbed. `keepAlive` stays false so
+    // polling pauses while the tab is hidden.
+    const hasInFlight = useMemo(
+        () => messages.data.some((m) => IN_FLIGHT_STATUSES.has(m.status)),
+        [messages.data],
+    );
+
+    const { start, stop } = usePoll(
+        POLL_INTERVAL_MS,
+        { only: ['messages'] },
+        { autoStart: false },
+    );
+
+    useEffect(() => {
+        if (!hasInFlight) {
+            stop();
+            return;
+        }
+
+        start();
+
+        return () => stop();
+    }, [hasInFlight, start, stop]);
 
     const initialSorting = useMemo(() => {
         if (filters.sort) {
@@ -172,6 +226,13 @@ export default function SmsOutbox({
                         <p className="text-sm text-muted-foreground">
                             Messages you've sent — newest first.
                         </p>
+                        {hasInFlight && (
+                            <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <RefreshCw className="size-3 animate-spin" />
+                                Updating automatically while messages are in
+                                flight…
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
