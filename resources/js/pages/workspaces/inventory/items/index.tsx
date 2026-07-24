@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
+import { PRODUCT_STATUSES } from '@/constants/product-statuses';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
@@ -97,6 +98,7 @@ interface Props {
             search?: string;
             is_active?: string | number | boolean;
             unassigned?: string | number | boolean;
+            product_status?: string;
         };
     };
 }
@@ -271,6 +273,12 @@ export default function ItemIndex({
     const [unassignedOnly, setUnassignedOnly] = useState(
         !!query?.filter?.unassigned && query?.filter?.unassigned !== '0',
     );
+    // Lifecycle stage of the linked product; '' means every stage.
+    const [productStatus, setProductStatus] = useState(
+        query?.filter?.product_status
+            ? String(query.filter.product_status)
+            : '',
+    );
     // Summarize rolls SKU variants up under their parent item and sums the values.
     const [summarize, setSummarize] = useState(!!query?.summarize);
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -293,26 +301,41 @@ export default function ItemIndex({
         [rowSelection],
     );
 
+    /**
+     * The list's full query string. Every navigation — search, each toggle,
+     * sorting, pagination — has to resend all of the filters, because anything
+     * left out silently resets. Building them in one place keeps a new filter
+     * from surviving a search but vanishing on a sort. A toggle handler passes
+     * its new value as an override, since its own state has not landed yet.
+     */
+    const buildParams = (
+        overrides: Record<string, string | number | undefined> = {},
+    ): Record<string, string | number | undefined> => ({
+        sort: query?.sort ?? undefined,
+        'filter[search]': searchValue || undefined,
+        'filter[is_active]': activeOnly ? 1 : 'all',
+        'filter[unassigned]': unassignedOnly ? 1 : undefined,
+        'filter[product_status]': productStatus || undefined,
+        summarize: summarize ? 1 : undefined,
+        page: 1,
+        per_page: query?.perPage ?? items.per_page,
+        ...overrides,
+    });
+
+    const visitOptions = {
+        preserveState: true,
+        replace: true,
+        preserveScroll: true,
+        only: ['items'],
+    };
+
     // Logic for searching (Resets to page 1)
     const performQuery = useCallback(
         debounce((search: string) => {
             router.get(
                 baseUrl,
-                {
-                    sort: query?.sort,
-                    'filter[search]': search || undefined,
-                    'filter[is_active]': activeOnly ? 1 : 'all',
-                    'filter[unassigned]': unassignedOnly ? 1 : undefined,
-                    summarize: summarize ? 1 : undefined,
-                    page: 1,
-                    per_page: query?.perPage ?? items.per_page,
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['items'],
-                },
+                buildParams({ 'filter[search]': search || undefined }),
+                visitOptions,
             );
         }, 400),
         [
@@ -322,6 +345,7 @@ export default function ItemIndex({
             items.per_page,
             activeOnly,
             unassignedOnly,
+            productStatus,
             summarize,
         ],
     );
@@ -330,43 +354,34 @@ export default function ItemIndex({
         setActiveOnly(checked);
         router.get(
             baseUrl,
-            {
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                'filter[is_active]': checked ? 1 : 'all',
-                'filter[unassigned]': unassignedOnly ? 1 : undefined,
-                summarize: summarize ? 1 : undefined,
-                page: 1,
-                per_page: query?.perPage ?? items.per_page,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['items'],
-            },
+            buildParams({ 'filter[is_active]': checked ? 1 : 'all' }),
+            visitOptions,
         );
     };
 
     const handleUnassignedChange = (checked: boolean) => {
         setUnassignedOnly(checked);
+        // Unassigned items have no product, so the two filters can never both
+        // match. Drop the status rather than leaving an empty list behind.
+        if (checked) {
+            setProductStatus('');
+        }
         router.get(
             baseUrl,
-            {
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                'filter[is_active]': activeOnly ? 1 : 'all',
+            buildParams({
                 'filter[unassigned]': checked ? 1 : undefined,
-                summarize: summarize ? 1 : undefined,
-                page: 1,
-                per_page: query?.perPage ?? items.per_page,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['items'],
-            },
+                ...(checked ? { 'filter[product_status]': undefined } : {}),
+            }),
+            visitOptions,
+        );
+    };
+
+    const handleProductStatusChange = (value: string) => {
+        setProductStatus(value);
+        router.get(
+            baseUrl,
+            buildParams({ 'filter[product_status]': value || undefined }),
+            visitOptions,
         );
     };
 
@@ -376,21 +391,8 @@ export default function ItemIndex({
         setRowSelection({});
         router.get(
             baseUrl,
-            {
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                'filter[is_active]': activeOnly ? 1 : 'all',
-                'filter[unassigned]': unassignedOnly ? 1 : undefined,
-                summarize: checked ? 1 : undefined,
-                page: 1,
-                per_page: query?.perPage ?? items.per_page,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['items'],
-            },
+            buildParams({ summarize: checked ? 1 : undefined }),
+            visitOptions,
         );
     };
 
@@ -888,6 +890,8 @@ export default function ItemIndex({
                                     'filter[unassigned]': unassignedOnly
                                         ? '1'
                                         : '',
+                                    'filter[product_status]':
+                                        productStatus || '',
                                     sort: query?.sort ?? '',
                                     // Export what's on screen: grouped rows when
                                     // the summarize toggle is on.
@@ -943,6 +947,27 @@ export default function ItemIndex({
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
                     </div>
+
+                    <select
+                        value={productStatus}
+                        onChange={(e) =>
+                            handleProductStatusChange(e.target.value)
+                        }
+                        disabled={unassignedOnly}
+                        title={
+                            unassignedOnly
+                                ? 'Unavailable while showing items with no product assigned'
+                                : undefined
+                        }
+                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-3 font-mono! text-[12px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
+                    >
+                        <option value="">All product statuses</option>
+                        {PRODUCT_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                                {s}
+                            </option>
+                        ))}
+                    </select>
 
                     <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
                         <Switch
@@ -1192,20 +1217,14 @@ export default function ItemIndex({
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
-                                {
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    'filter[is_active]': activeOnly ? 1 : 'all',
-                                    'filter[unassigned]': unassignedOnly
-                                        ? 1
-                                        : undefined,
-                                    summarize: summarize ? 1 : undefined,
+                                buildParams({
+                                    sort: params?.sort ?? undefined,
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??
                                         query?.perPage ??
                                         items.per_page,
-                                },
+                                }),
                                 {
                                     preserveState: true,
                                     replace: true,

@@ -29,6 +29,22 @@ class Product extends Model implements HasMedia
         return 'shops.teams';
     }
 
+    /**
+     * The product lifecycle stages, in order. Mirrors the `status` enum on the
+     * products table and resources/js/constants/product-statuses.ts — all three
+     * must be changed together (ProductStatusParityTest enforces the last two).
+     *
+     * @var list<string>
+     */
+    public const STATUSES = [
+        'New',
+        'Testing',
+        'Scaling',
+        'Maintaining',
+        'Failed',
+        'Inactive',
+    ];
+
     protected $fillable = [
         'workspace_id',
         'owner_id',

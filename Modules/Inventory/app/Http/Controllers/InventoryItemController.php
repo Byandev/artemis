@@ -168,6 +168,13 @@ class InventoryItemController extends Controller
                     $query->where('sku', 'like', "%{$value}%");
                 }),
                 AllowedFilter::exact('product_id'),
+                // Lifecycle stage of the item's linked product. The products
+                // table is already left-joined above, so this reads straight off
+                // it; unassigned items have a NULL status and drop out, which is
+                // the intent — you are filtering by a product attribute.
+                AllowedFilter::callback('product_status', function ($query, $value) {
+                    $query->whereIn('products.status', (array) $value);
+                }),
                 // "Unassigned only": items with no linked product. Off unless the
                 // toggle is on; a falsy value is a no-op so the key stays valid.
                 AllowedFilter::callback('unassigned', function ($query, $value) {
@@ -244,6 +251,18 @@ class InventoryItemController extends Controller
 
         if ($productId = $request->input('filter.product_id')) {
             $inner->where('inventory_items.product_id', $productId);
+        }
+
+        // Mirrors the flat list's product_status filter, but keeps the parent
+        // placeholder whenever any of its children match — a parent has no
+        // product of its own, so filtering it out on products.status would strip
+        // the group of the row that supplies its SKU and lead time. Same shape as
+        // applySummaryVisibility().
+        if ($productStatus = $request->input('filter.product_status')) {
+            $statuses = (array) $productStatus;
+            $onStatus = fn ($q) => $q->whereHas('product', fn ($p) => $p->whereIn('status', $statuses));
+
+            $inner->where(fn ($q) => $onStatus($q)->orWhereHas('children', $onStatus));
         }
 
         // "Unassigned only": keep only items with no linked product.
