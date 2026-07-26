@@ -3,6 +3,7 @@
 use App\Http\Controllers\Settings\ErpCredentialController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Settings\RmoSettingController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -51,4 +52,12 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.edit');
     Route::put('/workspaces/{workspace}/settings/notifications', [NotificationSettingsController::class, 'update'])
         ->name('notifications.update');
+
+    // RMO management settings — the "edit previous days" switch.
+    Route::get('/workspaces/{workspace}/settings/rmo', [RmoSettingController::class, 'edit'])
+        ->middleware('can:Manage RMO Settings,workspace')
+        ->name('rmo-settings.edit');
+    Route::put('/workspaces/{workspace}/settings/rmo', [RmoSettingController::class, 'update'])
+        ->middleware('can:Manage RMO Settings,workspace')
+        ->name('rmo-settings.update');
 });

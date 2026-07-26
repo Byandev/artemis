@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
     Tooltip,
     TooltipContent,
@@ -28,7 +27,6 @@ import {
 import { toFrontendSort } from '@/lib/sort';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import publicPage from '@/routes/public-page';
-import rmoSettings from '@/routes/workspaces/rts/rmo-settings';
 import { PaginatedData, SharedData } from '@/types';
 import { CallLog } from '@/types/models/CallLog';
 import {
@@ -110,8 +108,6 @@ interface Props {
      * delivery date is assignable / re-statusable.
      */
     enable_edit_previous_day?: boolean;
-    /** Viewer may flip the switch ("Edit Workspace Settings"). */
-    can_manage_rmo_settings?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -345,7 +341,6 @@ function RmoManagement({
     returning_count,
     problematic_count,
     enable_edit_previous_day = false,
-    can_manage_rmo_settings = false,
 }: Props) {
     const { appEnv, flash } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
@@ -451,31 +446,6 @@ function RmoManagement({
     // workspace enabled the switch.
     const canEditPastDay =
         enable_edit_previous_day && deliveryDate < todayLocal;
-
-    const [editPreviousDay, setEditPreviousDay] = useState(
-        enable_edit_previous_day,
-    );
-    const [savingRmoSetting, setSavingRmoSetting] = useState(false);
-
-    const handleToggleEditPreviousDay = useCallback(
-        (checked: boolean) => {
-            setEditPreviousDay(checked);
-            setSavingRmoSetting(true);
-
-            router.put(
-                rmoSettings.update(workspace.slug).url,
-                { enable_edit_previous_day: checked },
-                {
-                    preserveScroll: true,
-                    preserveState: false,
-                    // Roll the optimistic flip back if the save is rejected.
-                    onError: () => setEditPreviousDay(!checked),
-                    onFinish: () => setSavingRmoSetting(false),
-                },
-            );
-        },
-        [workspace.slug],
-    );
 
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
@@ -1736,36 +1706,6 @@ function RmoManagement({
                             </span>
                             My Confirmee Only
                         </button>
-
-                        {can_manage_rmo_settings && (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div className="inline-flex h-8 items-center gap-2 rounded-lg border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
-                                        <Switch
-                                            id="rmo-edit-previous-day"
-                                            checked={editPreviousDay}
-                                            onCheckedChange={
-                                                handleToggleEditPreviousDay
-                                            }
-                                            disabled={savingRmoSetting}
-                                        />
-                                        <Label
-                                            htmlFor="rmo-edit-previous-day"
-                                            className="cursor-pointer text-[12px]! font-medium text-gray-500 dark:text-gray-400"
-                                        >
-                                            Edit Previous Days
-                                        </Label>
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom">
-                                    <p className="text-xs">
-                                        Lets anyone on this page assign and
-                                        update status on every past delivery
-                                        date, not just yesterday.
-                                    </p>
-                                </TooltipContent>
-                            </Tooltip>
-                        )}
 
                         {window.location.hostname === 'efb.on-forge.com' && (
                             <div className="ml-auto flex items-center gap-2">

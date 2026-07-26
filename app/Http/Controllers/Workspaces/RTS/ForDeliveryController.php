@@ -159,24 +159,6 @@ class ForDeliveryController extends Controller
     }
 
     /**
-     * Toggle the workspace-wide "edit previous day" switch shown in the RMO
-     * management header. Gated by Edit Workspace Settings via the route.
-     */
-    public function updateRmoSetting(Request $request, Workspace $workspace)
-    {
-        $data = $request->validate([
-            'enable_edit_previous_day' => ['required', 'boolean'],
-        ]);
-
-        $workspace->rmoSetting()->updateOrCreate(
-            ['workspace_id' => $workspace->id],
-            ['enable_edit_previous_day' => $data['enable_edit_previous_day']],
-        );
-
-        return redirect()->back()->with('success', 'RMO settings updated successfully');
-    }
-
-    /**
      * Previous-day editing is governed solely by the workspace's rmo_settings
      * switch — the same rule for the public page and the authenticated CSR
      * routes. Only flipping the switch is permission-gated.
@@ -427,7 +409,6 @@ class ForDeliveryController extends Controller
             'returning_count' => $totalReturning,
             'problematic_count' => $totalProblematic,
             'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
-            'can_manage_rmo_settings' => (bool) $user?->hasPermission(Permission::EditWorkspaceSettings, $workspace),
         ]);
     }
 
