@@ -9,6 +9,7 @@ use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 
 /** A workspace member whose role carries exactly $permissions. */
 function rmoMemberWithPermissions(Workspace $workspace, array $permissions): User
@@ -206,10 +207,7 @@ test('the page hands the switch state to the frontend so the buttons enable', fu
     $url = route('public-page.rmo-management', ['workspace' => $this->workspace->slug]);
 
     $this->actingAs($admin)->get($url)
-        ->assertInertia(fn ($page) => $page
-            ->where('enable_edit_previous_day', false)
-            ->where('can_manage_rmo_settings', true)
-        );
+        ->assertInertia(fn ($page) => $page->where('enable_edit_previous_day', false));
 
     enablePreviousDayEditing($this->workspace);
 
@@ -217,15 +215,41 @@ test('the page hands the switch state to the frontend so the buttons enable', fu
         ->assertInertia(fn ($page) => $page->where('enable_edit_previous_day', true));
 });
 
-test('the toggle endpoint requires Edit Workspace Settings', function () {
-    $url = route('workspaces.rts.rmo-settings.update', ['workspace' => $this->workspace->slug]);
+test('the settings page is gated by Manage RMO Settings', function () {
+    $url = route('rmo-settings.edit', ['workspace' => $this->workspace->slug]);
 
-    $member = rmoMemberWithPermissions($this->workspace, [PermissionEnum::ViewRmoManagement->value]);
-    $this->actingAs($member)->put($url, ['enable_edit_previous_day' => true])->assertForbidden();
+    $outsider = rmoMemberWithPermissions($this->workspace, [PermissionEnum::ViewRmoManagement->value]);
+    $this->actingAs($outsider)->get($url)->assertForbidden();
+
+    $manager = rmoMemberWithPermissions($this->workspace, [PermissionEnum::ManageRmoSettings->value]);
+    $this->actingAs($manager)->get($url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('settings/rmo')
+            ->where('settings.enable_edit_previous_day', false)
+        );
+});
+
+test('saving the settings form flips the switch, and only for permitted users', function () {
+    $url = route('rmo-settings.update', ['workspace' => $this->workspace->slug]);
+
+    $outsider = rmoMemberWithPermissions($this->workspace, [PermissionEnum::ViewRmoManagement->value]);
+    $this->actingAs($outsider)->put($url, ['enable_edit_previous_day' => true])->assertForbidden();
 
     expect($this->workspace->fresh()->rmoEditPreviousDayEnabled())->toBeFalse();
 
-    $this->actingAs($this->owner)->put($url, ['enable_edit_previous_day' => true])->assertRedirect();
+    $manager = rmoMemberWithPermissions($this->workspace, [PermissionEnum::ManageRmoSettings->value]);
+    $this->actingAs($manager)->put($url, ['enable_edit_previous_day' => true])
+        ->assertRedirect(route('rmo-settings.edit', ['workspace' => $this->workspace->slug]));
 
     expect($this->workspace->fresh()->rmoEditPreviousDayEnabled())->toBeTrue();
+
+    // And back off again.
+    $this->actingAs($manager)->put($url, ['enable_edit_previous_day' => false])->assertRedirect();
+
+    expect($this->workspace->fresh()->rmoEditPreviousDayEnabled())->toBeFalse();
+});
+
+test('the old RMO-page toggle endpoint no longer exists', function () {
+    expect(Route::has('workspaces.rts.rmo-settings.update'))->toBeFalse();
 });
