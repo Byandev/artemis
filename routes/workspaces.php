@@ -237,6 +237,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/rts', function (Workspace $workspace) {
         return redirect()->route('workspaces.rts.analytics', $workspace);
     })->name('workspaces.rts');
+    // Workspace-wide RMO settings (the "edit previous day" switch).
+    Route::put('/workspaces/{workspace}/rts/rmo-settings', [ForDeliveryController::class, 'updateRmoSetting'])
+        ->middleware('can:Edit Workspace Settings,workspace')
+        ->name('workspaces.rts.rmo-settings.update');
+
     Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/order-item', [AnalyticController::class, 'groupByOrderItem'])->name('workspaces.rts.analytics.group-by-order-item');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/price', [AnalyticController::class, 'groupByPrice'])->name('workspaces.rts.analytics.group-by-price');

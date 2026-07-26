@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
     Tooltip,
     TooltipContent,
@@ -27,6 +28,7 @@ import {
 import { toFrontendSort } from '@/lib/sort';
 import { currencyFormatter, percentageFormatter } from '@/lib/utils';
 import publicPage from '@/routes/public-page';
+import rmoSettings from '@/routes/workspaces/rts/rmo-settings';
 import { PaginatedData, SharedData } from '@/types';
 import { CallLog } from '@/types/models/CallLog';
 import {
@@ -55,6 +57,7 @@ import {
     X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast, Toaster } from 'sonner';
 import FormModal from './formModal';
 
 const EXPORT_COLUMNS = [
@@ -102,6 +105,13 @@ interface Props {
     delivered_count: number;
     returning_count: number;
     problematic_count: number;
+    /**
+     * Workspace-wide switch stored on rmo_settings. When on, every past
+     * delivery date is assignable / re-statusable.
+     */
+    enable_edit_previous_day?: boolean;
+    /** Viewer may flip the switch ("Edit Workspace Settings"). */
+    can_manage_rmo_settings?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -334,9 +344,28 @@ function RmoManagement({
     delivered_count,
     returning_count,
     problematic_count,
+    enable_edit_previous_day = false,
+    can_manage_rmo_settings = false,
 }: Props) {
-    const { appEnv } = usePage<SharedData>().props;
+    const { appEnv, flash } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
+
+    // This page renders outside the app/CSR layouts, so it has no Toaster of
+    // its own. Without this every controller rejection — "status can only be
+    // updated for…", "please select a user" — redirects back silently and a
+    // click looks like it did nothing.
+    const flashMessages = flash as
+        | { success?: string | null; error?: string | null }
+        | undefined;
+
+    useEffect(() => {
+        if (flashMessages?.success) {
+            toast.success(flashMessages.success);
+        }
+        if (flashMessages?.error) {
+            toast.error(flashMessages.error);
+        }
+    }, [flashMessages]);
 
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
@@ -418,6 +447,35 @@ function RmoManagement({
     const deliveryDate = query?.delivery_date ?? todayLocal;
     const isToday = deliveryDate === todayLocal;
     const isYesterday = deliveryDate === yesterdayLocal;
+    // Any past delivery date — not just yesterday — is editable when the
+    // workspace enabled the switch.
+    const canEditPastDay =
+        enable_edit_previous_day && deliveryDate < todayLocal;
+
+    const [editPreviousDay, setEditPreviousDay] = useState(
+        enable_edit_previous_day,
+    );
+    const [savingRmoSetting, setSavingRmoSetting] = useState(false);
+
+    const handleToggleEditPreviousDay = useCallback(
+        (checked: boolean) => {
+            setEditPreviousDay(checked);
+            setSavingRmoSetting(true);
+
+            router.put(
+                rmoSettings.update(workspace.slug).url,
+                { enable_edit_previous_day: checked },
+                {
+                    preserveScroll: true,
+                    preserveState: false,
+                    // Roll the optimistic flip back if the save is rejected.
+                    onError: () => setEditPreviousDay(!checked),
+                    onFinish: () => setSavingRmoSetting(false),
+                },
+            );
+        },
+        [workspace.slug],
+    );
 
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
@@ -1213,6 +1271,7 @@ function RmoManagement({
                         row.original.parcel_status?.toLowerCase();
                     const canEditAssignee =
                         isToday ||
+                        canEditPastDay ||
                         (isYesterday &&
                             (parcelStatus === 'delivered' ||
                                 parcelStatus === 'returned' ||
@@ -1262,6 +1321,7 @@ function RmoManagement({
                         row.original.parcel_status?.toLowerCase();
                     const canEditStatus =
                         isToday ||
+                        canEditPastDay ||
                         (isYesterday &&
                             (yesterdayParcelStatus === 'returned' ||
                                 yesterdayParcelStatus === 'returning' ||
@@ -1286,6 +1346,7 @@ function RmoManagement({
             handleUpdatePhone,
             isToday,
             isYesterday,
+            canEditPastDay,
             canEditPhone,
             selectedIds,
             allSelected,
@@ -1297,6 +1358,7 @@ function RmoManagement({
 
     return (
         <div className="min-h-screen overflow-x-hidden bg-stone-50 dark:bg-zinc-950">
+            <Toaster position="top-right" richColors closeButton />
             <FormModal
                 open={isOpen}
                 onOpenChange={(open) => {
@@ -1675,6 +1737,36 @@ function RmoManagement({
                             My Confirmee Only
                         </button>
 
+                        {can_manage_rmo_settings && (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div className="inline-flex h-8 items-center gap-2 rounded-lg border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
+                                        <Switch
+                                            id="rmo-edit-previous-day"
+                                            checked={editPreviousDay}
+                                            onCheckedChange={
+                                                handleToggleEditPreviousDay
+                                            }
+                                            disabled={savingRmoSetting}
+                                        />
+                                        <Label
+                                            htmlFor="rmo-edit-previous-day"
+                                            className="cursor-pointer text-[12px]! font-medium text-gray-500 dark:text-gray-400"
+                                        >
+                                            Edit Previous Days
+                                        </Label>
+                                    </div>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                    <p className="text-xs">
+                                        Lets anyone on this page assign and
+                                        update status on every past delivery
+                                        date, not just yesterday.
+                                    </p>
+                                </TooltipContent>
+                            </Tooltip>
+                        )}
+
                         {window.location.hostname === 'efb.on-forge.com' && (
                             <div className="ml-auto flex items-center gap-2">
                                 <Tooltip>
@@ -1745,7 +1837,7 @@ function RmoManagement({
                             <div className="h-3.5 w-px bg-emerald-200 dark:bg-emerald-500/30" />
                             <button
                                 onClick={handleBulkAssignToMe}
-                                disabled={!isToday}
+                                disabled={!isToday && !canEditPastDay}
                                 className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-[12px] font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <UserPlus className="h-3.5 w-3.5" />
