@@ -6,7 +6,14 @@ import { edit as editPassword } from '@/routes/password';
 import { edit } from '@/routes/profile';
 import { Workspace } from '@/types/models/Workspace';
 import { Link, type InertiaLinkProps } from '@inertiajs/react';
-import { Bell, KeyRound, Server, User, type LucideIcon } from 'lucide-react';
+import {
+    Bell,
+    CalendarClock,
+    KeyRound,
+    Server,
+    User,
+    type LucideIcon,
+} from 'lucide-react';
 import { type PropsWithChildren } from 'react';
 
 type SettingsNavItem = {
@@ -30,6 +37,7 @@ export default function SettingsLayout({
     const canManageDiscordNotifications = usePermission(
         PERMISSIONS.ManageDiscordNotifications,
     );
+    const canManageRmoSettings = usePermission(PERMISSIONS.ManageRmoSettings);
 
     const groups: SettingsNavGroup[] = [
         {
@@ -75,6 +83,19 @@ export default function SettingsLayout({
                         title: 'Discord Notifications',
                         href: `/workspaces/${workspace.slug}/settings/notifications`,
                         icon: Bell,
+                    },
+                ],
+            });
+        }
+
+        if (canManageRmoSettings) {
+            groups.push({
+                label: 'RTS',
+                items: [
+                    {
+                        title: 'RMO Management',
+                        href: `/workspaces/${workspace.slug}/settings/rmo`,
+                        icon: CalendarClock,
                     },
                 ],
             });

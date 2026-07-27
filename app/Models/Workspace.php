@@ -428,6 +428,21 @@ class Workspace extends Model
         return $this->hasOne(WorkspaceMetricSetting::class);
     }
 
+    public function rmoSetting()
+    {
+        return $this->hasOne(RmoSetting::class);
+    }
+
+    /**
+     * Whether this workspace allows RMO orders from *any* past delivery date to
+     * be assigned / re-statused. Off by default, in which case only today (and
+     * the narrower yesterday carve-out) stays editable.
+     */
+    public function rmoEditPreviousDayEnabled(): bool
+    {
+        return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_edit_previous_day;
+    }
+
     public function allowedMetrics(): array
     {
         return $this->metricSetting
