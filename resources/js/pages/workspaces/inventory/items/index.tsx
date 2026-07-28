@@ -791,13 +791,24 @@ export default function ItemIndex({
             ),
             cell: ({ row }) => {
                 const v = row.original.po_needed;
-                const color =
-                    v != null && v > 0
-                        ? 'text-amber-500 dark:text-amber-400'
-                        : 'text-gray-400 dark:text-gray-500';
+                // Items that actually need a PO get the whole cell flagged red —
+                // the negative margins cancel TableCell's px-4 py-3 so the tint
+                // fills the cell edge to edge.
+                const needsPo = v != null && v > 0;
                 return (
-                    <div className="text-center">
-                        <MetricCell value={v} color={color} />
+                    <div
+                        className={`-mx-4 -my-3 px-4 py-3 text-center ${
+                            needsPo ? 'bg-red-50 dark:bg-red-500/10' : ''
+                        }`}
+                    >
+                        <MetricCell
+                            value={v}
+                            color={
+                                needsPo
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : 'text-gray-400 dark:text-gray-500'
+                            }
+                        />
                     </div>
                 );
             },
