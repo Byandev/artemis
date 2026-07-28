@@ -20,7 +20,13 @@ class AdminWorkspaceController extends Controller
         $baseQuery = Workspace::query()
             ->select('workspaces.*')
             ->with(['owner:id,name', 'subscription.plan', 'metricSetting'])
-            ->withCount(['pages', 'shops']);
+            ->withCount([
+                'pages',
+                'shops',
+                // How many of this workspace's pages have parcel journey turned on,
+                // surfaced in the admin table as "3 / 20".
+                'pages as parcel_journey_pages_count' => fn ($query) => $query->where('parcel_journey_enabled', true),
+            ]);
 
         $workspaces = QueryBuilder::for($baseQuery)
             ->allowedFilters([
@@ -31,6 +37,7 @@ class AdminWorkspaceController extends Controller
                 'created_at',
                 'pages_count',
                 'shops_count',
+                'parcel_journey_pages_count',
 
                 AllowedSort::callback('owner', function ($query, bool $descending) {
                     $direction = $descending ? 'desc' : 'asc';

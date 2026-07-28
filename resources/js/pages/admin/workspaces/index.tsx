@@ -16,6 +16,7 @@ import {
     LayoutGrid,
     Search,
     Settings2,
+    Truck,
     X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,6 +44,7 @@ interface Workspace {
     owner?: { name: string };
     pages_count: number;
     shops_count: number;
+    parcel_journey_pages_count: number;
     max_shops: number | null;
     subscription?: Subscription | null;
     inventory_module_enabled: boolean;
@@ -387,6 +389,37 @@ export default function Index({ workspaces, plans, filters }: Props) {
                     </div>
                 </div>
             ),
+        },
+        {
+            accessorKey: 'parcel_journey_pages_count',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Parcel Journey"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => {
+                const enabled = row.original.parcel_journey_pages_count;
+                const total = row.original.pages_count;
+
+                return (
+                    <div className="text-center">
+                        <div
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${
+                                enabled > 0
+                                    ? 'border-emerald-200 bg-emerald-50/50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400'
+                            }`}
+                            title={`${enabled} of ${total} page(s) have parcel journey enabled`}
+                        >
+                            <Truck className="h-3 w-3" />
+                            {enabled} / {total}
+                        </div>
+                    </div>
+                );
+            },
         },
         {
             id: 'subscription',
