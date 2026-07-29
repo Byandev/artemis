@@ -22,6 +22,7 @@ use App\Models\Page;
 use App\Models\Workspace;
 use App\Support\PublicWorkspaceGate;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -34,6 +35,11 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ForDeliveryController extends Controller
 {
+    /**
+     * Upper bound on comma-separated terms accepted by the RMO search box.
+     */
+    private const MAX_SEARCH_TERMS = 50;
+
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
         $orderForDelivery = OrderForDelivery::find($id);
@@ -352,19 +358,7 @@ class ForDeliveryController extends Controller
                     $query->whereIn('page_id', $pageIds);
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where(function ($q) use ($value) {
-                        $q->whereHas('order', function ($orderQuery) use ($value) {
-                            $orderQuery->where('order_number', 'LIKE', "%{$value}%")
-                                ->orWhere('tracking_code', 'LIKE', "%{$value}%")
-                                ->orWhereHas('shippingAddress', function ($addrQuery) use ($value) {
-                                    $addrQuery->where('full_name', 'LIKE', "%{$value}%");
-                                });
-                        })
-                            ->orWhere('rider_name', 'LIKE', "%{$value}%")
-                            ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
-                                $conferrerQuery->where('name', 'LIKE', "%{$value}%");
-                            });
-                    });
+                    $this->applyRmoSearch($query, $value);
                 }),
             ])
             ->allowedSorts([
@@ -515,19 +509,7 @@ class ForDeliveryController extends Controller
                     $query->whereIn('page_id', $pageIds);
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where(function ($q) use ($value) {
-                        $q->whereHas('order', function ($orderQuery) use ($value) {
-                            $orderQuery->where('order_number', 'LIKE', "%{$value}%")
-                                ->orWhere('tracking_code', 'LIKE', "%{$value}%")
-                                ->orWhereHas('shippingAddress', function ($addrQuery) use ($value) {
-                                    $addrQuery->where('full_name', 'LIKE', "%{$value}%");
-                                });
-                        })
-                            ->orWhere('rider_name', 'LIKE', "%{$value}%")
-                            ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
-                                $conferrerQuery->where('name', 'LIKE', "%{$value}%");
-                            });
-                    });
+                    $this->applyRmoSearch($query, $value);
                 }),
             ])
             ->whereDate('delivery_date', $deliveryDate);
@@ -572,6 +554,51 @@ class ForDeliveryController extends Controller
         $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
         return Excel::download(new RmoManagementExport($query, $columns), $filename);
+    }
+
+    /**
+     * RMO management search accepts several terms at once, separated by commas
+     * (e.g. pasting three tracking codes). Each term is matched against every
+     * searchable field and the terms are OR'd together, so "ABC, DEF" returns
+     * rows matching either. Spatie's QueryBuilder already explodes a
+     * comma-delimited filter value into an array, so handle both shapes.
+     *
+     * The value is `mixed` on purpose: Spatie coerces a bare "true"/"false"
+     * search term into a boolean before it reaches us.
+     *
+     * @param  string|array<int, string>|bool|null  $value
+     */
+    private function applyRmoSearch(Builder $query, mixed $value): void
+    {
+        $terms = collect(is_array($value) ? $value : explode(',', (string) $value))
+            ->map(fn ($term) => trim((string) $term))
+            ->filter()
+            ->unique()
+            // Guardrail: each term adds three LIKE subqueries, so cap the fan-out.
+            ->take(self::MAX_SEARCH_TERMS)
+            ->values();
+
+        if ($terms->isEmpty()) {
+            return;
+        }
+
+        $query->where(function ($outer) use ($terms) {
+            foreach ($terms as $term) {
+                $outer->orWhere(function ($q) use ($term) {
+                    $q->whereHas('order', function ($orderQuery) use ($term) {
+                        $orderQuery->where('order_number', 'LIKE', "%{$term}%")
+                            ->orWhere('tracking_code', 'LIKE', "%{$term}%")
+                            ->orWhereHas('shippingAddress', function ($addrQuery) use ($term) {
+                                $addrQuery->where('full_name', 'LIKE', "%{$term}%");
+                            });
+                    })
+                        ->orWhere('rider_name', 'LIKE', "%{$term}%")
+                        ->orWhereHas('conferrer', function ($conferrerQuery) use ($term) {
+                            $conferrerQuery->where('name', 'LIKE', "%{$term}%");
+                        });
+                });
+            }
+        });
     }
 
     public function myAssignedCount(Request $request, Workspace $workspace)

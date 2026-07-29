@@ -1633,7 +1633,7 @@ function RmoManagement({
                             <input
                                 type="text"
                                 className="h-8 w-full rounded-lg border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
-                                placeholder="Search by order #, tracking code, rider, customer, or confirmed by…"
+                                placeholder="Search order #, tracking code, rider, customer — separate multiple with commas"
                                 value={searchValue}
                                 onChange={(e) => setSearchValue(e.target.value)}
                             />
