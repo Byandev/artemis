@@ -22,6 +22,7 @@ class RmoSettingController extends Controller
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'settings' => [
                 'enable_edit_previous_day' => $workspace->rmoEditPreviousDayEnabled(),
+                'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
             ],
         ]);
     }
@@ -30,11 +31,15 @@ class RmoSettingController extends Controller
     {
         $data = $request->validate([
             'enable_edit_previous_day' => ['required', 'boolean'],
+            'enable_bulk_status_update' => ['required', 'boolean'],
         ]);
 
         $workspace->rmoSetting()->updateOrCreate(
             ['workspace_id' => $workspace->id],
-            ['enable_edit_previous_day' => $data['enable_edit_previous_day']],
+            [
+                'enable_edit_previous_day' => $data['enable_edit_previous_day'],
+                'enable_bulk_status_update' => $data['enable_bulk_status_update'],
+            ],
         );
 
         return Redirect::route('rmo-settings.edit', ['workspace' => $workspace->slug])

@@ -17,6 +17,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -30,6 +36,7 @@ import publicPage from '@/routes/public-page';
 import { PaginatedData, SharedData } from '@/types';
 import { CallLog } from '@/types/models/CallLog';
 import {
+    ORDER_STATUSES,
     OrderForDelivery,
     OrderStatus,
 } from '@/types/models/Pancake/OrderForDelivery';
@@ -44,6 +51,7 @@ import {
     ChevronUp,
     ClipboardCopy,
     Download,
+    ListChecks,
     Lock,
     MapPin,
     Pencil,
@@ -108,6 +116,11 @@ interface Props {
      * delivery date is assignable / re-statusable.
      */
     enable_edit_previous_day?: boolean;
+    /**
+     * Workspace-wide switch stored on rmo_settings. When on, the selection bar
+     * offers a "Set status" action that re-statuses every selected order.
+     */
+    enable_bulk_status_update?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -341,6 +354,7 @@ function RmoManagement({
     returning_count,
     problematic_count,
     enable_edit_previous_day = false,
+    enable_bulk_status_update = false,
 }: Props) {
     const { appEnv, flash } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
@@ -868,6 +882,24 @@ function RmoManagement({
         }
         doBulkAssign(userId);
     }, [selectedIds, orders.data, doBulkAssign]);
+
+    const handleBulkUpdateStatus = useCallback(
+        (status: OrderStatus) => {
+            router.post(
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-status`,
+                { ids: Array.from(selectedIds), status },
+                {
+                    preserveScroll: true,
+                    preserveState: false,
+                    onSuccess: () => {
+                        setSelectedIds(new Set());
+                        setBulkConflict(null);
+                    },
+                },
+            );
+        },
+        [selectedIds, workspace.slug],
+    );
 
     const pendingOrders = useMemo(
         () =>
@@ -1783,6 +1815,54 @@ function RmoManagement({
                                 <UserPlus className="h-3.5 w-3.5" />
                                 Assign to me
                             </button>
+                            {enable_bulk_status_update && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger
+                                        disabled={
+                                            !isToday &&
+                                            !isYesterday &&
+                                            !canEditPastDay
+                                        }
+                                        className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-1 text-[12px] font-medium text-emerald-700 transition-colors outline-none hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-500/40 dark:bg-transparent dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                                    >
+                                        <ListChecks className="h-3.5 w-3.5" />
+                                        Set status
+                                        <ChevronDown className="h-3 w-3 opacity-60" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="start"
+                                        className="w-52 overflow-hidden p-1"
+                                    >
+                                        <p className="px-2 pt-1 pb-1.5 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                            Set {selectedIds.size} order
+                                            {selectedIds.size !== 1
+                                                ? 's'
+                                                : ''}{' '}
+                                            to
+                                        </p>
+                                        <div className="max-h-72 overflow-y-auto">
+                                            {ORDER_STATUSES.map((s) => (
+                                                <DropdownMenuItem
+                                                    key={s}
+                                                    onClick={() =>
+                                                        handleBulkUpdateStatus(
+                                                            s,
+                                                        )
+                                                    }
+                                                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px] text-gray-600 dark:text-gray-400"
+                                                >
+                                                    <span
+                                                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${orderStatusConfig[s]?.dot ?? 'bg-gray-400'}`}
+                                                    />
+                                                    <span className="flex-1">
+                                                        {s}
+                                                    </span>
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                             <button
                                 onClick={() => {
                                     clearSelection();

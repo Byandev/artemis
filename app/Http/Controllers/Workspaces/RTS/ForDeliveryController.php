@@ -65,6 +65,61 @@ class ForDeliveryController extends Controller
         return redirect()->back()->with('success', 'Status updated successfully');
     }
 
+    /**
+     * Re-status every selected order in one request. Gated behind the
+     * workspace's "bulk status update" switch; orders outside the editable
+     * date window are skipped rather than failing the whole batch.
+     */
+    public function publicBulkUpdateStatus(Workspace $workspace, Request $request)
+    {
+        $data = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'status' => 'required|string|max:50',
+        ]);
+
+        if (! $workspace->rmoBulkStatusUpdateEnabled()) {
+            return redirect()->back()->with('error', 'Bulk status update is turned off for this workspace.');
+        }
+
+        $canEditAnyPreviousDay = $this->canEditPreviousDay($workspace);
+
+        // Same window as the single-row update: today, plus yesterday's
+        // delivered/returning parcels, widened to every past date when the
+        // workspace unlocked previous-day editing.
+        $editableIds = OrderForDelivery::whereIn('id', $data['ids'])
+            ->where('workspace_id', $workspace->id)
+            ->where(function ($query) use ($canEditAnyPreviousDay) {
+                $query->whereDate('delivery_date', today())
+                    ->orWhere(function ($q) use ($canEditAnyPreviousDay) {
+                        if ($canEditAnyPreviousDay) {
+                            $q->whereDate('delivery_date', '<', today());
+
+                            return;
+                        }
+
+                        $q->whereDate('delivery_date', today()->subDay())
+                            ->whereIn('parcel_status', ['delivered', 'returning']);
+                    });
+            })
+            ->pluck('id');
+
+        if ($editableIds->isEmpty()) {
+            return redirect()->back()->with('error', "Status can only be updated for today's orders, or yesterday's delivered orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
+        }
+
+        OrderForDelivery::whereIn('id', $editableIds)->update(['status' => $data['status']]);
+
+        $skipped = count($data['ids']) - $editableIds->count();
+        $message = "Updated {$editableIds->count()} order(s) to {$data['status']}.";
+
+        if ($skipped > 0) {
+            $message .= " {$skipped} order(s) skipped — outside the editable date range.";
+        }
+
+        return redirect()->back()->with('success', $message);
+    }
+
     public function publicBulkAssign(Workspace $workspace, Request $request)
     {
         $request->validate([
@@ -409,6 +464,7 @@ class ForDeliveryController extends Controller
             'returning_count' => $totalReturning,
             'problematic_count' => $totalProblematic,
             'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
+            'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
         ]);
     }
 

@@ -443,6 +443,15 @@ class Workspace extends Model
         return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_edit_previous_day;
     }
 
+    /**
+     * Whether the RMO management page may re-status selected orders in one go.
+     * Off by default — statuses are then changed one row at a time.
+     */
+    public function rmoBulkStatusUpdateEnabled(): bool
+    {
+        return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_bulk_status_update;
+    }
+
     public function allowedMetrics(): array
     {
         return $this->metricSetting
