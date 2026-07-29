@@ -19,13 +19,21 @@ class OrderTimestampResolver
         $history = collect($order['status_history']);
         $confirmed = $history->firstWhere('status', 1);
 
+        $returned_at = $this->toLocal($history->firstWhere('status', 5)['updated_at'] ?? null);
+
+        $returning_at = $this->toLocal($history->firstWhere('status', 4)['updated_at'] ?? null);
+
+        if ($returned_at && !$returning_at) {
+            $returning_at  = $returned_at;
+        }
+
         return [
             'inserted_at' => $insertedAt,
             'confirmed_at' => $this->toLocal($history->firstWhere('status', 1)['updated_at'] ?? null),
             'shipped_at' => $this->toLocal($history->firstWhere('status', 2)['updated_at'] ?? null),
             'delivered_at' => $this->toLocal($history->firstWhere('status', 3)['updated_at'] ?? null),
-            'returning_at' => $this->toLocal($history->firstWhere('status', 4)['updated_at'] ?? null),
-            'returned_at' => $this->toLocal($history->firstWhere('status', 5)['updated_at'] ?? null),
+            'returning_at' => $returning_at,
+            'returned_at' => $returned_at,
             'conferrer_id' => $confirmed['editor_fb'] ?? null ?: null,
             'confirmed_by' => $confirmed['editor_id'] ?? null ?: null,
         ];
