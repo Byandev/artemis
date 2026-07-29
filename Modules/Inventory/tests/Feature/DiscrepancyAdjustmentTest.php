@@ -17,7 +17,7 @@ function itemRow(int $itemId, $owner, $workspace): array
     $row = [];
 
     test()->actingAs($owner)
-        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=0')
         ->assertOk()
         ->assertInertia(function (Assert $page) use ($itemId, &$row) {
             $items = $page->toArray()['props']['items']['data'];

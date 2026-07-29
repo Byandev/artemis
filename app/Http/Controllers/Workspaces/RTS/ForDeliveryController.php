@@ -51,13 +51,73 @@ class ForDeliveryController extends Controller
         $isDeliveredYesterday = ($deliveryDate?->isYesterday() ?? false)
             && (strtolower((string) $orderForDelivery->parcel_status) === 'delivered' || strtolower((string) $orderForDelivery->parcel_status) === 'returning');
 
-        if (! $isToday && ! $isDeliveredYesterday) {
-            return redirect()->back()->with('error', "Status can only be updated for orders scheduled for delivery today, or yesterday's delivered orders.");
+        // When the workspace opts in, any past delivery date is editable —
+        // not just yesterday.
+        $isPastDay = $deliveryDate?->lt(today()) ?? false;
+        $canEditAnyPreviousDay = $isPastDay && $this->canEditPreviousDay($workspace);
+
+        if (! $isToday && ! $isDeliveredYesterday && ! $canEditAnyPreviousDay) {
+            return redirect()->back()->with('error', "Status can only be updated for today's orders, or yesterday's delivered orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
         }
 
         $orderForDelivery->update(['status' => $request->status]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
+    /**
+     * Re-status every selected order in one request. Gated behind the
+     * workspace's "bulk status update" switch; orders outside the editable
+     * date window are skipped rather than failing the whole batch.
+     */
+    public function publicBulkUpdateStatus(Workspace $workspace, Request $request)
+    {
+        $data = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'status' => 'required|string|max:50',
+        ]);
+
+        if (! $workspace->rmoBulkStatusUpdateEnabled()) {
+            return redirect()->back()->with('error', 'Bulk status update is turned off for this workspace.');
+        }
+
+        $canEditAnyPreviousDay = $this->canEditPreviousDay($workspace);
+
+        // Same window as the single-row update: today, plus yesterday's
+        // delivered/returning parcels, widened to every past date when the
+        // workspace unlocked previous-day editing.
+        $editableIds = OrderForDelivery::whereIn('id', $data['ids'])
+            ->where('workspace_id', $workspace->id)
+            ->where(function ($query) use ($canEditAnyPreviousDay) {
+                $query->whereDate('delivery_date', today())
+                    ->orWhere(function ($q) use ($canEditAnyPreviousDay) {
+                        if ($canEditAnyPreviousDay) {
+                            $q->whereDate('delivery_date', '<', today());
+
+                            return;
+                        }
+
+                        $q->whereDate('delivery_date', today()->subDay())
+                            ->whereIn('parcel_status', ['delivered', 'returning']);
+                    });
+            })
+            ->pluck('id');
+
+        if ($editableIds->isEmpty()) {
+            return redirect()->back()->with('error', "Status can only be updated for today's orders, or yesterday's delivered orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
+        }
+
+        OrderForDelivery::whereIn('id', $editableIds)->update(['status' => $data['status']]);
+
+        $skipped = count($data['ids']) - $editableIds->count();
+        $message = "Updated {$editableIds->count()} order(s) to {$data['status']}.";
+
+        if ($skipped > 0) {
+            $message .= " {$skipped} order(s) skipped — outside the editable date range.";
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 
     public function publicBulkAssign(Workspace $workspace, Request $request)
@@ -69,12 +129,21 @@ class ForDeliveryController extends Controller
         ]);
 
         // Assignable for today's orders, and for yesterday's orders only when
-        // the parcel was delivered or returned.
+        // the parcel was delivered or returned. Workspaces that enable
+        // previous-day editing widen this to every past delivery date.
+        $canEditAnyPreviousDay = $this->canEditPreviousDay($workspace);
+
         $updated = OrderForDelivery::whereIn('id', $request->ids)
             ->whereNull('assignee_id')
-            ->where(function ($query) {
+            ->where(function ($query) use ($canEditAnyPreviousDay) {
                 $query->whereDate('delivery_date', today())
-                    ->orWhere(function ($q) {
+                    ->orWhere(function ($q) use ($canEditAnyPreviousDay) {
+                        if ($canEditAnyPreviousDay) {
+                            $q->whereDate('delivery_date', '<', today());
+
+                            return;
+                        }
+
                         $q->whereDate('delivery_date', today()->subDay())
                             ->whereIn('parcel_status', ['delivered', 'returned', 'returning']);
                     });
@@ -92,8 +161,8 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $this->canEditAssignee($orderForDelivery)) {
-            return redirect()->back()->with('error', "Assignee can only be updated for orders scheduled for delivery today, or yesterday's delivered or returned orders.");
+        if (! $this->canEditAssignee($orderForDelivery, $this->canEditPreviousDay($workspace))) {
+            return redirect()->back()->with('error', "Assignee can only be updated for today's orders, or yesterday's delivered or returned orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
         }
 
         if (! $request->userId) {
@@ -102,7 +171,7 @@ class ForDeliveryController extends Controller
 
         $orderForDelivery->update(['assignee_id' => $request->userId]);
 
-        return redirect()->back()->with('success', 'Assignee updated successfully'.$request->userId);
+        return redirect()->back()->with('success', 'Assignee updated successfully');
     }
 
     public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
@@ -135,8 +204,8 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $this->canEditAssignee($orderForDelivery)) {
-            return redirect()->back()->with('error', "Assignee can only be removed for orders scheduled for delivery today, or yesterday's delivered or returned orders.");
+        if (! $this->canEditAssignee($orderForDelivery, $this->canEditPreviousDay($workspace))) {
+            return redirect()->back()->with('error', "Assignee can only be removed for today's orders, or yesterday's delivered or returned orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
         }
 
         $orderForDelivery->update(['assignee_id' => null]);
@@ -145,16 +214,31 @@ class ForDeliveryController extends Controller
     }
 
     /**
-     * Assignee is editable for today's orders, and for yesterday's orders
-     * only when the parcel was delivered or returned.
+     * Previous-day editing is governed solely by the workspace's rmo_settings
+     * switch — the same rule for the public page and the authenticated CSR
+     * routes. Only flipping the switch is permission-gated.
      */
-    private function canEditAssignee(OrderForDelivery $orderForDelivery): bool
+    private function canEditPreviousDay(Workspace $workspace): bool
+    {
+        return $workspace->rmoEditPreviousDayEnabled();
+    }
+
+    /**
+     * Assignee is editable for today's orders, and for yesterday's orders
+     * only when the parcel was delivered or returned. When previous-day
+     * editing is unlocked, every past delivery date is editable instead.
+     */
+    private function canEditAssignee(OrderForDelivery $orderForDelivery, bool $canEditPreviousDay = false): bool
     {
         $deliveryDate = $orderForDelivery->delivery_date
             ? Carbon::parse($orderForDelivery->delivery_date)
             : null;
 
         if ($deliveryDate?->isToday() ?? false) {
+            return true;
+        }
+
+        if ($canEditPreviousDay && ($deliveryDate?->lt(today()) ?? false)) {
             return true;
         }
 
@@ -379,6 +463,8 @@ class ForDeliveryController extends Controller
             'delivered_count' => $totalDelivered,
             'returning_count' => $totalReturning,
             'problematic_count' => $totalProblematic,
+            'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
+            'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
         ]);
     }
 

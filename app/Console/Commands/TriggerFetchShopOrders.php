@@ -46,7 +46,7 @@ class TriggerFetchShopOrders extends Command
                 dispatch(new FetchShopOrders(
                     $shop,
                     1,
-                    Carbon::parse($shop->orders_last_synced_at)->unix(),
+                    Carbon::parse($shop->orders_last_synced_at)->subDays(3)->unix(),
                     Carbon::now()->unix(),
                     $shipped,
                 ))->onQueue('pancake');

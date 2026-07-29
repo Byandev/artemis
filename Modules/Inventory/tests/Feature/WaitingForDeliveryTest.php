@@ -6,8 +6,11 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Models\PurchasedOrderItemDelivery;
+use Tests\TestCase;
 
-uses(RefreshDatabase::class);
+// Module test dirs aren't bound by the root tests/Pest.php (->in('Feature') only
+// covers tests/Feature), so extend the app TestCase explicitly to boot the app.
+uses(TestCase::class, RefreshDatabase::class);
 
 /** Read the computed waiting-for-delivery value for an item off the index page. */
 function waitingFor(int $itemId, $owner, $workspace): ?int
@@ -15,7 +18,7 @@ function waitingFor(int $itemId, $owner, $workspace): ?int
     $value = null;
 
     test()->actingAs($owner)
-        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=0')
         ->assertOk()
         ->assertInertia(function (Assert $page) use ($itemId, &$value) {
             $items = $page->toArray()['props']['items']['data'];
@@ -212,7 +215,7 @@ test('waiting-for-delivery ignores orders that are not in the awaiting-delivery 
         'issue_date' => '2026-06-01',
         'delivery_fee' => 0,
         'total_amount' => 0,
-        'status' => 2, // Approved — not awaiting delivery
+        'status' => 8, // Cancelled — outside AWAITING_DELIVERY_STATUSES (1-6)
     ]);
 
     PurchasedOrderItem::create([
