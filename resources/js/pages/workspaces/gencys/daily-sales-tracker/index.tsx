@@ -1,4 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
+import { DeleteTestOrderDialog } from '@/components/gencys/delete-test-order-dialog';
+import { TestOrderFormDialog } from '@/components/gencys/test-order-form-dialog';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -21,7 +23,7 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { debounce } from 'lodash';
-import { ChevronDown, Columns3, Search, Truck } from 'lucide-react';
+import { ChevronDown, Columns3, Plus, Search, Trash2, Truck } from 'lucide-react';
 import {
     useCallback,
     useEffect,
@@ -74,6 +76,8 @@ interface Order {
     price_upsell: string | null;
     intern_brands_name: string | null;
     total_cog: string | null;
+    /** Hand-made test order rather than a synced Gencys row. */
+    is_test?: boolean;
 }
 
 interface Props {
@@ -83,6 +87,8 @@ interface Props {
     platforms: string[];
     parcelStatuses: string[];
     orderStatuses: string[];
+    /** False in production, where the test-order endpoints don't exist. */
+    canManageTestOrders?: boolean;
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -422,9 +428,13 @@ export default function DailySalesTrackerIndex({
     platforms,
     parcelStatuses,
     orderStatuses,
+    canManageTestOrders = false,
     query,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/gencys/daily-sales-tracker`;
+
+    const [testOrderOpen, setTestOrderOpen] = useState(false);
+    const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [dateFilters, setDateFilters] = useState<DateFilterValue>(() => {
@@ -459,10 +469,34 @@ export default function DailySalesTrackerIndex({
         }
     }, [visible]);
 
-    const visibleColumns = useMemo(
-        () => COLUMNS.filter((c) => visible[c.key] !== false),
-        [visible],
-    );
+    // The actions column is appended rather than declared in COLUMNS: it needs
+    // component state, and it isn't user-toggleable.
+    const visibleColumns = useMemo(() => {
+        const cols = COLUMNS.filter((c) => visible[c.key] !== false);
+
+        if (!canManageTestOrders) return cols;
+
+        return [
+            ...cols,
+            {
+                key: '__actions',
+                label: '',
+                sortable: false,
+                align: 'right' as const,
+                render: (o: Order) =>
+                    o.is_test ? (
+                        <button
+                            onClick={() => setDeletingOrder(o)}
+                            className="text-gray-400 transition-colors hover:text-red-500"
+                            aria-label={`Delete test order ${o.id}`}
+                            title="Delete test order"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    ) : null,
+            },
+        ];
+    }, [visible, canManageTestOrders]);
 
     const sort = parseSort(query?.sort);
 
@@ -641,6 +675,17 @@ export default function DailySalesTrackerIndex({
                                 ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
+
+                        {canManageTestOrders && (
+                            <button
+                                onClick={() => setTestOrderOpen(true)}
+                                className="flex h-9 items-center gap-1.5 rounded-[10px] bg-amber-600 px-3 font-mono text-[12px] font-medium text-white transition-colors hover:bg-amber-700"
+                                title="Testing only — this button is hidden in production"
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                Add Test Order
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -688,7 +733,13 @@ export default function DailySalesTrackerIndex({
                                     rows.map((order) => (
                                         <tr
                                             key={order.id}
-                                            className="border-b border-black/6 transition-colors hover:bg-emerald-500/3 dark:border-white/6"
+                                            className={cn(
+                                                'border-b border-black/6 transition-colors hover:bg-emerald-500/3 dark:border-white/6',
+                                                // Tint hand-made test rows so they're
+                                                // never mistaken for synced data.
+                                                order.is_test &&
+                                                    'bg-amber-500/5',
+                                            )}
                                         >
                                             {visibleColumns.map((c) => (
                                                 <td
@@ -755,6 +806,25 @@ export default function DailySalesTrackerIndex({
                     </div>
                 </div>
             </div>
+
+            {canManageTestOrders && (
+                <>
+                    <TestOrderFormDialog
+                        workspace={workspace}
+                        open={testOrderOpen}
+                        onOpenChange={setTestOrderOpen}
+                        csrs={csrs}
+                        platforms={platforms}
+                        parcelStatuses={parcelStatuses}
+                        orderStatuses={orderStatuses}
+                    />
+                    <DeleteTestOrderDialog
+                        workspace={workspace}
+                        order={deletingOrder}
+                        onClose={() => setDeletingOrder(null)}
+                    />
+                </>
+            )}
         </AppLayout>
     );
 }

@@ -11,6 +11,7 @@ import {
     RefreshCw,
     Save,
     ShoppingBag,
+    Users,
 } from 'lucide-react';
 import moment from 'moment';
 import { ComponentType, useState } from 'react';
@@ -49,9 +50,11 @@ interface Props {
     // prefix + the scope label and the extra params to send on save.
     base?: string;
     scope?: { label?: string; params?: Record<string, string | number> };
+    // Live-computed view with no persistence — hides Save/Regenerate/Export.
+    readonly?: boolean;
 }
 
-const AUTO = ['shipping_fee', 'cod_fee', 'vat'];
+const AUTO = ['cogs', 'shipping_fee', 'cod_fee', 'vat'];
 
 // Money-flow segment colors — fixed order, separated in hue AND lightness; every
 // segment is direct-labelled in the legend, so identity is never colour-alone.
@@ -84,6 +87,7 @@ export default function IncomeStatementShow({
     statement,
     base: baseProp,
     scope,
+    readonly = false,
 }: Props) {
     const base =
         baseProp ?? `/workspaces/${workspace.slug}/finance/income-statements`;
@@ -117,6 +121,7 @@ export default function IncomeStatementShow({
     };
 
     const derivation = (r: ExpenseRow): string | null => {
+        if (r.source === 'cogs') return 'Cost of goods sold, from order data';
         if (r.source === 'shipping_fee') return 'Orders shipped out this month';
         if (r.source === 'cod_fee')
             return `${codPct}% of Total Delivered (${fmt(statement.delivered)})`;
@@ -338,11 +343,13 @@ export default function IncomeStatementShow({
                             : 'Income Statement'
                     }
                     description={
-                        isPreview
-                            ? `${monthLabel} · preview — choose deductions, then save.`
-                            : statement.generated_at
-                              ? `${monthLabel} · saved ${moment(statement.generated_at).format('MMM D, YYYY h:mm A')}`
-                              : `${monthLabel} · saved snapshot`
+                        readonly
+                            ? `${monthLabel} · live breakdown`
+                            : isPreview
+                              ? `${monthLabel} · preview — choose deductions, then save.`
+                              : statement.generated_at
+                                ? `${monthLabel} · saved ${moment(statement.generated_at).format('MMM D, YYYY h:mm A')}`
+                                : `${monthLabel} · saved snapshot`
                     }
                 >
                     <div className="flex items-center gap-2">
@@ -350,7 +357,16 @@ export default function IncomeStatementShow({
                             <ArrowLeft className="h-3.5 w-3.5" />
                             Back
                         </Link>
-                        {isPreview ? (
+                        {!scope && statement.gencys_partner && statement.id && (
+                            <Link
+                                href={`/workspaces/${workspace.slug}/finance/income-statements/${statement.id}/users`}
+                                className={BTN}
+                            >
+                                <Users className="h-3.5 w-3.5" />
+                                Per-user breakdown
+                            </Link>
+                        )}
+                        {readonly ? null : isPreview ? (
                             <button
                                 onClick={save}
                                 disabled={saving}
@@ -559,9 +575,10 @@ export default function IncomeStatementShow({
 
                 <p className="mt-3 text-[11px] text-gray-400">
                     Gross Profit = Delivered − Cost of Sales. Net Profit = Gross
-                    Profit − Advisory Share − OPEX. Cost-of-Sales types are set
-                    on the Transaction Types page; uncheck any line to exclude
-                    it.
+                    Profit − Advisory Share − OPEX.
+                    {isPreview
+                        ? ' Cost-of-Sales types are set on the Transaction Types page; uncheck any line to exclude it.'
+                        : ''}
                 </p>
             </div>
         </AppLayout>

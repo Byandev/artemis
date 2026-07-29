@@ -15,6 +15,7 @@ use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
+use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 
 /**
@@ -108,7 +109,7 @@ class IncomeStatementController extends Controller
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace)
+    public function store(Request $request, Workspace $workspace, UserIncomeStatementService $userStatements)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
@@ -144,6 +145,8 @@ class IncomeStatementController extends Controller
             ['workspace_id' => $workspace->id],
             ['cod_fee_rate' => $codRate, 'vat_rate' => $vatRate, 'advisory_rate' => $advisoryRate],
         );
+
+        $userStatements->snapshot($statement);
 
         return redirect()
             ->route('workspaces.finance.income-statements.show', [$workspace->slug, $statement->id])
@@ -188,7 +191,7 @@ class IncomeStatementController extends Controller
     }
 
     /** Re-pull the month's numbers with the snapshotted rates + included lines. */
-    public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
+    public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement, UserIncomeStatementService $userStatements)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
@@ -198,7 +201,7 @@ class IncomeStatementController extends Controller
 
         $includedKeys = $incomeStatement->breakdown->map(fn ($b) => $this->keyForRow($b));
 
-        $this->persist(
+        $statement = $this->persist(
             $workspace,
             $periodMonth,
             $from,
@@ -208,6 +211,8 @@ class IncomeStatementController extends Controller
             (float) $incomeStatement->vat_rate,
             (float) $incomeStatement->advisory_rate,
         );
+
+        $userStatements->snapshot($statement);
 
         return redirect()->back()->with('success', 'Income statement regenerated.');
     }

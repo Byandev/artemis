@@ -23,11 +23,14 @@ class InternResolver
     /** @var array<string,int> lowercased username => intern PK */
     private array $byUsername = [];
 
+    /** @var array<string,int> lowercased alias (other_names) => intern PK */
+    private array $byOther = [];
+
     public function __construct(int $workspaceId)
     {
         Intern::query()
             ->where('workspace_id', $workspaceId)
-            ->get(['id', 'full_name', 'username'])
+            ->get(['id', 'full_name', 'username', 'other_names'])
             ->each(function (Intern $intern) {
                 if ($key = $this->normalize($intern->full_name)) {
                     $this->byName[$key] = $intern->id;
@@ -35,6 +38,14 @@ class InternResolver
 
                 if ($key = $this->normalize($intern->username)) {
                     $this->byUsername[$key] = $intern->id;
+                }
+
+                foreach ((array) $intern->other_names as $alias) {
+                    // First intern to claim an alias keeps it; canonical
+                    // name/username always win in resolve() regardless.
+                    if (($key = $this->normalize($alias)) && ! isset($this->byOther[$key])) {
+                        $this->byOther[$key] = $intern->id;
+                    }
                 }
             });
     }
@@ -51,7 +62,7 @@ class InternResolver
         ]);
 
         foreach ($candidates as $candidate) {
-            if ($id = $this->byName[$candidate] ?? $this->byUsername[$candidate] ?? null) {
+            if ($id = $this->byName[$candidate] ?? $this->byUsername[$candidate] ?? $this->byOther[$candidate] ?? null) {
                 return $id;
             }
         }

@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\GencysERP\Support\OrderItemParser;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -48,6 +51,43 @@ class DailySalesTrackerController extends Controller
         'price_upsell',
         'intern_brands_name',
         'total_cog',
+    ];
+
+    /**
+     * Columns the test-order form may set. Everything is nullable in the schema,
+     * so test rows can be as sparse or as complete as the scenario needs.
+     */
+    private const TEST_ORDER_FIELDS = [
+        'order_no' => ['nullable', 'string', 'max:255'],
+        'order_date' => ['nullable', 'date'],
+        'csr' => ['nullable', 'string', 'max:255'],
+        'verifier_name' => ['nullable', 'string', 'max:255'],
+        'upsell_by' => ['nullable', 'string', 'max:255'],
+        'customer_name' => ['nullable', 'string', 'max:255'],
+        'address' => ['nullable', 'string', 'max:1000'],
+        'province' => ['nullable', 'string', 'max:255'],
+        'city' => ['nullable', 'string', 'max:255'],
+        'brgy' => ['nullable', 'string', 'max:255'],
+        'contact' => ['nullable', 'string', 'max:255'],
+        'order_details' => ['nullable', 'string', 'max:1000'],
+        'total_qty' => ['nullable', 'integer', 'min:0'],
+        'price_final' => ['nullable', 'numeric'],
+        'price_initial' => ['nullable', 'numeric'],
+        'shipping_fee' => ['nullable', 'numeric'],
+        'page' => ['nullable', 'string', 'max:255'],
+        'platform' => ['nullable', 'string', 'max:255'],
+        'tracking_number' => ['nullable', 'string', 'max:255'],
+        'courier' => ['nullable', 'string', 'max:255'],
+        'parcel_status' => ['nullable', 'string', 'max:255'],
+        'order_status' => ['nullable', 'string', 'max:255'],
+        'mop' => ['nullable', 'string', 'max:255'],
+        'encoded_date' => ['nullable', 'date'],
+        'parcel_updated_date' => ['nullable', 'date'],
+        'shipped_out_date' => ['nullable', 'date'],
+        'date_added' => ['nullable', 'date'],
+        'price_upsell' => ['nullable', 'numeric'],
+        'intern_brands_name' => ['nullable', 'string', 'max:255'],
+        'total_cog' => ['nullable', 'numeric'],
     ];
 
     /**
@@ -104,12 +144,72 @@ class DailySalesTrackerController extends Controller
             'platforms' => $distinct('platform'),
             'parcelStatuses' => $distinct('parcel_status'),
             'orderStatuses' => $distinct('order_status'),
+            'canManageTestOrders' => ! app()->isProduction(),
             'query' => [
                 'sort' => $request->input('sort', '-order_date'),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    /**
+     * Create a hand-made order for testing downstream features (income
+     * statements, the daily sales table) without waiting on an ERP sync.
+     *
+     * TESTING ONLY — blocked in production, and the routes aren't even
+     * registered there. Rows land in the reserved test id range so a real sync
+     * can never overwrite them and they stay identifiable.
+     */
+    public function store(Request $request, Workspace $workspace): RedirectResponse
+    {
+        $this->abortIfProduction();
+        $this->authorize('View Daily Sales Tracker', $workspace);
+
+        $data = $request->validate(self::TEST_ORDER_FIELDS);
+
+        $order = DB::transaction(function () use ($workspace, $data) {
+            $order = GencysDailySalesOrder::create([
+                'id' => GencysDailySalesOrder::nextTestId(),
+                'workspace_id' => $workspace->id,
+                ...$data,
+            ]);
+
+            // Same parsing the n8n ingest uses, so test rows have the line-item
+            // breakdown real ones do.
+            $items = OrderItemParser::parse($data['order_details'] ?? null);
+
+            if (! empty($items)) {
+                $order->items()->createMany($items);
+            }
+
+            return $order;
+        });
+
+        return back()->with('success', "Test order #{$order->id} created.");
+    }
+
+    /**
+     * Delete a test order. TESTING ONLY — refuses to touch synced Gencys rows.
+     */
+    public function destroy(Workspace $workspace, GencysDailySalesOrder $order): RedirectResponse
+    {
+        $this->abortIfProduction();
+        $this->authorize('View Daily Sales Tracker', $workspace);
+
+        abort_unless($order->workspace_id === $workspace->id, 404);
+        abort_unless($order->is_test, 403, 'Only test orders can be deleted.');
+
+        $order->items()->delete();
+        $order->delete();
+
+        return back()->with('success', 'Test order deleted.');
+    }
+
+    /** The test-order endpoints must never be reachable in production. */
+    private function abortIfProduction(): void
+    {
+        abort_if(app()->isProduction(), 404);
     }
 
     /**
