@@ -467,7 +467,6 @@ class ForDeliveryController extends Controller
             'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
             'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
             'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
-            'auto_tag_status_map' => $workspace->rmoAutoTagStatusMap(),
         ]);
     }
 

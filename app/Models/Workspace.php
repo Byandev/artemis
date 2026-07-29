@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Enums\Permission as PermissionEnum;
 use App\Support\Metrics\MetricRegistry;
-use App\Support\RmoAutoTag;
 use App\Support\WorkspaceMetrics;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -464,19 +463,6 @@ class Workspace extends Model
     public function rmoAutoTagStatusEnabled(): bool
     {
         return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_auto_tag_status;
-    }
-
-    /**
-     * The workspace's parcel-status => RMO-status auto-tag map, sanitised.
-     * Parcel statuses absent from it are never auto-tagged.
-     *
-     * @return array<string, string>
-     */
-    public function rmoAutoTagStatusMap(): array
-    {
-        return RmoAutoTag::sanitizeMap(
-            $this->loadMissing('rmoSetting')->rmoSetting?->auto_tag_status_map
-        );
     }
 
     public function allowedMetrics(): array

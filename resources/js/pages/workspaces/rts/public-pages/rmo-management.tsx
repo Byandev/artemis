@@ -123,13 +123,11 @@ interface Props {
      */
     enable_bulk_status_update?: boolean;
     /**
-     * Workspace-wide switch stored on rmo_settings. When on, mapped parcel
-     * statuses re-tag their RMO status on every parcel sync — which also means
-     * they overwrite manual edits, so the page says so out loud.
+     * Workspace-wide switch stored on rmo_settings. When on, delivered and
+     * returning parcels re-tag their RMO status nightly — which also means they
+     * overwrite manual edits, so the page says so out loud.
      */
     enable_auto_tag_status?: boolean;
-    /** The active parcel status => RMO status map, sanitised server-side. */
-    auto_tag_status_map?: Record<string, string>;
 }
 
 function formatDuration(seconds: number): string {
@@ -365,7 +363,6 @@ function RmoManagement({
     enable_edit_previous_day = false,
     enable_bulk_status_update = false,
     enable_auto_tag_status = false,
-    auto_tag_status_map = {},
 }: Props) {
     const { appEnv, flash } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
@@ -1625,30 +1622,17 @@ function RmoManagement({
                     </div>
                 </div>
 
-                {enable_auto_tag_status &&
-                    Object.keys(auto_tag_status_map).length > 0 && (
-                        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-[12px] text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
-                            <Tags className="h-3.5 w-3.5 shrink-0" />
-                            <span className="font-medium">
-                                Auto-tagging is on.
-                            </span>
-                            <span className="text-sky-700/80 dark:text-sky-300/70">
-                                These parcel statuses set the RMO status
-                                overnight and overwrite manual changes:
-                            </span>
-                            {Object.entries(auto_tag_status_map).map(
-                                ([parcelStatus, rmoStatus]) => (
-                                    <span
-                                        key={parcelStatus}
-                                        className="rounded-md bg-white/70 px-1.5 py-0.5 font-medium dark:bg-white/10"
-                                    >
-                                        {parcelStatus.replace(/_/g, ' ')} →{' '}
-                                        {rmoStatus}
-                                    </span>
-                                ),
-                            )}
-                        </div>
-                    )}
+                {enable_auto_tag_status && (
+                    <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-[12px] text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300">
+                        <Tags className="h-3.5 w-3.5 shrink-0" />
+                        <span className="font-medium">Auto-tagging is on.</span>
+                        <span className="text-sky-700/80 dark:text-sky-300/70">
+                            Delivered parcels are set to DELIVERED and returning
+                            ones to RETURNING overnight, overwriting manual
+                            changes.
+                        </span>
+                    </div>
+                )}
 
                 {showStats && (
                     <div className="mb-6">

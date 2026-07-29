@@ -10,61 +10,26 @@ use Modules\Pancake\Models\OrderForDelivery;
  * status: once the parcel reports "delivered", the RMO status follows to
  * "DELIVERED" on its own, with nobody touching the row.
  *
- * Which parcel statuses tag, and what they tag to, is per-workspace and lives in
- * rmo_settings.auto_tag_status_map. Everything here works on normalised keys —
- * couriers send "OUT FOR DELIVERY" and "out_for_delivery" interchangeably.
+ * The pairs are fixed — only the two that mean the same thing on both sides —
+ * so a workspace's only choice is whether auto-tagging runs at all.
  *
  * The tagging itself is driven by the `rmo:apply-auto-tag` command, which runs
- * on a schedule after the parcel syncs have landed fresh parcel statuses.
+ * nightly once the day's parcel syncs have landed.
  */
 class RmoAutoTag
 {
-    /** Parcel statuses that can drive an auto-tag, keyed by normalised value. */
-    public const PARCEL_STATUSES = [
-        'delivered' => 'Delivered',
-        'returning' => 'Returning',
-        'returned' => 'Returned',
-        'undeliverable' => 'Undeliverable',
-        'on_the_way' => 'On the Way',
-        'out_for_delivery' => 'Out for Delivery',
-        'shipped' => 'Shipped',
-        'in_transit' => 'In Transit',
-        'pending' => 'Pending',
-        'cancelled' => 'Cancelled',
-    ];
-
-    /** RMO statuses a row may be tagged with — mirrors ORDER_STATUSES in TS. */
-    public const RMO_STATUSES = [
-        'PENDING',
-        'DELIVERED',
-        'RIDER OTW',
-        'RETURNING',
-        'RESCHEDULED',
-        'CX CBR',
-        'RIDER CBR',
-        'CANCELLED',
-        'WRONG SEGMENT CODE',
-        'CX RINGING',
-        'RIDER RINGING',
-        'IN TRANSIT',
-        'INCORRECT NUMBER',
-        'AUTO DROP CX',
-        'AUTO DROP RIDER',
-    ];
-
     /**
-     * Offered as a starting point when a workspace first switches auto-tagging
-     * on. Only the parcel statuses with an unambiguous RMO twin — the rest are
-     * a judgement call the workspace has to make itself.
+     * Parcel status (normalised) => RMO status. Deliberately not configurable:
+     * every other parcel status is a judgement call that belongs to a CSR.
      */
-    public const DEFAULT_MAP = [
+    public const MAP = [
         'delivered' => 'DELIVERED',
         'returning' => 'RETURNING',
     ];
 
     /**
      * Collapse a courier's parcel status to the key shape used by the map:
-     * "OUT FOR DELIVERY", "Out For Delivery" and "out_for_delivery" all match.
+     * "DELIVERED", "Delivered" and "delivered" all match.
      */
     public static function normalize(?string $parcelStatus): string
     {
@@ -72,36 +37,8 @@ class RmoAutoTag
     }
 
     /**
-     * Drop unknown parcel statuses and non-status targets, so a map saved
-     * against an older status list can never tag a row with junk.
-     *
-     * @param  array<string, mixed>|null  $map
-     * @return array<string, string>
-     */
-    public static function sanitizeMap(?array $map): array
-    {
-        $clean = [];
-
-        foreach ($map ?? [] as $parcelStatus => $rmoStatus) {
-            $key = self::normalize((string) $parcelStatus);
-
-            if (! isset(self::PARCEL_STATUSES[$key])) {
-                continue;
-            }
-
-            if (! is_string($rmoStatus) || ! in_array($rmoStatus, self::RMO_STATUSES, true)) {
-                continue;
-            }
-
-            $clean[$key] = $rmoStatus;
-        }
-
-        return $clean;
-    }
-
-    /**
      * The RMO status this parcel status should tag to, or null when the
-     * workspace has auto-tagging off or hasn't mapped this parcel status.
+     * workspace has auto-tagging off or the parcel status isn't one of the two.
      */
     public static function statusFor(Workspace $workspace, ?string $parcelStatus): ?string
     {
@@ -109,13 +46,12 @@ class RmoAutoTag
             return null;
         }
 
-        return $workspace->rmoAutoTagStatusMap()[self::normalize($parcelStatus)] ?? null;
+        return self::MAP[self::normalize($parcelStatus)] ?? null;
     }
 
     /**
-     * Re-tag one workspace's RMO rows on $date against its own map, and report
-     * how many rows changed. A no-op when the workspace has auto-tagging off or
-     * has mapped nothing.
+     * Re-tag one workspace's RMO rows on $date, and report how many rows
+     * changed. A no-op when the workspace has auto-tagging off.
      *
      * Shared by the `rmo:apply-auto-tag` command and the settings save, so the
      * two can't drift into tagging differently.
@@ -128,12 +64,12 @@ class RmoAutoTag
 
         $tagged = 0;
 
-        foreach ($workspace->rmoAutoTagStatusMap() as $parcelStatus => $rmoStatus) {
+        foreach (self::MAP as $parcelStatus => $rmoStatus) {
             $tagged += OrderForDelivery::query()
                 ->where('workspace_id', $workspace->id)
                 ->whereDate('delivery_date', $date)
                 // Match the same normalisation applied to the map keys, so a
-                // stored "OUT FOR DELIVERY" still matches "out_for_delivery".
+                // stored "DELIVERED" still matches the "delivered" key.
                 ->whereRaw("LOWER(REPLACE(parcel_status, ' ', '_')) = ?", [$parcelStatus])
                 // Skip rows already carrying the target status — this runs on a
                 // schedule, so most passes should update nothing at all.

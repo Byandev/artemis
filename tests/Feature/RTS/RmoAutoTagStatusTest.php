@@ -57,14 +57,11 @@ function seedAutoTagDelivery(Workspace $workspace, Page $page, Shop $shop, strin
     ], $overrides));
 }
 
-function enableAutoTag(Workspace $workspace, array $map): void
+function enableAutoTag(Workspace $workspace): void
 {
     $workspace->rmoSetting()->updateOrCreate(
         ['workspace_id' => $workspace->id],
-        [
-            'enable_auto_tag_status' => true,
-            'auto_tag_status_map' => $map,
-        ],
+        ['enable_auto_tag_status' => true],
     );
 }
 
@@ -80,44 +77,42 @@ beforeEach(function () {
     $this->shop = Shop::factory()->forWorkspace($this->workspace)->create();
 });
 
-test('with auto-tagging off, a delivered parcel resolves to no RMO status', function () {
+test('with auto-tagging off, neither parcel status resolves to an RMO status', function () {
     expect(RmoAutoTag::statusFor($this->workspace, 'delivered'))->toBeNull();
+    expect(RmoAutoTag::statusFor($this->workspace, 'returning'))->toBeNull();
 });
 
-test('a mapped parcel status resolves to its RMO status', function () {
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
-
-    expect(RmoAutoTag::statusFor($this->workspace->fresh(), 'delivered'))->toBe('DELIVERED');
-});
-
-test('an unmapped parcel status is left alone even while auto-tagging is on', function () {
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
-
-    expect(RmoAutoTag::statusFor($this->workspace->fresh(), 'undeliverable'))->toBeNull();
-});
-
-test('parcel statuses match regardless of case or spacing', function () {
-    enableAutoTag($this->workspace, ['out_for_delivery' => 'RIDER OTW']);
+test('delivered tags to DELIVERED and returning to RETURNING', function () {
+    enableAutoTag($this->workspace);
 
     $workspace = $this->workspace->fresh();
 
-    expect(RmoAutoTag::statusFor($workspace, 'OUT FOR DELIVERY'))->toBe('RIDER OTW');
-    expect(RmoAutoTag::statusFor($workspace, 'Out For Delivery'))->toBe('RIDER OTW');
-    expect(RmoAutoTag::statusFor($workspace, 'out_for_delivery'))->toBe('RIDER OTW');
+    expect(RmoAutoTag::statusFor($workspace, 'delivered'))->toBe('DELIVERED');
+    expect(RmoAutoTag::statusFor($workspace, 'returning'))->toBe('RETURNING');
 });
 
-test('a map holding unknown statuses is sanitised away rather than tagging junk', function () {
-    enableAutoTag($this->workspace, [
-        'delivered' => 'DELIVERED',
-        'teleported' => 'DELIVERED',   // not a parcel status we know
-        'returning' => 'NOT A STATUS', // not an RMO status we know
-    ]);
+test('every other parcel status is left under CSR control', function () {
+    enableAutoTag($this->workspace);
 
-    expect($this->workspace->fresh()->rmoAutoTagStatusMap())->toBe(['delivered' => 'DELIVERED']);
+    $workspace = $this->workspace->fresh();
+
+    foreach (['returned', 'undeliverable', 'out_for_delivery', 'in_transit', 'cancelled'] as $parcelStatus) {
+        expect(RmoAutoTag::statusFor($workspace, $parcelStatus))->toBeNull();
+    }
 });
 
-test('the command re-tags matching orders and leaves the rest alone', function () {
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
+test('parcel statuses match regardless of case or spacing', function () {
+    enableAutoTag($this->workspace);
+
+    $workspace = $this->workspace->fresh();
+
+    expect(RmoAutoTag::statusFor($workspace, 'DELIVERED'))->toBe('DELIVERED');
+    expect(RmoAutoTag::statusFor($workspace, ' Delivered '))->toBe('DELIVERED');
+    expect(RmoAutoTag::statusFor($workspace, 'Returning'))->toBe('RETURNING');
+});
+
+test('the command tags both statuses and leaves the rest alone', function () {
+    enableAutoTag($this->workspace);
 
     $deliveredId = seedAutoTagDelivery(
         $this->workspace,
@@ -127,12 +122,27 @@ test('the command re-tags matching orders and leaves the rest alone', function (
         ['parcel_status' => 'delivered', 'status' => 'RIDER OTW'],
     );
 
-    $inTransitId = seedAutoTagDelivery($this->workspace, $this->page, $this->shop, now()->toDateString());
+    $returningId = seedAutoTagDelivery(
+        $this->workspace,
+        $this->page,
+        $this->shop,
+        now()->toDateString(),
+        ['parcel_status' => 'returning'],
+    );
+
+    $untouchedId = seedAutoTagDelivery(
+        $this->workspace,
+        $this->page,
+        $this->shop,
+        now()->toDateString(),
+        ['parcel_status' => 'undeliverable'],
+    );
 
     $this->artisan('rmo:apply-auto-tag')->assertSuccessful();
 
     expect(autoTaggedStatusOf($deliveredId))->toBe('DELIVERED');
-    expect(autoTaggedStatusOf($inTransitId))->toBe('PENDING');
+    expect(autoTaggedStatusOf($returningId))->toBe('RETURNING');
+    expect(autoTaggedStatusOf($untouchedId))->toBe('PENDING');
 });
 
 test('the command skips workspaces that have auto-tagging off', function () {
@@ -150,7 +160,7 @@ test('the command skips workspaces that have auto-tagging off', function () {
 });
 
 test('the command covers yesterday as well as today by default', function () {
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
+    enableAutoTag($this->workspace);
 
     $yesterdayId = seedAutoTagDelivery(
         $this->workspace,
@@ -174,8 +184,8 @@ test('the command covers yesterday as well as today by default', function () {
     expect(autoTaggedStatusOf($olderId))->toBe('PENDING');
 });
 
-test('--date and --days widen the command to older delivery dates', function () {
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
+test('--date widens the command to an older delivery date', function () {
+    enableAutoTag($this->workspace);
 
     $olderId = seedAutoTagDelivery(
         $this->workspace,
@@ -192,12 +202,12 @@ test('--date and --days widen the command to older delivery dates', function () 
 });
 
 test('--workspace limits the command to a single workspace', function () {
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
+    enableAutoTag($this->workspace);
 
     $otherWorkspace = Workspace::factory()->create(['owner_id' => User::factory()->create()->id]);
     $otherPage = Page::factory()->forWorkspace($otherWorkspace)->create();
     $otherShop = Shop::factory()->forWorkspace($otherWorkspace)->create();
-    enableAutoTag($otherWorkspace, ['delivered' => 'DELIVERED']);
+    enableAutoTag($otherWorkspace);
 
     $mineId = seedAutoTagDelivery(
         $this->workspace,
@@ -222,24 +232,24 @@ test('--workspace limits the command to a single workspace', function () {
     expect(autoTaggedStatusOf($theirsId))->toBe('PENDING');
 });
 
-test('the command matches parcel statuses regardless of case or spacing', function () {
-    enableAutoTag($this->workspace, ['out_for_delivery' => 'RIDER OTW']);
+test('the command matches a parcel status stored in upper case', function () {
+    enableAutoTag($this->workspace);
 
     $id = seedAutoTagDelivery(
         $this->workspace,
         $this->page,
         $this->shop,
         now()->toDateString(),
-        ['parcel_status' => 'OUT FOR DELIVERY'],
+        ['parcel_status' => 'DELIVERED'],
     );
 
     $this->artisan('rmo:apply-auto-tag')->assertSuccessful();
 
-    expect(autoTaggedStatusOf($id))->toBe('RIDER OTW');
+    expect(autoTaggedStatusOf($id))->toBe('DELIVERED');
 });
 
 test('re-running the command changes nothing once rows are tagged', function () {
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
+    enableAutoTag($this->workspace);
 
     $id = seedAutoTagDelivery(
         $this->workspace,
@@ -278,7 +288,6 @@ test('saving the settings re-tags today’s matching orders straight away', func
         'enable_edit_previous_day' => false,
         'enable_bulk_status_update' => false,
         'enable_auto_tag_status' => true,
-        'auto_tag_status_map' => ['delivered' => 'DELIVERED'],
     ])->assertRedirect(route('rmo-settings.edit', ['workspace' => $this->workspace->slug]));
 
     expect(autoTaggedStatusOf($deliveredId))->toBe('DELIVERED');
@@ -304,51 +313,38 @@ test('the immediate re-tag never reaches another workspace’s orders', function
         'enable_edit_previous_day' => false,
         'enable_bulk_status_update' => false,
         'enable_auto_tag_status' => true,
-        'auto_tag_status_map' => ['delivered' => 'DELIVERED'],
     ])->assertRedirect();
 
     expect(autoTaggedStatusOf($foreignId))->toBe('PENDING');
 });
 
-test('the settings page exposes the auto-tag switch and its map', function () {
+test('the settings page exposes and saves the auto-tag switch', function () {
     $manager = autoTagMemberWithPermissions($this->workspace, [PermissionEnum::ManageRmoSettings->value]);
 
     $this->actingAs($manager)->get(route('rmo-settings.edit', ['workspace' => $this->workspace->slug]))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->where('settings.enable_auto_tag_status', false)
-            ->where('settings.auto_tag_status_map', [])
-            ->has('parcel_statuses')
-            ->has('rmo_statuses')
-            ->has('default_auto_tag_map')
-        );
+        ->assertInertia(fn ($page) => $page->where('settings.enable_auto_tag_status', false));
 
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
+    enableAutoTag($this->workspace);
 
     $this->actingAs($manager)->get(route('rmo-settings.edit', ['workspace' => $this->workspace->slug]))
-        ->assertInertia(fn ($page) => $page
-            ->where('settings.enable_auto_tag_status', true)
-            ->where('settings.auto_tag_status_map', ['delivered' => 'DELIVERED'])
-        );
-});
-
-test('an RMO status outside the known list is rejected by validation', function () {
-    $manager = autoTagMemberWithPermissions($this->workspace, [PermissionEnum::ManageRmoSettings->value]);
+        ->assertInertia(fn ($page) => $page->where('settings.enable_auto_tag_status', true));
 
     $this->actingAs($manager)->put(route('rmo-settings.update', ['workspace' => $this->workspace->slug]), [
         'enable_edit_previous_day' => false,
         'enable_bulk_status_update' => false,
-        'enable_auto_tag_status' => true,
-        'auto_tag_status_map' => ['delivered' => 'MADE UP STATUS'],
-    ])->assertSessionHasErrors('auto_tag_status_map.delivered');
+        'enable_auto_tag_status' => false,
+    ])->assertRedirect();
+
+    expect($this->workspace->fresh()->rmoAutoTagStatusEnabled())->toBeFalse();
 });
 
-test('a save that omits the auto-tag fields leaves the map intact', function () {
+test('a save that omits the auto-tag field leaves the switch alone', function () {
     $manager = autoTagMemberWithPermissions($this->workspace, [PermissionEnum::ManageRmoSettings->value]);
 
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
+    enableAutoTag($this->workspace);
 
-    // The other two switches saved on their own must not wipe auto-tagging.
+    // The other two switches saved on their own must not turn auto-tagging off.
     $this->actingAs($manager)->put(route('rmo-settings.update', ['workspace' => $this->workspace->slug]), [
         'enable_edit_previous_day' => true,
         'enable_bulk_status_update' => false,
@@ -358,7 +354,6 @@ test('a save that omits the auto-tag fields leaves the map intact', function () 
 
     expect($workspace->rmoEditPreviousDayEnabled())->toBeTrue();
     expect($workspace->rmoAutoTagStatusEnabled())->toBeTrue();
-    expect($workspace->rmoAutoTagStatusMap())->toBe(['delivered' => 'DELIVERED']);
 });
 
 test('saving the auto-tag switch is gated by Manage RMO Settings', function () {
@@ -368,7 +363,6 @@ test('saving the auto-tag switch is gated by Manage RMO Settings', function () {
         'enable_edit_previous_day' => false,
         'enable_bulk_status_update' => false,
         'enable_auto_tag_status' => true,
-        'auto_tag_status_map' => ['delivered' => 'DELIVERED'],
     ])->assertForbidden();
 
     expect($this->workspace->fresh()->rmoAutoTagStatusEnabled())->toBeFalse();
@@ -381,11 +375,8 @@ test('the public page hands the auto-tag state to the frontend', function () {
     $this->actingAs($admin)->get($url)
         ->assertInertia(fn ($page) => $page->where('enable_auto_tag_status', false));
 
-    enableAutoTag($this->workspace, ['delivered' => 'DELIVERED']);
+    enableAutoTag($this->workspace);
 
     $this->actingAs($admin)->get($url)
-        ->assertInertia(fn ($page) => $page
-            ->where('enable_auto_tag_status', true)
-            ->where('auto_tag_status_map', ['delivered' => 'DELIVERED'])
-        );
+        ->assertInertia(fn ($page) => $page->where('enable_auto_tag_status', true));
 });
