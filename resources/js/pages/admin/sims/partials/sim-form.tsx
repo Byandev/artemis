@@ -39,7 +39,9 @@ export default function SimForm({
         <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
             {/* Workspace */}
             <div>
-                <label className={labelClass}>Workspace</label>
+                <label className={labelClass}>
+                    Workspace <span className="text-red-400">*</span>
+                </label>
                 <select
                     value={data.workspace_id}
                     onChange={(e) => setData('workspace_id', e.target.value)}
@@ -59,7 +61,9 @@ export default function SimForm({
 
             {/* Status */}
             <div>
-                <label className={labelClass}>Status</label>
+                <label className={labelClass}>
+                    Status <span className="text-red-400">*</span>
+                </label>
                 <select
                     value={data.status}
                     onChange={(e) => setData('status', e.target.value)}
@@ -76,7 +80,9 @@ export default function SimForm({
 
             {/* Phone number */}
             <div>
-                <label className={labelClass}>Phone number</label>
+                <label className={labelClass}>
+                    Phone number <span className="text-red-400">*</span>
+                </label>
                 <input
                     type="text"
                     value={data.phone_number}
@@ -91,7 +97,9 @@ export default function SimForm({
 
             {/* Carrier */}
             <div>
-                <label className={labelClass}>Carrier</label>
+                <label className={labelClass}>
+                    Carrier <span className="text-red-400">*</span>
+                </label>
                 <select
                     value={data.carrier}
                     onChange={(e) => setData('carrier', e.target.value)}
@@ -111,7 +119,7 @@ export default function SimForm({
 
             {/* Port number */}
             <div>
-                <label className={labelClass}>Hardware port</label>
+                <label className={labelClass}>Hardware port (optional)</label>
                 <input
                     type="number"
                     min="1"
