@@ -78,7 +78,7 @@ class InventoryDashboardQuery
         // PO tiles count only orders created in the window.
         $openPos = PurchasedOrder::where('workspace_id', $this->workspace->id)
             ->whereBetween('created_at', [$this->start->toDateTimeString(), $this->end->toDateTimeString()])
-            ->whereNotIn('status', [7, 8]);
+            ->whereNotIn('status', PurchasedOrder::CLOSED_STATUSES);
 
         // Shrinkage (bad + lost) over the selected window — a loss-monitoring tile.
         $shrinkage = DB::table('inventory_transactions')
@@ -185,7 +185,7 @@ class InventoryDashboardQuery
             ->join('inventory_purchased_orders as po', 'po.id', '=', 'poi.inventory_purchased_order_id')
             ->where('po.workspace_id', $this->workspace->id)
             ->whereBetween('po.issue_date', [$this->start->toDateString(), $this->end->toDateString()])
-            ->whereNotIn('po.status', [7, 8])
+            ->whereNotIn('po.status', PurchasedOrder::CLOSED_STATUSES)
             ->selectRaw("SUM(CASE WHEN $delivered <= 0 THEN 1 ELSE 0 END) as waiting")
             ->selectRaw("SUM(CASE WHEN $delivered > 0 AND $delivered < poi.count THEN 1 ELSE 0 END) as partial")
             ->selectRaw("SUM(CASE WHEN $delivered >= poi.count AND $delivered > 0 THEN 1 ELSE 0 END) as delivered")
@@ -248,7 +248,7 @@ class InventoryDashboardQuery
         $today = CarbonImmutable::now()->toDateString();
 
         return PurchasedOrder::where('workspace_id', $this->workspace->id)
-            ->whereNotIn('status', [7, 8])
+            ->whereNotIn('status', PurchasedOrder::CLOSED_STATUSES)
             ->whereBetween('expected_delivery_date', [$this->start->toDateString(), $this->end->toDateString()])
             ->orderBy('expected_delivery_date')
             ->limit($limit)

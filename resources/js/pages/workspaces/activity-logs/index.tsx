@@ -2,10 +2,7 @@ import ActivityLogView from '@/components/activity-logs/activity-log-view';
 import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
 import { PaginatedData, type BreadcrumbItem } from '@/types';
-import {
-    ActivityLog,
-    ActivityLogSummary,
-} from '@/types/models/ActivityLog';
+import { ActivityLog, ActivityLogSummary } from '@/types/models/ActivityLog';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
 

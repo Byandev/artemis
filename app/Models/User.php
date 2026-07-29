@@ -8,22 +8,36 @@ use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
+use Modules\EscTracker\Models\DailyEscRecord;
+use Modules\EscTracker\Models\EscNotification;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
      */
-    protected $fillable = ['name', 'email', 'gotyme_number', 'password', 'role', 'is_super_admin'];
+    protected $fillable = [
+        'name',
+        'email',
+        'gotyme_number',
+        'password',
+        'role',
+        'is_super_admin',
+        'reminder_time',
+        'current_streak',
+        'longest_streak',
+    ];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -48,6 +62,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
+            'current_streak' => 'integer',
+            'longest_streak' => 'integer',
         ];
     }
 
@@ -164,6 +180,25 @@ class User extends Authenticatable implements MustVerifyEmail
     public function pancakeAccounts(): User|HasMany
     {
         return $this->hasMany(\Modules\Pancake\Models\User::class);
+    }
+
+    /**
+     * Daily Extreme Self-Care records logged by this employee.
+     *
+     * Owned by the EscTracker module; the streak columns on `users` are written
+     * by \Modules\EscTracker\Services\EscStreakCalculator.
+     */
+    public function dailyEscRecords(): HasMany
+    {
+        return $this->hasMany(DailyEscRecord::class);
+    }
+
+    /**
+     * This employee's ESC reminder settings (enabled, time, timezone, style).
+     */
+    public function escNotification(): HasOne
+    {
+        return $this->hasOne(EscNotification::class);
     }
 
     /**

@@ -22,6 +22,7 @@ use Modules\Inventory\Http\Controllers\Api\UnitCodeController as InventoryUnitCo
 
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', HealthController::class)->name('health');
+
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/csr-daily-records', [CsrDailyRecordController::class, 'store'])->name('csr-daily-records.store');
     Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
@@ -48,6 +49,9 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     // key header — that alone identifies the workspace.
     Route::post('/inventory/unit-codes/bulk-sync', [InventoryUnitCodeApiController::class, 'bulkSync'])->name('inventory.unit-codes.bulk-sync');
 });
+
+// The WellSync / ESC API lives in the EscTracker module:
+// Modules/EscTracker/routes/api.php
 
 // GencysERP daily sales tracker callback. n8n posts the scraped rows here and
 // authenticates with the api_key embedded in the body (not a header), so this

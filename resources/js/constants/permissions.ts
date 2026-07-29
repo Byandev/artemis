@@ -58,6 +58,7 @@ export const PERMISSIONS = {
     ViewRtsAnalytics: 'View RTS Analytics',
     ViewRtsAiChat: 'View RTS AI Chat',
     ViewRmoManagement: 'View RMO Management',
+    ManageRmoSettings: 'Manage RMO Settings',
     ViewParcelJourneyTemplates: 'View Parcel Journey Templates',
     ManageParcelJourneyTemplates: 'Manage Parcel Journey Templates',
 
@@ -92,6 +93,7 @@ export const PERMISSIONS = {
     DeleteUnitCode: 'Delete Unit Code',
 
     // Checklist
+    ViewEscTracker: 'View ESC Tracker',
     ViewChecklist: 'View Checklist',
     CreateChecklist: 'Create Checklist',
     EditChecklist: 'Edit Checklist',

@@ -12,7 +12,11 @@ import { Transition } from '@headlessui/react';
 import { Form, Head, router } from '@inertiajs/react';
 import { CheckCircle2, Workflow } from 'lucide-react';
 
-export default function ErpCredentials({ workspace }: { workspace: Workspace }) {
+export default function ErpCredentials({
+    workspace,
+}: {
+    workspace: Workspace;
+}) {
     const baseUrl = `/workspaces/${workspace.slug}/settings/erp-credentials`;
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -39,10 +43,10 @@ export default function ErpCredentials({ workspace }: { workspace: Workspace }) 
                         <HelpTooltip side="right">
                             These credentials are used by our{' '}
                             <span className="font-semibold">n8n</span>{' '}
-                            integration to authenticate against your external ERP
-                            and automatically fetch its data into this workspace.
-                            The password is stored encrypted and is never shown
-                            again after saving.
+                            integration to authenticate against your external
+                            ERP and automatically fetch its data into this
+                            workspace. The password is stored encrypted and is
+                            never shown again after saving.
                         </HelpTooltip>
                     </div>
 
@@ -66,13 +70,17 @@ export default function ErpCredentials({ workspace }: { workspace: Workspace }) 
                         {({ processing, recentlySuccessful, errors }) => (
                             <>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="erp_username">ERP username</Label>
+                                    <Label htmlFor="erp_username">
+                                        ERP username
+                                    </Label>
                                     <Input
                                         id="erp_username"
                                         type="text"
                                         name="erp_username"
                                         className="mt-1 block w-full"
-                                        defaultValue={workspace.erp_username ?? ''}
+                                        defaultValue={
+                                            workspace.erp_username ?? ''
+                                        }
                                         autoComplete="off"
                                         placeholder="integration-account"
                                     />

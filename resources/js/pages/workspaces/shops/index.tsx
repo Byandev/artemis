@@ -636,18 +636,19 @@ const Shops = ({
                                                 )
                                             }
                                         />
-                                        {shopToEdit && editForm.data.pos_token && (
-                                            <ValidateTokenButton
-                                                url={`/workspaces/${workspace.slug}/shops/validate-pos-token`}
-                                                payload={{
-                                                    shop_id: String(
-                                                        shopToEdit.id,
-                                                    ),
-                                                    token: editForm.data
-                                                        .pos_token,
-                                                }}
-                                            />
-                                        )}
+                                        {shopToEdit &&
+                                            editForm.data.pos_token && (
+                                                <ValidateTokenButton
+                                                    url={`/workspaces/${workspace.slug}/shops/validate-pos-token`}
+                                                    payload={{
+                                                        shop_id: String(
+                                                            shopToEdit.id,
+                                                        ),
+                                                        token: editForm.data
+                                                            .pos_token,
+                                                    }}
+                                                />
+                                            )}
                                         {editForm.errors.pos_token && (
                                             <p className={errorClass}>
                                                 {editForm.errors.pos_token}

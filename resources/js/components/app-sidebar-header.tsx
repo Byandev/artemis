@@ -1,7 +1,7 @@
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { NavUser } from '@/components/nav-user';
-import TeamSwitcher from '@/components/team-switcher';
 import SettingsButton from '@/components/settings-button';
+import TeamSwitcher from '@/components/team-switcher';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import WorkspaceSwitcher from './workspace-switcher';
 

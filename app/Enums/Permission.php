@@ -60,6 +60,7 @@ enum Permission: string
     case ViewRtsAnalytics = 'View RTS Analytics';
     case ViewRtsAiChat = 'View RTS AI Chat';
     case ViewRmoManagement = 'View RMO Management';
+    case ManageRmoSettings = 'Manage RMO Settings';
     case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
@@ -92,6 +93,9 @@ enum Permission: string
     case CreateUnitCode = 'Create Unit Code';
     case EditUnitCode = 'Edit Unit Code';
     case DeleteUnitCode = 'Delete Unit Code';
+
+    // ESC Tracker
+    case ViewEscTracker = 'View ESC Tracker';
 
     // Checklist
     case ViewChecklist = 'View Checklist';
@@ -220,6 +224,7 @@ enum Permission: string
             self::ViewRtsAnalytics,
             self::ViewRtsAiChat,
             self::ViewRmoManagement,
+            self::ManageRmoSettings,
             self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
@@ -254,6 +259,8 @@ enum Permission: string
             self::CreateChecklist,
             self::EditChecklist,
             self::DeleteChecklist => 'Checklist',
+
+            self::ViewEscTracker => 'ESC Tracker',
 
             self::ViewFinanceDashboard,
             self::ViewFinanceAccounts,

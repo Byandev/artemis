@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Enums\Permission;
+use App\Exports\RmoCallLogsExport;
 use App\Exports\RmoManagementExport;
 use App\Http\Controllers\Controller;
 use App\Http\Sorts\Order\ForDelivery\ConferrerNameSort;
@@ -21,6 +22,7 @@ use App\Models\Page;
 use App\Models\Workspace;
 use App\Support\PublicWorkspaceGate;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -33,6 +35,11 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ForDeliveryController extends Controller
 {
+    /**
+     * Upper bound on comma-separated terms accepted by the RMO search box.
+     */
+    private const MAX_SEARCH_TERMS = 50;
+
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
         $orderForDelivery = OrderForDelivery::find($id);
@@ -51,13 +58,73 @@ class ForDeliveryController extends Controller
         $isDeliveredYesterday = ($deliveryDate?->isYesterday() ?? false)
             && (strtolower((string) $orderForDelivery->parcel_status) === 'delivered' || strtolower((string) $orderForDelivery->parcel_status) === 'returning');
 
-        if (! $isToday && ! $isDeliveredYesterday) {
-            return redirect()->back()->with('error', "Status can only be updated for orders scheduled for delivery today, or yesterday's delivered orders.");
+        // When the workspace opts in, any past delivery date is editable —
+        // not just yesterday.
+        $isPastDay = $deliveryDate?->lt(today()) ?? false;
+        $canEditAnyPreviousDay = $isPastDay && $this->canEditPreviousDay($workspace);
+
+        if (! $isToday && ! $isDeliveredYesterday && ! $canEditAnyPreviousDay) {
+            return redirect()->back()->with('error', "Status can only be updated for today's orders, or yesterday's delivered orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
         }
 
         $orderForDelivery->update(['status' => $request->status]);
 
         return redirect()->back()->with('success', 'Status updated successfully');
+    }
+
+    /**
+     * Re-status every selected order in one request. Gated behind the
+     * workspace's "bulk status update" switch; orders outside the editable
+     * date window are skipped rather than failing the whole batch.
+     */
+    public function publicBulkUpdateStatus(Workspace $workspace, Request $request)
+    {
+        $data = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'integer',
+            'status' => 'required|string|max:50',
+        ]);
+
+        if (! $workspace->rmoBulkStatusUpdateEnabled()) {
+            return redirect()->back()->with('error', 'Bulk status update is turned off for this workspace.');
+        }
+
+        $canEditAnyPreviousDay = $this->canEditPreviousDay($workspace);
+
+        // Same window as the single-row update: today, plus yesterday's
+        // delivered/returning parcels, widened to every past date when the
+        // workspace unlocked previous-day editing.
+        $editableIds = OrderForDelivery::whereIn('id', $data['ids'])
+            ->where('workspace_id', $workspace->id)
+            ->where(function ($query) use ($canEditAnyPreviousDay) {
+                $query->whereDate('delivery_date', today())
+                    ->orWhere(function ($q) use ($canEditAnyPreviousDay) {
+                        if ($canEditAnyPreviousDay) {
+                            $q->whereDate('delivery_date', '<', today());
+
+                            return;
+                        }
+
+                        $q->whereDate('delivery_date', today()->subDay())
+                            ->whereIn('parcel_status', ['delivered', 'returning']);
+                    });
+            })
+            ->pluck('id');
+
+        if ($editableIds->isEmpty()) {
+            return redirect()->back()->with('error', "Status can only be updated for today's orders, or yesterday's delivered orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
+        }
+
+        OrderForDelivery::whereIn('id', $editableIds)->update(['status' => $data['status']]);
+
+        $skipped = count($data['ids']) - $editableIds->count();
+        $message = "Updated {$editableIds->count()} order(s) to {$data['status']}.";
+
+        if ($skipped > 0) {
+            $message .= " {$skipped} order(s) skipped — outside the editable date range.";
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 
     public function publicBulkAssign(Workspace $workspace, Request $request)
@@ -69,12 +136,21 @@ class ForDeliveryController extends Controller
         ]);
 
         // Assignable for today's orders, and for yesterday's orders only when
-        // the parcel was delivered or returned.
+        // the parcel was delivered or returned. Workspaces that enable
+        // previous-day editing widen this to every past delivery date.
+        $canEditAnyPreviousDay = $this->canEditPreviousDay($workspace);
+
         $updated = OrderForDelivery::whereIn('id', $request->ids)
             ->whereNull('assignee_id')
-            ->where(function ($query) {
+            ->where(function ($query) use ($canEditAnyPreviousDay) {
                 $query->whereDate('delivery_date', today())
-                    ->orWhere(function ($q) {
+                    ->orWhere(function ($q) use ($canEditAnyPreviousDay) {
+                        if ($canEditAnyPreviousDay) {
+                            $q->whereDate('delivery_date', '<', today());
+
+                            return;
+                        }
+
                         $q->whereDate('delivery_date', today()->subDay())
                             ->whereIn('parcel_status', ['delivered', 'returned', 'returning']);
                     });
@@ -92,8 +168,8 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $this->canEditAssignee($orderForDelivery)) {
-            return redirect()->back()->with('error', "Assignee can only be updated for orders scheduled for delivery today, or yesterday's delivered or returned orders.");
+        if (! $this->canEditAssignee($orderForDelivery, $this->canEditPreviousDay($workspace))) {
+            return redirect()->back()->with('error', "Assignee can only be updated for today's orders, or yesterday's delivered or returned orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
         }
 
         if (! $request->userId) {
@@ -102,7 +178,7 @@ class ForDeliveryController extends Controller
 
         $orderForDelivery->update(['assignee_id' => $request->userId]);
 
-        return redirect()->back()->with('success', 'Assignee updated successfully'.$request->userId);
+        return redirect()->back()->with('success', 'Assignee updated successfully');
     }
 
     public function publicUpdatePhones(Workspace $workspace, $id, Request $request)
@@ -135,8 +211,8 @@ class ForDeliveryController extends Controller
             return redirect()->back()->with('error', 'Order not found.');
         }
 
-        if (! $this->canEditAssignee($orderForDelivery)) {
-            return redirect()->back()->with('error', "Assignee can only be removed for orders scheduled for delivery today, or yesterday's delivered or returned orders.");
+        if (! $this->canEditAssignee($orderForDelivery, $this->canEditPreviousDay($workspace))) {
+            return redirect()->back()->with('error', "Assignee can only be removed for today's orders, or yesterday's delivered or returned orders. Turn on \"Edit Previous Days\" to open up earlier dates.");
         }
 
         $orderForDelivery->update(['assignee_id' => null]);
@@ -145,16 +221,31 @@ class ForDeliveryController extends Controller
     }
 
     /**
-     * Assignee is editable for today's orders, and for yesterday's orders
-     * only when the parcel was delivered or returned.
+     * Previous-day editing is governed solely by the workspace's rmo_settings
+     * switch — the same rule for the public page and the authenticated CSR
+     * routes. Only flipping the switch is permission-gated.
      */
-    private function canEditAssignee(OrderForDelivery $orderForDelivery): bool
+    private function canEditPreviousDay(Workspace $workspace): bool
+    {
+        return $workspace->rmoEditPreviousDayEnabled();
+    }
+
+    /**
+     * Assignee is editable for today's orders, and for yesterday's orders
+     * only when the parcel was delivered or returned. When previous-day
+     * editing is unlocked, every past delivery date is editable instead.
+     */
+    private function canEditAssignee(OrderForDelivery $orderForDelivery, bool $canEditPreviousDay = false): bool
     {
         $deliveryDate = $orderForDelivery->delivery_date
             ? Carbon::parse($orderForDelivery->delivery_date)
             : null;
 
         if ($deliveryDate?->isToday() ?? false) {
+            return true;
+        }
+
+        if ($canEditPreviousDay && ($deliveryDate?->lt(today()) ?? false)) {
             return true;
         }
 
@@ -267,19 +358,7 @@ class ForDeliveryController extends Controller
                     $query->whereIn('page_id', $pageIds);
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where(function ($q) use ($value) {
-                        $q->whereHas('order', function ($orderQuery) use ($value) {
-                            $orderQuery->where('order_number', 'LIKE', "%{$value}%")
-                                ->orWhere('tracking_code', 'LIKE', "%{$value}%")
-                                ->orWhereHas('shippingAddress', function ($addrQuery) use ($value) {
-                                    $addrQuery->where('full_name', 'LIKE', "%{$value}%");
-                                });
-                        })
-                            ->orWhere('rider_name', 'LIKE', "%{$value}%")
-                            ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
-                                $conferrerQuery->where('name', 'LIKE', "%{$value}%");
-                            });
-                    });
+                    $this->applyRmoSearch($query, $value);
                 }),
             ])
             ->allowedSorts([
@@ -379,13 +458,20 @@ class ForDeliveryController extends Controller
             'delivered_count' => $totalDelivered,
             'returning_count' => $totalReturning,
             'problematic_count' => $totalProblematic,
+            'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
+            'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
         ]);
     }
 
-    public function publicExport(Request $request, Workspace $workspace)
+    /**
+     * The RMO list as the page currently has it filtered: delivery date, the
+     * "mine only" assignee/confirmee toggles, and the filter bar.
+     *
+     * Shared by the exports so a downloaded file always covers exactly the rows
+     * on screen — the two can't drift apart.
+     */
+    private function filteredRmoQuery(Request $request, Workspace $workspace, string $deliveryDate): QueryBuilder
     {
-        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
-
         $baseQuery = OrderForDelivery::where('workspace_id', $workspace->id);
 
         if ($request->input('assignee_id')) {
@@ -396,32 +482,7 @@ class ForDeliveryController extends Controller
             $baseQuery->where('conferrer_id', $request->input('confirmee_id'));
         }
 
-        $query = QueryBuilder::for($baseQuery)
-            ->addSelect([
-                'pancake_order_for_delivery.*',
-                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
-            ])
-            ->with([
-                'order' => function ($query) {
-                    $query
-                        ->selectRaw("
-                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
-                            (
-                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
-                                FROM pancake_order_phone_number_reports
-                                WHERE order_id = pancake_orders.id
-                                and pancake_order_phone_number_reports.type = 'latest'
-                            ) AS cx_rts_rate
-                        ")
-                        ->with([
-                            'shippingAddress' => function ($subQuery) {
-                                $subQuery->with(['cityOrderSummary']);
-                            },
-                        ]);
-                },
-                'conferrer:id,name',
-                'assignee:id,name',
-            ])
+        return QueryBuilder::for($baseQuery)
             ->allowedFilters([
                 AllowedFilter::callback('page_id', function ($query, $value) {
                     $values = is_string($value) ? explode(',', $value) : (array) $value;
@@ -448,22 +509,42 @@ class ForDeliveryController extends Controller
                     $query->whereIn('page_id', $pageIds);
                 }),
                 AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where(function ($q) use ($value) {
-                        $q->whereHas('order', function ($orderQuery) use ($value) {
-                            $orderQuery->where('order_number', 'LIKE', "%{$value}%")
-                                ->orWhere('tracking_code', 'LIKE', "%{$value}%")
-                                ->orWhereHas('shippingAddress', function ($addrQuery) use ($value) {
-                                    $addrQuery->where('full_name', 'LIKE', "%{$value}%");
-                                });
-                        })
-                            ->orWhere('rider_name', 'LIKE', "%{$value}%")
-                            ->orWhereHas('conferrer', function ($conferrerQuery) use ($value) {
-                                $conferrerQuery->where('name', 'LIKE', "%{$value}%");
-                            });
-                    });
+                    $this->applyRmoSearch($query, $value);
                 }),
             ])
             ->whereDate('delivery_date', $deliveryDate);
+    }
+
+    public function publicExport(Request $request, Workspace $workspace)
+    {
+        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
+
+        $query = $this->filteredRmoQuery($request, $workspace, $deliveryDate)
+            ->addSelect([
+                'pancake_order_for_delivery.*',
+                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
+            ])
+            ->with([
+                'order' => function ($query) {
+                    $query
+                        ->selectRaw("
+                            id, order_number, status_name, final_amount, parcel_status, tracking_code, delivery_attempts,
+                            (
+                                SELECT SUM(order_fail) / NULLIF(SUM(order_fail) + SUM(order_success), 0)
+                                FROM pancake_order_phone_number_reports
+                                WHERE order_id = pancake_orders.id
+                                and pancake_order_phone_number_reports.type = 'latest'
+                            ) AS cx_rts_rate
+                        ")
+                        ->with([
+                            'shippingAddress' => function ($subQuery) {
+                                $subQuery->with(['cityOrderSummary']);
+                            },
+                        ]);
+                },
+                'conferrer:id,name',
+                'assignee:id,name',
+            ]);
 
         $columns = $request->input('columns', []);
         if (is_string($columns)) {
@@ -473,6 +554,51 @@ class ForDeliveryController extends Controller
         $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
         return Excel::download(new RmoManagementExport($query, $columns), $filename);
+    }
+
+    /**
+     * RMO management search accepts several terms at once, separated by commas
+     * (e.g. pasting three tracking codes). Each term is matched against every
+     * searchable field and the terms are OR'd together, so "ABC, DEF" returns
+     * rows matching either. Spatie's QueryBuilder already explodes a
+     * comma-delimited filter value into an array, so handle both shapes.
+     *
+     * The value is `mixed` on purpose: Spatie coerces a bare "true"/"false"
+     * search term into a boolean before it reaches us.
+     *
+     * @param  string|array<int, string>|bool|null  $value
+     */
+    private function applyRmoSearch(Builder $query, mixed $value): void
+    {
+        $terms = collect(is_array($value) ? $value : explode(',', (string) $value))
+            ->map(fn ($term) => trim((string) $term))
+            ->filter()
+            ->unique()
+            // Guardrail: each term adds three LIKE subqueries, so cap the fan-out.
+            ->take(self::MAX_SEARCH_TERMS)
+            ->values();
+
+        if ($terms->isEmpty()) {
+            return;
+        }
+
+        $query->where(function ($outer) use ($terms) {
+            foreach ($terms as $term) {
+                $outer->orWhere(function ($q) use ($term) {
+                    $q->whereHas('order', function ($orderQuery) use ($term) {
+                        $orderQuery->where('order_number', 'LIKE', "%{$term}%")
+                            ->orWhere('tracking_code', 'LIKE', "%{$term}%")
+                            ->orWhereHas('shippingAddress', function ($addrQuery) use ($term) {
+                                $addrQuery->where('full_name', 'LIKE', "%{$term}%");
+                            });
+                    })
+                        ->orWhere('rider_name', 'LIKE', "%{$term}%")
+                        ->orWhereHas('conferrer', function ($conferrerQuery) use ($term) {
+                            $conferrerQuery->where('name', 'LIKE', "%{$term}%");
+                        });
+                });
+            }
+        });
     }
 
     public function myAssignedCount(Request $request, Workspace $workspace)
@@ -500,6 +626,38 @@ class ForDeliveryController extends Controller
             'delivered' => (int) ($row->delivered ?? 0),
             'returning' => (int) ($row->returning_count ?? 0),
         ]);
+    }
+
+    /**
+     * Every call log behind the RMO list for the selected delivery date, as one
+     * row per call, honouring the page's current filters.
+     *
+     * The per-order modal answers "who called this customer?"; this answers the
+     * same question for the whole filtered day in one file. A call belongs to an
+     * order when the CSR, date and phone all line up — the same rule the
+     * customer/rider call-log relations use for their on-screen counts — so a
+     * number shared by two orders is reported under both.
+     */
+    public function publicExportCallLogs(Request $request, Workspace $workspace)
+    {
+        // The page itself is behind the public password gate, so the bulk
+        // download is too — except for signed-in members of the workspace, who
+        // reach the same data through the authenticated CSR route.
+        $user = $request->user();
+        $isMember = $user && ($user->isSuperAdmin() || $user->isMemberOf($workspace));
+
+        if (! $isMember && ! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
+            abort(403);
+        }
+
+        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
+
+        $query = $this->filteredRmoQuery($request, $workspace, $deliveryDate)
+            ->with(['order:id,order_number,tracking_code', 'assignee:id,name', 'conferrer:id,name']);
+
+        $filename = 'rmo-call-logs-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
+
+        return Excel::download(new RmoCallLogsExport($query, $workspace->id, $deliveryDate), $filename);
     }
 
     public function callLogs(Workspace $workspace, Request $request)

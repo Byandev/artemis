@@ -48,6 +48,7 @@ class Workspace extends Model
         'sales_marketing_dashboard_module_enabled',
         'video_editor_dashboard_module_enabled',
         'csr_dashboard_module_enabled',
+        'esc_tracker_module_enabled',
         'sim_gateway_module_enabled',
         'inventory_sync',
         'public_password',
@@ -84,6 +85,7 @@ class Workspace extends Model
         'sales_marketing_dashboard_module_enabled' => 'boolean',
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
+        'esc_tracker_module_enabled' => 'boolean',
         'sim_gateway_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
@@ -111,6 +113,7 @@ class Workspace extends Model
             $this->botcake_module_enabled ? null : 'Botcake',
             $this->meta_ads_module_enabled ? null : 'Meta Ads',
             $this->gencys_module_enabled ? null : 'Gencys ERP',
+            $this->esc_tracker_module_enabled ? null : 'ESC Tracker',
         ]));
     }
 
@@ -426,6 +429,30 @@ class Workspace extends Model
     public function metricSetting()
     {
         return $this->hasOne(WorkspaceMetricSetting::class);
+    }
+
+    public function rmoSetting()
+    {
+        return $this->hasOne(RmoSetting::class);
+    }
+
+    /**
+     * Whether this workspace allows RMO orders from *any* past delivery date to
+     * be assigned / re-statused. Off by default, in which case only today (and
+     * the narrower yesterday carve-out) stays editable.
+     */
+    public function rmoEditPreviousDayEnabled(): bool
+    {
+        return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_edit_previous_day;
+    }
+
+    /**
+     * Whether the RMO management page may re-status selected orders in one go.
+     * Off by default — statuses are then changed one row at a time.
+     */
+    public function rmoBulkStatusUpdateEnabled(): bool
+    {
+        return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_bulk_status_update;
     }
 
     public function allowedMetrics(): array

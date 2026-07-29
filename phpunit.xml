@@ -11,6 +11,16 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!--
+            Module feature tests are listed one directory at a time: the
+            remaining modules' tests have pre-existing failures, so adding
+            Modules/*/tests wholesale would turn the suite red for unrelated
+            reasons. Add a module here once its tests pass.
+        -->
+        <testsuite name="Modules">
+            <directory>Modules/EscTracker/tests/Feature</directory>
+            <directory>Modules/Inventory/tests/Feature</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
