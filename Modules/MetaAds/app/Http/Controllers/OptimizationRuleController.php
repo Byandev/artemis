@@ -323,12 +323,20 @@ class OptimizationRuleController extends Controller
     }
 
     /**
+     * Seconds between queued Meta calls when approving proposals in bulk, so a
+     * large batch doesn't fire every write at the Ads API at once.
+     */
+    private const BULK_APPLY_DELAY_SECONDS = 30;
+
+    /**
      * Queue the approved change against Meta. Reuses ApplyOptimizationAction
      * (pause / enable / budget change + logging) and marks the proposal
      * `applied` on success. A fresh run id means its per-target claim never
      * collides with the daily evaluation run.
+     *
+     * @param  int  $delaySeconds  hold the job back this long before it runs
      */
-    private function applyProposal(OptimizationProposal $proposal): void
+    private function applyProposal(OptimizationProposal $proposal, int $delaySeconds = 0): void
     {
         $rule = $proposal->rule()->first();
         $account = AdAccount::find($proposal->meta_ads_account_id);
@@ -349,7 +357,9 @@ class OptimizationRuleController extends Controller
             $target,
             $proposal->conditions_snapshot ?? [],
             $proposal->id,
-        )->onQueue('meta-ads');
+        )
+            ->onQueue('meta-ads')
+            ->delay($delaySeconds > 0 ? now()->addSeconds($delaySeconds) : null);
     }
 
     public function rejectProposal(Request $request, Workspace $workspace, OptimizationProposal $proposal): RedirectResponse
@@ -376,6 +386,9 @@ class OptimizationRuleController extends Controller
     /**
      * Review many pending proposals at once. Returns the number actually acted
      * on (already-reviewed / cross-workspace ids are silently ignored).
+     *
+     * Approvals are queued 30s apart — the first runs immediately, the rest are
+     * staggered — so approving a big batch doesn't hammer the Meta Ads API.
      */
     private function bulkReview(Request $request, Workspace $workspace, string $status): int
     {
@@ -396,6 +409,8 @@ class OptimizationRuleController extends Controller
             );
         }
 
+        $applied = 0;
+
         foreach ($proposals as $proposal) {
             $proposal->update([
                 'status' => $status,
@@ -404,7 +419,8 @@ class OptimizationRuleController extends Controller
             ]);
 
             if ($status === 'approved') {
-                $this->applyProposal($proposal);
+                $this->applyProposal($proposal, $applied * self::BULK_APPLY_DELAY_SECONDS);
+                $applied++;
             }
         }
 
