@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
+import { PURCHASED_ORDER_STATUS_OPTIONS } from '@/constants/purchased-order-statuses';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -32,17 +33,6 @@ const emptyItem = (): OrderItem => ({
     amount: '',
     total_amount: '',
 });
-
-const STATUSES = [
-    { value: 1, label: 'For Approval' },
-    { value: 2, label: 'Approved' },
-    { value: 3, label: 'To Pay' },
-    { value: 4, label: 'Paid' },
-    { value: 5, label: 'For Purchase' },
-    { value: 6, label: 'Waiting For Delivery' },
-    { value: 7, label: 'Delivered' },
-    { value: 8, label: 'Cancelled' },
-];
 
 export default function Create({ workspace, items }: Props) {
     const { data, setData, post, processing, errors } = useForm({
@@ -180,7 +170,7 @@ export default function Create({ workspace, items }: Props) {
                                     }
                                     className={inputClass}
                                 >
-                                    {STATUSES.map((s) => (
+                                    {PURCHASED_ORDER_STATUS_OPTIONS.map((s) => (
                                         <option key={s.value} value={s.value}>
                                             {s.label}
                                         </option>
