@@ -18,7 +18,7 @@ function waitingFor(int $itemId, $owner, $workspace): ?int
     $value = null;
 
     test()->actingAs($owner)
-        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=0')
         ->assertOk()
         ->assertInertia(function (Assert $page) use ($itemId, &$value) {
             $items = $page->toArray()['props']['items']['data'];

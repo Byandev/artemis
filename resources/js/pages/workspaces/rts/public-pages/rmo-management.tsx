@@ -17,6 +17,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -30,6 +36,7 @@ import publicPage from '@/routes/public-page';
 import { PaginatedData, SharedData } from '@/types';
 import { CallLog } from '@/types/models/CallLog';
 import {
+    ORDER_STATUSES,
     OrderForDelivery,
     OrderStatus,
 } from '@/types/models/Pancake/OrderForDelivery';
@@ -44,6 +51,7 @@ import {
     ChevronUp,
     ClipboardCopy,
     Download,
+    ListChecks,
     Lock,
     MapPin,
     Pencil,
@@ -55,6 +63,7 @@ import {
     X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast, Toaster } from 'sonner';
 import FormModal from './formModal';
 
 const EXPORT_COLUMNS = [
@@ -102,6 +111,16 @@ interface Props {
     delivered_count: number;
     returning_count: number;
     problematic_count: number;
+    /**
+     * Workspace-wide switch stored on rmo_settings. When on, every past
+     * delivery date is assignable / re-statusable.
+     */
+    enable_edit_previous_day?: boolean;
+    /**
+     * Workspace-wide switch stored on rmo_settings. When on, the selection bar
+     * offers a "Set status" action that re-statuses every selected order.
+     */
+    enable_bulk_status_update?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -334,9 +353,28 @@ function RmoManagement({
     delivered_count,
     returning_count,
     problematic_count,
+    enable_edit_previous_day = false,
+    enable_bulk_status_update = false,
 }: Props) {
-    const { appEnv } = usePage<SharedData>().props;
+    const { appEnv, flash } = usePage<SharedData>().props;
     const canEditPhone = appEnv !== 'production';
+
+    // This page renders outside the app/CSR layouts, so it has no Toaster of
+    // its own. Without this every controller rejection — "status can only be
+    // updated for…", "please select a user" — redirects back silently and a
+    // click looks like it did nothing.
+    const flashMessages = flash as
+        | { success?: string | null; error?: string | null }
+        | undefined;
+
+    useEffect(() => {
+        if (flashMessages?.success) {
+            toast.success(flashMessages.success);
+        }
+        if (flashMessages?.error) {
+            toast.error(flashMessages.error);
+        }
+    }, [flashMessages]);
 
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
@@ -418,6 +456,10 @@ function RmoManagement({
     const deliveryDate = query?.delivery_date ?? todayLocal;
     const isToday = deliveryDate === todayLocal;
     const isYesterday = deliveryDate === yesterdayLocal;
+    // Any past delivery date — not just yesterday — is editable when the
+    // workspace enabled the switch.
+    const canEditPastDay =
+        enable_edit_previous_day && deliveryDate < todayLocal;
 
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
@@ -591,33 +633,44 @@ function RmoManagement({
         setBulkConflict(null);
     }, [orders.current_page, orders.data?.length]);
 
+    // The filters currently applied to the table, as query params — so every
+    // export downloads exactly the rows on screen.
+    const exportParams = useCallback(() => {
+        const params = new URLSearchParams();
+        if (searchValue) params.set('filter[search]', searchValue);
+        if (currentStatus) params.set('filter[status]', currentStatus);
+        if (currentParcelStatus)
+            params.set('filter[parcel_status]', currentParcelStatus);
+        if (selectedPageIds.length)
+            params.set('filter[page_id]', selectedPageIds.join(','));
+        if (selectedShopIds.length)
+            params.set('filter[shop_id]', selectedShopIds.join(','));
+        if (selectedUserIds.length)
+            params.set('filter[user_id]', selectedUserIds.join(','));
+        params.set('delivery_date', deliveryDate);
+        if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
+            params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        }
+        if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
+            params.set('confirmee_id', localStorage.getItem('user_id') ?? '');
+        }
+        return params;
+    }, [
+        searchValue,
+        currentStatus,
+        currentParcelStatus,
+        selectedPageIds,
+        selectedShopIds,
+        selectedUserIds,
+        showMyAssigneeOnly,
+        showMyConfirmeeOnly,
+        deliveryDate,
+    ]);
+
     const doExport = useCallback(
         (columns: string[]) => {
             localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
-            const params = new URLSearchParams();
-            if (searchValue) params.set('filter[search]', searchValue);
-            if (currentStatus) params.set('filter[status]', currentStatus);
-            if (currentParcelStatus)
-                params.set('filter[parcel_status]', currentParcelStatus);
-            if (selectedPageIds.length)
-                params.set('filter[page_id]', selectedPageIds.join(','));
-            if (selectedShopIds.length)
-                params.set('filter[shop_id]', selectedShopIds.join(','));
-            if (selectedUserIds.length)
-                params.set('filter[user_id]', selectedUserIds.join(','));
-            params.set('delivery_date', deliveryDate);
-            if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
-                params.set(
-                    'assignee_id',
-                    localStorage.getItem('user_id') ?? '',
-                );
-            }
-            if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
-                params.set(
-                    'confirmee_id',
-                    localStorage.getItem('user_id') ?? '',
-                );
-            }
+            const params = exportParams();
             if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
                 params.set('columns', columns.join(','));
             }
@@ -625,19 +678,15 @@ function RmoManagement({
             const qs = params.toString();
             window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
         },
-        [
-            workspace.slug,
-            searchValue,
-            currentStatus,
-            currentParcelStatus,
-            selectedPageIds,
-            selectedShopIds,
-            selectedUserIds,
-            showMyAssigneeOnly,
-            showMyConfirmeeOnly,
-            deliveryDate,
-        ],
+        [workspace.slug, exportParams],
     );
+
+    // Every call placed against the filtered orders on this delivery date — the
+    // bulk version of the per-order call-log modal.
+    const doExportCallLogs = useCallback(() => {
+        const qs = exportParams().toString();
+        window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/call-logs/export${qs ? `?${qs}` : ''}`;
+    }, [workspace.slug, exportParams]);
 
     const handleDateChange = useCallback(
         (date: string) => {
@@ -840,6 +889,24 @@ function RmoManagement({
         }
         doBulkAssign(userId);
     }, [selectedIds, orders.data, doBulkAssign]);
+
+    const handleBulkUpdateStatus = useCallback(
+        (status: OrderStatus) => {
+            router.post(
+                `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-status`,
+                { ids: Array.from(selectedIds), status },
+                {
+                    preserveScroll: true,
+                    preserveState: false,
+                    onSuccess: () => {
+                        setSelectedIds(new Set());
+                        setBulkConflict(null);
+                    },
+                },
+            );
+        },
+        [selectedIds, workspace.slug],
+    );
 
     const pendingOrders = useMemo(
         () =>
@@ -1213,6 +1280,7 @@ function RmoManagement({
                         row.original.parcel_status?.toLowerCase();
                     const canEditAssignee =
                         isToday ||
+                        canEditPastDay ||
                         (isYesterday &&
                             (parcelStatus === 'delivered' ||
                                 parcelStatus === 'returned' ||
@@ -1262,6 +1330,7 @@ function RmoManagement({
                         row.original.parcel_status?.toLowerCase();
                     const canEditStatus =
                         isToday ||
+                        canEditPastDay ||
                         (isYesterday &&
                             (yesterdayParcelStatus === 'returned' ||
                                 yesterdayParcelStatus === 'returning' ||
@@ -1286,6 +1355,7 @@ function RmoManagement({
             handleUpdatePhone,
             isToday,
             isYesterday,
+            canEditPastDay,
             canEditPhone,
             selectedIds,
             allSelected,
@@ -1297,6 +1367,7 @@ function RmoManagement({
 
     return (
         <div className="min-h-screen overflow-x-hidden bg-stone-50 dark:bg-zinc-950">
+            <Toaster position="top-right" richColors closeButton />
             <FormModal
                 open={isOpen}
                 onOpenChange={(open) => {
@@ -1488,6 +1559,17 @@ function RmoManagement({
                         >
                             <Download className="h-3.5 w-3.5" />
                             Export
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={doExportCallLogs}
+                            title="Download every call placed against these orders on this date"
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <PhoneCall className="h-3.5 w-3.5" />
+                            Export Call Logs
                         </Button>
 
                         <Button
@@ -1745,12 +1827,60 @@ function RmoManagement({
                             <div className="h-3.5 w-px bg-emerald-200 dark:bg-emerald-500/30" />
                             <button
                                 onClick={handleBulkAssignToMe}
-                                disabled={!isToday}
+                                disabled={!isToday && !canEditPastDay}
                                 className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-[12px] font-medium text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 <UserPlus className="h-3.5 w-3.5" />
                                 Assign to me
                             </button>
+                            {enable_bulk_status_update && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger
+                                        disabled={
+                                            !isToday &&
+                                            !isYesterday &&
+                                            !canEditPastDay
+                                        }
+                                        className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-1 text-[12px] font-medium text-emerald-700 transition-colors outline-none hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-500/40 dark:bg-transparent dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                                    >
+                                        <ListChecks className="h-3.5 w-3.5" />
+                                        Set status
+                                        <ChevronDown className="h-3 w-3 opacity-60" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="start"
+                                        className="w-52 overflow-hidden p-1"
+                                    >
+                                        <p className="px-2 pt-1 pb-1.5 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                            Set {selectedIds.size} order
+                                            {selectedIds.size !== 1
+                                                ? 's'
+                                                : ''}{' '}
+                                            to
+                                        </p>
+                                        <div className="max-h-72 overflow-y-auto">
+                                            {ORDER_STATUSES.map((s) => (
+                                                <DropdownMenuItem
+                                                    key={s}
+                                                    onClick={() =>
+                                                        handleBulkUpdateStatus(
+                                                            s,
+                                                        )
+                                                    }
+                                                    className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-[12px] text-gray-600 dark:text-gray-400"
+                                                >
+                                                    <span
+                                                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${orderStatusConfig[s]?.dot ?? 'bg-gray-400'}`}
+                                                    />
+                                                    <span className="flex-1">
+                                                        {s}
+                                                    </span>
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                             <button
                                 onClick={() => {
                                     clearSelection();

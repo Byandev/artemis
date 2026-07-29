@@ -84,7 +84,7 @@ class SyncInventoryFromGencysOrders extends Command
             $key = $this->normalize((string) $item->sku);
 
             InventoryItem::where('id', $item->id)->update([
-                'three_days_average' => round(($average[$key] ?? 0) / 3, 4),
+                'three_days_average' => ceil(($average[$key] ?? 0) / 3),
                 'unfulfilled_count' => $unfulfilled[$key] ?? 0,
             ]);
         }

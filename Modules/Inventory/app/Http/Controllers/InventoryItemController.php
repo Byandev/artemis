@@ -324,7 +324,9 @@ class InventoryItemController extends Controller
         $this->authorize('View Inventory Items', $workspace);
 
         $perPage = (int) $request->input('per_page', 100);
-        $summarize = $request->boolean('summarize');
+        // The roll-up is the default view; the toggle has to send an explicit 0
+        // to get the flat per-SKU list.
+        $summarize = $request->boolean('summarize', true);
 
         $items = $summarize
             ? $this->buildSummaryQuery($request, $workspace)->paginate($perPage)->withQueryString()
@@ -360,8 +362,8 @@ class InventoryItemController extends Controller
         $filename = 'inventory-items-'.now()->format('Y-m-d-His').'.xlsx';
 
         // Mirror whatever the list is showing: with the summarize toggle on, export the
-        // parent/child roll-up rather than the flat per-SKU rows.
-        $summarize = $request->boolean('summarize');
+        // parent/child roll-up rather than the flat per-SKU rows. Same default as index().
+        $summarize = $request->boolean('summarize', true);
 
         $query = $summarize
             ? $this->buildSummaryQuery($request, $workspace)
