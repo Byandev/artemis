@@ -52,10 +52,4 @@ class IncomeStatement extends Model
     {
         return $this->hasMany(IncomeStatementExpense::class, 'income_statement_id');
     }
-
-    /** Per-user (per-intern) breakdown statements for this month. */
-    public function userIncomeStatements(): HasMany
-    {
-        return $this->hasMany(UserIncomeStatement::class, 'income_statement_id');
-    }
 }

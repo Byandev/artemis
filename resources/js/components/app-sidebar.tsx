@@ -510,12 +510,6 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceDashboard,
                           },
                           {
-                              title: 'User Income Statements',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/user-income-statements`,
-                              icon: FileText,
-                              permission: PERMISSIONS.ViewFinanceDashboard,
-                          },
-                          {
                               title: 'Remittances',
                               href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
                               icon: Send,
