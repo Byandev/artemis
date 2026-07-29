@@ -633,33 +633,44 @@ function RmoManagement({
         setBulkConflict(null);
     }, [orders.current_page, orders.data?.length]);
 
+    // The filters currently applied to the table, as query params — so every
+    // export downloads exactly the rows on screen.
+    const exportParams = useCallback(() => {
+        const params = new URLSearchParams();
+        if (searchValue) params.set('filter[search]', searchValue);
+        if (currentStatus) params.set('filter[status]', currentStatus);
+        if (currentParcelStatus)
+            params.set('filter[parcel_status]', currentParcelStatus);
+        if (selectedPageIds.length)
+            params.set('filter[page_id]', selectedPageIds.join(','));
+        if (selectedShopIds.length)
+            params.set('filter[shop_id]', selectedShopIds.join(','));
+        if (selectedUserIds.length)
+            params.set('filter[user_id]', selectedUserIds.join(','));
+        params.set('delivery_date', deliveryDate);
+        if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
+            params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        }
+        if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
+            params.set('confirmee_id', localStorage.getItem('user_id') ?? '');
+        }
+        return params;
+    }, [
+        searchValue,
+        currentStatus,
+        currentParcelStatus,
+        selectedPageIds,
+        selectedShopIds,
+        selectedUserIds,
+        showMyAssigneeOnly,
+        showMyConfirmeeOnly,
+        deliveryDate,
+    ]);
+
     const doExport = useCallback(
         (columns: string[]) => {
             localStorage.setItem('rmo_export_columns', JSON.stringify(columns));
-            const params = new URLSearchParams();
-            if (searchValue) params.set('filter[search]', searchValue);
-            if (currentStatus) params.set('filter[status]', currentStatus);
-            if (currentParcelStatus)
-                params.set('filter[parcel_status]', currentParcelStatus);
-            if (selectedPageIds.length)
-                params.set('filter[page_id]', selectedPageIds.join(','));
-            if (selectedShopIds.length)
-                params.set('filter[shop_id]', selectedShopIds.join(','));
-            if (selectedUserIds.length)
-                params.set('filter[user_id]', selectedUserIds.join(','));
-            params.set('delivery_date', deliveryDate);
-            if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
-                params.set(
-                    'assignee_id',
-                    localStorage.getItem('user_id') ?? '',
-                );
-            }
-            if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
-                params.set(
-                    'confirmee_id',
-                    localStorage.getItem('user_id') ?? '',
-                );
-            }
+            const params = exportParams();
             if (columns.length > 0 && columns.length < ALL_COLUMN_KEYS.length) {
                 params.set('columns', columns.join(','));
             }
@@ -667,19 +678,15 @@ function RmoManagement({
             const qs = params.toString();
             window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/export${qs ? `?${qs}` : ''}`;
         },
-        [
-            workspace.slug,
-            searchValue,
-            currentStatus,
-            currentParcelStatus,
-            selectedPageIds,
-            selectedShopIds,
-            selectedUserIds,
-            showMyAssigneeOnly,
-            showMyConfirmeeOnly,
-            deliveryDate,
-        ],
+        [workspace.slug, exportParams],
     );
+
+    // Every call placed against the filtered orders on this delivery date — the
+    // bulk version of the per-order call-log modal.
+    const doExportCallLogs = useCallback(() => {
+        const qs = exportParams().toString();
+        window.location.href = `/public/workspaces/${workspace.slug}/rts/rmo-management/call-logs/export${qs ? `?${qs}` : ''}`;
+    }, [workspace.slug, exportParams]);
 
     const handleDateChange = useCallback(
         (date: string) => {
@@ -1552,6 +1559,17 @@ function RmoManagement({
                         >
                             <Download className="h-3.5 w-3.5" />
                             Export
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={doExportCallLogs}
+                            title="Download every call placed against these orders on this date"
+                            className="flex items-center gap-1.5 rounded-lg text-[12px]"
+                        >
+                            <PhoneCall className="h-3.5 w-3.5" />
+                            Export Call Logs
                         </Button>
 
                         <Button
