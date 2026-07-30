@@ -6,9 +6,12 @@ use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
+use Modules\Finance\Http\Requests\Concerns\SplitsShares;
 
 class TransactionRequest extends FormRequest
 {
+    use SplitsShares;
+
     public function authorize(): bool
     {
         return true;
@@ -40,10 +43,19 @@ class TransactionRequest extends FormRequest
             'charge_to' => ['nullable', 'array'],
             'charge_to.*.user_id' => ['required', 'distinct', $this->memberRule($workspaceId)],
             'charge_to.*.amount' => ['nullable', 'numeric', 'min:0'],
-            // Optional product tag (normalized order_details name) for the
-            // per-product income statement.
-            'product' => ['nullable', 'string', 'max:191'],
+            // A transaction can be charged to several products (normalized
+            // order_details names), each bearing a share of the amount for the
+            // per-product income statement. A blank share is split evenly.
+            'products' => ['nullable', 'array'],
+            'products.*.product' => ['required', 'string', 'max:191', 'distinct'],
+            'products.*.amount' => ['nullable', 'numeric', 'min:0'],
             'reference_no' => ['nullable', 'string', 'max:255'],
+            // The fund request this entry settles. Scoped to the workspace so a
+            // request from elsewhere cannot be attached.
+            'fund_request_id' => [
+                'nullable',
+                Rule::exists('finance_request_funds', 'id')->where('workspace_id', $workspaceId),
+            ],
             'status' => ['nullable', Rule::in(['pending', 'approved', 'posted'])],
             'amount' => ['required', 'numeric', 'min:0'],
             'running_balance' => ['nullable', 'numeric'],
@@ -57,8 +69,8 @@ class TransactionRequest extends FormRequest
     }
 
     /**
-     * The shares must account for the whole amount — otherwise part of the
-     * expense would silently belong to nobody.
+     * The charge-to and per-product shares must each account for the whole amount
+     * — otherwise part of the expense would silently belong to nobody.
      */
     public function after(): array
     {
@@ -67,71 +79,39 @@ class TransactionRequest extends FormRequest
                 return;
             }
 
-            $shares = $this->chargeToShares();
+            $amount = (float) $this->input('amount');
 
-            if ($shares === []) {
-                return;
-            }
-
-            $allocated = array_sum(array_column($shares, 'amount'));
-            $amount = round((float) $this->input('amount'), 2);
-
-            if (abs($allocated - $amount) >= 0.01) {
-                $validator->errors()->add('charge_to', sprintf(
-                    'The charge-to shares add up to %s, but the amount is %s.',
-                    number_format($allocated, 2),
-                    number_format($amount, 2),
-                ));
-            }
+            $this->assertSharesCoverAmount($validator, 'charge_to', 'charge-to', $this->chargeToShares(), $amount);
+            $this->assertSharesCoverAmount($validator, 'products', 'product', $this->productShares(), $amount);
         }];
     }
 
     /**
-     * The submitted charge-to rows as `{user_id, amount}`, with any blank share
-     * taking an even cut of whatever the explicit shares left over. Works in
-     * cents so an uneven split (100 across 3) loses nothing to rounding.
+     * The submitted charge-to rows as `{user_id, amount}`, blank shares taking
+     * an even cut of the remainder (see SplitsShares).
      *
      * @return list<array{user_id:int, amount:float}>
      */
     public function chargeToShares(): array
     {
-        $rows = [];
+        return array_map(
+            fn ($row) => ['user_id' => (int) $row['user_id'], 'amount' => $row['amount']],
+            $this->splitShares('charge_to', 'user_id', (float) $this->input('amount')),
+        );
+    }
 
-        foreach ((array) $this->input('charge_to', []) as $row) {
-            if (! is_array($row) || ! isset($row['user_id']) || $row['user_id'] === '') {
-                continue;
-            }
-
-            $share = $row['amount'] ?? null;
-
-            $rows[] = [
-                'user_id' => (int) $row['user_id'],
-                'cents' => ($share === null || $share === '') ? null : (int) round((float) $share * 100),
-            ];
-        }
-
-        if ($rows === []) {
-            return [];
-        }
-
-        $blank = array_keys(array_filter($rows, fn ($r) => $r['cents'] === null));
-
-        if ($blank !== []) {
-            $explicit = array_sum(array_column($rows, 'cents'));
-            $left = max((int) round((float) $this->input('amount') * 100) - $explicit, 0);
-            $each = intdiv($left, count($blank));
-            $odd = $left - ($each * count($blank));
-
-            // The leftover cents go to the first few users rather than vanishing.
-            foreach ($blank as $i => $index) {
-                $rows[$index]['cents'] = $each + ($i < $odd ? 1 : 0);
-            }
-        }
-
-        return array_map(fn ($r) => [
-            'user_id' => $r['user_id'],
-            'amount' => round($r['cents'] / 100, 2),
-        ], $rows);
+    /**
+     * The submitted product rows as `{product, amount}`, blank shares taking an
+     * even cut of the remainder (see SplitsShares).
+     *
+     * @return list<array{product:string, amount:float}>
+     */
+    public function productShares(): array
+    {
+        return array_map(
+            fn ($row) => ['product' => (string) $row['product'], 'amount' => $row['amount']],
+            $this->splitShares('products', 'product', (float) $this->input('amount')),
+        );
     }
 
     /**

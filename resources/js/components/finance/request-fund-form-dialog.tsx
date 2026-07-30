@@ -11,6 +11,7 @@ import {
     PageOption,
     ProductOption,
 } from '@/components/finance/ad-spent-items';
+import { Share, ShareAllocator } from '@/components/finance/share-allocator';
 import DatePicker from '@/components/ui/date-picker';
 import {
     Dialog,
@@ -39,13 +40,39 @@ export interface RequestFundItem {
     total: number | string;
 }
 
+/** A user the request is charged to, with their share of the amount. */
+export interface ChargedUser {
+    id: number;
+    name: string;
+    pivot: { amount: number | string };
+}
+
+/** A product the request covers, with its share of the amount. */
+export interface RequestFundProduct {
+    product_id: number | null;
+    product_label: string;
+    amount: number | string;
+}
+
+/** One allocation row as the form submits it. A blank amount is split evenly. */
+export interface ChargeToShare {
+    user_id: number;
+    amount: string;
+}
+
+export interface ProductShare {
+    product_id: number;
+    amount: string;
+}
+
 export interface RequestFund {
     id: number;
     template: string;
     request_date: string;
     reference_no: string;
     requested_by: number;
-    charge_to: number;
+    charge_to_users?: ChargedUser[];
+    product_shares?: RequestFundProduct[];
     gotyme_number: string | null;
     purpose: string;
     amount_requested: number | string;
@@ -54,7 +81,6 @@ export interface RequestFund {
     status: string;
     remarks: string | null;
     requester?: UserOption | null;
-    charge_to_user?: UserOption | null;
     approver?: UserOption | null;
     items?: RequestFundItem[];
 }
@@ -119,7 +145,8 @@ export function RequestFundFormDialog({
         template: 'blank',
         request_date: today(),
         requested_by: (meId ?? '') as number | '',
-        charge_to: '' as number | '',
+        charge_to: [] as ChargeToShare[],
+        products: [] as ProductShare[],
         gotyme_number: myGotymeNumber ?? '',
         purpose: '',
         amount_requested: '',
@@ -130,6 +157,37 @@ export function RequestFundFormDialog({
 
     const isAdSpent = data.template === 'ad_spent';
 
+    // An Ad Spent request's total comes from its line items, not the amount
+    // field — the server recomputes it on save, so the shares must add up to
+    // that same figure.
+    const total = isAdSpent
+        ? grandTotal(data.items)
+        : parseFloat(data.amount_requested) || 0;
+
+    // The shares carry on splitting evenly until someone types their own figure.
+    // A saved set is left exactly as it was.
+    const [autoSplit, setAutoSplit] = React.useState(true);
+    const [autoSplitProducts, setAutoSplitProducts] = React.useState(true);
+
+    const chargeToRows: Share[] = data.charge_to.map((r) => ({
+        key: String(r.user_id),
+        amount: r.amount,
+    }));
+
+    const productRows: Share[] = data.products.map((r) => ({
+        key: String(r.product_id),
+        amount: r.amount,
+    }));
+
+    // The sum error lands on `charge_to`, per-row ones on `charge_to.0.user_id`.
+    const fieldErrors = errors as Record<string, string | undefined>;
+
+    const errorFor = (field: string) =>
+        fieldErrors[field] ??
+        Object.entries(fieldErrors).find(([key]) =>
+            key.startsWith(`${field}.`),
+        )?.[1];
+
     // Stable initial dates for the picker (only recomputed when the target record
     // changes), so selecting a date doesn't re-init flatpickr on every keystroke.
     const initialRequestDate =
@@ -139,11 +197,24 @@ export function RequestFundFormDialog({
     useEffect(() => {
         if (!open) return;
         if (requestFund) {
+            setAutoSplit((requestFund.charge_to_users ?? []).length === 0);
+            setAutoSplitProducts(
+                (requestFund.product_shares ?? []).length === 0,
+            );
             setData({
                 template: requestFund.template ?? 'blank',
                 request_date: requestFund.request_date?.slice(0, 10) ?? today(),
                 requested_by: requestFund.requested_by ?? '',
-                charge_to: requestFund.charge_to ?? '',
+                charge_to: (requestFund.charge_to_users ?? []).map((u) => ({
+                    user_id: u.id,
+                    amount: Number(u.pivot?.amount ?? 0).toFixed(2),
+                })),
+                products: (requestFund.product_shares ?? [])
+                    .filter((p) => p.product_id !== null)
+                    .map((p) => ({
+                        product_id: p.product_id as number,
+                        amount: Number(p.amount ?? 0).toFixed(2),
+                    })),
                 gotyme_number: requestFund.gotyme_number ?? '',
                 purpose: requestFund.purpose ?? '',
                 amount_requested: String(requestFund.amount_requested ?? ''),
@@ -164,6 +235,8 @@ export function RequestFundFormDialog({
         } else {
             reset();
             clearErrors();
+            setAutoSplit(true);
+            setAutoSplitProducts(true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, requestFund]);
@@ -202,7 +275,7 @@ export function RequestFundFormDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
                 className={`gap-0 overflow-hidden border-none p-0 shadow-2xl dark:bg-zinc-900 ${
-                    isAdSpent ? 'sm:max-w-3xl' : 'sm:max-w-lg'
+                    isAdSpent ? 'sm:max-w-3xl' : 'sm:max-w-xl'
                 }`}
             >
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
@@ -305,58 +378,79 @@ export function RequestFundFormDialog({
                             </Field>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <Field
-                                label="Requested By"
-                                required
-                                error={errors.requested_by}
+                        <Field
+                            label="Requested By"
+                            required
+                            error={errors.requested_by}
+                        >
+                            <select
+                                value={data.requested_by}
+                                onChange={(e) =>
+                                    setData(
+                                        'requested_by',
+                                        e.target.value
+                                            ? Number(e.target.value)
+                                            : '',
+                                    )
+                                }
+                                className={inputCls}
                             >
-                                <select
-                                    value={data.requested_by}
-                                    onChange={(e) =>
-                                        setData(
-                                            'requested_by',
-                                            e.target.value
-                                                ? Number(e.target.value)
-                                                : '',
-                                        )
-                                    }
-                                    className={inputCls}
-                                >
-                                    <option value="">Select…</option>
-                                    {orderedUsers.map((u) => (
-                                        <option key={u.id} value={u.id}>
-                                            {u.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </Field>
-                            <Field
-                                label="Charge To"
-                                required
-                                error={errors.charge_to}
-                            >
-                                <select
-                                    value={data.charge_to}
-                                    onChange={(e) =>
-                                        setData(
-                                            'charge_to',
-                                            e.target.value
-                                                ? Number(e.target.value)
-                                                : '',
-                                        )
-                                    }
-                                    className={inputCls}
-                                >
-                                    <option value="">Select…</option>
-                                    {users.map((u) => (
-                                        <option key={u.id} value={u.id}>
-                                            {u.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </Field>
-                        </div>
+                                <option value="">Select…</option>
+                                {orderedUsers.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+
+                        <ShareAllocator
+                            label="Charge To"
+                            options={users.map((u) => ({
+                                value: String(u.id),
+                                label: u.name,
+                            }))}
+                            rows={chargeToRows}
+                            total={total}
+                            onChange={(rows) =>
+                                setData(
+                                    'charge_to',
+                                    rows.map((r) => ({
+                                        user_id: Number(r.key),
+                                        amount: r.amount,
+                                    })),
+                                )
+                            }
+                            placeholder="Select…"
+                            error={errorFor('charge_to')}
+                            autoSplit={autoSplit}
+                            onAutoSplitChange={setAutoSplit}
+                            hint="Who the request applies to. Charged to several people? The amount is split between them — edit a share to divide it your way, or leave one blank to give it the remainder."
+                        />
+
+                        <ShareAllocator
+                            label="Products Involved"
+                            options={products.map((p) => ({
+                                value: String(p.id),
+                                label: p.name,
+                            }))}
+                            rows={productRows}
+                            total={total}
+                            onChange={(rows) =>
+                                setData(
+                                    'products',
+                                    rows.map((r) => ({
+                                        product_id: Number(r.key),
+                                        amount: r.amount,
+                                    })),
+                                )
+                            }
+                            placeholder="No product"
+                            error={errorFor('products')}
+                            autoSplit={autoSplitProducts}
+                            onAutoSplitChange={setAutoSplitProducts}
+                            hint="The products this request covers. Optional — leave empty if it isn’t for any product in particular."
+                        />
 
                         <Field
                             label="GoTyme Number"

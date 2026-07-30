@@ -217,13 +217,49 @@ export default function RequestFundsIndex({
             ),
         },
         {
-            id: 'charge_to_user',
+            id: 'charge_to_users',
             header: 'Charge To',
-            cell: ({ row }) => (
-                <span className="text-[12px] text-gray-700 dark:text-gray-200">
-                    {row.original.charge_to_user?.name ?? '—'}
-                </span>
-            ),
+            // A split request shows each person's share, so the list keeps the
+            // same detail the form has.
+            cell: ({ row }) => {
+                const charged = row.original.charge_to_users ?? [];
+
+                if (charged.length === 0) {
+                    return (
+                        <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                            —
+                        </span>
+                    );
+                }
+
+                return (
+                    <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                        {charged.length === 1
+                            ? charged[0].name
+                            : charged
+                                  .map(
+                                      (u) =>
+                                          `${u.name} (${fmt(u.pivot?.amount ?? 0)})`,
+                                  )
+                                  .join(', ')}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'products',
+            header: 'Products',
+            cell: ({ row }) => {
+                const shares = row.original.product_shares ?? [];
+
+                return (
+                    <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                        {shares.length
+                            ? shares.map((p) => p.product_label).join(', ')
+                            : '—'}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'amount_requested',

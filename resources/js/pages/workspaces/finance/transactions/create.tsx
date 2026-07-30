@@ -1,6 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import {
     AccountOpt,
+    FundRequestOption,
     TransactionForm,
     UserOpt,
 } from '@/components/finance/transaction-form';
@@ -16,6 +17,7 @@ interface Props {
     transactionTypes: TransactionTypeItem[];
     users: UserOpt[];
     products: string[];
+    fundRequests: FundRequestOption[];
     departments: string[];
     defaultAccountId?: number | null;
     returnTo?: string | null;
@@ -27,6 +29,7 @@ export default function TransactionCreate({
     transactionTypes,
     users,
     products,
+    fundRequests,
     departments,
     defaultAccountId,
     returnTo,
@@ -56,6 +59,7 @@ export default function TransactionCreate({
                         transactionTypes={transactionTypes}
                         users={users}
                         products={products}
+                        fundRequests={fundRequests}
                         departments={departments}
                         defaults={
                             defaultAccountId

@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FundRequest extends Model
@@ -35,7 +36,6 @@ class FundRequest extends Model
         'request_date',
         'reference_no',
         'requested_by',
-        'charge_to',
         'purpose',
         'amount_requested',
         'date_needed',
@@ -65,6 +65,35 @@ class FundRequest extends Model
         return $this->template === self::TEMPLATE_AD_SPENT;
     }
 
+    /**
+     * The users this request is charged to. Each carries an `amount` pivot —
+     * their share of the request, the shares summing to the amount requested.
+     */
+    public function chargeToUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'finance_request_fund_charge_to', 'fund_request_id', 'user_id')
+            ->withPivot('amount')
+            ->withTimestamps();
+    }
+
+    /**
+     * The products this request covers, each with its share of the amount. Set
+     * on every template, independently of the Ad Spent line items.
+     */
+    public function productShares(): HasMany
+    {
+        return $this->hasMany(FundRequestProduct::class, 'fund_request_id')->orderBy('sort_order');
+    }
+
+    /**
+     * The transactions settling this request. A loose link: several entries may
+     * point here and nothing reconciles their amounts against the request.
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'fund_request_id');
+    }
+
     /*
      * Relations are named so they do NOT collide with the same-named foreign-key
      * columns on serialization (e.g. a requestedBy() relation would serialize to
@@ -74,11 +103,6 @@ class FundRequest extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by');
-    }
-
-    public function chargeToUser(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'charge_to');
     }
 
     public function approver(): BelongsTo

@@ -1,76 +1,45 @@
 <?php
 
+use App\Models\Product;
 use Modules\Finance\Models\Account;
-use Modules\Finance\Models\Transaction;
-use Modules\GencysERP\Models\GencysDailySalesOrder;
 
-function txnUrl($workspace, string $path = ''): string
-{
-    return "/workspaces/{$workspace->slug}/finance/transactions{$path}";
-}
+// Charging a transaction to one or more products (with per-product shares) is
+// covered by TransactionProductsTest. This file covers the product *suggestions*
+// the form offers — the workspace's catalog products, the same list a fund
+// request is built from, so an entry filled in from one lines up exactly.
 
-test('a transaction can be assigned a product on create', function () {
-    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
-
-    $this->actingAs($user)
-        ->post(txnUrl($workspace), [
-            'account_id' => $account->id,
-            'date' => '2026-05-10',
-            'description' => 'Ad spend',
-            'type' => 'out',
-            'amount' => 1000,
-            'product' => 'WIDGET',
-        ])
-        ->assertRedirect();
-
-    $this->assertDatabaseHas('finance_transactions', [
-        'workspace_id' => $workspace->id,
-        'description' => 'Ad spend',
-        'product' => 'WIDGET',
-    ]);
-});
-
-test('a transaction product can be changed on update', function () {
-    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
-    $txn = Transaction::create([
-        'workspace_id' => $workspace->id,
-        'account_id' => $account->id,
-        'date' => '2026-05-10',
-        'description' => 'Ad spend',
-        'type' => 'out',
-        'amount' => 1000,
-        'product' => 'WIDGET',
-    ]);
-
-    $this->actingAs($user)
-        ->put(txnUrl($workspace, "/{$txn->id}"), [
-            'account_id' => $account->id,
-            'date' => '2026-05-10',
-            'description' => 'Ad spend',
-            'type' => 'out',
-            'amount' => 1000,
-            'product' => 'GADGET',
-        ])
-        ->assertRedirect();
-
-    expect($txn->fresh()->product)->toBe('GADGET');
-});
-
-test('the transactions page lists normalized products for the picker', function () {
+test('the transactions page offers the workspace catalog products for the picker', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
 
-    // The quantity prefix ("2X ") is stripped and the name upper-cased, so both
-    // rows collapse to a single "WIDGET" suggestion.
-    GencysDailySalesOrder::create(['id' => 900001, 'workspace_id' => $workspace->id, 'order_details' => '1X WIDGET', 'parcel_status' => 'DELIVERED', 'price_final' => 0, 'shipping_fee' => 0]);
-    GencysDailySalesOrder::create(['id' => 900002, 'workspace_id' => $workspace->id, 'order_details' => '2X widget', 'parcel_status' => 'DELIVERED', 'price_final' => 0, 'shipping_fee' => 0]);
+    Product::factory()->create([
+        'workspace_id' => $workspace->id,
+        'owner_id' => $user->id,
+        'name' => 'Happy Heart Gel',
+    ]);
 
     $this->actingAs($user)
-        ->get(txnUrl($workspace))
+        ->get("/workspaces/{$workspace->slug}/finance/transactions")
         ->assertInertia(fn ($page) => $page
             ->component('workspaces/finance/transactions/index')
-            ->where('products', fn ($products) => collect($products)->contains('WIDGET'))
+            ->where('products', fn ($products) => collect($products)->contains('Happy Heart Gel'))
+        );
+});
+
+test('a product from another workspace is not suggested', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+
+    ['user' => $stranger, 'workspace' => $elsewhere] = makeWorkspaceWithOwner();
+    Product::factory()->create([
+        'workspace_id' => $elsewhere->id,
+        'owner_id' => $stranger->id,
+        'name' => 'Someone Elses Product',
+    ]);
+
+    $this->actingAs($user)
+        ->get("/workspaces/{$workspace->slug}/finance/transactions")
+        ->assertInertia(fn ($page) => $page
+            ->where('products', fn ($products) => ! collect($products)->contains('Someone Elses Product'))
         );
 });

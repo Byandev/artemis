@@ -7,6 +7,7 @@ use App\Enums\Permission;
 use App\Facades\Activity;
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -16,9 +17,9 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\TransactionRequest;
 use Modules\Finance\Models\Account;
+use Modules\Finance\Models\FundRequest;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
-use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -90,7 +91,7 @@ class TransactionController extends Controller
         $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
         $transactions = $this->buildQuery($workspace)
-            ->with(['account', 'remittance', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name'])
+            ->with(['account', 'remittance', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->paginate((int) $request->input('per_page', 100))
@@ -104,7 +105,7 @@ class TransactionController extends Controller
         return Inertia::render('workspaces/finance/transactions/index', [
             'workspace' => $workspace,
             'transactions' => $transactions,
-            ...$this->formOptions($workspace),
+            ...$this->formOptions($request, $workspace),
             'totals' => [
                 'credit' => (float) $totals->total_credit,
                 'debit' => (float) $totals->total_debit,
@@ -123,7 +124,7 @@ class TransactionController extends Controller
 
         return Inertia::render('workspaces/finance/transactions/create', [
             'workspace' => $workspace,
-            ...$this->formOptions($workspace),
+            ...$this->formOptions($request, $workspace),
             'defaultAccountId' => $request->integer('account_id') ?: null,
             'returnTo' => $this->safeReturnTo($request, $workspace),
         ]);
@@ -137,8 +138,8 @@ class TransactionController extends Controller
 
         return Inertia::render('workspaces/finance/transactions/edit', [
             'workspace' => $workspace,
-            'transaction' => $transaction->load('chargeToUsers:users.id,users.name'),
-            ...$this->formOptions($workspace, $transaction),
+            'transaction' => $transaction->load(['chargeToUsers:users.id,users.name', 'productShares', 'fundRequest:id,reference_no']),
+            ...$this->formOptions($request, $workspace, $transaction),
             'returnTo' => $this->safeReturnTo($request, $workspace),
         ]);
     }
@@ -152,21 +153,80 @@ class TransactionController extends Controller
      *                                     builds on the one before it rather
      *                                     than on itself.
      */
-    protected function formOptions(Workspace $workspace, ?Transaction $editing = null): array
+    protected function formOptions(Request $request, Workspace $workspace, ?Transaction $editing = null): array
     {
         return [
             'accounts' => $this->accountOptions($workspace, $editing),
             'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
                 ->orderBy('name')->get(['id', 'name']),
             'users' => $workspace->users()->get(['users.id', 'users.name']),
-            // Suggested product tags (normalized gencys order_details).
-            'products' => GencysDailySalesOrder::distinctProducts($workspace->id),
+            // The product tags the picker offers (see productOptions).
+            'products' => $this->productOptions($request, $workspace, $editing),
+            // Approved requests a new entry can be filled in from.
+            'fundRequests' => $this->fundRequestOptions($workspace),
             // The workspace's saved (active) departments, for the Department select.
             'departments' => Department::ofWorkspace($workspace)
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->pluck('name'),
         ];
+    }
+
+    /**
+     * The product tags the picker offers: the workspace's catalog products, the
+     * same list a fund request is built from, so an entry filled in from one
+     * lines up exactly. Any tag already saved on the entry being edited is
+     * carried along too — the picker only renders a selection it has an option
+     * for, so a tag from before this list (or from a since-renamed product)
+     * would otherwise show up blank.
+     *
+     * @return list<string>
+     */
+    protected function productOptions(Request $request, Workspace $workspace, ?Transaction $editing = null): array
+    {
+        $products = Product::ofWorkspace($workspace)
+            ->visibleTo($request->user(), $workspace)
+            ->orderBy('name')
+            ->pluck('name');
+
+        $saved = $editing?->productShares->pluck('product')->all() ?? [];
+
+        return $products->merge($saved)->filter()->unique()->values()->all();
+    }
+
+    /**
+     * The fund requests a transaction can be filled in from — the workspace's
+     * approved and released ones, newest first, each carrying the shares the
+     * form copies across. Capped: this rides along with every form render, and
+     * a request older than the most recent hundred is not what someone is
+     * settling today.
+     */
+    protected function fundRequestOptions(Workspace $workspace): Collection
+    {
+        return FundRequest::where('workspace_id', $workspace->id)
+            ->whereIn('status', FundRequest::APPROVED_STATUSES)
+            ->with(['chargeToUsers:users.id,users.name', 'productShares'])
+            ->orderByDesc('request_date')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (FundRequest $fundRequest) => [
+                'id' => $fundRequest->id,
+                'reference_no' => $fundRequest->reference_no,
+                'request_date' => $fundRequest->request_date?->toDateString(),
+                'purpose' => $fundRequest->purpose,
+                'amount_requested' => (float) $fundRequest->amount_requested,
+                'status' => $fundRequest->status,
+                'charge_to' => $fundRequest->chargeToUsers->map(fn ($user) => [
+                    'user_id' => $user->id,
+                    'name' => $user->name,
+                    'amount' => (float) $user->pivot->amount,
+                ])->values(),
+                'products' => $fundRequest->productShares->map(fn ($share) => [
+                    'product_label' => $share->product_label,
+                    'amount' => (float) $share->amount,
+                ])->values(),
+            ]);
     }
 
     /**
@@ -235,8 +295,8 @@ class TransactionController extends Controller
         $this->validateWorkspaceFor($workspace, $request->validated());
 
         $data = $request->validated();
-        // charge_to is a pivot, not a column — synced after the row exists.
-        unset($data['charge_to']);
+        // charge_to / products are pivots, not columns — synced after the row exists.
+        unset($data['charge_to'], $data['products']);
 
         // If position is provided (squeezing in), shift existing rows at that position and after
         if (! empty($data['position'])) {
@@ -257,6 +317,7 @@ class TransactionController extends Controller
 
         $transaction = Transaction::create([...$data, 'workspace_id' => $workspace->id]);
         $transaction->chargeToUsers()->sync($this->chargeToPivot($request->chargeToShares()));
+        $this->syncProductShares($transaction, $request->productShares());
 
         return $this->redirectAfterSave($request, $workspace)->with('success', 'Transaction created.');
     }
@@ -269,7 +330,7 @@ class TransactionController extends Controller
         $this->validateWorkspaceFor($workspace, $request->validated());
 
         $data = $request->validated();
-        unset($data['charge_to']);
+        unset($data['charge_to'], $data['products']);
 
         // Preserve existing position if not provided
         if (empty($data['position'])) {
@@ -278,6 +339,7 @@ class TransactionController extends Controller
 
         $transaction->update($data);
         $transaction->chargeToUsers()->sync($this->chargeToPivot($request->chargeToShares()));
+        $this->syncProductShares($transaction, $request->productShares());
 
         return $this->redirectAfterSave($request, $workspace)->with('success', 'Transaction updated.');
     }
@@ -294,6 +356,22 @@ class TransactionController extends Controller
         return collect($shares)
             ->mapWithKeys(fn ($s) => [$s['user_id'] => ['amount' => $s['amount']]])
             ->all();
+    }
+
+    /**
+     * Replace a transaction's product shares with the given `{product, amount}`
+     * rows (the `finance_transaction_products` pivot has no natural key to sync
+     * against, so the old rows are dropped and the new ones inserted).
+     *
+     * @param  list<array{product:string, amount:float}>  $shares
+     */
+    protected function syncProductShares(Transaction $transaction, array $shares): void
+    {
+        $transaction->productShares()->delete();
+
+        if ($shares !== []) {
+            $transaction->productShares()->createMany($shares);
+        }
     }
 
     public function import(Request $request, Workspace $workspace)
@@ -404,7 +482,7 @@ class TransactionController extends Controller
 
         $transactions = QueryBuilder::for(
             Transaction::where('workspace_id', $workspace->id)
-                ->with(['account', 'transactionType', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name'])
+                ->with(['account', 'transactionType', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
@@ -448,7 +526,7 @@ class TransactionController extends Controller
             fputcsv($out, [
                 'Posted Date', 'Accounts', 'Transaction', 'Requested By', 'Approved By',
                 'Department', 'Type of Expense', 'Debit (Expense)', 'Credit (Income)',
-                'Running Balance', 'Reference No.', 'Charge To', 'Status', 'Sub Category', 'Remarks',
+                'Running Balance', 'Reference No.', 'Fund Request', 'Charge To', 'Status', 'Sub Category', 'Remarks',
             ]);
 
             foreach ($transactions as $txn) {
@@ -464,6 +542,7 @@ class TransactionController extends Controller
                     $txn->type === 'in' ? $txn->amount : '',
                     $txn->running_balance ?? '',
                     $txn->reference_no ?? '',
+                    $txn->fundRequest?->reference_no ?? '',
                     $this->chargeToLabel($txn),
                     $txn->status ?? '',
                     $txn->sub_category ?? '',

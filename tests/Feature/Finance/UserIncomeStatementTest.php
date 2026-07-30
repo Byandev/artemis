@@ -53,8 +53,12 @@ function seedJuan($workspace, $user): Intern
     // Different intern — must be excluded from Juan's statement.
     uisOrder($workspace, ['intern_brands_name' => 'Maria Santos - Beta', 'order_details' => '1X WIDGET', 'price_final' => 9999, 'total_cog' => 999, 'shipping_fee' => 999, 'parcel_updated_date' => '2026-05-12 09:00:00', 'shipped_out_date' => '2026-05-07']);
 
-    // Transactions charged to Juan's user, who bears the whole of each.
+    // Transactions charged to Juan's user, who bears the whole of each. A
+    // `product` tag becomes a single product share for the whole amount.
     $chargeToJuan = function (array $attrs) use ($workspace, $account, $user) {
+        $product = $attrs['product'] ?? null;
+        unset($attrs['product']);
+
         $txn = Transaction::create(array_merge([
             'workspace_id' => $workspace->id,
             'account_id' => $account->id,
@@ -62,6 +66,10 @@ function seedJuan($workspace, $user): Intern
         ], $attrs));
 
         $txn->chargeToUsers()->sync([$user->id => ['amount' => $attrs['amount']]]);
+
+        if ($product !== null) {
+            $txn->productShares()->create(['product' => $product, 'amount' => $attrs['amount']]);
+        }
     };
 
     $chargeToJuan(['date' => '2026-05-14', 'description' => 'Ads', 'transaction_type_id' => $adSpent->id, 'product' => 'WIDGET', 'amount' => 800]);

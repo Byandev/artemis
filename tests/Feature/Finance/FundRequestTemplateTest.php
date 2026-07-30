@@ -44,7 +44,7 @@ function adSpentPayload(array $overrides = []): array
         'template' => 'ad_spent',
         'request_date' => '2026-05-14',
         'requested_by' => test()->user->id,
-        'charge_to' => test()->user->id,
+        'charge_to' => [['user_id' => test()->user->id]],
         'gotyme_number' => '11068673582',
         'purpose' => 'For scaling / running',
         'items' => [
@@ -85,7 +85,7 @@ it('keeps the client amount on a blank request and stores no items', function ()
             'template' => 'blank',
             'request_date' => '2026-05-14',
             'requested_by' => $this->user->id,
-            'charge_to' => $this->user->id,
+            'charge_to' => [['user_id' => $this->user->id]],
             'purpose' => 'Office supplies',
             'amount_requested' => 1234.56,
         ])
@@ -112,7 +112,7 @@ it('requires an amount on a blank request', function () {
             'template' => 'blank',
             'request_date' => '2026-05-14',
             'requested_by' => $this->user->id,
-            'charge_to' => $this->user->id,
+            'charge_to' => [['user_id' => $this->user->id]],
             'purpose' => 'Missing amount',
         ])
         ->assertSessionHasErrors('amount_requested');
@@ -127,7 +127,7 @@ it('drops the items when a request is switched back to blank', function () {
             'template' => 'blank',
             'request_date' => '2026-05-14',
             'requested_by' => $this->user->id,
-            'charge_to' => $this->user->id,
+            'charge_to' => [['user_id' => $this->user->id]],
             'purpose' => 'Switched to blank',
             'amount_requested' => 50,
         ])

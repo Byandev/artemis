@@ -588,10 +588,17 @@ export default function TransactionsIndex({
                     Reference No.
                 </div>
             ),
+            // The fund request this entry settles sits under the reference, so
+            // the ledger shows what a payout was authorised by.
             cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.reference_no || '—'}
-                </span>
+                <div className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                    <span>{row.original.reference_no || '—'}</span>
+                    {row.original.fund_request && (
+                        <span className="mt-0.5 block text-[10px] text-emerald-600 dark:text-emerald-500">
+                            {row.original.fund_request.reference_no}
+                        </span>
+                    )}
+                </div>
             ),
         },
         {

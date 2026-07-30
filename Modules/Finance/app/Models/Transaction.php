@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Transaction extends Model
@@ -23,10 +24,10 @@ class Transaction extends Model
         'type',
         'transaction_type',
         'transaction_type_id',
-        'product',
         'amount',
         'running_balance',
         'reference_no',
+        'fund_request_id',
         'status',
         'position',
         'sub_category',
@@ -67,6 +68,26 @@ class Transaction extends Model
         return $this->belongsToMany(User::class, 'finance_transaction_charge_to', 'transaction_id', 'user_id')
             ->withPivot('amount')
             ->withTimestamps();
+    }
+
+    /**
+     * The products this transaction is charged to. Each carries an `amount` — its
+     * share of the transaction, the shares summing to the full amount. Feeds the
+     * per-product income statement.
+     */
+    public function productShares(): HasMany
+    {
+        return $this->hasMany(TransactionProduct::class, 'transaction_id');
+    }
+
+    /**
+     * The fund request this entry settles, if any. A loose reference: the link
+     * is for traceability and for filling the form in, and no drawdown is
+     * reconciled against the request's amount.
+     */
+    public function fundRequest(): BelongsTo
+    {
+        return $this->belongsTo(FundRequest::class, 'fund_request_id');
     }
 
     public function transactionType(): BelongsTo

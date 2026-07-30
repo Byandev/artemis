@@ -3,16 +3,14 @@ import {
     Footer,
     inputCls,
 } from '@/components/finance/account-form-dialog';
-import { SearchableSelect } from '@/components/finance/searchable-select';
+import { Share, ShareAllocator } from '@/components/finance/share-allocator';
 import { SubCategory } from '@/components/finance/sub-category';
 import {
     buildTransactionTypeOptions,
     TransactionType,
     TransactionTypeItem,
 } from '@/components/finance/transaction-type';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { useForm } from '@inertiajs/react';
-import { Package } from 'lucide-react';
 import React, { useEffect } from 'react';
 
 export type TransactionStatus = 'pending' | 'approved' | 'posted';
@@ -28,6 +26,30 @@ export interface ChargedUser {
 export interface ChargeToShare {
     user_id: number;
     amount: string;
+}
+
+/** A product the transaction is charged to, with its share of the amount. */
+export interface TxnProductShare {
+    product: string;
+    amount: number | string;
+}
+
+/** One product row as the form submits it. A blank amount is split evenly. */
+export interface ProductShare {
+    product: string;
+    amount: string;
+}
+
+/** An approved fund request a new entry can be filled in from. */
+export interface FundRequestOption {
+    id: number;
+    reference_no: string;
+    request_date: string | null;
+    purpose: string;
+    amount_requested: number;
+    status: string;
+    charge_to: { user_id: number; name: string; amount: number }[];
+    products: { product_label: string; amount: number }[];
 }
 
 export interface FinanceTransaction {
@@ -50,7 +72,9 @@ export interface FinanceTransaction {
     status?: TransactionStatus | null;
     position?: number | null;
     sub_category: SubCategory | null;
-    product?: string | null;
+    product_shares?: TxnProductShare[];
+    fund_request_id?: number | null;
+    fund_request?: { id: number; reference_no: string } | null;
     notes: string | null;
 }
 
@@ -74,6 +98,7 @@ interface Props {
     transactionTypes: TransactionTypeItem[];
     users: UserOpt[];
     products?: string[];
+    fundRequests?: FundRequestOption[];
     departments?: string[];
     defaults?: Partial<FinanceTransaction>;
     workspaceSlug: string;
@@ -92,22 +117,6 @@ const money = (n: number) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
-
-/**
- * `total` cut into `count` even shares, in cents so nothing is lost to rounding
- * — 100 across 3 gives 33.34 / 33.33 / 33.33 rather than three times 33.33.
- */
-function evenShares(total: number, count: number): string[] {
-    if (count <= 0) return [];
-
-    const cents = Math.round((Number.isFinite(total) ? total : 0) * 100);
-    const each = Math.floor(cents / count);
-    const odd = cents - each * count;
-
-    return Array.from({ length: count }, (_, i) =>
-        ((each + (i < odd ? 1 : 0)) / 100).toFixed(2),
-    );
-}
 
 /**
  * A titled group of fields — label/description on the left, a two-column field
@@ -151,6 +160,7 @@ export function TransactionForm({
     transactionTypes,
     users,
     products = [],
+    fundRequests = [],
     departments = [],
     defaults,
     workspaceSlug,
@@ -181,12 +191,13 @@ export function TransactionForm({
         approved_by: '' as number | '',
         department: '',
         charge_to: [] as ChargeToShare[],
-        product: '',
+        products: [] as ProductShare[],
         type: 'in' as 'in' | 'out',
         transaction_type_id: defaultTypeId,
         amount: '',
         running_balance: '',
         reference_no: '',
+        fund_request_id: '' as number | '',
         status: 'posted' as TransactionStatus,
         position: '',
         notes: '',
@@ -204,6 +215,7 @@ export function TransactionForm({
     // types their own figure. Same idea for the charge-to shares below.
     const [autoBalance, setAutoBalance] = React.useState(true);
     const [autoSplit, setAutoSplit] = React.useState(true);
+    const [autoSplitProducts, setAutoSplitProducts] = React.useState(true);
 
     const selectedAccount = accounts.find(
         (a) => String(a.id) === data.account_id,
@@ -235,58 +247,60 @@ export function TransactionForm({
         data.running_balance,
     ]);
 
-    const userNames = React.useMemo(
-        () => new Map(users.map((u) => [u.id, u.name])),
-        [users],
-    );
-
-    useEffect(() => {
-        if (!autoSplit) return;
-
-        const shares = evenShares(
-            parseFloat(data.amount) || 0,
-            data.charge_to.length,
-        );
-
-        if (shares.some((s, i) => s !== data.charge_to[i]?.amount)) {
-            setData(
-                'charge_to',
-                data.charge_to.map((row, i) => ({ ...row, amount: shares[i] })),
-            );
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [autoSplit, data.amount, data.charge_to]);
-
-    /** Keep the shares already entered, and start any newly picked user blank. */
-    const setChargedUsers = (ids: string[]) => {
-        setData(
-            'charge_to',
-            ids.map(
-                (id) =>
-                    data.charge_to.find((r) => String(r.user_id) === id) ?? {
-                        user_id: Number(id),
-                        amount: '',
-                    },
-            ),
-        );
-    };
-
-    const setShare = (userId: number, amount: string) => {
-        setAutoSplit(false);
-        setData(
-            'charge_to',
-            data.charge_to.map((r) =>
-                r.user_id === userId ? { ...r, amount } : r,
-            ),
-        );
-    };
-
-    const allocated = data.charge_to.reduce(
-        (sum, r) => sum + (parseFloat(r.amount) || 0),
-        0,
-    );
     const totalAmount = parseFloat(data.amount) || 0;
-    const balanced = Math.abs(allocated - totalAmount) < 0.01;
+
+    // The allocators work in `{key, amount}` rows; the payload keys each row by
+    // user id / product name, so the two shapes are mapped at the boundary.
+    const chargeToRows: Share[] = data.charge_to.map((r) => ({
+        key: String(r.user_id),
+        amount: r.amount,
+    }));
+
+    const productRows: Share[] = data.products.map((r) => ({
+        key: r.product,
+        amount: r.amount,
+    }));
+
+    // A product pulled from a fund request is a catalog name, which the Gencys
+    // suggestion list need not contain — offer whatever is picked either way, or
+    // the allocator would have nothing to render the selection with.
+    const productOptions = React.useMemo(() => {
+        const names = [...products, ...data.products.map((r) => r.product)];
+
+        return [...new Set(names)].map((p) => ({ value: p, label: p }));
+    }, [products, data.products]);
+
+    /**
+     * Fill the form in from an approved fund request. Everything stays editable
+     * afterwards — this saves retyping the request into the ledger, it does not
+     * bind the entry to it. A description already typed is left alone.
+     */
+    const pullFromFundRequest = (id: string) => {
+        setData('fund_request_id', id ? Number(id) : '');
+
+        const request = fundRequests.find((r) => String(r.id) === id);
+
+        if (!request) return;
+
+        setAutoSplit(false);
+        setAutoSplitProducts(false);
+
+        setData((current) => ({
+            ...current,
+            fund_request_id: request.id,
+            amount: String(request.amount_requested ?? ''),
+            reference_no: request.reference_no ?? '',
+            description: current.description || request.purpose || '',
+            charge_to: request.charge_to.map((row) => ({
+                user_id: row.user_id,
+                amount: Number(row.amount ?? 0).toFixed(2),
+            })),
+            products: request.products.map((row) => ({
+                product: row.product_label,
+                amount: Number(row.amount ?? 0).toFixed(2),
+            })),
+        }));
+    };
 
     // The sum error lands on `charge_to`, per-row ones on `charge_to.0.user_id`.
     const fieldErrors = errors as Record<string, string | undefined>;
@@ -294,6 +308,13 @@ export function TransactionForm({
         fieldErrors.charge_to ??
         Object.entries(fieldErrors).find(([key]) =>
             key.startsWith('charge_to.'),
+        )?.[1];
+
+    // Likewise the product sum lands on `products`, per-row on `products.0.product`.
+    const productsError =
+        fieldErrors.products ??
+        Object.entries(fieldErrors).find(([key]) =>
+            key.startsWith('products.'),
         )?.[1];
 
     useEffect(() => {
@@ -305,6 +326,9 @@ export function TransactionForm({
                     transaction.running_balance === '',
             );
             setAutoSplit((transaction.charge_to_users ?? []).length === 0);
+            setAutoSplitProducts(
+                (transaction.product_shares ?? []).length === 0,
+            );
             setData({
                 account_id: String(transaction.account_id),
                 date: String(transaction.date).slice(0, 10),
@@ -316,7 +340,10 @@ export function TransactionForm({
                     user_id: u.id,
                     amount: Number(u.pivot?.amount ?? 0).toFixed(2),
                 })),
-                product: transaction.product ?? '',
+                products: (transaction.product_shares ?? []).map((p) => ({
+                    product: p.product,
+                    amount: Number(p.amount ?? 0).toFixed(2),
+                })),
                 // (numeric user ids; see FinanceTransaction)
                 type: transaction.type,
                 transaction_type_id:
@@ -326,6 +353,7 @@ export function TransactionForm({
                 amount: String(transaction.amount ?? ''),
                 running_balance: String(transaction.running_balance ?? ''),
                 reference_no: transaction.reference_no ?? '',
+                fund_request_id: transaction.fund_request_id ?? '',
                 status: transaction.status ?? 'posted',
                 position: String(transaction.position ?? ''),
                 notes: transaction.notes ?? '',
@@ -335,6 +363,7 @@ export function TransactionForm({
             clearErrors();
             setAutoBalance(true);
             setAutoSplit(true);
+            setAutoSplitProducts(true);
             if (defaults?.account_id)
                 setData('account_id', String(defaults.account_id));
         }
@@ -514,6 +543,38 @@ export function TransactionForm({
                             className={inputCls}
                         />
                     </Field>
+
+                    <Wide>
+                        <Field
+                            label="Fund Request"
+                            error={errors.fund_request_id}
+                        >
+                            <select
+                                value={String(data.fund_request_id)}
+                                onChange={(e) =>
+                                    pullFromFundRequest(e.target.value)
+                                }
+                                className={inputCls}
+                            >
+                                <option value="">
+                                    {fundRequests.length
+                                        ? 'Not from a fund request'
+                                        : 'No approved fund requests'}
+                                </option>
+                                {fundRequests.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                        {r.reference_no} — {r.purpose} (
+                                        {money(r.amount_requested)})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                Picking one fills in the amount, reference,
+                                charged people and products from the request.
+                                Everything stays editable afterwards.
+                            </p>
+                        </Field>
+                    </Wide>
                     <Field label="Status" error={errors.status}>
                         <select
                             value={data.status}
@@ -610,95 +671,52 @@ export function TransactionForm({
                     </Field>
 
                     <Wide>
-                        <Field label="Charge To" error={chargeToError}>
-                            <MultiSelect
-                                options={users.map((u) => ({
-                                    value: String(u.id),
-                                    label: u.name,
-                                }))}
-                                selected={data.charge_to.map((r) =>
-                                    String(r.user_id),
-                                )}
-                                onChange={setChargedUsers}
-                                placeholder="No one charged"
-                            />
-
-                            {data.charge_to.length > 1 && (
-                                <div className="mt-2 space-y-1.5 rounded-[10px] border border-black/8 bg-stone-50 p-2.5 dark:border-white/8 dark:bg-zinc-800/60">
-                                    {data.charge_to.map((row) => (
-                                        <div
-                                            key={row.user_id}
-                                            className="flex items-center gap-2"
-                                        >
-                                            <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-gray-600 dark:text-gray-300">
-                                                {userNames.get(row.user_id) ??
-                                                    `User #${row.user_id}`}
-                                            </span>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                value={row.amount}
-                                                onChange={(e) =>
-                                                    setShare(
-                                                        row.user_id,
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="0.00"
-                                                aria-label={`Share for ${userNames.get(row.user_id) ?? row.user_id}`}
-                                                className="h-8 w-28 rounded-md border border-black/8 bg-white px-2 text-right font-mono! text-[12px]! text-gray-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-100"
-                                            />
-                                        </div>
-                                    ))}
-
-                                    <div className="flex items-center justify-between gap-2 border-t border-black/6 pt-2 dark:border-white/6">
-                                        <span
-                                            className={`font-mono text-[10px] ${
-                                                balanced
-                                                    ? 'text-gray-400 dark:text-gray-500'
-                                                    : 'text-amber-600 dark:text-amber-500'
-                                            }`}
-                                        >
-                                            {money(allocated)} of{' '}
-                                            {money(totalAmount)} allocated
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setAutoSplit(true)}
-                                            className="font-mono text-[10px] text-emerald-600 hover:underline dark:text-emerald-500"
-                                        >
-                                            Split equally
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                Charged to several people? The amount is split
-                                between them — edit a share to divide it your
-                                way. Shares must add up to the amount; leave one
-                                blank to give it the remainder.
-                            </p>
-                        </Field>
+                        <ShareAllocator
+                            label="Charge To"
+                            options={users.map((u) => ({
+                                value: String(u.id),
+                                label: u.name,
+                            }))}
+                            rows={chargeToRows}
+                            total={totalAmount}
+                            onChange={(rows) =>
+                                setData(
+                                    'charge_to',
+                                    rows.map((r) => ({
+                                        user_id: Number(r.key),
+                                        amount: r.amount,
+                                    })),
+                                )
+                            }
+                            placeholder="No one charged"
+                            error={chargeToError}
+                            autoSplit={autoSplit}
+                            onAutoSplitChange={setAutoSplit}
+                            hint="Charged to several people? The amount is split between them — edit a share to divide it your way. Shares must add up to the amount; leave one blank to give it the remainder."
+                        />
                     </Wide>
 
                     <Wide>
-                        <Field label="Product" error={errors.product}>
-                            <SearchableSelect
-                                options={products}
-                                value={data.product}
-                                onChange={(v) => setData('product', v)}
-                                placeholder="No product"
-                                searchPlaceholder="Search products..."
-                                emptyText="No products found."
-                                icon={Package}
-                            />
-                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                Attribute this entry to a product for the
-                                per-product income statement.
-                            </p>
-                        </Field>
+                        <ShareAllocator
+                            label="Product"
+                            options={productOptions}
+                            rows={productRows}
+                            total={totalAmount}
+                            onChange={(rows) =>
+                                setData(
+                                    'products',
+                                    rows.map((r) => ({
+                                        product: r.key,
+                                        amount: r.amount,
+                                    })),
+                                )
+                            }
+                            placeholder="No product"
+                            error={productsError}
+                            autoSplit={autoSplitProducts}
+                            onAutoSplitChange={setAutoSplitProducts}
+                            hint="Attribute this entry to one or more products for the per-product income statement. Split across several? Edit a share to divide it your way, or leave one blank to give it the remainder — the shares must add up to the amount."
+                        />
                     </Wide>
                 </Section>
 

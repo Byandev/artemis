@@ -45,8 +45,9 @@ class FundRequestController extends Controller
             FundRequest::where('workspace_id', $workspace->id)
                 ->with([
                     'requester:id,name',
-                    'chargeToUser:id,name',
+                    'chargeToUsers:users.id,users.name',
                     'approver:id,name',
+                    'productShares',
                     'items',
                 ])
         )
@@ -57,7 +58,11 @@ class FundRequestController extends Controller
                 })),
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('template'),
-                AllowedFilter::exact('charge_to'),
+                // charge_to is a pivot now, so the filter matches any request
+                // the user bears a share of.
+                AllowedFilter::callback('charge_to', fn ($q, $v) => $q->whereHas(
+                    'chargeToUsers', fn ($sub) => $sub->where('users.id', $v)
+                )),
                 AllowedFilter::exact('requested_by'),
             ])
             ->allowedSorts([
@@ -97,7 +102,7 @@ class FundRequestController extends Controller
 
         $validated = $request->validated();
 
-        DB::transaction(function () use ($validated, $workspace) {
+        DB::transaction(function () use ($validated, $request, $workspace) {
             // New requests always start pending; the reference number is generated
             // here (never supplied by the client) and approval happens via updateStatus.
             $fundRequest = FundRequest::create([
@@ -109,6 +114,7 @@ class FundRequestController extends Controller
             ]);
 
             $this->syncItems($fundRequest, $validated, $workspace);
+            $this->syncShares($fundRequest, $request, $workspace);
         });
 
         return redirect()->route('workspaces.finance.request-funds.index', $workspace->slug)
@@ -123,11 +129,12 @@ class FundRequestController extends Controller
 
         $validated = $request->validated();
 
-        DB::transaction(function () use ($validated, $workspace, $requestFund) {
+        DB::transaction(function () use ($validated, $request, $workspace, $requestFund) {
             // reference_no is intentionally omitted from validated data, so it stays put.
             $requestFund->update($this->attributesFor($validated, $workspace));
 
             $this->syncItems($requestFund, $validated, $workspace);
+            $this->syncShares($requestFund, $request, $workspace);
         });
 
         return redirect()->route('workspaces.finance.request-funds.index', $workspace->slug)
@@ -188,7 +195,8 @@ class FundRequestController extends Controller
      */
     protected function attributesFor(array $validated, Workspace $workspace): array
     {
-        $attributes = collect($validated)->except('items')->all();
+        // charge_to / products are pivots, not columns — synced after the row exists.
+        $attributes = collect($validated)->except(['items', 'charge_to', 'products'])->all();
 
         if (($validated['template'] ?? null) === FundRequest::TEMPLATE_AD_SPENT) {
             $attributes['amount_requested'] = collect($validated['items'] ?? [])
@@ -236,6 +244,43 @@ class FundRequestController extends Controller
     protected function lineTotal(array $item): float
     {
         return round((float) $item['budget_per_day'] * (float) $item['days'], 2);
+    }
+
+    /**
+     * Replace a request's charge-to and product shares with the submitted sets.
+     * Both are rewritten rather than diffed — the product rows have no natural
+     * key to sync against, and the order on the form is the order that matters.
+     */
+    protected function syncShares(FundRequest $fundRequest, FundRequestRequest $request, Workspace $workspace): void
+    {
+        $fundRequest->chargeToUsers()->sync(
+            collect($request->chargeToShares())
+                ->mapWithKeys(fn ($share) => [$share['user_id'] => ['amount' => $share['amount']]])
+                ->all()
+        );
+
+        $shares = $request->productShares();
+
+        $fundRequest->productShares()->delete();
+
+        if ($shares === []) {
+            return;
+        }
+
+        // Name snapshots, so a row still reads after its product is deleted and
+        // so a transaction filled in from this request has something to tag.
+        $names = Product::where('workspace_id', $workspace->id)
+            ->whereIn('id', array_column($shares, 'product_id'))
+            ->pluck('name', 'id');
+
+        $fundRequest->productShares()->createMany(
+            collect($shares)->map(fn ($share, $index) => [
+                'product_id' => $share['product_id'],
+                'product_label' => $names[$share['product_id']] ?? '',
+                'amount' => $share['amount'],
+                'sort_order' => $index,
+            ])->all()
+        );
     }
 
     /**
