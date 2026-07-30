@@ -205,7 +205,7 @@ class TransactionController extends Controller
     {
         return FundRequest::where('workspace_id', $workspace->id)
             ->whereIn('status', FundRequest::APPROVED_STATUSES)
-            ->with(['chargeToUsers:users.id,users.name', 'productShares'])
+            ->with(['chargeToUsers:users.id,users.name', 'productShares', 'department:id,name'])
             ->orderByDesc('request_date')
             ->orderByDesc('id')
             ->limit(100)
@@ -214,9 +214,11 @@ class TransactionController extends Controller
                 'id' => $fundRequest->id,
                 'reference_no' => $fundRequest->reference_no,
                 'request_date' => $fundRequest->request_date?->toDateString(),
-                'purpose' => $fundRequest->purpose,
                 'amount_requested' => (float) $fundRequest->amount_requested,
                 'status' => $fundRequest->status,
+                // Copied onto the transaction when one is filled in from here.
+                'transaction_type_id' => $fundRequest->transaction_type_id,
+                'department' => $fundRequest->department?->name,
                 'charge_to' => $fundRequest->chargeToUsers->map(fn ($user) => [
                     'user_id' => $user->id,
                     'name' => $user->name,

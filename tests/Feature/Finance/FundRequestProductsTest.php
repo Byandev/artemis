@@ -27,7 +27,6 @@ beforeEach(function () {
 function productRequestPayload(array $attrs = []): array
 {
     return array_merge([
-        'template' => 'blank',
         'request_date' => '2026-05-14',
         'requested_by' => test()->user->id,
         'charge_to' => [['user_id' => test()->user->id]],
@@ -43,7 +42,7 @@ test('one product bears the whole amount and keeps a name snapshot', function ()
         ]))
         ->assertRedirect();
 
-    $this->assertDatabaseHas('finance_request_fund_products', [
+    $this->assertDatabaseHas('finance_fund_request_product_shares', [
         'fund_request_id' => FundRequest::first()->id,
         'product_id' => $this->widget->id,
         'product_label' => 'Widget',

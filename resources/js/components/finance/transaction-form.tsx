@@ -45,9 +45,10 @@ export interface FundRequestOption {
     id: number;
     reference_no: string;
     request_date: string | null;
-    purpose: string;
     amount_requested: number;
     status: string;
+    transaction_type_id: number | null;
+    department: string | null;
     charge_to: { user_id: number; name: string; amount: number }[];
     products: { product_label: string; amount: number }[];
 }
@@ -273,7 +274,8 @@ export function TransactionForm({
     /**
      * Fill the form in from an approved fund request. Everything stays editable
      * afterwards — this saves retyping the request into the ledger, it does not
-     * bind the entry to it. A description already typed is left alone.
+     * bind the entry to it. The type/department fall back to whatever is already
+     * set when the request carries none.
      */
     const pullFromFundRequest = (id: string) => {
         setData('fund_request_id', id ? Number(id) : '');
@@ -290,7 +292,11 @@ export function TransactionForm({
             fund_request_id: request.id,
             amount: String(request.amount_requested ?? ''),
             reference_no: request.reference_no ?? '',
-            description: current.description || request.purpose || '',
+            transaction_type_id:
+                request.transaction_type_id != null
+                    ? String(request.transaction_type_id)
+                    : current.transaction_type_id,
+            department: request.department ?? current.department,
             charge_to: request.charge_to.map((row) => ({
                 user_id: row.user_id,
                 amount: Number(row.amount ?? 0).toFixed(2),
@@ -440,6 +446,39 @@ export function TransactionForm({
 
                     <Wide>
                         <Field
+                            label="Fund Request"
+                            error={errors.fund_request_id}
+                        >
+                            <select
+                                value={String(data.fund_request_id)}
+                                onChange={(e) =>
+                                    pullFromFundRequest(e.target.value)
+                                }
+                                className={inputCls}
+                            >
+                                <option value="">
+                                    {fundRequests.length
+                                        ? 'Not from a fund request'
+                                        : 'No approved fund requests'}
+                                </option>
+                                {fundRequests.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                        {r.reference_no} (
+                                        {money(r.amount_requested)})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                Picking one fills in the type, department,
+                                amount, reference, charged people and products
+                                from the request. Everything stays editable
+                                afterwards.
+                            </p>
+                        </Field>
+                    </Wide>
+
+                    <Wide>
+                        <Field
                             label="Type of Expense"
                             required
                             error={errors.transaction_type_id}
@@ -544,37 +583,6 @@ export function TransactionForm({
                         />
                     </Field>
 
-                    <Wide>
-                        <Field
-                            label="Fund Request"
-                            error={errors.fund_request_id}
-                        >
-                            <select
-                                value={String(data.fund_request_id)}
-                                onChange={(e) =>
-                                    pullFromFundRequest(e.target.value)
-                                }
-                                className={inputCls}
-                            >
-                                <option value="">
-                                    {fundRequests.length
-                                        ? 'Not from a fund request'
-                                        : 'No approved fund requests'}
-                                </option>
-                                {fundRequests.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.reference_no} — {r.purpose} (
-                                        {money(r.amount_requested)})
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                Picking one fills in the amount, reference,
-                                charged people and products from the request.
-                                Everything stays editable afterwards.
-                            </p>
-                        </Field>
-                    </Wide>
                     <Field label="Status" error={errors.status}>
                         <select
                             value={data.status}

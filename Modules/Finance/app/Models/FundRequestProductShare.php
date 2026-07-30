@@ -11,9 +11,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * add up to its total (see FundRequestRequest::requestTotal()). `product_label`
  * is a name snapshot, so the row still reads after the product is deleted.
  */
-class FundRequestProduct extends Model
+class FundRequestProductShare extends Model
 {
-    protected $table = 'finance_request_fund_products';
+    protected $table = 'finance_fund_request_product_shares';
 
     protected $fillable = [
         'fund_request_id',

@@ -4,7 +4,7 @@ namespace Modules\Finance\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Page;
+use App\Models\Department;
 use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,6 +14,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\FundRequestRequest;
 use Modules\Finance\Models\FundRequest;
+use Modules\Finance\Models\TransactionType;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -48,16 +49,15 @@ class FundRequestController extends Controller
                     'chargeToUsers:users.id,users.name',
                     'approver:id,name',
                     'productShares',
-                    'items',
+                    'transactionType:id,name',
+                    'department:id,name',
                 ])
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($sub) use ($v) {
-                    $sub->where('reference_no', 'like', "%{$v}%")
-                        ->orWhere('purpose', 'like', "%{$v}%");
+                    $sub->where('reference_no', 'like', "%{$v}%");
                 })),
                 AllowedFilter::exact('status'),
-                AllowedFilter::exact('template'),
                 // charge_to is a pivot now, so the filter matches any request
                 // the user bears a share of.
                 AllowedFilter::callback('charge_to', fn ($q, $v) => $q->whereHas(
@@ -69,7 +69,6 @@ class FundRequestController extends Controller
                 'reference_no',
                 'request_date',
                 'amount_requested',
-                'date_needed',
                 'status',
                 'created_at',
                 AllowedSort::field('id', 'id'),
@@ -83,10 +82,11 @@ class FundRequestController extends Controller
             'requestFunds' => $requestFunds,
             'users' => $workspace->users()->get(['users.id', 'users.name']),
             'statuses' => FundRequest::STATUSES,
-            'templates' => FundRequest::TEMPLATES,
             'products' => $this->productOptions($request, $workspace),
-            'myPages' => $this->assignedPageOptions($request, $workspace),
-            'myGotymeNumber' => $request->user()->gotyme_number,
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->orderBy('name')->get(['id', 'name']),
+            'departments' => Department::ofWorkspace($workspace)
+                ->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'canApproveStatus' => $request->user()->can(Permission::ApproveFinanceRequestFunds->value, $workspace),
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
@@ -104,16 +104,19 @@ class FundRequestController extends Controller
 
         DB::transaction(function () use ($validated, $request, $workspace) {
             // New requests always start pending; the reference number is generated
-            // here (never supplied by the client) and approval happens via updateStatus.
+            // here (never supplied by the client) and approval happens via
+            // updateStatus. The request date is the creation date and the
+            // requester is the signed-in user — neither is entered on the form.
             $fundRequest = FundRequest::create([
                 ...$this->attributesFor($validated, $workspace),
                 'workspace_id' => $workspace->id,
                 'reference_no' => $this->nextReferenceNo($workspace),
+                'request_date' => now()->toDateString(),
+                'requested_by' => $request->user()->id,
                 'status' => 'pending',
                 'approved_by' => null,
             ]);
 
-            $this->syncItems($fundRequest, $validated, $workspace);
             $this->syncShares($fundRequest, $request, $workspace);
         });
 
@@ -133,7 +136,6 @@ class FundRequestController extends Controller
             // reference_no is intentionally omitted from validated data, so it stays put.
             $requestFund->update($this->attributesFor($validated, $workspace));
 
-            $this->syncItems($requestFund, $validated, $workspace);
             $this->syncShares($requestFund, $request, $workspace);
         });
 
@@ -189,61 +191,12 @@ class FundRequestController extends Controller
     }
 
     /**
-     * The column values for a request, minus the line items (which live in their
-     * own table). An Ad Spent request derives its amount from those items rather
-     * than trusting the figure the client sent.
+     * The column values for a request. charge_to / products are pivots, not
+     * columns, so they are stripped here and synced after the row exists.
      */
     protected function attributesFor(array $validated, Workspace $workspace): array
     {
-        // charge_to / products are pivots, not columns — synced after the row exists.
-        $attributes = collect($validated)->except(['items', 'charge_to', 'products'])->all();
-
-        if (($validated['template'] ?? null) === FundRequest::TEMPLATE_AD_SPENT) {
-            $attributes['amount_requested'] = collect($validated['items'] ?? [])
-                ->sum(fn (array $item) => $this->lineTotal($item));
-        }
-
-        return $attributes;
-    }
-
-    /**
-     * Replace a request's line items with the submitted set. Items are rewritten
-     * rather than diffed: nothing references them, and the order on the form is
-     * the order that matters.
-     */
-    protected function syncItems(FundRequest $fundRequest, array $validated, Workspace $workspace): void
-    {
-        $fundRequest->items()->delete();
-
-        // Line items belong to the Ad Spent template only, so switching a request
-        // back to blank leaves it with none.
-        if (($validated['template'] ?? null) !== FundRequest::TEMPLATE_AD_SPENT) {
-            return;
-        }
-
-        $items = array_values($validated['items'] ?? []);
-
-        $productNames = Product::where('workspace_id', $workspace->id)
-            ->whereIn('id', collect($items)->pluck('product_id')->filter()->unique())
-            ->pluck('name', 'id');
-
-        foreach ($items as $index => $item) {
-            $fundRequest->items()->create([
-                'product_id' => $item['product_id'],
-                'page_id' => $item['page_id'] ?? null,
-                'item_label' => $productNames[$item['product_id']] ?? '',
-                'creatives_running' => $item['creatives_running'],
-                'budget_per_day' => $item['budget_per_day'],
-                'days' => $item['days'],
-                'total' => $this->lineTotal($item),
-                'sort_order' => $index,
-            ]);
-        }
-    }
-
-    protected function lineTotal(array $item): float
-    {
-        return round((float) $item['budget_per_day'] * (float) $item['days'], 2);
+        return collect($validated)->except(['charge_to', 'products'])->all();
     }
 
     /**
@@ -284,7 +237,7 @@ class FundRequestController extends Controller
     }
 
     /**
-     * Products the user may request against, for the Ad Spent item picker.
+     * Products the user may request against, for the product-share picker.
      */
     protected function productOptions(Request $request, Workspace $workspace)
     {
@@ -292,30 +245,5 @@ class FundRequestController extends Controller
             ->visibleTo($request->user(), $workspace)
             ->orderBy('name')
             ->get(['id', 'name']);
-    }
-
-    /**
-     * The signed-in user's own pages, each carrying its most recent daily budget
-     * so the form can auto-fill "budget per day" once a page is picked. A page
-     * reaches its product through its shop (shops.product_id), which is what lets
-     * the picker narrow pages down to the chosen product.
-     */
-    protected function assignedPageOptions(Request $request, Workspace $workspace)
-    {
-        return Page::ofWorkspace($workspace)
-            ->where('owner_id', $request->user()->id)
-            // latestBudget is a latestOfMany relation: it self-joins, so naming
-            // columns here makes `page_id` ambiguous. Load the whole row.
-            ->with(['shop:id,product_id', 'latestBudget'])
-            ->orderBy('name')
-            ->get(['id', 'name', 'shop_id'])
-            ->map(fn (Page $page) => [
-                'id' => $page->id,
-                'name' => $page->name,
-                'product_id' => $page->shop?->product_id,
-                'budget_per_day' => $page->latestBudget?->budget,
-                'budget_date' => $page->latestBudget?->date?->toDateString(),
-            ])
-            ->values();
     }
 }

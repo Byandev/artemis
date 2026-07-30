@@ -1,9 +1,10 @@
 <?php
 
-use App\Models\Product;
+use App\Models\Department;
 use App\Models\User;
 use App\Models\Workspace;
 use Modules\Finance\Models\FundRequest;
+use Modules\Finance\Models\TransactionType;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -11,14 +12,13 @@ beforeEach(function () {
     $this->url = "/workspaces/{$this->workspace->slug}/finance/request-funds";
 });
 
-/** A blank request payload with everything but the charge-to rows filled in. */
+/**
+ * A blank request payload with everything but the charge-to rows filled in. The
+ * date and requester are stamped by the server, so they are not sent.
+ */
 function fundRequestPayload(array $attrs = []): array
 {
     return array_merge([
-        'template' => 'blank',
-        'request_date' => '2026-05-14',
-        'requested_by' => test()->user->id,
-        'purpose' => 'Office supplies',
         'amount_requested' => 900,
     ], $attrs);
 }
@@ -39,7 +39,7 @@ test('a request charged to one user gives them the whole amount', function () {
         ]))
         ->assertRedirect();
 
-    $this->assertDatabaseHas('finance_request_fund_charge_to', [
+    $this->assertDatabaseHas('finance_fund_request_user_shares', [
         'fund_request_id' => FundRequest::first()->id,
         'user_id' => $this->user->id,
         'amount' => 900,
@@ -149,41 +149,6 @@ test('a non-member cannot be charged', function () {
     expect(FundRequest::count())->toBe(0);
 });
 
-test('an ad spent request splits the item-derived total, not the amount the client sent', function () {
-    $maria = fundMember($this->workspace);
-    $product = Product::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'owner_id' => $this->user->id,
-    ]);
-
-    // The controller recomputes the total from the items (200x5 = 1000), so the
-    // shares must be checked against that rather than the bogus figure below.
-    $this->actingAs($this->user)
-        ->post($this->url, [
-            'template' => 'ad_spent',
-            'request_date' => '2026-05-14',
-            'requested_by' => $this->user->id,
-            'purpose' => 'For scaling',
-            'amount_requested' => 999999,
-            'charge_to' => [
-                ['user_id' => $this->user->id],
-                ['user_id' => $maria->id],
-            ],
-            'items' => [
-                ['product_id' => $product->id, 'page_id' => null, 'creatives_running' => 5, 'budget_per_day' => 200, 'days' => 5],
-            ],
-        ])
-        ->assertRedirect();
-
-    $request = FundRequest::first();
-
-    $shares = $request->chargeToUsers->pluck('pivot.amount', 'id')->map(fn ($a) => (float) $a);
-
-    expect((float) $request->amount_requested)->toBe(1000.00)
-        ->and($shares[$this->user->id])->toBe(500.0)
-        ->and($shares[$maria->id])->toBe(500.0);
-});
-
 test('editing a request replaces its charged users', function () {
     $maria = fundMember($this->workspace);
 
@@ -204,4 +169,64 @@ test('editing a request replaces its charged users', function () {
     expect($charged)->toHaveCount(1)
         ->and($charged->first()->id)->toBe($maria->id)
         ->and((float) $charged->first()->pivot->amount)->toBe(900.0);
+});
+
+test('the date and requester are stamped from creation, not the client', function () {
+    $other = fundMember($this->workspace);
+
+    $this->actingAs($this->user)
+        ->post($this->url, fundRequestPayload([
+            // A client-supplied date and requester are ignored.
+            'request_date' => '2020-01-01',
+            'requested_by' => $other->id,
+            'charge_to' => [['user_id' => $this->user->id]],
+        ]))
+        ->assertRedirect();
+
+    $request = FundRequest::first();
+
+    expect($request->requested_by)->toBe($this->user->id)
+        ->and($request->request_date->toDateString())->toBe(now()->toDateString());
+});
+
+test('a request stores its transaction type and department', function () {
+    $type = TransactionType::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'expenses',
+    ]);
+    $department = Department::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Marketing',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($this->user)
+        ->post($this->url, fundRequestPayload([
+            'transaction_type_id' => $type->id,
+            'department_id' => $department->id,
+            'charge_to' => [['user_id' => $this->user->id]],
+        ]))
+        ->assertRedirect();
+
+    $request = FundRequest::first();
+
+    expect($request->transaction_type_id)->toBe($type->id)
+        ->and($request->department_id)->toBe($department->id);
+});
+
+test('a type or department from another workspace is rejected', function () {
+    $otherWorkspace = Workspace::factory()->create();
+    $foreignType = TransactionType::create([
+        'workspace_id' => $otherWorkspace->id,
+        'name' => 'expenses',
+    ]);
+
+    $this->actingAs($this->user)
+        ->post($this->url, fundRequestPayload([
+            'transaction_type_id' => $foreignType->id,
+            'charge_to' => [['user_id' => $this->user->id]],
+        ]))
+        ->assertSessionHasErrors('transaction_type_id');
+
+    expect(FundRequest::count())->toBe(0);
 });

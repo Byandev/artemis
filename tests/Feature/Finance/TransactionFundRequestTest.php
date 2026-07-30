@@ -19,7 +19,6 @@ function approvedRequest(Workspace $workspace, User $user, array $attrs = []): F
 {
     $request = FundRequest::create(array_merge([
         'workspace_id' => $workspace->id,
-        'template' => 'blank',
         'request_date' => '2026-05-10',
         'reference_no' => 'RF-00001',
         'requested_by' => $user->id,

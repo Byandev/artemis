@@ -54,7 +54,7 @@ class TransactionRequest extends FormRequest
             // request from elsewhere cannot be attached.
             'fund_request_id' => [
                 'nullable',
-                Rule::exists('finance_request_funds', 'id')->where('workspace_id', $workspaceId),
+                Rule::exists('finance_fund_requests', 'id')->where('workspace_id', $workspaceId),
             ],
             'status' => ['nullable', Rule::in(['pending', 'approved', 'posted'])],
             'amount' => ['required', 'numeric', 'min:0'],

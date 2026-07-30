@@ -17,7 +17,7 @@ return new class extends Migration
     {
         Schema::table('finance_transactions', function (Blueprint $table) {
             $table->foreignId('fund_request_id')->nullable()->after('reference_no')
-                ->constrained('finance_request_funds')->nullOnDelete();
+                ->constrained('finance_fund_requests')->nullOnDelete();
 
             $table->index(['workspace_id', 'fund_request_id'], 'finance_txn_ws_fund_request_idx');
         });
