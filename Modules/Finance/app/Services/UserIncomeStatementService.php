@@ -236,6 +236,41 @@ class UserIncomeStatementService
             ->selectRaw('MIN(uc.product_id)');
     }
 
+    /**
+     * Unit codes referenced by this month's delivered order items that have no
+     * row in `inventory_unit_codes` — the orders using them can't resolve to a
+     * product, so they surface as the per-product "Discrepancy". Workspace-wide,
+     * newest-first by how many orders use each, so the biggest gaps show first.
+     *
+     * @return list<array{unit_code:string, orders:int}>
+     */
+    public function missingUnitCodes(IncomeStatement $statement): array
+    {
+        $workspace = $statement->workspace;
+        [$from, $to] = $this->range($statement);
+
+        return DB::table('gencys_order_items as goi')
+            ->join('gencys_orders as o', 'o.id', '=', 'goi.order_id')
+            ->where('o.workspace_id', $workspace->id)
+            ->where('o.parcel_status', self::DELIVERED_STATUS)
+            ->whereNotIn('o.platform', ['Shopee', 'TikTok'])
+            ->where('o.page', 'not like', '%pikutin%')
+            ->whereBetween('o.parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->whereNotNull('goi.sku')
+            ->where('goi.sku', '!=', '')
+            ->whereNotExists(function ($q) use ($workspace) {
+                $q->select(DB::raw('1'))
+                    ->from('inventory_unit_codes as uc')
+                    ->whereColumn('uc.unit_code', 'goi.sku')
+                    ->where('uc.workspace_id', $workspace->id);
+            })
+            ->groupBy('goi.sku')
+            ->orderByRaw('COUNT(DISTINCT goi.order_id) DESC')
+            ->get(['goi.sku as unit_code', DB::raw('COUNT(DISTINCT goi.order_id) as orders')])
+            ->map(fn ($r) => ['unit_code' => (string) $r->unit_code, 'orders' => (int) $r->orders])
+            ->all();
+    }
+
     private function ensureSnapshot(IncomeStatement $statement): void
     {
         if (! $statement->userStatements()->exists()) {

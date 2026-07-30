@@ -23,12 +23,18 @@ interface PnlRow {
     net_profit: number;
 }
 
+interface MissingUnitCode {
+    unit_code: string;
+    orders: number;
+}
+
 interface Props {
     workspace: Workspace;
     incomeStatement: StatementContext;
     users: PnlRow[];
     total: PnlRow;
     discrepancy: PnlRow;
+    missingUnitCodes: MissingUnitCode[];
 }
 
 const fmt = (v: number) =>
@@ -64,6 +70,7 @@ export default function UserIncomeStatementsIndex({
     users,
     total,
     discrepancy,
+    missingUnitCodes,
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
     const base = `${finance}/income-statements/${incomeStatement.id}/users`;
@@ -159,6 +166,63 @@ export default function UserIncomeStatementsIndex({
                         Back to statement
                     </Link>
                 </PageHeader>
+
+                {/* Unit codes referenced by orders but missing from the table —
+                    their revenue can't resolve to a product. */}
+                {missingUnitCodes.length > 0 && (
+                    <div className="mb-6 rounded-[14px] border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                        <div className="flex items-start gap-2.5">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                            <div className="min-w-0 flex-1">
+                                <div className="text-[13px] font-semibold text-amber-800 dark:text-amber-300">
+                                    {missingUnitCodes.length} unit code
+                                    {missingUnitCodes.length === 1
+                                        ? ''
+                                        : 's'}{' '}
+                                    not in your unit codes table
+                                </div>
+                                <p className="mt-0.5 text-[11px] text-amber-700/80 dark:text-amber-400/70">
+                                    Orders using these can’t resolve to a
+                                    product, so their revenue lands in the
+                                    Discrepancy column.{' '}
+                                    <Link
+                                        href={`/workspaces/${workspace.slug}/gencys/unit-codes`}
+                                        className="font-medium underline underline-offset-2"
+                                    >
+                                        Add them
+                                    </Link>{' '}
+                                    and set each one’s product to resolve.
+                                </p>
+                                <div className="mt-2.5 max-h-56 overflow-y-auto rounded-lg border border-amber-300/50 bg-white dark:border-amber-500/20 dark:bg-zinc-900">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="border-b border-amber-200/60 dark:border-amber-500/15">
+                                                <th className="px-3 py-1.5 text-left font-mono text-[10px] font-semibold tracking-wider text-amber-700/70 uppercase dark:text-amber-400/60">
+                                                    Unit Code
+                                                </th>
+                                                <th className="px-3 py-1.5 text-right font-mono text-[10px] font-semibold tracking-wider text-amber-700/70 uppercase dark:text-amber-400/60">
+                                                    Orders
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-amber-100 dark:divide-amber-500/10">
+                                            {missingUnitCodes.map((m) => (
+                                                <tr key={m.unit_code}>
+                                                    <td className="px-3 py-1.5 font-mono text-[11px] text-amber-900 dark:text-amber-200">
+                                                        {m.unit_code}
+                                                    </td>
+                                                    <td className="px-3 py-1.5 text-right font-mono text-[11px] text-amber-700/80 tabular-nums dark:text-amber-400/70">
+                                                        {int(m.orders)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Delivered revenue by user */}
                 {segments.length > 0 && (

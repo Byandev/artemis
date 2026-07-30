@@ -69,9 +69,8 @@ test('the per-product statement resolves the product through unit-code order ite
         'status' => 'final',
     ]);
 
-    $products = collect(
-        app(UserIncomeStatementService::class)->userPayload($statement, $user)['products']
-    );
+    $service = app(UserIncomeStatementService::class);
+    $products = collect($service->userPayload($statement, $user)['products']);
 
     // WIDGET: 1000 − (COGS 200 + ship 50 + COD 20 + VAT 2.40) = 727.60
     $widget = $products->firstWhere('product', 'WIDGET');
@@ -91,4 +90,10 @@ test('the per-product statement resolves the product through unit-code order ite
         ->and((float) $discrepancy['delivered'])->toBe(500.0)
         // 500 − (100 + 0 + 10 + 1.20) = 388.80
         ->and((float) $discrepancy['gross_profit'])->toBe(388.80);
+
+    // The unresolved unit code surfaces in the missing-unit-codes warning list;
+    // the mapped one does not.
+    $missing = collect($service->missingUnitCodes($statement))->pluck('unit_code');
+    expect($missing)->toContain('NOPE')
+        ->and($missing)->not->toContain('UC1');
 });
