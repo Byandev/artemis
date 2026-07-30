@@ -14,8 +14,11 @@ import {
     CreditCard,
     Files,
     LayoutGrid,
+    LucideIcon,
+    MessagesSquare,
     Search,
     Settings2,
+    Smartphone,
     X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,6 +46,8 @@ interface Workspace {
     owner?: { name: string };
     pages_count: number;
     shops_count: number;
+    sms_parcel_journey_pages_count: number;
+    chat_parcel_journey_pages_count: number;
     max_shops: number | null;
     subscription?: Subscription | null;
     inventory_module_enabled: boolean;
@@ -253,6 +258,43 @@ const statusColors: Record<string, string> = {
         'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20',
 };
 
+/**
+ * Shows how many of a workspace's pages are configured for a given parcel
+ * journey channel, as "configured / total pages".
+ */
+function PagesCoverageCell({
+    configured,
+    total,
+    icon: Icon,
+    label,
+}: {
+    configured: number;
+    total: number;
+    icon: LucideIcon;
+    label: string;
+}) {
+    const tone =
+        total === 0 || configured === 0
+            ? 'border-zinc-200 bg-zinc-50 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400'
+            : configured === total
+              ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-400'
+              : 'border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-400';
+
+    return (
+        <div
+            className="text-center"
+            title={`${configured} of ${total} page(s) — ${label}`}
+        >
+            <div
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${tone}`}
+            >
+                <Icon className="h-3 w-3" />
+                {total > 0 ? `${configured} / ${total}` : '—'}
+            </div>
+        </div>
+    );
+}
+
 export default function Index({ workspaces, plans, filters }: Props) {
     const [selectedWorkspace, setSelectedWorkspace] =
         useState<Workspace | null>(null);
@@ -355,12 +397,12 @@ export default function Index({ workspaces, plans, filters }: Props) {
             ),
         },
         {
-            accessorKey: 'pages_count',
+            accessorKey: 'shops_count',
             enableSorting: true,
             header: ({ column }) => (
                 <SortableHeader
                     column={column}
-                    title="Resources"
+                    title="Shops"
                     className="justify-center"
                 />
             ),
@@ -375,6 +417,44 @@ export default function Index({ workspaces, plans, filters }: Props) {
                         Shops
                     </div>
                 </div>
+            ),
+        },
+        {
+            accessorKey: 'sms_parcel_journey_pages_count',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Pages w/ SMS Journey"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => (
+                <PagesCoverageCell
+                    configured={row.original.sms_parcel_journey_pages_count}
+                    total={row.original.pages_count}
+                    icon={Smartphone}
+                    label="InfoTxt token + user ID set"
+                />
+            ),
+        },
+        {
+            accessorKey: 'chat_parcel_journey_pages_count',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Pages w/ Chat Journey"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => (
+                <PagesCoverageCell
+                    configured={row.original.chat_parcel_journey_pages_count}
+                    total={row.original.pages_count}
+                    icon={MessagesSquare}
+                    label="Parcel journey flow + custom field set"
+                />
             ),
         },
         {

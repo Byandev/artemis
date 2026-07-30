@@ -141,7 +141,10 @@ export function ItemFormDialog({
                     </DialogClose>
                 </div>
 
-                <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                <form
+                    onSubmit={handleSubmit}
+                    className="flex min-h-0 flex-1 flex-col"
+                >
                     <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
                         {/* SKU */}
                         <div className="space-y-1.5">

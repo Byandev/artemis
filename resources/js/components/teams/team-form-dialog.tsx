@@ -149,8 +149,8 @@ export function TeamFormDialog({
                                 className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
                             />
                             <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                The team's daily ad-budget summary is posted here
-                                each morning.
+                                The team's daily ad-budget summary is posted
+                                here each morning.
                             </p>
                             {errors.discord_webhook_url && (
                                 <p className="font-mono text-[11px] text-red-500">

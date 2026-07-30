@@ -825,7 +825,8 @@ export default function PitchDeck() {
                                                         sup: 'Dedicated',
                                                         f: false,
                                                         note: '+₱4,500 per additional 10,000 orders/mo',
-                                                        gencysNote: '+₱3,000 per additional 10,000 orders/mo',
+                                                        gencysNote:
+                                                            '+₱3,000 per additional 10,000 orders/mo',
                                                     },
                                                 ].map((t) => (
                                                     <div
@@ -858,7 +859,9 @@ export default function PitchDeck() {
                                                                 t.gencysPrice !==
                                                                     t.price && (
                                                                     <span className="text-[10px] text-gray-400 line-through sm:text-xs">
-                                                                        {t.price}
+                                                                        {
+                                                                            t.price
+                                                                        }
                                                                     </span>
                                                                 )}
                                                             <span className="text-[10px] text-gray-400 sm:text-xs">

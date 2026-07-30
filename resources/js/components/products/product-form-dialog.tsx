@@ -18,6 +18,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PRODUCT_STATUSES, ProductStatus } from '@/constants/product-statuses';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
@@ -178,32 +179,18 @@ export function ProductFormDialog({
                             <Select
                                 value={data.status}
                                 onValueChange={(value) =>
-                                    setData(
-                                        'status',
-                                        value as
-                                            | 'Scaling'
-                                            | 'Testing'
-                                            | 'Failed'
-                                            | 'Inactive',
-                                    )
+                                    setData('status', value as ProductStatus)
                                 }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Scaling">
-                                        Scaling
-                                    </SelectItem>
-                                    <SelectItem value="Testing">
-                                        Testing
-                                    </SelectItem>
-                                    <SelectItem value="Failed">
-                                        Failed
-                                    </SelectItem>
-                                    <SelectItem value="Inactive">
-                                        Inactive
-                                    </SelectItem>
+                                    {PRODUCT_STATUSES.map((status) => (
+                                        <SelectItem key={status} value={status}>
+                                            {status}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.status} />

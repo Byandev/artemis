@@ -21,6 +21,7 @@ class Intern extends Model
         'full_name',
         'company_name',
         'username',
+        'other_names',
         'contact_number',
         'email',
         'active',
@@ -30,6 +31,7 @@ class Intern extends Model
     protected $casts = [
         'intern_id' => 'integer',
         'active' => 'boolean',
+        'other_names' => 'array',
     ];
 
     public function workspace(): BelongsTo

@@ -36,6 +36,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 interface TransactionType {
     id: number;
     name: string;
+    is_gross_profit_deduction: boolean;
 }
 
 interface Props {
@@ -111,6 +112,25 @@ export default function TransactionTypesIndex({
                     </span>
                 );
             },
+        },
+        {
+            accessorKey: 'is_gross_profit_deduction',
+            enableSorting: false,
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                    Income Statement
+                </div>
+            ),
+            cell: ({ row }) =>
+                row.original.is_gross_profit_deduction ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] text-emerald-700 uppercase dark:bg-emerald-950/40 dark:text-emerald-300">
+                        Gross Profit deduction
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-0.5 font-mono text-[11px] text-gray-500 uppercase dark:bg-zinc-800 dark:text-gray-400">
+                        OPEX
+                    </span>
+                ),
         },
         ...(showActions
             ? [
@@ -263,12 +283,16 @@ function TypeFormDialog({
 }) {
     const isEditing = !!type;
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
-        useForm({ name: '' });
+        useForm({ name: '', is_gross_profit_deduction: false });
 
     useEffect(() => {
         if (open) {
             if (type) {
                 setData('name', type.name);
+                setData(
+                    'is_gross_profit_deduction',
+                    type.is_gross_profit_deduction,
+                );
             } else {
                 reset();
                 clearErrors();
@@ -325,6 +349,29 @@ function TypeFormDialog({
                                 className={inputCls}
                             />
                         </Field>
+
+                        <label className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-black/6 bg-stone-50 p-3 dark:border-white/6 dark:bg-zinc-800/50">
+                            <input
+                                type="checkbox"
+                                checked={data.is_gross_profit_deduction}
+                                onChange={(e) =>
+                                    setData(
+                                        'is_gross_profit_deduction',
+                                        e.target.checked,
+                                    )
+                                }
+                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <span className="text-[12px] leading-snug text-gray-600 dark:text-gray-300">
+                                <span className="font-medium text-gray-800 dark:text-gray-100">
+                                    Gross Profit deduction
+                                </span>
+                                <br />
+                                On the income statement this type is a Cost of
+                                Sales line (deducted to reach Gross Profit).
+                                Leave off for Operating Expenses (OPEX).
+                            </span>
+                        </label>
                     </div>
 
                     <Footer
