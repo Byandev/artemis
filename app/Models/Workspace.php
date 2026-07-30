@@ -455,6 +455,16 @@ class Workspace extends Model
         return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_bulk_status_update;
     }
 
+    /**
+     * Whether RMO statuses follow the courier's parcel status automatically —
+     * a parcel that reports "delivered" re-tags its RMO row to "DELIVERED"
+     * without a CSR touching it. Off by default.
+     */
+    public function rmoAutoTagStatusEnabled(): bool
+    {
+        return (bool) $this->loadMissing('rmoSetting')->rmoSetting?->enable_auto_tag_status;
+    }
+
     public function allowedMetrics(): array
     {
         return $this->metricSetting
