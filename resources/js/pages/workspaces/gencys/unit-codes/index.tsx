@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DeleteUnitCodeDialog } from '@/components/gencys/delete-unit-code-dialog';
+import { ProductCombobox } from '@/components/inventory/product-combobox';
 import {
     UnitCode,
     UnitCodeFormDialog,
@@ -24,7 +25,7 @@ import {
     Search,
     Trash2,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface UnitCodeItem {
@@ -34,13 +35,21 @@ interface UnitCodeItem {
     quantity: number | null;
 }
 
+interface ProductOpt {
+    id: number;
+    name: string;
+}
+
 interface UnitCodeRow extends UnitCode {
     items?: UnitCodeItem[];
+    product_id?: number | null;
+    product?: ProductOpt | null;
 }
 
 interface Props {
     workspace: Workspace;
     unitCodes: PaginatedData<UnitCodeRow>;
+    products: ProductOpt[];
     query: {
         sort: string;
         perPage: number | null;
@@ -89,7 +98,12 @@ function ItemBreakdown({ items }: { items: UnitCodeItem[] }) {
     );
 }
 
-export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
+export default function UnitCodesIndex({
+    workspace,
+    unitCodes,
+    products,
+    query,
+}: Props) {
     const { flash } = usePage().props as {
         flash?: { success?: string; error?: string };
     };
@@ -98,6 +112,8 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
     const canDelete = usePermission(PERMISSIONS.DeleteUnitCode);
 
     const [searchValue, setSearchValue] = useState(query.filter?.search ?? '');
+    // Row selection for the bulk product update (ids, current page only).
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [formOpen, setFormOpen] = useState(false);
     const [editing, setEditing] = useState<UnitCodeRow | null>(null);
     // Source row for a "copy" — prefills the form but saves as a new unit code.
@@ -116,6 +132,58 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
         if (flash?.success) toast.success(flash.success);
         if (flash?.error) toast.error(flash.error);
     }, [flash?.success, flash?.error]);
+
+    // Selection is per-page — clear it when the page changes.
+    useEffect(() => {
+        setSelectedIds(new Set());
+    }, [unitCodes.current_page]);
+
+    const rows = unitCodes.data ?? [];
+    const allOnPageSelected =
+        rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
+
+    const toggleRow = useCallback((id: number) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const toggleAll = useCallback(() => {
+        const ids = rows.map((r) => r.id);
+        setSelectedIds((prev) => {
+            const allSel = ids.length > 0 && ids.every((id) => prev.has(id));
+            const next = new Set(prev);
+            ids.forEach((id) => (allSel ? next.delete(id) : next.add(id)));
+            return next;
+        });
+    }, [rows]);
+
+    // Inline single-row product change.
+    const setRowProduct = useCallback(
+        (id: number, productId: number | null) => {
+            router.patch(
+                `${baseUrl}/${id}/product`,
+                { product_id: productId },
+                { preserveState: true, preserveScroll: true },
+            );
+        },
+        [baseUrl],
+    );
+
+    // Bulk: picking a product applies it to the selection immediately.
+    const applyBulkProduct = (productId: number | null) => {
+        router.post(
+            `${baseUrl}/bulk-product`,
+            { ids: Array.from(selectedIds), product_id: productId },
+            {
+                preserveScroll: true,
+                onSuccess: () => setSelectedIds(new Set()),
+            },
+        );
+    };
 
     const fetchData = (overrides: Record<string, unknown> = {}) => {
         router.get(
@@ -213,6 +281,29 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                 ),
             },
             {
+                id: 'product',
+                enableSorting: false,
+                header: () => (
+                    <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                        Product
+                    </span>
+                ),
+                cell: ({ row }) =>
+                    canEdit ? (
+                        <ProductCombobox
+                            products={products}
+                            value={row.original.product_id ?? null}
+                            onChange={(id) => setRowProduct(row.original.id, id)}
+                            placeholder="— No product —"
+                            triggerClassName="flex h-7 max-w-[200px] items-center gap-1.5 rounded-md border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none transition-colors hover:border-black/14 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:border-white/14"
+                        />
+                    ) : (
+                        <span className="text-[12px] text-gray-600 dark:text-gray-400">
+                            {row.original.product?.name ?? '—'}
+                        </span>
+                    ),
+            },
+            {
                 accessorKey: 'total_amount',
                 enableSorting: true,
                 header: ({ column }) => (
@@ -239,6 +330,36 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                 ),
             },
         ];
+
+        if (canEdit) {
+            cols.unshift({
+                id: 'select',
+                enableSorting: false,
+                meta: {
+                    headerClassName: 'w-0 pr-0 pl-4',
+                    cellClassName: 'w-0 pr-0 pl-4',
+                },
+                header: () => (
+                    <input
+                        type="checkbox"
+                        checked={allOnPageSelected}
+                        onChange={toggleAll}
+                        aria-label="Select all on page"
+                        className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-emerald-600 focus:ring-emerald-500/30 dark:border-gray-600"
+                    />
+                ),
+                cell: ({ row }) => (
+                    <input
+                        type="checkbox"
+                        checked={selectedIds.has(row.original.id)}
+                        onChange={() => toggleRow(row.original.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label="Select row"
+                        className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-emerald-600 focus:ring-emerald-500/30 dark:border-gray-600"
+                    />
+                ),
+            });
+        }
 
         if (canCreate || canEdit || canDelete) {
             cols.push({
@@ -297,7 +418,17 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
         }
 
         return cols;
-    }, [canCreate, canEdit, canDelete]);
+    }, [
+        canCreate,
+        canEdit,
+        canDelete,
+        products,
+        selectedIds,
+        allOnPageSelected,
+        toggleAll,
+        toggleRow,
+        setRowProduct,
+    ]);
 
     return (
         <AppLayout>
@@ -350,6 +481,28 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                         />
                     </div>
                 </div>
+
+                {canEdit && selectedIds.size > 0 && (
+                    <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[10px] border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                        <span className="font-mono text-[12px] font-medium text-emerald-800 dark:text-emerald-300">
+                            {selectedIds.size} selected
+                        </span>
+                        <ProductCombobox
+                            products={products}
+                            value={null}
+                            onChange={(id) => applyBulkProduct(id)}
+                            placeholder="Set product…"
+                            triggerClassName="flex h-8 min-w-[170px] items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3 font-mono! text-[12px]! font-medium text-gray-700 outline-none transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setSelectedIds(new Set())}
+                            className="inline-flex h-8 items-center rounded-lg px-2 font-mono! text-[12px]! text-emerald-700 transition-colors hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                )}
 
                 <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable

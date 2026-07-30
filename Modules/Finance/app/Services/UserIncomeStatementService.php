@@ -5,6 +5,7 @@ namespace Modules\Finance\Services;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\Carbon;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\Transaction;
@@ -122,7 +123,117 @@ class UserIncomeStatementService
             'net_profit' => (float) $row->net_profit,
             'generated_at' => $row->updated_at?->toIso8601String(),
             'expenses' => collect($row->lines ?? [])->map(fn ($l) => [...$l, 'included' => true])->values()->all(),
+            'products' => $this->userProductRows($statement, $user),
         ];
+    }
+
+    /**
+     * The user's delivered revenue and cost of sales broken down by product,
+     * where the product is resolved through the order's items: each
+     * `gencys_order_items.sku` is a unit-code label matching an
+     * `inventory_unit_codes.unit_code`, whose `product_id` is the product. Every
+     * order maps to a single product (its unit codes all point to one); orders
+     * whose items resolve to no product fall into a "Discrepancy" row (kept last).
+     *
+     * Cost of sales here is order-derived only — COGS + shipping + COD + VAT — so
+     * each product's gross is its own order economics. Transactions are not
+     * folded in yet; they stay at the user level.
+     *
+     * @return list<array{product_id:?int, product:string, orders:int, delivered:float, cogs:float, shipping:float, cod_fee:float, vat:float, cost_of_sales:float, gross_profit:float}>
+     */
+    private function userProductRows(IncomeStatement $statement, User $user): array
+    {
+        $workspace = $statement->workspace;
+        [$from, $to] = $this->range($statement);
+
+        $cells = $this->cellsForUser($workspace, $user->id, $from, $to);
+        if (empty($cells)) {
+            return [];
+        }
+
+        $codRate = (float) $statement->cod_fee_rate;
+        $vatRate = (float) $statement->vat_rate;
+
+        // Shipping per product (orders shipped out in the month).
+        $shipped = GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->whereBetween('shipped_out_date', [$from->toDateString(), $to->toDateString()])
+            ->whereIn('intern_brands_name', $cells)
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
+            ->selectRaw('COALESCE(shipping_fee, 0) as shipping')
+            ->selectSub($this->orderProductSubquery(), 'product_id');
+
+        $shipping = DB::query()->fromSub($shipped, 't')
+            ->selectRaw('product_id, COALESCE(SUM(shipping), 0) as shipping')
+            ->groupBy('product_id')
+            ->pluck('shipping', 'product_id');
+
+        // Delivered revenue + COGS per product.
+        $delivered = GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->where('parcel_status', self::DELIVERED_STATUS)
+            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->whereIn('intern_brands_name', $cells)
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
+            ->selectRaw('COALESCE(price_final, 0) as revenue, COALESCE(total_cog, 0) as cogs')
+            ->selectSub($this->orderProductSubquery(), 'product_id');
+
+        $rows = DB::query()->fromSub($delivered, 't')
+            ->selectRaw('product_id, COUNT(*) as orders, COALESCE(SUM(revenue), 0) as revenue, COALESCE(SUM(cogs), 0) as cogs')
+            ->groupBy('product_id')
+            ->get();
+
+        $names = DB::table('products')
+            ->whereIn('id', $rows->pluck('product_id')->filter()->all())
+            ->pluck('name', 'id');
+
+        $mapped = $rows->map(function ($r) use ($shipping, $names, $codRate, $vatRate) {
+            $pid = $r->product_id !== null ? (int) $r->product_id : null;
+            $revenue = round((float) $r->revenue, 2);
+            $cogs = round((float) $r->cogs, 2);
+            $ship = round((float) $shipping->get($r->product_id, 0), 2);
+            $cod = round($revenue * $codRate, 2);
+            $vat = round($cod * $vatRate, 2);
+            $costOfSales = round($cogs + $ship + $cod + $vat, 2);
+
+            return [
+                'product_id' => $pid,
+                'product' => $pid !== null ? ($names[$pid] ?? 'Unknown') : 'Discrepancy',
+                'orders' => (int) $r->orders,
+                'delivered' => $revenue,
+                'cogs' => $cogs,
+                'shipping' => $ship,
+                'cod_fee' => $cod,
+                'vat' => $vat,
+                'cost_of_sales' => $costOfSales,
+                'gross_profit' => round($revenue - $costOfSales, 2),
+            ];
+        });
+
+        // Real products by delivered desc; the unresolved "Discrepancy" row (no
+        // product) always sits last so it renders as the right-most column.
+        $products = $mapped->filter(fn ($r) => $r['product_id'] !== null)
+            ->sortByDesc('delivered')
+            ->values();
+        $discrepancy = $mapped->first(fn ($r) => $r['product_id'] === null);
+
+        return $discrepancy ? $products->push($discrepancy)->all() : $products->all();
+    }
+
+    /**
+     * A correlated subquery resolving the outer `gencys_orders` row to a single
+     * product id via its items: `gencys_order_items.sku` matches an
+     * `inventory_unit_codes.unit_code` whose `product_id` is the product. MIN
+     * picks one when an order carries several unit codes (all of one product).
+     */
+    private function orderProductSubquery(): Builder
+    {
+        return DB::table('inventory_unit_codes as uc')
+            ->join('gencys_order_items as goi', 'goi.sku', '=', 'uc.unit_code')
+            ->whereColumn('uc.workspace_id', 'gencys_orders.workspace_id')
+            ->whereColumn('goi.order_id', 'gencys_orders.id')
+            ->whereNotNull('uc.product_id')
+            ->selectRaw('MIN(uc.product_id)');
     }
 
     private function ensureSnapshot(IncomeStatement $statement): void
@@ -476,6 +587,7 @@ class UserIncomeStatementService
             'net_profit' => 0.0,
             'generated_at' => null,
             'expenses' => [],
+            'products' => [],
         ];
     }
 
