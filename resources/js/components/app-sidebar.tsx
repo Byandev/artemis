@@ -23,6 +23,7 @@ import {
     BookOpenIcon,
     Box,
     Building2,
+    Calculator,
     CalendarDays,
     Check,
     Clapperboard,
@@ -128,6 +129,11 @@ export function AppSidebar() {
             href: `/workspaces/${slug}/pancake/orders`,
             icon: ShoppingCart,
             permission: PERMISSIONS.ViewOrders,
+        },
+        {
+            title: 'Profitability Formula',
+            href: `/workspaces/${slug}/profitability-formula`,
+            icon: Calculator,
         },
         ...(currentWorkspace.products_module_enabled
             ? [

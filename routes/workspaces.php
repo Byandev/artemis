@@ -127,6 +127,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/dashboard', [WorkspaceController::class, 'dashboard'])->name('workspace.dashboard');
     Route::get('/workspaces/{workspace}/chart-data', [WorkspaceController::class, 'getChartData'])->name('workspace.chart-data');
 
+    // Profitability Formula (client-side calculator — no server-side data)
+    Route::get('/workspaces/{workspace:slug}/profitability-formula', function (Workspace $workspace) {
+        return inertia('workspaces/profitability-formula/index', [
+            'workspace' => $workspace->only('id', 'name', 'slug'),
+        ]);
+    })->middleware('workspace')->name('workspaces.profitability-formula');
+
     // Workspace activity log (audit trail) — gated to workspace admins in the controller.
     Route::get('/workspaces/{workspace}/activity-logs', [ActivityLogController::class, 'index'])->name('workspace.activity-logs.index');
 
