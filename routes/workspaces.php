@@ -130,7 +130,7 @@ Route::middleware(['auth'])->group(function () {
     // Profitability Formula (client-side calculator — no server-side data)
     Route::get('/workspaces/{workspace:slug}/profitability-formula', function (Workspace $workspace) {
         return inertia('workspaces/profitability-formula/index', [
-            'workspace' => $workspace->only('id', 'name', 'slug'),
+            'workspace' => $workspace->only('id', 'name', 'slug', 'is_gencys_partner'),
         ]);
     })->middleware('workspace')->name('workspaces.profitability-formula');
 
