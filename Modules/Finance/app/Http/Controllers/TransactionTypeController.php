@@ -64,6 +64,7 @@ class TransactionTypeController extends Controller
                     ->where('workspace_id', $workspace->id)
                     ->ignore($transactionType?->id),
             ],
+            'is_gross_profit_deduction' => ['boolean'],
         ];
     }
 
@@ -77,6 +78,7 @@ class TransactionTypeController extends Controller
         TransactionType::create([
             'workspace_id' => $workspace->id,
             'name' => trim($validated['name']),
+            'is_gross_profit_deduction' => $validated['is_gross_profit_deduction'] ?? false,
         ]);
 
         return redirect()->back()->with('success', 'Transaction type created.');
@@ -90,7 +92,10 @@ class TransactionTypeController extends Controller
 
         $validated = $request->validate($this->rules($workspace, $transactionType));
 
-        $transactionType->update(['name' => trim($validated['name'])]);
+        $transactionType->update([
+            'name' => trim($validated['name']),
+            'is_gross_profit_deduction' => $validated['is_gross_profit_deduction'] ?? false,
+        ]);
 
         return redirect()->back()->with('success', 'Transaction type updated.');
     }

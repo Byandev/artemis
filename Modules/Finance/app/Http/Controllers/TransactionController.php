@@ -6,14 +6,18 @@ use App\Enums\Logging\LogCategory;
 use App\Enums\Permission;
 use App\Facades\Activity;
 use App\Http\Controllers\Controller;
+use App\Models\Department;
+use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\TransactionRequest;
 use Modules\Finance\Models\Account;
+use Modules\Finance\Models\FundRequest;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -87,7 +91,7 @@ class TransactionController extends Controller
         $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
         $transactions = $this->buildQuery($workspace)
-            ->with(['account', 'remittance', 'requester:id,name', 'approver:id,name', 'chargeToUser:id,name'])
+            ->with(['account', 'remittance', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->paginate((int) $request->input('per_page', 100))
@@ -101,11 +105,7 @@ class TransactionController extends Controller
         return Inertia::render('workspaces/finance/transactions/index', [
             'workspace' => $workspace,
             'transactions' => $transactions,
-            'accounts' => Account::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name', 'currency']),
-            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name']),
-            'users' => $workspace->users()->get(['users.id', 'users.name']),
+            ...$this->formOptions($request, $workspace),
             'totals' => [
                 'credit' => (float) $totals->total_credit,
                 'debit' => (float) $totals->total_debit,
@@ -117,6 +117,179 @@ class TransactionController extends Controller
         ]);
     }
 
+    public function create(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::CreateFinanceTransactions->value, $workspace);
+
+        return Inertia::render('workspaces/finance/transactions/create', [
+            'workspace' => $workspace,
+            ...$this->formOptions($request, $workspace),
+            'defaultAccountId' => $request->integer('account_id') ?: null,
+            'returnTo' => $this->safeReturnTo($request, $workspace),
+        ]);
+    }
+
+    public function edit(Request $request, Workspace $workspace, Transaction $transaction)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
+        $this->ensureOwns($workspace, $transaction);
+
+        return Inertia::render('workspaces/finance/transactions/edit', [
+            'workspace' => $workspace,
+            'transaction' => $transaction->load(['chargeToUsers:users.id,users.name', 'productShares', 'fundRequest:id,reference_no']),
+            ...$this->formOptions($request, $workspace, $transaction),
+            'returnTo' => $this->safeReturnTo($request, $workspace),
+        ]);
+    }
+
+    /**
+     * Shared option lists for the transaction form (account/type/user selects and
+     * the product datalist).
+     *
+     * @param  Transaction|null  $editing  Left out of each account's current
+     *                                     balance, so editing the newest entry
+     *                                     builds on the one before it rather
+     *                                     than on itself.
+     */
+    protected function formOptions(Request $request, Workspace $workspace, ?Transaction $editing = null): array
+    {
+        return [
+            'accounts' => $this->accountOptions($workspace, $editing),
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->orderBy('name')->get(['id', 'name']),
+            'users' => $workspace->users()->get(['users.id', 'users.name']),
+            // The product tags the picker offers (see productOptions).
+            'products' => $this->productOptions($request, $workspace, $editing),
+            // Approved requests a new entry can be filled in from.
+            'fundRequests' => $this->fundRequestOptions($workspace),
+            // The workspace's saved (active) departments, for the Department select.
+            'departments' => Department::ofWorkspace($workspace)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->pluck('name'),
+        ];
+    }
+
+    /**
+     * The product tags the picker offers: the workspace's catalog products, the
+     * same list a fund request is built from, so an entry filled in from one
+     * lines up exactly. Any tag already saved on the entry being edited is
+     * carried along too — the picker only renders a selection it has an option
+     * for, so a tag from before this list (or from a since-renamed product)
+     * would otherwise show up blank.
+     *
+     * @return list<string>
+     */
+    protected function productOptions(Request $request, Workspace $workspace, ?Transaction $editing = null): array
+    {
+        $products = Product::ofWorkspace($workspace)
+            ->visibleTo($request->user(), $workspace)
+            ->orderBy('name')
+            ->pluck('name');
+
+        $saved = $editing?->productShares->pluck('product')->all() ?? [];
+
+        return $products->merge($saved)->filter()->unique()->values()->all();
+    }
+
+    /**
+     * The fund requests a transaction can be filled in from — the workspace's
+     * approved and released ones, newest first, each carrying the shares the
+     * form copies across. Capped: this rides along with every form render, and
+     * a request older than the most recent hundred is not what someone is
+     * settling today.
+     */
+    protected function fundRequestOptions(Workspace $workspace): Collection
+    {
+        return FundRequest::where('workspace_id', $workspace->id)
+            ->whereIn('status', FundRequest::APPROVED_STATUSES)
+            ->with(['chargeToUsers:users.id,users.name', 'productShares', 'department:id,name'])
+            ->orderByDesc('request_date')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get()
+            ->map(fn (FundRequest $fundRequest) => [
+                'id' => $fundRequest->id,
+                'reference_no' => $fundRequest->reference_no,
+                'request_date' => $fundRequest->request_date?->toDateString(),
+                'amount_requested' => (float) $fundRequest->amount_requested,
+                'status' => $fundRequest->status,
+                // Copied onto the transaction when one is filled in from here.
+                'transaction_type_id' => $fundRequest->transaction_type_id,
+                'department' => $fundRequest->department?->name,
+                'charge_to' => $fundRequest->chargeToUsers->map(fn ($user) => [
+                    'user_id' => $user->id,
+                    'name' => $user->name,
+                    'amount' => (float) $user->pivot->amount,
+                ])->values(),
+                'products' => $fundRequest->productShares->map(fn ($share) => [
+                    'product_label' => $share->product_label,
+                    'amount' => (float) $share->amount,
+                ])->values(),
+            ]);
+    }
+
+    /**
+     * The account picker's options, each carrying the balance a new entry should
+     * build on: the running balance of the account's newest transaction, or the
+     * opening balance when it has none yet.
+     */
+    protected function accountOptions(Workspace $workspace, ?Transaction $editing = null): Collection
+    {
+        $accounts = Account::where('workspace_id', $workspace->id)
+            ->orderBy('name')->get(['id', 'name', 'currency', 'opening_balance']);
+
+        // Newest per account, matching the ledger's date/position ordering.
+        $lastBalances = Transaction::where('workspace_id', $workspace->id)
+            ->whereIn('id', function ($q) use ($workspace, $editing) {
+                $q->selectRaw(
+                    '(SELECT t2.id FROM finance_transactions t2
+                        WHERE t2.account_id = finance_transactions.account_id
+                          AND t2.workspace_id = ?
+                          AND (? IS NULL OR t2.id <> ?)
+                        ORDER BY t2.date DESC, t2.position DESC LIMIT 1)',
+                    [$workspace->id, $editing?->getKey(), $editing?->getKey()]
+                )
+                    ->from('finance_transactions')
+                    ->where('workspace_id', $workspace->id)
+                    ->groupBy('account_id');
+            })
+            ->pluck('running_balance', 'account_id');
+
+        return $accounts->map(fn ($account) => [
+            'id' => $account->id,
+            'name' => $account->name,
+            'currency' => $account->currency,
+            'current_balance' => (float) ($lastBalances->get($account->id) ?? $account->opening_balance),
+            'has_transactions' => $lastBalances->has($account->id),
+        ]);
+    }
+
+    /**
+     * Where to send the user after a save. The form may pass a `return_to` path
+     * (the modal stays on its page); otherwise land on the transactions list.
+     * Restricted to this workspace's own paths to avoid an open redirect.
+     */
+    protected function redirectAfterSave(Request $request, Workspace $workspace)
+    {
+        return redirect($this->safeReturnTo($request, $workspace)
+            ?? route('workspaces.finance.transactions.index', $workspace->slug));
+    }
+
+    /**
+     * A `return_to` path from the request, but only when it points inside this
+     * workspace (guards against an open redirect). Null otherwise.
+     */
+    protected function safeReturnTo(Request $request, Workspace $workspace): ?string
+    {
+        $returnTo = $request->input('return_to');
+        $prefix = "/workspaces/{$workspace->slug}/";
+
+        return (is_string($returnTo) && str_starts_with($returnTo, $prefix)) ? $returnTo : null;
+    }
+
     public function store(TransactionRequest $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
@@ -124,6 +297,8 @@ class TransactionController extends Controller
         $this->validateWorkspaceFor($workspace, $request->validated());
 
         $data = $request->validated();
+        // charge_to / products are pivots, not columns — synced after the row exists.
+        unset($data['charge_to'], $data['products']);
 
         // If position is provided (squeezing in), shift existing rows at that position and after
         if (! empty($data['position'])) {
@@ -142,9 +317,11 @@ class TransactionController extends Controller
             $data['position'] = $maxPos + 1;
         }
 
-        Transaction::create([...$data, 'workspace_id' => $workspace->id]);
+        $transaction = Transaction::create([...$data, 'workspace_id' => $workspace->id]);
+        $transaction->chargeToUsers()->sync($this->chargeToPivot($request->chargeToShares()));
+        $this->syncProductShares($transaction, $request->productShares());
 
-        return redirect()->back()->with('success', 'Transaction created.');
+        return $this->redirectAfterSave($request, $workspace)->with('success', 'Transaction created.');
     }
 
     public function update(TransactionRequest $request, Workspace $workspace, Transaction $transaction)
@@ -155,6 +332,7 @@ class TransactionController extends Controller
         $this->validateWorkspaceFor($workspace, $request->validated());
 
         $data = $request->validated();
+        unset($data['charge_to'], $data['products']);
 
         // Preserve existing position if not provided
         if (empty($data['position'])) {
@@ -162,8 +340,40 @@ class TransactionController extends Controller
         }
 
         $transaction->update($data);
+        $transaction->chargeToUsers()->sync($this->chargeToPivot($request->chargeToShares()));
+        $this->syncProductShares($transaction, $request->productShares());
 
-        return redirect()->back()->with('success', 'Transaction updated.');
+        return $this->redirectAfterSave($request, $workspace)->with('success', 'Transaction updated.');
+    }
+
+    /**
+     * Normalized charge-to shares as the `user_id => ['amount' => share]` map
+     * belongsToMany::sync() expects.
+     *
+     * @param  list<array{user_id:int, amount:float}>  $shares
+     * @return array<int, array{amount:float}>
+     */
+    protected function chargeToPivot(array $shares): array
+    {
+        return collect($shares)
+            ->mapWithKeys(fn ($s) => [$s['user_id'] => ['amount' => $s['amount']]])
+            ->all();
+    }
+
+    /**
+     * Replace a transaction's product shares with the given `{product, amount}`
+     * rows (the `finance_transaction_products` pivot has no natural key to sync
+     * against, so the old rows are dropped and the new ones inserted).
+     *
+     * @param  list<array{product:string, amount:float}>  $shares
+     */
+    protected function syncProductShares(Transaction $transaction, array $shares): void
+    {
+        $transaction->productShares()->delete();
+
+        if ($shares !== []) {
+            $transaction->productShares()->createMany($shares);
+        }
     }
 
     public function import(Request $request, Workspace $workspace)
@@ -274,7 +484,7 @@ class TransactionController extends Controller
 
         $transactions = QueryBuilder::for(
             Transaction::where('workspace_id', $workspace->id)
-                ->with(['account', 'transactionType', 'requester:id,name', 'approver:id,name', 'chargeToUser:id,name'])
+                ->with(['account', 'transactionType', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
@@ -318,7 +528,7 @@ class TransactionController extends Controller
             fputcsv($out, [
                 'Posted Date', 'Accounts', 'Transaction', 'Requested By', 'Approved By',
                 'Department', 'Type of Expense', 'Debit (Expense)', 'Credit (Income)',
-                'Running Balance', 'Reference No.', 'Charge To', 'Status', 'Sub Category', 'Remarks',
+                'Running Balance', 'Reference No.', 'Fund Request', 'Charge To', 'Status', 'Sub Category', 'Remarks',
             ]);
 
             foreach ($transactions as $txn) {
@@ -334,7 +544,8 @@ class TransactionController extends Controller
                     $txn->type === 'in' ? $txn->amount : '',
                     $txn->running_balance ?? '',
                     $txn->reference_no ?? '',
-                    $txn->chargeToUser?->name ?? '',
+                    $txn->fundRequest?->reference_no ?? '',
+                    $this->chargeToLabel($txn),
                     $txn->status ?? '',
                     $txn->sub_category ?? '',
                     $txn->notes ?? '',
@@ -345,6 +556,23 @@ class TransactionController extends Controller
         }, $fileName, [
             'Content-Type' => 'text/csv',
         ]);
+    }
+
+    /**
+     * The export's "Charge To" cell. A split shows each user's share so the
+     * spreadsheet keeps the same detail the ledger has.
+     */
+    protected function chargeToLabel(Transaction $transaction): string
+    {
+        $users = $transaction->chargeToUsers;
+
+        if ($users->count() <= 1) {
+            return $users->first()?->name ?? '';
+        }
+
+        return $users
+            ->map(fn ($u) => $u->name.' ('.number_format((float) $u->pivot->amount, 2).')')
+            ->implode(', ');
     }
 
     public function destroy(Request $request, Workspace $workspace, Transaction $transaction)

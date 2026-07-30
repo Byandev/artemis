@@ -22,6 +22,7 @@ use Modules\Inventory\Http\Controllers\Api\UnitCodeController as InventoryUnitCo
 
 Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' => ['api.key']], function () {
     Route::get('/health', HealthController::class)->name('health');
+
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::post('/csr-daily-records', [CsrDailyRecordController::class, 'store'])->name('csr-daily-records.store');
     Route::get('/pages', [PageController::class, 'index'])->name('pages.index');

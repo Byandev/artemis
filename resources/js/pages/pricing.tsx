@@ -221,7 +221,9 @@ export default function Pricing() {
                                     <span
                                         className={`text-3xl font-bold tracking-tight ${t.featured ? 'text-brand-600 dark:text-brand-400' : ''}`}
                                     >
-                                        {gencysPartner ? t.gencysPrice : t.price}
+                                        {gencysPartner
+                                            ? t.gencysPrice
+                                            : t.price}
                                     </span>
                                     {gencysPartner &&
                                         t.gencysPrice !== t.price && (
@@ -258,9 +260,7 @@ export default function Pricing() {
                                 </div>
                                 {(gencysPartner ? t.gencysNote : t.note) && (
                                     <p className="mt-3 border-t border-gray-100 pt-3 text-[10px] leading-relaxed font-medium text-brand-600 dark:border-white/5 dark:text-brand-400">
-                                        {gencysPartner
-                                            ? t.gencysNote
-                                            : t.note}
+                                        {gencysPartner ? t.gencysNote : t.note}
                                     </p>
                                 )}
                                 <Link
@@ -283,8 +283,8 @@ export default function Pricing() {
                                 Unlimited orders & pages, dedicated support
                             </p>
                             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                Custom pricing negotiated per business — 24-month
-                                data retention, full analytics.
+                                Custom pricing negotiated per business —
+                                24-month data retention, full analytics.
                             </p>
                         </div>
                         <Link

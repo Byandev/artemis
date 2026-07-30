@@ -2,10 +2,7 @@ import ActivityLogView from '@/components/activity-logs/activity-log-view';
 import PageHeader from '@/components/common/PageHeader';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
-import {
-    ActivityLog,
-    ActivityLogSummary,
-} from '@/types/models/ActivityLog';
+import { ActivityLog, ActivityLogSummary } from '@/types/models/ActivityLog';
 import { Head } from '@inertiajs/react';
 
 interface Props {

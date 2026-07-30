@@ -1,5 +1,9 @@
 import { DeleteGoalDialog } from '@/components/ad-spend-goals/delete-goal-dialog';
 import {
+    GoalFormDialog,
+    Goal as GoalFormShape,
+} from '@/components/ad-spend-goals/goal-form-dialog';
+import {
     BRAND_GRAD,
     Goal,
     GoalGraph,
@@ -8,10 +12,6 @@ import {
     WARN_GRAD,
     fmtDate,
 } from '@/components/ad-spend-goals/goal-graph';
-import {
-    Goal as GoalFormShape,
-    GoalFormDialog,
-} from '@/components/ad-spend-goals/goal-form-dialog';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -302,7 +302,8 @@ function RampChart({
             </div>
             <div className="mt-1.5 flex items-center justify-between font-mono text-[9px] tracking-wide text-gray-400 uppercase dark:text-gray-500">
                 <span>
-                    Today {currencyFormatter(Math.min(target, yesterday + increment))}
+                    Today{' '}
+                    {currencyFormatter(Math.min(target, yesterday + increment))}
                 </span>
                 {days > 24 && (
                     <span className="text-gray-300 dark:text-gray-600">
@@ -394,7 +395,8 @@ export default function AdSpendGoalShow({
                         </div>
                         <p className="mt-1.5 font-mono text-[12px] text-gray-400 tabular-nums dark:text-gray-500">
                             {currencyFormatter(goal.daily_target)}/day ·{' '}
-                            {fmtDate(goal.start_date)} – {fmtDate(goal.end_date)}
+                            {fmtDate(goal.start_date)} –{' '}
+                            {fmtDate(goal.end_date)}
                         </p>
                     </div>
 
@@ -543,12 +545,15 @@ export default function AdSpendGoalShow({
                                                 </span>
                                                 , increase spend by about{' '}
                                                 <span className="font-mono font-semibold text-brand-600 dark:text-brand-400">
-                                                    +{currencyFormatter(increment)}
+                                                    +
+                                                    {currencyFormatter(
+                                                        increment,
+                                                    )}
                                                     /day
                                                 </span>{' '}
                                                 to reach{' '}
-                                                {currencyFormatter(target)} on the
-                                                last day.
+                                                {currencyFormatter(target)} on
+                                                the last day.
                                             </>
                                         ) : (
                                             <> The goal period has ended.</>

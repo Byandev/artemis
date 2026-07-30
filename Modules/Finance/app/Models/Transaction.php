@@ -5,6 +5,8 @@ namespace Modules\Finance\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Transaction extends Model
@@ -19,13 +21,13 @@ class Transaction extends Model
         'requested_by',
         'approved_by',
         'department',
-        'charge_to',
         'type',
         'transaction_type',
         'transaction_type_id',
         'amount',
         'running_balance',
         'reference_no',
+        'fund_request_id',
         'status',
         'position',
         'sub_category',
@@ -57,9 +59,35 @@ class Transaction extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    public function chargeToUser(): BelongsTo
+    /**
+     * The users this transaction is charged to. Each carries an `amount` pivot —
+     * their share of the transaction, the shares summing to the full amount.
+     */
+    public function chargeToUsers(): BelongsToMany
     {
-        return $this->belongsTo(User::class, 'charge_to');
+        return $this->belongsToMany(User::class, 'finance_transaction_charge_to', 'transaction_id', 'user_id')
+            ->withPivot('amount')
+            ->withTimestamps();
+    }
+
+    /**
+     * The products this transaction is charged to. Each carries an `amount` — its
+     * share of the transaction, the shares summing to the full amount. Feeds the
+     * per-product income statement.
+     */
+    public function productShares(): HasMany
+    {
+        return $this->hasMany(TransactionProduct::class, 'transaction_id');
+    }
+
+    /**
+     * The fund request this entry settles, if any. A loose reference: the link
+     * is for traceability and for filling the form in, and no drawdown is
+     * reconciled against the request's amount.
+     */
+    public function fundRequest(): BelongsTo
+    {
+        return $this->belongsTo(FundRequest::class, 'fund_request_id');
     }
 
     public function transactionType(): BelongsTo
