@@ -601,11 +601,34 @@ export default function TransactionsIndex({
                     Charge To
                 </div>
             ),
-            cell: ({ row }) => (
-                <span className="text-[12px] text-gray-700 dark:text-gray-200">
-                    {row.original.charge_to_user?.name || '—'}
-                </span>
-            ),
+            cell: ({ row }) => {
+                const charged = row.original.charge_to_users ?? [];
+
+                if (charged.length === 0) {
+                    return (
+                        <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                            —
+                        </span>
+                    );
+                }
+
+                // A split shows each share so the row still reconciles at a glance.
+                return (
+                    <span
+                        className="text-[12px] text-gray-700 dark:text-gray-200"
+                        title={charged
+                            .map(
+                                (u) =>
+                                    `${u.name}: ${Number(u.pivot?.amount ?? 0).toFixed(2)}`,
+                            )
+                            .join('\n')}
+                    >
+                        {charged.length === 1
+                            ? charged[0].name
+                            : charged.map((u) => u.name).join(', ')}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'status',

@@ -17,6 +17,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
 import {
     ChevronRight,
+    Copy,
     Pencil,
     Plus,
     RefreshCw,
@@ -99,6 +100,8 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
     const [searchValue, setSearchValue] = useState(query.filter?.search ?? '');
     const [formOpen, setFormOpen] = useState(false);
     const [editing, setEditing] = useState<UnitCodeRow | null>(null);
+    // Source row for a "copy" — prefills the form but saves as a new unit code.
+    const [copying, setCopying] = useState<UnitCodeRow | null>(null);
     const [deleting, setDeleting] = useState<UnitCodeRow | null>(null);
     const [syncing, setSyncing] = useState(false);
 
@@ -237,7 +240,7 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
             },
         ];
 
-        if (canEdit || canDelete) {
+        if (canCreate || canEdit || canDelete) {
             cols.push({
                 id: 'actions',
                 enableSorting: false,
@@ -252,9 +255,24 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                 ),
                 cell: ({ row }) => (
                     <div className="flex items-center justify-end gap-1">
+                        {canCreate && (
+                            <button
+                                onClick={() => {
+                                    setEditing(null);
+                                    setCopying(row.original);
+                                    setFormOpen(true);
+                                }}
+                                className="flex h-7 w-7 items-center justify-center rounded text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                                aria-label="Copy unit code"
+                                title="Copy to a new unit code"
+                            >
+                                <Copy className="h-3.5 w-3.5" />
+                            </button>
+                        )}
                         {canEdit && (
                             <button
                                 onClick={() => {
+                                    setCopying(null);
                                     setEditing(row.original);
                                     setFormOpen(true);
                                 }}
@@ -279,7 +297,7 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
         }
 
         return cols;
-    }, [canEdit, canDelete]);
+    }, [canCreate, canEdit, canDelete]);
 
     return (
         <AppLayout>
@@ -295,6 +313,7 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                             <button
                                 onClick={() => {
                                     setEditing(null);
+                                    setCopying(null);
                                     setFormOpen(true);
                                 }}
                                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
@@ -371,9 +390,13 @@ export default function UnitCodesIndex({ workspace, unitCodes, query }: Props) {
                 open={formOpen}
                 onOpenChange={(open) => {
                     setFormOpen(open);
-                    if (!open) setEditing(null);
+                    if (!open) {
+                        setEditing(null);
+                        setCopying(null);
+                    }
                 }}
-                unitCode={editing}
+                unitCode={editing ?? copying}
+                duplicate={!!copying}
             />
 
             <DeleteUnitCodeDialog

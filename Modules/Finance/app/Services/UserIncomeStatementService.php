@@ -365,11 +365,14 @@ class UserIncomeStatementService
             ->get(['id', 'name', 'is_gross_profit_deduction'])
             ->keyBy('id');
 
-        $rows = Transaction::where('workspace_id', $workspace->id)
-            ->where('type', 'out')
-            ->where('charge_to', $userId)
-            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
-            ->selectRaw('COALESCE(transaction_type_id, 0) as type_key, SUM(amount) as total')
+        // A transaction split across users contributes only this user's share.
+        $rows = Transaction::query()
+            ->join('finance_transaction_charge_to as ct', 'ct.transaction_id', '=', 'finance_transactions.id')
+            ->where('finance_transactions.workspace_id', $workspace->id)
+            ->where('finance_transactions.type', 'out')
+            ->where('ct.user_id', $userId)
+            ->whereBetween('finance_transactions.date', [$from->toDateString(), $to->toDateString()])
+            ->selectRaw('COALESCE(finance_transactions.transaction_type_id, 0) as type_key, SUM(ct.amount) as total')
             ->groupBy('type_key')
             ->orderByDesc('total')
             ->get()

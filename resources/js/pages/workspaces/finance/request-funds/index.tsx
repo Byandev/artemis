@@ -383,10 +383,10 @@ export default function RequestFundsIndex({
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Request Funds`} />
+            <Head title={`${workspace.name} - Fund Requests`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Request Funds"
+                    title="Fund Requests"
                     description="Create and track requests for funds and their approvals."
                 >
                     {canCreate && (

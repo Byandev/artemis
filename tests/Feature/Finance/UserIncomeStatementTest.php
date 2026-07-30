@@ -53,10 +53,20 @@ function seedJuan($workspace, $user): Intern
     // Different intern — must be excluded from Juan's statement.
     uisOrder($workspace, ['intern_brands_name' => 'Maria Santos - Beta', 'order_details' => '1X WIDGET', 'price_final' => 9999, 'total_cog' => 999, 'shipping_fee' => 999, 'parcel_updated_date' => '2026-05-12 09:00:00', 'shipped_out_date' => '2026-05-07']);
 
-    // Transactions charged to Juan's user.
-    Transaction::create(['workspace_id' => $workspace->id, 'account_id' => $account->id, 'date' => '2026-05-14', 'description' => 'Ads', 'type' => 'out', 'transaction_type_id' => $adSpent->id, 'product' => 'WIDGET', 'amount' => 800, 'charge_to' => $user->id]);
-    Transaction::create(['workspace_id' => $workspace->id, 'account_id' => $account->id, 'date' => '2026-05-16', 'description' => 'Ads', 'type' => 'out', 'transaction_type_id' => $adSpent->id, 'product' => 'GADGET', 'amount' => 300, 'charge_to' => $user->id]);
-    Transaction::create(['workspace_id' => $workspace->id, 'account_id' => $account->id, 'date' => '2026-05-15', 'description' => 'Pay', 'type' => 'out', 'transaction_type_id' => $salary->id, 'product' => null, 'amount' => 500, 'charge_to' => $user->id]);
+    // Transactions charged to Juan's user, who bears the whole of each.
+    $chargeToJuan = function (array $attrs) use ($workspace, $account, $user) {
+        $txn = Transaction::create(array_merge([
+            'workspace_id' => $workspace->id,
+            'account_id' => $account->id,
+            'type' => 'out',
+        ], $attrs));
+
+        $txn->chargeToUsers()->sync([$user->id => ['amount' => $attrs['amount']]]);
+    };
+
+    $chargeToJuan(['date' => '2026-05-14', 'description' => 'Ads', 'transaction_type_id' => $adSpent->id, 'product' => 'WIDGET', 'amount' => 800]);
+    $chargeToJuan(['date' => '2026-05-16', 'description' => 'Ads', 'transaction_type_id' => $adSpent->id, 'product' => 'GADGET', 'amount' => 300]);
+    $chargeToJuan(['date' => '2026-05-15', 'description' => 'Pay', 'transaction_type_id' => $salary->id, 'product' => null, 'amount' => 500]);
 
     return $juan;
 }

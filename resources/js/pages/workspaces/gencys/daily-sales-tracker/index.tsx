@@ -1,6 +1,9 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DeleteTestOrderDialog } from '@/components/gencys/delete-test-order-dialog';
-import { TestOrderFormDialog } from '@/components/gencys/test-order-form-dialog';
+import {
+    TestOrderFormDialog,
+    type UnitCodeOption,
+} from '@/components/gencys/test-order-form-dialog';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -23,7 +26,14 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { debounce } from 'lodash';
-import { ChevronDown, Columns3, Plus, Search, Trash2, Truck } from 'lucide-react';
+import {
+    ChevronDown,
+    Columns3,
+    Plus,
+    Search,
+    Trash2,
+    Truck,
+} from 'lucide-react';
 import {
     useCallback,
     useEffect,
@@ -89,6 +99,8 @@ interface Props {
     orderStatuses: string[];
     /** False in production, where the test-order endpoints don't exist. */
     canManageTestOrders?: boolean;
+    /** Unit codes the test-order form picks line items from. */
+    unitCodes?: UnitCodeOption[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -429,6 +441,7 @@ export default function DailySalesTrackerIndex({
     parcelStatuses,
     orderStatuses,
     canManageTestOrders = false,
+    unitCodes = [],
     query,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/gencys/daily-sales-tracker`;
@@ -813,9 +826,9 @@ export default function DailySalesTrackerIndex({
                         workspace={workspace}
                         open={testOrderOpen}
                         onOpenChange={setTestOrderOpen}
+                        unitCodes={unitCodes}
                         csrs={csrs}
                         platforms={platforms}
-                        parcelStatuses={parcelStatuses}
                         orderStatuses={orderStatuses}
                     />
                     <DeleteTestOrderDialog

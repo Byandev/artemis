@@ -58,9 +58,11 @@ export function DeleteTestOrderDialog({ order, workspace, onClose }: Props) {
                         <span className="font-mono text-emerald-600 dark:text-emerald-400">
                             #{order?.id}
                         </span>
-                        {order?.customer_name ? ` (${order.customer_name})` : ''}{' '}
-                        and its line items will be removed. This action cannot be
-                        undone.
+                        {order?.customer_name
+                            ? ` (${order.customer_name})`
+                            : ''}{' '}
+                        and its line items will be removed. This action cannot
+                        be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 

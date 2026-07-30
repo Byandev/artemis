@@ -516,7 +516,7 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceRemittances,
                           },
                           {
-                              title: 'Request Funds',
+                              title: 'Fund Requests',
                               href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
                               icon: Banknote,
                               permission: PERMISSIONS.ViewFinanceRequestFunds,

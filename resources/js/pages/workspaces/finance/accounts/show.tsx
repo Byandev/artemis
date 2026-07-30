@@ -42,7 +42,7 @@ interface Txn {
     requested_by?: string | null;
     approved_by?: string | null;
     department?: string | null;
-    charge_to?: string | null;
+    charge_to_users?: { id: number; name: string }[];
     type: 'in' | 'out';
     transaction_type: TransactionType | null;
     transaction_type_id?: number | null;

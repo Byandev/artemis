@@ -5,6 +5,7 @@ namespace Modules\Finance\Models;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Transaction extends Model
@@ -19,7 +20,6 @@ class Transaction extends Model
         'requested_by',
         'approved_by',
         'department',
-        'charge_to',
         'type',
         'transaction_type',
         'transaction_type_id',
@@ -58,9 +58,15 @@ class Transaction extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    public function chargeToUser(): BelongsTo
+    /**
+     * The users this transaction is charged to. Each carries an `amount` pivot —
+     * their share of the transaction, the shares summing to the full amount.
+     */
+    public function chargeToUsers(): BelongsToMany
     {
-        return $this->belongsTo(User::class, 'charge_to');
+        return $this->belongsToMany(User::class, 'finance_transaction_charge_to', 'transaction_id', 'user_id')
+            ->withPivot('amount')
+            ->withTimestamps();
     }
 
     public function transactionType(): BelongsTo
