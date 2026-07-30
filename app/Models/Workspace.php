@@ -48,7 +48,6 @@ class Workspace extends Model
         'sales_marketing_dashboard_module_enabled',
         'video_editor_dashboard_module_enabled',
         'csr_dashboard_module_enabled',
-        'esc_tracker_module_enabled',
         'sim_gateway_module_enabled',
         'inventory_sync',
         'public_password',
@@ -85,7 +84,6 @@ class Workspace extends Model
         'sales_marketing_dashboard_module_enabled' => 'boolean',
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
-        'esc_tracker_module_enabled' => 'boolean',
         'sim_gateway_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
@@ -113,7 +111,6 @@ class Workspace extends Model
             $this->botcake_module_enabled ? null : 'Botcake',
             $this->meta_ads_module_enabled ? null : 'Meta Ads',
             $this->gencys_module_enabled ? null : 'Gencys ERP',
-            $this->esc_tracker_module_enabled ? null : 'ESC Tracker',
         ]));
     }
 

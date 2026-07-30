@@ -18,7 +18,6 @@
             reasons. Add a module here once its tests pass.
         -->
         <testsuite name="Modules">
-            <directory>Modules/EscTracker/tests/Feature</directory>
             <directory>Modules/Inventory/tests/Feature</directory>
         </testsuite>
     </testsuites>
