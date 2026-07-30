@@ -1,6 +1,13 @@
 import PageHeader from '@/components/common/PageHeader';
+import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -24,6 +31,7 @@ interface Intern {
     intern_id: number | null;
     full_name: string | null;
     username: string | null;
+    other_names: string[] | null;
     contact_number: string | null;
     email: string | null;
     active: boolean;
@@ -174,6 +182,23 @@ export default function GencysInternsIndex({
                     <span className="font-mono text-[12px] text-gray-600 dark:text-gray-400">
                         {row.original.username ?? '—'}
                     </span>
+                ),
+            },
+            {
+                id: 'other_names',
+                header: ({ column }) => (
+                    <SortableHeader
+                        column={column}
+                        title="Other Names"
+                        enabled={false}
+                    />
+                ),
+                cell: ({ row }) => (
+                    <InternOtherNames
+                        baseUrl={baseUrl}
+                        intern={row.original}
+                        canEdit={canSync}
+                    />
                 ),
             },
             {
@@ -414,5 +439,122 @@ function InternUserAssign({
             saving={saving}
             onAssign={assign}
         />
+    );
+}
+
+/**
+ * Editor for an intern's alternate names — aliases (one per line) used to match
+ * ERP "intern & brand" cells whose spelling differs from the canonical name.
+ */
+function InternOtherNames({
+    baseUrl,
+    intern,
+    canEdit,
+}: {
+    baseUrl: string;
+    intern: Intern;
+    canEdit: boolean;
+}) {
+    const aliases = intern.other_names ?? [];
+    const [open, setOpen] = useState(false);
+    const [text, setText] = useState(aliases.join('\n'));
+    const [saving, setSaving] = useState(false);
+
+    // Reconcile when server data changes (paging/sorting/reload).
+    useEffect(
+        () => setText((intern.other_names ?? []).join('\n')),
+        [intern.other_names],
+    );
+
+    const label =
+        aliases.length === 0
+            ? 'Add'
+            : aliases.length === 1
+              ? aliases[0]
+              : `${aliases.length} names`;
+
+    if (!canEdit) {
+        return (
+            <span className="text-[12px] text-gray-600 dark:text-gray-400">
+                {aliases.length ? aliases.join(', ') : '—'}
+            </span>
+        );
+    }
+
+    const save = () => {
+        const names = text
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+        router.patch(
+            `${baseUrl}/${intern.id}/other-names`,
+            { other_names: names },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => {
+                    setSaving(false);
+                    setOpen(false);
+                },
+                onError: () => toast.error('Failed to save other names.'),
+            },
+        );
+    };
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className={cn(
+                        'max-w-[180px] truncate rounded-md px-2 py-1 text-left font-mono! text-[12px]! transition-colors hover:bg-stone-100 dark:hover:bg-zinc-800',
+                        aliases.length
+                            ? 'text-gray-700 dark:text-gray-300'
+                            : 'text-gray-400 dark:text-gray-500',
+                    )}
+                    title={aliases.join(', ')}
+                >
+                    {label}
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72">
+                <div className="space-y-2">
+                    <div className="text-[12px] font-medium text-gray-800 dark:text-gray-100">
+                        Other names
+                    </div>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        One per line. Aliases let ERP cells with different
+                        spellings resolve to this intern.
+                    </p>
+                    <Textarea
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        rows={4}
+                        placeholder={'MICHEAL JAMES HERMANO\nABAÑO MARK LOUISE'}
+                        className="font-mono! text-[12px]!"
+                    />
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            disabled={saving}
+                            onClick={save}
+                        >
+                            {saving ? 'Saving…' : 'Save'}
+                        </Button>
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
     );
 }

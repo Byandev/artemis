@@ -31,6 +31,8 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     unitCode?: UnitCode | null;
+    /** Prefill from `unitCode` but create a new record instead of updating it. */
+    duplicate?: boolean;
 }
 
 type FormItem = {
@@ -54,8 +56,9 @@ export function UnitCodeFormDialog({
     open,
     onOpenChange,
     unitCode,
+    duplicate = false,
 }: Props) {
-    const isEditing = !!unitCode;
+    const isEditing = !!unitCode && !duplicate;
 
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm({
@@ -69,9 +72,14 @@ export function UnitCodeFormDialog({
         if (!open) return;
 
         if (unitCode) {
+            clearErrors();
             setData({
                 sku: unitCode.sku ?? '',
-                unit_code: unitCode.unit_code ?? '',
+                // A copy needs its own code — unit_code is unique per workspace.
+                unit_code:
+                    duplicate && unitCode.unit_code
+                        ? `${unitCode.unit_code}-COPY`
+                        : (unitCode.unit_code ?? ''),
                 total_amount: unitCode.total_amount ?? '',
                 items:
                     unitCode.items && unitCode.items.length > 0
@@ -89,7 +97,7 @@ export function UnitCodeFormDialog({
             clearErrors();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, unitCode]);
+    }, [open, unitCode, duplicate]);
 
     const setItem = (index: number, key: keyof FormItem, value: string) => {
         setData(
@@ -138,12 +146,18 @@ export function UnitCodeFormDialog({
                 <div className="relative border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            {isEditing ? 'Edit Unit Code' : 'Add Unit Code'}
+                            {isEditing
+                                ? 'Edit Unit Code'
+                                : duplicate
+                                  ? 'Copy Unit Code'
+                                  : 'Add Unit Code'}
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
                             {isEditing
                                 ? 'Update this unit code and its inventory items.'
-                                : 'Create a unit code and its inventory item breakdown.'}
+                                : duplicate
+                                  ? 'Copied from the selected unit code. Give it a new code before saving.'
+                                  : 'Create a unit code and its inventory item breakdown.'}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogClose className="absolute top-4 right-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/6 dark:hover:text-gray-300">

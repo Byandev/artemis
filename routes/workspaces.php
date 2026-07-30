@@ -50,9 +50,11 @@ use Modules\Finance\Http\Controllers\AccountController as FinanceAccountControll
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
+use Modules\Finance\Http\Controllers\IncomeStatementController as FinanceIncomeStatementController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
+use Modules\Finance\Http\Controllers\UserIncomeStatementController as FinanceUserIncomeStatementController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\InternController as GencysInternController;
 use Modules\GencysERP\Http\Controllers\Web\PageController as GencysPageController;
@@ -506,10 +508,19 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
         Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
+
+        // Hand-made test orders. TESTING ONLY — not registered in production, so
+        // the endpoints don't exist there at all (the controller also aborts).
+        if (! app()->isProduction()) {
+            Route::post('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'store'])->name('daily-sales-tracker.store');
+            Route::delete('/daily-sales-tracker/{order}', [GencysDailySalesTrackerController::class, 'destroy'])->name('daily-sales-tracker.destroy');
+        }
+
         Route::get('/interns', [GencysInternController::class, 'index'])->name('interns.index');
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');
         Route::patch('/interns/{intern}/toggle-active', [GencysInternController::class, 'toggleActive'])->name('interns.toggle-active');
         Route::patch('/interns/{intern}/assign-user', [GencysInternController::class, 'assignUser'])->name('interns.assign-user');
+        Route::patch('/interns/{intern}/other-names', [GencysInternController::class, 'updateOtherNames'])->name('interns.other-names');
         Route::get('/pages', [GencysPageController::class, 'index'])->name('pages.index');
         Route::post('/pages/sync', [GencysPageController::class, 'sync'])->name('pages.sync');
         Route::get('/unit-codes', [UnitCodeController::class, 'index'])->name('unit-codes.index');
@@ -537,13 +548,26 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/accounts/{account}', [FinanceAccountController::class, 'destroy'])->name('accounts.destroy');
 
         Route::get('/transactions', [FinanceTransactionController::class, 'index'])->name('transactions.index');
+        Route::get('/transactions/create', [FinanceTransactionController::class, 'create'])->name('transactions.create');
         Route::get('/transactions/export', [FinanceTransactionController::class, 'export'])->name('transactions.export');
+        Route::get('/transactions/{transaction}/edit', [FinanceTransactionController::class, 'edit'])->name('transactions.edit');
         Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
         Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
         Route::put('/transactions/bulk-update-type', [FinanceTransactionController::class, 'bulkUpdateType'])->name('transactions.bulk-update-type');
         Route::put('/transactions/bulk-update-sub-category', [FinanceTransactionController::class, 'bulkUpdateSubCategory'])->name('transactions.bulk-update-sub-category');
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
+
+        Route::get('/income-statements', [FinanceIncomeStatementController::class, 'index'])->name('income-statements.index');
+        Route::get('/income-statements/preview', [FinanceIncomeStatementController::class, 'preview'])->name('income-statements.preview');
+        Route::post('/income-statements', [FinanceIncomeStatementController::class, 'store'])->name('income-statements.store');
+        Route::get('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'show'])->name('income-statements.show');
+        Route::get('/income-statements/{incomeStatement}/export', [FinanceIncomeStatementController::class, 'export'])->name('income-statements.export');
+        Route::post('/income-statements/{incomeStatement}/regenerate', [FinanceIncomeStatementController::class, 'regenerate'])->name('income-statements.regenerate');
+        Route::delete('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'destroy'])->name('income-statements.destroy');
+
+        Route::get('/income-statements/{incomeStatement}/users', [FinanceUserIncomeStatementController::class, 'index'])->name('income-statements.users.index');
+        Route::get('/income-statements/{incomeStatement}/users/{user}', [FinanceUserIncomeStatementController::class, 'show'])->name('income-statements.users.show');
 
         Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
         Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');
