@@ -1,6 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head } from '@inertiajs/react';
@@ -30,7 +31,20 @@ interface Props {
  * Every value on this page is derived from the inputs below — the page is a
  * pure client-side calculator, there is no server-side computation.
  *
+ * Two revenue modes reach gross profit by different routes. Everything from
+ * gross profit down is shared:
+ *
  *   adspentTotal      = adSpentPerDay × days
+ *   advisoryShare     = max(grossProfit, 0) × 30%   (Gencys partner workspaces)
+ *   varExpenseUnits   = ceil(adSpentPerDay ÷ per)   (whole units, per expense)
+ *   varExpenseTotal   = Σ (units × costPerUnit)
+ *   netProfit         = grossProfit − advisoryShare − opex − varExpenseTotal
+ *   rtsParcels        = parcel × rtsPct
+ *   cogOfRtsReturned  = rtsParcels × cogUnit
+ *   revolvingFund     = cogTotal + adspentTotal   (working capital that recycles)
+ *
+ * ROAS mode — revenue straight off spend, percentages off the money:
+ *
  *   grossSales        = roas × adspentTotal
  *   odzAmount         = grossSales × odzPct
  *   lessOdz           = grossSales − odzAmount
@@ -41,13 +55,30 @@ interface Props {
  *   codFee            = lessOdz × codPct
  *   cogTotal          = parcel × cogUnit
  *   grossProfit       = lessRts − shipping − codFee − cogTotal − adspentTotal
- *   advisoryShare     = max(grossProfit, 0) × 30%   (Gencys partner workspaces)
- *   varExpenseUnits   = ceil(adSpentPerDay ÷ per)   (whole units, per expense)
- *   varExpenseTotal   = Σ (units × costPerUnit)
- *   netProfit         = grossProfit − advisoryShare − opex − varExpenseTotal
- *   parcelFromRts     = parcel × rtsPct
- *   cogOfRtsReturned  = parcelFromRts × cogUnit
- *   revolvingFund     = cogTotal + adspentTotal   (working capital that recycles)
+ *
+ * CPP mode — unit economics first, then a parcel funnel off ad spend:
+ *
+ *   profitPerParcel   = pricing − cpp − shippingAmount − cogUnit
+ *                       − (pricing × codPct)
+ *   purchases         = adspentTotal ÷ cpp
+ *   odzParcels        = purchases × odzPct        (never ship: no shipping/COG)
+ *   parcel            = purchases − odzParcels    (shipped)
+ *   rtsParcels        = parcel × rtsPct
+ *   parcelsDelivered  = parcel − rtsParcels
+ *   grossSales        = parcelsDelivered × pricing   (only delivered collect)
+ *   codFee            = grossSales × codPct
+ *   shipping          = parcel × shippingAmount      (paid on all shipped)
+ *   cogTotal          = parcel × cogUnit
+ *   grossProfit       = grossSales − codFee − shipping − cogTotal
+ *                       − adspentTotal
+ *
+ * An RTS parcel therefore loses its sale but still burns ad spend and shipping;
+ * its COG comes back through the "COG of RTS Returned" line, as in ROAS mode.
+ * The identity behind CPP mode:
+ *
+ *   grossProfit = profitPerParcel × parcelsDelivered
+ *                 − rtsParcels × (cpp + shippingAmount + cogUnit)
+ *                 − odzParcels × cpp
  */
 
 /**
@@ -58,6 +89,7 @@ const ADVISORY_SHARE_RATE = 0.3;
 
 const DEFAULTS = {
     roas: '0',
+    cpp: '0',
     pricing: '0',
     cogUnit: '0',
     adSpentPerDay: '0',
@@ -72,8 +104,18 @@ const DEFAULTS = {
 type Field = keyof typeof DEFAULTS;
 type Scenario = Record<Field, string>;
 
-const FIELDS: Array<{ field: Field; label: string; suffix?: string }> = [
-    { field: 'roas', label: 'ROAS' },
+/** What drives revenue: ROAS directly, or CPP through a purchase count. */
+type Mode = 'roas' | 'cpp';
+
+/** `mode` limits a field to one revenue mode; unset means it shows in both. */
+const FIELDS: Array<{
+    field: Field;
+    label: string;
+    suffix?: string;
+    mode?: Mode;
+}> = [
+    { field: 'roas', label: 'ROAS', mode: 'roas' },
+    { field: 'cpp', label: 'CPP (cost per purchase)', mode: 'cpp' },
     { field: 'pricing', label: 'Pricing' },
     { field: 'cogUnit', label: 'COG (per unit)' },
     { field: 'adSpentPerDay', label: 'Ad Spent (per day)' },
@@ -129,12 +171,120 @@ const num = (v: string) => {
     return Number.isFinite(n) ? n : 0;
 };
 
+interface ChainInputs {
+    adspentTotal: number;
+    roas: number;
+    cpp: number;
+    pricing: number;
+    cogUnit: number;
+    shippingAmount: number;
+    odzPct: number;
+    rtsPct: number;
+    codPct: number;
+}
+
+/**
+ * Both chains return the same shape so the caller and the breakdown can read
+ * one type; each fills the other mode's fields with 0.
+ */
+interface Chain {
+    grossSales: number;
+    parcel: number;
+    shipping: number;
+    codFee: number;
+    cogTotal: number;
+    grossProfit: number;
+    // ROAS mode — percentages come off the money.
+    odzAmount: number;
+    lessOdz: number;
+    rtsAmount: number;
+    lessRts: number;
+    // CPP mode — percentages come off the parcel funnel.
+    purchases: number;
+    odzParcels: number;
+    parcelsDelivered: number;
+    profitPerParcel: number;
+}
+
+function roasChain(p: ChainInputs): Chain {
+    const grossSales = p.roas * p.adspentTotal;
+    const odzAmount = grossSales * p.odzPct;
+    const lessOdz = grossSales - odzAmount;
+    const parcel = p.pricing > 0 ? lessOdz / p.pricing : 0;
+    const rtsAmount = lessOdz * p.rtsPct;
+    const lessRts = lessOdz - rtsAmount;
+    const shipping = parcel * p.shippingAmount;
+    const codFee = lessOdz * p.codPct;
+    const cogTotal = parcel * p.cogUnit;
+    const grossProfit = lessRts - shipping - codFee - cogTotal - p.adspentTotal;
+
+    return {
+        grossSales,
+        parcel,
+        shipping,
+        codFee,
+        cogTotal,
+        grossProfit,
+        odzAmount,
+        lessOdz,
+        rtsAmount,
+        lessRts,
+        purchases: 0,
+        odzParcels: 0,
+        parcelsDelivered: 0,
+        profitPerParcel: 0,
+    };
+}
+
+/**
+ * Unit economics first, then a parcel funnel driven off ad spend. A delivered
+ * parcel earns the full margin; an RTS parcel earns nothing but still burns its
+ * ad spend and shipping (COG comes back via "COG of RTS Returned"); an ODZ
+ * parcel never ships, so it only costs its ad spend.
+ */
+function cppChain(p: ChainInputs): Chain {
+    const purchases = p.cpp > 0 ? p.adspentTotal / p.cpp : 0;
+    const odzParcels = purchases * p.odzPct;
+    const parcel = purchases - odzParcels;
+    const rtsParcels = parcel * p.rtsPct;
+    const parcelsDelivered = parcel - rtsParcels;
+
+    const grossSales = parcelsDelivered * p.pricing;
+    const codFee = grossSales * p.codPct;
+    const shipping = parcel * p.shippingAmount;
+    const cogTotal = parcel * p.cogUnit;
+    const grossProfit =
+        grossSales - codFee - shipping - cogTotal - p.adspentTotal;
+
+    const profitPerParcel =
+        p.pricing - p.cpp - p.shippingAmount - p.cogUnit - p.pricing * p.codPct;
+
+    return {
+        grossSales,
+        parcel,
+        shipping,
+        codFee,
+        cogTotal,
+        grossProfit,
+        odzAmount: 0,
+        lessOdz: 0,
+        rtsAmount: 0,
+        lessRts: 0,
+        purchases,
+        odzParcels,
+        parcelsDelivered,
+        profitPerParcel,
+    };
+}
+
 function calculate(
     inputs: Scenario,
     variableExpenses: VariableExpense[],
     advisoryShareApplies: boolean,
+    mode: Mode,
 ) {
     const roas = num(inputs.roas);
+    const cpp = num(inputs.cpp);
     const pricing = num(inputs.pricing);
     const cogUnit = num(inputs.cogUnit);
     const adSpentPerDay = num(inputs.adSpentPerDay);
@@ -146,16 +296,22 @@ function calculate(
     const opex = num(inputs.opex);
 
     const adspentTotal = adSpentPerDay * days;
-    const grossSales = roas * adspentTotal;
-    const odzAmount = grossSales * odzPct;
-    const lessOdz = grossSales - odzAmount;
-    const parcel = pricing > 0 ? lessOdz / pricing : 0;
-    const rtsAmount = lessOdz * rtsPct;
-    const lessRts = lessOdz - rtsAmount;
-    const shipping = parcel * shippingAmount;
-    const codFee = lessOdz * codPct;
-    const cogTotal = parcel * cogUnit;
-    const grossProfit = lessRts - shipping - codFee - cogTotal - adspentTotal;
+
+    const chainInputs: ChainInputs = {
+        adspentTotal,
+        roas,
+        cpp,
+        pricing,
+        cogUnit,
+        shippingAmount,
+        odzPct,
+        rtsPct,
+        codPct,
+    };
+    const chain =
+        mode === 'cpp' ? cppChain(chainInputs) : roasChain(chainInputs);
+    const { parcel, cogTotal, grossProfit } = chain;
+
     // Only share the upside — a loss must not credit money back.
     const advisoryShare = advisoryShareApplies
         ? Math.max(grossProfit, 0) * ADVISORY_SHARE_RATE
@@ -180,24 +336,26 @@ function calculate(
 
     const netProfit = grossProfit - advisoryShare - opex - variableExpenseTotal;
 
-    const parcelFromRts = parcel * rtsPct;
-    const cogOfRtsReturned = parcelFromRts * cogUnit;
+    const rtsParcels = parcel * rtsPct;
+    const cogOfRtsReturned = rtsParcels * cogUnit;
     const totalNetPlusCogRts = netProfit + cogOfRtsReturned;
     const revolvingFund = cogTotal + adspentTotal;
     const revolvingFundAndNetProfit = revolvingFund; // COG + Ad Spent
 
+    // What ROAS mode's driver works out to per purchase, for its input hint.
+    // There is no reverse hint in CPP mode: the modes no longer share a chain,
+    // so an implied ROAS there would suggest an equivalence that doesn't hold.
+    const impliedCpp = roas > 0 ? pricing / roas : 0;
+
     return {
+        ...chain,
         adspentTotal,
-        grossSales,
-        odzAmount,
-        lessOdz,
-        parcel,
-        rtsAmount,
-        lessRts,
-        shipping,
-        codFee,
-        cogTotal,
-        grossProfit,
+        impliedCpp,
+        rtsParcels,
+        pricing,
+        cpp,
+        cogUnit,
+        codFeePerParcel: pricing * codPct,
         advisoryShare,
         expenses,
         variableExpenseTotal,
@@ -218,6 +376,218 @@ type ComputedExpense = Results['expenses'][number];
 
 type LineVariant = 'default' | 'deduction' | 'subtotal' | 'result' | 'final';
 
+type BreakdownLine = {
+    key: string;
+    /** Rows are grouped under this heading; consecutive rows share a group. */
+    section: string;
+    label: string;
+    value: number;
+    variant?: LineVariant;
+};
+
+/** ROAS mode: percentages come off the money on the way down. */
+function roasLines(r: Results): BreakdownLine[] {
+    return [
+        {
+            section: 'Sales',
+            key: 'grossSales',
+            label: 'Gross Sales (ROAS × Ad Spent)',
+            value: r.grossSales,
+        },
+        {
+            section: 'Sales',
+            key: 'odz',
+            label: `Less: ODZ/INC (${fmt(r.odzPctRaw)}%)`,
+            value: r.odzAmount,
+            variant: 'deduction',
+        },
+        {
+            section: 'Sales',
+            key: 'lessOdz',
+            label: 'Total (Less: ODZ/INC)',
+            value: r.lessOdz,
+            variant: 'subtotal',
+        },
+        {
+            section: 'Sales',
+            key: 'rts',
+            label: `Less: RTS (${fmt(r.rtsPctRaw)}%)`,
+            value: r.rtsAmount,
+            variant: 'deduction',
+        },
+        {
+            section: 'Sales',
+            key: 'lessRts',
+            label: 'Total (Less: RTS)',
+            value: r.lessRts,
+            variant: 'subtotal',
+        },
+
+        {
+            section: 'Parcels',
+            key: 'parcel',
+            label: 'Parcels (Total Less ODZ ÷ Pricing)',
+            value: r.parcel,
+            variant: 'result',
+        },
+        {
+            section: 'Parcels',
+            key: 'rtsParcels',
+            label: `Of which RTS (${fmt(r.rtsPctRaw)}%)`,
+            value: r.rtsParcels,
+        },
+
+        {
+            section: 'Costs',
+            key: 'shipping',
+            label: `Shipping (${fmt(r.shippingAmount)} × parcels)`,
+            value: r.shipping,
+            variant: 'deduction',
+        },
+        {
+            section: 'Costs',
+            key: 'codFee',
+            label: `COD Fee (${fmt(r.codPctRaw)}% × Total Less ODZ)`,
+            value: r.codFee,
+            variant: 'deduction',
+        },
+        {
+            section: 'Costs',
+            key: 'cog',
+            label: `COG (${fmt(r.cogUnit)} × parcels)`,
+            value: r.cogTotal,
+            variant: 'deduction',
+        },
+        {
+            section: 'Costs',
+            key: 'adSpent',
+            label: 'Ad Spent',
+            value: r.adspentTotal,
+            variant: 'deduction',
+        },
+    ];
+}
+
+/**
+ * CPP mode: the per-parcel margin, then a parcel funnel, then the money those
+ * parcels actually move.
+ */
+function cppLines(r: Results): BreakdownLine[] {
+    return [
+        {
+            section: 'Per Parcel',
+            key: 'pricing',
+            label: 'Pricing',
+            value: r.pricing,
+        },
+        {
+            section: 'Per Parcel',
+            key: 'cppPerParcel',
+            label: 'Less: CPP',
+            value: r.cpp,
+            variant: 'deduction',
+        },
+        {
+            section: 'Per Parcel',
+            key: 'shippingPerParcel',
+            label: 'Less: Shipping',
+            value: r.shippingAmount,
+            variant: 'deduction',
+        },
+        {
+            section: 'Per Parcel',
+            key: 'cogPerParcel',
+            label: 'Less: COG',
+            value: r.cogUnit,
+            variant: 'deduction',
+        },
+        {
+            section: 'Per Parcel',
+            key: 'codFeePerParcel',
+            label: `Less: COD Fee (${fmt(r.codPctRaw)}%)`,
+            value: r.codFeePerParcel,
+            variant: 'deduction',
+        },
+        {
+            section: 'Per Parcel',
+            key: 'profitPerParcel',
+            label: 'Profit per Parcel',
+            value: r.profitPerParcel,
+            variant: 'result',
+        },
+
+        {
+            section: 'Parcels',
+            key: 'purchases',
+            label: 'Purchases (Ad Spent ÷ CPP)',
+            value: r.purchases,
+        },
+        {
+            section: 'Parcels',
+            key: 'odzParcels',
+            label: `Less: ODZ/INC (${fmt(r.odzPctRaw)}%)`,
+            value: r.odzParcels,
+            variant: 'deduction',
+        },
+        {
+            section: 'Parcels',
+            key: 'parcel',
+            label: 'Parcels Shipped',
+            value: r.parcel,
+            variant: 'subtotal',
+        },
+        {
+            section: 'Parcels',
+            key: 'rtsParcels',
+            label: `Less: RTS (${fmt(r.rtsPctRaw)}%)`,
+            value: r.rtsParcels,
+            variant: 'deduction',
+        },
+        {
+            section: 'Parcels',
+            key: 'parcelsDelivered',
+            label: 'Parcels Delivered',
+            value: r.parcelsDelivered,
+            variant: 'result',
+        },
+
+        {
+            section: 'Period Totals',
+            key: 'grossSales',
+            label: 'Gross Sales (Delivered × Pricing)',
+            value: r.grossSales,
+        },
+        {
+            section: 'Period Totals',
+            key: 'codFee',
+            label: `COD Fee (${fmt(r.codPctRaw)}% × delivered)`,
+            value: r.codFee,
+            variant: 'deduction',
+        },
+        {
+            section: 'Period Totals',
+            key: 'shipping',
+            label: `Shipping (${fmt(r.shippingAmount)} × shipped)`,
+            value: r.shipping,
+            variant: 'deduction',
+        },
+        {
+            section: 'Period Totals',
+            key: 'cog',
+            label: `COG (${fmt(r.cogUnit)} × shipped)`,
+            value: r.cogTotal,
+            variant: 'deduction',
+        },
+        {
+            section: 'Period Totals',
+            key: 'adSpent',
+            label: 'Ad Spent',
+            value: r.adspentTotal,
+            variant: 'deduction',
+        },
+    ];
+}
+
 /**
  * Built as data rather than JSX so both scenarios render the same rows in the
  * same order — which is what lets the comparison line up row-for-row.
@@ -225,54 +595,14 @@ type LineVariant = 'default' | 'deduction' | 'subtotal' | 'result' | 'final';
 function breakdownLines(
     r: Results,
     advisoryShareApplies: boolean,
-): Array<{ key: string; label: string; value: number; variant?: LineVariant }> {
+    mode: Mode,
+): BreakdownLine[] {
+    const profit = 'Profit';
+
     return [
-        { key: 'parcel', label: 'Parcel', value: r.parcel, variant: 'result' },
-        { key: 'grossSales', label: 'Gross Sales', value: r.grossSales },
+        ...(mode === 'cpp' ? cppLines(r) : roasLines(r)),
         {
-            key: 'odz',
-            label: `ODZ/INC (${fmt(r.odzPctRaw)}%)`,
-            value: r.odzAmount,
-            variant: 'deduction',
-        },
-        {
-            key: 'lessOdz',
-            label: 'Total (Less: ODZ/INC)',
-            value: r.lessOdz,
-            variant: 'subtotal',
-        },
-        {
-            key: 'rts',
-            label: `RTS ${fmt(r.rtsPctRaw)}%`,
-            value: r.rtsAmount,
-            variant: 'deduction',
-        },
-        {
-            key: 'lessRts',
-            label: 'Total (Less: RTS)',
-            value: r.lessRts,
-            variant: 'subtotal',
-        },
-        {
-            key: 'shipping',
-            label: `Shipping (${fmt(r.shippingAmount)})`,
-            value: r.shipping,
-            variant: 'deduction',
-        },
-        {
-            key: 'codFee',
-            label: `COD Fee (${fmt(r.codPctRaw)}%)`,
-            value: r.codFee,
-            variant: 'deduction',
-        },
-        { key: 'cog', label: 'COG', value: r.cogTotal, variant: 'deduction' },
-        {
-            key: 'adSpent',
-            label: 'Ad Spent',
-            value: r.adspentTotal,
-            variant: 'deduction',
-        },
-        {
+            section: profit,
             key: 'grossProfit',
             label: 'Gross Profit',
             value: r.grossProfit,
@@ -281,23 +611,32 @@ function breakdownLines(
         ...(advisoryShareApplies
             ? [
                   {
+                      section: profit,
                       key: 'advisoryShare',
-                      label: `Advisory Share (${ADVISORY_SHARE_RATE * 100}%)`,
+                      label: `Less: Advisory Share (${ADVISORY_SHARE_RATE * 100}%)`,
                       value: r.advisoryShare,
                       variant: 'deduction' as const,
                   },
               ]
             : []),
-        { key: 'opex', label: 'OPEX', value: r.opex, variant: 'deduction' },
+        {
+            section: profit,
+            key: 'opex',
+            label: 'Less: OPEX',
+            value: r.opex,
+            variant: 'deduction',
+        },
         ...r.expenses.map((e) => ({
+            section: profit,
             key: `expense:${e.id}`,
-            label: `${e.name} (${fmtUnits(e.units)} × ${fmt(e.costPerUnit)})`,
+            label: `Less: ${e.name} (${fmtUnits(e.units)} × ${fmt(e.costPerUnit)})`,
             value: e.total,
             variant: 'deduction' as const,
         })),
         ...(r.expenses.length > 1
             ? [
                   {
+                      section: profit,
                       key: 'variableExpenseTotal',
                       label: 'Total Variable Expenses',
                       value: r.variableExpenseTotal,
@@ -306,23 +645,28 @@ function breakdownLines(
               ]
             : []),
         {
+            section: profit,
             key: 'netProfit',
             label: 'NET Profit',
             value: r.netProfit,
             variant: 'result',
         },
+
         {
+            section: 'Returns & Revolving Fund',
             key: 'cogOfRtsReturned',
-            label: 'COG of RTS Returned',
+            label: `COG of RTS Returned (${fmt(r.cogUnit)} × RTS parcels)`,
             value: r.cogOfRtsReturned,
         },
         {
+            section: 'Returns & Revolving Fund',
             key: 'totalNetPlusCogRts',
             label: 'Total NET Profit & COG of RTS Ret.',
             value: r.totalNetPlusCogRts,
             variant: 'result',
         },
         {
+            section: 'Returns & Revolving Fund',
             key: 'revolvingFund',
             label: 'Total Revolving Fund & NET Profit',
             value: r.revolvingFundAndNetProfit,
@@ -331,9 +675,27 @@ function breakdownLines(
     ];
 }
 
+/** Collapse the flat line list into consecutive runs sharing a section. */
+function groupLines(lines: BreakdownLine[]) {
+    const groups: Array<{ section: string; lines: BreakdownLine[] }> = [];
+
+    for (const line of lines) {
+        const current = groups.at(-1);
+
+        if (current?.section === line.section) {
+            current.lines.push(line);
+        } else {
+            groups.push({ section: line.section, lines: [line] });
+        }
+    }
+
+    return groups;
+}
+
 export default function ProfitabilityFormula({ workspace }: Props) {
     const advisoryShareApplies = workspace.is_gencys_partner;
 
+    const [mode, setMode] = useState<Mode>('roas');
     const [comparing, setComparing] = useState(false);
     const [scenarioA, setScenarioA] = useState<Scenario>({ ...DEFAULTS });
     const [scenarioB, setScenarioB] = useState<Scenario>({ ...DEFAULTS });
@@ -341,12 +703,12 @@ export default function ProfitabilityFormula({ workspace }: Props) {
     const [expenses, setExpenses] = useState<VariableExpense[]>([]);
 
     const resultsA = useMemo(
-        () => calculate(scenarioA, expenses, advisoryShareApplies),
-        [scenarioA, expenses, advisoryShareApplies],
+        () => calculate(scenarioA, expenses, advisoryShareApplies, mode),
+        [scenarioA, expenses, advisoryShareApplies, mode],
     );
     const resultsB = useMemo(
-        () => calculate(scenarioB, expenses, advisoryShareApplies),
-        [scenarioB, expenses, advisoryShareApplies],
+        () => calculate(scenarioB, expenses, advisoryShareApplies, mode),
+        [scenarioB, expenses, advisoryShareApplies, mode],
     );
 
     const toggleCompare = () => {
@@ -387,6 +749,22 @@ export default function ProfitabilityFormula({ workspace }: Props) {
                     title="Profitability Formula"
                     description="Model net profit and revolving funds from ROAS, ad spend and cost inputs."
                 >
+                    <ToggleGroup
+                        type="single"
+                        variant="outline"
+                        size="sm"
+                        value={mode}
+                        // Radix allows deselecting in a single group — ignore
+                        // the empty value so a mode is always active.
+                        onValueChange={(next) => next && setMode(next as Mode)}
+                    >
+                        <ToggleGroupItem value="roas" className="px-3 text-xs">
+                            ROAS
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="cpp" className="px-3 text-xs">
+                            CPP
+                        </ToggleGroupItem>
+                    </ToggleGroup>
                     <Button
                         variant={comparing ? 'default' : 'outline'}
                         size="sm"
@@ -411,12 +789,16 @@ export default function ProfitabilityFormula({ workspace }: Props) {
                             scenarioLabel={comparing ? 'Scenario A' : undefined}
                             inputs={scenarioA}
                             onChange={setScenarioA}
+                            results={resultsA}
+                            mode={mode}
                         />
                         {comparing && (
                             <InputsCard
                                 scenarioLabel="Scenario B"
                                 inputs={scenarioB}
                                 onChange={setScenarioB}
+                                results={resultsB}
+                                mode={mode}
                             />
                         )}
                     </div>
@@ -457,12 +839,14 @@ export default function ProfitabilityFormula({ workspace }: Props) {
                             scenarioLabel={comparing ? 'Scenario A' : undefined}
                             results={resultsA}
                             advisoryShareApplies={advisoryShareApplies}
+                            mode={mode}
                         />
                         {comparing && (
                             <BreakdownCard
                                 scenarioLabel="Scenario B"
                                 results={resultsB}
                                 advisoryShareApplies={advisoryShareApplies}
+                                mode={mode}
                                 compareTo={resultsA}
                             />
                         )}
@@ -508,11 +892,22 @@ function InputsCard({
     scenarioLabel,
     inputs,
     onChange,
+    results,
+    mode,
 }: {
     scenarioLabel?: string;
     inputs: Scenario;
     onChange: React.Dispatch<React.SetStateAction<Scenario>>;
+    results: Results;
+    mode: Mode;
 }) {
+    // ROAS mode only: what its driver works out to per purchase. CPP mode gets
+    // no implied ROAS — the chains differ, so it would imply a false equivalence.
+    const hintFor = (field: Field) =>
+        field === 'roas' && results.impliedCpp > 0
+            ? `≈ ${fmt(results.impliedCpp)} CPP at this pricing`
+            : undefined;
+
     return (
         <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
             <CardHeader
@@ -521,20 +916,23 @@ function InputsCard({
                 icon={<Calculator className="h-4 w-4 text-gray-400" />}
             />
             <div className="divide-y divide-black/6 dark:divide-white/6">
-                {FIELDS.map(({ field, label, suffix }) => (
-                    <InputRow
-                        key={field}
-                        label={label}
-                        value={inputs[field]}
-                        onChange={(e) =>
-                            onChange((prev) => ({
-                                ...prev,
-                                [field]: e.target.value,
-                            }))
-                        }
-                        suffix={suffix}
-                    />
-                ))}
+                {FIELDS.filter((f) => !f.mode || f.mode === mode).map(
+                    ({ field, label, suffix }) => (
+                        <InputRow
+                            key={field}
+                            label={label}
+                            hint={hintFor(field)}
+                            value={inputs[field]}
+                            onChange={(e) =>
+                                onChange((prev) => ({
+                                    ...prev,
+                                    [field]: e.target.value,
+                                }))
+                            }
+                            suffix={suffix}
+                        />
+                    ),
+                )}
             </div>
         </div>
     );
@@ -544,17 +942,19 @@ function BreakdownCard({
     scenarioLabel,
     results,
     advisoryShareApplies,
+    mode,
     compareTo,
 }: {
     scenarioLabel?: string;
     results: Results;
     advisoryShareApplies: boolean;
+    mode: Mode;
     compareTo?: Results;
 }) {
-    const lines = breakdownLines(results, advisoryShareApplies);
+    const lines = breakdownLines(results, advisoryShareApplies, mode);
     const baseline = compareTo
         ? new Map(
-              breakdownLines(compareTo, advisoryShareApplies).map((l) => [
+              breakdownLines(compareTo, advisoryShareApplies, mode).map((l) => [
                   l.key,
                   l.value,
               ]),
@@ -565,18 +965,26 @@ function BreakdownCard({
         <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
             <CardHeader label="Breakdown" scenarioLabel={scenarioLabel} />
             <div>
-                {lines.map((line) => (
-                    <Line
-                        key={line.key}
-                        label={line.label}
-                        value={line.value}
-                        variant={line.variant}
-                        delta={
-                            baseline
-                                ? line.value - (baseline.get(line.key) ?? 0)
-                                : undefined
-                        }
-                    />
+                {groupLines(lines).map((group) => (
+                    <div key={group.section}>
+                        <div className="border-b border-black/5 bg-black/[0.02] px-5 py-1.5 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:border-white/5 dark:bg-white/[0.02] dark:text-gray-500">
+                            {group.section}
+                        </div>
+                        {group.lines.map((line) => (
+                            <Line
+                                key={line.key}
+                                label={line.label}
+                                value={line.value}
+                                variant={line.variant}
+                                delta={
+                                    baseline
+                                        ? line.value -
+                                          (baseline.get(line.key) ?? 0)
+                                        : undefined
+                                }
+                            />
+                        ))}
+                    </div>
                 ))}
             </div>
         </div>
@@ -722,21 +1130,30 @@ function VariableExpenseRow({
 
 function InputRow({
     label,
+    hint,
     value,
     onChange,
     suffix,
 }: {
     label: string;
+    hint?: string;
     value: string;
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     suffix?: string;
 }) {
     return (
         <div className="flex items-center justify-between gap-4 px-5 py-2.5">
-            <label className="text-[13px] text-gray-700 dark:text-gray-200">
-                {label}
-            </label>
-            <div className="relative w-44">
+            <div className="min-w-0">
+                <label className="text-[13px] text-gray-700 dark:text-gray-200">
+                    {label}
+                </label>
+                {hint && (
+                    <p className="font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                        {hint}
+                    </p>
+                )}
+            </div>
+            <div className="relative w-44 shrink-0">
                 <Input
                     type="number"
                     inputMode="decimal"
