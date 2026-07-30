@@ -379,6 +379,7 @@ class IncomeStatementController extends Controller
         $row = GencysDailySalesOrder::where('workspace_id', $workspace->id)
             ->where('parcel_status', self::DELIVERED_STATUS)
             ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
             ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
             ->selectRaw('COALESCE(SUM(price_final), 0) as delivered, COUNT(*) as orders')
             ->first();

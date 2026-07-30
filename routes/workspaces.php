@@ -525,7 +525,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/pages/sync', [GencysPageController::class, 'sync'])->name('pages.sync');
         Route::get('/unit-codes', [UnitCodeController::class, 'index'])->name('unit-codes.index');
         Route::post('/unit-codes/sync', [UnitCodeController::class, 'sync'])->name('unit-codes.sync');
+        Route::post('/unit-codes/bulk-product', [UnitCodeController::class, 'bulkUpdateProduct'])->name('unit-codes.bulk-product');
         Route::post('/unit-codes', [UnitCodeController::class, 'store'])->name('unit-codes.store');
+        Route::patch('/unit-codes/{unitCode}/product', [UnitCodeController::class, 'updateProduct'])->name('unit-codes.update-product');
         Route::put('/unit-codes/{unitCode}', [UnitCodeController::class, 'update'])->name('unit-codes.update');
         Route::delete('/unit-codes/{unitCode}', [UnitCodeController::class, 'destroy'])->name('unit-codes.destroy');
     });
