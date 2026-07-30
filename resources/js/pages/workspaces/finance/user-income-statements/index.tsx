@@ -2,7 +2,7 @@ import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronRight } from 'lucide-react';
 
 interface StatementContext {
     id: number;
@@ -27,8 +27,8 @@ interface Props {
     workspace: Workspace;
     incomeStatement: StatementContext;
     users: PnlRow[];
-    unassigned: PnlRow;
     total: PnlRow;
+    discrepancy: PnlRow;
 }
 
 const fmt = (v: number) =>
@@ -57,48 +57,33 @@ const PALETTE = [
     '#14b8a6',
     '#f43f5e',
 ];
-const UNASSIGNED = '#94a3b8';
 
 export default function UserIncomeStatementsIndex({
     workspace,
     incomeStatement,
     users,
-    unassigned,
     total,
+    discrepancy,
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
     const base = `${finance}/income-statements/${incomeStatement.id}/users`;
 
-    // Show the row whenever it carries any figure — delivered can be 0 while
-    // shipping-only costs (orders shipped but not delivered here) make net ≠ 0.
-    const hasUnassigned =
-        unassigned.orders > 0 ||
-        unassigned.delivered !== 0 ||
-        unassigned.cost_of_sales !== 0 ||
-        unassigned.net_profit !== 0;
     const totalDelivered = total.delivered || 0;
 
-    const colorFor = (r: PnlRow, i: number) =>
-        r.user_id == null ? UNASSIGNED : PALETTE[i % PALETTE.length];
+    // Delivered and orders should reconcile to the overall statement; anything
+    // left over is revenue no user is credited with — something to resolve.
+    const hasDiscrepancy =
+        discrepancy.orders !== 0 || Math.abs(discrepancy.delivered) >= 0.01;
 
-    const segments = [
-        ...users.map((u, i) => ({
+    const colorFor = (i: number) => PALETTE[i % PALETTE.length];
+
+    const segments = users
+        .map((u, i) => ({
             key: String(u.user_id),
             label: u.name,
             amount: u.delivered,
-            color: colorFor(u, i),
-        })),
-        ...(hasUnassigned
-            ? [
-                  {
-                      key: 'unassigned',
-                      label: unassigned.name,
-                      amount: unassigned.delivered,
-                      color: UNASSIGNED,
-                  },
-              ]
-            : []),
-    ]
+            color: colorFor(i),
+        }))
         .filter((s) => s.amount > 0)
         .map((s) => ({
             ...s,
@@ -265,7 +250,7 @@ export default function UserIncomeStatementsIndex({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                {users.length === 0 && !hasUnassigned && (
+                                {users.length === 0 && (
                                     <tr>
                                         <td
                                             colSpan={8}
@@ -291,7 +276,7 @@ export default function UserIncomeStatementsIndex({
                                                     className="h-7 w-1 shrink-0 rounded-full"
                                                     style={{
                                                         backgroundColor:
-                                                            colorFor(r, i),
+                                                            colorFor(i),
                                                     }}
                                                 />
                                                 <span className="min-w-0">
@@ -308,32 +293,6 @@ export default function UserIncomeStatementsIndex({
                                         {dataCols(r)}
                                     </tr>
                                 ))}
-
-                                {hasUnassigned && (
-                                    <tr className="bg-stone-50/50 dark:bg-zinc-800/20">
-                                        <td className="py-3 pr-4 pl-5">
-                                            <div className="flex items-center gap-3">
-                                                <span
-                                                    className="h-7 w-1 shrink-0 rounded-full opacity-60"
-                                                    style={{
-                                                        backgroundColor:
-                                                            UNASSIGNED,
-                                                    }}
-                                                />
-                                                <span>
-                                                    <span className="block text-[13px] font-medium text-gray-500 dark:text-gray-400">
-                                                        {unassigned.name}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-400">
-                                                        {int(unassigned.orders)}{' '}
-                                                        orders · unresolved
-                                                    </span>
-                                                </span>
-                                            </div>
-                                        </td>
-                                        {dataCols(unassigned)}
-                                    </tr>
-                                )}
                             </tbody>
                             <tfoot>
                                 <tr className="border-t border-black/6 bg-stone-100 dark:border-white/6 dark:bg-zinc-800/60">
@@ -378,16 +337,87 @@ export default function UserIncomeStatementsIndex({
                                         {fmt(total.net_profit)}
                                     </td>
                                 </tr>
+
+                                {/* Delivered/orders not credited to any user. Zero
+                                    means everything reconciles to the overall
+                                    statement; non-zero is something to resolve. */}
+                                <tr
+                                    className={
+                                        hasDiscrepancy
+                                            ? 'border-t border-amber-200 bg-amber-50/70 dark:border-amber-500/20 dark:bg-amber-500/10'
+                                            : 'border-t border-black/6 dark:border-white/6'
+                                    }
+                                >
+                                    <td className="py-3 pr-4 pl-5">
+                                        <div className="flex items-center gap-2">
+                                            {hasDiscrepancy ? (
+                                                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                            ) : (
+                                                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                            )}
+                                            <span>
+                                                <span
+                                                    className={`block text-[12px] font-semibold tracking-wide uppercase ${
+                                                        hasDiscrepancy
+                                                            ? 'text-amber-700 dark:text-amber-400'
+                                                            : 'text-gray-500 dark:text-gray-400'
+                                                    }`}
+                                                >
+                                                    Discrepancy
+                                                </span>
+                                                <span className="text-[10px] text-gray-400">
+                                                    {hasDiscrepancy
+                                                        ? 'revenue not attributed — resolve'
+                                                        : 'all revenue attributed'}
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td
+                                        className={`${COL} font-semibold ${
+                                            hasDiscrepancy
+                                                ? 'text-amber-700 dark:text-amber-400'
+                                                : 'text-gray-400'
+                                        }`}
+                                    >
+                                        {int(discrepancy.orders)}
+                                    </td>
+                                    <td
+                                        className={`${COL} font-semibold ${
+                                            hasDiscrepancy
+                                                ? 'text-amber-700 dark:text-amber-400'
+                                                : 'text-gray-400'
+                                        }`}
+                                    >
+                                        {fmt(discrepancy.delivered)}
+                                    </td>
+                                    <td className={`${COL} text-gray-300 dark:text-gray-600`}>
+                                        —
+                                    </td>
+                                    <td className={`${COL} text-gray-300 dark:text-gray-600`}>
+                                        —
+                                    </td>
+                                    <td className={`${COL} text-gray-300 dark:text-gray-600`}>
+                                        —
+                                    </td>
+                                    <td className={`${COL} text-gray-300 dark:text-gray-600`}>
+                                        —
+                                    </td>
+                                    <td className="px-4 py-3 pr-5 text-right text-gray-300 dark:text-gray-600">
+                                        —
+                                    </td>
+                                </tr>
                             </tfoot>
                         </table>
                     </div>
                 </div>
 
                 <p className="mt-3 text-[11px] text-gray-400">
-                    Delivered reconciles to the overall statement. Cost of Sales
-                    includes per-order COGS, so Gross and Net intentionally
-                    differ from the workspace statement. Click a user for their
-                    full income statement.
+                    Delivered and Orders reconcile to the overall statement — the
+                    Discrepancy row is what isn’t credited to any user; a non-zero
+                    figure means an intern isn’t linked to a user, so resolve it.
+                    Cost of Sales includes per-order COGS, so Gross and Net
+                    intentionally differ from the workspace statement.
                 </p>
             </div>
         </AppLayout>

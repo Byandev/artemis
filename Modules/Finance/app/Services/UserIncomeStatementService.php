@@ -40,18 +40,13 @@ class UserIncomeStatementService
 
     private const VAT_KEY = -3;
 
-    /** (Re)compute and store every per-user row (and the Unassigned row). */
+    /** (Re)compute and store every per-user row. */
     public function snapshot(IncomeStatement $statement): void
     {
         $workspace = $statement->workspace;
         [$from, $to] = $this->range($statement);
 
-        $codRate = (float) $statement->cod_fee_rate;
-        $vatRate = (float) $statement->vat_rate;
-        $advisoryRate = (float) $statement->advisory_rate;
-        $gencys = (bool) $workspace->is_gencys_partner;
-
-        [$agg, $unassigned] = $this->aggregateByUser($workspace, $from, $to);
+        $agg = $this->aggregateByUser($workspace, $from, $to);
 
         $users = User::whereIn('id', array_keys($agg))->get()->keyBy('id');
 
@@ -65,8 +60,6 @@ class UserIncomeStatementService
             $rows[] = $this->rowFromPayload($uid, $user->name, $payload);
         }
 
-        $rows[] = $this->unassignedRow($unassigned, $codRate, $vatRate, $advisoryRate, $gencys);
-
         DB::transaction(function () use ($statement, $rows) {
             $statement->userStatements()->delete();
             foreach ($rows as $row) {
@@ -76,22 +69,30 @@ class UserIncomeStatementService
     }
 
     /**
-     * The per-user P&L table payload (users[], unassigned, total) from the stored
-     * snapshot, building it on first access.
+     * The per-user P&L table payload (users[], total, overall, discrepancy) from
+     * the stored snapshot, building it on first access. The discrepancy is the
+     * overall workspace statement minus the attributed user rows — a non-zero
+     * delivered/orders figure is revenue nobody is credited with (resolve it).
      */
     public function listPayload(IncomeStatement $statement): array
     {
         $this->ensureSnapshot($statement);
 
-        $rows = $statement->userStatements()->get();
-        $userRows = $rows->whereNotNull('user_id')->sortByDesc('net_profit')->map(fn ($r) => $this->mapRow($r))->values()->all();
-        $unassignedRow = $rows->firstWhere('user_id', null);
-        $unassigned = $unassignedRow ? $this->mapRow($unassignedRow) : $this->blankRow('Unassigned');
+        $userRows = $statement->userStatements()
+            ->whereNotNull('user_id')
+            ->get()
+            ->sortByDesc('net_profit')
+            ->map(fn ($r) => $this->mapRow($r))
+            ->values()->all();
+
+        $total = $this->totalRow($userRows);
+        $overall = $this->overallRow($statement);
 
         return [
             'users' => $userRows,
-            'unassigned' => $unassigned,
-            'total' => $this->totalRow(array_merge($userRows, [$unassigned])),
+            'total' => $total,
+            'overall' => $overall,
+            'discrepancy' => $this->discrepancyRow($overall, $total),
         ];
     }
 
@@ -131,17 +132,24 @@ class UserIncomeStatementService
         }
     }
 
-    /** @return array{0:array<int,array>, 1:array} [per-user aggregates, unassigned aggregate] */
+    /**
+     * Per-user aggregates keyed by user id. Orders whose `intern_brands_name`
+     * resolves to no user are skipped here — they surface as the discrepancy
+     * between the summed user rows and the overall statement.
+     *
+     * @return array<int, array{revenue:float, cogs:float, orders:int, shipping:float}>
+     */
     private function aggregateByUser(Workspace $workspace, Carbon $from, Carbon $to): array
     {
         $cellToUser = $this->cellUserResolver($workspace);
         $blank = ['revenue' => 0.0, 'cogs' => 0.0, 'orders' => 0, 'shipping' => 0.0];
 
         $agg = [];
-        $unassigned = $blank;
 
         $revRows = GencysDailySalesOrder::where('workspace_id', $workspace->id)
             ->where('parcel_status', self::DELIVERED_STATUS)
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
             ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
             ->selectRaw('intern_brands_name as cell, COUNT(*) as orders, COALESCE(SUM(price_final), 0) as revenue, COALESCE(SUM(total_cog), 0) as cogs')
             ->groupBy('cell')
@@ -150,10 +158,6 @@ class UserIncomeStatementService
         foreach ($revRows as $r) {
             $uid = $cellToUser($r->cell);
             if ($uid === null) {
-                $unassigned['revenue'] += (float) $r->revenue;
-                $unassigned['cogs'] += (float) $r->cogs;
-                $unassigned['orders'] += (int) $r->orders;
-
                 continue;
             }
             $agg[$uid] ??= $blank;
@@ -164,6 +168,8 @@ class UserIncomeStatementService
 
         $shipRows = GencysDailySalesOrder::where('workspace_id', $workspace->id)
             ->whereBetween('shipped_out_date', [$from->toDateString(), $to->toDateString()])
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
             ->selectRaw('intern_brands_name as cell, COALESCE(SUM(shipping_fee), 0) as shipping')
             ->groupBy('cell')
             ->get();
@@ -171,15 +177,13 @@ class UserIncomeStatementService
         foreach ($shipRows as $r) {
             $uid = $cellToUser($r->cell);
             if ($uid === null) {
-                $unassigned['shipping'] += (float) $r->shipping;
-
                 continue;
             }
             $agg[$uid] ??= $blank;
             $agg[$uid]['shipping'] += (float) $r->shipping;
         }
 
-        return [$agg, $unassigned];
+        return $agg;
     }
 
     /** The user's two-tier P&L for the month, with expense line items. */
@@ -201,6 +205,8 @@ class UserIncomeStatementService
                 ->where('parcel_status', self::DELIVERED_STATUS)
                 ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
                 ->whereIn('intern_brands_name', $cells)
+                ->whereNotIn('platform', ['Shopee', 'TikTok'])
+                ->whereNotLike('page', '%pikutin%')
                 ->selectRaw('COALESCE(SUM(price_final), 0) as revenue, COALESCE(SUM(total_cog), 0) as cogs, COUNT(*) as orders')
                 ->first();
 
@@ -210,6 +216,8 @@ class UserIncomeStatementService
 
             $shipping = (float) GencysDailySalesOrder::where('workspace_id', $workspace->id)
                 ->whereBetween('shipped_out_date', [$from->toDateString(), $to->toDateString()])
+                ->whereNotIn('platform', ['Shopee', 'TikTok'])
+                ->whereNotLike('page', '%pikutin%')
                 ->whereIn('intern_brands_name', $cells)
                 ->sum('shipping_fee');
         }
@@ -292,29 +300,48 @@ class UserIncomeStatementService
         ];
     }
 
-    /** Persist-ready Unassigned row (order-derived costs only, no charged txns). */
-    private function unassignedRow(array $agg, float $codRate, float $vatRate, float $advisoryRate, bool $gencys): array
+    /** The overall workspace statement as a P&L row, to diff the user rows against. */
+    private function overallRow(IncomeStatement $statement): array
     {
-        $revenue = round((float) $agg['revenue'], 2);
-        $cod = round($revenue * $codRate, 2);
-        $vat = round($cod * $vatRate, 2);
-        $p = $this->derivePnl($revenue, (float) $agg['cogs'], (float) $agg['shipping'], $cod, $vat, 0.0, 0.0, $advisoryRate, $gencys);
+        $delivered = round((float) $statement->total_delivered, 2);
+        $gross = round((float) $statement->gross_profit, 2);
+        $net = round((float) $statement->net_profit, 2);
+        $advisory = round((float) $statement->advisory_share, 2);
 
         return [
             'user_id' => null,
-            'user_name' => 'Unassigned',
-            'orders' => (int) $agg['orders'],
-            'delivered' => $revenue,
-            'cost_of_sales' => $p['cost_of_sales'],
-            'gross_profit' => $p['gross'],
-            'advisory' => $p['advisory'],
-            'opex' => 0.0,
-            'net_profit' => $p['net'],
-            'cod_fee_rate' => $codRate,
-            'vat_rate' => $vatRate,
-            'advisory_rate' => $advisoryRate,
-            'gencys_partner' => $gencys,
-            'lines' => [],
+            'name' => 'Overall',
+            'orders' => (int) $statement->delivered_orders,
+            'delivered' => $delivered,
+            'cost_of_sales' => round($delivered - $gross, 2),
+            'gross_profit' => $gross,
+            'advisory' => $advisory,
+            'opex' => round($gross - $net - $advisory, 2),
+            'net_profit' => $net,
+        ];
+    }
+
+    /**
+     * The overall statement minus the summed user rows. Delivered and orders
+     * should net to ~0 once every intern resolves to a user — a non-zero figure
+     * is revenue nobody is credited with, i.e. something to resolve. (Cost of
+     * sales, gross and net diverge by design: the per-user rows fold in per-order
+     * COGS that the workspace statement does not.)
+     */
+    private function discrepancyRow(array $overall, array $total): array
+    {
+        $diff = fn (string $k) => round((float) $overall[$k] - (float) $total[$k], 2);
+
+        return [
+            'user_id' => null,
+            'name' => 'Discrepancy',
+            'orders' => (int) $overall['orders'] - (int) $total['orders'],
+            'delivered' => $diff('delivered'),
+            'cost_of_sales' => $diff('cost_of_sales'),
+            'gross_profit' => $diff('gross_profit'),
+            'advisory' => $diff('advisory'),
+            'opex' => $diff('opex'),
+            'net_profit' => $diff('net_profit'),
         ];
     }
 
@@ -343,6 +370,8 @@ class UserIncomeStatementService
 
         return GencysDailySalesOrder::where('workspace_id', $workspace->id)
             ->where('parcel_status', self::DELIVERED_STATUS)
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
             ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
             ->whereNotNull('intern_brands_name')
             ->where('intern_brands_name', '!=', '')
@@ -426,21 +455,6 @@ class UserIncomeStatementService
             'advisory' => $sum('advisory'),
             'opex' => $sum('opex'),
             'net_profit' => $sum('net_profit'),
-        ];
-    }
-
-    private function blankRow(string $name): array
-    {
-        return [
-            'user_id' => null,
-            'name' => $name,
-            'orders' => 0,
-            'delivered' => 0.0,
-            'cost_of_sales' => 0.0,
-            'gross_profit' => 0.0,
-            'advisory' => 0.0,
-            'opex' => 0.0,
-            'net_profit' => 0.0,
         ];
     }
 
