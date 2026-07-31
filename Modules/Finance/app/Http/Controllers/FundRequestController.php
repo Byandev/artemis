@@ -182,12 +182,31 @@ class FundRequestController extends Controller
 
     /**
      * The next sequential reference number for a workspace, e.g. RF-00007.
+     *
+     * Carried on from the highest number the workspace has issued rather than
+     * from its row count: deleting an older request drops the count while its
+     * successors keep their numbers, so counting would hand out one that is
+     * still in use and trip the unique (workspace_id, reference_no) index.
+     *
+     * Called inside the creating transaction, and the read is locked so two
+     * requests saved at the same moment can't settle on the same number.
      */
     protected function nextReferenceNo(Workspace $workspace): string
     {
-        $count = FundRequest::where('workspace_id', $workspace->id)->count();
+        $prefix = 'RF-';
 
-        return 'RF-'.str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
+        // Longest first, so RF-100000 still outranks RF-99999 once five digits
+        // are outgrown and the padding stops making lengths comparable.
+        $last = FundRequest::where('workspace_id', $workspace->id)
+            ->where('reference_no', 'like', $prefix.'%')
+            ->orderByRaw('LENGTH(reference_no) DESC')
+            ->orderBy('reference_no', 'desc')
+            ->lockForUpdate()
+            ->value('reference_no');
+
+        $next = (int) substr((string) $last, strlen($prefix)) + 1;
+
+        return $prefix.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 
     /**
