@@ -72,7 +72,7 @@ class TriggerFetchDailySalesTrackerCommand extends Command
             : "Dispatching {$workspaces->count()} workspace(s) with {$delay}s delay between jobs for {$dateLabel}");
 
         $callbackBase = rtrim(config('app.url'), '/');
-        $callbackUrl = "https://9692-152-32-104-235.ngrok-free.app/api/v1/public/gencys/daily-sales-tracker";
+        $callbackUrl = "$callbackBase/api/v1/public/gencys/daily-sales-tracker";
 
         $dispatched = 0;
         $skipped = 0;

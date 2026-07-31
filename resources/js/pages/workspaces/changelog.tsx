@@ -12,6 +12,73 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.21.0',
+        date: '2026-07-30',
+        sections: [
+            {
+                title: 'Finance — Income Statements (New)',
+                items: [
+                    'New Income Statements page under Finance — pick a month and see a live preview of that month’s P&L before you save anything: delivered revenue and order count at the top, then the cost-of-sales and operating-expense lines beneath it',
+                    'Two-tier profit — Gross Profit (delivered revenue minus cost of sales) and Net Profit (gross profit minus advisory share and OPEX) — with the COD fee, VAT and advisory rates editable per statement and Shipping Fee, COD Fee and VAT worked out for you',
+                    'Tick or untick any line to decide what the statement includes, then Save to snapshot it; Regenerate keeps your exact set of lines while refreshing the figures, and each saved statement can be exported',
+                    'Every saved statement also breaks down per person — each user’s revenue, cost of sales, gross and net profit, with a drill-in page for a single user; revenue that doesn’t resolve to anyone rolls into an Unassigned row',
+                    'Transaction types now carry an Income Statement classification — mark a type as a Gross Profit deduction (cost of sales) or leave it as OPEX, shown as a badge on the Transaction Types list; the classification is stored on each statement, so re-flagging a type later won’t reclassify a statement you already closed',
+                ],
+            },
+            {
+                title: 'Finance — Transactions Rebuilt',
+                items: [
+                    'Adding and editing a transaction now happens on its own full page instead of a cramped dialog, and you land back on the exact list you came from when you’re done',
+                    'A transaction can be charged to several people at once — give each their share, or leave a share blank and it takes an even cut of what’s left; the shares have to add up to the amount, so no part of it belongs to nobody',
+                    'Tag a transaction against one or more products the same way, so spend can be traced back to the product it was for; the picker offers your workspace’s catalog products',
+                    'Fill a new entry in from an approved or released fund request — the type, department, charge-to split and product split all copy across, and the transaction stays linked to the request',
+                    'The account picker now shows each account’s current running balance as you choose it, so you can see what the entry is building on',
+                ],
+            },
+            {
+                title: 'Finance — Fund Requests Reworked',
+                items: [
+                    'Fund requests (renamed from “Request Funds” in the sidebar) now split their amount across products and across the people being charged, replacing the old Ad Spent line-item template — the same split shape transactions use, so a request and the transaction that settles it line up exactly',
+                    'A department can be set on the request, and the fields that were never used — date needed and the GoTyme number — are gone from the form',
+                ],
+            },
+            {
+                title: 'RMO Management — Bulk Status, Auto-Tagging & Call Log Export',
+                items: [
+                    'New Bulk status update setting — turn it on and a “Set status” action appears on the RMO management page so several selected orders can be re-statused at once; orders outside the editable date window are skipped rather than failing the whole batch',
+                    'New Auto-tag status setting — let the RMO status follow the courier so no CSR has to close a finished row out by hand: a parcel reporting Delivered re-tags to DELIVERED and Returning to RETURNING, every other status stays under CSR control',
+                    'Auto-tagging re-applies every night at midnight to cover the day that just ended, and saving the setting re-tags today’s orders straight away so you can check it without waiting',
+                    'Call logs can now be exported from the RMO management page, matching whatever the page is currently filtered to',
+                    'The RMO search box accepts several terms at once — paste a comma-separated list of order numbers or tracking codes (up to 50) and get them all back in one go',
+                ],
+            },
+            {
+                title: 'Inventory — Product Lifecycle & Purchase Order Safeguards',
+                items: [
+                    'Two new product stages — New and Maintaining — join Testing, Scaling, Failed and Inactive, each with its own badge colour on the product pages',
+                    'Filter inventory items by the stage of the product they’re linked to, on both the flat list and the summarised view',
+                    'Purchase orders now show their status as a colour-coded badge and can be filtered by it on the list',
+                    'Closing a purchase order that still has undelivered units now warns you first, with the outstanding count, and asks you to confirm before closing it short — closing quietly drops those units out of the incoming-stock and reorder maths',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Unit Codes, Interns & Backfills',
+                items: [
+                    'Map a unit code to a product from the Unit Codes page — one at a time, or in bulk across a selection',
+                    'Interns can carry alternate names, so ERP rows that spell someone’s name differently still resolve to the right intern (their real name and username always win)',
+                    'The daily sales tracker sync can now be run for a date range, not just a single day, making backfills a single command',
+                ],
+            },
+            {
+                title: 'Smaller Improvements',
+                items: [
+                    'Admin — the Workspaces list now shows how many of each workspace’s pages are set up to send parcel updates by SMS and by chat, and you can sort by either',
+                    'Required fields are now marked with an asterisk on the SIM form, with optional ones labelled as such',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.20.0',
         date: '2026-07-21',
         sections: [
