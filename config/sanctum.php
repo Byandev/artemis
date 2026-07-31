@@ -19,7 +19,7 @@ return [
     */
 
     // Empty on purpose. Sanctum is used here only for token auth from separate
-    // first-party apps (WellSync) — never as an SPA cookie guard. Artemis' own
+    // first-party apps — never as an SPA cookie guard. Artemis' own
     // frontend is Inertia on the `web` session guard. Leaving domains in this
     // list would let the sanctum guard fall back to the session, which means a
     // revoked token could still authenticate from a browser on that host.

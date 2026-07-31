@@ -50,9 +50,6 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
     Route::post('/inventory/unit-codes/bulk-sync', [InventoryUnitCodeApiController::class, 'bulkSync'])->name('inventory.unit-codes.bulk-sync');
 });
 
-// The WellSync / ESC API lives in the EscTracker module:
-// Modules/EscTracker/routes/api.php
-
 // GencysERP daily sales tracker callback. n8n posts the scraped rows here and
 // authenticates with the api_key embedded in the body (not a header), so this
 // sits outside the api.key middleware group.
