@@ -120,7 +120,7 @@ class UnitCodeController extends Controller
             'workspace_api_key' => $apiKey->reveal(),
             'erp_username' => $workspace->erp_username,
             'erp_password' => $workspace->erp_password,
-            'webhook_url' => "https://6984-152-32-104-235.ngrok-free.app/api/v1/public/inventory/unit-codes/bulk-sync",
+            'webhook_url' => "$callbackBase/api/v1/public/inventory/unit-codes/bulk-sync",
         ]);
 
         if (! $response->successful()) {
