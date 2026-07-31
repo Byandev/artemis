@@ -509,7 +509,7 @@ export function TransactionForm({
 
                     <Wide>
                         <Field
-                            label="Transaction"
+                            label="Transaction Description"
                             required
                             error={errors.description}
                         >
