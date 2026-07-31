@@ -3,7 +3,12 @@ import {
     Footer,
     inputCls,
 } from '@/components/finance/account-form-dialog';
-import { Share, ShareAllocator } from '@/components/finance/share-allocator';
+import {
+    allocatedTotal,
+    Share,
+    ShareAllocator,
+    sharesBalanced,
+} from '@/components/finance/share-allocator';
 import { SubCategory } from '@/components/finance/sub-category';
 import {
     buildTransactionTypeOptions,
@@ -151,8 +156,18 @@ function Section({
 }
 
 /** Spans both columns of a Section's field grid. */
-function Wide({ children }: { children: React.ReactNode }) {
-    return <div className="sm:col-span-2">{children}</div>;
+function Wide({
+    children,
+    ref,
+}: {
+    children: React.ReactNode;
+    ref?: React.Ref<HTMLDivElement>;
+}) {
+    return (
+        <div ref={ref} className="sm:col-span-2">
+            {children}
+        </div>
+    );
 }
 
 export function TransactionForm({
@@ -323,8 +338,27 @@ export function TransactionForm({
             key.startsWith('products.'),
         )?.[1];
 
+    // The shares have to account for the whole amount before this is worth
+    // sending — the server rejects an entry whose shares don't (see
+    // TransactionRequest::after()), and the rest of the amount would otherwise
+    // belong to nobody. Raised on a submit attempt and cleared once it adds up.
+    const [showShareErrors, setShowShareErrors] = React.useState(false);
+    const chargeToRef = React.useRef<HTMLDivElement>(null);
+    const productsRef = React.useRef<HTMLDivElement>(null);
+
+    const chargeToBalanced = sharesBalanced(chargeToRows, totalAmount);
+    const productsBalanced = sharesBalanced(productRows, totalAmount);
+
+    const unbalancedMessage = (label: string, rows: Share[]) =>
+        `The ${label} shares add up to ${money(
+            allocatedTotal(rows),
+        )}, but the amount is ${money(totalAmount)}. Allocate the remaining ${money(
+            totalAmount - allocatedTotal(rows),
+        )} before saving.`;
+
     useEffect(() => {
         if (!active) return;
+        setShowShareErrors(false);
         if (transaction) {
             // A saved balance and saved shares are left exactly as they were.
             setAutoBalance(
@@ -378,6 +412,18 @@ export function TransactionForm({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!chargeToBalanced || !productsBalanced) {
+            setShowShareErrors(true);
+            (chargeToBalanced
+                ? productsRef
+                : chargeToRef
+            ).current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            return;
+        }
+
+        setShowShareErrors(false);
         // `return_to` steers the post-save redirect; it isn't a model field, so the
         // controller reads it separately and validated() drops it.
         transform((d) => (returnTo ? { ...d, return_to: returnTo } : d));
@@ -678,7 +724,7 @@ export function TransactionForm({
                         />
                     </Field>
 
-                    <Wide>
+                    <Wide ref={chargeToRef}>
                         <ShareAllocator
                             label="Charge To"
                             options={users.map((u) => ({
@@ -697,14 +743,22 @@ export function TransactionForm({
                                 )
                             }
                             placeholder="No one charged"
-                            error={chargeToError}
+                            error={
+                                chargeToError ??
+                                (showShareErrors && !chargeToBalanced
+                                    ? unbalancedMessage(
+                                          'charge-to',
+                                          chargeToRows,
+                                      )
+                                    : undefined)
+                            }
                             autoSplit={autoSplit}
                             onAutoSplitChange={setAutoSplit}
-                            hint="Charged to several people? The amount is split between them — edit a share to divide it your way. Shares must add up to the amount; leave one blank to give it the remainder."
+                            hint="Charged to several people? The amount is split between them — edit a share to divide it your way. Every share must be filled in and they have to add up to the amount, or this can’t be saved; “Split equally” divides it back evenly."
                         />
                     </Wide>
 
-                    <Wide>
+                    <Wide ref={productsRef}>
                         <ShareAllocator
                             label="Product"
                             options={productOptions}
@@ -720,10 +774,15 @@ export function TransactionForm({
                                 )
                             }
                             placeholder="No product"
-                            error={productsError}
+                            error={
+                                productsError ??
+                                (showShareErrors && !productsBalanced
+                                    ? unbalancedMessage('product', productRows)
+                                    : undefined)
+                            }
                             autoSplit={autoSplitProducts}
                             onAutoSplitChange={setAutoSplitProducts}
-                            hint="Attribute this entry to one or more products for the per-product income statement. Split across several? Edit a share to divide it your way, or leave one blank to give it the remainder — the shares must add up to the amount."
+                            hint="Attribute this entry to one or more products for the per-product income statement. Split across several? Edit a share to divide it your way — every share must be filled in and they have to add up to the amount, or this can’t be saved."
                         />
                     </Wide>
                 </Section>
