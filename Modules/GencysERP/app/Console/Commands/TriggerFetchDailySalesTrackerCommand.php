@@ -15,7 +15,7 @@ class TriggerFetchDailySalesTrackerCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'gencys-erp:trigger-fetch-daily-sales-tracker {--delay=30} {--date=} {--start-date=} {--end-date=} {--sync : POST to n8n immediately instead of queueing on the erp worker}';
+    protected $signature = 'gencys-erp:trigger-fetch-daily-sales-tracker {--delay=30} {--date=} {--start-date=} {--end-date=} {--sync : POST to n8n immediately instead of queueing on the erp worker} {--force : Run outside production (by default this command only runs on production)}';
 
     /**
      * The console command description.
@@ -29,6 +29,12 @@ class TriggerFetchDailySalesTrackerCommand extends Command
      */
     public function handle(): int
     {
+        if (! app()->environment('production') && ! $this->option('force')) {
+            $this->warn('This command only runs on production. Re-run with --force to override (current environment: '.app()->environment().').');
+
+            return self::SUCCESS;
+        }
+
         $webhookUrl = config('services.n8n.gencys_daily_sales_webhook_url')
             ?: config('services.n8n.webhook_url');
 
