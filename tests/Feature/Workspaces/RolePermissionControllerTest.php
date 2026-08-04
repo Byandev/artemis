@@ -65,6 +65,34 @@ test('update preserves permissions in disabled categories', function () {
         ->and($ids)->not->toContain($pagesPerm->id);
 });
 
+test('permissions of a disabled module are hidden from the role editor', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update([
+        'creatives_module_enabled' => false,
+        'rmo_module_enabled' => false,
+        'leaderboard_module_enabled' => false,
+    ]);
+    $role = Role::factory()->create(['workspace_id' => $workspace->id]);
+
+    $groups = collect(
+        $this->actingAs($owner)
+            ->get("/workspaces/{$workspace->slug}/roles/{$role->id}/permissions")
+            ->assertOk()
+            ->getOriginalContent()->getData()['page']['props']['groups']
+    );
+
+    // Whole category gone with the module off...
+    expect($groups->pluck('category'))->not->toContain('Creatives');
+
+    // ...and the toggles that own only part of a category hide just their own
+    // permissions, leaving the rest of RTS/CSR in place.
+    $names = $groups->flatMap(fn ($g) => collect($g['permissions'])->pluck('name'));
+    expect($names)->not->toContain('View RMO Management')
+        ->and($names)->not->toContain('Manage RMO Settings')
+        ->and($names)->not->toContain('View Leaderboards')
+        ->and($names)->toContain('View RTS Analytics');
+});
+
 test('update validates permission_ids is present and items exist', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $role = Role::factory()->create(['workspace_id' => $workspace->id]);
