@@ -1016,7 +1016,11 @@ export default function ItemIndex({
                     </label>
                 </div>
 
-                {canEditItems && selectedIds.length > 0 && (
+                {/* Selection only exists in the flat view (the checkbox column and
+                    the table's selection state are both gated on !summarize), so the
+                    bar follows it — otherwise a leftover selection could act on ids
+                    that mean something different in the rolled-up view. */}
+                {canEditItems && !summarize && selectedIds.length > 0 && (
                     <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-emerald-500/20 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-400/20 dark:bg-emerald-500/5">
                         <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
                             {selectedIds.length} selected
