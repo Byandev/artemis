@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Modules\Inventory\Console\Commands\ReportDeliveriesToDiscordCommand;
 use Modules\Inventory\Console\Commands\ReportLateDeliveriesToDiscordCommand;
+use Modules\Inventory\Console\Commands\SnapshotInventoryItemsCommand;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -48,6 +49,7 @@ class InventoryServiceProvider extends ServiceProvider
         $this->commands([
             ReportDeliveriesToDiscordCommand::class,
             ReportLateDeliveriesToDiscordCommand::class,
+            SnapshotInventoryItemsCommand::class,
         ]);
     }
 

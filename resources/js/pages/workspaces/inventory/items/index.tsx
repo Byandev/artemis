@@ -5,6 +5,7 @@ import { ItemFormDialog } from '@/components/inventory/item-form-dialog';
 import { WaitingForDeliveryDialog } from '@/components/inventory/waiting-for-delivery-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -34,6 +35,7 @@ import {
     ChevronsUpDown,
     ClipboardCheck,
     Download,
+    History,
     Layers,
     MoreHorizontal,
     Package,
@@ -89,6 +91,10 @@ interface Props {
     items: PaginatedData<Item>;
     products: Product[];
     parents: ParentOption[];
+    /** The day being shown, or null when the list is live. Resolved server-side. */
+    snapshotDate?: string | null;
+    /** Days that actually have a snapshot, newest first. */
+    snapshotDates?: string[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -99,6 +105,7 @@ interface Props {
             is_active?: string | number | boolean;
             unassigned?: string | number | boolean;
             product_status?: string;
+            date?: string;
         };
     };
 }
@@ -251,6 +258,8 @@ export default function ItemIndex({
     items,
     products,
     parents,
+    snapshotDate = null,
+    snapshotDates = [],
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -281,6 +290,10 @@ export default function ItemIndex({
     );
     // Summarize rolls SKU variants up under their parent item and sums the values.
     const [summarize, setSummarize] = useState(!!query?.summarize);
+    // A date pins the list to that day's saved snapshot; '' is live data.
+    const [dateValue, setDateValue] = useState(
+        query?.filter?.date ? String(query.filter.date) : '',
+    );
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkProcessing, setBulkProcessing] = useState(false);
     const [productPickerOpen, setProductPickerOpen] = useState(false);
@@ -289,9 +302,17 @@ export default function ItemIndex({
     const [parentSearch, setParentSearch] = useState('');
     const [newParentSku, setNewParentSku] = useState('');
 
-    const canCreateItems = usePermission(PERMISSIONS.CreateInventoryItems);
-    const canEditItems = usePermission(PERMISSIONS.EditInventoryItems);
-    const canDeleteItems = usePermission(PERMISSIONS.DeleteInventoryItems);
+    // A pinned date renders historical rows. Every mutating action still targets
+    // today's items, so editing from a snapshot would silently change a different
+    // thing than the one on screen — hide those affordances entirely while pinned.
+    const viewingSnapshot = !!snapshotDate;
+
+    const canCreateItems =
+        usePermission(PERMISSIONS.CreateInventoryItems) && !viewingSnapshot;
+    const canEditItems =
+        usePermission(PERMISSIONS.EditInventoryItems) && !viewingSnapshot;
+    const canDeleteItems =
+        usePermission(PERMISSIONS.DeleteInventoryItems) && !viewingSnapshot;
     const canUseItemActions = canEditItems || canDeleteItems;
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/items`;
@@ -316,6 +337,7 @@ export default function ItemIndex({
         'filter[is_active]': activeOnly ? 1 : 'all',
         'filter[unassigned]': unassignedOnly ? 1 : undefined,
         'filter[product_status]': productStatus || undefined,
+        'filter[date]': dateValue || undefined,
         summarize: summarize ? 1 : undefined,
         page: 1,
         per_page: query?.perPage ?? items.per_page,
@@ -326,7 +348,9 @@ export default function ItemIndex({
         preserveState: true,
         replace: true,
         preserveScroll: true,
-        only: ['items'],
+        // The snapshot props have to come back with the rows: they decide whether the
+        // banner shows and whether editing is allowed for what is now on screen.
+        only: ['items', 'snapshotDate', 'snapshotDates'],
     };
 
     // Logic for searching (Resets to page 1)
@@ -347,6 +371,7 @@ export default function ItemIndex({
             unassignedOnly,
             productStatus,
             summarize,
+            dateValue,
         ],
     );
 
@@ -381,6 +406,19 @@ export default function ItemIndex({
         router.get(
             baseUrl,
             buildParams({ 'filter[product_status]': value || undefined }),
+            visitOptions,
+        );
+    };
+
+    // Pin the list to a saved day, or pass '' to go back to live data. The row
+    // selection is dropped because a snapshot's rows are historical — bulk edits
+    // would be applied to today's items, not the ones on screen.
+    const handleDateChange = (value: string) => {
+        setDateValue(value);
+        setRowSelection({});
+        router.get(
+            baseUrl,
+            buildParams({ 'filter[date]': value || undefined }),
             visitOptions,
         );
     };
@@ -905,7 +943,10 @@ export default function ItemIndex({
                                         productStatus || '',
                                     sort: query?.sort ?? '',
                                     // Export what's on screen: grouped rows when
-                                    // the summarize toggle is on.
+                                    // the summarize toggle is on, and the pinned
+                                    // day's snapshot rather than today when a date
+                                    // is selected.
+                                    'filter[date]': dateValue || '',
                                     summarize: summarize ? '1' : '',
                                 }).filter(([, v]) => v !== ''),
                             ).toString()}`}
@@ -1009,7 +1050,42 @@ export default function ItemIndex({
                             Summarize by parent
                         </span>
                     </label>
+
+                    {/* Pin the list to a saved day. Only days with a stored snapshot
+                        are selectable — anything else has no data to show. */}
+                    <div className="w-44">
+                        <DatePicker
+                            id="inventory-items-snapshot-date"
+                            compact
+                            placeholder="Live (pick a date)"
+                            defaultDate={dateValue || undefined}
+                            enable={snapshotDates}
+                            onChange={(dates) => {
+                                handleDateChange(
+                                    dates.length
+                                        ? format(dates[0], 'yyyy-MM-dd')
+                                        : '',
+                                );
+                            }}
+                        />
+                    </div>
                 </div>
+
+                {viewingSnapshot && (
+                    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-amber-500/25 bg-amber-50/70 px-4 py-2.5 dark:border-amber-400/25 dark:bg-amber-500/5">
+                        <History className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                            Showing the saved snapshot for{' '}
+                            {winningDate(snapshotDate)} — read-only.
+                        </span>
+                        <button
+                            onClick={() => handleDateChange('')}
+                            className="ml-auto flex h-7 items-center rounded-lg border border-black/8 bg-white px-3 font-mono! text-[11px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                        >
+                            Back to live data
+                        </button>
+                    </div>
+                )}
 
                 {canEditItems && selectedIds.length > 0 && (
                     <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-emerald-500/20 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-400/20 dark:bg-emerald-500/5">
