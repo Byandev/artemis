@@ -929,6 +929,24 @@ export default function ItemIndex({
                     description="Manage your inventory items and stock levels."
                 >
                     <div className="flex items-center gap-2">
+                        {/* Pin the list to a saved day. Only days with a stored
+                            snapshot are selectable — anything else has no data to
+                            show. Sits next to Export because the export follows
+                            whichever day is pinned. */}
+                        <DatePicker
+                            id="inventory-items-snapshot-date"
+                            compact
+                            placeholder="Live (pick a date)"
+                            defaultDate={dateValue || undefined}
+                            enable={snapshotDates}
+                            onChange={(dates) => {
+                                handleDateChange(
+                                    dates.length
+                                        ? format(dates[0], 'yyyy-MM-dd')
+                                        : '',
+                                );
+                            }}
+                        />
                         <a
                             href={`${baseUrl}/export?${new URLSearchParams(
                                 Object.entries({
@@ -1050,25 +1068,6 @@ export default function ItemIndex({
                             Summarize by parent
                         </span>
                     </label>
-
-                    {/* Pin the list to a saved day. Only days with a stored snapshot
-                        are selectable — anything else has no data to show. */}
-                    <div className="w-44">
-                        <DatePicker
-                            id="inventory-items-snapshot-date"
-                            compact
-                            placeholder="Live (pick a date)"
-                            defaultDate={dateValue || undefined}
-                            enable={snapshotDates}
-                            onChange={(dates) => {
-                                handleDateChange(
-                                    dates.length
-                                        ? format(dates[0], 'yyyy-MM-dd')
-                                        : '',
-                                );
-                            }}
-                        />
-                    </div>
                 </div>
 
                 {viewingSnapshot && (
