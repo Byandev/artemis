@@ -281,6 +281,21 @@ const Shops = ({
                 );
             },
         },
+        {
+            accessorKey: 'created_at',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Created'} />
+            ),
+            cell: ({ row }) => {
+                const date = row.original.created_at;
+                return (
+                    <span>
+                        {date ? new Date(date).toLocaleDateString() : '—'}
+                    </span>
+                );
+            },
+        },
         ...(canUseShopActions
             ? [
                   {
