@@ -69,6 +69,7 @@ interface Item {
     unfulfilled: number | null;
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
+    po_qty: number | null;
     remaining_after_fulfillment: number | null;
     stocks_needed_for_lead_time: number | null;
     days_it_can_last: number | null;
@@ -609,6 +610,26 @@ export default function ItemIndex({
                     <MetricCell
                         value={row.original.three_days_average}
                         decimals={1}
+                    />
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'po_qty',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="PO QTY"
+                    className="justify-center"
+                />
+            ),
+            // Days-of-coverage buffer: days_of_coverage × 3-day average.
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.po_qty}
+                        color="text-amber-600 dark:text-amber-400"
                     />
                 </div>
             ),

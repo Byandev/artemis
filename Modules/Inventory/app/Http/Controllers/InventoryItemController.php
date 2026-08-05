@@ -61,7 +61,13 @@ class InventoryItemController extends Controller
         // Stock needed to cover the lead time = expected demand over that window
         // (daily-ish average × lead-time days). Same term that drives po_needed.
         $stocksNeededForLeadTimeSql = '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
-        $poNeededSql = "GREATEST(0, $stocksNeededForLeadTimeSql - $remainingAfterFulfillmentSql)";
+        // "PO QTY" = the safety buffer on top of lead-time demand: expected demand
+        // over days_of_coverage extra days. Surfaced as its own column and folded
+        // into PO Needed so reordering covers a runway beyond just the lead time.
+        $coverageBufferSql = '(COALESCE(inventory_items.days_of_coverage, 0) * COALESCE(inventory_items.three_days_average, 0))';
+        // PO Needed = coverage buffer + lead-time demand − what's on hand after
+        // fulfilment, floored at 0.
+        $poNeededSql = "GREATEST(0, $coverageBufferSql + $stocksNeededForLeadTimeSql - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
         return [
@@ -72,6 +78,7 @@ class InventoryItemController extends Controller
             'waiting_for_delivery_stocks' => $waitingStocksSql,
             'remaining_after_fulfillment' => $remainingAfterFulfillmentSql,
             'stocks_needed_for_lead_time' => $stocksNeededForLeadTimeSql,
+            'po_qty' => $coverageBufferSql,
             'po_needed' => $poNeededSql,
             'days_it_can_last' => $daysItCanLastSql,
         ];
@@ -160,6 +167,7 @@ class InventoryItemController extends Controller
             ->selectRaw("{$sql['discrepancy_date']} as discrepancy_date")
             ->selectRaw("{$sql['remaining_after_fulfillment']} as remaining_after_fulfillment")
             ->selectRaw("{$sql['stocks_needed_for_lead_time']} as stocks_needed_for_lead_time")
+            ->selectRaw("{$sql['po_qty']} as po_qty")
             ->selectRaw("{$sql['po_needed']} as po_needed")
             ->selectRaw("{$sql['days_it_can_last']} as days_it_can_last")
             // three_days_average is a stored column updated hourly by inventory:update-averages
@@ -210,6 +218,9 @@ class InventoryItemController extends Controller
                 AllowedSort::callback('stocks_needed_for_lead_time', function ($query, $descending) use ($sql) {
                     $query->orderByRaw("{$sql['stocks_needed_for_lead_time']} ".($descending ? 'DESC' : 'ASC'));
                 }),
+                AllowedSort::callback('po_qty', function ($query, $descending) use ($sql) {
+                    $query->orderByRaw("{$sql['po_qty']} ".($descending ? 'DESC' : 'ASC'));
+                }),
                 AllowedSort::callback('discrepancy', function ($query, $descending) use ($sql) {
                     $query->orderByRaw("{$sql['discrepancy']} ".($descending ? 'DESC' : 'ASC'));
                 }),
@@ -235,7 +246,7 @@ class InventoryItemController extends Controller
         $inner = InventoryItem::query()
             ->where('inventory_items.workspace_id', $workspace->id)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
+            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
@@ -276,6 +287,9 @@ class InventoryItemController extends Controller
         // the per-item formulas in stockSql() but over the rolled-up totals. The group's
         // lead_time is the representative one (parent's, else the max).
         $groupLeadTime = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
+        // The group's days-of-coverage buffer, chosen the same way as lead_time:
+        // the parent's when there is one, else the max across the group.
+        $groupDaysOfCoverage = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.days_of_coverage END), MAX(sub.days_of_coverage))';
         // The group's creation date — the parent's when there is one, else the earliest
         // item in the group. Drives the default ordering below, so it has to be an
         // aggregate: the outer query is grouped and has no bare created_at column.
@@ -287,7 +301,9 @@ class InventoryItemController extends Controller
         // Stock needed to cover the lead time for the whole group: the group's
         // representative lead time × its summed daily average (same term po_needed uses).
         $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
-        $groupPoNeeded = "GREATEST(0, $groupStocksNeeded - $summedRemaining)";
+        // Group safety buffer: the group's days-of-coverage × its summed daily average.
+        $groupCoverageBuffer = "($groupDaysOfCoverage * $summedThreeDayAvg)";
+        $groupPoNeeded = "GREATEST(0, $groupCoverageBuffer + $groupStocksNeeded - $summedRemaining)";
         $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
 
         // Aggregate the per-item rows into one row per group. Representative
@@ -313,6 +329,7 @@ class InventoryItemController extends Controller
             ->selectRaw('NULL as discrepancy_date')
             ->selectRaw('SUM(sub.remaining_after_fulfillment) as remaining_after_fulfillment')
             ->selectRaw("$groupStocksNeeded as stocks_needed_for_lead_time")
+            ->selectRaw("$groupCoverageBuffer as po_qty")
             ->selectRaw("$groupPoNeeded as po_needed")
             ->selectRaw("$summedThreeDayAvg as three_days_average")
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
@@ -323,7 +340,7 @@ class InventoryItemController extends Controller
         $sortable = [
             'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
             'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
-            'stocks_needed_for_lead_time', 'po_needed', 'three_days_average', 'days_it_can_last',
+            'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'three_days_average', 'days_it_can_last',
         ];
         $sort = (string) $request->input('sort');
         $descending = str_starts_with($sort, '-');
