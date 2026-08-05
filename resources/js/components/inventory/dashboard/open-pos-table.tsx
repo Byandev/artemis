@@ -87,15 +87,15 @@ export default function OpenPosTable({ slug }: { slug: string }) {
             </div>
 
             {loading ? (
-                <div className="px-[18px] pb-[18px]">
+                <div className="px-[18px] pb-6">
                     <TableSkeleton />
                 </div>
             ) : error ? (
-                <div className="px-[18px] pb-[18px]">
+                <div className="px-[18px] pb-6">
                     <EmptyState message="Couldn't load open purchase orders." />
                 </div>
             ) : lines.length === 0 ? (
-                <div className="px-[18px] pb-[18px]">
+                <div className="px-[18px] pb-6">
                     <EmptyState message="No open purchase orders — everything ordered has landed." />
                 </div>
             ) : (

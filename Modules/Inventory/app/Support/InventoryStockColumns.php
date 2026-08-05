@@ -76,19 +76,31 @@ final class InventoryStockColumns
         return "(COALESCE($current, 0) + COALESCE($waiting, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
     }
 
+    /** The safety buffer alone: days_of_coverage extra days of expected demand. */
+    public static function coverageBuffer(): string
+    {
+        return '(COALESCE(inventory_items.days_of_coverage, 0) * COALESCE(inventory_items.three_days_average, 0))';
+    }
+
+    /** Expected demand across the lead-time window. */
+    public static function stocksNeededForLeadTime(): string
+    {
+        return '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
+    }
+
     /**
-     * How much to purchase to cover a safety buffer plus lead-time demand, given
-     * what's incoming. The buffer is days_of_coverage extra days of expected demand
-     * on top of the lead-time window.
+     * How much to purchase to cover the safety buffer plus lead-time demand,
+     * given what's on hand once incoming deliveries land.
+     *
+     * Incoming stock is subtracted exactly once, via remainingAfterFulfillment
+     * (which already adds waitingStocks in). Subtracting waiting again on top
+     * would double-count it and understate the reorder.
      */
     public static function poNeeded(): string
     {
-        $waiting = self::waitingStocks();
         $remaining = self::remainingAfterFulfillment();
-        $coverageBuffer = '(COALESCE(inventory_items.days_of_coverage, 0) * COALESCE(inventory_items.three_days_average, 0))';
-        $leadTimeDemand = '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
 
-        return "GREATEST(0, $coverageBuffer + $leadTimeDemand - COALESCE($waiting, 0) - $remaining)";
+        return 'GREATEST(0, '.self::coverageBuffer().' + '.self::stocksNeededForLeadTime()." - $remaining)";
     }
 
     /** Days of cover: runway at the current 3-day average burn rate. */

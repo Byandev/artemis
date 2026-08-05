@@ -2,19 +2,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import RefreshButton from './refresh-button';
 import { useInventoryStat } from './use-inventory-stat';
 
-interface HighUnfulfilledItem {
+interface LowStockItem {
     id: number;
     sku: string | null;
     product_name: string | null;
     /** True when the row is a parent rolling up child SKUs. */
     is_group: boolean;
     child_count: number;
-    unfulfilled_count: number;
+    po_needed: number;
+    current_stocks: number | null;
 }
 
-interface HighUnfulfilledData {
-    items: HighUnfulfilledItem[];
-    listed_unfulfilled: number;
+interface LowStockData {
+    items: LowStockItem[];
+    listed_po_needed: number;
     limit: number;
 }
 
@@ -27,13 +28,15 @@ const headClass =
 const cellClass = 'px-3 py-2.5 align-middle';
 
 /**
- * The items owing the most stock, worst first. Counts are per group — children
- * roll into their parent — so this reads the same way the items list does with
- * summarize on, rather than splitting a grouped SKU across several rows.
+ * Sits beside the high-unfulfilled table: the items most in need of a purchase
+ * order. PO Needed is the group's figure, recomputed from its parts rather than
+ * summed, so it matches the items list's column of the same name.
  */
-export default function HighUnfulfilledTable({ slug }: { slug: string }) {
-    const { data, loading, error, refetch } =
-        useInventoryStat<HighUnfulfilledData>(slug, 'high-unfulfilled');
+export default function LowStockTable({ slug }: { slug: string }) {
+    const { data, loading, error, refetch } = useInventoryStat<LowStockData>(
+        slug,
+        'low-stock',
+    );
 
     const items = data?.items ?? [];
     const hasRows = !loading && !error && items.length > 0;
@@ -43,10 +46,10 @@ export default function HighUnfulfilledTable({ slug }: { slug: string }) {
             <div className="flex flex-col gap-3 p-[18px] sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        High Unfulfilled Items
+                        Low Stock Items
                     </h3>
                     <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
-                        Top {data?.limit ?? 20} by units still owed, counted per
+                        Top {data?.limit ?? 20} by units to reorder, counted per
                         group.
                     </p>
                 </div>
@@ -54,13 +57,10 @@ export default function HighUnfulfilledTable({ slug }: { slug: string }) {
                     {hasRows && (
                         <div className="text-right">
                             <div className="text-sm font-semibold text-gray-900 tabular-nums dark:text-gray-100">
-                                {num(data?.listed_unfulfilled)}
+                                {num(data?.listed_po_needed)}
                             </div>
-                            {/* "listed", not "total": this is the sum of the
-                                rows shown, not the whole workspace — the KPI
-                                tile above carries that figure. */}
                             <div className="text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                units listed
+                                units to order
                             </div>
                         </div>
                     )}
@@ -68,7 +68,7 @@ export default function HighUnfulfilledTable({ slug }: { slug: string }) {
                         onClick={refetch}
                         loading={loading}
                         error={error}
-                        label="high unfulfilled items"
+                        label="low stock items"
                     />
                 </div>
             </div>
@@ -79,23 +79,20 @@ export default function HighUnfulfilledTable({ slug }: { slug: string }) {
                 </div>
             ) : error ? (
                 <div className="px-[18px] pb-6">
-                    <EmptyState message="Couldn't load unfulfilled items." />
+                    <EmptyState message="Couldn't load low stock items." />
                 </div>
             ) : items.length === 0 ? (
                 <div className="px-[18px] pb-6">
-                    <EmptyState message="Nothing unfulfilled — every item is covered." />
+                    <EmptyState message="Nothing to reorder — every item is covered." />
                 </div>
             ) : (
-                // Full-bleed to the panel edge, matching the open-PO table, and
-                // capped in height so a full 20 rows scroll internally instead
-                // of stretching the row this panel shares.
                 <div className="max-h-[420px] overflow-auto border-t border-black/6 dark:border-white/6">
                     <table className="w-full border-collapse">
                         <thead className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900">
                             <tr className="border-b border-black/6 dark:border-white/6">
                                 <th className={headClass}>Item</th>
                                 <th className={`${headClass} text-right!`}>
-                                    Unfulfilled
+                                    PO Needed
                                 </th>
                             </tr>
                         </thead>
@@ -111,7 +108,7 @@ export default function HighUnfulfilledTable({ slug }: { slug: string }) {
                                                 {item.sku ?? '—'}
                                             </span>
                                             {/* Grouped rows say so, otherwise a
-                                                parent's total looks inflated
+                                                parent's figure looks inflated
                                                 against the flat items list. */}
                                             {item.is_group && (
                                                 <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
@@ -128,7 +125,7 @@ export default function HighUnfulfilledTable({ slug }: { slug: string }) {
                                     <td
                                         className={`${cellClass} text-right text-xs font-semibold whitespace-nowrap text-gray-900 tabular-nums dark:text-gray-100`}
                                     >
-                                        {num(item.unfulfilled_count)}
+                                        {num(item.po_needed)}
                                     </td>
                                 </tr>
                             ))}

@@ -45,6 +45,9 @@ class InventoryDashboardStatsController extends Controller
     /** How many groups the high-unfulfilled table lists. */
     private const HIGH_UNFULFILLED_LIMIT = 20;
 
+    /** How many groups the low-stock table lists. */
+    private const LOW_STOCK_LIMIT = 20;
+
     /**
      * Active items, counted the way the Inventory Items list shows them: one
      * per group. Children roll into their parent (the list's `summarize` view,
@@ -146,6 +149,73 @@ class InventoryDashboardStatsController extends Controller
             // job, and reusing it here would misdescribe this table.
             'listed_unfulfilled' => $rows->sum('unfulfilled_count'),
             'limit' => self::HIGH_UNFULFILLED_LIMIT,
+        ]);
+    }
+
+    /**
+     * The items most in need of reordering, worst first — what to raise a
+     * purchase order for next.
+     *
+     * Grouped by parent like its sibling table, but PO Needed cannot simply be
+     * summed across a group: each child's figure carries the same lead-time and
+     * buffer demand, so adding them would count that demand once per child.
+     * It is recomputed from the group's summed parts instead — the group's
+     * representative lead time and days-of-coverage against its summed daily
+     * average and summed remaining stock — exactly as
+     * InventoryItemController::buildSummaryQuery() does for the items list.
+     */
+    public function lowStock(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        $inner = $this->activeItems($request, $workspace)
+            ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.three_days_average, products.name as product_name')
+            ->selectRaw(InventoryStockColumns::currentStocks().' as current_stocks')
+            ->selectRaw(InventoryStockColumns::remainingAfterFulfillment().' as remaining_after_fulfillment');
+
+        // The group's lead time and buffer are the parent's when it has one,
+        // else the max across the group — same rule the items list applies.
+        $groupLeadTime = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
+        $groupDaysOfCoverage = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.days_of_coverage END), MAX(sub.days_of_coverage))';
+        $summedThreeDayAvg = 'SUM(sub.three_days_average)';
+        $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
+        $groupPoNeeded = "GREATEST(0, ($groupDaysOfCoverage * $summedThreeDayAvg) + ($groupLeadTime * $summedThreeDayAvg) - $summedRemaining)";
+
+        $rows = DB::query()
+            ->fromSub($inner, 'sub')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
+            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
+            ->selectRaw('SUM(sub.current_stocks) as current_stocks')
+            ->selectRaw("$groupPoNeeded as po_needed")
+            ->groupByRaw('COALESCE(sub.parent_id, sub.id)')
+            // Groups already covered need no purchase order — listing them as
+            // "low stock" would be wrong.
+            ->havingRaw("$groupPoNeeded > 0")
+            ->orderByDesc('po_needed')
+            // Tie-break so equal figures keep a stable order between refreshes.
+            ->orderBy('sku')
+            ->limit(self::LOW_STOCK_LIMIT)
+            ->get()
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'sku' => $row->sku,
+                'product_name' => $row->product_name,
+                'is_group' => (bool) $row->is_group,
+                'child_count' => (int) $row->child_count,
+                // Whole units: you cannot order a fraction of one, and the
+                // items list rounds the same way.
+                'po_needed' => (int) round((float) $row->po_needed),
+                'current_stocks' => $row->current_stocks === null ? null : (int) round((float) $row->current_stocks),
+            ]);
+
+        return response()->json([
+            'items' => $rows,
+            'listed_po_needed' => $rows->sum('po_needed'),
+            'limit' => self::LOW_STOCK_LIMIT,
         ]);
     }
 
