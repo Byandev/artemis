@@ -3,9 +3,11 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import React, { useEffect } from 'react';
 
 /**
- * One allocation row: what is charged, and its share of the amount. A blank
- * share takes an even cut of whatever the explicit ones left over — the server
- * fills it in the same way (see Modules\Finance\...\Concerns\SplitsShares).
+ * One allocation row: what is charged, and its share of the amount. The server
+ * gives a blank share an even cut of whatever the explicit ones left over (see
+ * Modules\Finance\...\Concerns\SplitsShares) — a convenience for API clients
+ * that the transaction form deliberately doesn't lean on, so that what is on
+ * screen is what gets saved.
  */
 export interface Share {
     /** The option's value: a user id, a product id, or a product name. */
@@ -32,6 +34,26 @@ export function evenShares(total: number, count: number): string[] {
     return Array.from({ length: count }, (_, i) =>
         ((each + (i < odd ? 1 : 0)) / 100).toFixed(2),
     );
+}
+
+/**
+ * What the rows allocate between them. A share left blank counts for nothing —
+ * the form makes you put a figure in it rather than quietly handing it the
+ * remainder, so the running total below is what actually gets saved.
+ */
+export function allocatedTotal(rows: Share[]): number {
+    return rows.reduce(
+        (sum, r) => sum + (parseFloat(String(r.amount)) || 0),
+        0,
+    );
+}
+
+/**
+ * Whether the rows account for the whole amount. An empty list opts out —
+ * nothing is charged, which is allowed.
+ */
+export function sharesBalanced(rows: Share[], total: number): boolean {
+    return rows.length === 0 || Math.abs(allocatedTotal(rows) - total) < 0.01;
 }
 
 const money = (n: number) =>
@@ -82,7 +104,10 @@ export function ShareAllocator({
     );
 
     useEffect(() => {
-        if (!autoSplit) return;
+        // Below two rows there is no share input on screen to correct a figure
+        // with, so a lone row always carries the whole amount rather than a
+        // stale share from when the list was longer.
+        if (!autoSplit && rows.length > 1) return;
 
         const shares = evenShares(total, rows.length);
 
@@ -106,10 +131,7 @@ export function ShareAllocator({
         onChange(rows.map((r) => (r.key === key ? { ...r, amount } : r)));
     };
 
-    const allocated = rows.reduce(
-        (sum, r) => sum + (parseFloat(r.amount) || 0),
-        0,
-    );
+    const allocated = allocatedTotal(rows);
     const balanced = Math.abs(allocated - total) < 0.01;
 
     return (

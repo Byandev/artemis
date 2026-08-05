@@ -9,6 +9,10 @@ Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00
 Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
+// Freeze every inventory item just before midnight, so each date's snapshot is that
+// day's closing state and the items list can be filtered back to it. Runs after the
+// last hourly sync-averages so the averages it captures are the day's final ones.
+Schedule::command('inventory:snapshot-items')->dailyAt('23:50')->withoutOverlapping();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
