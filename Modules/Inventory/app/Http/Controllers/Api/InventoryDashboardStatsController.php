@@ -304,7 +304,7 @@ class InventoryDashboardStatsController extends Controller
                 ->whereIn('status', PurchasedOrder::AWAITING_DELIVERY_STATUSES)
                 ->visibleTo($request->user(), $workspace))
             ->with([
-                'purchasedOrder:id,control_no,cust_po_no,status,issue_date',
+                'purchasedOrder:id,control_no,cust_po_no,status,issue_date,expected_delivery_date',
                 'inventoryItem:id,sku,product_id',
                 'inventoryItem.product:id,name',
             ])
@@ -313,15 +313,19 @@ class InventoryDashboardStatsController extends Controller
             // balance is max(0, count - delivered), so this drops both fully and
             // over-delivered lines.
             ->filter(fn (PurchasedOrderItem $line) => $line->balance > 0)
-            ->sortByDesc(fn (PurchasedOrderItem $line) => $line->balance)
+            // Most recently issued order first. Orders with no issue date sort
+            // last rather than leading the table — PHP_INT_MIN, since the sort
+            // runs descending.
+            ->sortByDesc(fn (PurchasedOrderItem $line) => $line->purchasedOrder->issue_date?->timestamp ?? PHP_INT_MIN)
             ->values()
             ->map(fn (PurchasedOrderItem $line) => [
                 'id' => $line->id,
                 'purchased_order_id' => $line->purchasedOrder->id,
                 'control_no' => $line->purchasedOrder->control_no,
                 'cust_po_no' => $line->purchasedOrder->cust_po_no,
-                // Date-only string; the client formats it for display.
+                // Date-only strings; the client formats them for display.
                 'issue_date' => $line->purchasedOrder->issue_date?->toDateString(),
+                'expected_delivery_date' => $line->purchasedOrder->expected_delivery_date?->toDateString(),
                 // Numeric status too: the frontend renders it through the
                 // shared PURCHASED_ORDER_STATUSES map rather than the label.
                 'status' => (int) $line->purchasedOrder->status,

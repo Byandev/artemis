@@ -3,6 +3,7 @@ import { PURCHASED_ORDER_STATUSES } from '@/constants/purchased-order-statuses';
 import { format, parseISO } from 'date-fns';
 import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import DeliveryProgressRing from './delivery-progress-ring';
 import PoLinesDialog, { type PoDialogTarget } from './po-lines-dialog';
 import RefreshButton from './refresh-button';
 import { useInventoryStat } from './use-inventory-stat';
@@ -14,6 +15,8 @@ interface OpenPoLine {
     cust_po_no: string | null;
     /** Date-only string (Y-m-d), or null on an order with no issue date. */
     issue_date: string | null;
+    /** Date-only string (Y-m-d), or null when no delivery date was promised. */
+    expected_delivery_date: string | null;
     status: number;
     status_label: string;
     sku: string | null;
@@ -120,6 +123,7 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                             <tr className="border-b border-black/6 dark:border-white/6">
                                 <th className={headClass}>PO</th>
                                 <th className={headClass}>Issued</th>
+                                <th className={headClass}>Expected</th>
                                 <th className={headClass}>Status</th>
                                 <th className={headClass}>Item</th>
                                 <th className={`${headClass} text-right!`}>
@@ -131,6 +135,7 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                                 <th className={`${headClass} text-right!`}>
                                     Waiting
                                 </th>
+                                <th className={headClass}>Progress</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -161,6 +166,11 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                                         className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
                                     >
                                         {issuedOn(line.issue_date)}
+                                    </td>
+                                    <td
+                                        className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
+                                    >
+                                        {issuedOn(line.expected_delivery_date)}
                                     </td>
                                     <td className={cellClass}>
                                         <StatusBadge
@@ -196,6 +206,15 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                                         className={`${numClass} font-semibold text-gray-900 dark:text-gray-100`}
                                     >
                                         {num(line.waiting_qty)}
+                                    </td>
+                                    {/* Per line, not per order: the same order can
+                                        carry several lines at different stages, and
+                                        one ring across them would hide that. */}
+                                    <td className={cellClass}>
+                                        <DeliveryProgressRing
+                                            ordered={line.ordered_qty}
+                                            delivered={line.delivered_qty}
+                                        />
                                     </td>
                                 </tr>
                             ))}
@@ -239,7 +258,9 @@ function TableSkeleton() {
                     <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
+                    <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[3]" />
+                    <Skeleton className="h-8 flex-1" />
                     <Skeleton className="h-8 flex-1" />
                     <Skeleton className="h-8 flex-1" />
                     <Skeleton className="h-8 flex-1" />

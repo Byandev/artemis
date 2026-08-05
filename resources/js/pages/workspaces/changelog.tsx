@@ -12,6 +12,41 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.23.1',
+        date: '2026-08-05',
+        sections: [
+            {
+                title: 'Inventory — Purchase Orders',
+                items: [
+                    'Open Purchase Orders now lists the most recently issued order first, so the newest commitments are what you see at the top — orders with no issue date still sort to the bottom rather than leading the table',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.23.0',
+        date: '2026-08-05',
+        sections: [
+            {
+                title: 'Inventory — Dashboard Additions',
+                items: [
+                    'New High Unfulfilled Items table — the items owing the most stock, worst first, so you can see where the Unfulfilled tile’s total is actually concentrated instead of just how big it is',
+                    'New Low Stock Items table beside it — the items most in need of a purchase order, ranked by how many units to reorder, with what’s on hand now alongside',
+                    'Both tables count per group rather than per SKU, the same way the items list reads with summarize on — a grouped SKU appears once under its parent with the group’s total, instead of scattered across the table as several smaller rows',
+                    'Each lists the top 20 and shows the total for the rows on screen, so the figure under the heading always describes what you’re looking at rather than the whole workspace',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Orders & Reorder Maths',
+                items: [
+                    'PO Needed was reordering too little — incoming deliveries were being subtracted twice, so the figure came out lower than it should have; it now counts them once, on the dashboard and on the Inventory Items list alike',
+                    'Open Purchase Orders now lists oldest order first — the lines that have been outstanding longest are the ones to chase — with orders that have no issue date sorted to the bottom rather than the top',
+                    'Each open PO line now shows its issue and expected delivery dates, plus a small progress ring for how much of what was ordered has landed',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.22.0',
         date: '2026-08-05',
         sections: [
