@@ -313,10 +313,10 @@ class InventoryDashboardStatsController extends Controller
             // balance is max(0, count - delivered), so this drops both fully and
             // over-delivered lines.
             ->filter(fn (PurchasedOrderItem $line) => $line->balance > 0)
-            // Oldest order first: on a list of what is still owed, the ones that
-            // have been outstanding longest are the ones to chase. Orders with no
-            // issue date sort last rather than leading the table.
-            ->sortBy(fn (PurchasedOrderItem $line) => $line->purchasedOrder->issue_date?->timestamp ?? PHP_INT_MAX)
+            // Most recently issued order first. Orders with no issue date sort
+            // last rather than leading the table — PHP_INT_MIN, since the sort
+            // runs descending.
+            ->sortByDesc(fn (PurchasedOrderItem $line) => $line->purchasedOrder->issue_date?->timestamp ?? PHP_INT_MIN)
             ->values()
             ->map(fn (PurchasedOrderItem $line) => [
                 'id' => $line->id,
