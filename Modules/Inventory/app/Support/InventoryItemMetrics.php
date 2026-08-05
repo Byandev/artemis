@@ -46,7 +46,13 @@ class InventoryItemMetrics
         // Stock needed to cover the lead time = expected demand over that window
         // (daily-ish average × lead-time days). Same term that drives po_needed.
         $stocksNeededForLeadTimeSql = '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
-        $poNeededSql = "GREATEST(0, $stocksNeededForLeadTimeSql - $remainingAfterFulfillmentSql)";
+        // "PO QTY" = the safety buffer on top of lead-time demand: expected demand
+        // over days_of_coverage extra days. Surfaced as its own column and folded
+        // into PO Needed so reordering covers a runway beyond just the lead time.
+        $coverageBufferSql = '(COALESCE(inventory_items.days_of_coverage, 0) * COALESCE(inventory_items.three_days_average, 0))';
+        // PO Needed = coverage buffer + lead-time demand − what's on hand after
+        // fulfilment, floored at 0.
+        $poNeededSql = "GREATEST(0, $coverageBufferSql + $stocksNeededForLeadTimeSql - $remainingAfterFulfillmentSql)";
         $daysItCanLastSql = "(CASE WHEN inventory_items.three_days_average > 0 THEN $remainingAfterFulfillmentSql / inventory_items.three_days_average ELSE 0 END)";
 
         return [
@@ -57,6 +63,7 @@ class InventoryItemMetrics
             'waiting_for_delivery_stocks' => $waitingStocksSql,
             'remaining_after_fulfillment' => $remainingAfterFulfillmentSql,
             'stocks_needed_for_lead_time' => $stocksNeededForLeadTimeSql,
+            'po_qty' => $coverageBufferSql,
             'po_needed' => $poNeededSql,
             'days_it_can_last' => $daysItCanLastSql,
         ];
