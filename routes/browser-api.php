@@ -59,19 +59,13 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
         });
 
-        // Inventory dashboard — one endpoint per widget so each loads, skeletons
+        // Inventory dashboard — one endpoint per KPI so each loads, skeletons
         // and refreshes independently. See InventoryDashboardStatsController.
-        Route::prefix('inventory/dashboard')->name('inventory.dashboard.')->group(function () {
-            Route::get('/kpis', [InventoryDashboardStatsController::class, 'kpis'])->name('kpis');
-            Route::get('/movement', [InventoryDashboardStatsController::class, 'movement'])->name('movement');
-            Route::get('/po-status', [InventoryDashboardStatsController::class, 'poStatus'])->name('po-status');
-            Route::get('/fulfillment', [InventoryDashboardStatsController::class, 'fulfillment'])->name('fulfillment');
-            Route::get('/shrinkage', [InventoryDashboardStatsController::class, 'shrinkage'])->name('shrinkage');
-            Route::get('/stock-health', [InventoryDashboardStatsController::class, 'stockHealth'])->name('stock-health');
-            Route::get('/upcoming-deliveries', [InventoryDashboardStatsController::class, 'upcomingDeliveries'])->name('upcoming-deliveries');
-            Route::get('/recent-adjustments', [InventoryDashboardStatsController::class, 'recentAdjustments'])->name('recent-adjustments');
-            Route::get('/top-discrepancies', [InventoryDashboardStatsController::class, 'topDiscrepancies'])->name('top-discrepancies');
-            Route::get('/alerts', [InventoryDashboardStatsController::class, 'alerts'])->name('alerts');
+        Route::prefix('inventory/dashboard/kpi')->name('inventory.dashboard.kpi.')->group(function () {
+            Route::get('/inventory-items', [InventoryDashboardStatsController::class, 'inventoryItems'])->name('inventory-items');
+            Route::get('/total-stocks', [InventoryDashboardStatsController::class, 'totalStocks'])->name('total-stocks');
+            Route::get('/unfulfilled', [InventoryDashboardStatsController::class, 'unfulfilled'])->name('unfulfilled');
+            Route::get('/open-pos', [InventoryDashboardStatsController::class, 'openPos'])->name('open-pos');
         });
     });
 });

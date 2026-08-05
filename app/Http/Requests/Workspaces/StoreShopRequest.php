@@ -4,7 +4,6 @@ namespace App\Http\Requests\Workspaces;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreShopRequest extends FormRequest
 {
@@ -29,10 +28,7 @@ class StoreShopRequest extends FormRequest
             'shop_id' => [
                 'required',
                 'integer',
-                // Reject a shop already in this workspace up front, before the
-                // controller makes any POS API call — the client gets an inline
-                // field error instead of an HTTP error thrown mid-request.
-                Rule::unique('shops', 'id')->where(fn ($query) => $query->where('workspace_id', $workspace?->id)),
+                'exists:shops,id',
             ],
             'pos_token' => 'required|string|max:255',
         ];
@@ -47,7 +43,6 @@ class StoreShopRequest extends FormRequest
     {
         return [
             'shop_id.required' => 'The shop ID is required.',
-            'shop_id.unique' => 'This shop has already been added to this workspace.',
             'pos_token.required' => 'The POS token is required.',
         ];
     }

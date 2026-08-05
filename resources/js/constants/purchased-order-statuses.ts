@@ -43,10 +43,14 @@ export const PURCHASED_ORDER_STATUSES: Record<
         label: 'Cancelled',
         color: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
     },
+    9: {
+        label: 'Manually Closed',
+        color: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+    },
 };
 
 /** Terminal stages — the order no longer owes stock. Mirrors `PurchasedOrder::CLOSED_STATUSES`. */
-export const CLOSED_PURCHASED_ORDER_STATUSES = [7, 8];
+export const CLOSED_PURCHASED_ORDER_STATUSES = [7, 8, 9];
 
 /** Ordered list for `<select>` inputs. */
 export const PURCHASED_ORDER_STATUS_OPTIONS = Object.entries(

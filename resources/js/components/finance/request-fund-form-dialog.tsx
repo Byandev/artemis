@@ -293,6 +293,7 @@ export function RequestFundFormDialog({
 
                         <ShareAllocator
                             label="Charge To"
+                            required
                             options={users.map((u) => ({
                                 value: String(u.id),
                                 label: u.name,

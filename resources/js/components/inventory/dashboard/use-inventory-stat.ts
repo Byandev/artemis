@@ -1,29 +1,23 @@
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 
-export interface DashboardRange {
-    start: string;
-    end: string;
-}
-
-export interface StatState<T> {
-    data: T | null;
+export interface StatState {
+    value: number | null;
     loading: boolean;
     error: boolean;
     refetch: () => void;
 }
 
 /**
- * Self-contained fetcher for a single dashboard widget. Hits its own endpoint,
- * cancels in-flight requests on range change/unmount, and exposes an explicit
- * error flag + refetch so each panel can render its own retry button.
+ * Self-contained fetcher for a single dashboard KPI. Hits its own endpoint,
+ * cancels an in-flight request on unmount, and exposes an explicit error flag
+ * plus refetch so each tile can render its own retry button.
  */
-export function useInventoryStat<T>(
+export function useInventoryStat(
     workspaceSlug: string,
     endpoint: string,
-    range: DashboardRange,
-): StatState<T> {
-    const [data, setData] = useState<T | null>(null);
+): StatState {
+    const [value, setValue] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     // Bumping the nonce re-runs the effect — that's the manual "refresh".
@@ -36,11 +30,11 @@ export function useInventoryStat<T>(
         setError(false);
 
         axios
-            .get<T>(
-                `/api/workspaces/${workspaceSlug}/inventory/dashboard/${endpoint}`,
-                { params: range, signal: controller.signal },
+            .get<{ value: number }>(
+                `/api/workspaces/${workspaceSlug}/inventory/dashboard/kpi/${endpoint}`,
+                { signal: controller.signal },
             )
-            .then((res) => setData(res.data))
+            .then((res) => setValue(res.data.value))
             .catch((err) => {
                 if (axios.isCancel(err)) return;
                 console.error(`inventory dashboard: ${endpoint} failed`, err);
@@ -51,9 +45,7 @@ export function useInventoryStat<T>(
             });
 
         return () => controller.abort();
-        // Depend on the range's primitives, not the object identity.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workspaceSlug, endpoint, range.start, range.end, nonce]);
+    }, [workspaceSlug, endpoint, nonce]);
 
-    return { data, loading, error, refetch };
+    return { value, loading, error, refetch };
 }
