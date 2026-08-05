@@ -71,7 +71,7 @@ export default function MovementChart({ slug }: { slug: string }) {
     return (
         // `inv-chart-panel` opts this panel's tooltip into the solid bordered
         // card in app.css — the global rule strips ApexCharts tooltips bare.
-        <div className="inv-chart-panel rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
+        <div className="inv-chart-panel rounded-[14px] border border-black/6 bg-white p-[18px] pb-6 dark:border-white/6 dark:bg-zinc-900">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
