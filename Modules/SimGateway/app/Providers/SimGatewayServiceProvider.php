@@ -66,8 +66,8 @@ class SimGatewayServiceProvider extends ModuleServiceProvider
      */
     protected function configureSchedules(Schedule $schedule): void
     {
-        $schedule->job(new ProcessScheduledMessagesJob)
-            ->everyMinute()
-            ->name('simgateway-scheduled-messages');
+//        $schedule->job(new ProcessScheduledMessagesJob)
+//            ->everyMinute()
+//            ->name('simgateway-scheduled-messages');
     }
 }
