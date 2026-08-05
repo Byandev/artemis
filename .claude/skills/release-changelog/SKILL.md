@@ -1,6 +1,6 @@
 ---
 name: release-changelog
-description: Write a new release entry in resources/js/pages/workspaces/changelog.tsx from the commits merged since the last release. Use when asked to "update the changelog", "add vX.Y.Z to the changelog", or to write release notes for a merge/release commit.
+description: Write a new release entry in resources/js/pages/workspaces/changelog.tsx from the commits merged since the last release, picking the semver bump (major/minor/patch) from what actually changed. Use when asked to "update the changelog", "cut a release", "add vX.Y.Z to the changelog", or to write release notes for a merge/release commit.
 ---
 
 # Release changelog
@@ -15,8 +15,9 @@ without knowing what a controller is.
 
 ## 1. Find the range
 
-The user gives a commit (usually the `develop` → `staging` merge) and a version.
-The previous release is the last commit that touched the changelog file:
+The target commit is usually the `develop` → `staging` merge; if the user doesn't
+name one, use `HEAD`. The previous release is the last commit that touched the
+changelog file:
 
 ```bash
 git log --oneline -3 -- resources/js/pages/workspaces/changelog.tsx
@@ -25,6 +26,8 @@ git diff --stat <last-release>..<target-commit>
 ```
 
 Use the target commit's own date for the entry's `date` (`YYYY-MM-DD`).
+
+If the range is empty, say so and stop — there's nothing to write.
 
 ## 2. Read the actual diffs — never the commit subjects
 
@@ -50,7 +53,48 @@ Ignore entirely: refactors with no visible effect, test-only commits,
 rewrite that shipped in the same range (describe the thing that shipped, not the
 scaffolding that was thrown away on the way there).
 
-## 3. Shape
+## 3. Pick the version
+
+Decide this yourself from what the diffs actually changed — only take a version
+the user names outright. Semantic versioning, read for an internal web app with
+no public API: "breaking" means the people using Artemis have to change what they
+do, not that a function signature moved.
+
+Start from the latest version at the top of the file and bump one part:
+
+| Bump      | When                                                                                                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **major** | A workflow people rely on is removed or reworked so they must relearn it; a module is retired; something needs action from admins (re-granting permissions, re-entering data) before it works again |
+| **minor** | Anything new and user-visible — a page, module, table, column, filter, export, setting, scheduled job, or a meaningful new ability inside an existing screen                                        |
+| **patch** | Only changes to things that already exist — bug fixes, corrected figures, sorting and layout, wording, performance, validation messages                                                             |
+
+Rules of thumb:
+
+- The highest-ranking change in the range wins. One new feature alongside eight
+  fixes is still a **minor**.
+- If any section title you're about to write ends in `(New)`, it's a **minor**.
+- A fix that changes a number people have been reading (a total that was wrong,
+  a figure that was double-counted) is still a **patch** — the capability
+  already existed, it was just wrong.
+- **major** is rare and consequential. Never pick it on your own judgment alone;
+  say why you think it qualifies and let the user confirm.
+
+Don't infer the convention from the file's own history — earlier entries are
+inconsistent (v3.15.4 and v3.19.1 both shipped whole new features as patch
+releases). Follow the table, not the precedent.
+
+Say which bump you chose and why when you report back, so a wrong call is easy
+to spot and correct.
+
+### Same-day continuation of an unreleased feature
+
+If the range is more work on a feature the entry directly above introduced —
+same day, extending rather than fixing — ask before writing whether to fold it
+into that entry or start a new one. Both are defensible: folding in reads as one
+coherent release, a new entry is right if the previous version already went out
+to users. This comes up often enough to be worth the one question.
+
+## 4. Shape
 
 ```tsx
 {
@@ -74,7 +118,7 @@ The new entry goes at the **top** of the `changelog` array.
 - No trailing full stops on items. Curly apostrophes (`’`), em dashes (`—`),
   and en/em dashes used the way the existing entries use them.
 
-## 4. Voice
+## 5. Voice
 
 Match the existing entries — this is the part worth getting right. Read the two
 entries above whatever you're adding before you write.
@@ -107,7 +151,7 @@ Written properly:
 >   on from the highest one issued rather than the row count, so deleting an
 >   older request can't hand out one that's still in use
 
-## 5. Finish
+## 6. Finish
 
 ```bash
 npx prettier --write resources/js/pages/workspaces/changelog.tsx
@@ -116,5 +160,6 @@ npx prettier --write resources/js/pages/workspaces/changelog.tsx
 The "unused default export" diagnostic on this file is expected — it's an Inertia
 page resolved at runtime by `app.tsx`, not imported anywhere.
 
-Then summarise the sections you added for the user, so they can spot anything
-you misread or left out.
+Then report back with the version you chose and the one-line reason for the bump,
+followed by a summary of the sections you added — so a wrong version or a
+misread commit is easy to spot. Call out anything you deliberately left out.
