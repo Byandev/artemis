@@ -184,6 +184,9 @@ class InventoryDashboardStatsController extends Controller
                 'purchased_order_id' => $line->purchasedOrder->id,
                 'control_no' => $line->purchasedOrder->control_no,
                 'cust_po_no' => $line->purchasedOrder->cust_po_no,
+                // Numeric status too: the frontend renders it through the
+                // shared PURCHASED_ORDER_STATUSES map rather than the label.
+                'status' => (int) $line->purchasedOrder->status,
                 'status_label' => $line->purchasedOrder->status_label,
                 'sku' => $line->inventoryItem?->sku,
                 'product_name' => $line->inventoryItem?->product?->name,
@@ -194,6 +197,58 @@ class InventoryDashboardStatsController extends Controller
 
         return response()->json([
             'lines' => $lines,
+            'total_waiting' => $lines->sum('waiting_qty'),
+        ]);
+    }
+
+    /**
+     * Every line on a single purchase order — delivered ones included, unlike
+     * the summary listing, which only carries what is still owed. This backs
+     * the drill-down, where the point is to see the whole order at once.
+     */
+    public function purchaseOrderLines(Request $request, Workspace $workspace, PurchasedOrder $purchasedOrder): JsonResponse
+    {
+        $this->authorize('View Purchased Orders', $workspace);
+
+        abort_unless($purchasedOrder->workspace_id === $workspace->id, 404);
+
+        // Team-scoped users have to reach the order through their team, the
+        // same gate the summary listing applies.
+        abort_unless(
+            PurchasedOrder::whereKey($purchasedOrder->getKey())
+                ->visibleTo($request->user(), $workspace)
+                ->exists(),
+            404
+        );
+
+        $lines = PurchasedOrderItem::query()
+            ->where('inventory_purchased_order_id', $purchasedOrder->id)
+            ->with(['inventoryItem:id,sku,product_id', 'inventoryItem.product:id,name'])
+            ->withSum('deliveries as delivered_qty', 'qty')
+            ->get()
+            // Outstanding lines first; fully delivered ones settle at the end.
+            ->sortByDesc(fn (PurchasedOrderItem $line) => $line->balance)
+            ->values()
+            ->map(fn (PurchasedOrderItem $line) => [
+                'id' => $line->id,
+                'sku' => $line->inventoryItem?->sku,
+                'product_name' => $line->inventoryItem?->product?->name,
+                'ordered_qty' => (int) $line->count,
+                'delivered_qty' => $line->delivered_qty,
+                'waiting_qty' => $line->balance,
+                'fulfillment_status' => $line->fulfillment_status,
+            ]);
+
+        return response()->json([
+            'order' => [
+                'id' => $purchasedOrder->id,
+                'control_no' => $purchasedOrder->control_no,
+                'cust_po_no' => $purchasedOrder->cust_po_no,
+                'status_label' => $purchasedOrder->status_label,
+            ],
+            'lines' => $lines,
+            'total_ordered' => $lines->sum('ordered_qty'),
+            'total_delivered' => $lines->sum('delivered_qty'),
             'total_waiting' => $lines->sum('waiting_qty'),
         ]);
     }

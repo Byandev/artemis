@@ -1,12 +1,8 @@
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { PURCHASED_ORDER_STATUSES } from '@/constants/purchased-order-statuses';
+import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import PoLinesDialog, { type PoDialogTarget } from './po-lines-dialog';
 import RefreshButton from './refresh-button';
 import { useInventoryStat } from './use-inventory-stat';
 
@@ -15,6 +11,7 @@ interface OpenPoLine {
     purchased_order_id: number;
     control_no: string | null;
     cust_po_no: string | null;
+    status: number;
     status_label: string;
     sku: string | null;
     product_name: string | null;
@@ -32,6 +29,15 @@ interface OpenPoData {
 const num = (v: number | null | undefined) =>
     v == null ? '—' : Number(v).toLocaleString('en-PH');
 
+/** Control no, then the customer's PO no, then the bare id as a last resort. */
+const poLabel = (line: OpenPoLine) =>
+    line.control_no ?? line.cust_po_no ?? `#${line.purchased_order_id}`;
+
+const headClass =
+    'px-3 py-2 text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
+const cellClass = 'px-3 py-2.5 align-middle';
+const numClass = `${cellClass} text-right text-xs tabular-nums whitespace-nowrap`;
+
 /**
  * Sits under the movement chart: the open purchase-order lines the chart's
  * "in" arm is still waiting on, so a flat week of arrivals can be read against
@@ -42,12 +48,15 @@ export default function OpenPosTable({ slug }: { slug: string }) {
         slug,
         'open-purchase-orders',
     );
+    // The drill-down target doubles as the dialog's open flag.
+    const [target, setTarget] = useState<PoDialogTarget | null>(null);
 
     const lines = data?.lines ?? [];
+    const hasRows = !loading && !error && lines.length > 0;
 
     return (
-        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+            <div className="flex flex-col gap-3 p-[18px] sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Open Purchase Orders
@@ -57,11 +66,16 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                         what is still waiting.
                     </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                    {!loading && !error && lines.length > 0 && (
-                        <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                            {num(data?.total_waiting)} units waiting
-                        </span>
+                <div className="flex shrink-0 items-center gap-3">
+                    {hasRows && (
+                        <div className="text-right">
+                            <div className="text-sm font-semibold text-gray-900 tabular-nums dark:text-gray-100">
+                                {num(data?.total_waiting)}
+                            </div>
+                            <div className="text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                units waiting
+                            </div>
+                        </div>
                     )}
                     <RefreshButton
                         onClick={refetch}
@@ -73,82 +87,139 @@ export default function OpenPosTable({ slug }: { slug: string }) {
             </div>
 
             {loading ? (
-                <TableSkeleton />
+                <div className="px-[18px] pb-[18px]">
+                    <TableSkeleton />
+                </div>
             ) : error ? (
-                <EmptyState message="Couldn't load open purchase orders." />
+                <div className="px-[18px] pb-[18px]">
+                    <EmptyState message="Couldn't load open purchase orders." />
+                </div>
             ) : lines.length === 0 ? (
-                <EmptyState message="No open purchase orders — everything ordered has landed." />
+                <div className="px-[18px] pb-[18px]">
+                    <EmptyState message="No open purchase orders — everything ordered has landed." />
+                </div>
             ) : (
-                // Every open line is listed rather than a top-N, so the panel
-                // scrolls internally instead of pushing the page down.
-                <div className="max-h-[420px] overflow-auto rounded-[10px] border border-black/6 dark:border-white/6">
-                    <Table>
-                        <TableHeader className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-950 [&_th]:border-b [&_th]:border-black/6 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left [&_th]:text-[11px] [&_th]:font-medium [&_th]:text-gray-500 dark:[&_th]:border-white/6 dark:[&_th]:text-gray-400">
-                            <TableRow>
-                                <TableHead>PO</TableHead>
-                                <TableHead>Item</TableHead>
-                                <TableHead className="text-right!">
+                // Full-bleed to the panel edge: a bordered table inside a
+                // bordered card reads as two nested boxes. Every open line is
+                // listed rather than a top-N, so this scrolls internally
+                // instead of pushing the page down.
+                <div className="max-h-[420px] overflow-auto border-t border-black/6 dark:border-white/6">
+                    <table className="w-full border-collapse">
+                        <thead className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900">
+                            <tr className="border-b border-black/6 dark:border-white/6">
+                                <th className={headClass}>PO</th>
+                                <th className={headClass}>Status</th>
+                                <th className={headClass}>Item</th>
+                                <th className={`${headClass} text-right!`}>
                                     Total PO
-                                </TableHead>
-                                <TableHead className="text-right!">
+                                </th>
+                                <th className={`${headClass} text-right!`}>
                                     Delivered
-                                </TableHead>
-                                <TableHead className="text-right!">
+                                </th>
+                                <th className={`${headClass} text-right!`}>
                                     Waiting
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
                             {lines.map((line) => (
-                                <TableRow
+                                <tr
                                     key={line.id}
-                                    className="border-b border-black/4 transition-colors hover:bg-zinc-50 dark:border-white/4 dark:hover:bg-zinc-800/60"
+                                    className="border-b border-black/5 transition-colors last:border-0 hover:bg-zinc-50 dark:border-white/5 dark:hover:bg-zinc-800/50"
                                 >
-                                    <TableCell className="text-xs">
-                                        <div className="font-medium text-gray-900 dark:text-gray-100">
-                                            {line.control_no ??
-                                                line.cust_po_no ??
-                                                `#${line.purchased_order_id}`}
-                                        </div>
-                                        <div className="text-[11px] text-gray-400 dark:text-gray-500">
-                                            {line.status_label}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-xs">
+                                    <td className={`${cellClass} text-xs`}>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setTarget({
+                                                    id: line.purchased_order_id,
+                                                    label: poLabel(line),
+                                                    status: line.status,
+                                                    status_label:
+                                                        line.status_label,
+                                                })
+                                            }
+                                            className="group inline-flex items-center gap-0.5 font-medium whitespace-nowrap text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                                        >
+                                            {poLabel(line)}
+                                            <ChevronRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                                        </button>
+                                    </td>
+                                    <td className={cellClass}>
+                                        <StatusBadge
+                                            status={line.status}
+                                            label={line.status_label}
+                                        />
+                                    </td>
+                                    <td className={`${cellClass} text-xs`}>
                                         <div className="font-medium text-gray-900 dark:text-gray-100">
                                             {line.sku ?? '—'}
                                         </div>
                                         {line.product_name && (
-                                            <div className="text-[11px] text-gray-400 dark:text-gray-500">
+                                            <div className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
                                                 {line.product_name}
                                             </div>
                                         )}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs text-gray-700 tabular-nums dark:text-gray-300">
+                                    </td>
+                                    <td
+                                        className={`${numClass} text-gray-500 dark:text-gray-400`}
+                                    >
                                         {num(line.ordered_qty)}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs text-gray-700 tabular-nums dark:text-gray-300">
+                                    </td>
+                                    <td
+                                        className={`${numClass} text-gray-500 dark:text-gray-400`}
+                                    >
                                         {num(line.delivered_qty)}
-                                    </TableCell>
-                                    <TableCell className="text-right text-xs font-medium text-amber-600 tabular-nums dark:text-amber-500">
+                                    </td>
+                                    {/* The row's headline figure, so it carries
+                                        the weight. Deliberately not a colour —
+                                        every row here is waiting, so tinting
+                                        them all would signal nothing. */}
+                                    <td
+                                        className={`${numClass} font-semibold text-gray-900 dark:text-gray-100`}
+                                    >
                                         {num(line.waiting_qty)}
-                                    </TableCell>
-                                </TableRow>
+                                    </td>
+                                </tr>
                             ))}
-                        </TableBody>
-                    </Table>
+                        </tbody>
+                    </table>
                 </div>
             )}
+
+            <PoLinesDialog
+                slug={slug}
+                order={target}
+                open={target !== null}
+                onClose={() => setTarget(null)}
+            />
         </div>
     );
 }
 
-/** Row placeholders matching the table's five columns. */
+/** Workflow stage, styled from the shared status map the PO pages use. */
+function StatusBadge({ status, label }: { status: number; label: string }) {
+    const badge = PURCHASED_ORDER_STATUSES[status];
+
+    return (
+        <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${
+                badge?.color ??
+                'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400'
+            }`}
+        >
+            {badge?.label ?? label}
+        </span>
+    );
+}
+
+/** Row placeholders echoing the table's column rhythm. */
 function TableSkeleton() {
     return (
         <div className="flex flex-col gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3">
+                    <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[3]" />
                     <Skeleton className="h-8 flex-1" />
