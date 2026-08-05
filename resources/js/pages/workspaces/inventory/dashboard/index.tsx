@@ -26,7 +26,9 @@ export default function InventoryDashboard({ workspace }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${workspace.name} - Inventory Dashboard`} />
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+            {/* The layout adds no padding of its own, so the last panel would
+                otherwise sit against the bottom of the scroll area. */}
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 pb-6 md:p-6 md:pb-6">
                 <PageHeader
                     title="Inventory Dashboard"
                     description="Stock health, movement, purchase orders and audit at a glance."

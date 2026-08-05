@@ -304,7 +304,7 @@ class InventoryDashboardStatsController extends Controller
                 ->whereIn('status', PurchasedOrder::AWAITING_DELIVERY_STATUSES)
                 ->visibleTo($request->user(), $workspace))
             ->with([
-                'purchasedOrder:id,control_no,cust_po_no,status',
+                'purchasedOrder:id,control_no,cust_po_no,status,issue_date',
                 'inventoryItem:id,sku,product_id',
                 'inventoryItem.product:id,name',
             ])
@@ -320,6 +320,8 @@ class InventoryDashboardStatsController extends Controller
                 'purchased_order_id' => $line->purchasedOrder->id,
                 'control_no' => $line->purchasedOrder->control_no,
                 'cust_po_no' => $line->purchasedOrder->cust_po_no,
+                // Date-only string; the client formats it for display.
+                'issue_date' => $line->purchasedOrder->issue_date?->toDateString(),
                 // Numeric status too: the frontend renders it through the
                 // shared PURCHASED_ORDER_STATUSES map rather than the label.
                 'status' => (int) $line->purchasedOrder->status,
