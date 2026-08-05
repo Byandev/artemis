@@ -372,6 +372,7 @@ export default function MetaAdAccounts({
                 <AccountPeople
                     people={row.original.people ?? []}
                     accountName={row.original.name}
+                    hasBusiness={Boolean(row.original.business_name)}
                 />
             ),
         },

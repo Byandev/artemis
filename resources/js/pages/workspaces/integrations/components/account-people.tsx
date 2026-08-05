@@ -99,9 +99,12 @@ const MAX_VISIBLE = 3;
 export function AccountPeople({
     people,
     accountName,
+    hasBusiness,
 }: {
     people: AdAccountPerson[];
     accountName: string;
+    /** False when the account is in no business portfolio — see the empty state. */
+    hasBusiness: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
@@ -116,10 +119,23 @@ export function AccountPeople({
         );
     }, [people, search]);
 
+    // Meta only exposes a People list through a business portfolio. An account
+    // in none is not "empty" — it's unreadable, and saying so beats a bare dash.
+    if (people.length === 0 && !hasBusiness) {
+        return (
+            <span
+                title="This ad account isn't in a business portfolio. Meta only exposes a people list for accounts owned by, or shared into, a portfolio."
+                className="font-mono text-[11px] text-gray-300 italic dark:text-gray-700"
+            >
+                No portfolio
+            </span>
+        );
+    }
+
     if (people.length === 0) {
         return (
             <span
-                title="No people synced yet — run metaads:sync-ad-account-people, or the account has no owning business."
+                title="No people synced yet — run metaads:sync-ad-account-people."
                 className="font-mono text-[12px] text-gray-300 dark:text-gray-700"
             >
                 —
@@ -201,8 +217,17 @@ export function AccountPeople({
                                 >
                                     <PersonAvatar person={p} />
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate font-mono text-[13px] text-gray-800 dark:text-gray-100">
-                                            {p.name ?? 'Unnamed'}
+                                        <p
+                                            className={clsx(
+                                                'truncate font-mono text-[13px]',
+                                                p.name
+                                                    ? 'text-gray-800 dark:text-gray-100'
+                                                    : 'text-gray-400 italic dark:text-gray-600',
+                                            )}
+                                        >
+                                            {/* Only reachable with people.skip_unnamed disabled. */}
+                                            {p.name ??
+                                                'Restricted or unavailable'}
                                         </p>
                                         {p.user_type
                                             ?.toUpperCase()

@@ -24,6 +24,9 @@ return new class extends Migration
             $table->json('tasks')->nullable();
             // Human label derived from tasks at sync time (Admin/Advertiser/...).
             $table->string('role')->nullable();
+            // Business the access was read through — the owning business, or an
+            // agency the account was shared into when there is no owner.
+            $table->string('source_business_id')->nullable();
             $table->timestamp('last_synced_at')->nullable();
             $table->timestamps();
 
