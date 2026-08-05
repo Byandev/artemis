@@ -1,6 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import KpiCards from '@/components/inventory/dashboard/kpi-cards';
 import MovementChart from '@/components/inventory/dashboard/movement-chart';
+import OpenPosTable from '@/components/inventory/dashboard/open-pos-table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
@@ -34,6 +35,7 @@ export default function InventoryDashboard({ workspace }: Props) {
                 <div className="flex flex-col gap-3">
                     <KpiCards slug={slug} />
                     <MovementChart slug={slug} />
+                    <OpenPosTable slug={slug} />
                 </div>
             </div>
         </AppLayout>
