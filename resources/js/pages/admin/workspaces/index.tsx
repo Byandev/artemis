@@ -43,6 +43,7 @@ interface Workspace {
     id: number;
     name: string;
     slug: string;
+    created_at: string;
     owner?: { name: string };
     pages_count: number;
     shops_count: number;
@@ -488,6 +489,37 @@ export default function Index({ workspaces, plans, filters }: Props) {
                     )}
                 </div>
             ),
+        },
+        {
+            accessorKey: 'created_at',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Created"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => {
+                const date = new Date(row.original.created_at);
+                return (
+                    <div className="text-center">
+                        <div className="text-xs font-medium text-zinc-900 dark:text-zinc-100">
+                            {date.toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                            })}
+                        </div>
+                        <div className="text-[10px] text-zinc-500">
+                            {date.toLocaleTimeString(undefined, {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                            })}
+                        </div>
+                    </div>
+                );
+            },
         },
         {
             id: 'actions',

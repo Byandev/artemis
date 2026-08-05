@@ -10,12 +10,15 @@ use Modules\GencysERP\Jobs\FetchDailySalesTrackerJob;
 
 class TriggerFetchDailySalesTrackerCommand extends Command
 {
+    /** Number of trailing days fetched when no date options are given. */
+    private const DEFAULT_DAYS = 3;
+
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'gencys-erp:trigger-fetch-daily-sales-tracker {--delay=30} {--date=} {--start-date=} {--end-date=} {--sync : POST to n8n immediately instead of queueing on the erp worker} {--force : Run outside production (by default this command only runs on production)}';
+    protected $signature = 'gencys-erp:trigger-fetch-daily-sales-tracker {--delay=240} {--date=} {--start-date=} {--end-date=} {--sync : POST to n8n immediately instead of queueing on the erp worker} {--force : Run outside production (by default this command only runs on production)}';
 
     /**
      * The console command description.
@@ -132,7 +135,7 @@ class TriggerFetchDailySalesTrackerCommand extends Command
      * Resolve the list of dates (formatted m/d/Y) to fetch.
      *
      * Supports a single --date, a --start-date/--end-date range (inclusive),
-     * or defaults to yesterday when none are given.
+     * or defaults to the last 3 days (ending yesterday) when none are given.
      *
      * @return array<int, string>
      *
@@ -168,16 +171,24 @@ class TriggerFetchDailySalesTrackerCommand extends Command
             return $dates;
         }
 
-        // Single-date mode (backwards compatible): explicit --date or yesterday.
-        try {
-            $date = $this->option('date')
-                ? Carbon::parse($this->option('date'))
-                : Carbon::yesterday();
-        } catch (\Exception) {
-            throw new \InvalidArgumentException("Invalid date provided: {$this->option('date')}");
+        // Explicit single date.
+        if ($this->option('date')) {
+            try {
+                $date = Carbon::parse($this->option('date'));
+            } catch (\Exception) {
+                throw new \InvalidArgumentException("Invalid date provided: {$this->option('date')}");
+            }
+
+            return [$date->format('m/d/Y')];
         }
 
-        return [$date->format('m/d/Y')];
+        // No date options at all: default to the last 3 days, ending yesterday.
+        $dates = [];
+        for ($i = self::DEFAULT_DAYS; $i >= 1; $i--) {
+            $dates[] = Carbon::today()->subDays($i)->format('m/d/Y');
+        }
+
+        return $dates;
     }
 
     /** Workspaces wired for ERP automation. Kept for readability/testability. */
