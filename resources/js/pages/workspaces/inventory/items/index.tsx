@@ -316,7 +316,10 @@ export default function ItemIndex({
         'filter[is_active]': activeOnly ? 1 : 'all',
         'filter[unassigned]': unassignedOnly ? 1 : undefined,
         'filter[product_status]': productStatus || undefined,
-        summarize: summarize ? 1 : undefined,
+        // Always explicit: the server rolls up by default, so an omitted param
+        // reads as "on" and the toggle would spring back the next time the URL
+        // is read (a refresh, or any navigation that rebuilds these params).
+        summarize: summarize ? 1 : 0,
         page: 1,
         per_page: query?.perPage ?? items.per_page,
         ...overrides,
@@ -391,7 +394,7 @@ export default function ItemIndex({
         setRowSelection({});
         router.get(
             baseUrl,
-            buildParams({ summarize: checked ? 1 : undefined }),
+            buildParams({ summarize: checked ? 1 : 0 }),
             visitOptions,
         );
     };
@@ -905,8 +908,10 @@ export default function ItemIndex({
                                         productStatus || '',
                                     sort: query?.sort ?? '',
                                     // Export what's on screen: grouped rows when
-                                    // the summarize toggle is on.
-                                    summarize: summarize ? '1' : '',
+                                    // the summarize toggle is on. Explicit '0'
+                                    // when off — '' is stripped below and the
+                                    // export would fall back to grouped.
+                                    summarize: summarize ? '1' : '0',
                                 }).filter(([, v]) => v !== ''),
                             ).toString()}`}
                             className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800"
@@ -1011,7 +1016,11 @@ export default function ItemIndex({
                     </label>
                 </div>
 
-                {canEditItems && selectedIds.length > 0 && (
+                {/* Selection only exists in the flat view (the checkbox column and
+                    the table's selection state are both gated on !summarize), so the
+                    bar follows it — otherwise a leftover selection could act on ids
+                    that mean something different in the rolled-up view. */}
+                {canEditItems && !summarize && selectedIds.length > 0 && (
                     <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-emerald-500/20 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-400/20 dark:bg-emerald-500/5">
                         <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
                             {selectedIds.length} selected
