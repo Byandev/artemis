@@ -7,10 +7,10 @@ namespace Modules\Inventory\Support;
  * inventory ledger into the derived stock figures shown across the module
  * (current stock, waiting-for-delivery, days-of-cover, PO-needed, …).
  *
- * Both the Inventory Items list (InventoryItemController) and the dashboard
- * (InventoryDashboardQuery) build on these fragments, so the numbers are
- * guaranteed to agree. Every fragment is written against the `inventory_items`
- * table alias, so callers must select from `inventory_items` (or join it).
+ * The Inventory Items list (InventoryItemController) builds on these fragments,
+ * so every view of the numbers agrees. Every fragment is written against the
+ * `inventory_items` table alias, so callers must select from `inventory_items`
+ * (or join it).
  */
 final class InventoryStockColumns
 {
