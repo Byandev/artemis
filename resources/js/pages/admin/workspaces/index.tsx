@@ -68,6 +68,7 @@ interface Workspace {
     video_editor_dashboard_module_enabled: boolean;
     csr_dashboard_module_enabled: boolean;
     sim_gateway_module_enabled: boolean;
+    ad_spend_goals_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -91,6 +92,7 @@ const MODULE_FIELDS: Array<{
         | 'video_editor_dashboard_module_enabled'
         | 'csr_dashboard_module_enabled'
         | 'sim_gateway_module_enabled'
+        | 'ad_spend_goals_module_enabled'
     >;
     label: string;
     description: string;
@@ -180,6 +182,11 @@ const MODULE_FIELDS: Array<{
         label: 'SMS Gateway',
         description: 'Send/receive SMS through workspace SIMs',
     },
+    {
+        key: 'ad_spend_goals_module_enabled',
+        label: 'Ad Spend Goals',
+        description: 'Per-team daily ad spend goals and milestones',
+    },
 ];
 
 type ModuleKey = (typeof MODULE_FIELDS)[number]['key'];
@@ -214,6 +221,7 @@ const MODULE_GROUPS: {
         keys: [
             'meta_ads_module_enabled',
             'creatives_module_enabled',
+            'ad_spend_goals_module_enabled',
             'botcake_module_enabled',
             'sim_gateway_module_enabled',
         ],
@@ -900,6 +908,7 @@ function ModulesModal({
             workspace.video_editor_dashboard_module_enabled,
         csr_dashboard_module_enabled: workspace.csr_dashboard_module_enabled,
         sim_gateway_module_enabled: workspace.sim_gateway_module_enabled,
+        ad_spend_goals_module_enabled: workspace.ad_spend_goals_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {
