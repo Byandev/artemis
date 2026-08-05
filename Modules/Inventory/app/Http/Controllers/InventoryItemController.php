@@ -685,9 +685,51 @@ class InventoryItemController extends Controller
             ->with('success', 'Items record created successfully.');
     }
 
+    /**
+     * One item's own editable fields, for the edit form.
+     *
+     * The summarize view's rows are group roll-ups: their unfulfilled_count and
+     * three_days_average are SUMs across the whole group, not the values stored
+     * on any one record. Opening the form from such a row and saving it would
+     * write the group's totals onto the parent, so the form reads the record
+     * itself through here rather than trusting the row it was opened from.
+     */
+    public function editData(Request $request, Workspace $workspace, InventoryItem $item)
+    {
+        $this->authorize('Edit Inventory Items', $workspace);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        return response()->json([
+            'item' => [
+                'id' => $item->id,
+                'sku' => $item->sku,
+                'is_active' => (bool) $item->is_active,
+                // Lets the form say it is editing a group placeholder rather
+                // than a stock-carrying SKU.
+                'is_parent' => (bool) $item->is_parent,
+                'product_id' => $item->product_id,
+                'sales_keywords' => (string) $item->getRawOriginal('sales_keywords'),
+                'transaction_keywords' => (string) $item->getRawOriginal('transaction_keywords'),
+                'lead_time' => (int) $item->lead_time,
+                'unfulfilled_count' => (int) $item->unfulfilled_count,
+                'three_days_average' => (float) $item->three_days_average,
+                'remaining_qty' => $item->remaining_qty,
+                'product' => $item->product ? [
+                    'id' => $item->product->id,
+                    'name' => $item->product->name,
+                ] : null,
+            ],
+        ]);
+    }
+
     public function update(Request $request, Workspace $workspace, InventoryItem $item)
     {
         $this->authorize('Edit Inventory Items', $workspace);
+
+        // Same guard as destroy(): the route binds by id alone, so without this
+        // a workspace's edit permission would reach another workspace's item.
+        abort_unless($item->workspace_id === $workspace->id, 404);
 
         $request->validate([
             'product_id' => 'nullable|exists:products,id',
@@ -1007,13 +1049,33 @@ class InventoryItemController extends Controller
             ->all();
     }
 
+    /**
+     * Delete an item. A parent placeholder takes its grouping with it but not
+     * its children: the child SKUs are ungrouped and stay in the list as
+     * standalone items, since they carry the real stock and deleting them
+     * alongside the group would destroy ledger history nobody asked to lose.
+     */
     public function destroy(Workspace $workspace, InventoryItem $item)
     {
         $this->authorize('Delete Inventory Items', $workspace);
 
+        // The route binds the item by id alone, so without this a user could
+        // delete another workspace's item using their own workspace's permission.
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        // The FK is ON DELETE SET NULL, but doing it explicitly keeps the
+        // behaviour visible here and independent of the schema.
+        $ungrouped = $item->is_parent
+            ? InventoryItem::where('parent_id', $item->id)->update(['parent_id' => null])
+            : 0;
+
         $item->delete();
 
-        return redirect()->back()
-            ->with('success', 'Inventory Items record deleted.');
+        return redirect()->back()->with(
+            'success',
+            $ungrouped > 0
+                ? "Group deleted. {$ungrouped} SKU(s) ungrouped and kept."
+                : 'Inventory Items record deleted.'
+        );
     }
 }

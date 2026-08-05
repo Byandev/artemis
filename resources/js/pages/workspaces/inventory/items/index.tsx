@@ -318,6 +318,39 @@ export default function ItemIndex({
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/items`;
 
+    /**
+     * Open the edit form for a row.
+     *
+     * A summarize row is a group roll-up — its unfulfilled count and 3-day
+     * average are sums across the group, not the record's own values — so the
+     * form is fed from the server rather than from the row, or saving would
+     * write the group's totals onto the parent. Flat rows are already the
+     * record and need no round trip.
+     */
+    const openEditFor = useCallback(
+        async (row: Item) => {
+            if (!summarize) {
+                setEditingItem(row);
+
+                return;
+            }
+
+            try {
+                const res = await fetch(`${baseUrl}/${row.id}/edit`, {
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (!res.ok) throw new Error(String(res.status));
+
+                const { item } = await res.json();
+                setEditingItem(item as Item);
+            } catch {
+                toast.error('Could not open that item for editing.');
+            }
+        },
+        [baseUrl, summarize],
+    );
+
     const selectedIds = useMemo(
         () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
         [rowSelection],
@@ -877,7 +910,10 @@ export default function ItemIndex({
                 );
             },
         },
-        ...(canUseItemActions && !summarize
+        // Rendered in the summarize view too, not just the flat list — a parent
+        // placeholder is hidden from the flat list, so without this a group has
+        // no row anywhere that can act on it and can never be deleted.
+        ...(canUseItemActions
             ? [
                   {
                       id: 'actions',
@@ -888,6 +924,13 @@ export default function ItemIndex({
                       ),
                       cell: ({ row }) => {
                           const item = row.original;
+                          const isGroupRow = !!item.is_group;
+                          // Adjust count posts a physical count against one SKU's
+                          // ledger; a group has no ledger of its own, so it stays
+                          // flat-view only. Edit works from either view — from a
+                          // group row it loads the parent record itself.
+                          const canAdjustCount = canEditItems && !summarize;
+
                           return (
                               <div className="flex justify-center">
                                   <DropdownMenu>
@@ -898,9 +941,9 @@ export default function ItemIndex({
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent
                                           align="end"
-                                          className="w-36"
+                                          className="w-40"
                                       >
-                                          {canEditItems && (
+                                          {canAdjustCount && (
                                               <DropdownMenuItem
                                                   onClick={() =>
                                                       setAdjustingItem(item)
@@ -913,11 +956,13 @@ export default function ItemIndex({
                                           {canEditItems && (
                                               <DropdownMenuItem
                                                   onClick={() =>
-                                                      setEditingItem(item)
+                                                      openEditFor(item)
                                                   }
                                               >
                                                   <Pencil className="mr-2 h-3.5 w-3.5" />
-                                                  Edit
+                                                  {isGroupRow
+                                                      ? 'Edit group'
+                                                      : 'Edit'}
                                               </DropdownMenuItem>
                                           )}
                                           {canEditItems && canDeleteItems && (
@@ -931,7 +976,9 @@ export default function ItemIndex({
                                                   }
                                               >
                                                   <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                                  Delete
+                                                  {isGroupRow
+                                                      ? 'Delete group'
+                                                      : 'Delete'}
                                               </DropdownMenuItem>
                                           )}
                                       </DropdownMenuContent>

@@ -465,6 +465,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
         Route::post('/bulk-product', [InventoryItemController::class, 'bulkUpdateProduct'])->name('bulk-product');
         Route::post('/bulk-group', [InventoryItemController::class, 'bulkGroup'])->name('bulk-group');
+        Route::get('/{item}/edit', [InventoryItemController::class, 'editData'])->name('edit');
         Route::get('/{item}/stock-as-of', [InventoryItemController::class, 'stockAsOf'])->name('stock-as-of');
         Route::get('/{item}/pending-purchase-orders', [InventoryItemController::class, 'pendingPurchaseOrders'])->name('pending-purchase-orders');
         Route::post('/{item}/discrepancies', [InventoryItemController::class, 'adjustCount'])->name('discrepancies.store');

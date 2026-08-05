@@ -18,6 +18,8 @@ interface InventoryItem {
     id: number;
     sku: string;
     is_active: boolean;
+    /** True when the record is a group placeholder rather than a stock-carrying SKU. */
+    is_parent?: boolean;
     product_id: number | null;
     sales_keywords: string;
     transaction_keywords: string;
@@ -49,6 +51,7 @@ export function ItemFormDialog({
     onSuccess,
 }: ItemFormDialogProps) {
     const isEditing = !!item;
+    const isParent = !!item?.is_parent;
 
     const [showAdditional, setShowAdditional] = useState(false);
 
@@ -126,12 +129,19 @@ export function ItemFormDialog({
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             {isEditing
-                                ? 'Edit Items Record'
+                                ? isParent
+                                    ? 'Edit Group'
+                                    : 'Edit Items Record'
                                 : 'Add Items Record'}
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
                             {isEditing
-                                ? 'Edit the details and settings for this inventory record.'
+                                ? isParent
+                                    ? // A parent is a placeholder: its children hold the
+                                      // stock, so its own counts read 0 and saying so
+                                      // beats letting someone wonder why.
+                                      'This is a group placeholder. Its stock figures live on the SKUs grouped under it — the counts here are the group row’s own and stay at zero.'
+                                    : 'Edit the details and settings for this inventory record.'
                                 : 'Add a new item to your workspace inventory.'}
                         </DialogDescription>
                     </DialogHeader>

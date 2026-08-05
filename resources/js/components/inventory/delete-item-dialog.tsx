@@ -23,6 +23,12 @@ interface Item {
         id: number;
         name: string;
     };
+    /** Summary view: the roll-up's product name (no `product` relation there). */
+    product_name?: string | null;
+    /** Summary view: true when the row is a parent standing for a group. */
+    is_group?: boolean | number;
+    /** How many SKUs the group holds. */
+    child_count?: number;
 }
 
 interface Props {
@@ -34,6 +40,9 @@ interface Props {
 export function DeleteItemDialog({ item, workspace, onClose }: Props) {
     const [processing, setProcessing] = useState(false);
 
+    const isGroup = !!item?.is_group;
+    const productName = item?.product?.name ?? item?.product_name ?? null;
+
     const handleDelete = () => {
         if (!item) return;
 
@@ -43,7 +52,11 @@ export function DeleteItemDialog({ item, workspace, onClose }: Props) {
                 preserveScroll: true,
                 onStart: () => setProcessing(true),
                 onSuccess: () => {
-                    toast.success(`Item deleted successfully`);
+                    toast.success(
+                        isGroup
+                            ? 'Group deleted — its SKUs were ungrouped, not removed'
+                            : 'Item deleted successfully',
+                    );
                     onClose();
                 },
                 onFinish: () => setProcessing(false),
@@ -56,18 +69,42 @@ export function DeleteItemDialog({ item, workspace, onClose }: Props) {
             <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
                 <AlertDialogHeader>
                     <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
-                        Delete Inventory Record?
+                        {isGroup ? 'Delete Group?' : 'Delete Inventory Record?'}
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                        Are you sure you want to delete the record for{' '}
-                        <span className="font-medium text-gray-900 dark:text-gray-200">
-                            {item?.product?.name || 'this product'}
-                        </span>{' '}
-                        on{' '}
-                        <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                            {item?.transaction_keywords}
-                        </span>
-                        ? This action cannot be undone.
+                        {isGroup ? (
+                            <>
+                                Delete the group{' '}
+                                <span className="font-mono font-medium text-gray-900 dark:text-gray-200">
+                                    {item?.sku}
+                                </span>
+                                ? Its{' '}
+                                <span className="font-medium text-gray-900 dark:text-gray-200">
+                                    {item?.child_count ?? 0} SKU(s)
+                                </span>{' '}
+                                are kept — they are ungrouped and stay in the
+                                list as standalone items. This action cannot be
+                                undone.
+                            </>
+                        ) : (
+                            <>
+                                Are you sure you want to delete{' '}
+                                <span className="font-mono font-medium text-gray-900 dark:text-gray-200">
+                                    {item?.sku}
+                                </span>
+                                {productName ? (
+                                    <>
+                                        {' '}
+                                        (
+                                        <span className="font-medium text-gray-900 dark:text-gray-200">
+                                            {productName}
+                                        </span>
+                                        )
+                                    </>
+                                ) : null}
+                                ? This action cannot be undone.
+                            </>
+                        )}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
