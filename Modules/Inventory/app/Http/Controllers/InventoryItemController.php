@@ -945,6 +945,20 @@ class InventoryItemController extends Controller
             ->reject(fn ($id) => $id === $parentId)
             ->all();
 
+        // Ungrouping a parent means "break this group up". The summary view lists a
+        // group under its parent's id, so that is the id the client sends — and the
+        // update below only touches leaf rows, so on its own it would report
+        // "0 item(s) ungrouped" and leave the group intact. Expand any selected
+        // parent into its children first.
+        if (! $parentId) {
+            $childIds = InventoryItem::where('workspace_id', $workspace->id)
+                ->whereIn('parent_id', $ids)
+                ->pluck('id')
+                ->all();
+
+            $ids = array_values(array_unique(array_merge($ids, $childIds)));
+        }
+
         $updated = InventoryItem::where('workspace_id', $workspace->id)
             ->whereIn('id', $ids)
             ->where('is_parent', false)

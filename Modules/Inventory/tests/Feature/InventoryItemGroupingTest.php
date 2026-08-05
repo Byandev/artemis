@@ -63,6 +63,48 @@ test('bulkGroup with no parent info ungroups the selected items', function () {
     expect($child->fresh()->parent_id)->toBeNull();
 });
 
+test('ungrouping a selected parent breaks up the whole group', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'P', 'is_parent' => true, 'is_active' => true]);
+    $childA = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'C-A', 'parent_id' => $parent->id, 'is_active' => true]);
+    $childB = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'C-B', 'parent_id' => $parent->id, 'is_active' => true]);
+
+    // The summary view lists the group under the parent's id, so that is the id
+    // the Ungroup button sends — it must detach the children, not no-op.
+    $this->actingAs($owner)
+        ->post(route('workspaces.inventory.item.bulk-group', $workspace), [
+            'ids' => [$parent->id],
+        ])
+        ->assertRedirect();
+
+    expect($childA->fresh()->parent_id)->toBeNull()
+        ->and($childB->fresh()->parent_id)->toBeNull()
+        // The parent placeholder itself is left alone — it is reusable.
+        ->and($parent->fresh())->not->toBeNull();
+});
+
+test('grouping under a parent is unaffected by the ungroup child expansion', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'P', 'is_parent' => true, 'is_active' => true]);
+    $otherParent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'P2', 'is_parent' => true, 'is_active' => true]);
+    $held = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'HELD', 'parent_id' => $otherParent->id, 'is_active' => true]);
+    $loose = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'LOOSE', 'is_active' => true]);
+
+    // Selecting a parent alongside a leaf while grouping must not drag the other
+    // parent's children along — the expansion only applies to ungrouping.
+    $this->actingAs($owner)
+        ->post(route('workspaces.inventory.item.bulk-group', $workspace), [
+            'ids' => [$loose->id, $otherParent->id],
+            'parent_id' => $parent->id,
+        ])
+        ->assertRedirect();
+
+    expect($loose->fresh()->parent_id)->toBe($parent->id)
+        ->and($held->fresh()->parent_id)->toBe($otherParent->id);
+});
+
 test('summarize view rolls children up under the parent and sums their stock', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
