@@ -62,11 +62,17 @@ class SyncAdAccountPeople implements ShouldQueue
 
             $businessIds = $this->resolveBusinessIds($client);
 
-            // assigned_users is only addressable through a business. An account
-            // that is neither owned by nor shared into one (a personal ad
-            // account) has no People list Meta will hand back.
+            // assigned_users is only addressable through a business. For an
+            // account that is neither owned by nor shared into one, Meta offers
+            // no People list at all — fall back to what we can still see.
             if ($businessIds === []) {
-                $run->succeed(0, ['skipped' => 'no_business']);
+                $count = $this->syncFromConnectedUsers();
+
+                $run->succeed($count, [
+                    'source' => AdAccountPerson::SOURCE_CONNECTED_USER,
+                    'people_count' => $count,
+                    'partial' => true,
+                ]);
 
                 return;
             }
@@ -111,6 +117,7 @@ class SyncAdAccountPeople implements ShouldQueue
                             'tasks' => $tasks ?: null,
                             'role' => AdAccountPerson::roleFromTasks($tasks),
                             'source_business_id' => $businessId,
+                            'source' => AdAccountPerson::SOURCE_PORTFOLIO,
                             'last_synced_at' => Carbon::now(),
                         ],
                     );
@@ -155,6 +162,60 @@ class SyncAdAccountPeople implements ShouldQueue
         } catch (Throwable $e) {
             $this->handleSyncError($run, $e);
         }
+    }
+
+    /**
+     * Fallback for ad accounts in no business portfolio.
+     *
+     * Meta won't enumerate an account's people without a business, but it does
+     * tell each connected Facebook user what THEY may do on the account — the
+     * `tasks` we store on the meta_ads_user_account pivot during
+     * SyncMetaAdAccounts. Inverting that gives a real, roled people list built
+     * entirely from data we already hold, with no extra Graph calls.
+     *
+     * It is knowingly partial: anyone with access who never connected Artemis
+     * is invisible to it. Rows are tagged SOURCE_CONNECTED_USER so the UI can
+     * say so rather than passing this off as the complete list.
+     */
+    private function syncFromConnectedUsers(): int
+    {
+        $seen = [];
+
+        foreach ($this->adAccount->metaUsers as $metaUser) {
+            $name = $this->cleanName($metaUser->name);
+
+            if ($name === null && config('metaads.people.skip_unnamed', true)) {
+                continue;
+            }
+
+            $tasks = $metaUser->pivot->permitted_tasks;
+            $tasks = is_string($tasks) ? json_decode($tasks, true) : $tasks;
+            $tasks = array_values(array_filter((array) $tasks));
+
+            AdAccountPerson::updateOrCreate(
+                [
+                    'meta_ads_account_id' => $this->adAccount->id,
+                    'meta_user_id' => $metaUser->id,
+                ],
+                [
+                    'name' => $name,
+                    'user_type' => null,
+                    'tasks' => $tasks ?: null,
+                    'role' => AdAccountPerson::roleFromTasks($tasks),
+                    'source_business_id' => null,
+                    'source' => AdAccountPerson::SOURCE_CONNECTED_USER,
+                    'last_synced_at' => Carbon::now(),
+                ],
+            );
+
+            $seen[] = (string) $metaUser->id;
+        }
+
+        AdAccountPerson::where('meta_ads_account_id', $this->adAccount->id)
+            ->when($seen !== [], fn ($q) => $q->whereNotIn('meta_user_id', $seen))
+            ->delete();
+
+        return count($seen);
     }
 
     /**

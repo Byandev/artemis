@@ -29,6 +29,15 @@ class AdAccountPerson extends Model
      * a person holds decides the label we show, matching how Business Manager
      * summarises a permission set as a single role.
      */
+    /** Complete list, read from a business portfolio's assigned_users. */
+    public const SOURCE_PORTFOLIO = 'portfolio';
+
+    /**
+     * Partial list, reverse-looked-up from the Facebook users who connected
+     * Artemis. The only thing Meta offers for accounts in no portfolio.
+     */
+    public const SOURCE_CONNECTED_USER = 'connected_user';
+
     private const ROLE_BY_TASK = [
         'MANAGE' => 'Admin',
         'ADVERTISE' => 'Advertiser',

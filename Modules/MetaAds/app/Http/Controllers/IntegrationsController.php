@@ -67,7 +67,7 @@ class IntegrationsController extends Controller
                 'people' => fn ($q) => $q
                     ->orderByRaw("FIELD(role, 'Admin', 'Advertiser', 'Draft', 'Analyst')")
                     ->orderBy('name')
-                    ->select('id', 'meta_ads_account_id', 'meta_user_id', 'name', 'role', 'user_type'),
+                    ->select('id', 'meta_ads_account_id', 'meta_user_id', 'name', 'role', 'user_type', 'source'),
             ])
             ->when(! $showAll, fn ($q) => $q->where('active_sync', true));
 

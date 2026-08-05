@@ -4,7 +4,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import clsx from 'clsx';
-import { Search, Users } from 'lucide-react';
+import { Info, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 export interface AdAccountPerson {
@@ -15,6 +15,11 @@ export interface AdAccountPerson {
     role: string | null;
     /** SYSTEM_USER / ADMIN_SYSTEM_USER when the assignee is a system user. */
     user_type: string | null;
+    /**
+     * 'portfolio' — complete list from Business Manager.
+     * 'connected_user' — partial fallback for accounts in no portfolio.
+     */
+    source: 'portfolio' | 'connected_user';
 }
 
 /** Two-letter initials (first + last word), matching the owner avatars. */
@@ -119,12 +124,13 @@ export function AccountPeople({
         );
     }, [people, search]);
 
-    // Meta only exposes a People list through a business portfolio. An account
-    // in none is not "empty" — it's unreadable, and saying so beats a bare dash.
+    // Meta enumerates an account's people only through a business portfolio.
+    // Without one we fall back to the connected Facebook users, so an empty
+    // list here means nobody has connected — not that nobody has access.
     if (people.length === 0 && !hasBusiness) {
         return (
             <span
-                title="This ad account isn't in a business portfolio. Meta only exposes a people list for accounts owned by, or shared into, a portfolio."
+                title="This ad account isn't in a business portfolio, so Meta won't enumerate its people. Nobody who has connected their Facebook to Artemis can reach it either."
                 className="font-mono text-[11px] text-gray-300 italic dark:text-gray-700"
             >
                 No portfolio
@@ -145,6 +151,8 @@ export function AccountPeople({
 
     const visible = people.slice(0, MAX_VISIBLE);
     const overflow = people.length - visible.length;
+    // Reverse-looked-up from connected accounts, so it can't see everyone.
+    const isPartial = people.every((p) => p.source === 'connected_user');
 
     return (
         <div onClick={(e) => e.stopPropagation()}>
@@ -190,6 +198,18 @@ export function AccountPeople({
                             </p>
                         </div>
                     </div>
+
+                    {isPartial && (
+                        <div className="flex items-start gap-2 border-b border-black/8 bg-amber-50 px-3 py-2 dark:border-white/8 dark:bg-amber-500/10">
+                            <Info className="mt-0.5 h-3 w-3 shrink-0 text-amber-600 dark:text-amber-400" />
+                            <p className="font-mono text-[10px] leading-relaxed text-amber-700 dark:text-amber-400">
+                                Partial list. This account isn't in a business
+                                portfolio, so Meta won't enumerate its people —
+                                these are the users who connected their Facebook
+                                to Artemis. Others may have access.
+                            </p>
+                        </div>
+                    )}
 
                     {people.length > 6 && (
                         <div className="flex items-center gap-2 border-b border-black/8 px-3 dark:border-white/8">
