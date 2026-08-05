@@ -36,6 +36,12 @@ class InventoryDashboardStatsController extends Controller
     use AuthorizesRequests;
 
     /**
+     * Trailing windows the movement chart offers, in days. The first is the
+     * default; anything else the client asks for falls back to it.
+     */
+    private const MOVEMENT_WINDOWS = [7, 14, 30];
+
+    /**
      * Active items, counted the way the Inventory Items list shows them: one
      * per group. Children roll into their parent (the list's `summarize` view,
      * which is the default), so a grouped SKU counts once rather than once per
@@ -92,20 +98,29 @@ class InventoryDashboardStatsController extends Controller
     }
 
     /**
-     * Daily units in vs out over the last 7 days, from the transaction ledger.
+     * Daily units in vs out over a trailing window, from the transaction ledger.
      * "In" is stock arriving (PO receipts + RTS goods returned to stock); "out"
      * is stock leaving. Write-offs (rts_bad, lost) are deliberately excluded —
      * they are shrinkage, not movement.
      *
+     * The window ends yesterday: today is still being written to, so a partial
+     * day would render as a slump next to complete ones.
+     *
      * Days with no transactions are returned as zeroes so the chart keeps an
-     * even 7-column axis instead of collapsing gaps.
+     * even axis instead of collapsing gaps.
      */
     public function movement(Request $request, Workspace $workspace): JsonResponse
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        $end = CarbonImmutable::today();
-        $start = $end->subDays(6);
+        $days = $request->integer('days', self::MOVEMENT_WINDOWS[0]);
+
+        if (! in_array($days, self::MOVEMENT_WINDOWS, true)) {
+            $days = self::MOVEMENT_WINDOWS[0];
+        }
+
+        $end = CarbonImmutable::yesterday();
+        $start = $end->subDays($days - 1);
 
         $rows = InventoryTransaction::where('workspace_id', $workspace->id)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])

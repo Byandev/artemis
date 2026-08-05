@@ -21,6 +21,7 @@ export interface StatState<T> {
 export function useInventoryStat<T>(
     workspaceSlug: string,
     endpoint: string,
+    params?: Record<string, string | number>,
 ): StatState<T> {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
@@ -36,6 +37,10 @@ export function useInventoryStat<T>(
     const { teamScope } = usePage<{ teamScope: TeamScope | null }>().props;
     const activeTeamId = teamScope?.activeTeamId ?? null;
 
+    // Callers pass a fresh object literal every render, so the effect keys off
+    // a serialised copy — depending on the object itself would refetch forever.
+    const paramKey = JSON.stringify(params ?? {});
+
     useEffect(() => {
         const controller = new AbortController();
         setLoading(true);
@@ -44,7 +49,7 @@ export function useInventoryStat<T>(
         axios
             .get<T>(
                 `/api/workspaces/${workspaceSlug}/inventory/dashboard/${endpoint}`,
-                { signal: controller.signal },
+                { params: JSON.parse(paramKey), signal: controller.signal },
             )
             .then((res) => setData(res.data))
             .catch((err) => {
@@ -57,7 +62,7 @@ export function useInventoryStat<T>(
             });
 
         return () => controller.abort();
-    }, [workspaceSlug, endpoint, nonce, activeTeamId]);
+    }, [workspaceSlug, endpoint, paramKey, nonce, activeTeamId]);
 
     return { data, loading, error, refetch };
 }

@@ -31,6 +31,10 @@ const INK = {
     dark: { text: '#9CA3AF', grid: 'rgba(255,255,255,0.08)' },
 };
 
+/** Trailing windows on offer. Must match MOVEMENT_WINDOWS server-side. */
+const WINDOWS = [7, 14, 30] as const;
+type WindowDays = (typeof WINDOWS)[number];
+
 /** Tracks the `dark` class the appearance hook stamps on <html>. */
 function useIsDark(): boolean {
     const [isDark, setIsDark] = useState(
@@ -56,9 +60,11 @@ function useIsDark(): boolean {
 }
 
 export default function MovementChart({ slug }: { slug: string }) {
+    const [windowDays, setWindow] = useState<WindowDays>(WINDOWS[0]);
     const { data, loading, error, refetch } = useInventoryStat<MovementData>(
         slug,
         'movement',
+        { days: windowDays },
     );
     const isDark = useIsDark();
 
@@ -66,49 +72,128 @@ export default function MovementChart({ slug }: { slug: string }) {
         // `inv-chart-panel` opts this panel's tooltip into the solid bordered
         // card in app.css — the global rule strips ApexCharts tooltips bare.
         <div className="inv-chart-panel rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         Items In / Out
                     </h3>
                     <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
-                        Units moved per day, last 7 days — in above the line,
-                        out below.
+                        Units moved per day over the last {windowDays} days, up
+                        to yesterday — in above the line, out below.
                     </p>
                 </div>
-                {error && (
-                    <button
-                        type="button"
+                <div className="flex shrink-0 items-center gap-2">
+                    <RefreshButton
                         onClick={refetch}
-                        className="flex shrink-0 items-center gap-1.5 text-[11px] text-red-500 hover:underline dark:text-red-400"
-                    >
-                        <RotateCcw className="h-3 w-3" />
-                        Retry
-                    </button>
-                )}
+                        loading={loading}
+                        error={error}
+                    />
+                    <WindowPicker value={windowDays} onChange={setWindow} />
+                </div>
             </div>
 
             {loading ? (
-                <ChartSkeleton />
+                <ChartSkeleton columns={windowDays} />
             ) : error ? (
                 <EmptyState message="Couldn't load inventory movement." />
             ) : (
-                <MovementPlot days={data?.days ?? []} isDark={isDark} />
+                <MovementPlot
+                    days={data?.days ?? []}
+                    window={windowDays}
+                    isDark={isDark}
+                />
             )}
+        </div>
+    );
+}
+
+/**
+ * Manual refetch. Always available rather than error-only, so a stale panel can
+ * be pulled fresh after a delivery or adjustment lands. Doubles as the retry
+ * affordance when the fetch failed — one control, two states.
+ */
+function RefreshButton({
+    onClick,
+    loading,
+    error,
+}: {
+    onClick: () => void;
+    loading: boolean;
+    error: boolean;
+}) {
+    const label = error ? 'Retry loading movement' : 'Refresh movement';
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={loading}
+            title={label}
+            aria-label={label}
+            className={
+                error
+                    ? 'flex items-center justify-center rounded-md p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950/40'
+                    : 'flex items-center justify-center rounded-md p-1.5 text-gray-400 hover:bg-zinc-100 hover:text-gray-700 disabled:opacity-50 dark:text-gray-500 dark:hover:bg-zinc-800 dark:hover:text-gray-200'
+            }
+        >
+            <RotateCcw
+                className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`}
+            />
+        </button>
+    );
+}
+
+/** Segmented control for the trailing window. */
+function WindowPicker({
+    value,
+    onChange,
+}: {
+    value: WindowDays;
+    onChange: (days: WindowDays) => void;
+}) {
+    return (
+        <div
+            role="group"
+            aria-label="Movement window"
+            className="flex items-center gap-0.5 rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800"
+        >
+            {WINDOWS.map((days) => {
+                const active = days === value;
+
+                return (
+                    <button
+                        key={days}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => onChange(days)}
+                        className={
+                            active
+                                ? 'rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-gray-900 shadow-sm dark:bg-zinc-950 dark:text-gray-100'
+                                : 'rounded-md px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                        }
+                    >
+                        {days}d
+                    </button>
+                );
+            })}
         </div>
     );
 }
 
 function MovementPlot({
     days,
+    window,
     isDark,
 }: {
     days: MovementDay[];
+    window: WindowDays;
     isDark: boolean;
 }) {
     if (!days.some((d) => d.in !== 0 || d.out !== 0)) {
         return (
-            <EmptyState message="No inventory movement in the last 7 days." />
+            <EmptyState
+                message={`No inventory movement in the last ${window} days.`}
+            />
         );
     }
 
@@ -150,7 +235,9 @@ function MovementPlot({
         plotOptions: {
             bar: {
                 horizontal: false,
-                columnWidth: '45%',
+                // Widen the columns as the window grows, so 30 days reads as a
+                // bar chart rather than 30 hairlines.
+                columnWidth: window <= 7 ? '45%' : window <= 14 ? '60%' : '78%',
                 borderRadius: 4,
                 borderRadiusApplication: 'end',
             },
@@ -185,8 +272,12 @@ function MovementPlot({
             axisBorder: { show: false },
             axisTicks: { show: false },
             tooltip: { enabled: false },
+            // Beyond a week there is no room for a label per column, so thin
+            // them to ~7 evenly spaced dates; the tooltip still names the day.
+            tickAmount: Math.min(window, 7),
             labels: {
                 rotate: 0,
+                hideOverlappingLabels: true,
                 style: { colors: ink.text, fontSize: '11px' },
             },
         },
@@ -238,11 +329,14 @@ function niceStep(peak: number): number {
 }
 
 /** Column placeholder mirrored around a baseline, matching the chart's shape. */
-function ChartSkeleton() {
+function ChartSkeleton({ columns }: { columns: number }) {
+    // Tighter gutters as the column count climbs, mirroring the real chart.
+    const gap = columns <= 7 ? 'gap-3' : columns <= 14 ? 'gap-2' : 'gap-1';
+
     return (
         <div className="h-[300px]">
-            <div className="flex h-1/2 items-end gap-3">
-                {Array.from({ length: 7 }).map((_, i) => (
+            <div className={`flex h-1/2 items-end ${gap}`}>
+                {Array.from({ length: columns }).map((_, i) => (
                     <Skeleton
                         key={i}
                         className="flex-1"
@@ -250,8 +344,8 @@ function ChartSkeleton() {
                     />
                 ))}
             </div>
-            <div className="flex h-1/2 items-start gap-3 pt-0.5">
-                {Array.from({ length: 7 }).map((_, i) => (
+            <div className={`flex h-1/2 items-start pt-0.5 ${gap}`}>
+                {Array.from({ length: columns }).map((_, i) => (
                     <Skeleton
                         key={i}
                         className="flex-1"
