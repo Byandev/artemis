@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import KpiCards from '@/components/inventory/dashboard/kpi-cards';
+import MovementChart from '@/components/inventory/dashboard/movement-chart';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
@@ -32,6 +33,7 @@ export default function InventoryDashboard({ workspace }: Props) {
                     no date filter — each tile owns its own fetch. */}
                 <div className="flex flex-col gap-3">
                     <KpiCards slug={slug} />
+                    <MovementChart slug={slug} />
                 </div>
             </div>
         </AppLayout>

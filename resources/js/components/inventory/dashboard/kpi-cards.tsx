@@ -69,10 +69,10 @@ export default function KpiCards({ slug }: { slug: string }) {
  * holds up the rest of the row.
  */
 function KpiTile({ slug, tile }: { slug: string; tile: Tile }) {
-    const { value, loading, error, refetch } = useInventoryStat(
-        slug,
-        tile.endpoint,
-    );
+    const { data, loading, error, refetch } = useInventoryStat<{
+        value: number;
+    }>(slug, `kpi/${tile.endpoint}`);
+    const value = data?.value ?? null;
     const Icon = tile.icon;
     const active = !tile.warn || (value ?? 0) > 0;
 

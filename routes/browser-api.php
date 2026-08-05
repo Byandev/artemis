@@ -67,6 +67,9 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/unfulfilled', [InventoryDashboardStatsController::class, 'unfulfilled'])->name('unfulfilled');
             Route::get('/open-pos', [InventoryDashboardStatsController::class, 'openPos'])->name('open-pos');
         });
+
+        Route::get('/inventory/dashboard/movement', [InventoryDashboardStatsController::class, 'movement'])
+            ->name('inventory.dashboard.movement');
     });
 });
 
