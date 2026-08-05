@@ -1316,8 +1316,8 @@ export function ColumnVisibilityMenu({
     };
     // Highlight against the draft (live, reflects in-dialog edits)…
     const activeDraftPresetId =
-        presets.find((p) => presetMatches(p, draftVisibility, draftOrder))?.id ??
-        null;
+        presets.find((p) => presetMatches(p, draftVisibility, draftOrder))
+            ?.id ?? null;
     // …and against the committed state (for the trigger button label).
     const activeAppliedPreset =
         presets.find((p) => presetMatches(p, value, columnOrder)) ?? null;
@@ -1663,64 +1663,68 @@ export function ColumnVisibilityMenu({
                                             const isActive =
                                                 p.id === activeDraftPresetId;
                                             return (
-                                            <div
-                                                key={p.id}
-                                                className={clsx(
-                                                    'flex items-center gap-0.5 rounded-md border py-0.5 pr-1 pl-2',
-                                                    isActive
-                                                        ? 'border-emerald-500/40 bg-emerald-500/10 dark:border-emerald-500/40 dark:bg-emerald-500/10'
-                                                        : 'border-black/6 bg-stone-50 dark:border-white/6 dark:bg-zinc-800',
-                                                )}
-                                            >
-                                                {isActive && (
-                                                    <Check className="h-2.5 w-2.5 shrink-0 text-emerald-500" />
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        onLoadPreset(p);
-                                                        setDraftVisibility(
-                                                            p.visibility,
-                                                        );
-                                                        const valid =
-                                                            p.columnOrder.filter(
-                                                                (id) =>
-                                                                    !!optById[
-                                                                        id
-                                                                    ],
-                                                            );
-                                                        const missing = options
-                                                            .filter(
-                                                                (o) =>
-                                                                    !valid.includes(
-                                                                        o.id,
-                                                                    ),
-                                                            )
-                                                            .map((o) => o.id);
-                                                        setDraftOrder([
-                                                            ...valid,
-                                                            ...missing,
-                                                        ]);
-                                                    }}
+                                                <div
+                                                    key={p.id}
                                                     className={clsx(
-                                                        'text-[11px]',
+                                                        'flex items-center gap-0.5 rounded-md border py-0.5 pr-1 pl-2',
                                                         isActive
-                                                            ? 'font-medium text-emerald-600 dark:text-emerald-400'
-                                                            : 'text-gray-700 hover:text-emerald-600 dark:text-gray-300 dark:hover:text-emerald-400',
+                                                            ? 'border-emerald-500/40 bg-emerald-500/10 dark:border-emerald-500/40 dark:bg-emerald-500/10'
+                                                            : 'border-black/6 bg-stone-50 dark:border-white/6 dark:bg-zinc-800',
                                                     )}
                                                 >
-                                                    {p.name}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        onDeletePreset(p.id)
-                                                    }
-                                                    className="ml-0.5 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
-                                                >
-                                                    <X className="h-2.5 w-2.5" />
-                                                </button>
-                                            </div>
+                                                    {isActive && (
+                                                        <Check className="h-2.5 w-2.5 shrink-0 text-emerald-500" />
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            onLoadPreset(p);
+                                                            setDraftVisibility(
+                                                                p.visibility,
+                                                            );
+                                                            const valid =
+                                                                p.columnOrder.filter(
+                                                                    (id) =>
+                                                                        !!optById[
+                                                                            id
+                                                                        ],
+                                                                );
+                                                            const missing =
+                                                                options
+                                                                    .filter(
+                                                                        (o) =>
+                                                                            !valid.includes(
+                                                                                o.id,
+                                                                            ),
+                                                                    )
+                                                                    .map(
+                                                                        (o) =>
+                                                                            o.id,
+                                                                    );
+                                                            setDraftOrder([
+                                                                ...valid,
+                                                                ...missing,
+                                                            ]);
+                                                        }}
+                                                        className={clsx(
+                                                            'text-[11px]',
+                                                            isActive
+                                                                ? 'font-medium text-emerald-600 dark:text-emerald-400'
+                                                                : 'text-gray-700 hover:text-emerald-600 dark:text-gray-300 dark:hover:text-emerald-400',
+                                                        )}
+                                                    >
+                                                        {p.name}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            onDeletePreset(p.id)
+                                                        }
+                                                        className="ml-0.5 rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                                                    >
+                                                        <X className="h-2.5 w-2.5" />
+                                                    </button>
+                                                </div>
                                             );
                                         })}
                                     </div>

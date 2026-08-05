@@ -5,6 +5,7 @@ import { ItemFormDialog } from '@/components/inventory/item-form-dialog';
 import { WaitingForDeliveryDialog } from '@/components/inventory/waiting-for-delivery-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -19,6 +20,7 @@ import {
 } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
+import { PRODUCT_STATUSES } from '@/constants/product-statuses';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
@@ -33,6 +35,7 @@ import {
     ChevronsUpDown,
     ClipboardCheck,
     Download,
+    History,
     Layers,
     MoreHorizontal,
     Package,
@@ -68,6 +71,7 @@ interface Item {
     unfulfilled: number | null;
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
+    po_qty: number | null;
     remaining_after_fulfillment: number | null;
     stocks_needed_for_lead_time: number | null;
     days_it_can_last: number | null;
@@ -88,6 +92,10 @@ interface Props {
     items: PaginatedData<Item>;
     products: Product[];
     parents: ParentOption[];
+    /** The day being shown, or null when the list is live. Resolved server-side. */
+    snapshotDate?: string | null;
+    /** Days that actually have a snapshot, newest first. */
+    snapshotDates?: string[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -97,6 +105,8 @@ interface Props {
             search?: string;
             is_active?: string | number | boolean;
             unassigned?: string | number | boolean;
+            product_status?: string;
+            date?: string;
         };
     };
 }
@@ -249,6 +259,8 @@ export default function ItemIndex({
     items,
     products,
     parents,
+    snapshotDate = null,
+    snapshotDates = [],
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -271,8 +283,18 @@ export default function ItemIndex({
     const [unassignedOnly, setUnassignedOnly] = useState(
         !!query?.filter?.unassigned && query?.filter?.unassigned !== '0',
     );
+    // Lifecycle stage of the linked product; '' means every stage.
+    const [productStatus, setProductStatus] = useState(
+        query?.filter?.product_status
+            ? String(query.filter.product_status)
+            : '',
+    );
     // Summarize rolls SKU variants up under their parent item and sums the values.
     const [summarize, setSummarize] = useState(!!query?.summarize);
+    // A date pins the list to that day's saved snapshot; '' is live data.
+    const [dateValue, setDateValue] = useState(
+        query?.filter?.date ? String(query.filter.date) : '',
+    );
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkProcessing, setBulkProcessing] = useState(false);
     const [productPickerOpen, setProductPickerOpen] = useState(false);
@@ -281,9 +303,17 @@ export default function ItemIndex({
     const [parentSearch, setParentSearch] = useState('');
     const [newParentSku, setNewParentSku] = useState('');
 
-    const canCreateItems = usePermission(PERMISSIONS.CreateInventoryItems);
-    const canEditItems = usePermission(PERMISSIONS.EditInventoryItems);
-    const canDeleteItems = usePermission(PERMISSIONS.DeleteInventoryItems);
+    // A pinned date renders historical rows. Every mutating action still targets
+    // today's items, so editing from a snapshot would silently change a different
+    // thing than the one on screen — hide those affordances entirely while pinned.
+    const viewingSnapshot = !!snapshotDate;
+
+    const canCreateItems =
+        usePermission(PERMISSIONS.CreateInventoryItems) && !viewingSnapshot;
+    const canEditItems =
+        usePermission(PERMISSIONS.EditInventoryItems) && !viewingSnapshot;
+    const canDeleteItems =
+        usePermission(PERMISSIONS.DeleteInventoryItems) && !viewingSnapshot;
     const canUseItemActions = canEditItems || canDeleteItems;
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/items`;
@@ -293,26 +323,47 @@ export default function ItemIndex({
         [rowSelection],
     );
 
+    /**
+     * The list's full query string. Every navigation — search, each toggle,
+     * sorting, pagination — has to resend all of the filters, because anything
+     * left out silently resets. Building them in one place keeps a new filter
+     * from surviving a search but vanishing on a sort. A toggle handler passes
+     * its new value as an override, since its own state has not landed yet.
+     */
+    const buildParams = (
+        overrides: Record<string, string | number | undefined> = {},
+    ): Record<string, string | number | undefined> => ({
+        sort: query?.sort ?? undefined,
+        'filter[search]': searchValue || undefined,
+        'filter[is_active]': activeOnly ? 1 : 'all',
+        'filter[unassigned]': unassignedOnly ? 1 : undefined,
+        'filter[product_status]': productStatus || undefined,
+        'filter[date]': dateValue || undefined,
+        // Always explicit: the server rolls up by default, so an omitted param
+        // reads as "on" and the toggle would spring back the next time the URL
+        // is read (a refresh, or any navigation that rebuilds these params).
+        summarize: summarize ? 1 : 0,
+        page: 1,
+        per_page: query?.perPage ?? items.per_page,
+        ...overrides,
+    });
+
+    const visitOptions = {
+        preserveState: true,
+        replace: true,
+        preserveScroll: true,
+        // The snapshot props have to come back with the rows: they decide whether the
+        // banner shows and whether editing is allowed for what is now on screen.
+        only: ['items', 'snapshotDate', 'snapshotDates'],
+    };
+
     // Logic for searching (Resets to page 1)
     const performQuery = useCallback(
         debounce((search: string) => {
             router.get(
                 baseUrl,
-                {
-                    sort: query?.sort,
-                    'filter[search]': search || undefined,
-                    'filter[is_active]': activeOnly ? 1 : 'all',
-                    'filter[unassigned]': unassignedOnly ? 1 : undefined,
-                    summarize: summarize ? 1 : undefined,
-                    page: 1,
-                    per_page: query?.perPage ?? items.per_page,
-                },
-                {
-                    preserveState: true,
-                    replace: true,
-                    preserveScroll: true,
-                    only: ['items'],
-                },
+                buildParams({ 'filter[search]': search || undefined }),
+                visitOptions,
             );
         }, 400),
         [
@@ -322,7 +373,9 @@ export default function ItemIndex({
             items.per_page,
             activeOnly,
             unassignedOnly,
+            productStatus,
             summarize,
+            dateValue,
         ],
     );
 
@@ -330,43 +383,47 @@ export default function ItemIndex({
         setActiveOnly(checked);
         router.get(
             baseUrl,
-            {
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                'filter[is_active]': checked ? 1 : 'all',
-                'filter[unassigned]': unassignedOnly ? 1 : undefined,
-                summarize: summarize ? 1 : undefined,
-                page: 1,
-                per_page: query?.perPage ?? items.per_page,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['items'],
-            },
+            buildParams({ 'filter[is_active]': checked ? 1 : 'all' }),
+            visitOptions,
         );
     };
 
     const handleUnassignedChange = (checked: boolean) => {
         setUnassignedOnly(checked);
+        // Unassigned items have no product, so the two filters can never both
+        // match. Drop the status rather than leaving an empty list behind.
+        if (checked) {
+            setProductStatus('');
+        }
         router.get(
             baseUrl,
-            {
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                'filter[is_active]': activeOnly ? 1 : 'all',
+            buildParams({
                 'filter[unassigned]': checked ? 1 : undefined,
-                summarize: summarize ? 1 : undefined,
-                page: 1,
-                per_page: query?.perPage ?? items.per_page,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['items'],
-            },
+                ...(checked ? { 'filter[product_status]': undefined } : {}),
+            }),
+            visitOptions,
+        );
+    };
+
+    const handleProductStatusChange = (value: string) => {
+        setProductStatus(value);
+        router.get(
+            baseUrl,
+            buildParams({ 'filter[product_status]': value || undefined }),
+            visitOptions,
+        );
+    };
+
+    // Pin the list to a saved day, or pass '' to go back to live data. The row
+    // selection is dropped because a snapshot's rows are historical — bulk edits
+    // would be applied to today's items, not the ones on screen.
+    const handleDateChange = (value: string) => {
+        setDateValue(value);
+        setRowSelection({});
+        router.get(
+            baseUrl,
+            buildParams({ 'filter[date]': value || undefined }),
+            visitOptions,
         );
     };
 
@@ -376,21 +433,8 @@ export default function ItemIndex({
         setRowSelection({});
         router.get(
             baseUrl,
-            {
-                sort: query?.sort,
-                'filter[search]': searchValue || undefined,
-                'filter[is_active]': activeOnly ? 1 : 'all',
-                'filter[unassigned]': unassignedOnly ? 1 : undefined,
-                summarize: checked ? 1 : undefined,
-                page: 1,
-                per_page: query?.perPage ?? items.per_page,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                preserveScroll: true,
-                only: ['items'],
-            },
+            buildParams({ summarize: checked ? 1 : 0 }),
+            visitOptions,
         );
     };
 
@@ -612,6 +656,26 @@ export default function ItemIndex({
             ),
         },
         {
+            accessorKey: 'po_qty',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="PO QTY"
+                    className="justify-center"
+                />
+            ),
+            // Days-of-coverage buffer: days_of_coverage × 3-day average.
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.po_qty}
+                        color="text-amber-600 dark:text-amber-400"
+                    />
+                </div>
+            ),
+        },
+        {
             accessorKey: 'unfulfilled_count',
             enableSorting: true,
             header: ({ column }) => (
@@ -791,13 +855,24 @@ export default function ItemIndex({
             ),
             cell: ({ row }) => {
                 const v = row.original.po_needed;
-                const color =
-                    v != null && v > 0
-                        ? 'text-amber-500 dark:text-amber-400'
-                        : 'text-gray-400 dark:text-gray-500';
+                // Items that actually need a PO get the whole cell flagged red —
+                // the negative margins cancel TableCell's px-4 py-3 so the tint
+                // fills the cell edge to edge.
+                const needsPo = v != null && v > 0;
                 return (
-                    <div className="text-center">
-                        <MetricCell value={v} color={color} />
+                    <div
+                        className={`-mx-4 -my-3 px-4 py-3 text-center ${
+                            needsPo ? 'bg-red-50 dark:bg-red-500/10' : ''
+                        }`}
+                    >
+                        <MetricCell
+                            value={v}
+                            color={
+                                needsPo
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : 'text-gray-400 dark:text-gray-500'
+                            }
+                        />
                     </div>
                 );
             },
@@ -878,6 +953,24 @@ export default function ItemIndex({
                     description="Manage your inventory items and stock levels."
                 >
                     <div className="flex items-center gap-2">
+                        {/* Pin the list to a saved day. Only days with a stored
+                            snapshot are selectable — anything else has no data to
+                            show. Sits next to Export because the export follows
+                            whichever day is pinned. */}
+                        <DatePicker
+                            id="inventory-items-snapshot-date"
+                            compact
+                            placeholder="Live (pick a date)"
+                            defaultDate={dateValue || undefined}
+                            enable={snapshotDates}
+                            onChange={(dates) => {
+                                handleDateChange(
+                                    dates.length
+                                        ? format(dates[0], 'yyyy-MM-dd')
+                                        : '',
+                                );
+                            }}
+                        />
                         <a
                             href={`${baseUrl}/export?${new URLSearchParams(
                                 Object.entries({
@@ -888,10 +981,18 @@ export default function ItemIndex({
                                     'filter[unassigned]': unassignedOnly
                                         ? '1'
                                         : '',
+                                    'filter[product_status]':
+                                        productStatus || '',
                                     sort: query?.sort ?? '',
                                     // Export what's on screen: grouped rows when
-                                    // the summarize toggle is on.
-                                    summarize: summarize ? '1' : '',
+                                    // the summarize toggle is on, and the pinned
+                                    // day's snapshot rather than today when a date
+                                    // is selected.
+                                    'filter[date]': dateValue || '',
+                                    // the summarize toggle is on. Explicit '0'
+                                    // when off — '' is stripped below and the
+                                    // export would fall back to grouped.
+                                    summarize: summarize ? '1' : '0',
                                 }).filter(([, v]) => v !== ''),
                             ).toString()}`}
                             className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800"
@@ -944,6 +1045,27 @@ export default function ItemIndex({
                         />
                     </div>
 
+                    <select
+                        value={productStatus}
+                        onChange={(e) =>
+                            handleProductStatusChange(e.target.value)
+                        }
+                        disabled={unassignedOnly}
+                        title={
+                            unassignedOnly
+                                ? 'Unavailable while showing items with no product assigned'
+                                : undefined
+                        }
+                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-3 font-mono! text-[12px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
+                    >
+                        <option value="">All product statuses</option>
+                        {PRODUCT_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                                {s}
+                            </option>
+                        ))}
+                    </select>
+
                     <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
                         <Switch
                             checked={activeOnly}
@@ -974,6 +1096,22 @@ export default function ItemIndex({
                         </span>
                     </label>
                 </div>
+
+                {viewingSnapshot && (
+                    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-amber-500/25 bg-amber-50/70 px-4 py-2.5 dark:border-amber-400/25 dark:bg-amber-500/5">
+                        <History className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        <span className="font-mono text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                            Showing the saved snapshot for{' '}
+                            {winningDate(snapshotDate)} — read-only.
+                        </span>
+                        <button
+                            onClick={() => handleDateChange('')}
+                            className="ml-auto flex h-7 items-center rounded-lg border border-black/8 bg-white px-3 font-mono! text-[11px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                        >
+                            Back to live data
+                        </button>
+                    </div>
+                )}
 
                 {canEditItems && selectedIds.length > 0 && (
                     <div className="mb-3 flex flex-wrap items-center gap-3 rounded-[12px] border border-emerald-500/20 bg-emerald-50/60 px-4 py-2.5 dark:border-emerald-400/20 dark:bg-emerald-500/5">
@@ -1192,20 +1330,14 @@ export default function ItemIndex({
                         onFetch={(params) => {
                             router.get(
                                 baseUrl,
-                                {
-                                    sort: params?.sort,
-                                    'filter[search]': searchValue || undefined,
-                                    'filter[is_active]': activeOnly ? 1 : 'all',
-                                    'filter[unassigned]': unassignedOnly
-                                        ? 1
-                                        : undefined,
-                                    summarize: summarize ? 1 : undefined,
+                                buildParams({
+                                    sort: params?.sort ?? undefined,
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??
                                         query?.perPage ??
                                         items.per_page,
-                                },
+                                }),
                                 {
                                     preserveState: true,
                                     replace: true,

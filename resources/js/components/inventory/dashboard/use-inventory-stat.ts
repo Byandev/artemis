@@ -1,9 +1,9 @@
+import { usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 
-export interface DashboardRange {
-    start: string;
-    end: string;
+interface TeamScope {
+    activeTeamId: number | null;
 }
 
 export interface StatState<T> {
@@ -15,13 +15,13 @@ export interface StatState<T> {
 
 /**
  * Self-contained fetcher for a single dashboard widget. Hits its own endpoint,
- * cancels in-flight requests on range change/unmount, and exposes an explicit
- * error flag + refetch so each panel can render its own retry button.
+ * cancels an in-flight request on unmount, and exposes an explicit error flag
+ * plus refetch so each widget can render its own retry button.
  */
 export function useInventoryStat<T>(
     workspaceSlug: string,
     endpoint: string,
-    range: DashboardRange,
+    params?: Record<string, string | number>,
 ): StatState<T> {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
@@ -29,6 +29,17 @@ export function useInventoryStat<T>(
     // Bumping the nonce re-runs the effect — that's the manual "refresh".
     const [nonce, setNonce] = useState(0);
     const refetch = useCallback(() => setNonce((n) => n + 1), []);
+
+    // The team switcher navigates with ?team_id=…, which the server validates
+    // and persists to the session — so these XHRs resolve the active team on
+    // their own. This is here purely so switching teams re-runs the fetch
+    // instead of leaving the widget on the previous team's numbers.
+    const { teamScope } = usePage<{ teamScope: TeamScope | null }>().props;
+    const activeTeamId = teamScope?.activeTeamId ?? null;
+
+    // Callers pass a fresh object literal every render, so the effect keys off
+    // a serialised copy — depending on the object itself would refetch forever.
+    const paramKey = JSON.stringify(params ?? {});
 
     useEffect(() => {
         const controller = new AbortController();
@@ -38,7 +49,7 @@ export function useInventoryStat<T>(
         axios
             .get<T>(
                 `/api/workspaces/${workspaceSlug}/inventory/dashboard/${endpoint}`,
-                { params: range, signal: controller.signal },
+                { params: JSON.parse(paramKey), signal: controller.signal },
             )
             .then((res) => setData(res.data))
             .catch((err) => {
@@ -51,9 +62,7 @@ export function useInventoryStat<T>(
             });
 
         return () => controller.abort();
-        // Depend on the range's primitives, not the object identity.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [workspaceSlug, endpoint, range.start, range.end, nonce]);
+    }, [workspaceSlug, endpoint, paramKey, nonce, activeTeamId]);
 
     return { data, loading, error, refetch };
 }

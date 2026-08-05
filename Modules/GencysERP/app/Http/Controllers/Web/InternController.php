@@ -112,6 +112,30 @@ class InternController extends Controller
             ->unique();
     }
 
+    /** Update an intern's alternate names (aliases used to resolve ERP cells). */
+    public function updateOtherNames(Request $request, Workspace $workspace, Intern $intern): RedirectResponse
+    {
+        $this->authorize(Permission::ViewGencysInterns->value, $workspace);
+
+        abort_unless($intern->workspace_id === $workspace->id, 404);
+
+        $data = $request->validate([
+            'other_names' => ['nullable', 'array'],
+            'other_names.*' => ['string', 'max:255'],
+        ]);
+
+        $aliases = collect($data['other_names'] ?? [])
+            ->map(fn ($name) => trim($name))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $intern->update(['other_names' => $aliases ?: null]);
+
+        return back();
+    }
+
     /** Toggle an intern's active status. */
     public function toggleActive(Request $request, Workspace $workspace, Intern $intern): RedirectResponse
     {

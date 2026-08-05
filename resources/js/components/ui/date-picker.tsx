@@ -10,19 +10,30 @@ type PropsType = {
     id: string;
     mode?: "single" | "multiple" | "range" | "time";
     onChange?: Hook | Hook[];
-    defaultDate?: DateOption;
+    /**
+     * A single date, or `[from, to]` in `mode="range"`. The component already
+     * normalises an array at runtime, and flatpickr's own `defaultDate` accepts
+     * both — the type just used to say otherwise.
+     */
+    defaultDate?: DateOption | DateOption[];
     label?: string;
     placeholder?: string;
     fullWidth?: boolean;
     /** Show a clear (×) button when a date is selected. Defaults to true. */
     clearable?: boolean;
     compact?: boolean;
+    /**
+     * Restrict the calendar to these dates (flatpickr's `enable`). Use when only
+     * certain days hold data — everything else renders greyed out and unclickable.
+     * Omit to allow any date.
+     */
+    enable?: DateOption[];
 };
 
 const fmt     = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtYear = (d: Date) => d.getFullYear().toString();
 
-export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact, clearable = true }: PropsType) {
+export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact, clearable = true, enable }: PropsType) {
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +62,9 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
             appendTo: (dialogRoot ?? document.body) as HTMLElement,
             disableMobile: true,
             onChange: wrappedOnChange,
+            // Only spread when given: flatpickr treats an empty `enable` as
+            // "nothing is selectable", which would lock the calendar entirely.
+            ...(enable?.length ? { enable } : {}),
         });
 
         fpRef.current = Array.isArray(instance) ? instance[0] : instance;
@@ -60,7 +74,7 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
         }
 
         return () => { fpRef.current?.destroy(); fpRef.current = null; };
-    }, [mode, id, defaultDate]);
+    }, [mode, id, defaultDate, enable]);
 
     const isRange  = mode === 'range';
     const hasStart = selectedDates.length >= 1;

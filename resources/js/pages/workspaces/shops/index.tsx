@@ -281,6 +281,21 @@ const Shops = ({
                 );
             },
         },
+        {
+            accessorKey: 'created_at',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title={'Created'} />
+            ),
+            cell: ({ row }) => {
+                const date = row.original.created_at;
+                return (
+                    <span>
+                        {date ? new Date(date).toLocaleDateString() : '—'}
+                    </span>
+                );
+            },
+        },
         ...(canUseShopActions
             ? [
                   {
@@ -636,18 +651,19 @@ const Shops = ({
                                                 )
                                             }
                                         />
-                                        {shopToEdit && editForm.data.pos_token && (
-                                            <ValidateTokenButton
-                                                url={`/workspaces/${workspace.slug}/shops/validate-pos-token`}
-                                                payload={{
-                                                    shop_id: String(
-                                                        shopToEdit.id,
-                                                    ),
-                                                    token: editForm.data
-                                                        .pos_token,
-                                                }}
-                                            />
-                                        )}
+                                        {shopToEdit &&
+                                            editForm.data.pos_token && (
+                                                <ValidateTokenButton
+                                                    url={`/workspaces/${workspace.slug}/shops/validate-pos-token`}
+                                                    payload={{
+                                                        shop_id: String(
+                                                            shopToEdit.id,
+                                                        ),
+                                                        token: editForm.data
+                                                            .pos_token,
+                                                    }}
+                                                />
+                                            )}
                                         {editForm.errors.pos_token && (
                                             <p className={errorClass}>
                                                 {editForm.errors.pos_token}

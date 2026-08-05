@@ -3,6 +3,7 @@
 namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -35,9 +36,12 @@ class UnitCodeController extends Controller
 
         $unitCodes = $this->filtered($request, $workspace)
             // Items link by (workspace_id, unit_code); scope to this workspace.
-            ->with(['items' => fn ($q) => $q
-                ->where('workspace_id', $workspace->id)
-                ->select(['id', 'workspace_id', 'unit_code', 'item_code', 'quantity'])])
+            ->with([
+                'items' => fn ($q) => $q
+                    ->where('workspace_id', $workspace->id)
+                    ->select(['id', 'workspace_id', 'unit_code', 'item_code', 'quantity']),
+                'product:id,name',
+            ])
             ->orderBy($sortColumn, $sortDir)
             ->orderBy('id', 'desc')
             ->paginate($request->integer('per_page', 25))
@@ -46,12 +50,46 @@ class UnitCodeController extends Controller
         return Inertia::render('workspaces/gencys/unit-codes/index', [
             'workspace' => $workspace,
             'unitCodes' => $unitCodes,
+            'products' => Product::ofWorkspace($workspace)->orderBy('name')->get(['id', 'name']),
             'query' => [
                 'sort' => $sortParam,
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    /** Set (or clear) the product a single unit code maps to. */
+    public function updateProduct(Request $request, Workspace $workspace, InventoryUnitCode $unitCode): RedirectResponse
+    {
+        $this->authorize('Edit Unit Code', $workspace);
+        abort_unless($unitCode->workspace_id === $workspace->id, 404);
+
+        $data = $request->validate([
+            'product_id' => ['nullable', Rule::exists('products', 'id')->where('workspace_id', $workspace->id)],
+        ]);
+
+        $unitCode->update(['product_id' => $data['product_id'] ?? null]);
+
+        return back()->with('success', 'Product updated.');
+    }
+
+    /** Set (or clear) the product on several unit codes at once. */
+    public function bulkUpdateProduct(Request $request, Workspace $workspace): RedirectResponse
+    {
+        $this->authorize('Edit Unit Code', $workspace);
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'product_id' => ['nullable', Rule::exists('products', 'id')->where('workspace_id', $workspace->id)],
+        ]);
+
+        $count = InventoryUnitCode::where('workspace_id', $workspace->id)
+            ->whereIn('id', $data['ids'])
+            ->update(['product_id' => $data['product_id'] ?? null]);
+
+        return back()->with('success', "{$count} unit code(s) updated.");
     }
 
     /**
@@ -82,7 +120,7 @@ class UnitCodeController extends Controller
             'workspace_api_key' => $apiKey->reveal(),
             'erp_username' => $workspace->erp_username,
             'erp_password' => $workspace->erp_password,
-            'webhook_url' => "{$callbackBase}/api/v1/public/inventory/unit-codes/bulk-sync",
+            'webhook_url' => "$callbackBase/api/v1/public/inventory/unit-codes/bulk-sync",
         ]);
 
         if (! $response->successful()) {

@@ -201,7 +201,7 @@ test('the waiting-for-delivery modal rejects an item from another workspace', fu
         ->assertNotFound();
 });
 
-test('waiting-for-delivery ignores orders that are not in the awaiting-delivery status', function () {
+test('waiting-for-delivery ignores closed orders but counts open ones from the start', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $item = InventoryItem::create([
@@ -210,21 +210,30 @@ test('waiting-for-delivery ignores orders that are not in the awaiting-delivery 
         'is_active' => true,
     ]);
 
-    $po = PurchasedOrder::create([
-        'workspace_id' => $workspace->id,
-        'issue_date' => '2026-06-01',
-        'delivery_fee' => 0,
-        'total_amount' => 0,
-        'status' => 8, // Cancelled — outside AWAITING_DELIVERY_STATUSES (1-6)
-    ]);
+    $makeLine = function (int $status, int $count) use ($workspace, $item) {
+        $po = PurchasedOrder::create([
+            'workspace_id' => $workspace->id,
+            'issue_date' => '2026-06-01',
+            'delivery_fee' => 0,
+            'total_amount' => 0,
+            'status' => $status,
+        ]);
 
-    PurchasedOrderItem::create([
-        'inventory_purchased_order_id' => $po->id,
-        'inventory_item_id' => $item->id,
-        'count' => 50,
-        'amount' => 0,
-        'total_amount' => 0,
-    ]);
+        PurchasedOrderItem::create([
+            'inventory_purchased_order_id' => $po->id,
+            'inventory_item_id' => $item->id,
+            'count' => $count,
+            'amount' => 0,
+            'total_amount' => 0,
+        ]);
+    };
 
+    // Cancelled — closed, so its units never count toward incoming stock.
+    $makeLine(PurchasedOrder::CANCELLED, 50);
     expect(waitingFor($item->id, $owner, $workspace))->toBeNull();
+
+    // Approved — an early, still-open stage. Counts from the moment it is raised
+    // (see AWAITING_DELIVERY_STATUSES), not only once paid.
+    $makeLine(2, 50);
+    expect(waitingFor($item->id, $owner, $workspace))->toBe(50);
 });

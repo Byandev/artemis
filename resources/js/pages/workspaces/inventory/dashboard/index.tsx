@@ -1,70 +1,20 @@
 import PageHeader from '@/components/common/PageHeader';
-import {
-    AlertsSection,
-    FulfillmentSection,
-    KpiSection,
-    MovementSection,
-    PoStatusSection,
-    RecentAdjustmentsSection,
-    ShrinkageSection,
-    StockHealthSection,
-    TopDiscrepanciesSection,
-    UpcomingDeliveriesSection,
-} from '@/components/inventory/dashboard/sections';
-import { type DashboardRange } from '@/components/inventory/dashboard/use-inventory-stat';
-import DatePicker from '@/components/ui/date-picker';
+import HighUnfulfilledTable from '@/components/inventory/dashboard/high-unfulfilled-table';
+import KpiCards from '@/components/inventory/dashboard/kpi-cards';
+import LowStockTable from '@/components/inventory/dashboard/low-stock-table';
+import MovementChart from '@/components/inventory/dashboard/movement-chart';
+import OpenPosTable from '@/components/inventory/dashboard/open-pos-table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head } from '@inertiajs/react';
-import { format, subDays } from 'date-fns';
-import flatpickr from 'flatpickr';
-import { useEffect, useMemo, useState } from 'react';
-import DateOption = flatpickr.Options.DateOption;
 
 interface Props {
     workspace: Workspace;
 }
 
-const today = () => format(new Date(), 'yyyy-MM-dd');
-const daysAgo = (n: number) => format(subDays(new Date(), n), 'yyyy-MM-dd');
-const isDate = (v: unknown): v is string =>
-    typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
-
 export default function InventoryDashboard({ workspace }: Props) {
     const slug = workspace.slug;
-    const storageKey = `inventory-dashboard-range:${slug}`;
-
-    // Restore the last-picked range (persisted below) so a page refresh keeps
-    // the filter instead of snapping back to the default 30 days. Computed once
-    // so the picker's defaultDate stays referentially stable.
-    const initialRange = useMemo<DashboardRange>(() => {
-        try {
-            const saved = JSON.parse(
-                localStorage.getItem(storageKey) ?? 'null',
-            );
-            if (saved && isDate(saved.start) && isDate(saved.end)) {
-                return { start: saved.start, end: saved.end };
-            }
-        } catch {
-            // Ignore unavailable / malformed storage.
-        }
-        return { start: daysAgo(29), end: today() };
-    }, [storageKey]);
-
-    const [range, setRange] = useState<DashboardRange>(initialRange);
-    const defaultDate = useMemo(
-        () => [initialRange.start, initialRange.end] as never as DateOption,
-        [initialRange],
-    );
-
-    useEffect(() => {
-        try {
-            localStorage.setItem(storageKey, JSON.stringify(range));
-        } catch {
-            // Ignore storage errors (quota / private mode).
-        }
-    }, [storageKey, range]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -76,49 +26,31 @@ export default function InventoryDashboard({ workspace }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${workspace.name} - Inventory Dashboard`} />
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
+            {/* The layout adds no padding of its own, so the last panel would
+                otherwise sit against the bottom of the scroll area. */}
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 pb-6 md:p-6 md:pb-6">
                 <PageHeader
                     title="Inventory Dashboard"
                     description="Stock health, movement, purchase orders and audit at a glance."
-                    stackActionsOnMobile
-                >
-                    <DatePicker
-                        id="inventory-dashboard-range"
-                        mode="range"
-                        defaultDate={defaultDate}
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                setRange({
-                                    start: format(dates[0], 'yyyy-MM-dd'),
-                                    end: format(dates[1], 'yyyy-MM-dd'),
-                                });
-                            }
-                        }}
-                    />
-                </PageHeader>
+                />
 
-                <div className="flex flex-col gap-3">
-                    <KpiSection slug={slug} range={range} />
-
-                    <AlertsSection slug={slug} range={range} />
-
-                    <MovementSection slug={slug} range={range} />
-
-                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                        <PoStatusSection slug={slug} range={range} />
-                        <FulfillmentSection slug={slug} range={range} />
-                    </div>
-
-                    <ShrinkageSection slug={slug} range={range} />
-
-                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-                        <StockHealthSection slug={slug} range={range} />
-                        <UpcomingDeliveriesSection slug={slug} range={range} />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                        <RecentAdjustmentsSection slug={slug} range={range} />
-                        <TopDiscrepanciesSection slug={slug} range={range} />
+                {/* Every figure is a snapshot of the current ledger, so there is
+                    no date filter — each tile owns its own fetch. */}
+                {/* gap-6 rather than a margin on each card: same 24px between
+                    panels, without a dangling one below the last. */}
+                <div className="flex flex-col gap-6">
+                    <KpiCards slug={slug} />
+                    <MovementChart slug={slug} />
+                    <OpenPosTable slug={slug} />
+                    {/* Two half-width tables side by side from lg up — both are
+                        narrow SKU/count lists that read worse stretched across
+                        the page. They stack full width on narrow screens. */}
+                    {/* Tighter between the pair than the 6 separating panels
+                        vertically; stacked on narrow screens they fall back to
+                        the page's rhythm. */}
+                    <div className="grid gap-x-4 gap-y-6 lg:grid-cols-2">
+                        <HighUnfulfilledTable slug={slug} />
+                        <LowStockTable slug={slug} />
                     </div>
                 </div>
             </div>

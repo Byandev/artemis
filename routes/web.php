@@ -5,6 +5,15 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Modules\MetaAds\Http\Controllers\MetaOAuthController;
 
+Route::get('/limits', function () {
+    return response()->json([
+        'php_ini' => php_ini_loaded_file(),
+        'post_max_size' => ini_get('post_max_size'),
+        'upload_max_filesize' => ini_get('upload_max_filesize'),
+        'memory_limit' => ini_get('memory_limit'),
+    ]);
+});
+
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');

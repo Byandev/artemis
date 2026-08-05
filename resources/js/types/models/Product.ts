@@ -1,3 +1,4 @@
+import { ProductStatus } from '@/constants/product-statuses';
 import { Shop } from '@/types/models/Shop';
 
 export interface Product {
@@ -8,7 +9,7 @@ export interface Product {
     name: string;
     code: string;
     category: string;
-    status: 'Scaling' | 'Testing' | 'Failed' | 'Inactive';
+    status: ProductStatus;
     /** Y-m-d date the product was marked a winning item. */
     winning_date: string | null;
     description: string | null;

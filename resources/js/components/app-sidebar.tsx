@@ -372,6 +372,12 @@ export function AppSidebar() {
                       ],
                       items: [
                           {
+                              title: 'Dashboard',
+                              href: `/workspaces/${slug}/inventory/dashboard`,
+                              icon: LayoutDashboard,
+                              permission: PERMISSIONS.ViewInventoryItems,
+                          },
+                          {
                               title: 'Inventory Items',
                               href: `/workspaces/${slug}/inventory/items`,
                               icon: Layers,
@@ -493,13 +499,19 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceTransactions,
                           },
                           {
+                              title: 'Income Statements',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/income-statements`,
+                              icon: FileText,
+                              permission: PERMISSIONS.ViewFinanceDashboard,
+                          },
+                          {
                               title: 'Remittances',
                               href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
                               icon: Send,
                               permission: PERMISSIONS.ViewFinanceRemittances,
                           },
                           {
-                              title: 'Request Funds',
+                              title: 'Fund Requests',
                               href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
                               icon: Banknote,
                               permission: PERMISSIONS.ViewFinanceRequestFunds,

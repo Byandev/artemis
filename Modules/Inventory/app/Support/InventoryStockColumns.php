@@ -2,15 +2,17 @@
 
 namespace Modules\Inventory\Support;
 
+use Modules\Inventory\Models\PurchasedOrder;
+
 /**
  * Single source of truth for the correlated-subquery SQL that turns the raw
  * inventory ledger into the derived stock figures shown across the module
  * (current stock, waiting-for-delivery, days-of-cover, PO-needed, …).
  *
- * Both the Inventory Items list (InventoryItemController) and the dashboard
- * (InventoryDashboardQuery) build on these fragments, so the numbers are
- * guaranteed to agree. Every fragment is written against the `inventory_items`
- * table alias, so callers must select from `inventory_items` (or join it).
+ * The Inventory Items list (InventoryItemController) builds on these fragments,
+ * so every view of the numbers agrees. Every fragment is written against the
+ * `inventory_items` table alias, so callers must select from `inventory_items`
+ * (or join it).
  */
 final class InventoryStockColumns
 {
@@ -58,7 +60,11 @@ final class InventoryStockColumns
      */
     public static function waitingStocks(): string
     {
-        return '(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status not in (7,8)))';
+        // Only orders still owing stock count — terminal statuses (Delivered,
+        // Cancelled, Manually Closed) are excluded via CLOSED_STATUSES.
+        $closed = implode(',', PurchasedOrder::CLOSED_STATUSES);
+
+        return "(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status not in ($closed)))";
     }
 
     /** Stock left once incoming deliveries land and unfulfilled orders are met. */
@@ -70,13 +76,31 @@ final class InventoryStockColumns
         return "(COALESCE($current, 0) + COALESCE($waiting, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
     }
 
-    /** How much to purchase to cover lead-time demand, given what's incoming. */
+    /** The safety buffer alone: days_of_coverage extra days of expected demand. */
+    public static function coverageBuffer(): string
+    {
+        return '(COALESCE(inventory_items.days_of_coverage, 0) * COALESCE(inventory_items.three_days_average, 0))';
+    }
+
+    /** Expected demand across the lead-time window. */
+    public static function stocksNeededForLeadTime(): string
+    {
+        return '(COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0))';
+    }
+
+    /**
+     * How much to purchase to cover the safety buffer plus lead-time demand,
+     * given what's on hand once incoming deliveries land.
+     *
+     * Incoming stock is subtracted exactly once, via remainingAfterFulfillment
+     * (which already adds waitingStocks in). Subtracting waiting again on top
+     * would double-count it and understate the reorder.
+     */
     public static function poNeeded(): string
     {
-        $waiting = self::waitingStocks();
         $remaining = self::remainingAfterFulfillment();
 
-        return "GREATEST(0, (COALESCE(inventory_items.lead_time, 0) * COALESCE(inventory_items.three_days_average, 0)) - COALESCE($waiting, 0) - $remaining)";
+        return 'GREATEST(0, '.self::coverageBuffer().' + '.self::stocksNeededForLeadTime()." - $remaining)";
     }
 
     /** Days of cover: runway at the current 3-day average burn rate. */

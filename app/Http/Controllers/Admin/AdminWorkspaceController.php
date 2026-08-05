@@ -20,7 +20,26 @@ class AdminWorkspaceController extends Controller
         $baseQuery = Workspace::query()
             ->select('workspaces.*')
             ->with(['owner:id,name', 'subscription.plan', 'metricSetting'])
-            ->withCount(['pages', 'shops']);
+            ->withCount([
+                'pages',
+                'shops',
+
+                // A page can send SMS parcel updates only when both InfoTxt
+                // credentials are present.
+                'pages as sms_parcel_journey_pages_count' => function ($query) {
+                    $query->whereNotNull('infotxt_token')
+                        ->where('infotxt_token', '!=', '')
+                        ->whereNotNull('infotxt_user_id')
+                        ->where('infotxt_user_id', '!=', '');
+                },
+
+                // ...and chat parcel updates only when both Botcake flow and
+                // custom field are mapped.
+                'pages as chat_parcel_journey_pages_count' => function ($query) {
+                    $query->whereNotNull('parcel_journey_flow_id')
+                        ->whereNotNull('parcel_journey_custom_field_id');
+                },
+            ]);
 
         $workspaces = QueryBuilder::for($baseQuery)
             ->allowedFilters([
@@ -31,6 +50,8 @@ class AdminWorkspaceController extends Controller
                 'created_at',
                 'pages_count',
                 'shops_count',
+                'sms_parcel_journey_pages_count',
+                'chat_parcel_journey_pages_count',
 
                 AllowedSort::callback('owner', function ($query, bool $descending) {
                     $direction = $descending ? 'desc' : 'asc';
@@ -139,6 +160,7 @@ class AdminWorkspaceController extends Controller
             'video_editor_dashboard_module_enabled' => 'required|boolean',
             'csr_dashboard_module_enabled' => 'required|boolean',
             'sim_gateway_module_enabled' => 'required|boolean',
+            'ad_spend_goals_module_enabled' => 'required|boolean',
         ]);
 
         $workspace->update($validated);

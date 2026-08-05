@@ -48,6 +48,17 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30);
         });
 
+        // Credential checks are the one public-API route where a valid key still
+        // lets the caller guess, so throttle per email+IP as well as per key.
+        RateLimiter::for('public-api-login', function (Request $request) {
+            $apiKey = $request->attributes->get('api_key');
+
+            return [
+                Limit::perMinute(5)->by($request->ip().'|'.strtolower((string) $request->input('email'))),
+                Limit::perMinute(30)->by('key:'.($apiKey->id ?? $request->ip())),
+            ];
+        });
+
         RateLimiter::for('csr-public-performance', function (Request $request) {
             $workspace = $request->route('workspace');
             $workspaceKey = is_object($workspace) ? ($workspace->slug ?? $workspace->id ?? 'unknown') : ($workspace ?? 'unknown');

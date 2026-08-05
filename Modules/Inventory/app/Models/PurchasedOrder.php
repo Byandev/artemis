@@ -45,6 +45,11 @@ class PurchasedOrder extends Model
         'delivery_timeliness',
     ];
 
+    /**
+     * The procurement workflow stages. Mirrored on the frontend by
+     * resources/js/constants/purchased-order-statuses.ts — keep the two in sync
+     * (PurchasedOrderStatusParityTest enforces it).
+     */
     public const STATUSES = [
         1 => 'For Approval',
         2 => 'Approved',
@@ -54,9 +59,33 @@ class PurchasedOrder extends Model
         6 => 'Waiting For Delivery',
         7 => 'Delivered',
         8 => 'Cancelled',
+        9 => 'Manually Closed',
     ];
 
-    /** Statuses that leave an order still owing stock: past approval, not yet Delivered or Cancelled. */
+    public const DELIVERED = 7;
+
+    public const CANCELLED = 8;
+
+    /**
+     * Manually closed at our end even though the source hasn't marked it
+     * Delivered/Cancelled — a deliberate override to stop the order counting as
+     * owed stock. Terminal, like Delivered/Cancelled.
+     */
+    public const MANUALLY_CLOSED = 9;
+
+    /**
+     * Terminal statuses — the order no longer owes stock, so its outstanding
+     * quantities drop out of incoming-stock and reorder maths.
+     * Exact complement of AWAITING_DELIVERY_STATUSES.
+     */
+    public const CLOSED_STATUSES = [self::DELIVERED, self::CANCELLED, self::MANUALLY_CLOSED];
+
+    /**
+     * Statuses that leave an order still owing stock — everything not yet
+     * Delivered or Cancelled, including the pre-approval stages. Widened from
+     * [4, 5, 6] in d03c4bd2 so an order counts toward incoming stock from the
+     * moment it is raised, not only once paid.
+     */
     public const AWAITING_DELIVERY_STATUSES = [1, 2, 3, 4, 5, 6];
 
     public function getStatusLabelAttribute(): string
@@ -101,8 +130,13 @@ class PurchasedOrder extends Model
 
     /**
      * Schedule status against the order's expected delivery date: ontime | delayed | null.
-     * Null only when no expected date is set; otherwise driven solely by that date —
-     * anything not fully delivered once the expected date has passed is delayed.
+     * Null only when no expected date is set. An order that has been fully delivered
+     * is settled and never goes on to become delayed; anything still owing stock is
+     * delayed once the expected date has passed.
+     *
+     * Note this measures the order against its deadline as of today, not when each
+     * delivery actually landed — a fully-delivered order reads "ontime" even if the
+     * final delivery was late.
      */
     public function getDeliveryTimelinessAttribute(): ?string
     {
@@ -112,6 +146,18 @@ class PurchasedOrder extends Model
             return null;
         }
 
+        if ($this->fulfillment_status === 'delivered') {
+            return 'ontime';
+        }
+
         return now()->startOfDay()->gt($expected) ? 'delayed' : 'ontime';
+    }
+
+    /** Total quantity still owed across the order's line items. Requires `items.deliveries`. */
+    public function outstandingBalance(): int
+    {
+        $this->loadMissing('items.deliveries');
+
+        return (int) $this->items->sum(fn (PurchasedOrderItem $item) => $item->balance);
     }
 }

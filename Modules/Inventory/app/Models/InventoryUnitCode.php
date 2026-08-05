@@ -3,6 +3,7 @@
 namespace Modules\Inventory\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
+use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,7 @@ class InventoryUnitCode extends Model
         'workspace_id',
         'unit_code',
         'sku',
+        'product_id',
         'total_amount',
     ];
 
@@ -44,6 +46,12 @@ class InventoryUnitCode extends Model
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    /** The product this unit code maps to, if linked. */
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 
     /**

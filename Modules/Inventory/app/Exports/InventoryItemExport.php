@@ -33,6 +33,7 @@ class InventoryItemExport implements FromGenerator, WithHeadings
             'Waiting for Delivery',
             'Stocks Needed for Lead Time',
             '3-Day Avg',
+            'PO QTY',
             'Days It Can Last',
             'PO Needed',
         ];
@@ -46,9 +47,9 @@ class InventoryItemExport implements FromGenerator, WithHeadings
         foreach ($this->query->lazy(200) as $item) {
             yield [
                 $item->sku,
-                // The roll-up joins the product name in as a column; the flat query
-                // carries the relation instead.
-                $this->grouped ? $item->product_name : $item->product?->name,
+                // The roll-up joins the product name in as a column, and so does a
+                // snapshot row; only the live flat query carries the relation.
+                $this->grouped ? $item->product_name : ($item->product_name ?? $item->product?->name),
                 // child_count excludes the parent placeholder, so a standalone item
                 // (no children) is a group of one.
                 ...($this->grouped ? [$item->child_count ?: 1] : []),
@@ -61,6 +62,7 @@ class InventoryItemExport implements FromGenerator, WithHeadings
                 $item->waiting_for_delivery_stocks,
                 $item->stocks_needed_for_lead_time,
                 $item->three_days_average,
+                $item->po_qty,
                 $item->days_it_can_last,
                 $item->po_needed,
             ];

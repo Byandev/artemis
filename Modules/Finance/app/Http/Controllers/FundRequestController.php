@@ -4,7 +4,7 @@ namespace Modules\Finance\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\Page;
+use App\Models\Department;
 use App\Models\Product;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,6 +14,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\FundRequestRequest;
 use Modules\Finance\Models\FundRequest;
+use Modules\Finance\Models\TransactionType;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -45,26 +46,29 @@ class FundRequestController extends Controller
             FundRequest::where('workspace_id', $workspace->id)
                 ->with([
                     'requester:id,name',
-                    'chargeToUser:id,name',
+                    'chargeToUsers:users.id,users.name',
                     'approver:id,name',
-                    'items',
+                    'productShares',
+                    'transactionType:id,name',
+                    'department:id,name',
                 ])
         )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($sub) use ($v) {
-                    $sub->where('reference_no', 'like', "%{$v}%")
-                        ->orWhere('purpose', 'like', "%{$v}%");
+                    $sub->where('reference_no', 'like', "%{$v}%");
                 })),
                 AllowedFilter::exact('status'),
-                AllowedFilter::exact('template'),
-                AllowedFilter::exact('charge_to'),
+                // charge_to is a pivot now, so the filter matches any request
+                // the user bears a share of.
+                AllowedFilter::callback('charge_to', fn ($q, $v) => $q->whereHas(
+                    'chargeToUsers', fn ($sub) => $sub->where('users.id', $v)
+                )),
                 AllowedFilter::exact('requested_by'),
             ])
             ->allowedSorts([
                 'reference_no',
                 'request_date',
                 'amount_requested',
-                'date_needed',
                 'status',
                 'created_at',
                 AllowedSort::field('id', 'id'),
@@ -78,10 +82,11 @@ class FundRequestController extends Controller
             'requestFunds' => $requestFunds,
             'users' => $workspace->users()->get(['users.id', 'users.name']),
             'statuses' => FundRequest::STATUSES,
-            'templates' => FundRequest::TEMPLATES,
             'products' => $this->productOptions($request, $workspace),
-            'myPages' => $this->assignedPageOptions($request, $workspace),
-            'myGotymeNumber' => $request->user()->gotyme_number,
+            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
+                ->orderBy('name')->get(['id', 'name']),
+            'departments' => Department::ofWorkspace($workspace)
+                ->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'canApproveStatus' => $request->user()->can(Permission::ApproveFinanceRequestFunds->value, $workspace),
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
@@ -97,18 +102,22 @@ class FundRequestController extends Controller
 
         $validated = $request->validated();
 
-        DB::transaction(function () use ($validated, $workspace) {
+        DB::transaction(function () use ($validated, $request, $workspace) {
             // New requests always start pending; the reference number is generated
-            // here (never supplied by the client) and approval happens via updateStatus.
+            // here (never supplied by the client) and approval happens via
+            // updateStatus. The request date is the creation date and the
+            // requester is the signed-in user — neither is entered on the form.
             $fundRequest = FundRequest::create([
                 ...$this->attributesFor($validated, $workspace),
                 'workspace_id' => $workspace->id,
                 'reference_no' => $this->nextReferenceNo($workspace),
+                'request_date' => now()->toDateString(),
+                'requested_by' => $request->user()->id,
                 'status' => 'pending',
                 'approved_by' => null,
             ]);
 
-            $this->syncItems($fundRequest, $validated, $workspace);
+            $this->syncShares($fundRequest, $request, $workspace);
         });
 
         return redirect()->route('workspaces.finance.request-funds.index', $workspace->slug)
@@ -123,11 +132,11 @@ class FundRequestController extends Controller
 
         $validated = $request->validated();
 
-        DB::transaction(function () use ($validated, $workspace, $requestFund) {
+        DB::transaction(function () use ($validated, $request, $workspace, $requestFund) {
             // reference_no is intentionally omitted from validated data, so it stays put.
             $requestFund->update($this->attributesFor($validated, $workspace));
 
-            $this->syncItems($requestFund, $validated, $workspace);
+            $this->syncShares($requestFund, $request, $workspace);
         });
 
         return redirect()->route('workspaces.finance.request-funds.index', $workspace->slug)
@@ -173,73 +182,81 @@ class FundRequestController extends Controller
 
     /**
      * The next sequential reference number for a workspace, e.g. RF-00007.
+     *
+     * Carried on from the highest number the workspace has issued rather than
+     * from its row count: deleting an older request drops the count while its
+     * successors keep their numbers, so counting would hand out one that is
+     * still in use and trip the unique (workspace_id, reference_no) index.
+     *
+     * Called inside the creating transaction, and the read is locked so two
+     * requests saved at the same moment can't settle on the same number.
      */
     protected function nextReferenceNo(Workspace $workspace): string
     {
-        $count = FundRequest::where('workspace_id', $workspace->id)->count();
+        $prefix = 'RF-';
 
-        return 'RF-'.str_pad((string) ($count + 1), 5, '0', STR_PAD_LEFT);
+        // Longest first, so RF-100000 still outranks RF-99999 once five digits
+        // are outgrown and the padding stops making lengths comparable.
+        $last = FundRequest::where('workspace_id', $workspace->id)
+            ->where('reference_no', 'like', $prefix.'%')
+            ->orderByRaw('LENGTH(reference_no) DESC')
+            ->orderBy('reference_no', 'desc')
+            ->lockForUpdate()
+            ->value('reference_no');
+
+        $next = (int) substr((string) $last, strlen($prefix)) + 1;
+
+        return $prefix.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 
     /**
-     * The column values for a request, minus the line items (which live in their
-     * own table). An Ad Spent request derives its amount from those items rather
-     * than trusting the figure the client sent.
+     * The column values for a request. charge_to / products are pivots, not
+     * columns, so they are stripped here and synced after the row exists.
      */
     protected function attributesFor(array $validated, Workspace $workspace): array
     {
-        $attributes = collect($validated)->except('items')->all();
-
-        if (($validated['template'] ?? null) === FundRequest::TEMPLATE_AD_SPENT) {
-            $attributes['amount_requested'] = collect($validated['items'] ?? [])
-                ->sum(fn (array $item) => $this->lineTotal($item));
-        }
-
-        return $attributes;
+        return collect($validated)->except(['charge_to', 'products'])->all();
     }
 
     /**
-     * Replace a request's line items with the submitted set. Items are rewritten
-     * rather than diffed: nothing references them, and the order on the form is
-     * the order that matters.
+     * Replace a request's charge-to and product shares with the submitted sets.
+     * Both are rewritten rather than diffed — the product rows have no natural
+     * key to sync against, and the order on the form is the order that matters.
      */
-    protected function syncItems(FundRequest $fundRequest, array $validated, Workspace $workspace): void
+    protected function syncShares(FundRequest $fundRequest, FundRequestRequest $request, Workspace $workspace): void
     {
-        $fundRequest->items()->delete();
+        $fundRequest->chargeToUsers()->sync(
+            collect($request->chargeToShares())
+                ->mapWithKeys(fn ($share) => [$share['user_id'] => ['amount' => $share['amount']]])
+                ->all()
+        );
 
-        // Line items belong to the Ad Spent template only, so switching a request
-        // back to blank leaves it with none.
-        if (($validated['template'] ?? null) !== FundRequest::TEMPLATE_AD_SPENT) {
+        $shares = $request->productShares();
+
+        $fundRequest->productShares()->delete();
+
+        if ($shares === []) {
             return;
         }
 
-        $items = array_values($validated['items'] ?? []);
-
-        $productNames = Product::where('workspace_id', $workspace->id)
-            ->whereIn('id', collect($items)->pluck('product_id')->filter()->unique())
+        // Name snapshots, so a row still reads after its product is deleted and
+        // so a transaction filled in from this request has something to tag.
+        $names = Product::where('workspace_id', $workspace->id)
+            ->whereIn('id', array_column($shares, 'product_id'))
             ->pluck('name', 'id');
 
-        foreach ($items as $index => $item) {
-            $fundRequest->items()->create([
-                'product_id' => $item['product_id'],
-                'page_id' => $item['page_id'] ?? null,
-                'item_label' => $productNames[$item['product_id']] ?? '',
-                'creatives_running' => $item['creatives_running'],
-                'budget_per_day' => $item['budget_per_day'],
-                'days' => $item['days'],
-                'total' => $this->lineTotal($item),
+        $fundRequest->productShares()->createMany(
+            collect($shares)->map(fn ($share, $index) => [
+                'product_id' => $share['product_id'],
+                'product_label' => $names[$share['product_id']] ?? '',
+                'amount' => $share['amount'],
                 'sort_order' => $index,
-            ]);
-        }
-    }
-
-    protected function lineTotal(array $item): float
-    {
-        return round((float) $item['budget_per_day'] * (float) $item['days'], 2);
+            ])->all()
+        );
     }
 
     /**
-     * Products the user may request against, for the Ad Spent item picker.
+     * Products the user may request against, for the product-share picker.
      */
     protected function productOptions(Request $request, Workspace $workspace)
     {
@@ -247,30 +264,5 @@ class FundRequestController extends Controller
             ->visibleTo($request->user(), $workspace)
             ->orderBy('name')
             ->get(['id', 'name']);
-    }
-
-    /**
-     * The signed-in user's own pages, each carrying its most recent daily budget
-     * so the form can auto-fill "budget per day" once a page is picked. A page
-     * reaches its product through its shop (shops.product_id), which is what lets
-     * the picker narrow pages down to the chosen product.
-     */
-    protected function assignedPageOptions(Request $request, Workspace $workspace)
-    {
-        return Page::ofWorkspace($workspace)
-            ->where('owner_id', $request->user()->id)
-            // latestBudget is a latestOfMany relation: it self-joins, so naming
-            // columns here makes `page_id` ambiguous. Load the whole row.
-            ->with(['shop:id,product_id', 'latestBudget'])
-            ->orderBy('name')
-            ->get(['id', 'name', 'shop_id'])
-            ->map(fn (Page $page) => [
-                'id' => $page->id,
-                'name' => $page->name,
-                'product_id' => $page->shop?->product_id,
-                'budget_per_day' => $page->latestBudget?->budget,
-                'budget_date' => $page->latestBudget?->date?->toDateString(),
-            ])
-            ->values();
     }
 }

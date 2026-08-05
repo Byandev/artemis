@@ -9,13 +9,15 @@ Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00
 Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
-
-
+// Freeze every inventory item just before midnight, so each date's snapshot is that
+// day's closing state and the items list can be filtered back to it. Runs after the
+// last hourly sync-averages so the averages it captures are the day's final ones.
+Schedule::command('inventory:snapshot-items')->dailyAt('23:50')->withoutOverlapping();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
-//Gencys ERP
+// Gencys ERP
 Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
 
 Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('08:00')->withoutOverlapping();
@@ -39,9 +41,15 @@ Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('08:30')->wi
 Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('12:30')->withoutOverlapping();
 Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('16:30')->withoutOverlapping();
 
-
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
+
+// Pull RMO statuses in line with the courier's parcel status for workspaces
+// that opted in. Runs once at midnight, which lands on the default two-day
+// window (today + yesterday) just as the day rolls over — so the day that has
+// only just ended gets closed out, including parcels whose final status the
+// courier reported late in the evening.
+Schedule::command('rmo:apply-auto-tag')->dailyAt('00:00')->withoutOverlapping();
 
 // ── Inventory (Discord) ─────────────────────────────────────────────────
 // Checked hourly (top of each hour); each command posts only for workspaces

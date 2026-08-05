@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { PRODUCT_STATUSES, ProductStatus } from '@/constants/product-statuses';
 import AppLayout from '@/layouts/app-layout';
 import workspaces from '@/routes/workspaces';
 import { Shop } from '@/types/models/Shop';
@@ -19,15 +20,12 @@ const labelClass =
 const fieldClass = 'space-y-1.5';
 const errorClass = 'font-mono text-[11px] text-red-500';
 
-const statuses = ['Testing', 'Scaling', 'Failed', 'Inactive'] as const;
-type Status = (typeof statuses)[number];
-
 const Create = ({ workspace, shops }: PageProps) => {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         code: '',
         category: '',
-        status: 'Testing' as Status,
+        status: 'Testing' as ProductStatus,
         description: '',
         shop_ids: [] as number[],
     });
@@ -133,11 +131,11 @@ const Create = ({ workspace, shops }: PageProps) => {
                                     onChange={(e) =>
                                         setData(
                                             'status',
-                                            e.target.value as Status,
+                                            e.target.value as ProductStatus,
                                         )
                                     }
                                 >
-                                    {statuses.map((s) => (
+                                    {PRODUCT_STATUSES.map((s) => (
                                         <option key={s} value={s}>
                                             {s}
                                         </option>
