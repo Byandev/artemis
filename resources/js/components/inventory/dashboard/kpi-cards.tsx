@@ -56,7 +56,9 @@ const num = (v: number | null | undefined) =>
 
 export default function KpiCards({ slug }: { slug: string }) {
     return (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        // Tighter between columns than between rows, matching the paired tables
+        // below: side-by-side cards sit closer than stacked ones.
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
             {TILES.map((tile) => (
                 <KpiTile key={tile.endpoint} slug={slug} tile={tile} />
             ))}
@@ -77,7 +79,10 @@ function KpiTile({ slug, tile }: { slug: string; tile: Tile }) {
     const active = !tile.warn || (value ?? 0) > 0;
 
     return (
-        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
+        // Deeper bottom padding than the sides: the value and its caption sit
+        // low in the tile, and matching all four edges left them crowded
+        // against the border.
+        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] pb-6 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
             <div className="flex items-start justify-between gap-3">
                 <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
                     {tile.label}
@@ -87,7 +92,7 @@ function KpiTile({ slug, tile }: { slug: string; tile: Tile }) {
                 </div>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-4">
                 {loading ? (
                     <>
                         <Skeleton className="h-[26px] w-16" />
