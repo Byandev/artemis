@@ -83,6 +83,16 @@ class AdAccount extends Model
             ->withTimestamps();
     }
 
+    /**
+     * People Meta reports as having access to this account (Business Manager's
+     * People list). Synced by SyncAdAccountPeople — unlike metaUsers(), this is
+     * everyone with access, not just those who connected Artemis.
+     */
+    public function people(): HasMany
+    {
+        return $this->hasMany(AdAccountPerson::class, 'meta_ads_account_id');
+    }
+
     public function campaigns(): HasMany
     {
         return $this->hasMany(Campaign::class, 'meta_ads_account_id');

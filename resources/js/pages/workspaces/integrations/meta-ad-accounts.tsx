@@ -20,6 +20,7 @@ import clsx from 'clsx';
 import { omit } from 'lodash';
 import { Facebook, Search, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { AccountPeople, AdAccountPerson } from './components/account-people';
 import { InlineOwner, OwnerOption } from './components/inline-owner';
 
 interface AdAccount {
@@ -35,6 +36,7 @@ interface AdAccount {
     owner_id: number | null;
     owner?: OwnerOption | null;
     meta_users?: { id: string; name: string }[];
+    people?: AdAccountPerson[];
 }
 
 interface MetaUserOption {
@@ -356,6 +358,22 @@ export default function MetaAdAccounts({
                     </div>
                 );
             },
+        },
+        {
+            id: 'people',
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="People with access"
+                    enabled={false}
+                />
+            ),
+            cell: ({ row }) => (
+                <AccountPeople
+                    people={row.original.people ?? []}
+                    accountName={row.original.name}
+                />
+            ),
         },
         {
             id: 'owner',

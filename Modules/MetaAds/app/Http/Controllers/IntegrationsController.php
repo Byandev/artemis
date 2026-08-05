@@ -63,6 +63,11 @@ class IntegrationsController extends Controller
                         ->select('meta_ads_users.id', 'meta_ads_users.name');
                 },
                 'owner:id,name',
+                // Everyone Meta says can reach the account, admins first.
+                'people' => fn ($q) => $q
+                    ->orderByRaw("FIELD(role, 'Admin', 'Advertiser', 'Draft', 'Analyst')")
+                    ->orderBy('name')
+                    ->select('id', 'meta_ads_account_id', 'meta_user_id', 'name', 'role', 'user_type'),
             ])
             ->when(! $showAll, fn ($q) => $q->where('active_sync', true));
 
