@@ -42,6 +42,9 @@ class InventoryDashboardStatsController extends Controller
      */
     private const MOVEMENT_WINDOWS = [7, 14, 30];
 
+    /** How many groups the high-unfulfilled table lists. */
+    private const HIGH_UNFULFILLED_LIMIT = 20;
+
     /**
      * Active items, counted the way the Inventory Items list shows them: one
      * per group. Children roll into their parent (the list's `summarize` view,
@@ -81,6 +84,69 @@ class InventoryDashboardStatsController extends Controller
         $total = $this->activeItems($request, $workspace)->sum('unfulfilled_count');
 
         return response()->json(['value' => (int) round((float) $total)]);
+    }
+
+    /**
+     * The items owing the most stock, worst first — where the Unfulfilled tile's
+     * total is actually concentrated.
+     *
+     * Counted per GROUP, not per SKU: children roll into their parent on
+     * COALESCE(parent_id, id) and their counts are summed, so a grouped SKU
+     * appears once under the parent's name with the group's total rather than
+     * scattered across the table as several smaller rows. Same grouping the
+     * items list's summarize view and the Inventory Items tile use.
+     *
+     * Only groups actually owing something are returned — a zero row is not a
+     * problem to look at — and the list is capped, since the point is the worst
+     * offenders rather than a full inventory.
+     */
+    public function highUnfulfilled(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        // Per-item rows first (parents included, so their children roll into
+        // them), then aggregated by group below — mirrors
+        // InventoryItemController::buildSummaryQuery().
+        $inner = $this->activeItems($request, $workspace)
+            ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.unfulfilled_count, products.name as product_name');
+
+        $groupUnfulfilled = 'COALESCE(SUM(sub.unfulfilled_count), 0)';
+
+        $rows = DB::query()
+            ->fromSub($inner, 'sub')
+            // Identity comes from the parent when the group has one, else from
+            // the standalone item itself.
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
+            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
+            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            // Excludes the parent placeholder, so a standalone item is a group of one.
+            ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
+            ->selectRaw("$groupUnfulfilled as unfulfilled_count")
+            ->groupByRaw('COALESCE(sub.parent_id, sub.id)')
+            ->havingRaw("$groupUnfulfilled > 0")
+            ->orderByDesc('unfulfilled_count')
+            // Tie-break so equal counts keep a stable order between refreshes.
+            ->orderBy('sku')
+            ->limit(self::HIGH_UNFULFILLED_LIMIT)
+            ->get()
+            ->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'sku' => $row->sku,
+                'product_name' => $row->product_name,
+                'is_group' => (bool) $row->is_group,
+                'child_count' => (int) $row->child_count,
+                'unfulfilled_count' => (int) round((float) $row->unfulfilled_count),
+            ]);
+
+        return response()->json([
+            'items' => $rows,
+            // The listed rows only — the workspace-wide total is the KPI tile's
+            // job, and reusing it here would misdescribe this table.
+            'listed_unfulfilled' => $rows->sum('unfulfilled_count'),
+            'limit' => self::HIGH_UNFULFILLED_LIMIT,
+        ]);
     }
 
     /** Purchase orders still owing stock (not yet delivered or cancelled). */
