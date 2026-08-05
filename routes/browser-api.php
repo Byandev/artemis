@@ -70,6 +70,9 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
 
         Route::get('/inventory/dashboard/movement', [InventoryDashboardStatsController::class, 'movement'])
             ->name('inventory.dashboard.movement');
+
+        Route::get('/inventory/dashboard/open-purchase-orders', [InventoryDashboardStatsController::class, 'openPurchaseOrders'])
+            ->name('inventory.dashboard.open-purchase-orders');
     });
 });
 

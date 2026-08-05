@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\Inventory\Models\PurchasedOrder;
+use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Support\InventoryStockColumns;
 
 /**
@@ -146,6 +147,55 @@ class InventoryDashboardStatsController extends Controller
         }
 
         return response()->json(['days' => $days]);
+    }
+
+    /**
+     * Every line still owing stock on an open purchase order — what the
+     * movement chart's "in" arm is waiting on.
+     *
+     * One row per PO line rather than per item: the same SKU can sit on several
+     * open orders, and rolling them together would hide which order is late.
+     * Lines already delivered in full are dropped — an order stays open until
+     * all of its lines land, so a zero-waiting row is noise.
+     */
+    public function openPurchaseOrders(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorize('View Purchased Orders', $workspace);
+
+        $lines = PurchasedOrderItem::query()
+            ->whereHas('purchasedOrder', fn ($query) => $query
+                ->where('workspace_id', $workspace->id)
+                ->whereIn('status', PurchasedOrder::AWAITING_DELIVERY_STATUSES)
+                ->visibleTo($request->user(), $workspace))
+            ->with([
+                'purchasedOrder:id,control_no,cust_po_no,status',
+                'inventoryItem:id,sku,product_id',
+                'inventoryItem.product:id,name',
+            ])
+            ->withSum('deliveries as delivered_qty', 'qty')
+            ->get()
+            // balance is max(0, count - delivered), so this drops both fully and
+            // over-delivered lines.
+            ->filter(fn (PurchasedOrderItem $line) => $line->balance > 0)
+            ->sortByDesc(fn (PurchasedOrderItem $line) => $line->balance)
+            ->values()
+            ->map(fn (PurchasedOrderItem $line) => [
+                'id' => $line->id,
+                'purchased_order_id' => $line->purchasedOrder->id,
+                'control_no' => $line->purchasedOrder->control_no,
+                'cust_po_no' => $line->purchasedOrder->cust_po_no,
+                'status_label' => $line->purchasedOrder->status_label,
+                'sku' => $line->inventoryItem?->sku,
+                'product_name' => $line->inventoryItem?->product?->name,
+                'ordered_qty' => (int) $line->count,
+                'delivered_qty' => $line->delivered_qty,
+                'waiting_qty' => $line->balance,
+            ]);
+
+        return response()->json([
+            'lines' => $lines,
+            'total_waiting' => $lines->sum('waiting_qty'),
+        ]);
     }
 
     /**
