@@ -1,7 +1,9 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { PURCHASED_ORDER_STATUSES } from '@/constants/purchased-order-statuses';
+import { format, parseISO } from 'date-fns';
 import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import DeliveryProgressRing from './delivery-progress-ring';
 import PoLinesDialog, { type PoDialogTarget } from './po-lines-dialog';
 import RefreshButton from './refresh-button';
 import { useInventoryStat } from './use-inventory-stat';
@@ -11,6 +13,10 @@ interface OpenPoLine {
     purchased_order_id: number;
     control_no: string | null;
     cust_po_no: string | null;
+    /** Date-only string (Y-m-d), or null on an order with no issue date. */
+    issue_date: string | null;
+    /** Date-only string (Y-m-d), or null when no delivery date was promised. */
+    expected_delivery_date: string | null;
     status: number;
     status_label: string;
     sku: string | null;
@@ -32,6 +38,14 @@ const num = (v: number | null | undefined) =>
 /** Control no, then the customer's PO no, then the bare id as a last resort. */
 const poLabel = (line: OpenPoLine) =>
     line.control_no ?? line.cust_po_no ?? `#${line.purchased_order_id}`;
+
+/**
+ * Short, unambiguous date. parseISO rather than `new Date` so a date-only
+ * string lands on local midnight instead of being read as UTC and slipping a
+ * day either side of the meridian.
+ */
+const issuedOn = (iso: string | null) =>
+    iso ? format(parseISO(iso), 'd MMM yyyy') : '—';
 
 const headClass =
     'px-3 py-2 text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
@@ -87,15 +101,15 @@ export default function OpenPosTable({ slug }: { slug: string }) {
             </div>
 
             {loading ? (
-                <div className="px-[18px] pb-[18px]">
+                <div className="px-[18px] pb-6">
                     <TableSkeleton />
                 </div>
             ) : error ? (
-                <div className="px-[18px] pb-[18px]">
+                <div className="px-[18px] pb-6">
                     <EmptyState message="Couldn't load open purchase orders." />
                 </div>
             ) : lines.length === 0 ? (
-                <div className="px-[18px] pb-[18px]">
+                <div className="px-[18px] pb-6">
                     <EmptyState message="No open purchase orders — everything ordered has landed." />
                 </div>
             ) : (
@@ -108,6 +122,8 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                         <thead className="sticky top-0 z-10 bg-zinc-50 dark:bg-zinc-900">
                             <tr className="border-b border-black/6 dark:border-white/6">
                                 <th className={headClass}>PO</th>
+                                <th className={headClass}>Issued</th>
+                                <th className={headClass}>Expected</th>
                                 <th className={headClass}>Status</th>
                                 <th className={headClass}>Item</th>
                                 <th className={`${headClass} text-right!`}>
@@ -119,6 +135,7 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                                 <th className={`${headClass} text-right!`}>
                                     Waiting
                                 </th>
+                                <th className={headClass}>Progress</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -144,6 +161,16 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                                             {poLabel(line)}
                                             <ChevronRight className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
                                         </button>
+                                    </td>
+                                    <td
+                                        className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
+                                    >
+                                        {issuedOn(line.issue_date)}
+                                    </td>
+                                    <td
+                                        className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
+                                    >
+                                        {issuedOn(line.expected_delivery_date)}
                                     </td>
                                     <td className={cellClass}>
                                         <StatusBadge
@@ -179,6 +206,15 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                                         className={`${numClass} font-semibold text-gray-900 dark:text-gray-100`}
                                     >
                                         {num(line.waiting_qty)}
+                                    </td>
+                                    {/* Per line, not per order: the same order can
+                                        carry several lines at different stages, and
+                                        one ring across them would hide that. */}
+                                    <td className={cellClass}>
+                                        <DeliveryProgressRing
+                                            ordered={line.ordered_qty}
+                                            delivered={line.delivered_qty}
+                                        />
                                     </td>
                                 </tr>
                             ))}
@@ -221,7 +257,10 @@ function TableSkeleton() {
                 <div key={i} className="flex items-center gap-3">
                     <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
+                    <Skeleton className="h-8 flex-[2]" />
+                    <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[3]" />
+                    <Skeleton className="h-8 flex-1" />
                     <Skeleton className="h-8 flex-1" />
                     <Skeleton className="h-8 flex-1" />
                     <Skeleton className="h-8 flex-1" />
