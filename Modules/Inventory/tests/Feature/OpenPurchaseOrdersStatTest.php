@@ -80,7 +80,7 @@ test('each line carries what it has taken delivery of, for its progress ring', f
         ->and($data['lines'][0]['waiting_qty'])->toBe(5);
 });
 
-test('lines are ordered by issue date, oldest first, undated last', function () {
+test('lines are ordered by issue date, newest first, undated last', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $item = InventoryItem::create([
@@ -107,5 +107,5 @@ test('lines are ordered by issue date, oldest first, undated last', function () 
     $data = openPos($owner, $workspace);
 
     expect(array_column($data['lines'], 'control_no'))
-        ->toBe(['OLDEST', 'MIDDLE', 'NEWEST']);
+        ->toBe(['NEWEST', 'MIDDLE', 'OLDEST']);
 });
