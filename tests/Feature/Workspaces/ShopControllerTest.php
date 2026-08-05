@@ -385,6 +385,33 @@ test('store rejects a shop already added to the workspace', function () {
         ->assertSessionHasErrors('shop_id');
 });
 
+test('store rejects a shop already connected to another workspace', function () {
+    Bus::fake();
+    Http::fake([
+        'pos.pages.fm/*' => Http::response([
+            'shop' => ['name' => 'Dup', 'pages' => [['id' => 1, 'name' => 'P']]],
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    Shop::factory()->forWorkspace($workspaceB)->create(['id' => 123, 'name' => 'Owned by B']);
+
+    $this->actingAs($owner)
+        ->from("/workspaces/{$workspaceA->slug}/shops")
+        ->post("/workspaces/{$workspaceA->slug}/shops", [
+            'shop_id' => 123,
+            'pos_token' => 'valid',
+        ])
+        ->assertSessionHasErrors('shop_id');
+
+    // The shop stays with workspace B, untouched, and nothing is queued for it.
+    $shop = Shop::find(123);
+    expect($shop->workspace_id)->toBe($workspaceB->id)
+        ->and($shop->name)->toBe('Owned by B');
+    Bus::assertNothingDispatched();
+});
+
 test('non-member cannot reach shop store', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     $stranger = User::factory()->create();

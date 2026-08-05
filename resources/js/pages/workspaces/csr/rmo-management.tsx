@@ -421,44 +421,6 @@ export default function CsrRmoManagement({
         [],
     );
 
-    const handleFilterChange = useCallback(
-        (value: FilterValue) => {
-            const newPageIds = value.pageIds.map(String);
-            const newShopIds = value.shopIds.map(String);
-            const newUserIds = value.userIds.map(String);
-
-            setSelectedPageIds(newPageIds);
-            setSelectedShopIds(newShopIds);
-            setSelectedUserIds(newUserIds);
-
-            router.get(
-                rmoUrl,
-                {
-                    sort: query?.sort || undefined,
-                    'filter[search]': searchValue || undefined,
-                    ...(currentStatus
-                        ? { 'filter[status]': currentStatus }
-                        : {}),
-                    ...(currentParcelStatus
-                        ? { 'filter[parcel_status]': currentParcelStatus }
-                        : {}),
-                    ...(newPageIds.length
-                        ? { 'filter[page_id]': newPageIds.join(',') }
-                        : {}),
-                    ...(newShopIds.length
-                        ? { 'filter[shop_id]': newShopIds.join(',') }
-                        : {}),
-                    ...(newUserIds.length
-                        ? { 'filter[user_id]': newUserIds.join(',') }
-                        : {}),
-                    page: 1,
-                },
-                { preserveState: true, replace: true, preserveScroll: true },
-            );
-        },
-        [rmoUrl, query?.sort, searchValue, currentStatus, currentParcelStatus],
-    );
-
     const buildAllParams = useCallback(
         (
             sort?: string | null,
@@ -466,38 +428,53 @@ export default function CsrRmoManagement({
             status?: string,
             parcelStatus?: string,
             perPage?: number,
-        ) => ({
-            sort: sort ?? undefined,
-            'filter[search]': searchValue || undefined,
-            ...(status !== undefined
-                ? status
-                    ? { 'filter[status]': status }
-                    : {}
-                : currentStatus
-                  ? { 'filter[status]': currentStatus }
-                  : {}),
-            ...(parcelStatus !== undefined
-                ? parcelStatus
-                    ? { 'filter[parcel_status]': parcelStatus }
-                    : {}
-                : currentParcelStatus
-                  ? { 'filter[parcel_status]': currentParcelStatus }
-                  : {}),
-            ...(selectedPageIds.length
-                ? { 'filter[page_id]': selectedPageIds.join(',') }
-                : {}),
-            ...(selectedShopIds.length
-                ? { 'filter[shop_id]': selectedShopIds.join(',') }
-                : {}),
-            ...(selectedUserIds.length
-                ? { 'filter[user_id]': selectedUserIds.join(',') }
-                : {}),
-            page: page ?? 1,
-            per_page: perPage ?? orders.per_page,
-            delivery_date: deliveryDate,
-            ...(showMyAssigneeOnly ? { assignee_id: userId } : {}),
-            ...(showMyConfirmeeOnly ? { confirmee_id: userId } : {}),
-        }),
+            /**
+             * Freshly picked filter ids, for callers that change them in the
+             * same tick and so can't read them back off state yet.
+             */
+            ids?: {
+                pageIds?: string[];
+                shopIds?: string[];
+                userIds?: string[];
+            },
+        ) => {
+            const pageIds = ids?.pageIds ?? selectedPageIds;
+            const shopIds = ids?.shopIds ?? selectedShopIds;
+            const userIds = ids?.userIds ?? selectedUserIds;
+
+            return {
+                sort: sort ?? undefined,
+                'filter[search]': searchValue || undefined,
+                ...(status !== undefined
+                    ? status
+                        ? { 'filter[status]': status }
+                        : {}
+                    : currentStatus
+                      ? { 'filter[status]': currentStatus }
+                      : {}),
+                ...(parcelStatus !== undefined
+                    ? parcelStatus
+                        ? { 'filter[parcel_status]': parcelStatus }
+                        : {}
+                    : currentParcelStatus
+                      ? { 'filter[parcel_status]': currentParcelStatus }
+                      : {}),
+                ...(pageIds.length
+                    ? { 'filter[page_id]': pageIds.join(',') }
+                    : {}),
+                ...(shopIds.length
+                    ? { 'filter[shop_id]': shopIds.join(',') }
+                    : {}),
+                ...(userIds.length
+                    ? { 'filter[user_id]': userIds.join(',') }
+                    : {}),
+                page: page ?? 1,
+                per_page: perPage ?? orders.per_page,
+                delivery_date: deliveryDate,
+                ...(showMyAssigneeOnly ? { assignee_id: userId } : {}),
+                ...(showMyConfirmeeOnly ? { confirmee_id: userId } : {}),
+            };
+        },
         [
             searchValue,
             currentStatus,
@@ -511,6 +488,40 @@ export default function CsrRmoManagement({
             deliveryDate,
             userId,
         ],
+    );
+
+    const handleFilterChange = useCallback(
+        (value: FilterValue) => {
+            const newPageIds = value.pageIds.map(String);
+            const newShopIds = value.shopIds.map(String);
+            const newUserIds = value.userIds.map(String);
+
+            setSelectedPageIds(newPageIds);
+            setSelectedShopIds(newShopIds);
+            setSelectedUserIds(newUserIds);
+
+            // Goes through buildAllParams so the delivery date, page size and
+            // "mine only" toggles survive a filter change. Hand-rolling the
+            // params here used to drop delivery_date, which sent the server
+            // back to today and blanked the table on any other date.
+            router.get(
+                rmoUrl,
+                buildAllParams(
+                    query?.sort,
+                    1,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                        pageIds: newPageIds,
+                        shopIds: newShopIds,
+                        userIds: newUserIds,
+                    },
+                ),
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [rmoUrl, buildAllParams, query?.sort],
     );
 
     const handleStatusChange = useCallback(

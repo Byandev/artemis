@@ -12,10 +12,9 @@ class InventoryDashboardController extends Controller
     use AuthorizesRequests;
 
     /**
-     * Renders the dashboard shell only. Every widget fetches its own statistic
-     * from a dedicated browser-API endpoint (see InventoryDashboardStatsController),
-     * so the page paints instantly and each panel loads, skeletons and refreshes
-     * on its own.
+     * Renders the dashboard shell. Widgets are not wired up yet — each one is
+     * meant to fetch its own statistic from its own endpoint so the page paints
+     * instantly and every panel loads, skeletons and refreshes on its own.
      */
     public function index(Workspace $workspace)
     {

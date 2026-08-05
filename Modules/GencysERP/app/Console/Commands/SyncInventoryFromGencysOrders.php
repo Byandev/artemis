@@ -27,12 +27,18 @@ class SyncInventoryFromGencysOrders extends Command
     /** Order statuses that count as unfulfilled (committed but not yet shipped). */
     private const UNFULFILLED_STATUSES = ['New', 'PENDING PRINTED WAYBILL', 'ENCODED'];
 
-    protected $signature = 'gencys-erp:sync-inventory-from-orders';
+    protected $signature = 'gencys-erp:sync-inventory-from-orders {--force : Run outside production (by default this command only runs on production)}';
 
     protected $description = 'Compute three_days_average and unfulfilled_count on inventory items from Gencys orders, expanding unit codes into their component items';
 
     public function handle(): int
     {
+        if (! app()->environment('production') && ! $this->option('force')) {
+            $this->warn('This command only runs on production. Re-run with --force to override (current environment: '.app()->environment().').');
+
+            return self::SUCCESS;
+        }
+
         $workspaceIds = Workspace::where('is_gencys_partner', true)->pluck('id');
 
         if ($workspaceIds->isEmpty()) {

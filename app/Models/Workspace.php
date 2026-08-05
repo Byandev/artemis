@@ -49,6 +49,7 @@ class Workspace extends Model
         'video_editor_dashboard_module_enabled',
         'csr_dashboard_module_enabled',
         'sim_gateway_module_enabled',
+        'ad_spend_goals_module_enabled',
         'inventory_sync',
         'public_password',
         'erp_username',
@@ -85,6 +86,7 @@ class Workspace extends Model
         'video_editor_dashboard_module_enabled' => 'boolean',
         'csr_dashboard_module_enabled' => 'boolean',
         'sim_gateway_module_enabled' => 'boolean',
+        'ad_spend_goals_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
         // Reversible encryption so the automation pipeline can read it back.
@@ -109,8 +111,10 @@ class Workspace extends Model
             $this->checklist_module_enabled ? null : 'Checklist',
             $this->csr_module_enabled ? null : 'CSR',
             $this->botcake_module_enabled ? null : 'Botcake',
+            $this->creatives_module_enabled ? null : 'Creatives',
             $this->meta_ads_module_enabled ? null : 'Meta Ads',
             $this->gencys_module_enabled ? null : 'Gencys ERP',
+            $this->ad_spend_goals_module_enabled ? null : 'Ad Spend Goals',
         ]));
     }
 
@@ -129,6 +133,11 @@ class Workspace extends Model
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDashboard->value,
             $this->video_editor_dashboard_module_enabled ? null : PermissionEnum::ViewVideoEditorDashboard->value,
             $this->csr_dashboard_module_enabled ? null : PermissionEnum::ViewCsrDashboard->value,
+            // RMO lives in the RTS category and the leaderboard in CSR, so each
+            // toggle hides its own permissions rather than the whole category.
+            $this->rmo_module_enabled ? null : PermissionEnum::ViewRmoManagement->value,
+            $this->rmo_module_enabled ? null : PermissionEnum::ManageRmoSettings->value,
+            $this->leaderboard_module_enabled ? null : PermissionEnum::ViewLeaderboards->value,
         ]));
     }
 

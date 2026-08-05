@@ -1,20 +1,18 @@
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
-    AlertTriangle,
     Boxes,
-    CalendarClock,
     type LucideIcon,
-    PackageCheck,
     PackageX,
+    RotateCcw,
     ShoppingCart,
     Tag,
-    TrendingDown,
 } from 'lucide-react';
-import { type InventoryKpis } from './types';
-import { num } from './utils';
+import { useInventoryStat } from './use-inventory-stat';
 
 interface Tile {
-    key: keyof InventoryKpis;
+    /** Endpoint segment under .../inventory/dashboard/kpi/. */
+    endpoint: string;
     label: string;
     icon: LucideIcon;
     sub: string;
@@ -25,112 +23,118 @@ interface Tile {
 
 const TILES: Tile[] = [
     {
-        key: 'active_skus',
-        label: 'Active SKUs',
+        endpoint: 'inventory-items',
+        label: 'Inventory Items',
         icon: Tag,
         sub: 'tracked items',
     },
     {
-        key: 'total_stock_on_hand',
-        label: 'Stock on Hand',
+        endpoint: 'total-stocks',
+        label: 'Total Stocks',
         icon: Boxes,
-        sub: 'units in stock',
+        sub: 'units on hand',
     },
     {
-        key: 'low_stock_count',
-        label: 'Low / Out of Stock',
-        icon: TrendingDown,
-        sub: 'below lead-time cover',
-        accentDot: 'bg-red-500',
-        warn: true,
-    },
-    {
-        key: 'reorder_needed_count',
-        label: 'Reorder Needed',
-        icon: AlertTriangle,
-        sub: 'need a PO',
+        endpoint: 'unfulfilled',
+        label: 'Unfulfilled',
+        icon: PackageX,
+        sub: 'units still owed',
         accentDot: 'bg-amber-500',
         warn: true,
     },
     {
-        key: 'incoming_units',
-        label: 'Incoming Units',
-        icon: PackageCheck,
-        sub: 'awaiting delivery',
-        accentDot: 'bg-blue-500',
-    },
-    {
-        key: 'open_pos',
+        endpoint: 'open-pos',
         label: 'Open POs',
         icon: ShoppingCart,
         sub: 'not yet delivered',
     },
-    {
-        key: 'overdue_pos',
-        label: 'Overdue POs',
-        icon: CalendarClock,
-        sub: 'past expected date',
-        accentDot: 'bg-red-500',
-        warn: true,
-    },
-    {
-        key: 'shrinkage_units',
-        label: 'Shrinkage',
-        icon: PackageX,
-        sub: 'bad + lost (period)',
-        accentDot: 'bg-red-500',
-        warn: true,
-    },
 ];
 
-export default function KpiCards({ kpis }: { kpis: InventoryKpis }) {
+/** Compact, locale-aware number; em dash for null/undefined. */
+const num = (v: number | null | undefined) =>
+    v == null ? '—' : Number(v).toLocaleString('en-PH');
+
+export default function KpiCards({ slug }: { slug: string }) {
     return (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {TILES.map((tile) => {
-                const value = kpis[tile.key];
-                const active = !tile.warn || value > 0;
-                const Icon = tile.icon;
-                return (
-                    <div
-                        key={tile.key}
-                        className="rounded-[14px] border border-black/6 bg-white p-[18px] transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10"
-                    >
-                        <div className="flex items-start justify-between gap-3">
-                            <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
-                                {tile.label}
-                            </p>
-                            <div className="rounded-lg bg-stone-100 p-2 text-gray-700 dark:bg-zinc-800 dark:text-white/90">
-                                <Icon className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <div className="mt-3">
-                            <h4
-                                className={cn(
-                                    'font-mono text-[22px] font-semibold tracking-tight tabular-nums',
-                                    active && tile.warn
-                                        ? 'text-red-500 dark:text-red-400'
-                                        : 'text-gray-900 dark:text-gray-100',
-                                )}
-                            >
-                                {num(value)}
-                            </h4>
-                            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
-                                {tile.accentDot && (
-                                    <span
-                                        className={cn(
-                                            'h-1.5 w-1.5 shrink-0 rounded-full',
-                                            active
-                                                ? tile.accentDot
-                                                : 'bg-gray-300 dark:bg-gray-600',
-                                        )}
-                                    />
-                                )}
-                                {tile.sub}
-                            </p>
-                        </div>
-                    </div>
-                );
-            })}
+            {TILES.map((tile) => (
+                <KpiTile key={tile.endpoint} slug={slug} tile={tile} />
+            ))}
+        </div>
+    );
+}
+
+/**
+ * One tile, one request. Each fetches independently so a slow statistic never
+ * holds up the rest of the row.
+ */
+function KpiTile({ slug, tile }: { slug: string; tile: Tile }) {
+    const { data, loading, error, refetch } = useInventoryStat<{
+        value: number;
+    }>(slug, `kpi/${tile.endpoint}`);
+    const value = data?.value ?? null;
+    const Icon = tile.icon;
+    const active = !tile.warn || (value ?? 0) > 0;
+
+    return (
+        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
+            <div className="flex items-start justify-between gap-3">
+                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                    {tile.label}
+                </p>
+                <div className="rounded-lg bg-stone-100 p-2 text-gray-700 dark:bg-zinc-800 dark:text-white/90">
+                    <Icon className="h-5 w-5" />
+                </div>
+            </div>
+
+            <div className="mt-3">
+                {loading ? (
+                    <>
+                        <Skeleton className="h-[26px] w-16" />
+                        <Skeleton className="mt-2 h-3 w-24" />
+                    </>
+                ) : error ? (
+                    <>
+                        <h4 className="font-mono text-[22px] font-semibold tracking-tight text-gray-300 tabular-nums dark:text-gray-600">
+                            —
+                        </h4>
+                        <button
+                            type="button"
+                            onClick={refetch}
+                            className="mt-1.5 flex items-center gap-1.5 text-[11px] text-red-500 hover:underline dark:text-red-400"
+                        >
+                            <RotateCcw className="h-3 w-3" />
+                            Failed — retry
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <h4
+                            className={cn(
+                                'font-mono text-[22px] font-semibold tracking-tight tabular-nums',
+                                active && tile.warn
+                                    ? 'text-red-500 dark:text-red-400'
+                                    : 'text-gray-900 dark:text-gray-100',
+                            )}
+                        >
+                            {num(value)}
+                        </h4>
+                        <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                            {tile.accentDot && (
+                                <span
+                                    className={cn(
+                                        'h-1.5 w-1.5 shrink-0 rounded-full',
+                                        active
+                                            ? tile.accentDot
+                                            : 'bg-gray-300 dark:bg-gray-600',
+                                    )}
+                                />
+                            )}
+                            {tile.sub}
+                        </p>
+                    </>
+                )}
+            </div>
         </div>
     );
 }
