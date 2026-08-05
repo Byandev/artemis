@@ -455,16 +455,24 @@ export default function UserIncomeStatementsIndex({
                                     >
                                         {fmt(discrepancy.delivered)}
                                     </td>
-                                    <td className={`${COL} text-gray-300 dark:text-gray-600`}>
+                                    <td
+                                        className={`${COL} text-gray-300 dark:text-gray-600`}
+                                    >
                                         —
                                     </td>
-                                    <td className={`${COL} text-gray-300 dark:text-gray-600`}>
+                                    <td
+                                        className={`${COL} text-gray-300 dark:text-gray-600`}
+                                    >
                                         —
                                     </td>
-                                    <td className={`${COL} text-gray-300 dark:text-gray-600`}>
+                                    <td
+                                        className={`${COL} text-gray-300 dark:text-gray-600`}
+                                    >
                                         —
                                     </td>
-                                    <td className={`${COL} text-gray-300 dark:text-gray-600`}>
+                                    <td
+                                        className={`${COL} text-gray-300 dark:text-gray-600`}
+                                    >
                                         —
                                     </td>
                                     <td className="px-4 py-3 pr-5 text-right text-gray-300 dark:text-gray-600">
@@ -477,11 +485,11 @@ export default function UserIncomeStatementsIndex({
                 </div>
 
                 <p className="mt-3 text-[11px] text-gray-400">
-                    Delivered and Orders reconcile to the overall statement — the
-                    Discrepancy row is what isn’t credited to any user; a non-zero
-                    figure means an intern isn’t linked to a user, so resolve it.
-                    Cost of Sales includes per-order COGS, so Gross and Net
-                    intentionally differ from the workspace statement.
+                    Delivered and Orders reconcile to the overall statement —
+                    the Discrepancy row is what isn’t credited to any user; a
+                    non-zero figure means an intern isn’t linked to a user, so
+                    resolve it. COGS isn’t derived from orders here — it comes
+                    in as a transaction charged to a user.
                 </p>
             </div>
         </AppLayout>

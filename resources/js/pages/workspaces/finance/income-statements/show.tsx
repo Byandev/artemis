@@ -29,7 +29,6 @@ interface ProductRow {
     product: string;
     orders: number;
     delivered: number;
-    cogs: number;
     shipping: number;
     cod_fee: number;
     vat: number;
@@ -47,7 +46,6 @@ const PRODUCT_LINES: {
 }[] = [
     { key: 'orders', label: 'Orders', money: false },
     { key: 'delivered', label: 'Delivered', money: true, strong: true },
-    { key: 'cogs', label: 'COGS', money: true },
     { key: 'shipping', label: 'Shipping Fee', money: true },
     { key: 'cod_fee', label: 'COD Fee', money: true },
     { key: 'vat', label: 'VAT', money: true },
@@ -97,7 +95,7 @@ interface Props {
     readonly?: boolean;
 }
 
-const AUTO = ['cogs', 'shipping_fee', 'cod_fee', 'vat'];
+const AUTO = ['shipping_fee', 'cod_fee', 'vat'];
 
 // Money-flow segment colors — fixed order, separated in hue AND lightness; every
 // segment is direct-labelled in the legend, so identity is never colour-alone.
@@ -164,7 +162,6 @@ export default function IncomeStatementShow({
     };
 
     const derivation = (r: ExpenseRow): string | null => {
-        if (r.source === 'cogs') return 'Cost of goods sold, from order data';
         if (r.source === 'shipping_fee') return 'Orders shipped out this month';
         if (r.source === 'cod_fee')
             return `${codPct}% of Total Delivered (${fmt(statement.delivered)})`;
@@ -657,11 +654,13 @@ export default function IncomeStatementShow({
                                 </thead>
                                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                                     {PRODUCT_LINES.map((line) => {
-                                        const total = statement.products!.reduce(
-                                            (s, p) =>
-                                                s + (Number(p[line.key]) || 0),
-                                            0,
-                                        );
+                                        const total =
+                                            statement.products!.reduce(
+                                                (s, p) =>
+                                                    s +
+                                                    (Number(p[line.key]) || 0),
+                                                0,
+                                            );
                                         const cell = (v: number) =>
                                             line.money
                                                 ? fmt(v)
@@ -698,14 +697,20 @@ export default function IncomeStatementShow({
                                                 >
                                                     {cell(total)}
                                                 </td>
-                                                {statement.products!.map((p) => (
-                                                    <td
-                                                        key={p.product}
-                                                        className={`px-4 py-2.5 text-[12px] whitespace-nowrap tabular-nums ${tone(Number(p[line.key]))}`}
-                                                    >
-                                                        {cell(Number(p[line.key]))}
-                                                    </td>
-                                                ))}
+                                                {statement.products!.map(
+                                                    (p) => (
+                                                        <td
+                                                            key={p.product}
+                                                            className={`px-4 py-2.5 text-[12px] whitespace-nowrap tabular-nums ${tone(Number(p[line.key]))}`}
+                                                        >
+                                                            {cell(
+                                                                Number(
+                                                                    p[line.key],
+                                                                ),
+                                                            )}
+                                                        </td>
+                                                    ),
+                                                )}
                                             </tr>
                                         );
                                     })}
@@ -713,8 +718,9 @@ export default function IncomeStatementShow({
                             </table>
                         </div>
                         <p className="border-t border-black/6 px-5 py-3 text-[10px] text-gray-400 dark:border-white/6">
-                            Cost of Sales here is order-derived (COGS + Shipping +
-                            COD + VAT). Transactions stay at the intern level below.
+                            Cost of Sales here is order-derived (Shipping + COD
+                            + VAT). COGS comes in as a transaction, and
+                            transactions stay at the intern level below.
                         </p>
                     </div>
                 )}
