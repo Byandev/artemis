@@ -74,7 +74,7 @@ class TriggerFetchERPPurchaseOrders extends Command
             ->where('erp_username', '!=', '')
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
-            ->with(['apiKeys', 'deliveredPurchaseOrders' => function ($query) {
+            ->with(['apiKeys', 'closedPurchasedOrders' => function ($query) {
                 $query->select(['cust_po_no', 'workspace_id']);
             }, 'inventoryItems' => function ($query) use ($itemIds) {
                 // Parent items are grouping placeholders with no ERP SKU — never sync them.
@@ -142,7 +142,7 @@ class TriggerFetchERPPurchaseOrders extends Command
                             'keyword' => $item->sku,
                             'sync_run_id' => $runIds[$item->id],
                         ])->values()->toArray(),
-                        'delivered_purchase_orders_no' => $workspace->deliveredPurchaseOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
+                        'delivered_purchase_orders_no' => $workspace->closedPurchasedOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
                     ];
 
                     dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data, $runIds->values()->all()))
