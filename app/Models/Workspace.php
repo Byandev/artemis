@@ -541,6 +541,11 @@ class Workspace extends Model
         return $this->hasMany(PurchasedOrder::class)->where('status', 7);
     }
 
+    public function closedPurchasedOrders(): HasMany|Workspace
+    {
+        return $this->hasMany(PurchasedOrder::class)->whereIn('status', PurchasedOrder::CLOSED_STATUSES);
+    }
+
     public function inventoryNotificationSetting(): HasOne
     {
         return $this->hasOne(InventoryNotificationSetting::class);

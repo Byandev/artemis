@@ -26,6 +26,7 @@ class InventoryItem extends Model
         'sales_keywords',
         'transaction_keywords',
         'lead_time',
+        'days_of_coverage',
         'unfulfilled_count',
         'three_days_average',
         'remaining_qty',
