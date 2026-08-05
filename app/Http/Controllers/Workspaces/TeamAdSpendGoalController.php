@@ -22,8 +22,10 @@ class TeamAdSpendGoalController extends Controller
     public function index(Request $request, Workspace $workspace)
     {
         // Rendered as the "Ad Spend Goals" tab of the S&M dashboard, so it
-        // shares that dashboard's gating (module flag + permission).
+        // shares that dashboard's gating (module flag + permission) on top of
+        // its own module toggle.
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+        $this->guardModule($workspace);
 
         $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
 
@@ -67,6 +69,8 @@ class TeamAdSpendGoalController extends Controller
 
     public function show(Request $request, Workspace $workspace, TeamAdSpendGoal $goal)
     {
+        $this->guardModule($workspace);
+
         $this->authorize(Permission::ViewAdSpendGoals->value, $workspace);
 
         $this->guardOwnership($workspace, $goal);
@@ -108,6 +112,8 @@ class TeamAdSpendGoalController extends Controller
 
     public function store(Request $request, Workspace $workspace)
     {
+        $this->guardModule($workspace);
+
         $this->authorize(Permission::ManageAdSpendGoals->value, $workspace);
 
         $validated = $this->validateGoal($request, $workspace);
@@ -128,6 +134,8 @@ class TeamAdSpendGoalController extends Controller
 
     public function update(Request $request, Workspace $workspace, TeamAdSpendGoal $goal)
     {
+        $this->guardModule($workspace);
+
         $this->authorize(Permission::ManageAdSpendGoals->value, $workspace);
 
         $this->guardOwnership($workspace, $goal);
@@ -182,6 +190,8 @@ class TeamAdSpendGoalController extends Controller
 
     public function destroy(Request $request, Workspace $workspace, TeamAdSpendGoal $goal)
     {
+        $this->guardModule($workspace);
+
         $this->authorize(Permission::ManageAdSpendGoals->value, $workspace);
 
         $this->guardOwnership($workspace, $goal);
@@ -247,5 +257,14 @@ class TeamAdSpendGoalController extends Controller
         if ($goal->workspace_id !== $workspace->id) {
             abort(403, 'This goal does not belong to the current workspace.');
         }
+    }
+
+    /**
+     * Ad Spend Goals is an admin-toggled module; every route here 404s while it
+     * is off, matching how the tab disappears from the S&M dashboard.
+     */
+    private function guardModule(Workspace $workspace): void
+    {
+        abort_unless($workspace->ad_spend_goals_module_enabled, 404);
     }
 }

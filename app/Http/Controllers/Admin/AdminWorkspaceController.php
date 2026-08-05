@@ -160,6 +160,7 @@ class AdminWorkspaceController extends Controller
             'video_editor_dashboard_module_enabled' => 'required|boolean',
             'csr_dashboard_module_enabled' => 'required|boolean',
             'sim_gateway_module_enabled' => 'required|boolean',
+            'ad_spend_goals_module_enabled' => 'required|boolean',
         ]);
 
         $workspace->update($validated);
