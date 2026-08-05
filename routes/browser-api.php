@@ -9,6 +9,7 @@ use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
+use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
 Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
@@ -58,6 +59,14 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
         });
 
+        // Inventory dashboard — one endpoint per KPI so each loads, skeletons
+        // and refreshes independently. See InventoryDashboardStatsController.
+        Route::prefix('inventory/dashboard/kpi')->name('inventory.dashboard.kpi.')->group(function () {
+            Route::get('/inventory-items', [InventoryDashboardStatsController::class, 'inventoryItems'])->name('inventory-items');
+            Route::get('/total-stocks', [InventoryDashboardStatsController::class, 'totalStocks'])->name('total-stocks');
+            Route::get('/unfulfilled', [InventoryDashboardStatsController::class, 'unfulfilled'])->name('unfulfilled');
+            Route::get('/open-pos', [InventoryDashboardStatsController::class, 'openPos'])->name('open-pos');
+        });
     });
 });
 
