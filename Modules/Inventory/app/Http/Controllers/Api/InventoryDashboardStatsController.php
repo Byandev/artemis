@@ -25,14 +25,21 @@ class InventoryDashboardStatsController extends Controller
 {
     use AuthorizesRequests;
 
-    /** Active tracked SKUs. */
+    /**
+     * Active items, counted the way the Inventory Items list shows them: one
+     * per group. Children roll into their parent (the list's `summarize` view,
+     * which is the default), so a grouped SKU counts once rather than once per
+     * child. Mirrors buildSummaryQuery()'s `COALESCE(parent_id, id)` grouping.
+     */
     public function inventoryItems(Workspace $workspace): JsonResponse
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        return response()->json([
-            'value' => $this->activeItems($workspace)->count(),
-        ]);
+        $count = $this->activeItems($workspace)
+            ->distinct()
+            ->count(DB::raw('COALESCE(inventory_items.parent_id, inventory_items.id)'));
+
+        return response()->json(['value' => $count]);
     }
 
     /**
