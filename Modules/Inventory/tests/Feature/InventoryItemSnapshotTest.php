@@ -48,6 +48,7 @@ test('the snapshot command stores every item column and computed metric', functi
         'sku' => 'SKU-1',
         'is_active' => true,
         'lead_time' => 5,
+        'days_of_coverage' => 10,
         'three_days_average' => 4,
         'unfulfilled_count' => 2,
     ]);
@@ -61,6 +62,7 @@ test('the snapshot command stores every item column and computed metric', functi
     // Stored columns copied verbatim...
     expect($snap->sku)->toBe('SKU-1')
         ->and($snap->lead_time)->toBe(5)
+        ->and($snap->days_of_coverage)->toBe(10)
         ->and($snap->unfulfilled_count)->toBe(2)
         ->and($snap->is_active)->toBeTrue()
         ->and($snap->product_id)->toBe($product->id)
@@ -69,11 +71,42 @@ test('the snapshot command stores every item column and computed metric', functi
 
     // ...and the derived metrics as the list computes them:
     // current 30, remaining_after_fulfillment 30 - 2 unfulfilled = 28,
-    // stocks needed 5 × 4 = 20, po_needed max(0, 20 - 28) = 0.
+    // stocks needed 5 × 4 = 20, po_qty (buffer) 10 × 4 = 40,
+    // po_needed max(0, 40 + 20 - 28) = 32.
     expect((int) $snap->current_stocks)->toBe(30)
         ->and((int) $snap->remaining_after_fulfillment)->toBe(28)
         ->and((int) $snap->stocks_needed_for_lead_time)->toBe(20)
-        ->and((int) $snap->po_needed)->toBe(0);
+        ->and((int) $snap->po_qty)->toBe(40)
+        ->and((int) $snap->po_needed)->toBe(32);
+});
+
+test('a snapshot row reproduces the same PO QTY and PO Needed the live list shows', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = InventoryItem::create([
+        'workspace_id' => $workspace->id,
+        'sku' => 'SKU-1',
+        'is_active' => true,
+        'lead_time' => 5,
+        'days_of_coverage' => 7,
+        'three_days_average' => 4,
+    ]);
+    ledger($item, 10);
+
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+
+    // The buffer is a stored column, so the two views can only agree if the
+    // snapshot captured it — the flat list and the roll-up alike.
+    foreach (['0', '1'] as $summarize) {
+        $live = collect(listRows($owner, $workspace, "?summarize=$summarize"))->firstWhere('sku', 'SKU-1');
+        $past = collect(listRows($owner, $workspace, "?summarize=$summarize&filter[date]=2026-08-01"))->firstWhere('sku', 'SKU-1');
+
+        // 7 × 4 = 28 buffer, plus 5 × 4 = 20 lead-time demand, less 10 on hand.
+        expect((int) $past['po_qty'])->toBe(28)
+            ->and((int) $past['po_needed'])->toBe(38)
+            ->and((int) $past['po_qty'])->toBe((int) $live['po_qty'])
+            ->and((int) $past['po_needed'])->toBe((int) $live['po_needed']);
+    }
 });
 
 test('re-running the command for a date refreshes rather than duplicates', function () {
