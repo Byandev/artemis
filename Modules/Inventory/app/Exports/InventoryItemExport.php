@@ -33,6 +33,7 @@ class InventoryItemExport implements FromGenerator, WithHeadings
             'Waiting for Delivery',
             'Stocks Needed for Lead Time',
             '3-Day Avg',
+            'PO QTY',
             'Days It Can Last',
             'PO Needed',
         ];
@@ -61,6 +62,7 @@ class InventoryItemExport implements FromGenerator, WithHeadings
                 $item->waiting_for_delivery_stocks,
                 $item->stocks_needed_for_lead_time,
                 $item->three_days_average,
+                $item->po_qty,
                 $item->days_it_can_last,
                 $item->po_needed,
             ];

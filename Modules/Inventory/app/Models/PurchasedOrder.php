@@ -59,6 +59,7 @@ class PurchasedOrder extends Model
         6 => 'Waiting For Delivery',
         7 => 'Delivered',
         8 => 'Cancelled',
+        9 => 'Manually Closed',
     ];
 
     public const DELIVERED = 7;
@@ -66,11 +67,18 @@ class PurchasedOrder extends Model
     public const CANCELLED = 8;
 
     /**
+     * Manually closed at our end even though the source hasn't marked it
+     * Delivered/Cancelled — a deliberate override to stop the order counting as
+     * owed stock. Terminal, like Delivered/Cancelled.
+     */
+    public const MANUALLY_CLOSED = 9;
+
+    /**
      * Terminal statuses — the order no longer owes stock, so its outstanding
      * quantities drop out of incoming-stock and reorder maths.
      * Exact complement of AWAITING_DELIVERY_STATUSES.
      */
-    public const CLOSED_STATUSES = [self::DELIVERED, self::CANCELLED];
+    public const CLOSED_STATUSES = [self::DELIVERED, self::CANCELLED, self::MANUALLY_CLOSED];
 
     /**
      * Statuses that leave an order still owing stock — everything not yet
