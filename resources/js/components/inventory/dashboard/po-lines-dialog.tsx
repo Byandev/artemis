@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { PURCHASED_ORDER_STATUSES } from '@/constants/purchased-order-statuses';
 import axios from 'axios';
+import { format, parseISO } from 'date-fns';
 import { useEffect, useState } from 'react';
 
 export interface PoDialogTarget {
@@ -29,8 +30,24 @@ interface PoLine {
     fulfillment_status: FulfillmentStatus;
 }
 
+/** One stage transition in the ERP's audit trail for the order. */
+interface PoStatusLog {
+    id: number;
+    /** The ERP's own label ("Approve", "To Pay", "Paid", …), not our status map. */
+    status: string;
+    by: string | null;
+    /** "Y-m-d H:i:s", or null when the ERP logged no timestamp. */
+    logged_at: string | null;
+}
+
 interface PoLinesData {
+    order: {
+        supplier: string | null;
+        issue_date: string | null;
+        paid_date: string | null;
+    };
     lines: PoLine[];
+    status_logs: PoStatusLog[];
     total_ordered: number;
     total_delivered: number;
     total_waiting: number;
@@ -54,6 +71,17 @@ const BADGE: Record<FulfillmentStatus, { label: string; color: string }> = {
 
 const num = (v: number | null | undefined) =>
     v == null ? '—' : Number(v).toLocaleString('en-PH');
+
+/**
+ * Short date. parseISO rather than `new Date` so a date-only string lands on
+ * local midnight instead of being read as UTC and slipping a day.
+ */
+const shortDate = (iso: string | null | undefined) =>
+    iso ? format(parseISO(iso), 'd MMM yyyy') : '—';
+
+/** Trail entries carry a time of day, and the order of same-day moves matters. */
+const stamp = (iso: string | null) =>
+    iso ? format(parseISO(iso.replace(' ', 'T')), 'd MMM yyyy, HH:mm') : '—';
 
 const headClass =
     'px-3 py-2 text-left text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500';
@@ -130,6 +158,22 @@ export default function PoLinesDialog({
                         Every item on this order, delivered and still waiting.
                     </DialogDescription>
                 </DialogHeader>
+
+                {/* Supplier and the two dates that bracket the order, straight
+                    under the title — the questions asked before the line items. */}
+                {data && (
+                    <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-[10px] bg-stone-50 px-3 py-2.5 dark:bg-zinc-800/60">
+                        <Fact label="Supplier" value={data.order.supplier} />
+                        <Fact
+                            label="Issued"
+                            value={shortDate(data.order.issue_date)}
+                        />
+                        <Fact
+                            label="Paid"
+                            value={shortDate(data.order.paid_date)}
+                        />
+                    </div>
+                )}
 
                 {loading ? (
                     <p className="py-8 text-center text-[12px] text-gray-400 dark:text-gray-500">
@@ -240,6 +284,37 @@ export default function PoLinesDialog({
                     </div>
                 )}
 
+                {/* The ERP's trail, oldest first. Only rendered when the sync
+                    has actually carried one — orders synced before status logs
+                    existed simply have none, which is not an error. */}
+                {!loading && !error && (data?.status_logs.length ?? 0) > 0 && (
+                    <div>
+                        <h4 className="mb-1.5 text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Status history
+                        </h4>
+                        <ol className="max-h-[22vh] space-y-1 overflow-auto">
+                            {data?.status_logs.map((log) => (
+                                <li
+                                    key={log.id}
+                                    className="flex flex-wrap items-baseline gap-x-2 text-[12px]"
+                                >
+                                    <span className="font-medium text-gray-800 dark:text-gray-200">
+                                        {log.status}
+                                    </span>
+                                    <span className="text-gray-400 tabular-nums dark:text-gray-500">
+                                        {stamp(log.logged_at)}
+                                    </span>
+                                    {log.by && (
+                                        <span className="text-gray-400 dark:text-gray-500">
+                                            · {log.by}
+                                        </span>
+                                    )}
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
+                )}
+
                 <DialogFooter className="mt-2">
                     <button
                         type="button"
@@ -251,5 +326,19 @@ export default function PoLinesDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** Label over value, for the header's supplier/date strip. */
+function Fact({ label, value }: { label: string; value: string | null }) {
+    return (
+        <div>
+            <div className="text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                {label}
+            </div>
+            <div className="text-[12px] font-medium text-gray-800 dark:text-gray-200">
+                {value ?? '—'}
+            </div>
+        </div>
     );
 }

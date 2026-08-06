@@ -15,9 +15,11 @@ class PurchasedOrderExport implements FromGenerator, WithHeadings
     {
         return [
             'Issue Date',
+            'Paid Date',
             'Delivery No.',
             'Cust PO No.',
             'Control No.',
+            'Supplier',
             'Status',
             'Item SKU',
             'Item Product',
@@ -39,9 +41,12 @@ class PurchasedOrderExport implements FromGenerator, WithHeadings
         foreach ($orders as $order) {
             $base = [
                 $order->issue_date?->format('Y-m-d'),
+                // Date only: the trail's time of day is noise in a spreadsheet.
+                $order->paid_at?->format('Y-m-d'),
                 $order->delivery_no,
                 $order->cust_po_no,
                 $order->control_no,
+                $order->supplier,
                 PurchasedOrder::STATUSES[$order->status] ?? 'Unknown',
             ];
 

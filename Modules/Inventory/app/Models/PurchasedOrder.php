@@ -21,9 +21,11 @@ class PurchasedOrder extends Model
         'expected_delivery_date',
         'cust_po_no',
         'control_no',
+        'supplier',
         'delivery_fee',
         'total_amount',
         'status',
+        'paid_at',
     ];
 
     protected $casts = [
@@ -32,6 +34,9 @@ class PurchasedOrder extends Model
         'delivery_fee' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'status' => 'integer',
+        // Datetime, not date: the ERP's log carries the time of day, and it is
+        // the log entry that this mirrors. Lists render it as a date.
+        'paid_at' => 'datetime',
     ];
 
     /**
@@ -110,6 +115,16 @@ class PurchasedOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(PurchasedOrderItem::class, 'inventory_purchased_order_id');
+    }
+
+    /**
+     * The ERP's audit trail for this order, oldest first. Synced wholesale —
+     * see PurchasedOrderStatusLog.
+     */
+    public function statusLogs(): HasMany
+    {
+        return $this->hasMany(PurchasedOrderStatusLog::class, 'inventory_purchased_order_id')
+            ->orderBy('logged_at');
     }
 
     /** Aggregate fulfilment across the order's items: waiting | partial | delivered. */

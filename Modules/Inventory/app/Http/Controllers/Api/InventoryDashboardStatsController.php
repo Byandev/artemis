@@ -317,7 +317,7 @@ class InventoryDashboardStatsController extends Controller
                 ->whereIn('status', PurchasedOrder::AWAITING_DELIVERY_STATUSES)
                 ->visibleTo($request->user(), $workspace))
             ->with([
-                'purchasedOrder:id,control_no,cust_po_no,status,issue_date,expected_delivery_date',
+                'purchasedOrder:id,control_no,cust_po_no,supplier,status,issue_date,expected_delivery_date,paid_at',
                 'inventoryItem:id,sku,product_id',
                 'inventoryItem.product:id,name',
             ])
@@ -336,9 +336,13 @@ class InventoryDashboardStatsController extends Controller
                 'purchased_order_id' => $line->purchasedOrder->id,
                 'control_no' => $line->purchasedOrder->control_no,
                 'cust_po_no' => $line->purchasedOrder->cust_po_no,
+                'supplier' => $line->purchasedOrder->supplier,
                 // Date-only strings; the client formats them for display.
                 'issue_date' => $line->purchasedOrder->issue_date?->toDateString(),
                 'expected_delivery_date' => $line->purchasedOrder->expected_delivery_date?->toDateString(),
+                // The ERP logs a time of day, but every PO list renders a date —
+                // sent date-only so the client can't drift it across a timezone.
+                'paid_date' => $line->purchasedOrder->paid_at?->toDateString(),
                 // Numeric status too: the frontend renders it through the
                 // shared PURCHASED_ORDER_STATUSES map rather than the label.
                 'status' => (int) $line->purchasedOrder->status,
@@ -399,9 +403,20 @@ class InventoryDashboardStatsController extends Controller
                 'id' => $purchasedOrder->id,
                 'control_no' => $purchasedOrder->control_no,
                 'cust_po_no' => $purchasedOrder->cust_po_no,
+                'supplier' => $purchasedOrder->supplier,
                 'status_label' => $purchasedOrder->status_label,
+                'issue_date' => $purchasedOrder->issue_date?->toDateString(),
+                'paid_date' => $purchasedOrder->paid_at?->toDateString(),
             ],
             'lines' => $lines,
+            // The ERP's audit trail, oldest first — the drill-down is where you
+            // ask why an order is where it is, and this answers it.
+            'status_logs' => $purchasedOrder->statusLogs->map(fn ($log) => [
+                'id' => $log->id,
+                'status' => $log->status,
+                'by' => $log->by,
+                'logged_at' => $log->logged_at?->toDateTimeString(),
+            ]),
             'total_ordered' => $lines->sum('ordered_qty'),
             'total_delivered' => $lines->sum('delivered_qty'),
             'total_waiting' => $lines->sum('waiting_qty'),

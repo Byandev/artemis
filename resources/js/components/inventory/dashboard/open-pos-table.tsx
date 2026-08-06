@@ -13,10 +13,16 @@ interface OpenPoLine {
     purchased_order_id: number;
     control_no: string | null;
     cust_po_no: string | null;
+    supplier: string | null;
     /** Date-only string (Y-m-d), or null on an order with no issue date. */
     issue_date: string | null;
     /** Date-only string (Y-m-d), or null when no delivery date was promised. */
     expected_delivery_date: string | null;
+    /**
+     * Date-only string (Y-m-d) taken from the ERP's Paid status log, or null on
+     * an order that has not been paid (or predates the status-log sync).
+     */
+    paid_date: string | null;
     status: number;
     status_label: string;
     sku: string | null;
@@ -123,6 +129,10 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                             <tr className="border-b border-black/6 dark:border-white/6">
                                 <th className={headClass}>PO</th>
                                 <th className={headClass}>Issued</th>
+                                {/* Next to Issued, not off with the amounts:
+                                    the gap between the two is the thing worth
+                                    reading. */}
+                                <th className={headClass}>Paid</th>
                                 <th className={headClass}>Expected</th>
                                 <th className={headClass}>Status</th>
                                 <th className={headClass}>Item</th>
@@ -166,6 +176,14 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                                         className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
                                     >
                                         {issuedOn(line.issue_date)}
+                                    </td>
+                                    {/* An unpaid open order is the normal state
+                                        early on, so the em dash is left plain
+                                        rather than flagged. */}
+                                    <td
+                                        className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
+                                    >
+                                        {issuedOn(line.paid_date)}
                                     </td>
                                     <td
                                         className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
@@ -255,6 +273,7 @@ function TableSkeleton() {
         <div className="flex flex-col gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3">
+                    <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
