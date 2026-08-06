@@ -69,7 +69,14 @@ interface Item {
     product_winning_date?: string | null;
     remaining_qty: number | null;
     unfulfilled: number | null;
+    /** Owed on orders a supplier already has — genuinely incoming. */
     waiting_for_delivery_stocks: number | null;
+    /**
+     * Owed on orders raised but not yet released to a supplier. Shown so nothing
+     * is hidden, but excluded from Days It Can Last and PO Needed — an order
+     * waiting for approval or payment is an intention, not stock.
+     */
+    requested_stocks: number | null;
     three_days_average: number | null;
     po_qty: number | null;
     remaining_after_fulfillment: number | null;
@@ -742,6 +749,47 @@ export default function ItemIndex({
                             <MetricCell
                                 value={row.original.waiting_for_delivery_stocks}
                                 color="text-blue-500 dark:text-blue-400"
+                            />
+                        </button>
+                    )}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'requested_stocks',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title="Requested"
+                    className="justify-center"
+                />
+            ),
+            /*
+             * Ordered, but nobody has told a supplier yet — still sitting in
+             * approval or payment. Deliberately amber rather than the blue used
+             * for genuinely incoming stock, and deliberately NOT counted toward
+             * Days It Can Last or PO Needed: treating an unapproved order as
+             * stock is what let items sit at zero showing weeks of cover.
+             * Opens the same breakdown, which lists both kinds.
+             */
+            cell: ({ row }) => (
+                <div className="text-center">
+                    {row.original.requested_stocks == null ? (
+                        <MetricCell
+                            value={null}
+                            color="text-amber-600 dark:text-amber-500"
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setWaitingItem(row.original)}
+                            title="Ordered but not yet sent to a supplier — not counted as stock"
+                            className="cursor-pointer rounded px-1 underline decoration-dotted underline-offset-4 transition-colors hover:bg-amber-500/10"
+                        >
+                            <MetricCell
+                                value={row.original.requested_stocks}
+                                color="text-amber-600 dark:text-amber-500"
                             />
                         </button>
                     )}

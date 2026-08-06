@@ -61,6 +61,14 @@ export function WaitingForDeliveryDialog({
 }: Props) {
     const [orders, setOrders] = useState<PendingOrder[]>([]);
     const [total, setTotal] = useState(0);
+    /**
+     * The same balance split the list columns use: `released` is what the
+     * "Waiting for Delivery" column shows, `requested` is what is ordered but
+     * still inside the business. Both kinds are listed below; the split is
+     * called out so the dialog and the list column cannot look contradictory.
+     */
+    const [released, setReleased] = useState(0);
+    const [requested, setRequested] = useState(0);
     const [loading, setLoading] = useState(false);
     const [failed, setFailed] = useState(false);
 
@@ -80,11 +88,15 @@ export function WaitingForDeliveryDialog({
                 if (cancelled) return;
                 setOrders(json.orders ?? []);
                 setTotal(json.total_balance ?? 0);
+                setReleased(json.released_balance ?? 0);
+                setRequested(json.requested_balance ?? 0);
             })
             .catch(() => {
                 if (cancelled) return;
                 setOrders([]);
                 setTotal(0);
+                setReleased(0);
+                setRequested(0);
                 setFailed(true);
             })
             .finally(() => {
@@ -113,6 +125,20 @@ export function WaitingForDeliveryDialog({
                                     {item.sku}
                                 </span>
                                 {isGroup && ' and its variants'}.
+                                {requested > 0 && (
+                                    <>
+                                        {' '}
+                                        <span className="font-mono text-gray-700 dark:text-gray-300">
+                                            {released.toLocaleString('en-PH')}
+                                        </span>{' '}
+                                        with a supplier,{' '}
+                                        <span className="font-mono text-amber-600 dark:text-amber-500">
+                                            {requested.toLocaleString('en-PH')}
+                                        </span>{' '}
+                                        still awaiting approval or payment —
+                                        only the first counts as incoming stock.
+                                    </>
+                                )}
                             </>
                         ) : (
                             'Pending purchase orders for this item.'

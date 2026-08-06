@@ -118,8 +118,10 @@ class InventoryItemController extends Controller
             ->select('inventory_items.*')
             ->with(['product'])
             ->selectRaw("$parentSkuSql as parent_sku")
-            // Undelivered remainder on status-6 orders (see waiting_for_delivery_stocks).
+            // Undelivered remainder on orders a supplier already has.
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
+            // Ordered but not yet released — shown, never counted as stock.
+            ->selectRaw("{$sql['requested_stocks']} as requested_stocks")
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
             ->selectRaw("{$sql['discrepancy_counted_qty']} as discrepancy_counted_qty")
@@ -169,6 +171,7 @@ class InventoryItemController extends Controller
                 'three_days_average',
                 'current_stocks',
                 'waiting_for_delivery_stocks',
+                'requested_stocks',
                 AllowedSort::callback('remaining_after_fulfillment', function ($query, $descending) use ($sql) {
                     $query->orderByRaw("{$sql['remaining_after_fulfillment']} ".($descending ? 'DESC' : 'ASC'));
                 }),
@@ -212,6 +215,7 @@ class InventoryItemController extends Controller
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
+            ->selectRaw("{$sql['requested_stocks']} as requested_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
             ->selectRaw("{$sql['remaining_after_fulfillment']} as remaining_after_fulfillment")
             ->selectRaw("{$sql['po_needed']} as po_needed");
@@ -287,6 +291,7 @@ class InventoryItemController extends Controller
             ->selectRaw('SUM(sub.unfulfilled_count) as unfulfilled_count')
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
             ->selectRaw('SUM(sub.waiting_for_delivery_stocks) as waiting_for_delivery_stocks')
+            ->selectRaw('SUM(sub.requested_stocks) as requested_stocks')
             ->selectRaw('SUM(sub.discrepancy) as discrepancy')
             ->selectRaw('NULL as discrepancy_counted_qty')
             ->selectRaw('NULL as discrepancy_date')
@@ -302,7 +307,7 @@ class InventoryItemController extends Controller
         // Sorting on the aggregated aliases; anything unknown falls back to SKU.
         $sortable = [
             'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
-            'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
+            'waiting_for_delivery_stocks', 'requested_stocks', 'discrepancy', 'remaining_after_fulfillment',
             'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'three_days_average', 'days_it_can_last',
         ];
         $sort = (string) $request->input('sort');
@@ -398,7 +403,7 @@ class InventoryItemController extends Controller
         $inner = InventoryItemSnapshot::query()
             ->where('inventory_item_snapshots.workspace_id', $workspace->id)
             ->where('inventory_item_snapshots.snapshot_date', $date)
-            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.product_id, inventory_item_snapshots.is_active, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.item_created_at as created_at, inventory_item_snapshots.product_name, inventory_item_snapshots.product_winning_date, inventory_item_snapshots.current_stocks, inventory_item_snapshots.waiting_for_delivery_stocks, inventory_item_snapshots.discrepancy, inventory_item_snapshots.remaining_after_fulfillment, inventory_item_snapshots.po_needed');
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.product_id, inventory_item_snapshots.is_active, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.item_created_at as created_at, inventory_item_snapshots.product_name, inventory_item_snapshots.product_winning_date, inventory_item_snapshots.current_stocks, inventory_item_snapshots.waiting_for_delivery_stocks, inventory_item_snapshots.requested_stocks, inventory_item_snapshots.discrepancy, inventory_item_snapshots.remaining_after_fulfillment, inventory_item_snapshots.po_needed');
 
         $this->applySnapshotActiveFilter($request, $inner);
         $this->applySnapshotSummaryVisibility($request, $inner, $workspace);
@@ -448,6 +453,7 @@ class InventoryItemController extends Controller
             ->selectRaw('SUM(sub.unfulfilled_count) as unfulfilled_count')
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
             ->selectRaw('SUM(sub.waiting_for_delivery_stocks) as waiting_for_delivery_stocks')
+            ->selectRaw('SUM(sub.requested_stocks) as requested_stocks')
             ->selectRaw('SUM(sub.discrepancy) as discrepancy')
             ->selectRaw('NULL as discrepancy_counted_qty')
             ->selectRaw('NULL as discrepancy_date')
@@ -462,7 +468,7 @@ class InventoryItemController extends Controller
 
         $sortable = [
             'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
-            'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
+            'waiting_for_delivery_stocks', 'requested_stocks', 'discrepancy', 'remaining_after_fulfillment',
             'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'three_days_average', 'days_it_can_last',
         ];
         $sort = (string) $request->input('sort');
@@ -821,6 +827,17 @@ class InventoryItemController extends Controller
         return response()->json([
             'orders' => $lines,
             'total_balance' => $lines->sum('balance'),
+            // Split the same way the list columns are: the released subtotal is
+            // what "Waiting for Delivery" shows, the requested subtotal is what
+            // the reorder maths deliberately ignores. The modal still lists both
+            // — hiding an order because it is stuck in approval is how it stays
+            // stuck.
+            'released_balance' => $lines
+                ->whereIn('status', PurchasedOrder::RELEASED_STATUSES)
+                ->sum('balance'),
+            'requested_balance' => $lines
+                ->whereIn('status', PurchasedOrder::REQUESTED_STATUSES)
+                ->sum('balance'),
         ]);
     }
 

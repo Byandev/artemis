@@ -54,26 +54,64 @@ final class InventoryStockColumns
     }
 
     /**
-     * Quantity still OWED on orders awaiting delivery (open POs, status not in
-     * 7/8): the undelivered remainder per item, not the full ordered count.
-     * NULLIF keeps items with nothing outstanding showing as "—" not 0.
+     * Quantity still OWED on every open order, whatever stage it sits at: the
+     * undelivered remainder per item, not the full ordered count. NULLIF keeps
+     * items with nothing outstanding showing as "—" not 0.
+     *
+     * This is the whole open book. For the reorder maths use releasedStocks(),
+     * which is the part a supplier has actually been handed.
      */
     public static function waitingStocks(): string
     {
-        // Only orders still owing stock count — terminal statuses (Delivered,
-        // Cancelled, Manually Closed) are excluded via CLOSED_STATUSES.
-        $closed = implode(',', PurchasedOrder::CLOSED_STATUSES);
-
-        return "(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status not in ($closed)))";
+        // Terminal statuses (Delivered, Cancelled, Manually Closed) are excluded.
+        return self::owedOn(PurchasedOrder::AWAITING_DELIVERY_STATUSES);
     }
 
-    /** Stock left once incoming deliveries land and unfulfilled orders are met. */
+    /**
+     * Quantity owed on orders a supplier is actually working on. This is the
+     * only incoming figure the reorder maths trusts — see
+     * PurchasedOrder::RELEASED_STATUSES for why.
+     */
+    public static function releasedStocks(): string
+    {
+        return self::owedOn(PurchasedOrder::RELEASED_STATUSES);
+    }
+
+    /**
+     * Quantity owed on orders still waiting for approval or payment. Shown as
+     * its own column so nothing is hidden — it is simply not counted as stock.
+     */
+    public static function requestedStocks(): string
+    {
+        return self::owedOn(PurchasedOrder::REQUESTED_STATUSES);
+    }
+
+    /**
+     * Stock left once released deliveries land and unfulfilled orders are met.
+     *
+     * Deliberately excludes requestedStocks(): an order waiting for approval or
+     * payment is an intention, not stock. Counting it here is what let items sit
+     * at zero while the list reported weeks of cover — the order existed, so
+     * po_needed fell to zero, so nobody reordered, while the PO sat in a queue.
+     */
     public static function remainingAfterFulfillment(): string
     {
         $current = self::currentStocks();
-        $waiting = self::waitingStocks();
+        $released = self::releasedStocks();
 
-        return "(COALESCE($current, 0) + COALESCE($waiting, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
+        return "(COALESCE($current, 0) + COALESCE($released, 0) - COALESCE(inventory_items.unfulfilled_count, 0))";
+    }
+
+    /**
+     * Undelivered remainder across the given order statuses, per item.
+     *
+     * @param  list<int>  $statuses
+     */
+    private static function owedOn(array $statuses): string
+    {
+        $in = implode(',', $statuses);
+
+        return "(SELECT NULLIF(SUM(GREATEST(0, poi.count - COALESCE((SELECT SUM(d.qty) FROM inventory_purchased_order_item_deliveries d WHERE d.inventory_purchased_order_item_id = poi.id), 0))), 0) FROM inventory_purchased_order_items poi WHERE poi.inventory_item_id = inventory_items.id AND EXISTS (SELECT 1 FROM inventory_purchased_orders po WHERE poi.inventory_purchased_order_id = po.id AND po.status in ($in)))";
     }
 
     /** The safety buffer alone: days_of_coverage extra days of expected demand. */

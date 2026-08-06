@@ -12,21 +12,33 @@ use Tests\TestCase;
 // covers tests/Feature), so extend the app TestCase explicitly to boot the app.
 uses(TestCase::class, RefreshDatabase::class);
 
-/** Read the computed waiting-for-delivery value for an item off the index page. */
-function waitingFor(int $itemId, $owner, $workspace): ?int
+/** Read a computed stock column for an item off the index page. */
+function stockColumn(int $itemId, $owner, $workspace, string $column): ?int
 {
     $value = null;
 
     test()->actingAs($owner)
         ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=0')
         ->assertOk()
-        ->assertInertia(function (Assert $page) use ($itemId, &$value) {
+        ->assertInertia(function (Assert $page) use ($itemId, $column, &$value) {
             $items = $page->toArray()['props']['items']['data'];
             $row = collect($items)->firstWhere('id', $itemId);
-            $value = $row['waiting_for_delivery_stocks'];
+            $value = $row[$column];
         });
 
     return $value === null ? null : (int) $value;
+}
+
+/** Units owed on orders a supplier already has (RELEASED_STATUSES). */
+function waitingFor(int $itemId, $owner, $workspace): ?int
+{
+    return stockColumn($itemId, $owner, $workspace, 'waiting_for_delivery_stocks');
+}
+
+/** Units owed on orders still awaiting approval or payment (REQUESTED_STATUSES). */
+function requestedFor(int $itemId, $owner, $workspace): ?int
+{
+    return stockColumn($itemId, $owner, $workspace, 'requested_stocks');
 }
 
 test('waiting-for-delivery reflects the undelivered remainder on status-6 orders', function () {
@@ -139,10 +151,13 @@ test('the waiting-for-delivery modal lists the pending purchase orders behind th
         'balance' => 100,
     ]);
 
-    // The listed balances sum to exactly what the list column shows.
-    expect($response->json('total_balance'))
+    // Both listed orders are with a supplier, so the released subtotal is the
+    // whole balance — and it is exactly what the list column shows.
+    expect($response->json('total_balance'))->toBe(150);
+    expect($response->json('released_balance'))
         ->toBe(150)
         ->toBe(waitingFor($item->id, $owner, $workspace));
+    expect($response->json('requested_balance'))->toBe(0);
 });
 
 test('the waiting-for-delivery modal rolls a parent item up over its children', function () {
@@ -201,7 +216,7 @@ test('the waiting-for-delivery modal rejects an item from another workspace', fu
         ->assertNotFound();
 });
 
-test('waiting-for-delivery ignores closed orders but counts open ones from the start', function () {
+test('waiting-for-delivery counts only what a supplier actually has', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $item = InventoryItem::create([
@@ -228,12 +243,62 @@ test('waiting-for-delivery ignores closed orders but counts open ones from the s
         ]);
     };
 
-    // Cancelled — closed, so its units never count toward incoming stock.
+    // Cancelled — closed, so its units never count anywhere.
     $makeLine(PurchasedOrder::CANCELLED, 50);
-    expect(waitingFor($item->id, $owner, $workspace))->toBeNull();
+    expect(waitingFor($item->id, $owner, $workspace))->toBeNull()
+        ->and(requestedFor($item->id, $owner, $workspace))->toBeNull();
 
-    // Approved — an early, still-open stage. Counts from the moment it is raised
-    // (see AWAITING_DELIVERY_STATUSES), not only once paid.
+    // Approved — raised, but nobody has told a supplier. Real intent, so it
+    // shows as requested; not stock, so it stays out of waiting-for-delivery.
     $makeLine(2, 50);
-    expect(waitingFor($item->id, $owner, $workspace))->toBe(50);
+    expect(waitingFor($item->id, $owner, $workspace))->toBeNull()
+        ->and(requestedFor($item->id, $owner, $workspace))->toBe(50);
+
+    // Released to the supplier — now it is genuinely incoming.
+    $makeLine(6, 30);
+    expect(waitingFor($item->id, $owner, $workspace))->toBe(30)
+        ->and(requestedFor($item->id, $owner, $workspace))->toBe(50);
+});
+
+test('the reorder maths ignores orders that have not reached a supplier', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = InventoryItem::create([
+        'workspace_id' => $workspace->id,
+        'sku' => 'SKU-REORDER',
+        'is_active' => true,
+        'lead_time' => 10,
+        'days_of_coverage' => 10,
+        'three_days_average' => 10,   // 20 days of cover = 200 units wanted
+    ]);
+
+    $order = function (int $status, int $count) use ($workspace, $item) {
+        $po = PurchasedOrder::create([
+            'workspace_id' => $workspace->id,
+            'issue_date' => '2026-06-01',
+            'delivery_fee' => 0,
+            'total_amount' => 0,
+            'status' => $status,
+        ]);
+        PurchasedOrderItem::create([
+            'inventory_purchased_order_id' => $po->id,
+            'inventory_item_id' => $item->id,
+            'count' => $count,
+            'amount' => 0,
+            'total_amount' => 0,
+        ]);
+    };
+
+    // Nothing on hand, nothing ordered: the full 200 is needed.
+    expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(200);
+
+    // 200 raised but sitting in To Pay. It is intent, not stock — the reorder
+    // figure must not move, or nobody reorders while the PO waits in a queue.
+    $order(3, 200);
+    expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(200)
+        ->and(requestedFor($item->id, $owner, $workspace))->toBe(200);
+
+    // Released to the supplier: now it counts, and the need is covered.
+    $order(6, 200);
+    expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(0);
 });
