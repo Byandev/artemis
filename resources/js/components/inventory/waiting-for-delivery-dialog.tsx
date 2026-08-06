@@ -62,10 +62,10 @@ export function WaitingForDeliveryDialog({
     const [orders, setOrders] = useState<PendingOrder[]>([]);
     const [total, setTotal] = useState(0);
     /**
-     * The balance split by stage: `released` is with a supplier, `requested` is
-     * still awaiting approval or payment. Both count toward the item's incoming
-     * stock — the split is shown because a large requested figure means the
-     * stock is committed but has not started moving.
+     * The balance split by stage: `released` is paid for and so the supplier's
+     * to deliver, `requested` is raised but not yet paid. Both count toward the
+     * item's incoming stock — the split is shown because a large requested
+     * figure means the stock is committed but has not started moving.
      */
     const [released, setReleased] = useState(0);
     const [requested, setRequested] = useState(0);
@@ -135,7 +135,7 @@ export function WaitingForDeliveryDialog({
                                         <span className="font-mono text-amber-600 dark:text-amber-500">
                                             {requested.toLocaleString('en-PH')}
                                         </span>{' '}
-                                        still awaiting approval or payment.
+                                        raised but not yet paid for.
                                     </>
                                 )}
                             </>

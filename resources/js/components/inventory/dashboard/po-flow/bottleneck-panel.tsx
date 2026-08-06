@@ -18,7 +18,7 @@ function verdict(data: BottleneckData): { headline: string; why: string } {
         const only = blocked[0];
         const why =
             only.key === 'operations'
-                ? `Stock is being ordered, then held in your own approval and payment queues. ${num(data.internal_units)} units have not been sent to a supplier.`
+                ? `Stock is being ordered, then held in your own approval and payment queues. ${num(data.internal_units)} units have not been paid for.`
                 : only.key === 'supplier'
                   ? `Orders are leaving the office and then stalling. ${num(data.supplier_units)} units are with suppliers, and too much of it is past the delivery target.`
                   : `Goods are on the shelf with orders waiting on them — ${num(only.value)} units could have shipped days ago.`;
@@ -55,9 +55,9 @@ function verdict(data: BottleneckData): { headline: string; why: string } {
 const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
     operations: (
         <>
-            <b>Units on purchase orders that exist but have not been sent.</b>{' '}
-            Raised, then sitting in approval or payment — no supplier has seen
-            them, so nothing is on its way.
+            <b>Units on purchase orders that exist but have not been paid for.</b>{' '}
+            Raised, then sitting in approval or waiting on payment — nothing has
+            been committed that would make a supplier start.
             <br />
             <br />
             <b>Past the target</b> is the part that has waited longer than a
@@ -73,15 +73,16 @@ const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
     supplier: (
         <>
             <b>
-                Units on orders a supplier has and has not finished delivering.
-            </b>
+                Units on paid orders a supplier has not finished delivering.
+            </b>{' '}
+            Payment is the commitment point: money has moved, so the goods are
+            theirs to deliver.
             <br />
             <br />
             <b>Past the target</b> is the part older than the delivery target.
             One caveat worth knowing: the clock runs from when the order was{' '}
-            <i>raised</i>, not released — most orders carry no release timestamp
-            yet, so this includes any time they spent in your own queues and
-            reads slightly harsh on the supplier.
+            <i>raised</i>, not paid — so this includes any time it spent in your
+            own approval queue, and reads slightly harsh on the supplier.
             <br />
             <br />
             Goes red only when more than 40% of in-transit stock is overdue. A

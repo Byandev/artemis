@@ -67,7 +67,7 @@ const TILES: Tile[] = [
             d.stuck_overdue > 0
                 ? `${d.stuck_overdue.toLocaleString('en-PH')} past the ${d.sla_days}-day target`
                 : 'never sent to a supplier',
-        help: 'Units on purchase orders that have been raised but not yet released to a supplier — sitting in approval or payment. The quantity is committed, so it will not be reordered; it just has not started moving.',
+        help: 'Units on purchase orders that have been raised but not yet paid for — sitting in approval, or approved and queued for payment. The quantity is committed, so it will not be reordered; it just has not started moving.',
         tone: 'warn',
     },
     {

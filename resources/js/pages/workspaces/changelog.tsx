@@ -47,11 +47,11 @@ const changelog: ChangelogEntry[] = [
                 ],
             },
             {
-                title: 'Inventory — Reorder Maths Corrected',
+                title: 'Inventory — Ordered vs Actually Moving',
                 items: [
-                    'A purchase order only counts as incoming stock once it has actually been released to a supplier — orders still sitting in approval or payment no longer count; previously an item could be at zero stock while the reorder maths reported weeks of cover, because the order existed, so PO Needed fell to zero and nobody reordered while the paperwork queued',
-                    'Expect PO Needed to rise on items whose orders are stuck in approval, and that is the point — those units were being counted as though they were already on their way',
-                    'The waiting-for-delivery breakdown now says what it is waiting on: how many units are with a supplier, and how many are still awaiting approval or payment, so stock that is committed but not yet moving is visible rather than buried in a single total',
+                    'Stock still owed on purchase orders is now split by whether the order has been paid for — paid means the supplier is on the hook and the goods are genuinely on their way, unpaid means the quantity is committed but nothing has started moving',
+                    'The waiting-for-delivery breakdown says which is which, so an item showing weeks of cover on the back of an order that has sat unpaid for a fortnight is visible rather than buried in a single total',
+                    'PO Needed is unchanged by this: every raised order still counts against what to buy, because an order that exists is committed quantity and ignoring it would have you order the same stock twice — an order stuck in a queue is a flow problem, and the dashboard panels are where it now shows up, measured as time',
                 ],
             },
             {

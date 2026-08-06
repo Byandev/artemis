@@ -20,12 +20,12 @@ use Modules\Inventory\Support\InventoryStockColumns;
  * has been there, and which of operations, the supplier or the warehouse is
  * holding it.
  *
- * These exist because the items list can no longer warn you on its own. It
- * counts every raised purchase order as incoming stock — correctly, since
- * excluding one would have it reordered twice — which means an item can read
- * weeks of cover while its stock sits in an approval queue. Nothing there is
- * wrong; the risk is simply invisible from a quantity column. It shows up here
- * instead, as time.
+ * These exist because the items list can no longer warn you on its own. Its
+ * waiting-for-delivery column counts every raised purchase order — correctly,
+ * since the quantity is genuinely committed — which means an item can read
+ * weeks of cover while its stock sits unpaid in an approval queue. Nothing
+ * there is wrong; the risk is simply invisible from a quantity column. It
+ * shows up here instead, as time.
  *
  * Every endpoint is team-scoped: purchase orders through PurchasedOrder's
  * visibleTo (which reaches teams via items.inventoryItem.product.shops), and
@@ -481,7 +481,7 @@ class PurchaseOrderFlowController extends Controller
                 'question' => 'Are we processing purchase orders on time?',
                 'state' => $internalOverdue > 0 ? 'blocked' : ($internalUnits > $supplierUnits ? 'watch' : 'ok'),
                 'value' => $internalUnits,
-                'unit' => 'units never sent to a supplier',
+                'unit' => 'units pending for approval or payment',
                 'facts' => [
                     ['Past the target', $internalOverdue ?: null, 'units'],
                     ['Longest wait', $internal->max('age'), 'days'],
@@ -496,7 +496,7 @@ class PurchaseOrderFlowController extends Controller
                     ? 'blocked'
                     : ($supplierOverdue > 0 ? 'watch' : 'ok'),
                 'value' => $supplierUnits,
-                'unit' => 'units released and in transit',
+                'unit' => 'paid and waiting for delivery',
                 'facts' => [
                     ['Past the target', $supplierOverdue ?: null, 'units'],
                     ['Delivery target', $quoted, 'days'],
@@ -509,7 +509,7 @@ class PurchaseOrderFlowController extends Controller
                 'question' => 'Is stock sitting here that an unfulfilled order could already take?',
                 'state' => $sittingShare > 0.15 ? 'blocked' : ($sittingShare > 0.05 ? 'watch' : 'ok'),
                 'value' => $split['sitting']['units'],
-                'unit' => 'units on the shelf with an order waiting',
+                'unit' => 'orders with available stocks in warehouse',
                 'facts' => [
                     ['Could ship today', $split['here'] ?: null, 'units'],
                     ['SKUs affected', $split['sitting']['skus'] ?: null, 'SKUs'],

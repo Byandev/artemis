@@ -110,9 +110,12 @@ final class InventoryStockColumns
     }
 
     /**
-     * Quantity owed on orders a supplier is actually working on — the only
-     * incoming figure the reorder maths trusts. See
-     * PurchasedOrder::RELEASED_STATUSES.
+     * Quantity owed on orders that are the supplier's problem now — paid for,
+     * and so genuinely on their way. See PurchasedOrder::RELEASED_STATUSES.
+     *
+     * Its own column rather than the reorder input: the reorder maths counts
+     * every open order (see remainingAfterFulfillment), and this half is what
+     * the flow panels read to tell moving stock from committed-but-stuck.
      */
     public static function releasedStocks(): string
     {
@@ -120,7 +123,7 @@ final class InventoryStockColumns
     }
 
     /**
-     * Quantity owed on orders still waiting for approval or payment. Shown as
+     * Quantity owed on orders raised but not yet paid for. Shown as
      * its own column so nothing is hidden — it is simply not counted as stock.
      */
     public static function requestedStocks(): string
@@ -164,10 +167,10 @@ final class InventoryStockColumns
 
     /**
      * How much to purchase to cover the safety buffer plus lead-time demand,
-     * given what's on hand once released deliveries land.
+     * given what's on hand once every open order lands.
      *
      * Incoming stock is subtracted exactly once, via remainingAfterFulfillment
-     * (which already adds releasedStocks in). Subtracting it again on top would
+     * (which already adds waitingStocks in). Subtracting it again on top would
      * double-count and understate the reorder.
      */
     public static function poNeeded(): string
