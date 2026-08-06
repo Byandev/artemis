@@ -116,6 +116,79 @@ class SalesTargetScoreboardQuery
     }
 
     /**
+     * How the teams fall across achievement bands.
+     *
+     * Only teams with a sales target to measure against are placed — a team
+     * carrying an ad budget alone has no achievement, so it is reported as
+     * `unrated` rather than quietly counted as failing.
+     *
+     * @return array<string, mixed>
+     */
+    public function achievementDistribution(SalesTarget $target, ?int $teamId = null): array
+    {
+        $teams = $this->snapshot($target, $teamId)['teams'];
+
+        $bands = [
+            ['key' => 'at_target', 'label' => '100%+', 'min' => 100.0],
+            ['key' => 'near', 'label' => '75% - 99%', 'min' => 75.0],
+            ['key' => 'half', 'label' => '50% - 74%', 'min' => 50.0],
+            ['key' => 'below', 'label' => 'Below 50%', 'min' => null],
+        ];
+
+        $rated = array_values(array_filter(
+            $teams,
+            fn (array $team) => $team['achievement_pct'] !== null,
+        ));
+
+        $buckets = [];
+
+        foreach ($bands as $i => $band) {
+            // Each band runs from its own floor up to the floor of the one above.
+            $ceiling = $i === 0 ? null : $bands[$i - 1]['min'];
+            $floor = $band['min'];
+
+            $count = count(array_filter($rated, function (array $team) use ($floor, $ceiling) {
+                $pct = (float) $team['achievement_pct'];
+
+                return ($floor === null || $pct >= $floor)
+                    && ($ceiling === null || $pct < $ceiling);
+            }));
+
+            $buckets[] = [
+                'key' => $band['key'],
+                'label' => $band['label'],
+                'count' => $count,
+                'share' => $rated === [] ? 0.0 : round($count / count($rated) * 100, 1),
+            ];
+        }
+
+        return [
+            'buckets' => $buckets,
+            'total' => count($rated),
+            'unrated' => count($teams) - count($rated),
+        ];
+    }
+
+    /**
+     * Each team's sales beside the target it was given — the pair of bars the
+     * chart stands side by side, in the board's ranking order.
+     *
+     * @return array<int, array{team_id: int, name: string, sales: float, target: float}>
+     */
+    public function salesVsTarget(SalesTarget $target, ?int $teamId = null): array
+    {
+        return array_map(
+            fn (array $team) => [
+                'team_id' => $team['team_id'],
+                'name' => $team['name'],
+                'sales' => $team['sales'],
+                'target' => $team['target'],
+            ],
+            $this->teamsFor($target, $teamId),
+        );
+    }
+
+    /**
      * One day's board: the target's teams with their actuals, plus the
      * deduplicated company totals.
      *

@@ -54,8 +54,8 @@ export function GameboardLeaderboard({
     const cell = 'px-2 py-2 text-[12px] tabular-nums whitespace-nowrap';
 
     return (
-        <section className="mt-4">
-            <div className="overflow-hidden rounded-[12px] border border-black/6 bg-white dark:border-white/8 dark:bg-zinc-900">
+        <section className="h-full">
+            <div className="h-full overflow-hidden rounded-[12px] border border-black/6 bg-white dark:border-white/8 dark:bg-zinc-900">
                 <div className="flex items-center justify-between gap-3 border-b border-black/6 px-3 py-2.5 dark:border-white/8">
                     <h2 className="my-0! font-mono text-[10px]! font-medium tracking-[0.16em] text-gray-700 uppercase dark:text-gray-200">
                         Team Leaderboard

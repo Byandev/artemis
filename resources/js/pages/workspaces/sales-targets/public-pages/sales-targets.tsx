@@ -1,5 +1,9 @@
 import { BoardSectionState } from '@/components/sales-targets/board-section';
 import {
+    DistributionData,
+    GameboardDistribution,
+} from '@/components/sales-targets/gameboard-distribution';
+import {
     BoardTeam,
     GameboardHeader,
 } from '@/components/sales-targets/gameboard-header';
@@ -15,6 +19,10 @@ import {
     GameboardLeaderboard,
     LeaderboardData,
 } from '@/components/sales-targets/gameboard-leaderboard';
+import {
+    GameboardSalesChart,
+    SalesVsTargetPoint,
+} from '@/components/sales-targets/gameboard-sales-chart';
 import {
     GameboardTeams,
     TeamPerformance,
@@ -127,6 +135,14 @@ export default function PublicSalesTargets({
         ...shared,
         section: 'teams',
     });
+    const salesChart = useBoardSection<SalesVsTargetPoint[]>({
+        ...shared,
+        section: 'sales-vs-target',
+    });
+    const distribution = useBoardSection<DistributionData>({
+        ...shared,
+        section: 'achievement-distribution',
+    });
     // "View all" is just a bigger limit — the hook refetches when it changes.
     const [showAllRanks, setShowAllRanks] = useState(false);
     const leaderboard = useBoardSection<LeaderboardData>({
@@ -139,7 +155,14 @@ export default function PublicSalesTargets({
         return <SalesTargetsLock workspace={workspace} />;
     }
 
-    const busy = kpis.loading || leader.loading || teamRows.loading;
+    const busy = [
+        kpis,
+        leader,
+        teamRows,
+        salesChart,
+        distribution,
+        leaderboard,
+    ].some((section) => section.loading);
 
     return (
         <div className="min-h-screen bg-stone-50 dark:bg-zinc-950">
@@ -200,25 +223,61 @@ export default function PublicSalesTargets({
                             </div>
                         )}
 
-                        {leaderboard.data ? (
-                            <GameboardLeaderboard
-                                data={leaderboard.data}
-                                expanded={showAllRanks}
-                                onToggleExpanded={() =>
-                                    setShowAllRanks((shown) => !shown)
-                                }
-                            />
-                        ) : (
-                            <div className="mt-4">
-                                <BoardSectionState
-                                    loading={leaderboard.loading}
-                                    failed={leaderboard.failed}
-                                    onRetry={leaderboard.reload}
-                                    label="the leaderboard"
-                                    height="h-40"
-                                />
+                        {/* Standings, trend and spread sit side by side once
+                            there is width for all three. */}
+                        <div className="mt-4 grid grid-cols-1 gap-2 xl:grid-cols-12">
+                            <div className="xl:col-span-5">
+                                {leaderboard.data ? (
+                                    <GameboardLeaderboard
+                                        data={leaderboard.data}
+                                        expanded={showAllRanks}
+                                        onToggleExpanded={() =>
+                                            setShowAllRanks((shown) => !shown)
+                                        }
+                                    />
+                                ) : (
+                                    <BoardSectionState
+                                        loading={leaderboard.loading}
+                                        failed={leaderboard.failed}
+                                        onRetry={leaderboard.reload}
+                                        label="the leaderboard"
+                                        height="h-56"
+                                    />
+                                )}
                             </div>
-                        )}
+
+                            <div className="xl:col-span-4">
+                                {salesChart.data ? (
+                                    <GameboardSalesChart
+                                        points={salesChart.data}
+                                    />
+                                ) : (
+                                    <BoardSectionState
+                                        loading={salesChart.loading}
+                                        failed={salesChart.failed}
+                                        onRetry={salesChart.reload}
+                                        label="sales vs target"
+                                        height="h-56"
+                                    />
+                                )}
+                            </div>
+
+                            <div className="xl:col-span-3">
+                                {distribution.data ? (
+                                    <GameboardDistribution
+                                        data={distribution.data}
+                                    />
+                                ) : (
+                                    <BoardSectionState
+                                        loading={distribution.loading}
+                                        failed={distribution.failed}
+                                        onRetry={distribution.reload}
+                                        label="the distribution"
+                                        height="h-56"
+                                    />
+                                )}
+                            </div>
+                        </div>
                     </>
                 ) : (
                     <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-black/8 bg-white py-20 dark:border-white/8 dark:bg-zinc-900">

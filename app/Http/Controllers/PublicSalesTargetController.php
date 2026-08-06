@@ -90,6 +90,26 @@ class PublicSalesTargetController extends Controller
         return $this->section($request, $workspace, fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->teamsFor($target, $teamId));
     }
 
+    /** How many teams fall in each achievement band. */
+    public function achievementDistribution(Request $request, Workspace $workspace): JsonResponse
+    {
+        return $this->section(
+            $request,
+            $workspace,
+            fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->achievementDistribution($target, $teamId),
+        );
+    }
+
+    /** Each team's sales beside its target. */
+    public function salesVsTarget(Request $request, Workspace $workspace): JsonResponse
+    {
+        return $this->section(
+            $request,
+            $workspace,
+            fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->salesVsTarget($target, $teamId),
+        );
+    }
+
     /**
      * The team leaderboard — the same ranking as the cards, cut to the top few
      * unless asked for more. `total` is always the full count, so the table can
