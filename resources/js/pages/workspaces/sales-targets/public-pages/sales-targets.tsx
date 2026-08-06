@@ -1,3 +1,4 @@
+import { BoardSectionState } from '@/components/sales-targets/board-section';
 import {
     BoardTeam,
     GameboardHeader,
@@ -6,9 +7,18 @@ import {
     GameboardKpiRow,
     GameboardKpis,
 } from '@/components/sales-targets/gameboard-kpis';
-import { GameboardLeader } from '@/components/sales-targets/gameboard-leader';
+import {
+    GameboardLeader,
+    LeaderTeam,
+} from '@/components/sales-targets/gameboard-leader';
+import {
+    GameboardTeams,
+    TeamPerformance,
+} from '@/components/sales-targets/gameboard-teams';
+import { useBoardSection } from '@/components/sales-targets/use-board-section';
 import { Head, useForm } from '@inertiajs/react';
 import { Lock, Target } from 'lucide-react';
+import { useState } from 'react';
 
 interface PublicWorkspace {
     id: number;
@@ -22,7 +32,6 @@ interface Props {
     locked?: boolean;
     /** The day the board is scored on — today's target, else the most recent. */
     featured?: { id: number; name: string; date: string } | null;
-    kpis?: GameboardKpis | null;
     /** The teams on the featured day, and the one the board is narrowed to. */
     teams?: BoardTeam[];
     teamId?: number | null;
@@ -93,13 +102,33 @@ export default function PublicSalesTargets({
     workspace,
     locked,
     featured,
-    kpis,
     teams,
     teamId,
 }: Props) {
+    // Refresh doesn't reload the page — it re-runs every section's own request.
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    const shared = {
+        workspaceSlug: workspace.slug,
+        teamId,
+        refreshKey,
+    };
+
+    const kpis = useBoardSection<GameboardKpis>({ ...shared, section: 'kpis' });
+    const leader = useBoardSection<LeaderTeam>({
+        ...shared,
+        section: 'leader',
+    });
+    const teamRows = useBoardSection<TeamPerformance[]>({
+        ...shared,
+        section: 'teams',
+    });
+
     if (locked) {
         return <SalesTargetsLock workspace={workspace} />;
     }
+
+    const busy = kpis.loading || leader.loading || teamRows.loading;
 
     return (
         <div className="min-h-screen bg-stone-50 dark:bg-zinc-950">
@@ -110,17 +139,54 @@ export default function PublicSalesTargets({
                 featured={featured}
                 teams={teams}
                 teamId={teamId}
+                refreshing={busy}
+                onRefresh={() => setRefreshKey((key) => key + 1)}
             />
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) px-4 py-3 md:px-6">
-                {kpis ? (
+                {featured ? (
                     <>
-                        <GameboardKpiRow kpis={kpis} />
-                        {kpis.leader && (
-                            <GameboardLeader
-                                leader={kpis.leader}
-                                qualifyingRoas={kpis.qualifying_roas}
+                        {kpis.data ? (
+                            <GameboardKpiRow kpis={kpis.data} />
+                        ) : (
+                            <BoardSectionState
+                                loading={kpis.loading}
+                                failed={kpis.failed}
+                                onRetry={kpis.reload}
+                                label="the totals"
+                                height="h-24"
                             />
+                        )}
+
+                        {leader.data ? (
+                            <GameboardLeader
+                                leader={leader.data}
+                                qualifyingRoas={leader.data.qualifying_roas}
+                            />
+                        ) : (
+                            <div className="mt-2">
+                                <BoardSectionState
+                                    loading={leader.loading}
+                                    failed={leader.failed}
+                                    onRetry={leader.reload}
+                                    label="the leader"
+                                    height="h-20"
+                                />
+                            </div>
+                        )}
+
+                        {teamRows.data ? (
+                            <GameboardTeams teams={teamRows.data} />
+                        ) : (
+                            <div className="mt-4">
+                                <BoardSectionState
+                                    loading={teamRows.loading}
+                                    failed={teamRows.failed}
+                                    onRetry={teamRows.reload}
+                                    label="team performance"
+                                    height="h-40"
+                                />
+                            </div>
                         )}
                     </>
                 ) : (

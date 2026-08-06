@@ -1,4 +1,3 @@
-import { LeaderTeam } from '@/components/sales-targets/gameboard-leader';
 import { formatPeso } from '@/pages/workspaces/sales-targets/shared';
 import {
     BarChart3,
@@ -33,8 +32,6 @@ export interface GameboardKpis {
     qualified_teams: number;
     /** Signed: negative is a shortfall against the day's target. */
     above_target: number;
-    /** The team out front on the day, or null when the target has no teams. */
-    leader: LeaderTeam | null;
     trends: { achievement: Trend | null; roas: Trend | null };
 }
 

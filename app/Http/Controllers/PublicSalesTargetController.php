@@ -7,6 +7,7 @@ use App\Models\SalesTarget;
 use App\Models\Workspace;
 use App\Queries\SalesTargetScoreboardQuery;
 use App\Support\PublicWorkspaceGate;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -68,9 +69,54 @@ class PublicSalesTargetController extends Controller
             ] : null,
             'teams' => $boardTeams,
             'teamId' => $teamId,
-            'kpis' => $featured
-                ? (new SalesTargetScoreboardQuery($workspace))->kpisFor($featured, $teamId)
-                : null,
+        ]);
+    }
+
+    /** The headline tiles. */
+    public function kpis(Request $request, Workspace $workspace): JsonResponse
+    {
+        return $this->section($request, $workspace, fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->kpisFor($target, $teamId));
+    }
+
+    /** The leader banner: rank 1, its criteria and its sales trend. */
+    public function leader(Request $request, Workspace $workspace): JsonResponse
+    {
+        return $this->section($request, $workspace, fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->leaderFor($target, $teamId));
+    }
+
+    /** The per-team performance cards. */
+    public function teams(Request $request, Workspace $workspace): JsonResponse
+    {
+        return $this->section($request, $workspace, fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->teamsFor($target, $teamId));
+    }
+
+    /**
+     * Shared shell for the per-section endpoints: same password gate, same
+     * featured day, same team filter — only the slice of data differs, so each
+     * section can load, fail and refresh on its own.
+     */
+    private function section(Request $request, Workspace $workspace, callable $resolve): JsonResponse
+    {
+        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewSalesMarketingDashboard)) {
+            abort(403, 'This board is locked.');
+        }
+
+        $target = $this->featuredTarget($workspace);
+
+        if (! $target) {
+            return response()->json(['data' => null]);
+        }
+
+        $teamId = $request->integer('team_id') ?: null;
+
+        // A team that isn't on the board's day scores nothing, so ignore it
+        // rather than returning an empty section.
+        if ($teamId !== null && ! $target->teamTargets->contains('team_id', $teamId)) {
+            $teamId = null;
+        }
+
+        return response()->json([
+            'data' => $resolve(new SalesTargetScoreboardQuery($workspace), $target, $teamId),
         ]);
     }
 

@@ -18,6 +18,9 @@ interface Props {
     /** The teams on the board's day, to narrow it to one. */
     teams?: BoardTeam[];
     teamId?: number | null;
+    /** True while any section is fetching, so Refresh can show it. */
+    refreshing?: boolean;
+    onRefresh: () => void;
 }
 
 /**
@@ -31,8 +34,9 @@ export function GameboardHeader({
     featured,
     teams = [],
     teamId,
+    refreshing = false,
+    onRefresh,
 }: Props) {
-    const [refreshing, setRefreshing] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Fullscreen can also be left with Esc or the browser chrome, so the label
@@ -44,12 +48,6 @@ export function GameboardHeader({
 
         return () => document.removeEventListener('fullscreenchange', sync);
     }, []);
-
-    const refresh = () =>
-        router.reload({
-            onStart: () => setRefreshing(true),
-            onFinish: () => setRefreshing(false),
-        });
 
     const toggleFullscreen = () => {
         if (document.fullscreenElement) {
@@ -133,7 +131,7 @@ export function GameboardHeader({
                     )}
 
                     <button
-                        onClick={refresh}
+                        onClick={onRefresh}
                         disabled={refreshing}
                         className={controlClass}
                     >

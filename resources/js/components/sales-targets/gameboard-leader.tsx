@@ -1,18 +1,14 @@
+import { TeamPerformance } from '@/components/sales-targets/gameboard-teams';
 import { formatPeso } from '@/pages/workspaces/sales-targets/shared';
 import { Square, SquareCheck, Trophy } from 'lucide-react';
 import { useId } from 'react';
 
-export interface LeaderTeam {
-    team_id: number;
-    name: string;
-    sales: number;
-    target: number;
-    achievement_pct: number | null;
-    roas: number | null;
-    hit_target: boolean;
-    hit_roas: boolean;
+/** Rank 1's row, plus what the leader endpoint adds on top of it. */
+export interface LeaderTeam extends TeamPerformance {
     /** Daily sales over the fortnight ending on the board's day. */
     trend: { date: string; sales: number }[];
+    /** The ROAS bar this target judges teams against. */
+    qualifying_roas: number;
 }
 
 /**

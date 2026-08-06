@@ -40,7 +40,7 @@ class SalesTargetScoreboardQuery
     public function __construct(private readonly Workspace $workspace) {}
 
     /**
-     * The KPI payload for one target, with day-over-day trends taken from the
+     * The headline tiles for one target, with day-over-day trends taken from the
      * previous day's target when there is one.
      *
      * Pass $teamId to score the board on a single team — the totals, the counts
@@ -76,12 +76,43 @@ class SalesTargetScoreboardQuery
             'qualified_teams' => $today['qualified_teams'],
             // Signed on purpose: below target reads as a shortfall, not a zero.
             'above_target' => round($sales - $goal, 2),
-            'leader' => $this->leader($target, $today['teams']),
             'trends' => [
                 'achievement' => $this->delta($today['achievement_pct'], $previous['achievement_pct'] ?? null),
                 'roas' => $this->delta($today['roas'], $previous['roas'] ?? null),
             ],
         ];
+    }
+
+    /**
+     * Every team on the target, best first. The same ranking backs the leader,
+     * so the team this puts at rank 1 is the one {@see leaderFor()} names.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function teamsFor(SalesTarget $target, ?int $teamId = null): array
+    {
+        return $this->ranked($this->snapshot($target, $teamId)['teams']);
+    }
+
+    /**
+     * The team out front, with the ROAS bar it is being judged against and its
+     * recent sales for the sparkline.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function leaderFor(SalesTarget $target, ?int $teamId = null): ?array
+    {
+        $ranked = $this->teamsFor($target, $teamId);
+
+        if (empty($ranked)) {
+            return null;
+        }
+
+        $leader = $ranked[0];
+        $leader['trend'] = $this->teamSalesTrend($leader['team_id'], $target->date->toDateString());
+        $leader['qualifying_roas'] = $this->qualifyingRoas($target);
+
+        return $leader;
     }
 
     /**
@@ -145,10 +176,13 @@ class SalesTargetScoreboardQuery
                 'name' => $row->team?->name ?? 'Unknown team',
                 'sales' => $teamSales,
                 'target' => round($goal, 2),
+                'ad_budget' => $teamBudget === null ? null : round($teamBudget, 2),
                 'achievement_pct' => $goal > 0 ? round($teamSales / $goal * 100, 1) : null,
                 'roas' => $roas === null ? null : round($roas, 2),
+                'above_target' => round($teamSales - $goal, 2),
                 'hit_target' => $hitTarget,
                 'hit_roas' => $hitRoas,
+                'qualified' => $hitTarget && $hitRoas,
             ];
         }
 
@@ -171,19 +205,14 @@ class SalesTargetScoreboardQuery
     }
 
     /**
-     * The team out front: the highest achievement against its own target, with
-     * sales breaking a tie. Carries its recent sales so the board can draw the
-     * shape of its run.
+     * Teams best-first: highest achievement against its own target, with sales
+     * breaking a tie. Each row carries the rank it landed on.
      *
      * @param  array<int, array<string, mixed>>  $teams
-     * @return array<string, mixed>|null
+     * @return array<int, array<string, mixed>>
      */
-    private function leader(SalesTarget $target, array $teams): ?array
+    private function ranked(array $teams): array
     {
-        if (empty($teams)) {
-            return null;
-        }
-
         usort($teams, function (array $a, array $b) {
             // A team with no target to measure against ranks below one that has.
             $byAchievement = ($b['achievement_pct'] ?? -1) <=> ($a['achievement_pct'] ?? -1);
@@ -191,10 +220,11 @@ class SalesTargetScoreboardQuery
             return $byAchievement !== 0 ? $byAchievement : $b['sales'] <=> $a['sales'];
         });
 
-        $leader = $teams[0];
-        $leader['trend'] = $this->teamSalesTrend($leader['team_id'], $target->date->toDateString());
+        foreach ($teams as $i => $team) {
+            $teams[$i]['rank'] = $i + 1;
+        }
 
-        return $leader;
+        return $teams;
     }
 
     /**
