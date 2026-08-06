@@ -12,6 +12,43 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.24.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Inventory — Delivery Lead Time (New)',
+                items: [
+                    'New Delivery Lead Time table on the Inventory Dashboard — for each item, the average number of days from a purchase order being issued to 25%, 50%, 75% and finally all of the ordered quantity landing, so you can see not just how long a supplier takes overall but how much of it arrives early',
+                    'Every figure carries the number of orders it was averaged from — a partly delivered line counts towards the levels it has already passed and not the ones it hasn’t, so the samples thin out towards the right and a solid average is easy to tell from a lone data point',
+                    'Only orders issued in the last 6 months are counted, so the figures track how a supplier is performing now; cancelled orders are left out entirely rather than held against them as deliveries that were never going to arrive',
+                    'A toggle rolls child SKUs up into their parent or breaks them back out, the same grouping the Inventory Items list uses',
+                ],
+            },
+            {
+                title: 'Inventory — Supplier & Paid Dates',
+                items: [
+                    'Purchase orders now carry their supplier and the date they were paid, both coming across from the ERP — the paid date is taken from the ERP’s own audit trail, using the first time the order was marked Paid, so a part-payment still counts as the day money moved',
+                    'New Supplier and Paid Date columns on the Purchase Orders list, both sortable, and the search box now matches on supplier alongside delivery number, PO number, control number and SKU',
+                    'Both are in the Excel export too, and the PO Date column has dropped its “(Paid)” note now that the paid date has a column of its own to be sorted by',
+                    'The dashboard’s Open Purchase Orders table gained a Paid column sitting next to Issued, so the gap between raising an order and settling it reads at a glance',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Order History',
+                items: [
+                    'Opening a purchase order from the dashboard now shows its supplier, issue date and paid date across the top, before you get to the line items',
+                    'Underneath the lines sits the full status history the ERP recorded — every stage, when it happened, and who moved it — so you can see why an order is sitting where it is rather than just that it is; orders synced before this existed simply show no history instead of an error',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Pancake order syncing now spreads across more background workers, so a large sync clears faster',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.23.1',
         date: '2026-08-05',
         sections: [

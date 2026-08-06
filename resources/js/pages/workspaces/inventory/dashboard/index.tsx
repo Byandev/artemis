@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import DeliveryLeadTimeTable from '@/components/inventory/dashboard/delivery-lead-time-table';
 import HighUnfulfilledTable from '@/components/inventory/dashboard/high-unfulfilled-table';
 import KpiCards from '@/components/inventory/dashboard/kpi-cards';
 import LowStockTable from '@/components/inventory/dashboard/low-stock-table';
@@ -42,6 +43,10 @@ export default function InventoryDashboard({ workspace }: Props) {
                     <KpiCards slug={slug} />
                     <MovementChart slug={slug} />
                     <OpenPosTable slug={slug} />
+                    {/* Sits under the open POs it explains: that table is what
+                        is still owed, this one is how long owing usually
+                        lasts. Full width — six columns don't fit in half. */}
+                    <DeliveryLeadTimeTable slug={slug} />
                     {/* Two half-width tables side by side from lg up — both are
                         narrow SKU/count lists that read worse stretched across
                         the page. They stack full width on narrow screens. */}
