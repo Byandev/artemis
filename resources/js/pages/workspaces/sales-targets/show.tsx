@@ -15,6 +15,7 @@ import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     SalesTarget,
+    budgetOf,
     dayOffset,
     formatTargetDate,
     statusFor,
@@ -46,6 +47,7 @@ export default function SalesTargetShow({
 
     const status = statusFor(dayOffset(target.date));
     const total = totalOf(target);
+    const budget = budgetOf(target);
 
     return (
         <AppLayout>
@@ -98,13 +100,31 @@ export default function SalesTargetShow({
                     )}
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="rounded-[16px] border border-black/6 bg-white px-5 py-4 dark:border-white/6 dark:bg-zinc-900">
                         <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                             Target Sale
                         </p>
                         <p className="mt-1 font-mono text-[20px] font-semibold text-gray-800 tabular-nums dark:text-gray-100">
                             {currencyFormatter(total)}
+                        </p>
+                    </div>
+                    <div className="rounded-[16px] border border-black/6 bg-white px-5 py-4 dark:border-white/6 dark:bg-zinc-900">
+                        <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Ad Budget
+                        </p>
+                        <p className="mt-1 font-mono text-[20px] font-semibold text-gray-800 tabular-nums dark:text-gray-100">
+                            {budget > 0 ? currencyFormatter(budget) : '—'}
+                        </p>
+                    </div>
+                    <div className="rounded-[16px] border border-black/6 bg-white px-5 py-4 dark:border-white/6 dark:bg-zinc-900">
+                        <p className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Target ROAS
+                        </p>
+                        <p className="mt-1 font-mono text-[20px] font-semibold text-gray-800 tabular-nums dark:text-gray-100">
+                            {target.target_roas
+                                ? Number(target.target_roas).toFixed(2)
+                                : '—'}
                         </p>
                     </div>
                     <div className="rounded-[16px] border border-black/6 bg-white px-5 py-4 dark:border-white/6 dark:bg-zinc-900">
@@ -118,18 +138,21 @@ export default function SalesTargetShow({
                 </div>
 
                 <div className="mt-4 overflow-hidden rounded-[16px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                    <div className="flex items-center justify-between border-b border-black/6 px-5 py-2.5 dark:border-white/6">
-                        <span className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                    <div className="flex items-center gap-3 border-b border-black/6 px-5 py-2.5 dark:border-white/6">
+                        <span className="flex-1 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                             Team
                         </span>
-                        <span className="font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                        <span className="w-36 text-right font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                             Target
+                        </span>
+                        <span className="w-36 text-right font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                            Ad Budget
                         </span>
                     </div>
 
                     <div className="divide-y divide-black/4 dark:divide-white/4">
                         {target.team_targets.map((row) => {
-                            const amount = Number(row.sales_target);
+                            const amount = Number(row.sales_target ?? 0);
                             const share =
                                 total > 0
                                     ? Math.round((amount / total) * 100)
@@ -138,19 +161,30 @@ export default function SalesTargetShow({
                             return (
                                 <div
                                     key={row.id}
-                                    className="flex items-center justify-between gap-3 px-5 py-3"
+                                    className="flex items-center gap-3 px-5 py-3"
                                 >
-                                    <span className="truncate text-[12px] text-gray-700 dark:text-gray-300">
+                                    <span className="flex-1 truncate text-[12px] text-gray-700 dark:text-gray-300">
                                         {row.team?.name ?? 'Unknown team'}
                                     </span>
-                                    <div className="flex shrink-0 items-baseline gap-2">
-                                        <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                                            {share}% of total
-                                        </span>
+                                    <div className="w-36 text-right">
                                         <span className="font-mono text-[12px] text-gray-700 tabular-nums dark:text-gray-300">
-                                            {currencyFormatter(amount)}
+                                            {row.sales_target === null
+                                                ? '—'
+                                                : currencyFormatter(amount)}
                                         </span>
+                                        {row.sales_target !== null && (
+                                            <span className="ml-1.5 font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                                {share}%
+                                            </span>
+                                        )}
                                     </div>
+                                    <span className="w-36 text-right font-mono text-[12px] text-gray-700 tabular-nums dark:text-gray-300">
+                                        {row.ad_budget === null
+                                            ? '—'
+                                            : currencyFormatter(
+                                                  Number(row.ad_budget),
+                                              )}
+                                    </span>
                                 </div>
                             );
                         })}

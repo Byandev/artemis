@@ -15,10 +15,12 @@ class SalesTargetTeam extends Model
         'sales_target_id',
         'team_id',
         'sales_target',
+        'ad_budget',
     ];
 
     protected $casts = [
         'sales_target' => 'decimal:2',
+        'ad_budget' => 'decimal:2',
     ];
 
     public function salesTarget(): BelongsTo

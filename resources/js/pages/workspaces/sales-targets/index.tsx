@@ -15,10 +15,11 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { Pencil, Plus, Target, Trash2 } from 'lucide-react';
+import { MonitorPlay, Pencil, Plus, Target, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     SalesTarget,
+    budgetOf,
     dayOffset,
     formatTargetDate,
     statusFor,
@@ -101,6 +102,44 @@ export default function SalesTargetsIndex({
                 </span>
             ),
         },
+        {
+            id: 'ad_budget',
+            enableSorting: false,
+            header: ({ column }) => (
+                <SortableHeader
+                    enabled={false}
+                    column={column}
+                    title="Ad Budget"
+                />
+            ),
+            cell: ({ row }) => {
+                const budget = budgetOf(row.original);
+
+                return (
+                    <span className="font-mono text-[12px] text-gray-600 tabular-nums dark:text-gray-300">
+                        {budget > 0 ? currencyFormatter(budget) : '—'}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'target_roas',
+            enableSorting: false,
+            header: ({ column }) => (
+                <SortableHeader
+                    enabled={false}
+                    column={column}
+                    title="Target ROAS"
+                />
+            ),
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] text-gray-600 tabular-nums dark:text-gray-300">
+                    {row.original.target_roas
+                        ? Number(row.original.target_roas).toFixed(2)
+                        : '—'}
+                </span>
+            ),
+        },
         ...(canManage
             ? [
                   {
@@ -151,15 +190,28 @@ export default function SalesTargetsIndex({
                             one to see the per-team amounts.
                         </p>
                     </div>
-                    {canManage && teams.length > 0 && (
-                        <button
-                            onClick={() => setCreateOpen(true)}
-                            className="flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-brand-700"
+                    <div className="flex items-center gap-2">
+                        {/* The public board is password-gated and meant for a wall
+                            display, so it opens in its own tab. */}
+                        <a
+                            href={`/public/workspaces/${workspace.slug}/sales-targets`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
                         >
-                            <Plus className="h-3.5 w-3.5" />
-                            New Sales Target
-                        </button>
-                    )}
+                            <MonitorPlay className="h-3.5 w-3.5" />
+                            Public Gameboard
+                        </a>
+                        {canManage && teams.length > 0 && (
+                            <button
+                                onClick={() => setCreateOpen(true)}
+                                className="flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-brand-700"
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                New Sales Target
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {targets.total === 0 ? (

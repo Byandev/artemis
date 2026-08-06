@@ -16,10 +16,12 @@ class SalesTarget extends Model
         'workspace_id',
         'date',
         'name',
+        'target_roas',
     ];
 
     protected $casts = [
         'date' => 'date:Y-m-d',
+        'target_roas' => 'decimal:2',
     ];
 
     public function workspace(): BelongsTo

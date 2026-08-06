@@ -86,6 +86,7 @@ class SalesTargetController extends Controller
                 'workspace_id' => $workspace->id,
                 'date' => $validated['date'],
                 'name' => $validated['name'],
+                'target_roas' => $validated['target_roas'],
             ]);
 
             $target->teamTargets()->createMany($validated['teams']);
@@ -109,6 +110,7 @@ class SalesTargetController extends Controller
             $salesTarget->update([
                 'date' => $validated['date'],
                 'name' => $validated['name'],
+                'target_roas' => $validated['target_roas'],
             ]);
 
             // Replace the team rows wholesale — the form always submits the full
@@ -137,7 +139,11 @@ class SalesTargetController extends Controller
     /**
      * Shared validation for store and update.
      *
-     * @return array{date: string, name: string, teams: array<int, array{team_id: int, sales_target: string}>}
+     * A selected team may carry a sales amount, an ad budget, or both — the
+     * selection itself is what puts it on the target, so neither number is
+     * required.
+     *
+     * @return array{date: string, name: string, target_roas: string|null, teams: array<int, array{team_id: int, sales_target: string|null, ad_budget: string|null}>}
      */
     private function validatePayload(Request $request, Workspace $workspace, ?SalesTarget $ignore = null): array
     {
@@ -152,9 +158,11 @@ class SalesTargetController extends Controller
                     ->ignore($ignore?->id),
             ],
             'name' => ['required', 'string', 'max:255'],
+            'target_roas' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'teams' => ['required', 'array', 'min:1'],
             'teams.*.team_id' => ['required', 'integer', 'distinct'],
-            'teams.*.sales_target' => ['required', 'numeric', 'min:0', 'max:9999999999999.99'],
+            'teams.*.sales_target' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
+            'teams.*.ad_budget' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
         ], [
             'date.unique' => 'A sales target already exists for this date.',
             'teams.required' => 'Add at least one team to the target.',
@@ -174,11 +182,21 @@ class SalesTargetController extends Controller
 
             $validated['teams'][$i] = [
                 'team_id' => (int) $team['team_id'],
-                'sales_target' => $team['sales_target'],
+                // An empty box means "not set", which is not the same as zero.
+                'sales_target' => $this->amount($team['sales_target'] ?? null),
+                'ad_budget' => $this->amount($team['ad_budget'] ?? null),
             ];
         }
 
+        $validated['target_roas'] = $this->amount($validated['target_roas'] ?? null);
+
         return $validated;
+    }
+
+    /** Normalises a submitted money/ratio field: blank becomes null. */
+    private function amount(mixed $value): ?string
+    {
+        return $value === null || $value === '' ? null : (string) $value;
     }
 
     private function guardOwnership(Workspace $workspace, SalesTarget $salesTarget): void
