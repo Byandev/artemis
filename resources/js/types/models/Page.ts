@@ -24,6 +24,8 @@ export interface Page {
     parcel_journey_custom_field_id: number | null;
     parcel_journey_enabled: boolean | null;
     is_sync_logic_updated: boolean | null;
+    /** False keeps the Meta budget snapshot from overwriting this page's budget. */
+    auto_update_ad_budget: boolean;
     pending_required_checklists_count?: number;
 
     shop?: Shop;
