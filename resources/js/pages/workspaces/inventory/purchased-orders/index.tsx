@@ -99,6 +99,12 @@ interface PurchasedOrder {
     expected_delivery_date: string | null;
     cust_po_no: string | null;
     control_no: string | null;
+    supplier: string | null;
+    /**
+     * "Y-m-d H:i:s" from the ERP's Paid status log, or null on an order that
+     * has not been paid (or predates the status-log sync).
+     */
+    paid_at: string | null;
     delivery_fee: string;
     total_amount: string;
     status: number;
@@ -256,13 +262,42 @@ export default function PurchasedOrderIndex({
                 accessorKey: 'issue_date',
                 enableSorting: true,
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="PO Date (Paid)" />
+                    <SortableHeader column={column} title="PO Date" />
                 ),
                 cell: ({ row }) => (
                     <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 dark:text-gray-400">
                         {row.original.issue_date
                             ? moment(row.original.issue_date).format('MMM D')
                             : '—'}
+                    </span>
+                ),
+            },
+            {
+                // Its own sortable column rather than a parenthetical under the
+                // PO date: finance sorts and filters on when money moved, which
+                // a second line inside another column can't do.
+                accessorKey: 'paid_at',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Paid Date" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 dark:text-gray-400">
+                        {row.original.paid_at
+                            ? moment(row.original.paid_at).format('MMM D')
+                            : '—'}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'supplier',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Supplier" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                        {row.original.supplier || '—'}
                     </span>
                 ),
             },
@@ -747,7 +782,7 @@ export default function PurchasedOrderIndex({
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
-                            placeholder="Search Delivery No., Cust PO No., Control No., SKU…"
+                            placeholder="Search Delivery No., Cust PO No., Control No., Supplier, SKU…"
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
