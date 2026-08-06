@@ -1,3 +1,4 @@
+import { LeaderTeam } from '@/components/sales-targets/gameboard-leader';
 import { formatPeso } from '@/pages/workspaces/sales-targets/shared';
 import {
     BarChart3,
@@ -23,8 +24,7 @@ export interface GameboardKpis {
     achievement_pct: number | null;
     /** The target's summed per-team ad budgets — what the day is allowed to spend. */
     ad_budget: number | null;
-    /** Actual spend. Sent for the ROAS figure; the budget tile doesn't show it. */
-    total_ad_spent: number;
+    /** Sales ÷ ad budget. Null when no budget was set to divide by. */
     roas: number | null;
     qualifying_roas: number;
     teams_total: number;
@@ -33,6 +33,8 @@ export interface GameboardKpis {
     qualified_teams: number;
     /** Signed: negative is a shortfall against the day's target. */
     above_target: number;
+    /** The team out front on the day, or null when the target has no teams. */
+    leader: LeaderTeam | null;
     trends: { achievement: Trend | null; roas: Trend | null };
 }
 

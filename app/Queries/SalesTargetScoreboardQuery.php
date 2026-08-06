@@ -2,25 +2,29 @@
 
 namespace App\Queries;
 
-use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\SalesTarget;
 use App\Models\Workspace;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Scores a dated sales target against what its teams actually did that day —
- * the numbers behind the public gameboard's KPI row.
+ * Scores a dated sales target against what actually happened that day — the
+ * numbers behind the public gameboard's KPI row.
  *
- * The target supplies the goal (per-team amounts); the actuals come from the
- * unified advertiser_performance_daily_records, rolled up to the team the same
- * source-aware way as {@see TeamAdSpendGoalStatusQuery}:
- *   - gencys:  advertiser is an Intern → gencys_interns.user_id → team_user → team
- *   - artemis: advertiser_id IS the user id → team_user → team
+ * The target supplies the goals (per-team sales amounts, ad budget, ROAS). The
+ * only actual read is sales, straight from pancake_orders: final_amount dated on
+ * confirmed_at, cancelled and removed orders excluded — the same definition as
+ * the workspace's Total Sales metric.
  *
- * A user on two teams contributes to BOTH teams' rows (the pivot is
- * many-to-many), so the company totals are read from the deduplicated advertiser
- * set rather than by summing the team rows — otherwise that user's sales would
- * be counted twice in the headline figure.
+ * ROAS here is sales ÷ the ad BUDGET the target set, not ÷ money actually spent.
+ * It answers "what did the budget we handed out return", which is the question a
+ * board about targets is asking.
+ *
+ * The headline totals are workspace-wide and are NOT gated on team membership —
+ * "total sales" means everything the workspace confirmed that day. Only the
+ * per-team figures need attribution, and they get it through the page an order
+ * came in on (pages.owner_id → team_user), the same link the workspace metrics
+ * use for their team filter.
  *
  * This is the workspace-wide board: no team visibility scoping is applied, which
  * is why it only backs the password-gated public page and not a per-user view.
@@ -33,15 +37,7 @@ class SalesTargetScoreboardQuery
      */
     public const DEFAULT_QUALIFYING_ROAS = 5.0;
 
-    /** Which unified source this workspace reads ('gencys' | 'artemis'). */
-    private string $source;
-
-    public function __construct(private readonly Workspace $workspace)
-    {
-        $this->source = $workspace->is_gencys_partner
-            ? AdvertiserPerformanceDailyRecord::SOURCE_GENCYS
-            : AdvertiserPerformanceDailyRecord::SOURCE_ARTEMIS;
-    }
+    public function __construct(private readonly Workspace $workspace) {}
 
     /**
      * The KPI payload for one target, with day-over-day trends taken from the
@@ -64,7 +60,6 @@ class SalesTargetScoreboardQuery
         $previous = $previousTarget ? $this->snapshot($previousTarget, $teamId) : null;
 
         $sales = $today['sales'];
-        $spend = $today['ad_spent'];
         $goal = $today['target_sales'];
 
         return [
@@ -72,7 +67,6 @@ class SalesTargetScoreboardQuery
             'total_sales' => $sales,
             'target_sales' => $goal,
             'achievement_pct' => $today['achievement_pct'],
-            'total_ad_spent' => $spend,
             'ad_budget' => $today['ad_budget'],
             'roas' => $today['roas'],
             'qualifying_roas' => $this->qualifyingRoas($target),
@@ -82,6 +76,7 @@ class SalesTargetScoreboardQuery
             'qualified_teams' => $today['qualified_teams'],
             // Signed on purpose: below target reads as a shortfall, not a zero.
             'above_target' => round($sales - $goal, 2),
+            'leader' => $this->leader($target, $today['teams']),
             'trends' => [
                 'achievement' => $this->delta($today['achievement_pct'], $previous['achievement_pct'] ?? null),
                 'roas' => $this->delta($today['roas'], $previous['roas'] ?? null),
@@ -112,7 +107,7 @@ class SalesTargetScoreboardQuery
         $teamIds = $teamTargets->pluck('team_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
 
         $actuals = $this->actualsByTeam($date, $teamIds);
-        $company = $this->companyTotals($date, $teamIds);
+        $company = $this->companySales($date, $teamId);
         $qualifyingRoas = $this->qualifyingRoas($target);
 
         $targetSales = 0.0;
@@ -121,51 +116,133 @@ class SalesTargetScoreboardQuery
         $teamsAtTarget = 0;
         $teamsAtRoas = 0;
         $qualified = 0;
+        $teams = [];
 
         foreach ($teamTargets as $row) {
             $goal = (float) $row->sales_target;
-            $actual = $actuals[(int) $row->team_id] ?? ['sales' => 0.0, 'ad_spent' => 0.0];
+            $teamSales = $actuals[(int) $row->team_id] ?? 0.0;
+            $teamBudget = $row->ad_budget === null ? null : (float) $row->ad_budget;
 
             $targetSales += $goal;
 
-            if ($row->ad_budget !== null) {
-                $adBudget += (float) $row->ad_budget;
+            if ($teamBudget !== null) {
+                $adBudget += $teamBudget;
                 $hasBudget = true;
             }
 
-            $hitTarget = $goal > 0 && $actual['sales'] >= $goal;
-            $roas = $actual['ad_spent'] > 0 ? $actual['sales'] / $actual['ad_spent'] : null;
+            $hitTarget = $goal > 0 && $teamSales >= $goal;
+            // ROAS on this board is the return on the budget the team was given,
+            // not on what it actually spent.
+            $roas = $teamBudget > 0 ? $teamSales / $teamBudget : null;
             $hitRoas = $roas !== null && round($roas, 2) >= $qualifyingRoas;
 
             $teamsAtTarget += $hitTarget ? 1 : 0;
             $teamsAtRoas += $hitRoas ? 1 : 0;
             $qualified += $hitTarget && $hitRoas ? 1 : 0;
+
+            $teams[] = [
+                'team_id' => (int) $row->team_id,
+                'name' => $row->team?->name ?? 'Unknown team',
+                'sales' => $teamSales,
+                'target' => round($goal, 2),
+                'achievement_pct' => $goal > 0 ? round($teamSales / $goal * 100, 1) : null,
+                'roas' => $roas === null ? null : round($roas, 2),
+                'hit_target' => $hitTarget,
+                'hit_roas' => $hitRoas,
+            ];
         }
 
-        $sales = $company['sales'];
-        $spend = $company['ad_spent'];
+        $budget = $hasBudget ? round($adBudget, 2) : null;
 
         return [
-            'sales' => $sales,
-            'ad_spent' => $spend,
+            'sales' => $company,
             'target_sales' => round($targetSales, 2),
-            // Null, not zero, when no team was given a budget — the ads tile has
-            // nothing to measure against rather than a goal of nothing.
-            'ad_budget' => $hasBudget ? round($adBudget, 2) : null,
-            'achievement_pct' => $targetSales > 0 ? round($sales / $targetSales * 100, 1) : null,
-            'roas' => $spend > 0 ? round($sales / $spend, 2) : null,
+            // Null, not zero, when no team was given a budget — there is then no
+            // budget to divide by and no ads figure to show.
+            'ad_budget' => $budget,
+            'achievement_pct' => $targetSales > 0 ? round($company / $targetSales * 100, 1) : null,
+            'roas' => $budget > 0 ? round($company / $budget, 2) : null,
             'teams_total' => count($teamIds),
             'teams_at_target' => $teamsAtTarget,
             'teams_at_roas' => $teamsAtRoas,
             'qualified_teams' => $qualified,
+            'teams' => $teams,
         ];
     }
 
     /**
-     * team id => that team's sales and ad spend on the date.
+     * The team out front: the highest achievement against its own target, with
+     * sales breaking a tie. Carries its recent sales so the board can draw the
+     * shape of its run.
+     *
+     * @param  array<int, array<string, mixed>>  $teams
+     * @return array<string, mixed>|null
+     */
+    private function leader(SalesTarget $target, array $teams): ?array
+    {
+        if (empty($teams)) {
+            return null;
+        }
+
+        usort($teams, function (array $a, array $b) {
+            // A team with no target to measure against ranks below one that has.
+            $byAchievement = ($b['achievement_pct'] ?? -1) <=> ($a['achievement_pct'] ?? -1);
+
+            return $byAchievement !== 0 ? $byAchievement : $b['sales'] <=> $a['sales'];
+        });
+
+        $leader = $teams[0];
+        $leader['trend'] = $this->teamSalesTrend($leader['team_id'], $target->date->toDateString());
+
+        return $leader;
+    }
+
+    /**
+     * The team's daily sales over the window ending on the target's date, with
+     * the days that have no record filled in as zero so the line has no gaps.
+     *
+     * @return array<int, array{date: string, sales: float}>
+     */
+    private function teamSalesTrend(int $teamId, string $end, int $days = 14): array
+    {
+        $from = Carbon::parse($end)->subDays($days - 1)->toDateString();
+
+        $byDate = DB::table('pancake_orders')
+            ->where('pancake_orders.workspace_id', $this->workspace->id)
+            ->whereBetween('pancake_orders.confirmed_at', [
+                $from.' 00:00:00',
+                $end.' 23:59:59',
+            ])
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->join('team_user as tu', 'tu.user_id', '=', 'pages.owner_id')
+            ->where('tu.team_id', $teamId)
+            ->groupBy('date')
+            ->selectRaw('DATE(pancake_orders.confirmed_at) as date, SUM(pancake_orders.final_amount) as sales')
+            ->pluck('sales', 'date');
+
+        $trend = [];
+        $cursor = Carbon::parse($from);
+
+        for ($i = 0; $i < $days; $i++) {
+            $date = $cursor->toDateString();
+            $trend[] = [
+                'date' => $date,
+                'sales' => round((float) ($byDate[$date] ?? 0), 2),
+            ];
+            $cursor->addDay();
+        }
+
+        return $trend;
+    }
+
+    /**
+     * team id => confirmed sales that day, straight from the orders. A team owns
+     * an order through the page it came in on (pages.owner_id → team_user), the
+     * same link the workspace metrics use for a team filter.
      *
      * @param  array<int, int>  $teamIds
-     * @return array<int, array{sales: float, ad_spent: float}>
+     * @return array<int, float>
      */
     private function actualsByTeam(string $date, array $teamIds): array
     {
@@ -173,94 +250,57 @@ class SalesTargetScoreboardQuery
             return [];
         }
 
-        $query = $this->baseQuery($date);
-
-        if ($this->source === AdvertiserPerformanceDailyRecord::SOURCE_GENCYS) {
-            $query->join('gencys_interns as gi', function ($join) {
-                $join->on('gi.id', '=', 'apdr.advertiser_id')
-                    ->where('gi.workspace_id', '=', $this->workspace->id);
-            })->join('team_user as tu', 'tu.user_id', '=', 'gi.user_id');
-        } else {
-            $query->join('team_user as tu', 'tu.user_id', '=', 'apdr.advertiser_id');
-        }
-
-        $rows = $query
+        $rows = $this->ordersQuery($date)
+            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->join('team_user as tu', 'tu.user_id', '=', 'pages.owner_id')
             ->whereIn('tu.team_id', $teamIds)
             ->groupBy('tu.team_id')
-            ->selectRaw('tu.team_id as team_id, SUM(COALESCE(apdr.sales, 0)) as sales, SUM(COALESCE(apdr.ad_spent, 0)) as ad_spent')
+            ->selectRaw('tu.team_id as team_id, SUM(pancake_orders.final_amount) as sales')
             ->get();
 
         $map = [];
 
         foreach ($rows as $row) {
-            $map[(int) $row->team_id] = [
-                'sales' => round((float) $row->sales, 2),
-                'ad_spent' => round((float) $row->ad_spent, 2),
-            ];
+            $map[(int) $row->team_id] = round((float) $row->sales, 2);
         }
 
         return $map;
     }
 
     /**
-     * The day's totals over every advertiser on the board's teams, counted once
-     * each however many of those teams they belong to.
-     *
-     * @param  array<int, int>  $teamIds
-     * @return array{sales: float, ad_spent: float}
+     * The day's workspace-wide sales — every confirmed order, whoever owns the
+     * page it came in on. Team membership deliberately doesn't gate this: the
+     * headline is what the company sold, not what the linked teams sold.
      */
-    private function companyTotals(string $date, array $teamIds): array
+    private function companySales(string $date, ?int $teamId): float
     {
-        $advertiserIds = $this->advertiserIds($teamIds);
+        $sales = $this->ordersQuery($date)
+            ->when($teamId, fn ($query) => $query
+                ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+                ->whereIn('pages.owner_id', fn ($sub) => $sub
+                    ->from('team_user')
+                    ->select('user_id')
+                    ->where('team_id', $teamId)))
+            ->selectRaw('COALESCE(SUM(pancake_orders.final_amount), 0) as sales')
+            ->value('sales');
 
-        if (empty($advertiserIds)) {
-            return ['sales' => 0.0, 'ad_spent' => 0.0];
-        }
-
-        $agg = $this->baseQuery($date)
-            ->whereIn('apdr.advertiser_id', $advertiserIds)
-            ->selectRaw('SUM(COALESCE(apdr.sales, 0)) as sales, SUM(COALESCE(apdr.ad_spent, 0)) as ad_spent')
-            ->first();
-
-        return [
-            'sales' => round((float) ($agg->sales ?? 0), 2),
-            'ad_spent' => round((float) ($agg->ad_spent ?? 0), 2),
-        ];
+        return round((float) $sales, 2);
     }
 
     /**
-     * The advertiser ids behind the given teams' members, deduplicated.
-     *
-     * @param  array<int, int>  $teamIds
-     * @return array<int, int>
+     * Confirmed orders for one day. Same definition as the workspace's Total
+     * Sales metric: final_amount, dated on confirmed_at, cancelled and removed
+     * orders (status 6 and 7) left out.
      */
-    private function advertiserIds(array $teamIds): array
+    private function ordersQuery(string $date)
     {
-        if (empty($teamIds)) {
-            return [];
-        }
-
-        $userIds = DB::table('team_user')
-            ->whereIn('team_id', $teamIds)
-            ->distinct()
-            ->pluck('user_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if (empty($userIds)) {
-            return [];
-        }
-
-        if ($this->source === AdvertiserPerformanceDailyRecord::SOURCE_GENCYS) {
-            return DB::table('gencys_interns')
-                ->where('workspace_id', $this->workspace->id)
-                ->whereIn('user_id', $userIds)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-        }
-
-        return $userIds;
+        return DB::table('pancake_orders')
+            ->where('pancake_orders.workspace_id', $this->workspace->id)
+            ->whereBetween('pancake_orders.confirmed_at', [
+                $date.' 00:00:00',
+                $date.' 23:59:59',
+            ])
+            ->whereNotIn('pancake_orders.status', [6, 7]);
     }
 
     /**
@@ -272,16 +312,6 @@ class SalesTargetScoreboardQuery
         $roas = $target->target_roas === null ? null : (float) $target->target_roas;
 
         return $roas !== null && $roas > 0 ? $roas : self::DEFAULT_QUALIFYING_ROAS;
-    }
-
-    private function baseQuery(string $date)
-    {
-        return DB::table('advertiser_performance_daily_records as apdr')
-            ->where('apdr.workspace_id', $this->workspace->id)
-            ->where('apdr.source', $this->source)
-            // Plain comparison, not whereDate(): the column is a date, and wrapping
-            // it in date() would sidestep the (workspace_id, source, date) index.
-            ->where('apdr.date', $date);
     }
 
     /**

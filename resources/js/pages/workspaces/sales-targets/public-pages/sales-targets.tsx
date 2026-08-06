@@ -6,6 +6,7 @@ import {
     GameboardKpiRow,
     GameboardKpis,
 } from '@/components/sales-targets/gameboard-kpis';
+import { GameboardLeader } from '@/components/sales-targets/gameboard-leader';
 import { Head, useForm } from '@inertiajs/react';
 import { Lock, Target } from 'lucide-react';
 
@@ -113,7 +114,15 @@ export default function PublicSalesTargets({
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) px-4 py-3 md:px-6">
                 {kpis ? (
-                    <GameboardKpiRow kpis={kpis} />
+                    <>
+                        <GameboardKpiRow kpis={kpis} />
+                        {kpis.leader && (
+                            <GameboardLeader
+                                leader={kpis.leader}
+                                qualifyingRoas={kpis.qualifying_roas}
+                            />
+                        )}
+                    </>
                 ) : (
                     <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-black/8 bg-white py-20 dark:border-white/8 dark:bg-zinc-900">
                         <div className="rounded-2xl bg-stone-100 p-3.5 dark:bg-zinc-800">
@@ -123,7 +132,8 @@ export default function PublicSalesTargets({
                             No sales targets yet
                         </p>
                         <p className="mt-1 text-[12px] text-gray-400 dark:text-gray-500">
-                            The board lights up once a target is set for the day.
+                            The board lights up once a target is set for the
+                            day.
                         </p>
                     </div>
                 )}
