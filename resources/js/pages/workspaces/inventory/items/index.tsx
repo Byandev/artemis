@@ -69,12 +69,13 @@ interface Item {
     product_winning_date?: string | null;
     remaining_qty: number | null;
     unfulfilled: number | null;
-    /** Owed on orders a supplier already has — genuinely incoming. */
+    /** Everything still owed on open purchase orders, at any stage. */
     waiting_for_delivery_stocks: number | null;
     /**
-     * Owed on orders raised but not yet released to a supplier. Shown so nothing
-     * is hidden, but excluded from Days It Can Last and PO Needed — an order
-     * waiting for approval or payment is an intention, not stock.
+     * The subset of the above that no supplier has been given yet — still in
+     * approval or payment. Counted as incoming like the rest (the PO exists, so
+     * reordering it would double-order); broken out because a large or ageing
+     * figure here means the stock is committed but not actually moving.
      */
     requested_stocks: number | null;
     three_days_average: number | null;
@@ -761,17 +762,15 @@ export default function ItemIndex({
             header: ({ column }) => (
                 <SortableHeader
                     column={column}
-                    title="Requested"
+                    title="Of Which Not Sent"
                     className="justify-center"
                 />
             ),
             /*
-             * Ordered, but nobody has told a supplier yet — still sitting in
-             * approval or payment. Deliberately amber rather than the blue used
-             * for genuinely incoming stock, and deliberately NOT counted toward
-             * Days It Can Last or PO Needed: treating an unapproved order as
-             * stock is what let items sit at zero showing weeks of cover.
-             * Opens the same breakdown, which lists both kinds.
+             * The part of "Waiting for Delivery" that has not reached a supplier
+             * yet. Amber rather than blue because it is the same stock seen from
+             * a different angle: committed, so it still covers the reorder, but
+             * not yet moving. A big number here is a queue, not a shortage.
              */
             cell: ({ row }) => (
                 <div className="text-center">
@@ -784,7 +783,7 @@ export default function ItemIndex({
                         <button
                             type="button"
                             onClick={() => setWaitingItem(row.original)}
-                            title="Ordered but not yet sent to a supplier — not counted as stock"
+                            title="Of the units waiting for delivery, the part still awaiting approval or payment"
                             className="cursor-pointer rounded px-1 underline decoration-dotted underline-offset-4 transition-colors hover:bg-amber-500/10"
                         >
                             <MetricCell

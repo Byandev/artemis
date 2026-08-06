@@ -29,10 +29,11 @@ class InventoryItemMetrics
             'discrepancy' => InventoryStockColumns::latestDiscrepancy(),
             'discrepancy_counted_qty' => InventoryStockColumns::latestCounted(),
             'discrepancy_date' => InventoryStockColumns::latestDiscrepancyDate(),
-            // Named for what it is: quantity owed on orders a supplier already
-            // has. Orders still awaiting approval or payment are reported
-            // separately as requested_stocks.
-            'waiting_for_delivery_stocks' => InventoryStockColumns::releasedStocks(),
+            // Everything still owed on open orders — the full committed figure
+            // the reorder maths works from, so a raised PO is never ordered
+            // twice. requested_stocks breaks out the part of it that no supplier
+            // has been given yet, which is a flow signal rather than a quantity.
+            'waiting_for_delivery_stocks' => InventoryStockColumns::waitingStocks(),
             'requested_stocks' => InventoryStockColumns::requestedStocks(),
             'remaining_after_fulfillment' => InventoryStockColumns::remainingAfterFulfillment(),
             'stocks_needed_for_lead_time' => InventoryStockColumns::stocksNeededForLeadTime(),

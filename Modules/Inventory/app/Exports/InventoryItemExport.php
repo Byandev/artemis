@@ -31,7 +31,7 @@ class InventoryItemExport implements FromGenerator, WithHeadings
             'Discrepancy',
             'Remaining After Fulfillment',
             'Waiting for Delivery',
-            'Requested (not yet with supplier)',
+            'Of Which Not Sent to Supplier',
             'Stocks Needed for Lead Time',
             '3-Day Avg',
             'PO QTY',

@@ -21,6 +21,7 @@ use Modules\Inventory\Models\InventoryUnitCodeItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Support\InventoryItemMetrics;
+use Modules\Inventory\Support\InventoryStockColumns;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -112,6 +113,9 @@ class InventoryItemController extends Controller
         // Parent's SKU for child rows, so the flat list can show what each SKU is
         // grouped under. NULL for parents and standalone items.
         $parentSkuSql = '(SELECT sku FROM inventory_items p WHERE p.id = inventory_items.parent_id)';
+
+        // The computed columns read from derived tables; attach them once here.
+        InventoryStockColumns::applyJoins($base);
 
         return QueryBuilder::for($base)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
@@ -212,6 +216,7 @@ class InventoryItemController extends Controller
         $inner = InventoryItem::query()
             ->where('inventory_items.workspace_id', $workspace->id)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")

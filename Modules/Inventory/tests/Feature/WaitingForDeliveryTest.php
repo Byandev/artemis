@@ -29,7 +29,7 @@ function stockColumn(int $itemId, $owner, $workspace, string $column): ?int
     return $value === null ? null : (int) $value;
 }
 
-/** Units owed on orders a supplier already has (RELEASED_STATUSES). */
+/** Everything still owed on open orders — released and requested alike. */
 function waitingFor(int $itemId, $owner, $workspace): ?int
 {
     return stockColumn($itemId, $owner, $workspace, 'waiting_for_delivery_stocks');
@@ -216,7 +216,7 @@ test('the waiting-for-delivery modal rejects an item from another workspace', fu
         ->assertNotFound();
 });
 
-test('waiting-for-delivery counts only what a supplier actually has', function () {
+test('waiting-for-delivery counts every open order, with the un-sent part broken out', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $item = InventoryItem::create([
@@ -248,19 +248,19 @@ test('waiting-for-delivery counts only what a supplier actually has', function (
     expect(waitingFor($item->id, $owner, $workspace))->toBeNull()
         ->and(requestedFor($item->id, $owner, $workspace))->toBeNull();
 
-    // Approved — raised, but nobody has told a supplier. Real intent, so it
-    // shows as requested; not stock, so it stays out of waiting-for-delivery.
+    // Approved — raised but not yet with a supplier. Committed quantity, so it
+    // counts as incoming; also reported separately so the delay is visible.
     $makeLine(2, 50);
-    expect(waitingFor($item->id, $owner, $workspace))->toBeNull()
+    expect(waitingFor($item->id, $owner, $workspace))->toBe(50)
         ->and(requestedFor($item->id, $owner, $workspace))->toBe(50);
 
-    // Released to the supplier — now it is genuinely incoming.
+    // Released to the supplier — the total grows, the un-sent part does not.
     $makeLine(6, 30);
-    expect(waitingFor($item->id, $owner, $workspace))->toBe(30)
+    expect(waitingFor($item->id, $owner, $workspace))->toBe(80)
         ->and(requestedFor($item->id, $owner, $workspace))->toBe(50);
 });
 
-test('the reorder maths ignores orders that have not reached a supplier', function () {
+test('a raised purchase order is never reordered, whatever stage it sits at', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $item = InventoryItem::create([
@@ -292,13 +292,14 @@ test('the reorder maths ignores orders that have not reached a supplier', functi
     // Nothing on hand, nothing ordered: the full 200 is needed.
     expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(200);
 
-    // 200 raised but sitting in To Pay. It is intent, not stock — the reorder
-    // figure must not move, or nobody reorders while the PO waits in a queue.
+    // 200 raised, still sitting in To Pay. The quantity is committed, so the
+    // need is covered — telling anyone to order another 200 would double-order.
+    // That the order is stuck is a separate signal, carried by requested_stocks.
     $order(3, 200);
-    expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(200)
+    expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(0)
         ->and(requestedFor($item->id, $owner, $workspace))->toBe(200);
 
-    // Released to the supplier: now it counts, and the need is covered.
-    $order(6, 200);
+    // Once released, the same 200 is still covered — nothing double counts.
+    $order2 = $order;
     expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(0);
 });

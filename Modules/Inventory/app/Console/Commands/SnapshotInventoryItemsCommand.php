@@ -7,6 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Support\InventoryItemMetrics;
+use Modules\Inventory\Support\InventoryStockColumns;
 
 /**
  * Freeze every inventory item — stored columns and computed metrics alike — against
@@ -40,6 +41,7 @@ class SnapshotInventoryItemsCommand extends Command
         // photo of the page rather than a second, subtly different calculation.
         $query = InventoryItem::query()
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
             ->select([
                 'inventory_items.id',
                 'inventory_items.workspace_id',

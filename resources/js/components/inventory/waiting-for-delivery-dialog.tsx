@@ -62,10 +62,10 @@ export function WaitingForDeliveryDialog({
     const [orders, setOrders] = useState<PendingOrder[]>([]);
     const [total, setTotal] = useState(0);
     /**
-     * The same balance split the list columns use: `released` is what the
-     * "Waiting for Delivery" column shows, `requested` is what is ordered but
-     * still inside the business. Both kinds are listed below; the split is
-     * called out so the dialog and the list column cannot look contradictory.
+     * The balance split by stage: `released` is with a supplier, `requested` is
+     * still awaiting approval or payment. Both count toward the item's incoming
+     * stock — the split is shown because a large requested figure means the
+     * stock is committed but has not started moving.
      */
     const [released, setReleased] = useState(0);
     const [requested, setRequested] = useState(0);
@@ -135,8 +135,7 @@ export function WaitingForDeliveryDialog({
                                         <span className="font-mono text-amber-600 dark:text-amber-500">
                                             {requested.toLocaleString('en-PH')}
                                         </span>{' '}
-                                        still awaiting approval or payment —
-                                        only the first counts as incoming stock.
+                                        still awaiting approval or payment.
                                     </>
                                 )}
                             </>
