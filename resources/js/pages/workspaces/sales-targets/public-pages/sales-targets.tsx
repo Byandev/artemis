@@ -1,0 +1,332 @@
+import { BoardSectionState } from '@/components/sales-targets/board-section';
+import { GameboardBackdrop } from '@/components/sales-targets/gameboard-backdrop';
+import {
+    DistributionData,
+    GameboardDistribution,
+} from '@/components/sales-targets/gameboard-distribution';
+import {
+    BoardTeam,
+    GameboardHeader,
+} from '@/components/sales-targets/gameboard-header';
+import {
+    GameboardKpiRow,
+    GameboardKpis,
+} from '@/components/sales-targets/gameboard-kpis';
+import {
+    GameboardLeader,
+    LeaderTeam,
+} from '@/components/sales-targets/gameboard-leader';
+import {
+    GameboardLeaderboard,
+    LeaderboardData,
+} from '@/components/sales-targets/gameboard-leaderboard';
+import {
+    GameboardSalesChart,
+    SalesVsTargetPoint,
+} from '@/components/sales-targets/gameboard-sales-chart';
+import { GameboardSlideshow } from '@/components/sales-targets/gameboard-slideshow';
+import {
+    GameboardTeams,
+    TeamPerformance,
+} from '@/components/sales-targets/gameboard-teams';
+import { useBoardSection } from '@/components/sales-targets/use-board-section';
+import { Head, useForm } from '@inertiajs/react';
+import { Lock, Target } from 'lucide-react';
+import { useState } from 'react';
+
+interface PublicWorkspace {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+interface Props {
+    workspace: PublicWorkspace;
+    /** When true the password gate is shown and no data is sent. */
+    locked?: boolean;
+    /** The day the board is scored on — today's target, else the most recent. */
+    featured?: { id: number; name: string; date: string } | null;
+    /** The teams on the featured day, and the one the board is narrowed to. */
+    teams?: BoardTeam[];
+    teamId?: number | null;
+}
+
+/** Password gate shown before the board when the workspace requires it. */
+function SalesTargetsLock({ workspace }: { workspace: PublicWorkspace }) {
+    const form = useForm({ password: '' });
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(
+            `/public/workspaces/${workspace.slug}/sales-targets/verify-password`,
+            {
+                preserveScroll: true,
+                onError: () => form.reset('password'),
+            },
+        );
+    };
+
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-stone-50 p-4 dark:bg-zinc-950">
+            <div className="w-full max-w-sm rounded-2xl border border-black/8 bg-white p-6 dark:border-white/8 dark:bg-zinc-900">
+                <div className="mb-4 flex flex-col items-center text-center">
+                    <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400">
+                        <Lock className="h-5 w-5" />
+                    </div>
+                    <h1 className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                        Protected page
+                    </h1>
+                    <p className="mt-1 text-[12px] text-gray-400 dark:text-gray-500">
+                        Enter the password to view {workspace.name}&apos;s sales
+                        targets.
+                    </p>
+                </div>
+
+                <form onSubmit={submit} className="space-y-3">
+                    <input
+                        type="password"
+                        autoFocus
+                        autoComplete="current-password"
+                        value={form.data.password}
+                        onChange={(e) =>
+                            form.setData('password', e.target.value)
+                        }
+                        placeholder="Password"
+                        className="h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600"
+                    />
+                    {form.errors.password && (
+                        <p className="text-center font-mono text-[11px] text-red-500">
+                            {form.errors.password}
+                        </p>
+                    )}
+                    <button
+                        type="submit"
+                        disabled={form.processing || !form.data.password}
+                        className="h-10 w-full rounded-[10px] bg-brand-600 font-mono! text-[12px]! font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                    >
+                        {form.processing ? 'Unlocking…' : 'Unlock'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+export default function PublicSalesTargets({
+    workspace,
+    locked,
+    featured,
+    teams,
+    teamId,
+}: Props) {
+    // Refresh doesn't reload the page — it re-runs every section's own request.
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    const shared = {
+        workspaceSlug: workspace.slug,
+        teamId,
+        refreshKey,
+    };
+
+    const kpis = useBoardSection<GameboardKpis>({ ...shared, section: 'kpis' });
+    const leader = useBoardSection<LeaderTeam>({
+        ...shared,
+        section: 'leader',
+    });
+    const teamRows = useBoardSection<TeamPerformance[]>({
+        ...shared,
+        section: 'teams',
+    });
+    const salesChart = useBoardSection<SalesVsTargetPoint[]>({
+        ...shared,
+        section: 'sales-vs-target',
+    });
+    const distribution = useBoardSection<DistributionData>({
+        ...shared,
+        section: 'achievement-distribution',
+    });
+    // "View all" is just a bigger limit — the hook refetches when it changes.
+    const [showAllRanks, setShowAllRanks] = useState(false);
+    const leaderboard = useBoardSection<LeaderboardData>({
+        ...shared,
+        section: 'leaderboard',
+        params: { limit: showAllRanks ? 100 : 5 },
+    });
+    const [presenting, setPresenting] = useState(false);
+
+    // "Present on TV" is a presentation, so it takes the whole screen; leaving
+    // it hands the screen back.
+    const startPresenting = () => {
+        setPresenting(true);
+        document.documentElement.requestFullscreen?.().catch(() => {});
+    };
+
+    const stopPresenting = () => {
+        setPresenting(false);
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+    };
+
+    if (locked) {
+        return <SalesTargetsLock workspace={workspace} />;
+    }
+
+    const busy = [
+        kpis,
+        leader,
+        teamRows,
+        salesChart,
+        distribution,
+        leaderboard,
+    ].some((section) => section.loading);
+
+    return (
+        <div className="relative min-h-screen bg-stone-50 dark:bg-zinc-950">
+            <Head title={`${workspace.name} - Sales Targets`} />
+
+            <GameboardBackdrop />
+
+            <GameboardHeader
+                workspaceName={workspace.name}
+                featured={featured}
+                teams={teams}
+                teamId={teamId}
+                refreshing={busy}
+                onRefresh={() => setRefreshKey((key) => key + 1)}
+                onPresent={startPresenting}
+            />
+
+            {presenting && (
+                <GameboardSlideshow
+                    data={{
+                        workspaceName: workspace.name,
+                        featured,
+                        kpis: kpis.data,
+                        leader: leader.data,
+                        teams: teamRows.data,
+                    }}
+                    onClose={stopPresenting}
+                />
+            )}
+
+            <div className="relative mx-auto w-full max-w-(--breakpoint-2xl) px-4 py-3 md:px-6 2xl:px-8 2xl:py-5">
+                {featured ? (
+                    <>
+                        {kpis.data ? (
+                            <GameboardKpiRow kpis={kpis.data} />
+                        ) : (
+                            <BoardSectionState
+                                loading={kpis.loading}
+                                failed={kpis.failed}
+                                onRetry={kpis.reload}
+                                label="the totals"
+                                height="h-24"
+                            />
+                        )}
+
+                        {leader.data ? (
+                            <GameboardLeader
+                                leader={leader.data}
+                                qualifyingRoas={leader.data.qualifying_roas}
+                            />
+                        ) : (
+                            <div className="mt-2">
+                                <BoardSectionState
+                                    loading={leader.loading}
+                                    failed={leader.failed}
+                                    onRetry={leader.reload}
+                                    label="the leader"
+                                    height="h-20"
+                                />
+                            </div>
+                        )}
+
+                        {teamRows.data ? (
+                            <GameboardTeams teams={teamRows.data} />
+                        ) : (
+                            <div className="mt-4">
+                                <BoardSectionState
+                                    loading={teamRows.loading}
+                                    failed={teamRows.failed}
+                                    onRetry={teamRows.reload}
+                                    label="team performance"
+                                    height="h-40"
+                                />
+                            </div>
+                        )}
+
+                        {/* Standings, trend and spread sit side by side once
+                            there is width for all three. */}
+                        <div className="mt-4 grid grid-cols-1 gap-2 xl:grid-cols-12 2xl:mt-5 2xl:gap-3">
+                            <div className="xl:col-span-5">
+                                {leaderboard.data ? (
+                                    <GameboardLeaderboard
+                                        data={leaderboard.data}
+                                        expanded={showAllRanks}
+                                        onToggleExpanded={() =>
+                                            setShowAllRanks((shown) => !shown)
+                                        }
+                                    />
+                                ) : (
+                                    <BoardSectionState
+                                        loading={leaderboard.loading}
+                                        failed={leaderboard.failed}
+                                        onRetry={leaderboard.reload}
+                                        label="the leaderboard"
+                                        height="h-56"
+                                    />
+                                )}
+                            </div>
+
+                            <div className="xl:col-span-4">
+                                {salesChart.data ? (
+                                    <GameboardSalesChart
+                                        points={salesChart.data}
+                                    />
+                                ) : (
+                                    <BoardSectionState
+                                        loading={salesChart.loading}
+                                        failed={salesChart.failed}
+                                        onRetry={salesChart.reload}
+                                        label="sales vs target"
+                                        height="h-56"
+                                    />
+                                )}
+                            </div>
+
+                            <div className="xl:col-span-3">
+                                {distribution.data ? (
+                                    <GameboardDistribution
+                                        data={distribution.data}
+                                    />
+                                ) : (
+                                    <BoardSectionState
+                                        loading={distribution.loading}
+                                        failed={distribution.failed}
+                                        onRetry={distribution.reload}
+                                        label="the distribution"
+                                        height="h-56"
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-black/8 bg-white py-20 dark:border-white/8 dark:bg-zinc-900">
+                        <div className="rounded-2xl bg-stone-100 p-3.5 dark:bg-zinc-800">
+                            <Target className="h-7 w-7 text-gray-400 dark:text-gray-500" />
+                        </div>
+                        <p className="mt-4 text-[14px] font-semibold text-gray-700 dark:text-gray-200">
+                            No sales targets yet
+                        </p>
+                        <p className="mt-1 text-[12px] text-gray-400 dark:text-gray-500">
+                            The board lights up once a target is set for the
+                            day.
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
