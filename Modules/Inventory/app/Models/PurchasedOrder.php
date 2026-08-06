@@ -93,6 +93,25 @@ class PurchasedOrder extends Model
      */
     public const AWAITING_DELIVERY_STATUSES = [1, 2, 3, 4, 5, 6];
 
+    /**
+     * Open orders the supplier has actually been given — the only ones whose
+     * quantities can honestly be called incoming stock.
+     *
+     * The reorder maths counts these and not REQUESTED_STATUSES. Counting an
+     * unapproved, unpaid order as stock on hand is what let items sit at zero
+     * while the dashboard reported weeks of cover: the order existed, so
+     * `po_needed` fell to zero, so nobody reordered, while the PO waited in an
+     * approval queue. See InventoryStockColumns::releasedStocks().
+     */
+    public const RELEASED_STATUSES = [5, 6];
+
+    /**
+     * Open orders still inside the business — raised, but not yet released to a
+     * supplier. Real intent, and worth showing, but not stock. Exact complement
+     * of RELEASED_STATUSES within AWAITING_DELIVERY_STATUSES.
+     */
+    public const REQUESTED_STATUSES = [1, 2, 3, 4];
+
     public function getStatusLabelAttribute(): string
     {
         return self::STATUSES[$this->status] ?? 'Unknown';

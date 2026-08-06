@@ -682,6 +682,9 @@ class InventoryDashboardStatsController extends Controller
         $query = InventoryItem::where('inventory_items.workspace_id', $workspace->id)
             ->where('inventory_items.is_active', true);
 
+        // Every stock fragment reads from the derived tables these attach.
+        InventoryStockColumns::applyJoins($query);
+
         $this->applyTeamVisibility($request, $query, $workspace);
 
         return $query;
