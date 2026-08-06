@@ -230,6 +230,8 @@
 :root {
     --po-internal: #d97706;
     --po-supplier: #0284c7;
+    /* Door-to-door measures span both legs, so they take neither hue. */
+    --po-total: #52525b;
 
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
@@ -267,6 +269,8 @@
 }
 
 .dark {
+    --po-total: #a1a1aa;
+
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.145 0 0);

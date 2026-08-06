@@ -71,15 +71,20 @@ class PurchaseOrderFlowController extends Controller
     private const SUPPLIER_TARGET_DAYS = 14;
 
     /**
-     * Fill levels reported for the supplier leg, as a percentage of the ordered
-     * quantity. The clock starts when the order is released, so these measure
-     * the supplier alone rather than the whole cycle.
+     * Fill levels reported for the delivery curve, as a percentage of the
+     * ordered quantity.
      *
-     * Partial delivery is the norm here, so a single "delivered" figure would
-     * hide the shape: an order that lands 90% in a week and dribbles the last
-     * 10% over a month reads very differently from one that arrives whole.
+     * The clock starts at the issue date — the whole door-to-door cycle, not
+     * the supplier leg alone. Two reasons: it is the number that decides
+     * whether stock arrives before you run out, and it needs only an issue date
+     * and deliveries, so it runs over every order rather than the handful
+     * carrying a release timestamp.
+     *
+     * Partial delivery is the norm, so a single "delivered" figure would hide
+     * the shape: an order that lands 90% in a week and dribbles the last 10%
+     * over a month reads very differently from one that arrives whole.
      */
-    private const SUPPLIER_FILL_LEVELS = [30, 60, 90, 100];
+    private const FILL_LEVELS = [30, 60, 90, 100];
 
     /**
      * The four standing figures, in the order the page reads them: what we owe,
@@ -276,8 +281,9 @@ class PurchaseOrderFlowController extends Controller
 
         $samples = array_fill_keys(array_column($steps, 'label'), []);
         $internalTotal = [];
-        $toFirstDelivery = [];
-        $toFill = array_fill_keys(self::SUPPLIER_FILL_LEVELS, []);
+        $toRelease = [];
+        $toFirst = [];
+        $toFill = array_fill_keys(self::FILL_LEVELS, []);
 
         foreach ($orders as $order) {
             $at = fn (string $label) => $order->statusLogs
@@ -305,6 +311,33 @@ class PurchaseOrderFlowController extends Controller
                 continue;
             }
 
+            $first = $order->items->flatMap->deliveries
+                ->filter(fn ($d) => $d->delivery_date)
+                ->min('delivery_date');
+
+            if ($first) {
+                $toRelease[] = round(max(0, $released->copy()->startOfDay()->diffInDays($first, absolute: false)), 2);
+            }
+        }
+
+        // The delivery curve runs over every visible order, not just the ones
+        // carrying a status trail: it needs an issue date and deliveries, both
+        // of which every order has.
+        $withDeliveries = PurchasedOrder::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('status', '!=', PurchasedOrder::CANCELLED)
+            ->whereNotNull('issue_date')
+            ->visibleTo($request->user(), $workspace)
+            ->with('items.deliveries')
+            ->get();
+
+        foreach ($withDeliveries as $order) {
+            $ordered = (int) $order->items->sum('count');
+
+            if ($ordered <= 0) {
+                continue;
+            }
+
             $deliveries = $order->items->flatMap->deliveries
                 ->filter(fn ($d) => $d->delivery_date)
                 ->sortBy(fn ($d) => $d->delivery_date->getTimestamp());
@@ -313,30 +346,20 @@ class PurchaseOrderFlowController extends Controller
                 continue;
             }
 
-            // Calendar days, not elapsed hours: the release carries a time of
-            // day while a delivery is date-only, so a raw diff would report an
-            // order released at 09:00 and delivered four days later as 3.6.
-            $releasedOn = $released->copy()->startOfDay();
+            $issuedOn = $order->issue_date;
+            $toFirst[] = round(max(0, $issuedOn->diffInDays($deliveries->first()->delivery_date, absolute: false)), 2);
 
-            $toFirstDelivery[] = round(max(0, $releasedOn->diffInDays($deliveries->first()->delivery_date, absolute: false)), 2);
-
-            // Walk the deliveries once, stamping each fill level with the date
-            // that carried cumulative receipts past it. Several levels land on
-            // the same date when one delivery jumps past them all.
-            $ordered = (int) $order->items->sum('count');
-
-            if ($ordered <= 0) {
-                continue;
-            }
-
+            // Walk the deliveries once, stamping each level with the date that
+            // carried cumulative receipts past it. Several levels land on the
+            // same date when one delivery jumps past them all.
             $cumulative = 0;
             $stamped = [];
 
             foreach ($deliveries as $delivery) {
                 $cumulative += max(0, (int) $delivery->qty);
-                $elapsed = round(max(0, $releasedOn->diffInDays($delivery->delivery_date, absolute: false)), 2);
+                $elapsed = round(max(0, $issuedOn->diffInDays($delivery->delivery_date, absolute: false)), 2);
 
-                foreach (self::SUPPLIER_FILL_LEVELS as $level) {
+                foreach (self::FILL_LEVELS as $level) {
                     if (! isset($stamped[$level]) && $cumulative * 100 >= $ordered * $level) {
                         $stamped[$level] = $elapsed;
                         $toFill[$level][] = $elapsed;
@@ -360,20 +383,21 @@ class PurchaseOrderFlowController extends Controller
             ->filter(fn (array $r) => $r['samples'] > 0 && $r['p90'] > 0)
             ->values();
 
-        // The supplier leg, first arrival then each fill level. Levels nothing
-        // has reached are dropped rather than shown empty — an unreached level
-        // is unknown, not instant.
-        $supplierSteps = collect([$describe('Released → first delivery', 'supplier', $toFirstDelivery)])
-            ->concat(collect(self::SUPPLIER_FILL_LEVELS)
-                ->map(fn (int $level) => $describe("Released → {$level}% delivered", 'supplier', $toFill[$level])))
+        // The delivery curve, measured door to door. Levels nothing has reached
+        // are dropped rather than shown empty — an unreached level is unknown,
+        // not instant.
+        $deliverySteps = collect([$describe('Raised → first delivery', 'total', $toFirst)])
+            ->concat(collect(self::FILL_LEVELS)
+                ->map(fn (int $level) => $describe("Raised → {$level}% delivered", 'total', $toFill[$level])))
             ->filter(fn (array $r) => $r['samples'] > 0)
             ->values();
 
         return response()->json([
             'steps' => $rows,
             'internal_total' => $describe('Total inside', 'internal', $internalTotal),
-            'supplier_steps' => $supplierSteps,
-            'fill_levels' => self::SUPPLIER_FILL_LEVELS,
+            'released_to_delivery' => $describe('Released → first delivery', 'supplier', $toRelease),
+            'delivery_steps' => $deliverySteps,
+            'fill_levels' => self::FILL_LEVELS,
             'clustering' => $this->clustering($orders),
             'orders_sampled' => $orders->count(),
         ]);

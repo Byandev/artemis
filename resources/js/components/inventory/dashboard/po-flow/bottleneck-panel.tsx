@@ -55,7 +55,9 @@ function verdict(data: BottleneckData): { headline: string; why: string } {
 const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
     operations: (
         <>
-            <b>Units on purchase orders that exist but have not been paid for.</b>{' '}
+            <b>
+                Units on purchase orders that exist but have not been paid for.
+            </b>{' '}
             Raised, then sitting in approval or waiting on payment — nothing has
             been committed that would make a supplier start.
             <br />
@@ -72,9 +74,7 @@ const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
     ),
     supplier: (
         <>
-            <b>
-                Units on paid orders a supplier has not finished delivering.
-            </b>{' '}
+            <b>Units on paid orders a supplier has not finished delivering.</b>{' '}
             Payment is the commitment point: money has moved, so the goods are
             theirs to deliver.
             <br />

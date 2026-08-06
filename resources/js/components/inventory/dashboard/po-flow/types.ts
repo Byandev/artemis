@@ -9,8 +9,11 @@
 /** How a step is doing against its target. */
 export type FlowState = 'blocked' | 'watch' | 'ok';
 
-/** Whether an order has left the building yet. */
-export type FlowKind = 'internal' | 'supplier';
+/**
+ * Whether an order has left the building yet — plus `total`, for measures that
+ * span both legs (issue date through to delivery).
+ */
+export type FlowKind = 'internal' | 'supplier' | 'total';
 
 /** A supporting number under an owner's headline. Value is null when unknown. */
 export type OwnerFact = [label: string, value: number | null, unit: string];
@@ -126,11 +129,14 @@ export interface StageTimingData {
     /** The internal workflow, one row per transition that takes any time. */
     steps: TimingStep[];
     internal_total: TimingStep;
+    /** Release to first arrival — the supplier leg alone, where logged. */
+    released_to_delivery: TimingStep;
     /**
-     * The supplier leg: first arrival, then how long each share of the order
-     * took to land. Levels nothing has reached yet are absent rather than zero.
+     * The delivery curve door to door: first arrival, then how long each share
+     * of the order took to land, measured from the issue date. Levels nothing
+     * has reached yet are absent rather than zero.
      */
-    supplier_steps: TimingStep[];
+    delivery_steps: TimingStep[];
     fill_levels: number[];
     clustering: ClusteringRow[];
     orders_sampled: number;
