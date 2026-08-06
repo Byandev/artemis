@@ -159,7 +159,7 @@ test('supplier deliveries separate the untouched from the merely stalled', funct
         ->and($data['nothing_arrived']['units'])->toBe(700)
         ->and($data['part_delivered']['orders'])->toBe(1)
         ->and($data['part_delivered']['units'])->toBe(300)
-        // Past the 10-day quoted lead time: the 40-day and the 20-day.
+        // Past the 14-day delivery target: the 40-day and the 20-day.
         ->and($data['past_quote']['orders'])->toBe(2)
         ->and($data['past_quote']['units'])->toBe(800);
 
@@ -292,4 +292,47 @@ test('a step that always completes instantly is not reported as a queue', functi
     expect($steps)->toContain('Raised → Approve')
         ->toContain('To Pay → Paid')
         ->not->toContain('Approve → To Pay');
+});
+
+test('supplier fill levels are stamped by the delivery that crossed each one', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = flowItem($workspace, 'SKU-1');
+
+    $order = flowOrder($workspace, $item, 6, '2026-07-01', 100);
+    // Released on the 10th; the supplier clock starts there, not at issue.
+    $order->statusLogs()->create(['status' => 'Purchased', 'logged_at' => '2026-07-10 09:00:00']);
+
+    $line = $order->items->first();
+    $line->deliveries()->create(['delivery_date' => '2026-07-14', 'qty' => 40]);  // 40% on day 4
+    $line->deliveries()->create(['delivery_date' => '2026-07-20', 'qty' => 55]);  // 95% on day 10
+    $line->deliveries()->create(['delivery_date' => '2026-08-04', 'qty' => 5]);   // 100% on day 25
+
+    $steps = collect(flow($owner, $workspace, 'stage-timings')['supplier_steps'])
+        ->keyBy('label');
+
+    // First delivery and 30% are both crossed by the day-4 delivery.
+    expect($steps['Released → first delivery']['p50'])->toEqual(4.0)
+        ->and($steps['Released → 30% delivered']['p50'])->toEqual(4.0)
+        // 60% and 90% both land on the day-10 delivery.
+        ->and($steps['Released → 60% delivered']['p50'])->toEqual(10.0)
+        ->and($steps['Released → 90% delivered']['p50'])->toEqual(10.0)
+        // The last 5% dribbles in a fortnight later — the shape a single
+        // "delivered" figure would hide.
+        ->and($steps['Released → 100% delivered']['p50'])->toEqual(25.0);
+});
+
+test('a fill level nothing has reached is absent rather than reported as zero', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = flowItem($workspace, 'SKU-1');
+
+    $order = flowOrder($workspace, $item, 6, '2026-07-01', 100);
+    $order->statusLogs()->create(['status' => 'Purchased', 'logged_at' => '2026-07-02 09:00:00']);
+    $order->items->first()->deliveries()->create(['delivery_date' => '2026-07-05', 'qty' => 45]);
+
+    $labels = collect(flow($owner, $workspace, 'stage-timings')['supplier_steps'])
+        ->pluck('label');
+
+    expect($labels)->toContain('Released → 30% delivered')
+        ->not->toContain('Released → 60% delivered')
+        ->not->toContain('Released → 100% delivered');
 });

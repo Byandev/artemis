@@ -59,6 +59,62 @@ class PurchaseOrderFlowController extends Controller
     private const PICKING_DAYS = 3;
 
     /**
+     * How long a supplier has, once an order is released, before it counts as
+     * late.
+     *
+     * A fixed target rather than a figure read off `inventory_items.lead_time`:
+     * that column is a flat default across almost the whole catalogue, so
+     * deriving a "quote" from it implied a precision the data does not have.
+     * 14 days sits between the observed P75 and P90 for issue-to-delivery, so
+     * it is comfortably past normal without flagging every ordinary order.
+     */
+    private const SUPPLIER_TARGET_DAYS = 14;
+
+    /**
+     * Fill levels reported for the supplier leg, as a percentage of the ordered
+     * quantity. The clock starts when the order is released, so these measure
+     * the supplier alone rather than the whole cycle.
+     *
+     * Partial delivery is the norm here, so a single "delivered" figure would
+     * hide the shape: an order that lands 90% in a week and dribbles the last
+     * 10% over a month reads very differently from one that arrives whole.
+     */
+    private const SUPPLIER_FILL_LEVELS = [30, 60, 90, 100];
+
+    /**
+     * The four standing figures, in the order the page reads them: what we owe,
+     * what we have not ordered, what we are sitting on, and what could ship
+     * today.
+     *
+     * One endpoint rather than four: they come from the same two scans, and
+     * splitting them would run those scans four times for four numbers.
+     */
+    public function kpi(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Purchased Orders', $workspace);
+        $this->authorize('View Inventory Items', $workspace);
+
+        $lines = $this->openLines($request, $workspace);
+        $split = $this->unfulfilledSplit($request, $workspace)->getData(true);
+        $internal = $lines->where('kind', 'internal');
+
+        $needed = $this->poNeededTotal($request, $workspace);
+
+        return response()->json([
+            'unfulfilled' => $split['total'],
+            'not_ordered' => $needed['units'],
+            'not_ordered_groups' => $needed['groups'],
+            'stuck_inside' => $internal->sum('balance'),
+            'stuck_overdue' => $internal->where('age', '>', self::INTERNAL_SLA_DAYS)->sum('balance'),
+            'shippable_now' => $split['sitting']['units'],
+            'shippable_skus' => $split['sitting']['skus'],
+            'open_total' => $lines->sum('balance'),
+            'sla_days' => self::INTERNAL_SLA_DAYS,
+            'picking_days' => self::PICKING_DAYS,
+        ]);
+    }
+
+    /**
      * Where every open unit is sitting, and how stale each pile is.
      *
      * Stages come from the data rather than a fixed list, so a workspace whose
@@ -100,8 +156,9 @@ class PurchaseOrderFlowController extends Controller
             'supplier_units' => $supplier->sum('balance'),
             'total_units' => $lines->sum('balance'),
             'sla_days' => self::INTERNAL_SLA_DAYS,
-            // What the reorder maths says still needs buying on top of all this.
-            'po_needed' => $this->poNeededTotal($request, $workspace),
+            // What the reorder maths still wants bought once every open order
+            // has been credited against it.
+            'po_needed' => $this->poNeededTotal($request, $workspace)['units'],
         ]);
     }
 
@@ -170,7 +227,7 @@ class PurchaseOrderFlowController extends Controller
                 'covers_days' => $r->covers,
             ]);
 
-        $quoted = $this->quotedLeadTime($request, $workspace);
+        $quoted = self::SUPPLIER_TARGET_DAYS;
 
         // Counted per order, not per line: one purchase order carrying three
         // late lines is one phone call, and "28 orders overdue" would overstate
@@ -220,6 +277,7 @@ class PurchaseOrderFlowController extends Controller
         $samples = array_fill_keys(array_column($steps, 'label'), []);
         $internalTotal = [];
         $toFirstDelivery = [];
+        $toFill = array_fill_keys(self::SUPPLIER_FILL_LEVELS, []);
 
         foreach ($orders as $order) {
             $at = fn (string $label) => $order->statusLogs
@@ -243,13 +301,41 @@ class PurchaseOrderFlowController extends Controller
                 $internalTotal[] = round(max(0, $order->issue_date->diffInDays($released, absolute: false)), 2);
             }
 
-            if ($released) {
-                $first = $order->items->flatMap->deliveries
-                    ->filter(fn ($d) => $d->delivery_date)
-                    ->min('delivery_date');
+            if (! $released) {
+                continue;
+            }
 
-                if ($first) {
-                    $toFirstDelivery[] = round(max(0, $released->diffInDays($first, absolute: false)), 2);
+            $deliveries = $order->items->flatMap->deliveries
+                ->filter(fn ($d) => $d->delivery_date)
+                ->sortBy(fn ($d) => $d->delivery_date->getTimestamp());
+
+            if ($deliveries->isEmpty()) {
+                continue;
+            }
+
+            $toFirstDelivery[] = round(max(0, $released->diffInDays($deliveries->first()->delivery_date, absolute: false)), 2);
+
+            // Walk the deliveries once, stamping each fill level with the date
+            // that carried cumulative receipts past it. Several levels land on
+            // the same date when one delivery jumps past them all.
+            $ordered = (int) $order->items->sum('count');
+
+            if ($ordered <= 0) {
+                continue;
+            }
+
+            $cumulative = 0;
+            $stamped = [];
+
+            foreach ($deliveries as $delivery) {
+                $cumulative += max(0, (int) $delivery->qty);
+                $elapsed = round(max(0, $released->diffInDays($delivery->delivery_date, absolute: false)), 2);
+
+                foreach (self::SUPPLIER_FILL_LEVELS as $level) {
+                    if (! isset($stamped[$level]) && $cumulative * 100 >= $ordered * $level) {
+                        $stamped[$level] = $elapsed;
+                        $toFill[$level][] = $elapsed;
+                    }
                 }
             }
         }
@@ -269,10 +355,20 @@ class PurchaseOrderFlowController extends Controller
             ->filter(fn (array $r) => $r['samples'] > 0 && $r['p90'] > 0)
             ->values();
 
+        // The supplier leg, first arrival then each fill level. Levels nothing
+        // has reached are dropped rather than shown empty — an unreached level
+        // is unknown, not instant.
+        $supplierSteps = collect([$describe('Released → first delivery', 'supplier', $toFirstDelivery)])
+            ->concat(collect(self::SUPPLIER_FILL_LEVELS)
+                ->map(fn (int $level) => $describe("Released → {$level}% delivered", 'supplier', $toFill[$level])))
+            ->filter(fn (array $r) => $r['samples'] > 0)
+            ->values();
+
         return response()->json([
             'steps' => $rows,
             'internal_total' => $describe('Total inside', 'internal', $internalTotal),
-            'supplier' => $describe('Released → first delivery', 'supplier', $toFirstDelivery),
+            'supplier_steps' => $supplierSteps,
+            'fill_levels' => self::SUPPLIER_FILL_LEVELS,
             'clustering' => $this->clustering($orders),
             'orders_sampled' => $orders->count(),
         ]);
@@ -362,7 +458,7 @@ class PurchaseOrderFlowController extends Controller
         $lines = $this->openLines($request, $workspace);
         $internal = $lines->where('kind', 'internal');
         $supplier = $lines->where('kind', 'supplier');
-        $quoted = $this->quotedLeadTime($request, $workspace);
+        $quoted = self::SUPPLIER_TARGET_DAYS;
 
         $internalUnits = $internal->sum('balance');
         $supplierUnits = $supplier->sum('balance');
@@ -397,8 +493,8 @@ class PurchaseOrderFlowController extends Controller
                 'value' => $supplierUnits,
                 'unit' => 'units released and in transit',
                 'facts' => [
-                    ['Past the quote', $supplierOverdue ?: null, 'units'],
-                    ['Quoted lead time', $quoted, 'days'],
+                    ['Past the target', $supplierOverdue ?: null, 'units'],
+                    ['Delivery target', $quoted, 'days'],
                     ['Longest wait', $supplier->max('age'), 'days'],
                 ],
             ],
@@ -509,30 +605,45 @@ class PurchaseOrderFlowController extends Controller
         return $demand;
     }
 
-    /** What the reorder maths still wants bought, over and above what is open. */
-    private function poNeededTotal(Request $request, Workspace $workspace): int
-    {
-        // DB::raw: poNeeded() is an expression, and sum() would otherwise quote
-        // the whole thing as a column name.
-        $total = $this->visibleItems($request, $workspace)
-            ->sum(DB::raw(InventoryStockColumns::poNeeded()));
-
-        return (int) round((float) $total);
-    }
-
     /**
-     * The lead time suppliers are held to. One workspace-wide figure: lead_time
-     * is currently a flat default on almost every item, so a per-item quote
-     * would imply a precision the data does not have.
+     * What the reorder maths still wants bought, after every open purchase
+     * order is credited against it.
+     *
+     * Recomputed per group, never summed per SKU. po_needed is not additive:
+     * each sibling in a group carries the whole group's lead-time and buffer
+     * demand, so adding their figures counts that demand once per sibling —
+     * 69,398 units instead of 17,748 on this workspace. Mirrors
+     * InventoryItemController::buildSummaryQuery(), which is what the items
+     * list shows in its default summarize view.
+     *
+     * @return array{units: int, groups: int}
      */
-    private function quotedLeadTime(Request $request, Workspace $workspace): int
+    private function poNeededTotal(Request $request, Workspace $workspace): array
     {
-        $median = $this->visibleItems($request, $workspace)
-            ->where('inventory_items.lead_time', '>', 0)
-            ->orderBy('inventory_items.lead_time')
-            ->pluck('inventory_items.lead_time');
+        $inner = $this->visibleItems($request, $workspace)
+            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent,
+                inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.three_days_average')
+            ->selectRaw(InventoryStockColumns::remainingAfterFulfillment().' as remaining_after_fulfillment');
 
-        return $median->isEmpty() ? 10 : (int) round($median[(int) floor($median->count() / 2)]);
+        // The group's lead time and buffer are the parent's when it has one,
+        // else the max across the group — same rule the items list applies.
+        $lead = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
+        $cover = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.days_of_coverage END), MAX(sub.days_of_coverage))';
+        $avg = 'SUM(sub.three_days_average)';
+        $remaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
+        $needed = "GREATEST(0, ($cover * $avg) + ($lead * $avg) - $remaining)";
+
+        $groups = DB::query()
+            ->fromSub($inner, 'sub')
+            ->selectRaw("$needed as needed")
+            ->groupByRaw('COALESCE(sub.parent_id, sub.id)')
+            ->havingRaw("$needed > 0")
+            ->get();
+
+        return [
+            'units' => (int) round((float) $groups->sum('needed')),
+            'groups' => $groups->count(),
+        ];
     }
 
     /**

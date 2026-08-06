@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import { CloseOrderDialog } from '@/components/inventory/close-order-dialog';
+import DeliveryLeadTimeTable from '@/components/inventory/dashboard/delivery-lead-time-table';
 import { DeleteOrderDialog } from '@/components/inventory/delete-order-dialog';
 import {
     DeliveryTarget,
@@ -876,6 +877,13 @@ export default function PurchasedOrderIndex({
                         })}
                     </li>
                 </ul>
+
+                {/* Lead-time calibration lives with the orders it is derived
+                    from, not on the dashboard: it is the reference you consult
+                    when setting an item's lead time, not a daily signal. */}
+                <div className="mt-6">
+                    <DeliveryLeadTimeTable slug={workspace.slug} />
+                </div>
 
                 <DeleteOrderDialog
                     order={deletingOrder}

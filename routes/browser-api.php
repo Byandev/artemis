@@ -91,6 +91,7 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         // it. One endpoint per panel, same as the rest of the dashboard, so a
         // slow panel never blocks the others.
         Route::prefix('inventory/dashboard/po-flow')->name('inventory.dashboard.po-flow.')->group(function () {
+            Route::get('/kpi', [PurchaseOrderFlowController::class, 'kpi'])->name('kpi');
             Route::get('/bottleneck', [PurchaseOrderFlowController::class, 'bottleneck'])->name('bottleneck');
             Route::get('/pipeline', [PurchaseOrderFlowController::class, 'pipeline'])->name('pipeline');
             Route::get('/worklist', [PurchaseOrderFlowController::class, 'worklist'])->name('worklist');
