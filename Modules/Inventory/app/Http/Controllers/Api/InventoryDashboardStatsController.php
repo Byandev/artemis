@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
@@ -343,6 +344,10 @@ class InventoryDashboardStatsController extends Controller
                 // The ERP logs a time of day, but every PO list renders a date —
                 // sent date-only so the client can't drift it across a timezone.
                 'paid_date' => $line->purchasedOrder->paid_at?->toDateString(),
+                // How long this order has been open. Computed here rather than
+                // in the browser so "today" is the app's timezone, not the
+                // viewer's, and so the figure can be tested.
+                'days_since_po' => $this->daysSince($line->purchasedOrder->issue_date),
                 // Numeric status too: the frontend renders it through the
                 // shared PURCHASED_ORDER_STATUSES map rather than the label.
                 'status' => (int) $line->purchasedOrder->status,
@@ -421,6 +426,22 @@ class InventoryDashboardStatsController extends Controller
             'total_delivered' => $lines->sum('delivered_qty'),
             'total_waiting' => $lines->sum('waiting_qty'),
         ]);
+    }
+
+    /**
+     * Whole days from a date up to today, or null when there is no date.
+     *
+     * Floored at zero: an order issued with tomorrow's date is nought days old,
+     * not minus one. Same clamp the lead-time table applies to back-dated
+     * deliveries, and for the same reason.
+     */
+    private function daysSince(?Carbon $date): ?int
+    {
+        if (! $date) {
+            return null;
+        }
+
+        return max(0, (int) $date->diffInDays(CarbonImmutable::today(), absolute: false));
     }
 
     /**
