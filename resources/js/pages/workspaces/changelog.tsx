@@ -12,6 +12,98 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.23.1',
+        date: '2026-08-05',
+        sections: [
+            {
+                title: 'Inventory — Purchase Orders',
+                items: [
+                    'Open Purchase Orders now lists the most recently issued order first, so the newest commitments are what you see at the top — orders with no issue date still sort to the bottom rather than leading the table',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.23.0',
+        date: '2026-08-05',
+        sections: [
+            {
+                title: 'Inventory — Dashboard Additions',
+                items: [
+                    'New High Unfulfilled Items table — the items owing the most stock, worst first, so you can see where the Unfulfilled tile’s total is actually concentrated instead of just how big it is',
+                    'New Low Stock Items table beside it — the items most in need of a purchase order, ranked by how many units to reorder, with what’s on hand now alongside',
+                    'Both tables count per group rather than per SKU, the same way the items list reads with summarize on — a grouped SKU appears once under its parent with the group’s total, instead of scattered across the table as several smaller rows',
+                    'Each lists the top 20 and shows the total for the rows on screen, so the figure under the heading always describes what you’re looking at rather than the whole workspace',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Orders & Reorder Maths',
+                items: [
+                    'PO Needed was reordering too little — incoming deliveries were being subtracted twice, so the figure came out lower than it should have; it now counts them once, on the dashboard and on the Inventory Items list alike',
+                    'Open Purchase Orders now lists oldest order first — the lines that have been outstanding longest are the ones to chase — with orders that have no issue date sorted to the bottom rather than the top',
+                    'Each open PO line now shows its issue and expected delivery dates, plus a small progress ring for how much of what was ordered has landed',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.22.0',
+        date: '2026-08-05',
+        sections: [
+            {
+                title: 'Inventory — Dashboard (New)',
+                items: [
+                    'New Inventory Dashboard at the top of the Inventory menu — four headline tiles (Inventory Items, Total Stocks, Unfulfilled units, Open POs) each load and refresh on their own, so a slow figure never holds up the rest of the row',
+                    'An Items In / Out chart shows units arriving against units leaving, day by day over the last 7, 14 or 30 days — in above the line, out below; the window ends yesterday so a half-written day doesn’t read as a slump, and write-offs are left out because they’re shrinkage rather than movement',
+                    'An Open Purchase Orders table sits underneath: every line still owing stock, with what was ordered, delivered so far and still waiting, plus a running total of units outstanding — click a row to drill into that PO’s lines',
+                    'Every figure is team-scoped and follows the “viewing as team” switcher, and the counts are worked out the same way the Inventory Items list works them out, so the tiles and the list agree to the unit',
+                ],
+            },
+            {
+                title: 'Inventory — Look Back at Any Day',
+                items: [
+                    'Every inventory item is now frozen nightly, so the Inventory Items list can be pinned to a past date and show that day’s closing stock, averages and computed columns instead of today’s',
+                    'The date picker only offers days that actually have a saved snapshot — everything else is greyed out — and while a day is pinned, add/edit/delete are hidden, because those actions would change today’s items rather than the historical rows on screen',
+                    'New PO QTY column on the items list — the safety buffer on top of lead-time demand (your days of coverage × the daily average), the same figure that feeds PO Needed',
+                ],
+            },
+            {
+                title: 'Inventory — Grouping Fixes',
+                items: [
+                    'Ungrouping now works from the summarised view — selecting a parent breaks up the whole group instead of reporting “0 items ungrouped” and leaving it intact',
+                    'Bulk actions are hidden in the summarised view, where a selected row is a group rather than a single item',
+                    'The summarize toggle now sticks — refreshing or changing another filter no longer springs it back on',
+                ],
+            },
+            {
+                title: 'Finance — Shares & Reference Numbers',
+                items: [
+                    'A transaction won’t save until the charge-to and product shares add up to the full amount — you get told how much is still unallocated and the page scrolls you to the section that needs it, instead of the server bouncing the save',
+                    'Charge To is now marked required on fund requests, and a single allocation row always carries the whole amount rather than keeping a stale share from when the list was longer',
+                    'Fund request reference numbers no longer collide — the next number carries on from the highest one issued rather than the row count, so deleting an older request can’t hand out one that’s still in use',
+                    'The transaction form’s “Transaction” field is now labelled Transaction Description',
+                ],
+            },
+            {
+                title: 'Admin — Module Toggles',
+                items: [
+                    'Ad Spend Goals is now its own admin-toggled module — turn it off and the tab disappears from the S&M dashboard and every one of its routes stops responding',
+                    'RMO management and Leaderboards can now be hidden on their own, without turning off the whole RTS or CSR permission category, and the Creatives module gates its own permissions the same way',
+                    'The stale “View ESC Tracker” permission has been removed along with the role grants that referenced it',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Team schedules — clearing every shift in a week now saves; previously the cleared shifts came back on reload',
+                    'Connecting a shop that’s already in use is now caught up front with a clear message, instead of failing part-way through the POS call',
+                    'RMO management — changing the page, shop or user filter now keeps the rest of your filters and the current page size instead of dropping them',
+                    'Gencys ERP — the daily sales tracker sync now pulls the last 3 days by default rather than just yesterday, so a missed day catches itself up',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.21.0',
         date: '2026-07-30',
         sections: [
