@@ -69,6 +69,7 @@ interface Item {
     product_winning_date?: string | null;
     remaining_qty: number | null;
     unfulfilled: number | null;
+    /** Everything still owed on open purchase orders, at any stage. */
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
     po_qty: number | null;
