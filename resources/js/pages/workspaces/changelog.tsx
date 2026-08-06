@@ -12,6 +12,46 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.26.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Inventory Dashboard — Rebuilt Around Purchase Order Flow',
+                items: [
+                    'The dashboard now opens with a verdict instead of a chart — it names whichever of Operations, the Supplier or the Warehouse is holding the most stock right now and says why in a sentence, so the first thing you read is the thing to act on',
+                    'The four headline figures have changed to ones you can do something about — units of demand not yet met, units the reorder maths still wants ordered, units stuck inside the business that were never sent to a supplier, and units on the shelf that a waiting order could ship today; the old item and total-stock counts were true but never changed anyone’s mind',
+                    'Underneath, the whole pipeline shows where every open unit is sitting stage by stage, an aging grid shows how stale each pile has got (0–7 days through to 60+), and a timings panel shows how long each step usually takes',
+                    'Two worklists replace the old open-orders table — “Clear these first” for orders held inside the business, longest wait at the top, and “Chase these deliveries” for orders a supplier already has, split into nothing arrived, part delivered, and past the delivery target',
+                    'The unfulfilled total is now broken down by whether the stock is physically here, so the part the warehouse could ship today is separated from the part genuinely waiting on supply',
+                ],
+            },
+            {
+                title: 'Inventory — Reorder Maths Corrected',
+                items: [
+                    'A purchase order only counts as incoming stock once it has actually been released to a supplier — orders still sitting in approval or payment no longer count; previously an item could be at zero stock while the reorder maths reported weeks of cover, because the order existed, so PO Needed fell to zero and nobody reordered while the paperwork queued',
+                    'Expect PO Needed to rise on items whose orders are stuck in approval, and that is the point — those units were being counted as though they were already on their way',
+                    'The waiting-for-delivery breakdown now says what it is waiting on: how many units are with a supplier, and how many are still awaiting approval or payment, so stock that is committed but not yet moving is visible rather than buried in a single total',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Order Timings',
+                items: [
+                    'A new timings panel reads the ERP’s own status trail to show how long each step of a purchase order really takes — raised to approved, approved to paid, paid through to released — with the typical time and the slowest tenth side by side, and steps that are always instant left out rather than drawn as empty bars',
+                    'The supplier’s leg is measured from the moment an order is released, through first delivery and on to 30, 60, 90 and 100% of the ordered quantity landing — partial delivery is the norm, and one “delivered” figure would hide an order that arrives 90% in a week then dribbles the rest out over a month',
+                    'Paid dates can now be rebuilt from the ERP trail, so orders that synced before payment dates were tracked can be filled in rather than left permanently blank',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The Inventory Items list is around four times quicker to load and sort — the stock figures are worked out in a single pass now instead of re-deriving the same handful of lookups once per column',
+                    'The Delivery Lead Time table has moved off the dashboard and onto the Purchase Orders page, alongside the orders it is derived from — it is the reference you consult when setting an item’s lead time, not a daily signal',
+                    'The items in / out chart now sits below a Background divider at the foot of the dashboard: it reports what already happened, which is context rather than something to act on',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.25.0',
         date: '2026-08-06',
         sections: [
