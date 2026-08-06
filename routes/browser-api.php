@@ -10,6 +10,7 @@ use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
+use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
 Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
@@ -85,6 +86,18 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
 
         Route::get('/inventory/dashboard/delivery-lead-time', [InventoryDashboardStatsController::class, 'deliveryLeadTime'])
             ->name('inventory.dashboard.delivery-lead-time');
+
+        // Purchase-order flow: where ordered stock is sitting and who is holding
+        // it. One endpoint per panel, same as the rest of the dashboard, so a
+        // slow panel never blocks the others.
+        Route::prefix('inventory/dashboard/po-flow')->name('inventory.dashboard.po-flow.')->group(function () {
+            Route::get('/bottleneck', [PurchaseOrderFlowController::class, 'bottleneck'])->name('bottleneck');
+            Route::get('/pipeline', [PurchaseOrderFlowController::class, 'pipeline'])->name('pipeline');
+            Route::get('/worklist', [PurchaseOrderFlowController::class, 'worklist'])->name('worklist');
+            Route::get('/supplier-deliveries', [PurchaseOrderFlowController::class, 'supplierDeliveries'])->name('supplier-deliveries');
+            Route::get('/stage-timings', [PurchaseOrderFlowController::class, 'stageTimings'])->name('stage-timings');
+            Route::get('/unfulfilled-split', [PurchaseOrderFlowController::class, 'unfulfilledSplit'])->name('unfulfilled-split');
+        });
     });
 });
 
