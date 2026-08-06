@@ -12,6 +12,57 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.25.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Sales & Marketing — Sales Targets (New)',
+                items: [
+                    'New Sales Targets tab on the Sales & Marketing dashboard — a dated target holding one amount per team, so a day has a single number to hit and every team can see its share of it',
+                    'Tick the teams that are on a target and set each one’s sales target and ad budget; a team can be on the target for its budget alone, with no sales figure to hit, and typing in either box ticks it for you',
+                    'Each target also carries a Target ROAS — the bar teams are judged against on the board; leave it blank and 5.00 is used',
+                    'A date holds at most one target — if you pick one that’s already taken you’re told on the field rather than getting an error page',
+                    'Anyone who can see the dashboard can read the targets; creating, editing and deleting them needs the same permission as editing teams',
+                ],
+            },
+            {
+                title: 'Sales Targets — Public Gameboard (New)',
+                items: [
+                    'New public Sales Targets board behind the same password as the public RMO page and leaderboard, scored on today’s target — or the most recent one if today has none — with six headline tiles: total sales against target, overall achievement, ads budget, ROAS, qualified teams, and how far above or below the day has landed',
+                    'Sales are counted straight from confirmed Pancake orders on the target’s date, so the board reads the same figure as Total Sales does elsewhere; the headline total covers everything the workspace confirmed that day, whoever it came through',
+                    'ROAS here is measured against the ad budget you set rather than money already spent — it answers what the budget you handed out returned',
+                    'Narrow the whole board to a single team from the header, and Refresh pulls fresh numbers in place instead of reloading the page',
+                    'Each panel loads, fails and retries on its own, so one slow or broken figure never blanks the rest of the board',
+                ],
+            },
+            {
+                title: 'Sales Targets — Leader, Teams & Standings (New)',
+                items: [
+                    'A Current Leader banner names the team out front — highest achievement against its own target — with the two qualification criteria ticked or not and a sparkline of its last fortnight of sales',
+                    'Team Performance cards for every team, best first, each showing target, sales, ad budget, achievement, ROAS and the gap either way, with a bar that runs past 100% so beating the target still shows as headroom',
+                    'Teams that clear both the target and the ROAS bar are marked Qualified; anything over 100% of target picks up a Target Breaker flag, so a team can be one without the other',
+                    'A Team Leaderboard table beneath ranks every team across all nine figures at once, showing the top five until you ask for all of them',
+                    'Beside it, Sales vs Target puts each team’s sales next to its target as a pair of bars, and an Achievement Distribution donut counts how many teams sit in each band — teams with only an ad budget are reported separately rather than counted as failing',
+                ],
+            },
+            {
+                title: 'Sales Targets — Present on TV (New)',
+                items: [
+                    'A Present on TV button turns the board into a full-screen rotation for a wall display: an overview slide, then every team in turn with its medal, rank, six figures and achievement bar',
+                    'Choose 5, 10, 15 or 30 seconds a slide, pause it, step back and forward, or jump straight to any slide from the dots along the bottom — a bar across the top counts down to the next turn',
+                    'Arrow keys move between slides, space pauses and Escape leaves, so a presentation remote drives it without a keyboard in reach',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'A Sales Targets link now sits with the other public pages in the sidebar for workspaces with the Sales & Marketing dashboard turned on',
+                    'The board reads in both light and dark, and everything on it steps up a size on a large screen so a wall-mounted TV isn’t showing laptop-sized type',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.24.0',
         date: '2026-08-06',
         sections: [
