@@ -962,6 +962,11 @@ export default function TransactionsIndex({
                                     preserveState: true,
                                     replace: true,
                                     preserveScroll: true,
+                                    // Paging and sorting only move the ledger.
+                                    // Without this the form's option lists
+                                    // (accounts, users, products, fund
+                                    // requests) are rebuilt on every click.
+                                    only: ['transactions', 'totals'],
                                 },
                             );
                         }}

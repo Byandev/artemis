@@ -241,29 +241,26 @@ class TransactionController extends Controller
         $accounts = Account::where('workspace_id', $workspace->id)
             ->orderBy('name')->get(['id', 'name', 'currency', 'opening_balance']);
 
-        // Newest per account, matching the ledger's date/position ordering.
-        $lastBalances = Transaction::where('workspace_id', $workspace->id)
-            ->whereIn('id', function ($q) use ($workspace, $editing) {
-                $q->selectRaw(
-                    '(SELECT t2.id FROM finance_transactions t2
-                        WHERE t2.account_id = finance_transactions.account_id
-                          AND t2.workspace_id = ?
-                          AND (? IS NULL OR t2.id <> ?)
-                        ORDER BY t2.date DESC, t2.position DESC LIMIT 1)',
-                    [$workspace->id, $editing?->getKey(), $editing?->getKey()]
-                )
-                    ->from('finance_transactions')
-                    ->where('workspace_id', $workspace->id)
-                    ->groupBy('account_id');
-            })
-            ->pluck('running_balance', 'account_id');
+        // Newest per account, matching the ledger's date/position ordering. One
+        // small indexed lookup per account rather than a single clever query: a
+        // workspace has a handful of accounts, and every "newest per group"
+        // formulation MySQL offers here either runs as a dependent subquery or
+        // sorts the whole ledger, both of which cost seconds on a large one.
+        $latest = $accounts->mapWithKeys(fn ($account) => [
+            $account->id => Transaction::where('workspace_id', $workspace->id)
+                ->where('account_id', $account->id)
+                ->when($editing, fn ($q) => $q->whereKeyNot($editing->getKey()))
+                ->orderByDesc('date')
+                ->orderByDesc('position')
+                ->first(['id', 'running_balance']),
+        ]);
 
         return $accounts->map(fn ($account) => [
             'id' => $account->id,
             'name' => $account->name,
             'currency' => $account->currency,
-            'current_balance' => (float) ($lastBalances->get($account->id) ?? $account->opening_balance),
-            'has_transactions' => $lastBalances->has($account->id),
+            'current_balance' => (float) ($latest[$account->id]?->running_balance ?? $account->opening_balance),
+            'has_transactions' => $latest[$account->id] !== null,
         ]);
     }
 
