@@ -313,7 +313,12 @@ class PurchaseOrderFlowController extends Controller
                 continue;
             }
 
-            $toFirstDelivery[] = round(max(0, $released->diffInDays($deliveries->first()->delivery_date, absolute: false)), 2);
+            // Calendar days, not elapsed hours: the release carries a time of
+            // day while a delivery is date-only, so a raw diff would report an
+            // order released at 09:00 and delivered four days later as 3.6.
+            $releasedOn = $released->copy()->startOfDay();
+
+            $toFirstDelivery[] = round(max(0, $releasedOn->diffInDays($deliveries->first()->delivery_date, absolute: false)), 2);
 
             // Walk the deliveries once, stamping each fill level with the date
             // that carried cumulative receipts past it. Several levels land on
@@ -329,7 +334,7 @@ class PurchaseOrderFlowController extends Controller
 
             foreach ($deliveries as $delivery) {
                 $cumulative += max(0, (int) $delivery->qty);
-                $elapsed = round(max(0, $released->diffInDays($delivery->delivery_date, absolute: false)), 2);
+                $elapsed = round(max(0, $releasedOn->diffInDays($delivery->delivery_date, absolute: false)), 2);
 
                 foreach (self::SUPPLIER_FILL_LEVELS as $level) {
                     if (! isset($stamped[$level]) && $cumulative * 100 >= $ordered * $level) {

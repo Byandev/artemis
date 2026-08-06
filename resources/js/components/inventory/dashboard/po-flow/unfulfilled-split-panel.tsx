@@ -37,6 +37,22 @@ export default function UnfulfilledSplitPanel({ slug }: { slug: string }) {
         <section className={panelClass}>
             <PanelHead
                 title="Unfulfilled — is the stock actually here?"
+                help={
+                    <>
+                        <b>Splits unmet demand by who can fix it.</b> Solid
+                        green is demand you could satisfy today from stock
+                        already in the building — that is a picking and despatch
+                        job, not a buying one. Hatched is demand with nothing
+                        behind it, which belongs to whichever step above is
+                        blocked.
+                        <br />
+                        <br />
+                        Compared per SKU, not per group: a customer ordered a
+                        specific variant, so stock on its sibling cannot ship
+                        it. A large green share means the warehouse is the
+                        hold-up.
+                    </>
+                }
                 action={
                     <RefreshButton
                         onClick={refetch}

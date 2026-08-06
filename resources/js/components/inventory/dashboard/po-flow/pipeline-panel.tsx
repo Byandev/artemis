@@ -34,6 +34,21 @@ export default function PipelinePanel({ slug }: { slug: string }) {
         <section className={panelClass}>
             <PanelHead
                 title="The whole pipeline"
+                help={
+                    <>
+                        <b>Every unit between demand and the shelf.</b> The
+                        dashed block is demand with no purchase order behind it
+                        yet. The amber blocks are orders raised but still in
+                        your own approval and payment queues — no supplier has
+                        seen them. The blue block is with a supplier.
+                        <br />
+                        <br />
+                        Width is quantity, so the biggest block is the biggest
+                        pile. The red ring marks the stage holding the most
+                        stock past its target — which is not always the biggest
+                        block, because busy is not the same as blocked.
+                    </>
+                }
                 action={
                     <RefreshButton
                         onClick={refetch}

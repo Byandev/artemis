@@ -56,6 +56,26 @@ export default function StageTimingsPanel({ slug }: { slug: string }) {
         <section className={panelClass}>
             <PanelHead
                 title="How long each step takes"
+                help={
+                    <>
+                        <b>How long each hand-off actually takes</b>, from the
+                        ERP&rsquo;s own status trail. The bar is the typical
+                        order; the tick is the slowest one in ten, so a short
+                        bar with a far-right tick means most orders fly through
+                        and a few get stranded.
+                        <br />
+                        <br />
+                        Supplier rows restart the clock at release, so they
+                        measure the supplier alone. The fill levels show the
+                        shape of a delivery: an order that lands 90% in a week
+                        and dribbles the last 10% over a month reads very
+                        differently from one that arrives whole.
+                        <br />
+                        <br />
+                        Steps that always complete instantly are left out — they
+                        are one click, not a queue.
+                    </>
+                }
                 action={
                     <RefreshButton
                         onClick={refetch}

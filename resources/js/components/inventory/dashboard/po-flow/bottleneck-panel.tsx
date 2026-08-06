@@ -1,7 +1,7 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import RefreshButton from '../refresh-button';
 import { useInventoryStat } from '../use-inventory-stat';
-import { EmptyState, num, panelClass, STATE_STYLE } from './shared';
+import { EmptyState, num, panelClass, PanelHelp, STATE_STYLE } from './shared';
 import type { BottleneckData, FlowOwner } from './types';
 
 /**
@@ -45,6 +45,69 @@ function verdict(data: BottleneckData): { headline: string; why: string } {
         why: 'Every step is inside its target. No bottleneck right now.',
     };
 }
+
+/**
+ * What each card is counting, and what would clear it.
+ *
+ * Copy lives here rather than in the API for the same reason the headline
+ * sentence does — it changes far more often than the scoring behind it.
+ */
+const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
+    operations: (
+        <>
+            <b>Units on purchase orders that exist but have not been sent.</b>{' '}
+            Raised, then sitting in approval or payment — no supplier has seen
+            them, so nothing is on its way.
+            <br />
+            <br />
+            <b>Past the target</b> is the part that has waited longer than a
+            week. <b>Longest wait</b> and <b>orders held</b> count from when
+            each order was raised.
+            <br />
+            <br />
+            Goes red the moment any stock breaches the target, because an order
+            nobody has actioned is pure delay — the work itself takes seconds.
+            Clearing the approval and payment queues empties this card.
+        </>
+    ),
+    supplier: (
+        <>
+            <b>
+                Units on orders a supplier has and has not finished delivering.
+            </b>
+            <br />
+            <br />
+            <b>Past the target</b> is the part older than the delivery target.
+            One caveat worth knowing: the clock runs from when the order was{' '}
+            <i>raised</i>, not released — most orders carry no release timestamp
+            yet, so this includes any time they spent in your own queues and
+            reads slightly harsh on the supplier.
+            <br />
+            <br />
+            Goes red only when more than 40% of in-transit stock is overdue. A
+            couple of late orders is normal; most of the book being late is not.
+        </>
+    ),
+    warehouse: (
+        <>
+            <b>Stock physically here with an unfulfilled order against it.</b>{' '}
+            The headline counts only what has been sittable more than three days
+            — <b>could ship today</b> is the full figure including the normal
+            picking queue.
+            <br />
+            <br />
+            <b>No stock to give</b> is the other half of unfulfilled demand:
+            real orders with nothing behind them, which belong to whichever step
+            above is blocked rather than to the warehouse.
+            <br />
+            <br />
+            Goes red above 15% of unmet demand. One caveat: this is a snapshot,
+            not a stopwatch — a high number can also mean the unfulfilled counts
+            are stale rather than that nothing is being picked. Worth spot-
+            checking a couple of SKUs before anyone is blamed.
+        </>
+    ),
+};
 
 /**
  * Opens the dashboard by answering the only question that matters first: is it
@@ -109,9 +172,35 @@ export default function BottleneckPanel({ slug }: { slug: string }) {
         <section className={panelClass}>
             <div className="flex items-start justify-between gap-4 border-b border-black/6 p-[18px] pt-5 dark:border-white/6">
                 <div>
-                    <p className="text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500">
-                        The bottleneck is
-                    </p>
+                    <div className="flex items-center gap-1.5">
+                        <p className="text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500">
+                            The bottleneck is
+                        </p>
+                        <PanelHelp>
+                            <b>
+                                Three questions, answered from the data rather
+                                than from anyone&rsquo;s opinion.
+                            </b>
+                            <br />
+                            <br />
+                            <b>Operations</b> — are we raising and processing
+                            purchase orders on time? Blocked when any stock has
+                            sat in an internal queue past the target.
+                            <br />
+                            <b>Supplier</b> — are suppliers delivering what we
+                            have released to them? Blocked when more than 40% of
+                            in-transit stock is past the delivery target.
+                            <br />
+                            <b>Warehouse</b> — is stock sitting here that an
+                            unfulfilled order could already take? Blocked when
+                            more than 15% of unmet demand has stock on the shelf
+                            behind it.
+                            <br />
+                            <br />
+                            Each is scored on its own evidence, so clearing one
+                            will make this panel start naming the next.
+                        </PanelHelp>
+                    </div>
                     {/* Deliberately large: this is the one line someone reads if
                         they read nothing else on the page. */}
                     <h2 className="mt-1.5 text-[26px] leading-[1.1] font-semibold tracking-tight text-balance text-gray-900 sm:text-[30px] dark:text-gray-100">
@@ -143,9 +232,12 @@ function OwnerCard({ owner }: { owner: FlowOwner }) {
 
     return (
         <div className="bg-white p-[18px] dark:bg-zinc-900">
-            <p className="text-[11px] font-semibold tracking-[0.11em] text-gray-500 uppercase dark:text-gray-400">
-                {owner.name}
-            </p>
+            <div className="flex items-center gap-1.5">
+                <p className="text-[11px] font-semibold tracking-[0.11em] text-gray-500 uppercase dark:text-gray-400">
+                    {owner.name}
+                </p>
+                <PanelHelp>{OWNER_HELP[owner.key]}</PanelHelp>
+            </div>
             {/* Fixed height so the three verdict chips line up across cards
                 however long the questions are. */}
             <p className="mt-2 min-h-[3em] text-[11px] leading-snug text-gray-400 dark:text-gray-500">

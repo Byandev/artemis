@@ -42,6 +42,23 @@ export default function SupplierDeliveriesPanel({ slug }: { slug: string }) {
         <section className={panelClass}>
             <PanelHead
                 title="Chase these deliveries"
+                help={
+                    <>
+                        <b>
+                            Orders a supplier already has and has not finished.
+                        </b>{' '}
+                        The three tallies split them by the conversation they
+                        need: nothing has arrived at all, the supplier started
+                        then stopped, or it is simply past the delivery target.
+                        <br />
+                        <br />
+                        The progress bar turns red when nothing has been
+                        delivered — a supplier who has sent nothing in three
+                        months is a different call from one mid-delivery. Rows
+                        above 90% fade, because chasing a handful of leftover
+                        units wastes the call.
+                    </>
+                }
                 action={
                     <RefreshButton
                         onClick={refetch}

@@ -47,6 +47,22 @@ export default function AgingPanel({ slug }: { slug: string }) {
         <section className={panelClass}>
             <PanelHead
                 title="What is going stale, and where"
+                help={
+                    <>
+                        <b>
+                            The same units, cut by how long they have sat there.
+                        </b>{' '}
+                        Read down a column to find what is old; read across a
+                        row to find the stage that lets it rot.
+                        <br />
+                        <br />
+                        The corner to watch is top right: a dark cell there is
+                        stock that stopped moving inside a stage that should
+                        have passed it on. A supplier row with a long tail is a
+                        late delivery; an internal row with one is an order
+                        nobody picked up.
+                    </>
+                }
                 action={
                     <RefreshButton
                         onClick={refetch}
