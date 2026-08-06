@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
+use App\Http\Controllers\PublicSalesTargetController;
 use App\Http\Controllers\Workspaces\ActivityLogController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
 use App\Http\Controllers\Workspaces\AskDataController;
@@ -27,6 +28,7 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\SalesMarketingDashboardController;
+use App\Http\Controllers\Workspaces\SalesTargetController;
 use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamAdAccountController;
@@ -94,6 +96,9 @@ use Modules\SimGateway\Http\Controllers\SmsController;
 | member management, and invitation handling.
 |
 */
+Route::get('/public/workspaces/{workspace}/sales-targets', [PublicSalesTargetController::class, 'index'])->name('public-page.sales-targets');
+Route::post('/public/workspaces/{workspace}/sales-targets/verify-password', [PublicSalesTargetController::class, 'verifyPublicPassword'])->name('public-page.sales-targets.verify-password');
+
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
@@ -145,6 +150,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('workspaces.sales-marketing.dashboard.page-roas-tracker');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spend-goals');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spent-summary');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets', [SalesTargetController::class, 'index'])->name('workspaces.sales-marketing.dashboard.sales-targets');
+    Route::post('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets', [SalesTargetController::class, 'store'])->name('workspaces.sales-marketing.dashboard.sales-targets.store');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'show'])->name('workspaces.sales-marketing.dashboard.sales-targets.show');
+    Route::put('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'update'])->name('workspaces.sales-marketing.dashboard.sales-targets.update');
+    Route::delete('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'destroy'])->name('workspaces.sales-marketing.dashboard.sales-targets.destroy');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
