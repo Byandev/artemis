@@ -3,7 +3,7 @@ import {
     SalesTarget,
 } from '@/pages/workspaces/sales-targets/shared';
 import { router } from '@inertiajs/react';
-import { Maximize2, Minimize2, RefreshCw } from 'lucide-react';
+import { Maximize2, Minimize2, MonitorPlay, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export interface BoardTeam {
@@ -21,6 +21,7 @@ interface Props {
     /** True while any section is fetching, so Refresh can show it. */
     refreshing?: boolean;
     onRefresh: () => void;
+    onPresent: () => void;
 }
 
 /**
@@ -36,6 +37,7 @@ export function GameboardHeader({
     teamId,
     refreshing = false,
     onRefresh,
+    onPresent,
 }: Props) {
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -70,9 +72,11 @@ export function GameboardHeader({
         'flex h-8 2xl:h-10 items-center gap-2 rounded-lg border border-black/8 bg-white px-3 2xl:px-4 text-[12px] 2xl:text-[14px] font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10';
 
     return (
-        <header className="relative overflow-hidden border-b border-black/8 bg-white dark:border-white/8 dark:bg-zinc-950">
+        <header className="relative z-10 overflow-hidden border-b border-black/8 bg-white/80 backdrop-blur-md dark:border-white/8 dark:bg-zinc-950/80">
             {/* Brand wash behind the title — faint in light, a touch stronger on dark. */}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_140%_at_0%_50%,rgba(16,211,161,0.10),transparent_70%)] dark:bg-[radial-gradient(70%_140%_at_0%_50%,rgba(16,211,161,0.16),transparent_70%)]" />
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-brand-500/60 via-brand-500/10 to-transparent dark:from-brand-400/60 dark:via-brand-400/10" />
 
             <div className="relative mx-auto flex w-full max-w-(--breakpoint-2xl) flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 2xl:px-8 2xl:py-5">
                 <div className="min-w-0">
@@ -139,6 +143,14 @@ export function GameboardHeader({
                         <RefreshCw
                             className={`h-3.5 w-3.5 2xl:h-4 2xl:w-4 ${refreshing ? 'animate-spin' : ''}`}
                         />
+                    </button>
+
+                    <button
+                        onClick={onPresent}
+                        className={`${controlClass} border-brand-500/50 text-brand-700 dark:border-brand-400/50 dark:text-brand-300`}
+                    >
+                        <MonitorPlay className="h-3.5 w-3.5 2xl:h-4 2xl:w-4" />
+                        Present on TV
                     </button>
 
                     <button onClick={toggleFullscreen} className={controlClass}>

@@ -77,7 +77,7 @@ function TeamCard({ team }: { team: TeamPerformance }) {
 
     return (
         <div
-            className={`rounded-[12px] border bg-white p-3 2xl:p-4 dark:bg-zinc-900 ${
+            className={`rounded-[12px] border bg-white/85 p-3 shadow-[0_1px_2px_rgba(9,52,41,0.04),0_8px_24px_-12px_rgba(9,52,41,0.10)] transition-all hover:-translate-y-0.5 2xl:p-4 dark:bg-zinc-900/80 dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)] ${
                 style?.card ?? 'border-black/6 dark:border-white/8'
             }`}
         >
@@ -190,7 +190,7 @@ export function GameboardTeams({ teams }: { teams: TeamPerformance[] }) {
                 <h2 className="my-0! shrink-0 font-mono text-[9px]! font-medium tracking-[0.16em] text-gray-500 uppercase 2xl:text-[11px]! dark:text-gray-400">
                     Team Performance
                 </h2>
-                <div className="h-px flex-1 bg-black/8 dark:bg-white/8" />
+                <div className="h-px flex-1 bg-gradient-to-r from-brand-500/40 to-transparent dark:from-brand-400/40" />
             </div>
 
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:gap-3">

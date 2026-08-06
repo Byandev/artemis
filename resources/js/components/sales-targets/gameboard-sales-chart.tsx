@@ -74,7 +74,7 @@ export function GameboardSalesChart({
 
     return (
         <section className="h-full">
-            <div className="h-full rounded-[12px] border border-black/6 bg-white px-3 py-2.5 dark:border-white/8 dark:bg-zinc-900">
+            <div className="h-full rounded-[12px] border border-black/6 bg-white/85 px-3 py-2.5 shadow-[0_1px_2px_rgba(9,52,41,0.04),0_8px_24px_-12px_rgba(9,52,41,0.10)] dark:border-white/8 dark:bg-zinc-900/80 dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="my-0! font-mono text-[10px]! font-medium tracking-[0.16em] text-gray-700 uppercase 2xl:text-[12px]! dark:text-gray-200">
                         Sales vs Target

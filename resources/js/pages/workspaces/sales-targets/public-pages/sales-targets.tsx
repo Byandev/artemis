@@ -1,4 +1,5 @@
 import { BoardSectionState } from '@/components/sales-targets/board-section';
+import { GameboardBackdrop } from '@/components/sales-targets/gameboard-backdrop';
 import {
     DistributionData,
     GameboardDistribution,
@@ -23,6 +24,7 @@ import {
     GameboardSalesChart,
     SalesVsTargetPoint,
 } from '@/components/sales-targets/gameboard-sales-chart';
+import { GameboardSlideshow } from '@/components/sales-targets/gameboard-slideshow';
 import {
     GameboardTeams,
     TeamPerformance,
@@ -150,6 +152,21 @@ export default function PublicSalesTargets({
         section: 'leaderboard',
         params: { limit: showAllRanks ? 100 : 5 },
     });
+    const [presenting, setPresenting] = useState(false);
+
+    // "Present on TV" is a presentation, so it takes the whole screen; leaving
+    // it hands the screen back.
+    const startPresenting = () => {
+        setPresenting(true);
+        document.documentElement.requestFullscreen?.().catch(() => {});
+    };
+
+    const stopPresenting = () => {
+        setPresenting(false);
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+    };
 
     if (locked) {
         return <SalesTargetsLock workspace={workspace} />;
@@ -165,8 +182,10 @@ export default function PublicSalesTargets({
     ].some((section) => section.loading);
 
     return (
-        <div className="min-h-screen bg-stone-50 dark:bg-zinc-950">
+        <div className="relative min-h-screen bg-stone-50 dark:bg-zinc-950">
             <Head title={`${workspace.name} - Sales Targets`} />
+
+            <GameboardBackdrop />
 
             <GameboardHeader
                 workspaceName={workspace.name}
@@ -175,9 +194,23 @@ export default function PublicSalesTargets({
                 teamId={teamId}
                 refreshing={busy}
                 onRefresh={() => setRefreshKey((key) => key + 1)}
+                onPresent={startPresenting}
             />
 
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) px-4 py-3 md:px-6 2xl:px-8 2xl:py-5">
+            {presenting && (
+                <GameboardSlideshow
+                    data={{
+                        workspaceName: workspace.name,
+                        featured,
+                        kpis: kpis.data,
+                        leader: leader.data,
+                        teams: teamRows.data,
+                    }}
+                    onClose={stopPresenting}
+                />
+            )}
+
+            <div className="relative mx-auto w-full max-w-(--breakpoint-2xl) px-4 py-3 md:px-6 2xl:px-8 2xl:py-5">
                 {featured ? (
                     <>
                         {kpis.data ? (

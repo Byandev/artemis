@@ -145,7 +145,7 @@ export function GameboardLeader({
     qualifyingRoas: number;
 }) {
     return (
-        <div className="mt-2 grid gap-4 rounded-[12px] border border-black/6 bg-white px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] md:gap-6 2xl:px-5 2xl:py-4 dark:border-white/8 dark:bg-zinc-900">
+        <div className="mt-2 grid gap-4 overflow-hidden rounded-[12px] border border-black/6 bg-gradient-to-r from-amber-50/80 via-white/85 to-white/85 px-4 py-3 shadow-[0_1px_2px_rgba(9,52,41,0.04),0_8px_24px_-12px_rgba(9,52,41,0.10)] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] md:gap-6 2xl:px-5 2xl:py-4 dark:border-white/8 dark:from-amber-500/[0.07] dark:via-zinc-900/80 dark:to-zinc-900/80 dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)]">
             <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-amber-500/10 text-amber-500 2xl:h-14 2xl:w-14">
                     <Trophy className="h-5 w-5 2xl:h-7 2xl:w-7" />

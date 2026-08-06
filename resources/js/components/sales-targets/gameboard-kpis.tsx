@@ -80,10 +80,10 @@ function KpiCard({
     const TrendIcon = trend?.status === 'down' ? TrendingDown : TrendingUp;
 
     return (
-        <div className="rounded-[12px] border border-black/6 bg-white px-3 py-2.5 2xl:px-4 2xl:py-3.5 dark:border-white/8 dark:bg-zinc-900">
+        <div className="group rounded-[12px] border border-black/6 bg-white/85 px-3 py-2.5 shadow-[0_1px_2px_rgba(9,52,41,0.04),0_8px_24px_-12px_rgba(9,52,41,0.10)] transition-all hover:border-black/10 2xl:px-4 2xl:py-3.5 dark:border-white/8 dark:bg-zinc-900/80 dark:shadow-[0_1px_2px_rgba(0,0,0,0.4),0_8px_24px_-12px_rgba(0,0,0,0.6)] dark:hover:border-white/15">
             <div className="flex items-center gap-2.5 2xl:gap-3.5">
                 <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 2xl:h-12 2xl:w-12 ${t.ring} ${t.icon}`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-transform group-hover:scale-105 2xl:h-12 2xl:w-12 ${t.ring} ${t.icon}`}
                 >
                     <Icon className="h-4 w-4 2xl:h-5 2xl:w-5" />
                 </div>

@@ -21,7 +21,7 @@ export function BoardSectionState({
     if (failed) {
         return (
             <div
-                className={`flex ${height} flex-col items-center justify-center gap-2 rounded-[12px] border border-dashed border-black/8 bg-white dark:border-white/8 dark:bg-zinc-900`}
+                className={`flex ${height} flex-col items-center justify-center gap-2 rounded-[12px] border border-dashed border-black/8 bg-white/70 dark:border-white/8 dark:bg-zinc-900/70`}
             >
                 <p className="text-[11px] text-gray-500 dark:text-gray-400">
                     Couldn&apos;t load {label}.
@@ -40,7 +40,7 @@ export function BoardSectionState({
     if (loading) {
         return (
             <div
-                className={`${height} animate-pulse rounded-[12px] border border-black/6 bg-white dark:border-white/8 dark:bg-zinc-900`}
+                className={`${height} animate-pulse rounded-[12px] border border-black/6 bg-white/70 dark:border-white/8 dark:bg-zinc-900/70`}
                 aria-label={`Loading ${label}`}
             />
         );
