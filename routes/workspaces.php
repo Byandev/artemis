@@ -102,6 +102,7 @@ Route::post('/public/workspaces/{workspace}/sales-targets/verify-password', [Pub
 Route::get('/public/workspaces/{workspace}/sales-targets/kpis', [PublicSalesTargetController::class, 'kpis'])->name('public-page.sales-targets.kpis');
 Route::get('/public/workspaces/{workspace}/sales-targets/leader', [PublicSalesTargetController::class, 'leader'])->name('public-page.sales-targets.leader');
 Route::get('/public/workspaces/{workspace}/sales-targets/teams', [PublicSalesTargetController::class, 'teams'])->name('public-page.sales-targets.teams');
+Route::get('/public/workspaces/{workspace}/sales-targets/leaderboard', [PublicSalesTargetController::class, 'leaderboard'])->name('public-page.sales-targets.leaderboard');
 
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');

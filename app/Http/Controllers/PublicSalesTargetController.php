@@ -91,6 +91,25 @@ class PublicSalesTargetController extends Controller
     }
 
     /**
+     * The team leaderboard — the same ranking as the cards, cut to the top few
+     * unless asked for more. `total` is always the full count, so the table can
+     * say what it is holding back.
+     */
+    public function leaderboard(Request $request, Workspace $workspace): JsonResponse
+    {
+        $limit = max(1, min($request->integer('limit', 5), 100));
+
+        return $this->section($request, $workspace, function (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) use ($limit) {
+            $ranked = $query->teamsFor($target, $teamId);
+
+            return [
+                'rows' => array_slice($ranked, 0, $limit),
+                'total' => count($ranked),
+            ];
+        });
+    }
+
+    /**
      * Shared shell for the per-section endpoints: same password gate, same
      * featured day, same team filter — only the slice of data differs, so each
      * section can load, fail and refresh on its own.

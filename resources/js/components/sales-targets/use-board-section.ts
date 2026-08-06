@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 interface Options {
     /** Board slug the endpoints hang off. */
     workspaceSlug: string;
-    /** Which section to fetch: 'kpis' | 'leader' | 'teams'. */
+    /** Which section to fetch: 'kpis' | 'leader' | 'teams' | 'leaderboard'. */
     section: string;
     teamId?: number | null;
     /** Bumped by the header's Refresh — every section refetches on change. */
     refreshKey: number;
+    /** Anything else the section's endpoint takes, e.g. the leaderboard's limit. */
+    params?: Record<string, string | number>;
 }
 
 interface State<T> {
@@ -30,12 +32,17 @@ export function useBoardSection<T>({
     section,
     teamId,
     refreshKey,
+    params,
 }: Options): State<T> & { reload: () => void } {
     const [state, setState] = useState<State<T>>({
         data: null,
         loading: true,
         failed: false,
     });
+
+    // A fresh object every render would restart the request every render, so the
+    // effect keys off the params' contents rather than their identity.
+    const paramsKey = JSON.stringify(params ?? {});
 
     const load = useCallback(
         (signal?: AbortSignal) => {
@@ -45,7 +52,10 @@ export function useBoardSection<T>({
                 .get(
                     `/public/workspaces/${workspaceSlug}/sales-targets/${section}`,
                     {
-                        params: teamId ? { team_id: teamId } : {},
+                        params: {
+                            ...(teamId ? { team_id: teamId } : {}),
+                            ...JSON.parse(paramsKey),
+                        },
                         signal,
                     },
                 )
@@ -63,7 +73,7 @@ export function useBoardSection<T>({
                     setState({ data: null, loading: false, failed: true });
                 });
         },
-        [workspaceSlug, section, teamId],
+        [workspaceSlug, section, teamId, paramsKey],
     );
 
     useEffect(() => {

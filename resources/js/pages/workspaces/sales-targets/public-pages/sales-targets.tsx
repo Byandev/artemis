@@ -12,6 +12,10 @@ import {
     LeaderTeam,
 } from '@/components/sales-targets/gameboard-leader';
 import {
+    GameboardLeaderboard,
+    LeaderboardData,
+} from '@/components/sales-targets/gameboard-leaderboard';
+import {
     GameboardTeams,
     TeamPerformance,
 } from '@/components/sales-targets/gameboard-teams';
@@ -123,6 +127,13 @@ export default function PublicSalesTargets({
         ...shared,
         section: 'teams',
     });
+    // "View all" is just a bigger limit — the hook refetches when it changes.
+    const [showAllRanks, setShowAllRanks] = useState(false);
+    const leaderboard = useBoardSection<LeaderboardData>({
+        ...shared,
+        section: 'leaderboard',
+        params: { limit: showAllRanks ? 100 : 5 },
+    });
 
     if (locked) {
         return <SalesTargetsLock workspace={workspace} />;
@@ -184,6 +195,26 @@ export default function PublicSalesTargets({
                                     failed={teamRows.failed}
                                     onRetry={teamRows.reload}
                                     label="team performance"
+                                    height="h-40"
+                                />
+                            </div>
+                        )}
+
+                        {leaderboard.data ? (
+                            <GameboardLeaderboard
+                                data={leaderboard.data}
+                                expanded={showAllRanks}
+                                onToggleExpanded={() =>
+                                    setShowAllRanks((shown) => !shown)
+                                }
+                            />
+                        ) : (
+                            <div className="mt-4">
+                                <BoardSectionState
+                                    loading={leaderboard.loading}
+                                    failed={leaderboard.failed}
+                                    onRetry={leaderboard.reload}
+                                    label="the leaderboard"
                                     height="h-40"
                                 />
                             </div>
