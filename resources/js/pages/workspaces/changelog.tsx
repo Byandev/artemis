@@ -12,6 +12,118 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.27.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Inventory Dashboard — Built-in Explanations',
+                items: [
+                    'Every panel and headline figure on the Inventory Dashboard now carries a question mark that explains how to read it — what the number counts, where it comes from, and what would make it go down — so nobody has to be walked through the page by someone who already knows it',
+                    'The three bottleneck cards spell out exactly what puts each of them in the red: Operations the moment any stock breaches the week-long target, the Supplier once more than 40% of released stock is overdue, the Warehouse above 15% of unmet demand — the verdict is checkable rather than something to take on faith',
+                    'The notes are candid about what the figures can’t tell you — the supplier clock currently runs from when an order was raised rather than released, so it reads harsh on the supplier, and a high warehouse figure can mean the unfulfilled counts are stale rather than that nothing is being picked, worth spot-checking before anyone gets blamed',
+                    'Each explanation opens on keyboard focus as well as hover, so it’s reachable without a mouse',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Supplier delivery times are now counted in whole calendar days — an order released at nine in the morning and delivered four days later was being reported as 3.6 days, because the release carries a time of day while the delivery only carries a date',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.26.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Inventory Dashboard — Rebuilt Around Purchase Order Flow',
+                items: [
+                    'The dashboard now opens with a verdict instead of a chart — it names whichever of Operations, the Supplier or the Warehouse is holding the most stock right now and says why in a sentence, so the first thing you read is the thing to act on',
+                    'The four headline figures have changed to ones you can do something about — units of demand not yet met, units the reorder maths still wants ordered, units stuck inside the business that were never sent to a supplier, and units on the shelf that a waiting order could ship today; the old item and total-stock counts were true but never changed anyone’s mind',
+                    'Underneath, the whole pipeline shows where every open unit is sitting stage by stage, an aging grid shows how stale each pile has got (0–7 days through to 60+), and a timings panel shows how long each step usually takes',
+                    'Two worklists replace the old open-orders table — “Clear these first” for orders held inside the business, longest wait at the top, and “Chase these deliveries” for orders a supplier already has, split into nothing arrived, part delivered, and past the delivery target',
+                    'The unfulfilled total is now broken down by whether the stock is physically here, so the part the warehouse could ship today is separated from the part genuinely waiting on supply',
+                ],
+            },
+            {
+                title: 'Inventory — Reorder Maths Corrected',
+                items: [
+                    'A purchase order only counts as incoming stock once it has actually been released to a supplier — orders still sitting in approval or payment no longer count; previously an item could be at zero stock while the reorder maths reported weeks of cover, because the order existed, so PO Needed fell to zero and nobody reordered while the paperwork queued',
+                    'Expect PO Needed to rise on items whose orders are stuck in approval, and that is the point — those units were being counted as though they were already on their way',
+                    'The waiting-for-delivery breakdown now says what it is waiting on: how many units are with a supplier, and how many are still awaiting approval or payment, so stock that is committed but not yet moving is visible rather than buried in a single total',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Order Timings',
+                items: [
+                    'A new timings panel reads the ERP’s own status trail to show how long each step of a purchase order really takes — raised to approved, approved to paid, paid through to released — with the typical time and the slowest tenth side by side, and steps that are always instant left out rather than drawn as empty bars',
+                    'The supplier’s leg is measured from the moment an order is released, through first delivery and on to 30, 60, 90 and 100% of the ordered quantity landing — partial delivery is the norm, and one “delivered” figure would hide an order that arrives 90% in a week then dribbles the rest out over a month',
+                    'Paid dates can now be rebuilt from the ERP trail, so orders that synced before payment dates were tracked can be filled in rather than left permanently blank',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The Inventory Items list is around four times quicker to load and sort — the stock figures are worked out in a single pass now instead of re-deriving the same handful of lookups once per column',
+                    'The Delivery Lead Time table has moved off the dashboard and onto the Purchase Orders page, alongside the orders it is derived from — it is the reference you consult when setting an item’s lead time, not a daily signal',
+                    'The items in / out chart now sits below a Background divider at the foot of the dashboard: it reports what already happened, which is context rather than something to act on',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.25.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Sales & Marketing — Sales Targets (New)',
+                items: [
+                    'New Sales Targets tab on the Sales & Marketing dashboard — a dated target holding one amount per team, so a day has a single number to hit and every team can see its share of it',
+                    'Tick the teams that are on a target and set each one’s sales target and ad budget; a team can be on the target for its budget alone, with no sales figure to hit, and typing in either box ticks it for you',
+                    'Each target also carries a Target ROAS — the bar teams are judged against on the board; leave it blank and 5.00 is used',
+                    'A date holds at most one target — if you pick one that’s already taken you’re told on the field rather than getting an error page',
+                    'Anyone who can see the dashboard can read the targets; creating, editing and deleting them needs the same permission as editing teams',
+                ],
+            },
+            {
+                title: 'Sales Targets — Public Gameboard (New)',
+                items: [
+                    'New public Sales Targets board behind the same password as the public RMO page and leaderboard, scored on today’s target — or the most recent one if today has none — with six headline tiles: total sales against target, overall achievement, ads budget, ROAS, qualified teams, and how far above or below the day has landed',
+                    'Sales are counted straight from confirmed Pancake orders on the target’s date, so the board reads the same figure as Total Sales does elsewhere; the headline total covers everything the workspace confirmed that day, whoever it came through',
+                    'ROAS here is measured against the ad budget you set rather than money already spent — it answers what the budget you handed out returned',
+                    'Narrow the whole board to a single team from the header, and Refresh pulls fresh numbers in place instead of reloading the page',
+                    'Each panel loads, fails and retries on its own, so one slow or broken figure never blanks the rest of the board',
+                ],
+            },
+            {
+                title: 'Sales Targets — Leader, Teams & Standings (New)',
+                items: [
+                    'A Current Leader banner names the team out front — highest achievement against its own target — with the two qualification criteria ticked or not and a sparkline of its last fortnight of sales',
+                    'Team Performance cards for every team, best first, each showing target, sales, ad budget, achievement, ROAS and the gap either way, with a bar that runs past 100% so beating the target still shows as headroom',
+                    'Teams that clear both the target and the ROAS bar are marked Qualified; anything over 100% of target picks up a Target Breaker flag, so a team can be one without the other',
+                    'A Team Leaderboard table beneath ranks every team across all nine figures at once, showing the top five until you ask for all of them',
+                    'Beside it, Sales vs Target puts each team’s sales next to its target as a pair of bars, and an Achievement Distribution donut counts how many teams sit in each band — teams with only an ad budget are reported separately rather than counted as failing',
+                ],
+            },
+            {
+                title: 'Sales Targets — Present on TV (New)',
+                items: [
+                    'A Present on TV button turns the board into a full-screen rotation for a wall display: an overview slide, then every team in turn with its medal, rank, six figures and achievement bar',
+                    'Choose 5, 10, 15 or 30 seconds a slide, pause it, step back and forward, or jump straight to any slide from the dots along the bottom — a bar across the top counts down to the next turn',
+                    'Arrow keys move between slides, space pauses and Escape leaves, so a presentation remote drives it without a keyboard in reach',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'A Sales Targets link now sits with the other public pages in the sidebar for workspaces with the Sales & Marketing dashboard turned on',
+                    'The board reads in both light and dark, and everything on it steps up a size on a large screen so a wall-mounted TV isn’t showing laptop-sized type',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.24.0',
         date: '2026-08-06',
         sections: [

@@ -6,6 +6,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Models\PurchasedOrderItemDelivery;
+use Modules\Inventory\Support\InventoryStockColumns;
 use Tests\TestCase;
 
 // Module test dirs aren't bound by the root tests/Pest.php (->in('Feature') only
@@ -35,10 +36,21 @@ function waitingFor(int $itemId, $owner, $workspace): ?int
     return stockColumn($itemId, $owner, $workspace, 'waiting_for_delivery_stocks');
 }
 
-/** Units owed on orders still awaiting approval or payment (REQUESTED_STATUSES). */
+/**
+ * Units owed on orders still awaiting approval or payment. Read straight off
+ * the query rather than the page: the items list deliberately shows only the
+ * combined "Waiting for Delivery" figure, and this split feeds the PO-flow
+ * dashboard and the daily snapshot instead.
+ */
 function requestedFor(int $itemId, $owner, $workspace): ?int
 {
-    return stockColumn($itemId, $owner, $workspace, 'requested_stocks');
+    $value = InventoryItem::query()
+        ->whereKey($itemId)
+        ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
+        ->selectRaw(InventoryStockColumns::requestedStocks().' as requested_stocks')
+        ->value('requested_stocks');
+
+    return $value === null ? null : (int) $value;
 }
 
 test('waiting-for-delivery reflects the undelivered remainder on status-6 orders', function () {

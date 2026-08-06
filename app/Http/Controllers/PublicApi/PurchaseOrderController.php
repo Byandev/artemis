@@ -163,9 +163,13 @@ class PurchaseOrderController extends Controller
             return;
         }
 
-        PurchasedOrderStatusLog::where('inventory_purchased_order_id', $order->id)->delete();
+        // Bypasses model events on purpose: a wholesale replace would otherwise
+        // re-derive paid_at once per row. The single recalculate below does the
+        // same work once.
+        PurchasedOrderStatusLog::where('inventory_purchased_order_id', $order->id)->toBase()->delete();
 
-        $paidAt = null;
+        $now = now();
+        $rows = [];
 
         foreach (($po['statusLogs'] ?? []) as $log) {
             $status = $this->trimmed($log['status'] ?? null);
@@ -174,27 +178,24 @@ class PurchaseOrderController extends Controller
                 continue;
             }
 
-            $loggedAt = $this->toDateTime($log['timestamp'] ?? null);
-
-            PurchasedOrderStatusLog::create([
+            $rows[] = [
                 'inventory_purchased_order_id' => $order->id,
                 'status' => $status,
                 'by' => $this->trimmed($log['by'] ?? null),
                 'detail' => $log['detail'] ?? null,
-                'logged_at' => $loggedAt,
-            ]);
-
-            // Earliest Paid entry wins: an order marked paid, reverted and paid
-            // again was first settled on the first date, and a 50% payment is
-            // still the date money moved.
-            if ($loggedAt && strtolower($status) === PurchasedOrderStatusLog::PAID) {
-                $paidAt = $paidAt === null ? $loggedAt : min($paidAt, $loggedAt);
-            }
+                'logged_at' => $this->toDateTime($log['timestamp'] ?? null),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
 
-        // Assigned even when null, so an order whose Paid entry the ERP has
-        // withdrawn stops reporting a payment date.
-        $order->update(['paid_at' => $paidAt]);
+        if ($rows) {
+            PurchasedOrderStatusLog::insert($rows);
+        }
+
+        // Runs even when the trail came back empty, so an order whose Paid entry
+        // the ERP has withdrawn stops reporting a payment date.
+        $order->recalculatePaidAt();
     }
 
     /** Trim a scalar to a non-empty string, or null. */
