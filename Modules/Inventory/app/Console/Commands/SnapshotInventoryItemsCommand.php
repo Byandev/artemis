@@ -7,6 +7,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Support\InventoryItemMetrics;
+use Modules\Inventory\Support\InventoryStockColumns;
 
 /**
  * Freeze every inventory item — stored columns and computed metrics alike — against
@@ -40,6 +41,7 @@ class SnapshotInventoryItemsCommand extends Command
         // photo of the page rather than a second, subtly different calculation.
         $query = InventoryItem::query()
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
             ->select([
                 'inventory_items.id',
                 'inventory_items.workspace_id',
@@ -96,6 +98,7 @@ class SnapshotInventoryItemsCommand extends Command
                     'discrepancy_counted_qty' => $item->discrepancy_counted_qty,
                     'discrepancy_date' => $item->discrepancy_date,
                     'waiting_for_delivery_stocks' => $item->waiting_for_delivery_stocks,
+                    'requested_stocks' => $item->requested_stocks,
                     'remaining_after_fulfillment' => $item->remaining_after_fulfillment,
                     'stocks_needed_for_lead_time' => $item->stocks_needed_for_lead_time,
                     'po_qty' => $item->po_qty,
@@ -118,7 +121,7 @@ class SnapshotInventoryItemsCommand extends Command
                         'sales_keywords', 'transaction_keywords', 'lead_time', 'days_of_coverage',
                         'unfulfilled_count', 'three_days_average', 'remaining_qty', 'item_created_at',
                         'current_stocks', 'discrepancy', 'discrepancy_counted_qty', 'discrepancy_date',
-                        'waiting_for_delivery_stocks', 'remaining_after_fulfillment',
+                        'waiting_for_delivery_stocks', 'requested_stocks', 'remaining_after_fulfillment',
                         'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'days_it_can_last',
                         'product_name', 'product_winning_date', 'updated_at',
                     ]

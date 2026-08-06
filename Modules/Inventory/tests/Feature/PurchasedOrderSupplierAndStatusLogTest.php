@@ -221,3 +221,91 @@ test('the PO drill-down carries the paid date, supplier and trail', function () 
         ->and($data['status_logs'])->toHaveCount(4)
         ->and($data['status_logs'][0]['status'])->toBe('Approve');
 });
+
+test('a Paid log written outside the sync still sets the paid date', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $order = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'CN-DIRECT',
+        'issue_date' => '2026-07-01',
+        'status' => 6,
+    ]);
+
+    // No sync involved — this is the path that used to leave paid_at null.
+    $order->statusLogs()->create([
+        'status' => 'Paid',
+        'by' => 'RENZ LAICA MERCADO',
+        'logged_at' => '2026-07-04 09:15:00',
+    ]);
+
+    expect($order->fresh()->paid_at->toDateTimeString())->toBe('2026-07-04 09:15:00');
+});
+
+test('the earliest Paid entry wins when an order is paid more than once', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $order = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'CN-TWICE',
+        'issue_date' => '2026-07-01',
+        'status' => 6,
+    ]);
+
+    // Written newest-first, so the answer cannot come from insertion order.
+    $order->statusLogs()->create(['status' => 'Paid', 'logged_at' => '2026-07-20 10:00:00']);
+    $order->statusLogs()->create(['status' => 'Paid', 'logged_at' => '2026-07-05 16:00:00']);
+
+    expect($order->fresh()->paid_at->toDateTimeString())->toBe('2026-07-05 16:00:00');
+});
+
+test('deleting the Paid log clears the paid date', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $order = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'CN-UNDO',
+        'issue_date' => '2026-07-01',
+        'status' => 6,
+    ]);
+
+    $order->statusLogs()->create(['status' => 'Approve', 'logged_at' => '2026-07-02 09:00:00']);
+    $paid = $order->statusLogs()->create(['status' => 'Paid', 'logged_at' => '2026-07-03 09:00:00']);
+
+    expect($order->fresh()->paid_at)->not->toBeNull();
+
+    $paid->delete();
+
+    // The approval entry survives, so the trail is not empty — only payment is gone.
+    expect($order->fresh()->paid_at)->toBeNull()
+        ->and($order->statusLogs()->count())->toBe(1);
+});
+
+test('the backfill command repairs orders whose paid date was never derived', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $order = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'CN-STALE',
+        'issue_date' => '2026-07-01',
+        'status' => 6,
+    ]);
+
+    // Insert the trail the way a bulk writer would — no model events, so
+    // paid_at is left behind exactly as it was in production.
+    PurchasedOrderStatusLog::insert([
+        [
+            'inventory_purchased_order_id' => $order->id,
+            'status' => 'Paid',
+            'logged_at' => '2026-07-06 11:30:00',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    ]);
+
+    expect($order->fresh()->paid_at)->toBeNull();
+
+    test()->artisan('inventory:backfill-po-paid-at')->assertSuccessful();
+
+    expect($order->fresh()->paid_at->toDateTimeString())->toBe('2026-07-06 11:30:00');
+});

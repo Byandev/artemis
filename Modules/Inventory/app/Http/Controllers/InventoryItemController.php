@@ -21,6 +21,7 @@ use Modules\Inventory\Models\InventoryUnitCodeItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Support\InventoryItemMetrics;
+use Modules\Inventory\Support\InventoryStockColumns;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -113,12 +114,15 @@ class InventoryItemController extends Controller
         // grouped under. NULL for parents and standalone items.
         $parentSkuSql = '(SELECT sku FROM inventory_items p WHERE p.id = inventory_items.parent_id)';
 
+        // The computed columns read from derived tables; attach them once here.
+        InventoryStockColumns::applyJoins($base);
+
         return QueryBuilder::for($base)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->select('inventory_items.*')
             ->with(['product'])
             ->selectRaw("$parentSkuSql as parent_sku")
-            // Undelivered remainder on status-6 orders (see waiting_for_delivery_stocks).
+            // Undelivered remainder on orders a supplier already has.
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
@@ -209,6 +213,7 @@ class InventoryItemController extends Controller
         $inner = InventoryItem::query()
             ->where('inventory_items.workspace_id', $workspace->id)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
@@ -821,6 +826,17 @@ class InventoryItemController extends Controller
         return response()->json([
             'orders' => $lines,
             'total_balance' => $lines->sum('balance'),
+            // Split the same way the list columns are: the released subtotal is
+            // what "Waiting for Delivery" shows, the requested subtotal is what
+            // the reorder maths deliberately ignores. The modal still lists both
+            // — hiding an order because it is stuck in approval is how it stays
+            // stuck.
+            'released_balance' => $lines
+                ->whereIn('status', PurchasedOrder::RELEASED_STATUSES)
+                ->sum('balance'),
+            'requested_balance' => $lines
+                ->whereIn('status', PurchasedOrder::REQUESTED_STATUSES)
+                ->sum('balance'),
         ]);
     }
 
