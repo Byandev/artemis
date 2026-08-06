@@ -91,7 +91,7 @@ class TransactionController extends Controller
         $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
         $transactions = $this->buildQuery($workspace)
-            ->with(['account', 'remittance', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
+            ->with(['account', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->paginate((int) $request->input('per_page', 100))
