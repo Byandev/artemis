@@ -67,36 +67,36 @@ export function GameboardHeader({
         );
 
     const controlClass =
-        'flex h-8 items-center gap-2 rounded-lg border border-black/8 bg-white px-3 text-[12px] font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10';
+        'flex h-8 2xl:h-10 items-center gap-2 rounded-lg border border-black/8 bg-white px-3 2xl:px-4 text-[12px] 2xl:text-[14px] font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:bg-white/10';
 
     return (
         <header className="relative overflow-hidden border-b border-black/8 bg-white dark:border-white/8 dark:bg-zinc-950">
             {/* Brand wash behind the title — faint in light, a touch stronger on dark. */}
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_140%_at_0%_50%,rgba(16,211,161,0.10),transparent_70%)] dark:bg-[radial-gradient(70%_140%_at_0%_50%,rgba(16,211,161,0.16),transparent_70%)]" />
 
-            <div className="relative mx-auto flex w-full max-w-(--breakpoint-2xl) flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+            <div className="relative mx-auto flex w-full max-w-(--breakpoint-2xl) flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6 2xl:px-8 2xl:py-5">
                 <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                        <span className="truncate font-mono text-[9px] font-medium tracking-[0.16em] text-gray-500 uppercase dark:text-gray-300">
+                        <span className="truncate font-mono text-[9px] font-medium tracking-[0.16em] text-gray-500 uppercase 2xl:text-[11px] dark:text-gray-300">
                             {workspaceName}
                         </span>
                         <span className="relative flex h-1.5 w-1.5">
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-500 opacity-75" />
                             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-500" />
                         </span>
-                        <span className="font-mono text-[9px] font-medium tracking-[0.16em] text-gray-400 uppercase">
+                        <span className="font-mono text-[9px] font-medium tracking-[0.16em] text-gray-400 uppercase 2xl:text-[11px]">
                             Live
                         </span>
                     </div>
 
-                    <h1 className="my-0! text-[18px]! leading-none font-bold tracking-tight text-gray-900 uppercase sm:text-[22px]! md:text-[26px]! dark:text-white">
+                    <h1 className="my-0! text-[18px]! leading-none font-bold tracking-tight text-gray-900 uppercase sm:text-[22px]! md:text-[26px]! 2xl:text-[36px]! dark:text-white">
                         Double Digit Sales{' '}
                         <span className="text-brand-600 dark:text-brand-400">
                             Gameboard
                         </span>
                     </h1>
 
-                    <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-[11px] text-gray-500 2xl:text-[14px] dark:text-gray-400">
                         {featured ? (
                             <>
                                 {featured.name}
@@ -137,16 +137,16 @@ export function GameboardHeader({
                     >
                         Refresh
                         <RefreshCw
-                            className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
+                            className={`h-3.5 w-3.5 2xl:h-4 2xl:w-4 ${refreshing ? 'animate-spin' : ''}`}
                         />
                     </button>
 
                     <button onClick={toggleFullscreen} className={controlClass}>
                         {isFullscreen ? 'Exit Full Screen' : 'Full Screen'}
                         {isFullscreen ? (
-                            <Minimize2 className="h-3.5 w-3.5" />
+                            <Minimize2 className="h-3.5 w-3.5 2xl:h-4 2xl:w-4" />
                         ) : (
-                            <Maximize2 className="h-3.5 w-3.5" />
+                            <Maximize2 className="h-3.5 w-3.5 2xl:h-4 2xl:w-4" />
                         )}
                     </button>
                 </div>

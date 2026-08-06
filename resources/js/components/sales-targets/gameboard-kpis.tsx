@@ -80,20 +80,20 @@ function KpiCard({
     const TrendIcon = trend?.status === 'down' ? TrendingDown : TrendingUp;
 
     return (
-        <div className="rounded-[12px] border border-black/6 bg-white px-3 py-2.5 dark:border-white/8 dark:bg-zinc-900">
-            <div className="flex items-center gap-2.5">
+        <div className="rounded-[12px] border border-black/6 bg-white px-3 py-2.5 2xl:px-4 2xl:py-3.5 dark:border-white/8 dark:bg-zinc-900">
+            <div className="flex items-center gap-2.5 2xl:gap-3.5">
                 <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 ${t.ring} ${t.icon}`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 2xl:h-12 2xl:w-12 ${t.ring} ${t.icon}`}
                 >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4 2xl:h-5 2xl:w-5" />
                 </div>
 
                 <div className="min-w-0">
-                    <p className="truncate font-mono text-[9px] font-medium tracking-[0.1em] text-gray-500 uppercase dark:text-gray-400">
+                    <p className="truncate font-mono text-[9px] font-medium tracking-[0.1em] text-gray-500 uppercase 2xl:text-[11px] dark:text-gray-400">
                         {label}
                     </p>
                     <div className="flex items-baseline gap-1">
-                        <span className="truncate text-[16px] leading-tight font-semibold text-gray-900 tabular-nums dark:text-white">
+                        <span className="truncate text-[16px] leading-tight font-semibold text-gray-900 tabular-nums xl:text-[18px] 2xl:text-[24px] dark:text-white">
                             {value}
                         </span>
                         {trend && trend.status !== 'flat' && (
@@ -111,16 +111,16 @@ function KpiCard({
                             />
                         )}
                     </div>
-                    <p className="truncate text-[10px] text-gray-500 dark:text-gray-400">
+                    <p className="truncate text-[10px] text-gray-500 2xl:text-[12px] dark:text-gray-400">
                         {caption}
                     </p>
                 </div>
             </div>
 
-            <div className="mt-2 flex h-1 items-center gap-1.5">
+            <div className="mt-2 flex h-1 items-center gap-1.5 2xl:mt-3 2xl:h-1.5">
                 {progress !== null && (
                     <>
-                        <div className="h-1 flex-1 overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-800">
+                        <div className="h-1 flex-1 overflow-hidden rounded-full bg-stone-200 2xl:h-1.5 dark:bg-zinc-800">
                             <div
                                 className={`h-full rounded-full transition-[width] duration-500 ${t.bar}`}
                                 style={{
@@ -129,7 +129,7 @@ function KpiCard({
                             />
                         </div>
                         {progressLabel && (
-                            <span className="shrink-0 font-mono text-[9px] text-gray-500 tabular-nums dark:text-gray-400">
+                            <span className="shrink-0 font-mono text-[9px] text-gray-500 tabular-nums 2xl:text-[11px] dark:text-gray-400">
                                 {progressLabel}
                             </span>
                         )}
@@ -164,7 +164,7 @@ export function GameboardKpiRow({ kpis }: { kpis: GameboardKpis }) {
     const exceeded = above_target >= 0;
 
     return (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 2xl:gap-3">
             <KpiCard
                 icon={Wallet}
                 label="Total Sales"

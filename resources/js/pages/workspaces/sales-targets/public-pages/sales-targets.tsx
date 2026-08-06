@@ -177,7 +177,7 @@ export default function PublicSalesTargets({
                 onRefresh={() => setRefreshKey((key) => key + 1)}
             />
 
-            <div className="mx-auto w-full max-w-(--breakpoint-2xl) px-4 py-3 md:px-6">
+            <div className="mx-auto w-full max-w-(--breakpoint-2xl) px-4 py-3 md:px-6 2xl:px-8 2xl:py-5">
                 {featured ? (
                     <>
                         {kpis.data ? (
@@ -225,7 +225,7 @@ export default function PublicSalesTargets({
 
                         {/* Standings, trend and spread sit side by side once
                             there is width for all three. */}
-                        <div className="mt-4 grid grid-cols-1 gap-2 xl:grid-cols-12">
+                        <div className="mt-4 grid grid-cols-1 gap-2 xl:grid-cols-12 2xl:mt-5 2xl:gap-3">
                             <div className="xl:col-span-5">
                                 {leaderboard.data ? (
                                     <GameboardLeaderboard

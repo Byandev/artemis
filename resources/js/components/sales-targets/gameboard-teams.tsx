@@ -57,11 +57,11 @@ function Stat({
 
     return (
         <div className="min-w-0">
-            <p className="truncate font-mono text-[8px] font-medium tracking-[0.1em] text-gray-500 uppercase dark:text-gray-400">
+            <p className="truncate font-mono text-[8px] font-medium tracking-[0.1em] text-gray-500 uppercase 2xl:text-[10px] dark:text-gray-400">
                 {label}
             </p>
             <p
-                className={`flex items-center gap-1 truncate font-mono text-[13px] font-semibold tabular-nums ${toneClass}`}
+                className={`flex items-center gap-1 truncate font-mono text-[13px] font-semibold tabular-nums 2xl:text-[16px] ${toneClass}`}
             >
                 {value}
                 {trailing}
@@ -77,20 +77,20 @@ function TeamCard({ team }: { team: TeamPerformance }) {
 
     return (
         <div
-            className={`rounded-[12px] border bg-white p-3 dark:bg-zinc-900 ${
+            className={`rounded-[12px] border bg-white p-3 2xl:p-4 dark:bg-zinc-900 ${
                 style?.card ?? 'border-black/6 dark:border-white/8'
             }`}
         >
             <div className="flex items-center gap-2">
                 <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold ${
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold 2xl:h-7 2xl:w-7 2xl:text-[12px] ${
                         style?.badge ??
                         'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400'
                     }`}
                 >
                     {team.rank}
                 </span>
-                <h3 className="my-0! truncate text-[14px]! font-bold tracking-tight text-gray-900 uppercase dark:text-white">
+                <h3 className="my-0! truncate text-[14px]! font-bold tracking-tight text-gray-900 uppercase 2xl:text-[18px]! dark:text-white">
                     {team.name}
                 </h3>
             </div>
@@ -137,7 +137,7 @@ function TeamCard({ team }: { team: TeamPerformance }) {
             </div>
 
             <div className="mt-3">
-                <div className="h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-800">
+                <div className="h-1.5 overflow-hidden rounded-full bg-stone-200 2xl:h-2 dark:bg-zinc-800">
                     <div
                         className="h-full rounded-full bg-brand-500 transition-[width] duration-500 dark:bg-brand-400"
                         style={{
@@ -145,12 +145,12 @@ function TeamCard({ team }: { team: TeamPerformance }) {
                         }}
                     />
                 </div>
-                <div className="mt-1 flex justify-between font-mono text-[8px] text-gray-400 tabular-nums dark:text-gray-500">
+                <div className="mt-1 flex justify-between font-mono text-[8px] text-gray-400 tabular-nums 2xl:text-[10px] dark:text-gray-500">
                     {TICKS.map((tick) => (
                         <span key={tick}>{tick}%</span>
                     ))}
                 </div>
-                <p className="text-right font-mono text-[11px] font-semibold text-brand-600 tabular-nums dark:text-brand-400">
+                <p className="text-right font-mono text-[11px] font-semibold text-brand-600 tabular-nums 2xl:text-[13px] dark:text-brand-400">
                     {team.achievement_pct === null
                         ? '—'
                         : `${team.achievement_pct}%`}
@@ -159,13 +159,13 @@ function TeamCard({ team }: { team: TeamPerformance }) {
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
                 {team.qualified && (
-                    <span className="rounded-md border border-brand-500/40 px-2 py-0.5 font-mono text-[9px] font-medium tracking-wider text-brand-600 uppercase dark:border-brand-400/40 dark:text-brand-400">
+                    <span className="rounded-md border border-brand-500/40 px-2 py-0.5 font-mono text-[9px] font-medium tracking-wider text-brand-600 uppercase 2xl:text-[11px] dark:border-brand-400/40 dark:text-brand-400">
                         Qualified
                     </span>
                 )}
                 {team.hit_target && (
-                    <span className="flex items-center gap-1 font-mono text-[9px] font-medium tracking-wider text-amber-600 uppercase dark:text-amber-500">
-                        <Flame className="h-3 w-3" />
+                    <span className="flex items-center gap-1 font-mono text-[9px] font-medium tracking-wider text-amber-600 uppercase 2xl:text-[11px] dark:text-amber-500">
+                        <Flame className="h-3 w-3 2xl:h-3.5 2xl:w-3.5" />
                         Target Breaker
                     </span>
                 )}
@@ -187,13 +187,13 @@ export function GameboardTeams({ teams }: { teams: TeamPerformance[] }) {
     return (
         <section className="mt-4">
             <div className="flex items-center gap-3">
-                <h2 className="my-0! shrink-0 font-mono text-[9px]! font-medium tracking-[0.16em] text-gray-500 uppercase dark:text-gray-400">
+                <h2 className="my-0! shrink-0 font-mono text-[9px]! font-medium tracking-[0.16em] text-gray-500 uppercase 2xl:text-[11px]! dark:text-gray-400">
                     Team Performance
                 </h2>
                 <div className="h-px flex-1 bg-black/8 dark:bg-white/8" />
             </div>
 
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 2xl:gap-3">
                 {teams.map((team) => (
                     <TeamCard key={team.team_id} team={team} />
                 ))}

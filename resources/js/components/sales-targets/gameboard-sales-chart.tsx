@@ -63,7 +63,8 @@ export function GameboardSalesChart({
     );
     const max = niceCeiling(peak || 1);
     const ticks = [1, 0.75, 0.5, 0.25, 0].map((fraction) => fraction * max);
-    const height = 168;
+    // Y axis, gridlines and bars are three stacked layers — one height for all.
+    const plotHeight = 'h-[168px] 2xl:h-[230px]';
 
     const active = hovered === null ? null : points[hovered];
     const activeAchievement =
@@ -75,20 +76,20 @@ export function GameboardSalesChart({
         <section className="h-full">
             <div className="h-full rounded-[12px] border border-black/6 bg-white px-3 py-2.5 dark:border-white/8 dark:bg-zinc-900">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="my-0! font-mono text-[10px]! font-medium tracking-[0.16em] text-gray-700 uppercase dark:text-gray-200">
+                    <h2 className="my-0! font-mono text-[10px]! font-medium tracking-[0.16em] text-gray-700 uppercase 2xl:text-[12px]! dark:text-gray-200">
                         Sales vs Target
                     </h2>
                     {/* Two series, so the legend is always present. */}
                     <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-300">
+                        <span className="flex items-center gap-1.5 text-[10px] text-gray-600 2xl:text-[12px] dark:text-gray-300">
                             <span
-                                className={`h-2 w-3 rounded-[2px] ${SALES_FILL}`}
+                                className={`h-2 w-3 rounded-[2px] 2xl:h-2.5 2xl:w-4 ${SALES_FILL}`}
                             />
                             Sales
                         </span>
-                        <span className="flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-300">
+                        <span className="flex items-center gap-1.5 text-[10px] text-gray-600 2xl:text-[12px] dark:text-gray-300">
                             <span
-                                className={`h-2 w-3 rounded-[2px] ${TARGET_FILL}`}
+                                className={`h-2 w-3 rounded-[2px] 2xl:h-2.5 2xl:w-4 ${TARGET_FILL}`}
                             />
                             Target
                         </span>
@@ -98,13 +99,12 @@ export function GameboardSalesChart({
                 <div className="relative mt-3 flex">
                     {/* Y axis */}
                     <div
-                        className="flex w-11 shrink-0 flex-col justify-between pr-1.5 text-right"
-                        style={{ height }}
+                        className={`flex w-11 shrink-0 flex-col justify-between pr-1.5 text-right 2xl:w-14 ${plotHeight}`}
                     >
                         {ticks.map((tick) => (
                             <span
                                 key={tick}
-                                className="font-mono text-[8px] leading-none text-gray-400 tabular-nums dark:text-gray-500"
+                                className="font-mono text-[8px] leading-none text-gray-400 tabular-nums 2xl:text-[10px] dark:text-gray-500"
                             >
                                 {compactPeso(tick)}
                             </span>
@@ -114,8 +114,7 @@ export function GameboardSalesChart({
                     <div className="relative min-w-0 flex-1">
                         {/* Gridlines, recessive. */}
                         <div
-                            className="pointer-events-none absolute inset-x-0 top-0 flex flex-col justify-between"
-                            style={{ height }}
+                            className={`pointer-events-none absolute inset-x-0 top-0 flex flex-col justify-between ${plotHeight}`}
                         >
                             {ticks.map((tick) => (
                                 <div
@@ -126,8 +125,7 @@ export function GameboardSalesChart({
                         </div>
 
                         <div
-                            className="relative flex items-end gap-1.5"
-                            style={{ height }}
+                            className={`relative flex items-end gap-1.5 ${plotHeight}`}
                         >
                             {points.map((point, index) => (
                                 <div
@@ -171,7 +169,7 @@ export function GameboardSalesChart({
                                 <span
                                     key={point.team_id}
                                     title={point.name}
-                                    className="min-w-0 flex-1 truncate text-center text-[8px] text-gray-500 dark:text-gray-400"
+                                    className="min-w-0 flex-1 truncate text-center text-[8px] text-gray-500 2xl:text-[10px] dark:text-gray-400"
                                 >
                                     {point.name}
                                 </span>
@@ -180,13 +178,13 @@ export function GameboardSalesChart({
 
                         {active && (
                             <div className="pointer-events-none absolute top-0 right-0 rounded-lg border border-black/8 bg-white px-2.5 py-1.5 shadow-sm dark:border-white/10 dark:bg-zinc-800">
-                                <p className="max-w-32 truncate font-mono text-[9px] text-gray-500 dark:text-gray-400">
+                                <p className="max-w-32 truncate font-mono text-[9px] text-gray-500 2xl:text-[11px] dark:text-gray-400">
                                     {active.name}
                                 </p>
-                                <p className="font-mono text-[11px] font-semibold text-gray-900 tabular-nums dark:text-white">
+                                <p className="font-mono text-[11px] font-semibold text-gray-900 tabular-nums 2xl:text-[13px] dark:text-white">
                                     {formatPeso(active.sales)}
                                 </p>
-                                <p className="font-mono text-[9px] text-gray-500 tabular-nums dark:text-gray-400">
+                                <p className="font-mono text-[9px] text-gray-500 tabular-nums 2xl:text-[11px] dark:text-gray-400">
                                     Target {formatPeso(active.target)}
                                     {activeAchievement === null
                                         ? ''

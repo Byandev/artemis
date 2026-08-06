@@ -59,7 +59,7 @@ function Sparkline({ points }: { points: number[] }) {
         <svg
             viewBox={`0 0 ${width} ${height}`}
             preserveAspectRatio="none"
-            className="h-14 w-full text-brand-700 dark:text-brand-400"
+            className="h-14 w-full text-brand-700 2xl:h-20 dark:text-brand-400"
             role="img"
             aria-label={`Leader's daily sales over the last ${points.length} days, ${formatPeso(min)} to ${formatPeso(max)}`}
         >
@@ -113,14 +113,14 @@ function Criterion({ met, label }: { met: boolean; label: string }) {
     return (
         <div className="flex items-center gap-2">
             <Icon
-                className={`h-3.5 w-3.5 shrink-0 ${
+                className={`h-3.5 w-3.5 shrink-0 2xl:h-4 2xl:w-4 ${
                     met
                         ? 'text-brand-600 dark:text-brand-400'
                         : 'text-gray-300 dark:text-gray-600'
                 }`}
             />
             <span
-                className={`truncate text-[11px] ${
+                className={`truncate text-[11px] 2xl:text-[13px] ${
                     met
                         ? 'text-gray-700 dark:text-gray-200'
                         : 'text-gray-400 dark:text-gray-500'
@@ -145,26 +145,26 @@ export function GameboardLeader({
     qualifyingRoas: number;
 }) {
     return (
-        <div className="mt-2 grid gap-4 rounded-[12px] border border-black/6 bg-white px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] md:gap-6 dark:border-white/8 dark:bg-zinc-900">
+        <div className="mt-2 grid gap-4 rounded-[12px] border border-black/6 bg-white px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] md:gap-6 2xl:px-5 2xl:py-4 dark:border-white/8 dark:bg-zinc-900">
             <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-amber-500/10 text-amber-500">
-                    <Trophy className="h-5 w-5" />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-amber-500/10 text-amber-500 2xl:h-14 2xl:w-14">
+                    <Trophy className="h-5 w-5 2xl:h-7 2xl:w-7" />
                 </div>
                 <div className="min-w-0">
-                    <p className="font-mono text-[9px] font-medium tracking-[0.14em] text-amber-600 uppercase dark:text-amber-500">
+                    <p className="font-mono text-[9px] font-medium tracking-[0.14em] text-amber-600 uppercase 2xl:text-[11px] dark:text-amber-500">
                         Current Leader
                     </p>
-                    <p className="truncate text-[18px] leading-tight font-bold tracking-tight text-brand-600 uppercase dark:text-brand-400">
+                    <p className="truncate text-[18px] leading-tight font-bold tracking-tight text-brand-600 uppercase xl:text-[20px] 2xl:text-[26px] dark:text-brand-400">
                         {leader.name}
                     </p>
-                    <p className="truncate text-[10px] text-gray-500 dark:text-gray-400">
+                    <p className="truncate text-[10px] text-gray-500 2xl:text-[12px] dark:text-gray-400">
                         Top ranked team
                     </p>
                 </div>
             </div>
 
             <div className="min-w-0 md:border-l md:border-black/6 md:pl-6 md:dark:border-white/8">
-                <p className="font-mono text-[9px] font-medium tracking-[0.14em] text-gray-500 uppercase dark:text-gray-400">
+                <p className="font-mono text-[9px] font-medium tracking-[0.14em] text-gray-500 uppercase 2xl:text-[11px] dark:text-gray-400">
                     Qualification Criteria
                 </p>
                 <div className="mt-2 space-y-1.5">

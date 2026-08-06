@@ -21,7 +21,7 @@ function Status({ rank }: { rank: number }) {
     if (ink) {
         return (
             <Trophy
-                className={`h-3.5 w-3.5 ${ink}`}
+                className={`h-3.5 w-3.5 2xl:h-4 2xl:w-4 ${ink}`}
                 aria-label={`Rank ${rank}, podium`}
             />
         );
@@ -29,7 +29,7 @@ function Status({ rank }: { rank: number }) {
 
     return (
         <Award
-            className="h-3.5 w-3.5 text-rose-400 dark:text-rose-300"
+            className="h-3.5 w-3.5 text-rose-400 2xl:h-4 2xl:w-4 dark:text-rose-300"
             aria-label={`Rank ${rank}`}
         />
     );
@@ -50,20 +50,21 @@ export function GameboardLeaderboard({
     onToggleExpanded: () => void;
 }) {
     const headCell =
-        'px-2 py-1.5 font-mono text-[8px] font-medium tracking-[0.1em] text-gray-500 uppercase dark:text-gray-400';
-    const cell = 'px-2 py-2 text-[12px] tabular-nums whitespace-nowrap';
+        'px-2 py-1.5 2xl:py-2 font-mono text-[8px] 2xl:text-[10px] font-medium tracking-[0.1em] text-gray-500 uppercase dark:text-gray-400';
+    const cell =
+        'px-2 2xl:px-3 py-2 2xl:py-2.5 text-[12px] 2xl:text-[14px] tabular-nums whitespace-nowrap';
 
     return (
         <section className="h-full">
             <div className="h-full overflow-hidden rounded-[12px] border border-black/6 bg-white dark:border-white/8 dark:bg-zinc-900">
                 <div className="flex items-center justify-between gap-3 border-b border-black/6 px-3 py-2.5 dark:border-white/8">
-                    <h2 className="my-0! font-mono text-[10px]! font-medium tracking-[0.16em] text-gray-700 uppercase dark:text-gray-200">
+                    <h2 className="my-0! font-mono text-[10px]! font-medium tracking-[0.16em] text-gray-700 uppercase 2xl:text-[12px]! dark:text-gray-200">
                         Team Leaderboard
                     </h2>
                     {data.total > data.rows.length || expanded ? (
                         <button
                             onClick={onToggleExpanded}
-                            className="rounded-md border border-black/8 px-2 py-1 font-mono text-[9px] font-medium tracking-wider text-gray-600 uppercase transition-all hover:bg-stone-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10"
+                            className="rounded-md border border-black/8 px-2 py-1 font-mono text-[9px] font-medium tracking-wider text-gray-600 uppercase transition-all hover:bg-stone-50 2xl:px-2.5 2xl:py-1.5 2xl:text-[11px] dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10"
                         >
                             {expanded
                                 ? 'Show Less'
