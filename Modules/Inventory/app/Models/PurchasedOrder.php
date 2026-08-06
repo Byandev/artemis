@@ -25,7 +25,11 @@ class PurchasedOrder extends Model
         'delivery_fee',
         'total_amount',
         'status',
+        'approved_at',
+        'to_pay_at',
         'paid_at',
+        'for_purchase_at',
+        'purchased_at',
     ];
 
     protected $casts = [
@@ -34,9 +38,29 @@ class PurchasedOrder extends Model
         'delivery_fee' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'status' => 'integer',
-        // Datetime, not date: the ERP's log carries the time of day, and it is
-        // the log entry that this mirrors. Lists render it as a date.
+        // Datetimes, not dates: the ERP stamps these to the second, and the gap
+        // between two stages is often minutes. Lists render them as dates.
+        'approved_at' => 'datetime',
+        'to_pay_at' => 'datetime',
         'paid_at' => 'datetime',
+        'for_purchase_at' => 'datetime',
+        'purchased_at' => 'datetime',
+    ];
+
+    /**
+     * When the order reached each workflow stage, keyed by the field the ERP
+     * sends it as, in workflow order.
+     *
+     * These are the ERP's own stamps. `paid_at` was previously derived from the
+     * status trail and still falls back to it when the ERP omits the field —
+     * see the public purchase-order sync.
+     */
+    public const STAGE_TIMESTAMPS = [
+        'approved_at',
+        'to_pay_at',
+        'paid_at',
+        'for_purchase_at',
+        'purchased_at',
     ];
 
     /**

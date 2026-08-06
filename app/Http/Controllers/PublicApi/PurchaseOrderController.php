@@ -42,7 +42,13 @@ class PurchaseOrderController extends Controller
      *           "statusLogs": [           // the ERP's audit trail, any order
      *             { "status": "Paid", "by": "RENZ LAICA MERCADO",
      *               "detail": "PAID-50%", "timestamp": "2026-07-24 16:23:30" }
-     *           ]
+     *           ],
+     *           // When the order reached each stage. Null until it gets there.
+     *           "approved_at": "2026-07-23 17:32:32",
+     *           "to_pay_at": "2026-07-23 17:33:52",
+     *           "paid_at": "2026-07-24 16:23:30",
+     *           "for_purchase_at": "2026-07-24 16:52:25",
+     *           "purchased_at": "2026-07-24 16:52:34"
      *         }
      *       ]
      *     }
@@ -113,6 +119,7 @@ class PurchaseOrderController extends Controller
                 'delivery_fee' => $po['delivery_fee'] ?? 0,
                 'total_amount' => $po['total_amount'] ?? 0,
                 'status' => $this->normalizeStatus($po['status'] ?? null),
+                ...$this->stageTimestamps($po),
             ]
         );
 
@@ -149,8 +156,33 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Replace the order's status trail with what the ERP sent, and denormalise
-     * the payment date out of it onto the order.
+     * The stage timestamps the ERP sends alongside the trail, as columns to
+     * write.
+     *
+     * Only keys actually present are returned: a field the ERP has stopped
+     * sending must leave the stored value alone, while one sent as null is the
+     * ERP saying the order has not reached that stage (or has been moved back),
+     * and does clear it.
+     *
+     * @return array<string, Carbon|null>
+     */
+    private function stageTimestamps(array $po): array
+    {
+        $stamps = [];
+
+        foreach (PurchasedOrder::STAGE_TIMESTAMPS as $field) {
+            if (array_key_exists($field, $po)) {
+                $stamps[$field] = $this->toDateTime($po[$field]);
+            }
+        }
+
+        return $stamps;
+    }
+
+    /**
+     * Replace the order's status trail with what the ERP sent, and — only when
+     * the ERP did not send `paid_at` itself — denormalise the payment date out
+     * of it onto the order.
      *
      * Wholesale replacement, like deliveries: the ERP owns this trail and can
      * revise it, and there is no local id to match entries on. A payload that
@@ -191,6 +223,13 @@ class PurchaseOrderController extends Controller
 
         if ($rows) {
             PurchasedOrderStatusLog::insert($rows);
+        }
+
+        // The ERP's own paid_at is authoritative when it sends one — re-deriving
+        // would overwrite it with a reading of the same trail it came from, and
+        // disagree whenever the ERP knows something the log does not.
+        if (array_key_exists('paid_at', $po)) {
+            return;
         }
 
         // Runs even when the trail came back empty, so an order whose Paid entry
