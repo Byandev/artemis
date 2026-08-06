@@ -12,6 +12,27 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.27.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Inventory Dashboard — Built-in Explanations',
+                items: [
+                    'Every panel and headline figure on the Inventory Dashboard now carries a question mark that explains how to read it — what the number counts, where it comes from, and what would make it go down — so nobody has to be walked through the page by someone who already knows it',
+                    'The three bottleneck cards spell out exactly what puts each of them in the red: Operations the moment any stock breaches the week-long target, the Supplier once more than 40% of released stock is overdue, the Warehouse above 15% of unmet demand — the verdict is checkable rather than something to take on faith',
+                    'The notes are candid about what the figures can’t tell you — the supplier clock currently runs from when an order was raised rather than released, so it reads harsh on the supplier, and a high warehouse figure can mean the unfulfilled counts are stale rather than that nothing is being picked, worth spot-checking before anyone gets blamed',
+                    'Each explanation opens on keyboard focus as well as hover, so it’s reachable without a mouse',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Supplier delivery times are now counted in whole calendar days — an order released at nine in the morning and delivered four days later was being reported as 3.6 days, because the release carries a time of day while the delivery only carries a date',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.26.0',
         date: '2026-08-06',
         sections: [
