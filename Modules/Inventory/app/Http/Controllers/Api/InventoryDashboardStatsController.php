@@ -426,7 +426,8 @@ class InventoryDashboardStatsController extends Controller
      *
      * With `group_by_parent` on (the default) children roll into their parent
      * the way the items list's summarize view shows them; off, every SKU is its
-     * own row.
+     * own row. Rows are listed alphabetically by product name, SKU as the
+     * tie-break — see the two-stage sort below for how that meets the cap.
      */
     public function deliveryLeadTime(Request $request, Workspace $workspace): JsonResponse
     {
@@ -514,19 +515,33 @@ class InventoryDashboardStatsController extends Controller
                 'averages' => $this->averageDays($group['sums'], $group['samples']),
                 'samples' => $group['samples'],
             ])
-            // Slowest to fully arrive first — the point of the table. Rows that
-            // have not reached a level yet have no average there, so they fall
-            // to the bottom of that comparison rather than reading as fast.
+            ->values();
+
+        // Two different sorts, deliberately. The cap has to keep the rows worth
+        // seeing, so which rows survive is decided slowest-first; the rows that
+        // do survive are then listed by name, which is how you actually find an
+        // item in a long table. The client says as much when the cap bites.
+        $listed = $rows
             ->sortBy([
+                // Rows that have not reached a level yet have no average there,
+                // so they sink in that comparison rather than reading as fast.
                 fn (array $a, array $b) => ($b['averages'][100] ?? -1) <=> ($a['averages'][100] ?? -1),
                 fn (array $a, array $b) => ($b['averages'][75] ?? -1) <=> ($a['averages'][75] ?? -1),
-                // Tie-break so equal figures keep a stable order between refreshes.
+                // Tie-break so equal figures keep a stable cut between refreshes.
                 fn (array $a, array $b) => ($a['sku'] ?? '') <=> ($b['sku'] ?? ''),
+            ])
+            ->take(self::LEAD_TIME_LIMIT)
+            ->sortBy([
+                // Unnamed items sort last rather than leading the table under a
+                // blank; their SKU still orders them among themselves.
+                fn (array $a, array $b) => ($a['product_name'] === null) <=> ($b['product_name'] === null),
+                fn (array $a, array $b) => strcasecmp((string) $a['product_name'], (string) $b['product_name']),
+                fn (array $a, array $b) => strcasecmp((string) $a['sku'], (string) $b['sku']),
             ])
             ->values();
 
         return response()->json([
-            'items' => $rows->take(self::LEAD_TIME_LIMIT)->values(),
+            'items' => $listed,
             // The client says so when these differ, rather than presenting a
             // capped list as the whole picture.
             'total_groups' => $rows->count(),

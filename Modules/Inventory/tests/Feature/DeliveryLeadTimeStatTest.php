@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
@@ -194,10 +195,49 @@ test('children roll into their parent when grouping, and split when not', functi
 
     $flat = leadTime($owner, $workspace, ['group_by_parent' => 0]);
 
-    // Slowest first.
-    expect(array_column($flat['items'], 'sku'))->toBe(['CHILD-B', 'CHILD-A']);
-    expect($flat['items'][0]['averages']['100'])->toEqual(30.0)
+    expect(array_column($flat['items'], 'sku'))->toBe(['CHILD-A', 'CHILD-B']);
+    expect($flat['items'][0]['averages']['100'])->toEqual(10.0)
+        ->and($flat['items'][1]['averages']['100'])->toEqual(30.0)
         ->and($flat['items'][0]['is_group'])->toBeFalse();
+});
+
+test('rows are listed by product name, unnamed items last', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $products = [];
+
+    // Created out of order, so the sort cannot be passing by accident. The
+    // lowercase entry would sort after every capitalised one byte-wise.
+    foreach (['Zinc Tablets', 'apple Cider', 'Multivitamin'] as $name) {
+        $products[$name] = Product::factory()->create([
+            'workspace_id' => $workspace->id,
+            'name' => $name,
+        ]);
+    }
+
+    foreach ($products as $name => $product) {
+        $item = InventoryItem::create([
+            'workspace_id' => $workspace->id,
+            'sku' => 'SKU-'.$product->id,
+            'product_id' => $product->id,
+            'is_active' => true,
+        ]);
+        poLine($item, '2026-07-01', 10, ['2026-07-11' => 10]);
+    }
+
+    // No product attached — it has no name to sort by.
+    $unnamed = InventoryItem::create([
+        'workspace_id' => $workspace->id,
+        'sku' => 'SKU-UNNAMED',
+        'is_active' => true,
+    ]);
+    poLine($unnamed, '2026-07-01', 10, ['2026-07-11' => 10]);
+
+    $data = leadTime($owner, $workspace);
+
+    expect(array_column($data['items'], 'product_name'))
+        // Case-insensitive, so "apple Cider" leads rather than trailing.
+        ->toBe(['apple Cider', 'Multivitamin', 'Zinc Tablets', null]);
 });
 
 test('the overall summary weighs every line equally, not every row', function () {

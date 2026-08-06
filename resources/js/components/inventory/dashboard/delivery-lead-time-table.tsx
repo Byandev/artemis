@@ -60,6 +60,9 @@ const cellClass = 'px-3 py-2.5 align-middle';
  * Sample sizes shrink to the right — a partially delivered line counts toward
  * the levels it has crossed and not the ones it hasn't — so every cell carries
  * the count it was averaged from.
+ *
+ * Rows come back listed by product name, which is how you find a given item in
+ * a long table; the slow ones are found by reading across, not by position.
  */
 export default function DeliveryLeadTimeTable({ slug }: { slug: string }) {
     const [groupByParent, setGroupByParent] = useState(true);
@@ -223,11 +226,12 @@ export default function DeliveryLeadTimeTable({ slug }: { slug: string }) {
                 </div>
             )}
 
-            {/* Never present a capped list as the whole picture. */}
+            {/* Never present a capped list as the whole picture — and say which
+                rows the cap kept, since it isn't the order they're listed in. */}
             {truncated && (
                 <div className="border-t border-black/6 px-[18px] py-2.5 text-[11px] text-gray-400 dark:border-white/6 dark:text-gray-500">
-                    Showing the {num(items.length)} slowest of{' '}
-                    {num(data?.total_groups)}{' '}
+                    Listed by name, but capped: showing the {num(items.length)}{' '}
+                    slowest to fully arrive out of {num(data?.total_groups)}{' '}
                     {groupByParent ? 'groups' : 'items'}.
                 </div>
             )}
