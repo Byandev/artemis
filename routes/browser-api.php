@@ -82,6 +82,9 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
 
         Route::get('/inventory/dashboard/purchase-orders/{purchasedOrder}/lines', [InventoryDashboardStatsController::class, 'purchaseOrderLines'])
             ->name('inventory.dashboard.purchase-order-lines');
+
+        Route::get('/inventory/dashboard/delivery-lead-time', [InventoryDashboardStatsController::class, 'deliveryLeadTime'])
+            ->name('inventory.dashboard.delivery-lead-time');
     });
 });
 

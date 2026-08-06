@@ -15,6 +15,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
+use Modules\Inventory\Models\PurchasedOrderItemDelivery;
 use Modules\Inventory\Support\InventoryStockColumns;
 
 /**
@@ -47,6 +48,18 @@ class InventoryDashboardStatsController extends Controller
 
     /** How many groups the low-stock table lists. */
     private const LOW_STOCK_LIMIT = 20;
+
+    /** How far back the delivery lead-time table looks for purchase orders, in months. */
+    private const LEAD_TIME_MONTHS = 6;
+
+    /**
+     * Fill levels the lead-time table reports, as a percentage of the ordered
+     * quantity. Mirrored on the frontend by delivery-lead-time-table.tsx.
+     */
+    private const LEAD_TIME_THRESHOLDS = [25, 50, 75, 100];
+
+    /** How many groups the delivery lead-time table lists, slowest first. */
+    private const LEAD_TIME_LIMIT = 200;
 
     /**
      * Active items, counted the way the Inventory Items list shows them: one
@@ -393,6 +406,219 @@ class InventoryDashboardStatsController extends Controller
             'total_delivered' => $lines->sum('delivered_qty'),
             'total_waiting' => $lines->sum('waiting_qty'),
         ]);
+    }
+
+    /**
+     * How long purchase orders actually take to arrive, per inventory item.
+     *
+     * For each PO line the clock starts on the order's issue date and stops at
+     * the delivery that carried cumulative receipts past each fill level — 25%,
+     * 50%, 75% and 100% of the ordered quantity. A line contributes to every
+     * level it has already crossed, so partially delivered lines count toward
+     * the levels they have reached and are simply absent from the ones they
+     * have not. That means each column has its own sample size (returned as
+     * `samples`), and the columns get progressively thinner to the right.
+     *
+     * Only orders issued within the last LEAD_TIME_MONTHS months are counted,
+     * so the figures track current supplier performance rather than history.
+     * Cancelled orders are dropped: they were never going to arrive, and
+     * counting them as "never reached 100%" would libel the supplier.
+     *
+     * With `group_by_parent` on (the default) children roll into their parent
+     * the way the items list's summarize view shows them; off, every SKU is its
+     * own row.
+     */
+    public function deliveryLeadTime(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorize('View Purchased Orders', $workspace);
+
+        $groupByParent = $request->boolean('group_by_parent', true);
+        $since = CarbonImmutable::today()->subMonths(self::LEAD_TIME_MONTHS);
+
+        $lines = PurchasedOrderItem::query()
+            ->whereHas('purchasedOrder', fn ($query) => $query
+                ->where('workspace_id', $workspace->id)
+                ->where('status', '!=', PurchasedOrder::CANCELLED)
+                // Undated orders have no clock to start, so they cannot
+                // contribute a lead time — the range filter drops them too.
+                ->whereNotNull('issue_date')
+                ->where('issue_date', '>=', $since->toDateString())
+                ->visibleTo($request->user(), $workspace))
+            // A zero/absent ordered quantity has no fill levels to cross.
+            ->where('count', '>', 0)
+            ->with([
+                'purchasedOrder:id,issue_date',
+                'deliveries:id,inventory_purchased_order_item_id,delivery_date,qty',
+                'inventoryItem:id,sku,parent_id,product_id',
+                'inventoryItem.product:id,name',
+                'inventoryItem.parent:id,sku,product_id',
+                'inventoryItem.parent.product:id,name',
+            ])
+            ->get();
+
+        $groups = [];
+        $overallSums = array_fill_keys(self::LEAD_TIME_THRESHOLDS, 0.0);
+        $overallSamples = array_fill_keys(self::LEAD_TIME_THRESHOLDS, 0);
+
+        foreach ($lines as $line) {
+            $item = $line->inventoryItem;
+
+            // A PO line pointing at a deleted item has nothing to group under.
+            if (! $item) {
+                continue;
+            }
+
+            $parent = $groupByParent ? $item->parent : null;
+            $key = $parent?->id ?? $item->id;
+
+            if (! isset($groups[$key])) {
+                $display = $parent ?? $item;
+
+                $groups[$key] = [
+                    'id' => (int) $display->id,
+                    'sku' => $display->sku,
+                    'product_name' => $display->product?->name,
+                    'is_group' => $parent !== null,
+                    // Distinct SKUs that actually contributed a line, not every
+                    // child on file — a row's figures come only from these.
+                    'child_ids' => [],
+                    'lines' => 0,
+                    'sums' => array_fill_keys(self::LEAD_TIME_THRESHOLDS, 0.0),
+                    'samples' => array_fill_keys(self::LEAD_TIME_THRESHOLDS, 0),
+                ];
+            }
+
+            $groups[$key]['lines']++;
+            $groups[$key]['child_ids'][$item->id] = true;
+
+            foreach ($this->fillLevelDays($line) as $threshold => $days) {
+                if ($days === null) {
+                    continue;
+                }
+
+                $groups[$key]['sums'][$threshold] += $days;
+                $groups[$key]['samples'][$threshold]++;
+                $overallSums[$threshold] += $days;
+                $overallSamples[$threshold]++;
+            }
+        }
+
+        $rows = collect($groups)
+            ->map(fn (array $group) => [
+                'id' => $group['id'],
+                'sku' => $group['sku'],
+                'product_name' => $group['product_name'],
+                'is_group' => $group['is_group'],
+                'child_count' => count($group['child_ids']),
+                'lines' => $group['lines'],
+                'averages' => $this->averageDays($group['sums'], $group['samples']),
+                'samples' => $group['samples'],
+            ])
+            // Slowest to fully arrive first — the point of the table. Rows that
+            // have not reached a level yet have no average there, so they fall
+            // to the bottom of that comparison rather than reading as fast.
+            ->sortBy([
+                fn (array $a, array $b) => ($b['averages'][100] ?? -1) <=> ($a['averages'][100] ?? -1),
+                fn (array $a, array $b) => ($b['averages'][75] ?? -1) <=> ($a['averages'][75] ?? -1),
+                // Tie-break so equal figures keep a stable order between refreshes.
+                fn (array $a, array $b) => ($a['sku'] ?? '') <=> ($b['sku'] ?? ''),
+            ])
+            ->values();
+
+        return response()->json([
+            'items' => $rows->take(self::LEAD_TIME_LIMIT)->values(),
+            // The client says so when these differ, rather than presenting a
+            // capped list as the whole picture.
+            'total_groups' => $rows->count(),
+            'limit' => self::LEAD_TIME_LIMIT,
+            'thresholds' => self::LEAD_TIME_THRESHOLDS,
+            'months' => self::LEAD_TIME_MONTHS,
+            'since' => $since->toDateString(),
+            'group_by_parent' => $groupByParent,
+            // Across every line in the window, not an average of the row
+            // averages — a row with one line would otherwise weigh as much as
+            // one with fifty.
+            'overall' => [
+                'lines' => $lines->count(),
+                'averages' => $this->averageDays($overallSums, $overallSamples),
+                'samples' => $overallSamples,
+            ],
+        ]);
+    }
+
+    /**
+     * Days from the order's issue date to the delivery that took this line past
+     * each fill level, or null for levels it has not reached yet.
+     *
+     * Deliveries are walked oldest first and accumulated, so a level is stamped
+     * with the date it was actually crossed — several levels land on the same
+     * date when one delivery jumps past them all. Comparison is cross-multiplied
+     * (`delivered * 100 >= ordered * threshold`) to keep it in integers.
+     *
+     * @return array<int, int|null>
+     */
+    private function fillLevelDays(PurchasedOrderItem $line): array
+    {
+        $days = array_fill_keys(self::LEAD_TIME_THRESHOLDS, null);
+        $issued = $line->purchasedOrder?->issue_date;
+        $ordered = (int) $line->count;
+
+        if (! $issued || $ordered <= 0) {
+            return $days;
+        }
+
+        $deliveries = $line->deliveries
+            ->filter(fn (PurchasedOrderItemDelivery $delivery) => $delivery->delivery_date !== null)
+            ->sortBy(fn (PurchasedOrderItemDelivery $delivery) => $delivery->delivery_date->getTimestamp());
+
+        $cumulative = 0;
+        $fullyReceived = self::LEAD_TIME_THRESHOLDS[array_key_last(self::LEAD_TIME_THRESHOLDS)];
+
+        foreach ($deliveries as $delivery) {
+            // Negative correction rows would otherwise walk the total backwards
+            // after a level has already been stamped.
+            $cumulative += max(0, (int) $delivery->qty);
+
+            // Both are `date:` casts, so already midnight — the difference is
+            // whole days. A delivery dated before its order is data noise
+            // (back-dated receipt, mistyped issue date); floor it at same-day
+            // rather than let a negative lead time drag the average down.
+            $elapsed = max(0, (int) $issued->diffInDays($delivery->delivery_date, absolute: false));
+
+            foreach (self::LEAD_TIME_THRESHOLDS as $threshold) {
+                if ($days[$threshold] === null && $cumulative * 100 >= $ordered * $threshold) {
+                    $days[$threshold] = $elapsed;
+                }
+            }
+
+            // Nothing left to stamp once the line is fully received.
+            if ($days[$fullyReceived] !== null) {
+                break;
+            }
+        }
+
+        return $days;
+    }
+
+    /**
+     * Mean days per fill level, to one decimal. Null where no line has reached
+     * that level — an unreached level is unknown, not zero.
+     *
+     * @param  array<int, float>  $sums
+     * @param  array<int, int>  $samples
+     * @return array<int, float|null>
+     */
+    private function averageDays(array $sums, array $samples): array
+    {
+        $averages = [];
+
+        foreach (self::LEAD_TIME_THRESHOLDS as $threshold) {
+            $averages[$threshold] = $samples[$threshold] > 0
+                ? round($sums[$threshold] / $samples[$threshold], 1)
+                : null;
+        }
+
+        return $averages;
     }
 
     /**
