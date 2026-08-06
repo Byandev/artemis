@@ -187,6 +187,35 @@ class PurchasedOrder extends Model
         return now()->startOfDay()->gt($expected) ? 'delayed' : 'ontime';
     }
 
+    /**
+     * Re-derive `paid_at` from the order's status trail and persist it.
+     *
+     * The earliest Paid entry wins: an order marked paid, reverted and paid
+     * again was first settled on the first date, and a 50% payment is still the
+     * date money moved. Null when the trail carries no Paid entry — including
+     * when the ERP has withdrawn one.
+     *
+     * Written with a bare update so it neither touches `updated_at` nor fires
+     * model events: this is a derived column catching up with its source, not a
+     * change to the order.
+     */
+    public function recalculatePaidAt(): void
+    {
+        $paidAt = $this->statusLogs()
+            ->paid()
+            ->whereNotNull('logged_at')
+            ->min('logged_at');
+
+        if ($this->paid_at?->toDateTimeString() === $paidAt) {
+            return;
+        }
+
+        static::withoutTimestamps(fn () => static::whereKey($this->getKey())->toBase()->update(['paid_at' => $paidAt]));
+
+        $this->paid_at = $paidAt;
+        $this->syncOriginalAttribute('paid_at');
+    }
+
     /** Total quantity still owed across the order's line items. Requires `items.deliveries`. */
     public function outstandingBalance(): int
     {

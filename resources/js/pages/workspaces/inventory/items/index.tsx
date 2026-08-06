@@ -71,13 +71,6 @@ interface Item {
     unfulfilled: number | null;
     /** Everything still owed on open purchase orders, at any stage. */
     waiting_for_delivery_stocks: number | null;
-    /**
-     * The subset of the above that no supplier has been given yet — still in
-     * approval or payment. Counted as incoming like the rest (the PO exists, so
-     * reordering it would double-order); broken out because a large or ageing
-     * figure here means the stock is committed but not actually moving.
-     */
-    requested_stocks: number | null;
     three_days_average: number | null;
     po_qty: number | null;
     remaining_after_fulfillment: number | null;
@@ -750,45 +743,6 @@ export default function ItemIndex({
                             <MetricCell
                                 value={row.original.waiting_for_delivery_stocks}
                                 color="text-blue-500 dark:text-blue-400"
-                            />
-                        </button>
-                    )}
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'requested_stocks',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    column={column}
-                    title="Of Which Not Sent"
-                    className="justify-center"
-                />
-            ),
-            /*
-             * The part of "Waiting for Delivery" that has not reached a supplier
-             * yet. Amber rather than blue because it is the same stock seen from
-             * a different angle: committed, so it still covers the reorder, but
-             * not yet moving. A big number here is a queue, not a shortage.
-             */
-            cell: ({ row }) => (
-                <div className="text-center">
-                    {row.original.requested_stocks == null ? (
-                        <MetricCell
-                            value={null}
-                            color="text-amber-600 dark:text-amber-500"
-                        />
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setWaitingItem(row.original)}
-                            title="Of the units waiting for delivery, the part still awaiting approval or payment"
-                            className="cursor-pointer rounded px-1 underline decoration-dotted underline-offset-4 transition-colors hover:bg-amber-500/10"
-                        >
-                            <MetricCell
-                                value={row.original.requested_stocks}
-                                color="text-amber-600 dark:text-amber-500"
                             />
                         </button>
                     )}
