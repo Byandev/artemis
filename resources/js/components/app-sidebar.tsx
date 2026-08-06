@@ -53,6 +53,7 @@ import {
     Sparkles,
     Store,
     Tags,
+    Target,
     Trophy,
     Truck,
     User,
@@ -575,6 +576,9 @@ export function AppSidebar() {
                     leaderboardEnabled={
                         currentWorkspace.leaderboard_module_enabled
                     }
+                    salesTargetsEnabled={
+                        currentWorkspace.sales_marketing_dashboard_module_enabled
+                    }
                 />
             </SidebarContent>
 
@@ -589,14 +593,19 @@ function PublicLinks({
     workspaceSlug,
     rmoEnabled,
     leaderboardEnabled,
+    salesTargetsEnabled,
 }: {
     workspaceSlug: string;
     rmoEnabled: boolean;
     leaderboardEnabled: boolean;
+    salesTargetsEnabled: boolean;
 }) {
     const canViewRmoLink = useAnyPermission([PERMISSIONS.ViewRmoManagement]);
     const canViewLeaderboardLink = useAnyPermission([
         PERMISSIONS.ViewLeaderboards,
+    ]);
+    const canViewSalesTargetsLink = useAnyPermission([
+        PERMISSIONS.ViewSalesMarketingDashboard,
     ]);
 
     const links = [
@@ -615,6 +624,15 @@ function PublicLinks({
                       title: 'Leaderboards',
                       href: `/public/workspaces/${workspaceSlug}/leaderboards`,
                       icon: Trophy,
+                  },
+              ]
+            : []),
+        ...(salesTargetsEnabled && canViewSalesTargetsLink
+            ? [
+                  {
+                      title: 'Sales Targets',
+                      href: `/public/workspaces/${workspaceSlug}/sales-targets`,
+                      icon: Target,
                   },
               ]
             : []),
