@@ -12,6 +12,52 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.28.0',
+        date: '2026-08-07',
+        sections: [
+            {
+                title: 'Pages — Auto Update Budget (New)',
+                items: [
+                    'Each page now decides for itself whether Meta is allowed to overwrite its daily ad budget — a new Auto Update Budget column on the Pages screen with a switch reading either Auto or Manual',
+                    'Every page starts on Manual, so a budget you type on the Pages screen stays exactly as you left it; switching a page to Auto is a deliberate decision to let Meta’s figure win from then on, and the four-hourly snapshot then replaces that page’s budget on its own',
+                    'The switch flips straight away and rolls back with a message if the save fails, so you are never left looking at a setting that did not actually take',
+                ],
+            },
+            {
+                title: 'Sales Targets — Public Gameboard',
+                items: [
+                    'The public gameboard is now opened from a target’s own page rather than from the targets list — a board is always scored against one specific target, and the old link had to guess which one you meant',
+                    'The board is noticeably quicker to come up: it now asks the server only for things it cannot work out itself — the day’s measured totals, each team’s goal and actual, and the leading team’s trend — and does the percentages, ROAS, ranking, achievement bands and leaderboard order in the page',
+                    'Each section still loads and fails on its own, so one slow panel degrades a corner of the board rather than blanking the whole wall display',
+                ],
+            },
+            {
+                title: 'Inventory — When Stock Was Last Ordered and Last Moved',
+                items: [
+                    'Low Stock Items gains a Last PO Issued column, with how long ago underneath — an item that needs stock and was last ordered two months back is a different problem from one ordered yesterday, and the reorder figure alone could not tell them apart',
+                    'An item that has never been ordered at all says so in red rather than showing a blank, because on a row already asking you to buy stock that is the loudest thing on the line',
+                    'The unfulfilled breakdown gains Last PO In and Last PO Out — when stock last arrived and when it last went out. On a row holding stock that could ship today, an out date more than a week old turns amber: the stock is here and none of it has left',
+                    'Cancelled orders are ignored when working out when something was last ordered — an order you called off is not a time you ordered the item — while delivered and closed ones still count',
+                ],
+            },
+            {
+                title: 'Inventory — Corrected Figures',
+                items: [
+                    'The unfulfilled split now compares each group’s totals instead of each variant separately, which moved roughly 1,400 units out of “no stock” and into “could ship today” — stock sitting on one variant was being written off as unsupplied because it could not be matched against a sibling’s demand',
+                    'Supplier lateness is measured against a flat 14-day delivery target rather than a figure read off the item’s lead time — that field is the same default on almost every item, so treating it as a supplier’s quote implied a precision it never had',
+                    'The delivery curve — first delivery, then 30, 60, 90 and 100% of an order landing — is now measured from the day an order was raised rather than the day it was released, which is both the number that decides whether stock arrives before you run out and one that can be worked out for every order rather than the handful carrying a full status trail',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Date filters now follow the page when it changes the date for you — using “Back to live data” on the Inventory Items list left the box still showing a date that was no longer filtering anything',
+                    'The ROAS colours on the Page ROAS Tracker have moved: 3.00 and above is now the green bar, 2 to 3 reads as short of it, and below 2 is a deep red with white text so a bad day is legible across a room',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.27.0',
         date: '2026-08-06',
         sections: [
