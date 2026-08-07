@@ -26,9 +26,10 @@ use Modules\GencysERP\Models\GencysDailySalesOrder;
  *   Net Profit   = Gross Profit − Advisory Share − OPEX
  *
  * Cost of Sales = the auto lines (Shipping Fee, COD Fee, VAT) plus every
- * transaction type flagged `is_gross_profit_deduction`. OPEX = every *other*
- * outflow transaction type. Which side a line sits on is stored per breakdown row
- * (`section`) so a later flag change doesn't reclassify a closed statement.
+ * transaction type whose `income_statement_section` is `cost_of_sales`. OPEX =
+ * types marked `opex`. Types with a null section are excluded and never appear.
+ * Which side a line sits on is stored per breakdown row (`section`) so a later
+ * change doesn't reclassify a closed statement.
  */
 class IncomeStatementController extends Controller
 {
@@ -356,11 +357,12 @@ class IncomeStatementController extends Controller
             $lines->push($this->line(self::VAT_KEY, 'VAT', $vat, 'vat', 'cost_of_sales'));
         }
 
-        // Flagged transaction types → cost of sales; the rest → OPEX.
-        foreach ($buckets->where('flagged', true) as $b) {
+        // Split transaction types by their income-statement section (excluded
+        // types were already dropped in transactionBuckets()).
+        foreach ($buckets->where('section', 'cost_of_sales') as $b) {
             $lines->push($this->line($b['type_key'], $b['type_name'], $b['amount'], 'transaction_type', 'cost_of_sales'));
         }
-        foreach ($buckets->where('flagged', false) as $b) {
+        foreach ($buckets->where('section', 'opex') as $b) {
             $lines->push($this->line($b['type_key'], $b['type_name'], $b['amount'], 'transaction_type', 'opex'));
         }
 
@@ -400,15 +402,17 @@ class IncomeStatementController extends Controller
 
     /**
      * The month's outflow finance transactions grouped by transaction type, each
-     * tagged with whether its type is a gross-profit deduction. Key 0 is the
-     * "Uncategorized" bucket (no transaction_type_id, never flagged).
+     * tagged with its income-statement section ('cost_of_sales' | 'opex'). Types
+     * whose section is null (excluded) are dropped entirely. Key 0 is the
+     * "Uncategorized" bucket (no transaction_type_id) which always falls to OPEX;
+     * a deleted/unknown type also falls back to OPEX rather than being dropped.
      *
-     * @return Collection<int, array{type_key:int, type_name:string, amount:float, flagged:bool}>
+     * @return Collection<int, array{type_key:int, type_name:string, amount:float, section:string}>
      */
     private function transactionBuckets(Workspace $workspace, Carbon $from, Carbon $to): Collection
     {
         $types = TransactionType::where('workspace_id', $workspace->id)
-            ->get(['id', 'name', 'is_gross_profit_deduction'])
+            ->get(['id', 'name', 'income_statement_section'])
             ->keyBy('id');
 
         return Transaction::where('workspace_id', $workspace->id)
@@ -418,12 +422,21 @@ class IncomeStatementController extends Controller
             ->groupBy('type_key')
             ->orderByDesc('total')
             ->get()
-            ->map(fn ($r) => [
-                'type_key' => (int) $r->type_key,
-                'type_name' => $r->type_key ? ($types[$r->type_key]->name ?? 'Unknown') : 'Uncategorized',
-                'amount' => (float) $r->total,
-                'flagged' => $r->type_key ? (bool) ($types[$r->type_key]->is_gross_profit_deduction ?? false) : false,
-            ]);
+            ->map(function ($r) use ($types) {
+                $key = (int) $r->type_key;
+                $type = $key ? $types->get($key) : null;
+
+                return [
+                    'type_key' => $key,
+                    'type_name' => $key ? ($type->name ?? 'Unknown') : 'Uncategorized',
+                    'amount' => (float) $r->total,
+                    // Existing type → its section (null = excluded); uncategorized
+                    // or a deleted type → OPEX.
+                    'section' => $type ? $type->income_statement_section : 'opex',
+                ];
+            })
+            ->reject(fn ($b) => $b['section'] === null)
+            ->values();
     }
 
     /** Map a saved breakdown row back to its preview type_key. */

@@ -21,9 +21,10 @@ use Modules\GencysERP\Support\InternResolver;
  * Each delivered gencys order's `intern_brands_name` cell is resolved to an
  * intern (InternResolver) and then to the intern's linked user; revenue that
  * resolves to no user rolls into an "Unassigned" row. Per user we compute the
- * same two-tier P&L as the overall statement (COGS + Shipping + COD + VAT + the
- * user's flagged charged transactions = cost of sales; other charged txns = OPEX;
- * advisory = % of gross).
+ * same two-tier P&L as the overall statement (Shipping + COD + VAT + the user's
+ * flagged charged transactions = cost of sales; other charged txns = OPEX;
+ * advisory = % of gross). COGS is intentionally not folded in, so the per-user
+ * rows reconcile with the workspace statement, which also excludes it.
  *
  * The result is snapshotted into `finance_user_income_statements` when the parent
  * statement is saved/regenerated, so the pages read stored rows instead of
@@ -32,8 +33,6 @@ use Modules\GencysERP\Support\InternResolver;
 class UserIncomeStatementService
 {
     private const DELIVERED_STATUS = 'DELIVERED';
-
-    private const COGS_KEY = -4;
 
     private const SHIPPING_FEE_KEY = -1;
 
@@ -342,7 +341,6 @@ class UserIncomeStatementService
         $cells = $this->cellsForUser($workspace, $user->id, $from, $to);
 
         $revenue = 0.0;
-        $cogs = 0.0;
         $orders = 0;
         $shipping = 0.0;
 
@@ -353,11 +351,10 @@ class UserIncomeStatementService
                 ->whereIn('intern_brands_name', $cells)
                 ->whereNotIn('platform', ['Shopee', 'TikTok'])
                 ->whereNotLike('page', '%pikutin%')
-                ->selectRaw('COALESCE(SUM(price_final), 0) as revenue, COALESCE(SUM(total_cog), 0) as cogs, COUNT(*) as orders')
+                ->selectRaw('COALESCE(SUM(price_final), 0) as revenue, COUNT(*) as orders')
                 ->first();
 
             $revenue = (float) $row->revenue;
-            $cogs = (float) $row->cogs;
             $orders = (int) $row->orders;
 
             $shipping = (float) GencysDailySalesOrder::where('workspace_id', $workspace->id)
@@ -376,9 +373,6 @@ class UserIncomeStatementService
         $opexTotal = (float) collect($opexBuckets)->sum('amount');
 
         $lines = collect();
-        if ($cogs > 0) {
-            $lines->push($this->line(self::COGS_KEY, 'COGS', round($cogs, 2), 'cogs', 'cost_of_sales'));
-        }
         if ($shipping > 0) {
             $lines->push($this->line(self::SHIPPING_FEE_KEY, 'Shipping Fee', round($shipping, 2), 'shipping_fee', 'cost_of_sales'));
         }
@@ -395,7 +389,7 @@ class UserIncomeStatementService
             $lines->push($this->line($b['type_key'], $b['type_name'], $b['amount'], 'transaction_type', 'opex'));
         }
 
-        $p = $this->derivePnl(round($revenue, 2), $cogs, $shipping, $cod, $vat, $flaggedTotal, $opexTotal, $advisoryRate, (bool) $workspace->is_gencys_partner);
+        $p = $this->derivePnl(round($revenue, 2), $shipping, $cod, $vat, $flaggedTotal, $opexTotal, $advisoryRate, (bool) $workspace->is_gencys_partner);
 
         return [
             'delivered' => round($revenue, 2),
@@ -412,9 +406,9 @@ class UserIncomeStatementService
     }
 
     /** Two-tier P&L math. */
-    private function derivePnl(float $revenue, float $cogs, float $shipping, float $cod, float $vat, float $flagged, float $opex, float $advisoryRate, bool $gencysPartner): array
+    private function derivePnl(float $revenue, float $shipping, float $cod, float $vat, float $flagged, float $opex, float $advisoryRate, bool $gencysPartner): array
     {
-        $costOfSales = round($cogs + $shipping + $cod + $vat + $flagged, 2);
+        $costOfSales = round($shipping + $cod + $vat + $flagged, 2);
         $gross = round($revenue - $costOfSales, 2);
         $advisory = ($gencysPartner && $gross > 0) ? round($gross * $advisoryRate, 2) : 0.0;
         $net = round($gross - $opex - $advisory, 2);
@@ -529,15 +523,16 @@ class UserIncomeStatementService
     }
 
     /**
-     * The user's charged outflow transactions grouped by type, split into flagged
-     * (cost of sales) and the rest (OPEX).
+     * The user's charged outflow transactions grouped by type, split into cost of
+     * sales and OPEX by each type's `income_statement_section`. Types with a null
+     * section (excluded) are dropped; a deleted/unknown type falls back to OPEX.
      *
      * @return array{0:list<array{type_key:int,type_name:string,amount:float}>, 1:list<array{type_key:int,type_name:string,amount:float}>}
      */
     private function userTransactionBuckets(Workspace $workspace, int $userId, Carbon $from, Carbon $to): array
     {
         $types = TransactionType::where('workspace_id', $workspace->id)
-            ->get(['id', 'name', 'is_gross_profit_deduction'])
+            ->get(['id', 'name', 'income_statement_section'])
             ->keyBy('id');
 
         // A transaction split across users contributes only this user's share.
@@ -551,16 +546,22 @@ class UserIncomeStatementService
             ->groupBy('type_key')
             ->orderByDesc('total')
             ->get()
-            ->map(fn ($r) => [
-                'type_key' => (int) $r->type_key,
-                'type_name' => $r->type_key ? ($types[$r->type_key]->name ?? 'Unknown') : 'Uncategorized',
-                'amount' => (float) $r->total,
-                'flagged' => $r->type_key ? (bool) ($types[$r->type_key]->is_gross_profit_deduction ?? false) : false,
-            ]);
+            ->map(function ($r) use ($types) {
+                $key = (int) $r->type_key;
+                $type = $key ? $types->get($key) : null;
+
+                return [
+                    'type_key' => $key,
+                    'type_name' => $key ? ($type->name ?? 'Unknown') : 'Uncategorized',
+                    'amount' => (float) $r->total,
+                    'section' => $type ? $type->income_statement_section : 'opex',
+                ];
+            })
+            ->reject(fn ($b) => $b['section'] === null);
 
         return [
-            $rows->where('flagged', true)->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),
-            $rows->where('flagged', false)->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),
+            $rows->where('section', 'cost_of_sales')->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),
+            $rows->where('section', 'opex')->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),
         ];
     }
 
