@@ -3,31 +3,41 @@
 namespace App\Queries;
 
 use App\Models\SalesTarget;
+use App\Models\SalesTargetTeam;
 use App\Models\Workspace;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Scores a dated sales target against what actually happened that day — the
- * numbers behind the public gameboard's KPI row.
+ * Reads what actually happened on the day a sales target covers — the measured
+ * numbers behind the public gameboard.
  *
- * The target supplies the goals (per-team sales amounts, ad budget, ROAS). The
- * only actual read is sales, straight from pancake_orders: final_amount dated on
- * confirmed_at, cancelled and removed orders excluded — the same definition as
+ * This class deliberately stops at measurement. It returns the day's sales, each
+ * included team's goal, budget and actual, and the previous day's equivalents;
+ * the board derives percentages, ROAS, ranking, achievement bands and the
+ * day-over-day arrows from those in the browser. Keeping the arithmetic on one
+ * side means one definition of each rule rather than one per endpoint, and the
+ * board no longer re-runs this query once per panel.
+ *
+ * Sales come straight from pancake_orders: final_amount dated on confirmed_at,
+ * cancelled and removed orders (status 6 and 7) excluded — the same definition as
  * the workspace's Total Sales metric.
  *
- * ROAS here is sales ÷ the ad BUDGET the target set, not ÷ money actually spent.
- * It answers "what did the budget we handed out return", which is the question a
- * board about targets is asking.
+ * The totals cover exactly the teams the target included — the ones ticked when
+ * it was created — and nothing else. A team left out of the target has no goal on
+ * this board, so counting its sales would score the workspace against a target
+ * that never asked for it. Attribution runs through the page an order came in on
+ * (pages.owner_id → team_user), the same link the workspace metrics use for their
+ * team filter.
  *
- * The headline totals are workspace-wide and are NOT gated on team membership —
- * "total sales" means everything the workspace confirmed that day. Only the
- * per-team figures need attribution, and they get it through the page an order
- * came in on (pages.owner_id → team_user), the same link the workspace metrics
- * use for their team filter.
+ * The day total is deliberately not the sum of the per-team rows: it filters
+ * orders rather than joining through team membership, so an order whose page
+ * owner sits on two included teams still counts once.
  *
- * This is the workspace-wide board: no team visibility scoping is applied, which
- * is why it only backs the password-gated public page and not a per-user view.
+ * No team *visibility* scoping is applied — every included team's number is
+ * shown, which is why this only backs the password-gated public page and not a
+ * per-user view.
  */
 class SalesTargetScoreboardQuery
 {
@@ -40,273 +50,62 @@ class SalesTargetScoreboardQuery
     public function __construct(private readonly Workspace $workspace) {}
 
     /**
-     * The headline tiles for one target, with day-over-day trends taken from the
-     * previous day's target when there is one.
+     * The day's measured totals, plus the previous day's for the trend arrows.
      *
-     * Pass $teamId to score the board on a single team — the totals, the counts
-     * and the trends all narrow to it.
+     * Pass $teamId to narrow every total to a single team.
      *
      * @return array<string, mixed>
      */
-    public function kpisFor(SalesTarget $target, ?int $teamId = null): array
+    public function factsFor(SalesTarget $target, ?int $teamId = null): array
     {
-        $today = $this->snapshot($target, $teamId);
-
-        $previousTarget = SalesTarget::ofWorkspace($this->workspace)
+        $previous = SalesTarget::ofWorkspace($this->workspace)
             ->where('date', $target->date->copy()->subDay()->toDateString())
             ->with('teamTargets')
             ->first();
 
-        $previous = $previousTarget ? $this->snapshot($previousTarget, $teamId) : null;
-
-        $sales = $today['sales'];
-        $goal = $today['target_sales'];
-
         return [
+            // The cast keeps this a Carbon instance; send the bare date so the
+            // frontend parses it as a local day.
             'date' => $target->date->toDateString(),
-            'total_sales' => $sales,
-            'target_sales' => $goal,
-            'achievement_pct' => $today['achievement_pct'],
-            'ad_budget' => $today['ad_budget'],
-            'roas' => $today['roas'],
             'qualifying_roas' => $this->qualifyingRoas($target),
-            'teams_total' => $today['teams_total'],
-            'teams_at_target' => $today['teams_at_target'],
-            'teams_at_roas' => $today['teams_at_roas'],
-            'qualified_teams' => $today['qualified_teams'],
-            // Signed on purpose: below target reads as a shortfall, not a zero.
-            'above_target' => round($sales - $goal, 2),
-            'trends' => [
-                'achievement' => $this->delta($today['achievement_pct'], $previous['achievement_pct'] ?? null),
-                'roas' => $this->delta($today['roas'], $previous['roas'] ?? null),
-            ],
+            'today' => $this->dayTotals($target, $teamId),
+            'previous' => $previous ? $this->dayTotals($previous, $teamId) : null,
         ];
     }
 
     /**
-     * Every team on the target, best first. The same ranking backs the leader,
-     * so the team this puts at rank 1 is the one {@see leaderFor()} names.
+     * Each included team's goal, budget and what it actually sold — unscored, in
+     * no particular order. The board ranks and rates them.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function teamsFor(SalesTarget $target, ?int $teamId = null): array
+    public function teamRows(SalesTarget $target, ?int $teamId = null): array
     {
-        return $this->ranked($this->snapshot($target, $teamId)['teams']);
-    }
-
-    /**
-     * The team out front, with the ROAS bar it is being judged against and its
-     * recent sales for the sparkline.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function leaderFor(SalesTarget $target, ?int $teamId = null): ?array
-    {
-        $ranked = $this->teamsFor($target, $teamId);
-
-        if (empty($ranked)) {
-            return null;
-        }
-
-        $leader = $ranked[0];
-        $leader['trend'] = $this->teamSalesTrend($leader['team_id'], $target->date->toDateString());
-        $leader['qualifying_roas'] = $this->qualifyingRoas($target);
-
-        return $leader;
-    }
-
-    /**
-     * How the teams fall across achievement bands.
-     *
-     * Only teams with a sales target to measure against are placed — a team
-     * carrying an ad budget alone has no achievement, so it is reported as
-     * `unrated` rather than quietly counted as failing.
-     *
-     * @return array<string, mixed>
-     */
-    public function achievementDistribution(SalesTarget $target, ?int $teamId = null): array
-    {
-        $teams = $this->snapshot($target, $teamId)['teams'];
-
-        $bands = [
-            ['key' => 'at_target', 'label' => '100%+', 'min' => 100.0],
-            ['key' => 'near', 'label' => '75% - 99%', 'min' => 75.0],
-            ['key' => 'half', 'label' => '50% - 74%', 'min' => 50.0],
-            ['key' => 'below', 'label' => 'Below 50%', 'min' => null],
-        ];
-
-        $rated = array_values(array_filter(
-            $teams,
-            fn (array $team) => $team['achievement_pct'] !== null,
-        ));
-
-        $buckets = [];
-
-        foreach ($bands as $i => $band) {
-            // Each band runs from its own floor up to the floor of the one above.
-            $ceiling = $i === 0 ? null : $bands[$i - 1]['min'];
-            $floor = $band['min'];
-
-            $count = count(array_filter($rated, function (array $team) use ($floor, $ceiling) {
-                $pct = (float) $team['achievement_pct'];
-
-                return ($floor === null || $pct >= $floor)
-                    && ($ceiling === null || $pct < $ceiling);
-            }));
-
-            $buckets[] = [
-                'key' => $band['key'],
-                'label' => $band['label'],
-                'count' => $count,
-                'share' => $rated === [] ? 0.0 : round($count / count($rated) * 100, 1),
-            ];
-        }
-
-        return [
-            'buckets' => $buckets,
-            'total' => count($rated),
-            'unrated' => count($teams) - count($rated),
-        ];
-    }
-
-    /**
-     * Each team's sales beside the target it was given — the pair of bars the
-     * chart stands side by side, in the board's ranking order.
-     *
-     * @return array<int, array{team_id: int, name: string, sales: float, target: float}>
-     */
-    public function salesVsTarget(SalesTarget $target, ?int $teamId = null): array
-    {
-        return array_map(
-            fn (array $team) => [
-                'team_id' => $team['team_id'],
-                'name' => $team['name'],
-                'sales' => $team['sales'],
-                'target' => $team['target'],
-            ],
-            $this->teamsFor($target, $teamId),
+        $teamTargets = $this->teamTargets($target, $teamId);
+        $actuals = $this->actualsByTeam(
+            $target->date->toDateString(),
+            $this->teamIds($teamTargets),
         );
-    }
 
-    /**
-     * One day's board: the target's teams with their actuals, plus the
-     * deduplicated company totals.
-     *
-     * @return array<string, mixed>
-     */
-    private function snapshot(SalesTarget $target, ?int $teamId = null): array
-    {
-        $date = $target->date->toDateString();
-
-        $teamTargets = $target->relationLoaded('teamTargets')
-            ? $target->teamTargets
-            : $target->teamTargets()->get();
-
-        // Narrowing to one team is just a smaller board — every total below
-        // then covers that team alone.
-        if ($teamId !== null) {
-            $teamTargets = $teamTargets->where('team_id', $teamId)->values();
-        }
-
-        $teamIds = $teamTargets->pluck('team_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
-
-        $actuals = $this->actualsByTeam($date, $teamIds);
-        $company = $this->companySales($date, $teamId);
-        $qualifyingRoas = $this->qualifyingRoas($target);
-
-        $targetSales = 0.0;
-        $adBudget = 0.0;
-        $hasBudget = false;
-        $teamsAtTarget = 0;
-        $teamsAtRoas = 0;
-        $qualified = 0;
-        $teams = [];
-
-        foreach ($teamTargets as $row) {
-            $goal = (float) $row->sales_target;
-            $teamSales = $actuals[(int) $row->team_id] ?? 0.0;
-            $teamBudget = $row->ad_budget === null ? null : (float) $row->ad_budget;
-
-            $targetSales += $goal;
-
-            if ($teamBudget !== null) {
-                $adBudget += $teamBudget;
-                $hasBudget = true;
-            }
-
-            $hitTarget = $goal > 0 && $teamSales >= $goal;
-            // ROAS on this board is the return on the budget the team was given,
-            // not on what it actually spent.
-            $roas = $teamBudget > 0 ? $teamSales / $teamBudget : null;
-            $hitRoas = $roas !== null && round($roas, 2) >= $qualifyingRoas;
-
-            $teamsAtTarget += $hitTarget ? 1 : 0;
-            $teamsAtRoas += $hitRoas ? 1 : 0;
-            $qualified += $hitTarget && $hitRoas ? 1 : 0;
-
-            $teams[] = [
+        return $teamTargets
+            ->map(fn ($row) => [
                 'team_id' => (int) $row->team_id,
                 'name' => $row->team?->name ?? 'Unknown team',
-                'sales' => $teamSales,
-                'target' => round($goal, 2),
-                'ad_budget' => $teamBudget === null ? null : round($teamBudget, 2),
-                'achievement_pct' => $goal > 0 ? round($teamSales / $goal * 100, 1) : null,
-                'roas' => $roas === null ? null : round($roas, 2),
-                'above_target' => round($teamSales - $goal, 2),
-                'hit_target' => $hitTarget,
-                'hit_roas' => $hitRoas,
-                'qualified' => $hitTarget && $hitRoas,
-            ];
-        }
-
-        $budget = $hasBudget ? round($adBudget, 2) : null;
-
-        return [
-            'sales' => $company,
-            'target_sales' => round($targetSales, 2),
-            // Null, not zero, when no team was given a budget — there is then no
-            // budget to divide by and no ads figure to show.
-            'ad_budget' => $budget,
-            'achievement_pct' => $targetSales > 0 ? round($company / $targetSales * 100, 1) : null,
-            'roas' => $budget > 0 ? round($company / $budget, 2) : null,
-            'teams_total' => count($teamIds),
-            'teams_at_target' => $teamsAtTarget,
-            'teams_at_roas' => $teamsAtRoas,
-            'qualified_teams' => $qualified,
-            'teams' => $teams,
-        ];
+                'sales' => $actuals[(int) $row->team_id] ?? 0.0,
+                'target' => round((float) $row->sales_target, 2),
+                'ad_budget' => $row->ad_budget === null ? null : round((float) $row->ad_budget, 2),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
-     * Teams best-first: highest achievement against its own target, with sales
-     * breaking a tie. Each row carries the rank it landed on.
-     *
-     * @param  array<int, array<string, mixed>>  $teams
-     * @return array<int, array<string, mixed>>
-     */
-    private function ranked(array $teams): array
-    {
-        usort($teams, function (array $a, array $b) {
-            // A team with no target to measure against ranks below one that has.
-            $byAchievement = ($b['achievement_pct'] ?? -1) <=> ($a['achievement_pct'] ?? -1);
-
-            return $byAchievement !== 0 ? $byAchievement : $b['sales'] <=> $a['sales'];
-        });
-
-        foreach ($teams as $i => $team) {
-            $teams[$i]['rank'] = $i + 1;
-        }
-
-        return $teams;
-    }
-
-    /**
-     * The team's daily sales over the window ending on the target's date, with
-     * the days that have no record filled in as zero so the line has no gaps.
+     * One team's daily sales over the window ending on the target's date, with
+     * days that have no orders filled in as zero so the line has no gaps.
      *
      * @return array<int, array{date: string, sales: float}>
      */
-    private function teamSalesTrend(int $teamId, string $end, int $days = 14): array
+    public function teamSalesTrend(int $teamId, string $end, int $days = 14): array
     {
         $from = Carbon::parse($end)->subDays($days - 1)->toDateString();
 
@@ -340,9 +139,57 @@ class SalesTargetScoreboardQuery
     }
 
     /**
-     * team id => confirmed sales that day, straight from the orders. A team owns
-     * an order through the page it came in on (pages.owner_id → team_user), the
-     * same link the workspace metrics use for a team filter.
+     * One day's measured totals: what the included teams sold, what they were
+     * asked for, and the budget they were given.
+     *
+     * @return array<string, float|null>
+     */
+    private function dayTotals(SalesTarget $target, ?int $teamId): array
+    {
+        $teamTargets = $this->teamTargets($target, $teamId);
+
+        $budgets = $teamTargets->whereNotNull('ad_budget');
+
+        return [
+            'total_sales' => $this->includedSales(
+                $target->date->toDateString(),
+                $this->teamIds($teamTargets),
+            ),
+            'target_sales' => round((float) $teamTargets->sum('sales_target'), 2),
+            // Null, not zero, when no team was given a budget — there is then no
+            // budget to divide by and no ads figure to show.
+            'ad_budget' => $budgets->isEmpty() ? null : round((float) $budgets->sum('ad_budget'), 2),
+        ];
+    }
+
+    /**
+     * The target's team rows, narrowed to one team when asked. A team filter that
+     * isn't on the target yields nothing, which is the honest answer.
+     *
+     * @return Collection<int, SalesTargetTeam>
+     */
+    private function teamTargets(SalesTarget $target, ?int $teamId)
+    {
+        $rows = $target->relationLoaded('teamTargets')
+            ? $target->teamTargets
+            : $target->teamTargets()->with('team:id,name')->get();
+
+        return $teamId === null ? $rows : $rows->where('team_id', $teamId)->values();
+    }
+
+    /**
+     * @param  Collection<int, SalesTargetTeam>  $teamTargets
+     * @return array<int, int>
+     */
+    private function teamIds($teamTargets): array
+    {
+        return $teamTargets->pluck('team_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+    }
+
+    /**
+     * team id => confirmed sales that day. A team owns an order through the page
+     * it came in on (pages.owner_id → team_user), the same link the workspace
+     * metrics use for a team filter.
      *
      * @param  array<int, int>  $teamIds
      * @return array<int, float>
@@ -371,19 +218,29 @@ class SalesTargetScoreboardQuery
     }
 
     /**
-     * The day's workspace-wide sales — every confirmed order, whoever owns the
-     * page it came in on. Team membership deliberately doesn't gate this: the
-     * headline is what the company sold, not what the linked teams sold.
+     * The day's sales for the teams the target included, counted once each.
+     *
+     * Filtering the orders by page owner (rather than joining through team
+     * membership and summing) is what keeps it once: a page owner on two
+     * included teams would otherwise have their orders double-counted.
+     *
+     * A target with no teams has nothing to compare, so it totals zero rather
+     * than falling back to the whole workspace.
+     *
+     * @param  array<int, int>  $teamIds
      */
-    private function companySales(string $date, ?int $teamId): float
+    private function includedSales(string $date, array $teamIds): float
     {
+        if (empty($teamIds)) {
+            return 0.0;
+        }
+
         $sales = $this->ordersQuery($date)
-            ->when($teamId, fn ($query) => $query
-                ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-                ->whereIn('pages.owner_id', fn ($sub) => $sub
-                    ->from('team_user')
-                    ->select('user_id')
-                    ->where('team_id', $teamId)))
+            ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
+            ->whereIn('pages.owner_id', fn ($sub) => $sub
+                ->from('team_user')
+                ->select('user_id')
+                ->whereIn('team_id', $teamIds))
             ->selectRaw('COALESCE(SUM(pancake_orders.final_amount), 0) as sales')
             ->value('sales');
 
@@ -415,26 +272,5 @@ class SalesTargetScoreboardQuery
         $roas = $target->target_roas === null ? null : (float) $target->target_roas;
 
         return $roas !== null && $roas > 0 ? $roas : self::DEFAULT_QUALIFYING_ROAS;
-    }
-
-    /**
-     * Direction + percentage change against the previous day's board. Null when
-     * either side is missing — there is nothing honest to draw an arrow from.
-     *
-     * @return array{pct: float|null, status: 'up'|'down'|'flat'}|null
-     */
-    private function delta(int|float|null $current, int|float|null $previous): ?array
-    {
-        if ($current === null || $previous === null) {
-            return null;
-        }
-
-        $cur = (float) $current;
-        $prev = (float) $previous;
-
-        return [
-            'pct' => $prev != 0.0 ? round(($cur - $prev) / abs($prev) * 100, 1) : null,
-            'status' => $cur > $prev ? 'up' : ($cur < $prev ? 'down' : 'flat'),
-        ];
     }
 }

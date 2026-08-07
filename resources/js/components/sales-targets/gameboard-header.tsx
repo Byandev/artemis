@@ -60,7 +60,9 @@ export function GameboardHeader({
         document.documentElement.requestFullscreen().catch(() => {});
     };
 
-    // Changing the team restarts the list, so `page` is deliberately dropped.
+    // Team is the only thing in the query string — a pinned target lives in the
+    // path, so reusing the current pathname keeps the board on its own day
+    // without naming the target here.
     const selectTeam = (value: string) =>
         router.get(
             window.location.pathname,

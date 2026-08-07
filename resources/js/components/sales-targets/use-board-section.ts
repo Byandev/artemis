@@ -4,13 +4,21 @@ import { useCallback, useEffect, useState } from 'react';
 interface Options {
     /** Board slug the endpoints hang off. */
     workspaceSlug: string;
-    /** Which section to fetch: 'kpis' | 'leader' | 'teams' | 'leaderboard'. */
+    /** Which section to fetch: 'kpis' | 'teams' | 'team-trend'. */
     section: string;
     teamId?: number | null;
+    /** Pins every section to one target; null lets each resolve the day itself. */
+    targetId?: number | null;
     /** Bumped by the header's Refresh — every section refetches on change. */
     refreshKey: number;
-    /** Anything else the section's endpoint takes, e.g. the leaderboard's limit. */
+    /** Anything else the section's endpoint takes, e.g. the trend's team id. */
     params?: Record<string, string | number>;
+    /**
+     * Skip the request until its inputs exist. The leader's sparkline is fetched
+     * for whichever team the board ranks first, which isn't known until the team
+     * rows have arrived — firing before that would ask for nothing.
+     */
+    enabled?: boolean;
 }
 
 interface State<T> {
@@ -24,19 +32,23 @@ interface State<T> {
  *
  * Each section owns its request, so a slow or failing one doesn't hold up or
  * blank the others — the board degrades a panel at a time rather than all at
- * once. The team filter and the Refresh button are the only inputs; both simply
- * refetch.
+ * once. The pinned target, the team filter and the Refresh button are the only
+ * inputs; all of them simply refetch.
  */
 export function useBoardSection<T>({
     workspaceSlug,
     section,
     teamId,
+    targetId,
     refreshKey,
     params,
+    enabled = true,
 }: Options): State<T> & { reload: () => void } {
     const [state, setState] = useState<State<T>>({
         data: null,
-        loading: true,
+        // A disabled section isn't waiting on anything, so it must not report
+        // itself as loading — the header's Refresh spinner watches this.
+        loading: enabled,
         failed: false,
     });
 
@@ -46,6 +58,12 @@ export function useBoardSection<T>({
 
     const load = useCallback(
         (signal?: AbortSignal) => {
+            if (!enabled) {
+                setState({ data: null, loading: false, failed: false });
+
+                return;
+            }
+
             setState((current) => ({ ...current, loading: true }));
 
             return axios
@@ -53,6 +71,7 @@ export function useBoardSection<T>({
                     `/public/workspaces/${workspaceSlug}/sales-targets/${section}`,
                     {
                         params: {
+                            ...(targetId ? { id: targetId } : {}),
                             ...(teamId ? { team_id: teamId } : {}),
                             ...JSON.parse(paramsKey),
                         },
@@ -73,7 +92,7 @@ export function useBoardSection<T>({
                     setState({ data: null, loading: false, failed: true });
                 });
         },
-        [workspaceSlug, section, teamId, paramsKey],
+        [workspaceSlug, section, teamId, targetId, paramsKey, enabled],
     );
 
     useEffect(() => {

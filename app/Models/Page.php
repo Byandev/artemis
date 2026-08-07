@@ -20,6 +20,7 @@ class Page extends Model
 
     protected $casts = [
         'orders_last_synced_at' => 'datetime',
+        'auto_update_ad_budget' => 'boolean',
     ];
 
     protected $hidden = [];

@@ -15,7 +15,7 @@ import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { omit } from 'lodash';
-import { MonitorPlay, Pencil, Plus, Target, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Target, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     SalesTarget,
@@ -190,18 +190,10 @@ export default function SalesTargetsIndex({
                             one to see the per-team amounts.
                         </p>
                     </div>
+                    {/* The public board lives on a target's own detail page — it is
+                        always scored on one specific target, so there is nothing
+                        for it to point at from the list. */}
                     <div className="flex items-center gap-2">
-                        {/* The public board is password-gated and meant for a wall
-                            display, so it opens in its own tab. */}
-                        <a
-                            href={`/public/workspaces/${workspace.slug}/sales-targets`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
-                        >
-                            <MonitorPlay className="h-3.5 w-3.5" />
-                            Public Gameboard
-                        </a>
                         {canManage && teams.length > 0 && (
                             <button
                                 onClick={() => setCreateOpen(true)}
