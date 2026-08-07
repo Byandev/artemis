@@ -1,38 +1,30 @@
 import { BoardSectionState } from '@/components/sales-targets/board-section';
-import { GameboardBackdrop } from '@/components/sales-targets/gameboard-backdrop';
 import {
-    DistributionData,
-    GameboardDistribution,
-} from '@/components/sales-targets/gameboard-distribution';
+    BoardFacts,
+    TeamFacts,
+    deriveDistribution,
+    deriveKpis,
+    deriveLeader,
+    deriveLeaderboard,
+    deriveSalesVsTarget,
+    deriveTeams,
+} from '@/components/sales-targets/derive';
+import { GameboardBackdrop } from '@/components/sales-targets/gameboard-backdrop';
+import { GameboardDistribution } from '@/components/sales-targets/gameboard-distribution';
 import {
     BoardTeam,
     GameboardHeader,
 } from '@/components/sales-targets/gameboard-header';
-import {
-    GameboardKpiRow,
-    GameboardKpis,
-} from '@/components/sales-targets/gameboard-kpis';
-import {
-    GameboardLeader,
-    LeaderTeam,
-} from '@/components/sales-targets/gameboard-leader';
-import {
-    GameboardLeaderboard,
-    LeaderboardData,
-} from '@/components/sales-targets/gameboard-leaderboard';
-import {
-    GameboardSalesChart,
-    SalesVsTargetPoint,
-} from '@/components/sales-targets/gameboard-sales-chart';
+import { GameboardKpiRow } from '@/components/sales-targets/gameboard-kpis';
+import { GameboardLeader } from '@/components/sales-targets/gameboard-leader';
+import { GameboardLeaderboard } from '@/components/sales-targets/gameboard-leaderboard';
+import { GameboardSalesChart } from '@/components/sales-targets/gameboard-sales-chart';
 import { GameboardSlideshow } from '@/components/sales-targets/gameboard-slideshow';
-import {
-    GameboardTeams,
-    TeamPerformance,
-} from '@/components/sales-targets/gameboard-teams';
+import { GameboardTeams } from '@/components/sales-targets/gameboard-teams';
 import { useBoardSection } from '@/components/sales-targets/use-board-section';
 import { Head, useForm } from '@inertiajs/react';
 import { Lock, Target } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 interface PublicWorkspace {
     id: number;
@@ -49,6 +41,11 @@ interface Props {
     /** The teams on the featured day, and the one the board is narrowed to. */
     teams?: BoardTeam[];
     teamId?: number | null;
+    /**
+     * Set when the board was opened from a target's detail page — it stays on
+     * that target instead of rolling to today's.
+     */
+    targetId?: number | null;
 }
 
 /** Password gate shown before the board when the workspace requires it. */
@@ -118,6 +115,7 @@ export default function PublicSalesTargets({
     featured,
     teams,
     teamId,
+    targetId,
 }: Props) {
     // Refresh doesn't reload the page — it re-runs every section's own request.
     const [refreshKey, setRefreshKey] = useState(0);
@@ -125,33 +123,67 @@ export default function PublicSalesTargets({
     const shared = {
         workspaceSlug: workspace.slug,
         teamId,
+        targetId,
         refreshKey,
     };
 
-    const kpis = useBoardSection<GameboardKpis>({ ...shared, section: 'kpis' });
-    const leader = useBoardSection<LeaderTeam>({
-        ...shared,
-        section: 'leader',
-    });
-    const teamRows = useBoardSection<TeamPerformance[]>({
+    // Two requests carry the whole board: the day's measured totals, and each
+    // team's goal against what it sold. Everything below is arithmetic on those.
+    const facts = useBoardSection<BoardFacts>({ ...shared, section: 'kpis' });
+    const teamFacts = useBoardSection<TeamFacts[]>({
         ...shared,
         section: 'teams',
     });
-    const salesChart = useBoardSection<SalesVsTargetPoint[]>({
+
+    const qualifyingRoas = facts.data?.qualifying_roas ?? 0;
+
+    const ranked = useMemo(
+        () =>
+            teamFacts.data ? deriveTeams(teamFacts.data, qualifyingRoas) : null,
+        [teamFacts.data, qualifyingRoas],
+    );
+
+    const kpis = useMemo(
+        () => (facts.data && ranked ? deriveKpis(facts.data, ranked) : null),
+        [facts.data, ranked],
+    );
+
+    // Only the leader's sparkline still needs the server, so it is fetched for
+    // whichever team the ranking above puts first.
+    const leaderId = ranked?.[0]?.team_id ?? null;
+    const trend = useBoardSection<{ date: string; sales: number }[]>({
         ...shared,
-        section: 'sales-vs-target',
+        section: 'team-trend',
+        params: leaderId ? { team_id: leaderId } : undefined,
+        enabled: leaderId !== null,
     });
-    const distribution = useBoardSection<DistributionData>({
-        ...shared,
-        section: 'achievement-distribution',
-    });
-    // "View all" is just a bigger limit — the hook refetches when it changes.
+
+    const leader = useMemo(
+        () =>
+            ranked
+                ? deriveLeader(ranked, qualifyingRoas, trend.data ?? [])
+                : null,
+        [ranked, qualifyingRoas, trend.data],
+    );
+
+    // "View all" is just a bigger slice — no refetch, the rows are already here.
     const [showAllRanks, setShowAllRanks] = useState(false);
-    const leaderboard = useBoardSection<LeaderboardData>({
-        ...shared,
-        section: 'leaderboard',
-        params: { limit: showAllRanks ? 100 : 5 },
-    });
+    const leaderboard = useMemo(
+        () =>
+            ranked ? deriveLeaderboard(ranked, showAllRanks ? 100 : 5) : null,
+        [ranked, showAllRanks],
+    );
+
+    const salesChart = useMemo(
+        () => (ranked ? deriveSalesVsTarget(ranked) : null),
+        [ranked],
+    );
+
+    const distribution = useMemo(
+        () => (ranked ? deriveDistribution(ranked) : null),
+        [ranked],
+    );
+
     const [presenting, setPresenting] = useState(false);
 
     // "Present on TV" is a presentation, so it takes the whole screen; leaving
@@ -172,14 +204,18 @@ export default function PublicSalesTargets({
         return <SalesTargetsLock workspace={workspace} />;
     }
 
-    const busy = [
-        kpis,
-        leader,
-        teamRows,
-        salesChart,
-        distribution,
-        leaderboard,
-    ].some((section) => section.loading);
+    const busy = [facts, teamFacts, trend].some((section) => section.loading);
+
+    // Every panel is derived from the same two requests, so they share one
+    // loading/failed state and one retry.
+    const panel = {
+        loading: facts.loading || teamFacts.loading,
+        failed: facts.failed || teamFacts.failed,
+        onRetry: () => {
+            facts.reload();
+            teamFacts.reload();
+        },
+    };
 
     return (
         <div className="relative min-h-screen bg-stone-50 dark:bg-zinc-950">
@@ -202,9 +238,9 @@ export default function PublicSalesTargets({
                     data={{
                         workspaceName: workspace.name,
                         featured,
-                        kpis: kpis.data,
-                        leader: leader.data,
-                        teams: teamRows.data,
+                        kpis,
+                        leader,
+                        teams: ranked,
                     }}
                     onClose={stopPresenting}
                 />
@@ -213,43 +249,37 @@ export default function PublicSalesTargets({
             <div className="relative mx-auto w-full max-w-(--breakpoint-2xl) px-4 py-3 md:px-6 2xl:px-8 2xl:py-5">
                 {featured ? (
                     <>
-                        {kpis.data ? (
-                            <GameboardKpiRow kpis={kpis.data} />
+                        {kpis ? (
+                            <GameboardKpiRow kpis={kpis} />
                         ) : (
                             <BoardSectionState
-                                loading={kpis.loading}
-                                failed={kpis.failed}
-                                onRetry={kpis.reload}
+                                {...panel}
                                 label="the totals"
                                 height="h-24"
                             />
                         )}
 
-                        {leader.data ? (
+                        {leader ? (
                             <GameboardLeader
-                                leader={leader.data}
-                                qualifyingRoas={leader.data.qualifying_roas}
+                                leader={leader}
+                                qualifyingRoas={leader.qualifying_roas}
                             />
                         ) : (
                             <div className="mt-2">
                                 <BoardSectionState
-                                    loading={leader.loading}
-                                    failed={leader.failed}
-                                    onRetry={leader.reload}
+                                    {...panel}
                                     label="the leader"
                                     height="h-20"
                                 />
                             </div>
                         )}
 
-                        {teamRows.data ? (
-                            <GameboardTeams teams={teamRows.data} />
+                        {ranked ? (
+                            <GameboardTeams teams={ranked} />
                         ) : (
                             <div className="mt-4">
                                 <BoardSectionState
-                                    loading={teamRows.loading}
-                                    failed={teamRows.failed}
-                                    onRetry={teamRows.reload}
+                                    {...panel}
                                     label="team performance"
                                     height="h-40"
                                 />
@@ -260,9 +290,9 @@ export default function PublicSalesTargets({
                             there is width for all three. */}
                         <div className="mt-4 grid grid-cols-1 gap-2 xl:grid-cols-12 2xl:mt-5 2xl:gap-3">
                             <div className="xl:col-span-5">
-                                {leaderboard.data ? (
+                                {leaderboard ? (
                                     <GameboardLeaderboard
-                                        data={leaderboard.data}
+                                        data={leaderboard}
                                         expanded={showAllRanks}
                                         onToggleExpanded={() =>
                                             setShowAllRanks((shown) => !shown)
@@ -270,9 +300,7 @@ export default function PublicSalesTargets({
                                     />
                                 ) : (
                                     <BoardSectionState
-                                        loading={leaderboard.loading}
-                                        failed={leaderboard.failed}
-                                        onRetry={leaderboard.reload}
+                                        {...panel}
                                         label="the leaderboard"
                                         height="h-56"
                                     />
@@ -280,15 +308,11 @@ export default function PublicSalesTargets({
                             </div>
 
                             <div className="xl:col-span-4">
-                                {salesChart.data ? (
-                                    <GameboardSalesChart
-                                        points={salesChart.data}
-                                    />
+                                {salesChart ? (
+                                    <GameboardSalesChart points={salesChart} />
                                 ) : (
                                     <BoardSectionState
-                                        loading={salesChart.loading}
-                                        failed={salesChart.failed}
-                                        onRetry={salesChart.reload}
+                                        {...panel}
                                         label="sales vs target"
                                         height="h-56"
                                     />
@@ -296,15 +320,13 @@ export default function PublicSalesTargets({
                             </div>
 
                             <div className="xl:col-span-3">
-                                {distribution.data ? (
+                                {distribution ? (
                                     <GameboardDistribution
-                                        data={distribution.data}
+                                        data={distribution}
                                     />
                                 ) : (
                                     <BoardSectionState
-                                        loading={distribution.loading}
-                                        failed={distribution.failed}
-                                        onRetry={distribution.reload}
+                                        {...panel}
                                         label="the distribution"
                                         height="h-56"
                                     />

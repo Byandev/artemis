@@ -30,6 +30,13 @@ type PropsType = {
     enable?: DateOption[];
 };
 
+/** Normalise the `defaultDate` prop — single or array, string or Date — to real dates. */
+const toDates = (value?: DateOption | DateOption[]): Date[] => {
+    if (!value) return [];
+    const arr = Array.isArray(value) ? value : [value];
+    return arr.map((d) => new Date(d as string)).filter((d) => !isNaN(d.getTime()));
+};
+
 const fmt     = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtYear = (d: Date) => d.getFullYear().toString();
 
@@ -37,11 +44,26 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const [selectedDates, setSelectedDates] = useState<Date[]>(() => {
-        if (!defaultDate) return [];
-        const arr = Array.isArray(defaultDate) ? defaultDate : [defaultDate];
-        return arr.map((d) => new Date(d as string)).filter((d) => !isNaN(d.getTime()));
-    });
+    const [selectedDates, setSelectedDates] = useState<Date[]>(() => toDates(defaultDate));
+
+    /**
+     * Follow the prop when the parent changes it.
+     *
+     * The label below renders from `selectedDates`, which flatpickr only updates
+     * when the user picks from the calendar. A parent that clears or moves the
+     * date itself — "Back to live data" on the inventory list, say — fires no
+     * change event, so without this the input keeps showing a date that is no
+     * longer filtering anything.
+     *
+     * Keyed on the serialised value rather than the prop: `mode="range"` callers
+     * pass a fresh array every render, and depending on its identity would reset
+     * the display on every keystroke elsewhere on the page.
+     */
+    const defaultDateKey = JSON.stringify(defaultDate ?? null);
+
+    useEffect(() => {
+        setSelectedDates(toDates(JSON.parse(defaultDateKey) ?? undefined));
+    }, [defaultDateKey]);
 
     useEffect(() => {
         if (!inputRef.current) return;
