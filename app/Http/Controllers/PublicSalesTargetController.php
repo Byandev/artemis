@@ -16,9 +16,19 @@ use Inertia\Inertia;
  * The public sales gameboard, behind the shared public-pages password (same
  * mechanism as the public RMO page and leaderboard).
  *
- * One day at a time: the KPI row scores the day's target — today's if the
- * workspace set one, otherwise the most recent — against what the teams
- * actually did. No history list; a wall display shows the day it is on.
+ * One day at a time: the board scores the day's target — today's if the workspace
+ * set one, otherwise the most recent — against what the teams actually did. No
+ * history list; a wall display shows the day it is on.
+ *
+ * Adding the target's id to the path pins the board to that one target instead,
+ * which is how a target's detail page links out to its own board — four targets,
+ * four links, each scored on its own day. Without an id the board keeps rolling
+ * to today.
+ *
+ * These endpoints return measured numbers only. Percentages, ROAS, ranking, the
+ * achievement bands and the leaderboard slice are derived in the browser from the
+ * same payload, so the board makes two requests instead of six and each rule has
+ * one definition. See resources/js/components/sales-targets/derive.ts.
  *
  * Deliberately view-only: no create, edit or delete. Managing targets stays on
  * the authenticated S&M dashboard tab, where permissions and team visibility
@@ -27,7 +37,7 @@ use Inertia\Inertia;
  */
 class PublicSalesTargetController extends Controller
 {
-    public function index(Request $request, Workspace $workspace)
+    public function index(Request $request, Workspace $workspace, ?int $salesTarget = null)
     {
         if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewSalesMarketingDashboard)) {
             return Inertia::render('workspaces/sales-targets/public-pages/sales-targets', [
@@ -36,7 +46,7 @@ class PublicSalesTargetController extends Controller
             ]);
         }
 
-        $featured = $this->featuredTarget($workspace);
+        $featured = $this->featuredTarget($workspace, $salesTarget);
 
         // The teams to choose between are the ones on the board's own day; a
         // team id that isn't one of them falls back to the whole board.
@@ -63,76 +73,58 @@ class PublicSalesTargetController extends Controller
             'featured' => $featured ? [
                 'id' => $featured->id,
                 'name' => $featured->name,
-                // The cast keeps this a Carbon instance, and the frontend parses
-                // a bare Y-m-d as a local date — send it in that shape.
                 'date' => $featured->date->toDateString(),
             ] : null,
             'teams' => $boardTeams,
             'teamId' => $teamId,
+            // Only a target pinned by the path is echoed back. Null means the
+            // sections keep resolving the day themselves, so a board left up
+            // overnight rolls onto tomorrow's target on its next refresh.
+            'targetId' => $featured && $salesTarget === $featured->id ? $featured->id : null,
         ]);
     }
 
-    /** The headline tiles. */
+    /** The day's measured totals, and the previous day's for the trend arrows. */
     public function kpis(Request $request, Workspace $workspace): JsonResponse
-    {
-        return $this->section($request, $workspace, fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->kpisFor($target, $teamId));
-    }
-
-    /** The leader banner: rank 1, its criteria and its sales trend. */
-    public function leader(Request $request, Workspace $workspace): JsonResponse
-    {
-        return $this->section($request, $workspace, fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->leaderFor($target, $teamId));
-    }
-
-    /** The per-team performance cards. */
-    public function teams(Request $request, Workspace $workspace): JsonResponse
-    {
-        return $this->section($request, $workspace, fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->teamsFor($target, $teamId));
-    }
-
-    /** How many teams fall in each achievement band. */
-    public function achievementDistribution(Request $request, Workspace $workspace): JsonResponse
     {
         return $this->section(
             $request,
             $workspace,
-            fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->achievementDistribution($target, $teamId),
+            fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->factsFor($target, $teamId),
         );
     }
 
-    /** Each team's sales beside its target. */
-    public function salesVsTarget(Request $request, Workspace $workspace): JsonResponse
+    /** Each included team's goal, budget and actual — unscored. */
+    public function teams(Request $request, Workspace $workspace): JsonResponse
     {
         return $this->section(
             $request,
             $workspace,
-            fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->salesVsTarget($target, $teamId),
+            fn (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) => $query->teamRows($target, $teamId),
         );
     }
 
     /**
-     * The team leaderboard — the same ranking as the cards, cut to the top few
-     * unless asked for more. `total` is always the full count, so the table can
-     * say what it is holding back.
+     * One team's recent daily sales for the leader sparkline. The board works out
+     * who leads and asks for that team; only the window needs the database.
      */
-    public function leaderboard(Request $request, Workspace $workspace): JsonResponse
+    public function teamTrend(Request $request, Workspace $workspace): JsonResponse
     {
-        $limit = max(1, min($request->integer('limit', 5), 100));
+        $teamId = $request->integer('team_id') ?: null;
 
-        return $this->section($request, $workspace, function (SalesTargetScoreboardQuery $query, SalesTarget $target, ?int $teamId) use ($limit) {
-            $ranked = $query->teamsFor($target, $teamId);
+        return $this->section($request, $workspace, function (SalesTargetScoreboardQuery $query, SalesTarget $target) use ($teamId) {
+            if ($teamId === null || ! $target->teamTargets->contains('team_id', $teamId)) {
+                return null;
+            }
 
-            return [
-                'rows' => array_slice($ranked, 0, $limit),
-                'total' => count($ranked),
-            ];
+            return $query->teamSalesTrend($teamId, $target->date->toDateString());
         });
     }
 
     /**
-     * Shared shell for the per-section endpoints: same password gate, same
-     * featured day, same team filter — only the slice of data differs, so each
-     * section can load, fail and refresh on its own.
+     * Shared shell for the section endpoints: same password gate, same target,
+     * same team filter — only the slice of data differs, so a section can load,
+     * fail and refresh on its own.
      */
     private function section(Request $request, Workspace $workspace, callable $resolve): JsonResponse
     {
@@ -140,7 +132,7 @@ class PublicSalesTargetController extends Controller
             abort(403, 'This board is locked.');
         }
 
-        $target = $this->featuredTarget($workspace);
+        $target = $this->featuredTarget($workspace, $request->integer('id') ?: null);
 
         if (! $target) {
             return response()->json(['data' => null]);
@@ -160,12 +152,19 @@ class PublicSalesTargetController extends Controller
     }
 
     /**
-     * The target the board is pointed at: today's if the workspace set one,
-     * otherwise the most recent. The KPI row is scored against this one day.
+     * The target the board is pointed at: the one asked for by id, else today's
+     * if the workspace set one, else the most recent.
+     *
+     * An id that isn't this workspace's falls through to the usual day rather
+     * than erroring — a stale link shows the current board, not a 404.
      */
-    private function featuredTarget(Workspace $workspace): ?SalesTarget
+    private function featuredTarget(Workspace $workspace, ?int $targetId = null): ?SalesTarget
     {
         $base = fn () => SalesTarget::ofWorkspace($workspace)->with(['teamTargets.team:id,name']);
+
+        if ($targetId !== null && $pinned = $base()->whereKey($targetId)->first()) {
+            return $pinned;
+        }
 
         return $base()->where('date', now()->toDateString())->first()
             ?? $base()->orderByDesc('date')->orderByDesc('id')->first();

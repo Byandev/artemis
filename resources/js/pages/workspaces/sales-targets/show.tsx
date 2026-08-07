@@ -11,7 +11,7 @@ import AppLayout from '@/layouts/app-layout';
 import { currencyFormatter } from '@/lib/utils';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, MonitorPlay, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     SalesTarget,
@@ -80,24 +80,39 @@ export default function SalesTargetShow({
                         </p>
                     </div>
 
-                    {canManage && (
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setEditing(true)}
-                                className="flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
-                            >
-                                <Pencil className="h-3.5 w-3.5" />
-                                Edit
-                            </button>
-                            <button
-                                onClick={() => setDeleting(true)}
-                                className="flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                            >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                Delete
-                            </button>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {/* The board scored on *this* target rather than today's.
+                            Password-gated and built for a wall display, so it
+                            opens in its own tab like the index's link does. */}
+                        <a
+                            href={`/public/workspaces/${workspace.slug}/sales-targets/${target.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        >
+                            <MonitorPlay className="h-3.5 w-3.5" />
+                            Public Gameboard
+                        </a>
+
+                        {canManage && (
+                            <>
+                                <button
+                                    onClick={() => setEditing(true)}
+                                    className="flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit
+                                </button>
+                                <button
+                                    onClick={() => setDeleting(true)}
+                                    className="flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Delete
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

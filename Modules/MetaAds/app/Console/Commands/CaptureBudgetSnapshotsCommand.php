@@ -70,12 +70,21 @@ class CaptureBudgetSnapshotsCommand extends Command
         }
 
         $count = 0;
+        $skipped = 0;
 
         foreach ($pageDailyBudgets as $metaPageId => $dailyBudget) {
             // A Pancake page's id is the FB page id (== meta_page_id), so it maps
             // straight to a local Page. Record the summed *daily* budget even when
             // it's 0 (e.g. lifetime-budget-only pages).
             if (($page = Page::find($metaPageId)) === null) {
+                continue;
+            }
+
+            // Opt-in: only pages switched to Auto on the Pages screen are
+            // overwritten. Every other page keeps the budget it was given.
+            if (! $page->auto_update_ad_budget) {
+                $skipped++;
+
                 continue;
             }
 
@@ -92,6 +101,10 @@ class CaptureBudgetSnapshotsCommand extends Command
         }
 
         $this->info("Captured page daily budgets for {$count} page(s) on {$date}.");
+
+        if ($skipped > 0) {
+            $this->info("Left {$skipped} page(s) alone — auto update is off for them.");
+        }
 
         return self::SUCCESS;
     }
