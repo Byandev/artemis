@@ -20,10 +20,6 @@ Schedule::command('trigger-fetch-shops-users')->daily(7);
 // Gencys ERP
 Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
 
-Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('08:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('12:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('15:00')->withoutOverlapping();
-
 Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('08:30')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('12:30')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('15:30')->withoutOverlapping();
@@ -33,13 +29,17 @@ Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('12:4
 Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('15:45')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('19:00')->withoutOverlapping();
 
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:15')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:15')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:15')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('09:15')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('13:15')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('16:15')->withoutOverlapping();
 
-Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('08:30')->withoutOverlapping();
-Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('12:30')->withoutOverlapping();
-Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('16:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
+
+Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('09:45')->withoutOverlapping();
+Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('13:45')->withoutOverlapping();
+Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('16:45')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
