@@ -84,7 +84,7 @@ class FundRequestController extends Controller
             'statuses' => FundRequest::STATUSES,
             'products' => $this->productOptions($request, $workspace),
             'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name']),
+                ->orderBy('name')->get(['id', 'name', 'nature']),
             'departments' => Department::ofWorkspace($workspace)
                 ->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'canApproveStatus' => $request->user()->can(Permission::ApproveFinanceRequestFunds->value, $workspace),

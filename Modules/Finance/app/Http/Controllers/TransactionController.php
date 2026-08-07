@@ -158,7 +158,7 @@ class TransactionController extends Controller
         return [
             'accounts' => $this->accountOptions($workspace, $editing),
             'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name']),
+                ->orderBy('name')->get(['id', 'name', 'nature']),
             'users' => $workspace->users()->get(['users.id', 'users.name']),
             // The product tags the picker offers (see productOptions).
             'products' => $this->productOptions($request, $workspace, $editing),

@@ -200,7 +200,24 @@ class IncomeStatementController extends Controller
 
         [$periodMonth, $from, $to] = $this->resolveMonth($incomeStatement->period_month->format('Y-m'));
 
-        $includedKeys = $incomeStatement->breakdown->map(fn ($b) => $this->keyForRow($b));
+        $codRate = (float) $incomeStatement->cod_fee_rate;
+        $vatRate = (float) $incomeStatement->vat_rate;
+
+        // Keep the user's saved line choices, but always (re)include every
+        // cost-of-sales line. A transaction type newly tagged as cost of sales
+        // (e.g. Ad Spent), or a cost-of-sales transaction added after the last
+        // save, must flow into Gross Profit on regenerate rather than being
+        // dropped for not being in the original set. OPEX toggles are preserved.
+        $revenue = $this->deliveredRevenue($workspace, $from, $to);
+        $costOfSalesKeys = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate)
+            ->where('section', 'cost_of_sales')
+            ->map(fn ($l) => $l['type_key']);
+
+        $includedKeys = $incomeStatement->breakdown
+            ->map(fn ($b) => $this->keyForRow($b))
+            ->merge($costOfSalesKeys)
+            ->unique()
+            ->values();
 
         $statement = $this->persist(
             $workspace,
@@ -208,8 +225,8 @@ class IncomeStatementController extends Controller
             $from,
             $to,
             $includedKeys,
-            (float) $incomeStatement->cod_fee_rate,
-            (float) $incomeStatement->vat_rate,
+            $codRate,
+            $vatRate,
             (float) $incomeStatement->advisory_rate,
         );
 

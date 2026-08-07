@@ -32,8 +32,11 @@ interface ProductRow {
     shipping: number;
     cod_fee: number;
     vat: number;
+    adspent: number;
     cost_of_sales: number;
     gross_profit: number;
+    advisory: number;
+    net_profit: number;
 }
 
 // Per-product table lines (rows), top to bottom. Money lines format with `fmt`.
@@ -49,6 +52,7 @@ const PRODUCT_LINES: {
     { key: 'shipping', label: 'Shipping Fee', money: true },
     { key: 'cod_fee', label: 'COD Fee', money: true },
     { key: 'vat', label: 'VAT', money: true },
+    { key: 'adspent', label: 'Ad Spent', money: true },
     {
         key: 'cost_of_sales',
         label: 'Cost of Sales',
@@ -58,6 +62,14 @@ const PRODUCT_LINES: {
     {
         key: 'gross_profit',
         label: 'Gross Profit',
+        money: true,
+        strong: true,
+        signed: true,
+    },
+    { key: 'advisory', label: 'Advisory Share', money: true },
+    {
+        key: 'net_profit',
+        label: 'Net Profit',
         money: true,
         strong: true,
         signed: true,
@@ -653,7 +665,12 @@ export default function IncomeStatementShow({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                    {PRODUCT_LINES.map((line) => {
+                                    {PRODUCT_LINES.filter(
+                                        (line) =>
+                                            statement.gencys_partner ||
+                                            (line.key !== 'advisory' &&
+                                                line.key !== 'net_profit'),
+                                    ).map((line) => {
                                         const total =
                                             statement.products!.reduce(
                                                 (s, p) =>
@@ -719,8 +736,9 @@ export default function IncomeStatementShow({
                         </div>
                         <p className="border-t border-black/6 px-5 py-3 text-[10px] text-gray-400 dark:border-white/6">
                             Cost of Sales here is order-derived (Shipping + COD
-                            + VAT). COGS comes in as a transaction, and
-                            transactions stay at the intern level below.
+                            + VAT) plus the intern&apos;s Ad Spent for the
+                            product. COGS and other transactions stay at the
+                            intern level below.
                         </p>
                     </div>
                 )}
