@@ -8,7 +8,9 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+use Modules\Finance\Models\CommissionRate;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Services\UserIncomeStatementService;
 
@@ -54,8 +56,30 @@ class UserIncomeStatementController extends Controller
             'readonly' => true,
             'base' => "/workspaces/{$workspace->slug}/finance/income-statements/{$incomeStatement->id}/users",
             'scope' => ['label' => $user->name],
+            // Where the product breakdown saves a per-product commission rate.
+            'commissionUrl' => "/workspaces/{$workspace->slug}/finance/income-statements/{$incomeStatement->id}/users/{$user->id}/commission-rate",
             'statement' => $this->service->userPayload($incomeStatement, $user),
         ]);
+    }
+
+    /** Set (or clear) this user's commission rate for a single product. */
+    public function setCommissionRate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement, User $user)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
+        $this->ensureOwns($workspace, $incomeStatement);
+
+        $validated = $request->validate([
+            'product_id' => ['required', Rule::exists('products', 'id')->where('workspace_id', $workspace->id)],
+            'rate' => ['required', 'numeric', 'min:0', 'max:1'],
+        ]);
+
+        CommissionRate::updateOrCreate(
+            ['workspace_id' => $workspace->id, 'user_id' => $user->id, 'product_id' => $validated['product_id']],
+            ['rate' => $validated['rate']],
+        );
+
+        return redirect()->back()->with('success', 'Commission rate saved.');
     }
 
     /** @return array{id:int, period_month:string, month:string, label:string} */

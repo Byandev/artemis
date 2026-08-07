@@ -38,6 +38,9 @@ interface ProductRow {
     gross_profit: number;
     advisory: number;
     net_profit: number;
+    commission_rate: number;
+    commission: number;
+    product_id: number | null;
 }
 
 // Per-product table lines (rows), top to bottom. Money lines format with `fmt`.
@@ -107,6 +110,9 @@ interface Props {
     scope?: { label?: string; params?: Record<string, string | number> };
     // Live-computed view with no persistence — hides Save/Regenerate/Export.
     readonly?: boolean;
+    // When set (per-user view), the endpoint to PUT a per-product commission
+    // rate to, enabling the editable commission row on the product breakdown.
+    commissionUrl?: string;
 }
 
 const AUTO = ['shipping_fee', 'cod_fee', 'vat'];
@@ -143,6 +149,7 @@ export default function IncomeStatementShow({
     base: baseProp,
     scope,
     readonly = false,
+    commissionUrl,
 }: Props) {
     const base =
         baseProp ?? `/workspaces/${workspace.slug}/finance/income-statements`;

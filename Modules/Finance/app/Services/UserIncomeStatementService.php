@@ -7,6 +7,7 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Modules\Finance\Models\CommissionRate;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
@@ -144,7 +145,7 @@ class UserIncomeStatementService
      * user's charge-to fraction of the whole transaction. It therefore sums back
      * to the user's ad spend on the P&L.
      *
-     * @return list<array{product_id:?int, product:string, orders:int, delivered:float, cogs:float, shipping:float, cod_fee:float, vat:float, adspent:float, cost_of_sales:float, gross_profit:float, advisory:float, net_profit:float}>
+     * @return list<array{product_id:?int, product:string, orders:int, delivered:float, cogs:float, shipping:float, cod_fee:float, vat:float, adspent:float, cost_of_sales:float, gross_profit:float, advisory:float, net_profit:float, commission_rate:float, commission:float}>
      */
     private function userProductRows(IncomeStatement $statement, User $user): array
     {
@@ -212,7 +213,12 @@ class UserIncomeStatementService
             ->whereIn('id', $keys->filter(fn ($k) => $k !== '')->map(fn ($k) => (int) $k)->all())
             ->pluck('name', 'id');
 
-        $mapped = $keys->map(function ($key) use ($orderByKey, $adSpendByPid, $shipping, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner) {
+        // This user's per-product commission rate (fraction of net profit).
+        $commissionRates = CommissionRate::where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->pluck('rate', 'product_id');
+
+        $mapped = $keys->map(function ($key) use ($orderByKey, $adSpendByPid, $shipping, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner, $commissionRates) {
             $pid = $key === '' ? null : (int) $key;
             $order = $orderByKey[$key] ?? ['orders' => 0, 'revenue' => 0.0, 'cogs' => 0.0];
             $revenue = round((float) $order['revenue'], 2);
@@ -227,6 +233,12 @@ class UserIncomeStatementService
             // Advisory is a % of positive gross profit, gencys-partner only —
             // the same rule the statement and per-user rows use.
             $advisory = ($gencysPartner && $gross > 0) ? round($gross * $advisoryRate, 2) : 0.0;
+            $net = round($gross - $advisory, 2);
+
+            // Commission: the intern's cut of a product's *positive* net profit,
+            // at their per-product rate. Display-only — it does not change net.
+            $commissionRate = $pid !== null ? (float) ($commissionRates[$pid] ?? 0) : 0.0;
+            $commission = $net > 0 ? round($net * $commissionRate, 2) : 0.0;
 
             return [
                 'product_id' => $pid,
@@ -241,7 +253,9 @@ class UserIncomeStatementService
                 'cost_of_sales' => $costOfSales,
                 'gross_profit' => $gross,
                 'advisory' => $advisory,
-                'net_profit' => round($gross - $advisory, 2),
+                'net_profit' => $net,
+                'commission_rate' => $commissionRate,
+                'commission' => $commission,
             ];
         });
 
