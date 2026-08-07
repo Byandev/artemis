@@ -165,11 +165,13 @@ export function GameboardKpiRow({ kpis }: { kpis: GameboardKpis }) {
 
     return (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 2xl:gap-3">
+            {/* Sales for the teams this target included, not the whole
+                workspace — the caption says how many that is. */}
             <KpiCard
                 icon={Wallet}
                 label="Total Sales"
                 value={formatPeso(total_sales)}
-                caption={`Target: ${formatPeso(target_sales)}`}
+                caption={`Target: ${formatPeso(target_sales)} · ${teams_total} ${teams_total === 1 ? 'team' : 'teams'}`}
                 progress={achievement_pct}
                 progressLabel={
                     achievement_pct === null ? undefined : `${achievement_pct}%`
@@ -221,7 +223,7 @@ export function GameboardKpiRow({ kpis }: { kpis: GameboardKpis }) {
                 icon={Rocket}
                 label={exceeded ? 'Above Target' : 'Below Target'}
                 value={formatPeso(Math.abs(above_target))}
-                caption={exceeded ? 'Company exceeded' : 'Left to cover'}
+                caption={exceeded ? 'Ahead of target' : 'Left to cover'}
                 progress={exceeded ? 100 : achievement_pct}
             />
         </div>

@@ -98,13 +98,16 @@ use Modules\SimGateway\Http\Controllers\SmsController;
 */
 Route::get('/public/workspaces/{workspace}/sales-targets', [PublicSalesTargetController::class, 'index'])->name('public-page.sales-targets');
 Route::post('/public/workspaces/{workspace}/sales-targets/verify-password', [PublicSalesTargetController::class, 'verifyPublicPassword'])->name('public-page.sales-targets.verify-password');
-// One endpoint per board section, so each loads and refreshes on its own.
+// The board only fetches what it cannot work out for itself: the day's measured
+// totals, each team's goal and actual, and the leader's sparkline. Percentages,
+// ranking, bands and the leaderboard slice are derived client-side.
 Route::get('/public/workspaces/{workspace}/sales-targets/kpis', [PublicSalesTargetController::class, 'kpis'])->name('public-page.sales-targets.kpis');
-Route::get('/public/workspaces/{workspace}/sales-targets/leader', [PublicSalesTargetController::class, 'leader'])->name('public-page.sales-targets.leader');
 Route::get('/public/workspaces/{workspace}/sales-targets/teams', [PublicSalesTargetController::class, 'teams'])->name('public-page.sales-targets.teams');
-Route::get('/public/workspaces/{workspace}/sales-targets/leaderboard', [PublicSalesTargetController::class, 'leaderboard'])->name('public-page.sales-targets.leaderboard');
-Route::get('/public/workspaces/{workspace}/sales-targets/sales-vs-target', [PublicSalesTargetController::class, 'salesVsTarget'])->name('public-page.sales-targets.sales-vs-target');
-Route::get('/public/workspaces/{workspace}/sales-targets/achievement-distribution', [PublicSalesTargetController::class, 'achievementDistribution'])->name('public-page.sales-targets.achievement-distribution');
+Route::get('/public/workspaces/{workspace}/sales-targets/team-trend', [PublicSalesTargetController::class, 'teamTrend'])->name('public-page.sales-targets.team-trend');
+// Last, and digits only, so the literal section paths above always win.
+Route::get('/public/workspaces/{workspace}/sales-targets/{salesTarget}', [PublicSalesTargetController::class, 'index'])
+    ->whereNumber('salesTarget')
+    ->name('public-page.sales-targets.show');
 
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
