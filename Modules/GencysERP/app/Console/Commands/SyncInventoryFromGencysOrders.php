@@ -48,8 +48,8 @@ class SyncInventoryFromGencysOrders extends Command
         }
 
         // Last 3 full days, excluding today (matches SyncInventoryAverage).
-        $start = now()->subDays(4)->startOfDay();
-        $end = now()->subDays(1)->startOfDay();
+        $start = now()->subDays(3)->startOfDay();
+        $end = now()->startOfDay();
 
         $totalItems = 0;
 
