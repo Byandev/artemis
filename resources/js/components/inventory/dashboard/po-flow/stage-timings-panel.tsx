@@ -40,9 +40,12 @@ export default function StageTimingsPanel({ slug }: { slug: string }) {
               ...(data.internal_total.samples > 0
                   ? [{ step: data.internal_total, separated: true }]
                   : []),
-              ...data.supplier_steps.map((step, i) => ({
+              ...(data.released_to_delivery.samples > 0
+                  ? [{ step: data.released_to_delivery, separated: true }]
+                  : []),
+              ...data.delivery_steps.map((step, i) => ({
                   step,
-                  separated: i === 0,
+                  separated: i === 0 && data.released_to_delivery.samples === 0,
               })),
           ]
         : [];
@@ -56,6 +59,26 @@ export default function StageTimingsPanel({ slug }: { slug: string }) {
         <section className={panelClass}>
             <PanelHead
                 title="How long each step takes"
+                help={
+                    <>
+                        <b>How long each hand-off actually takes</b>, from the
+                        ERP&rsquo;s own status trail. The bar is the typical
+                        order; the tick is the slowest one in ten, so a short
+                        bar with a far-right tick means most orders fly through
+                        and a few get stranded.
+                        <br />
+                        <br />
+                        Supplier rows restart the clock at release, so they
+                        measure the supplier alone. The fill levels show the
+                        shape of a delivery: an order that lands 90% in a week
+                        and dribbles the last 10% over a month reads very
+                        differently from one that arrives whole.
+                        <br />
+                        <br />
+                        Steps that always complete instantly are left out — they
+                        are one click, not a queue.
+                    </>
+                }
                 action={
                     <RefreshButton
                         onClick={refetch}
@@ -66,9 +89,8 @@ export default function StageTimingsPanel({ slug }: { slug: string }) {
                 }
             >
                 Typical time per step, with a marker showing the slowest one in
-                ten. The supplier rows restart the clock at release, so they
-                measure the supplier alone. From {data?.orders_sampled ?? 0}{' '}
-                orders carrying a status trail.
+                ten. The grey rows run door to door from the issue date, so they
+                answer &ldquo;how long until stock actually turns up&rdquo;.
             </PanelHead>
 
             <div className="px-[18px] pb-6">
@@ -105,6 +127,13 @@ export default function StageTimingsPanel({ slug }: { slug: string }) {
                                     style={{ background: KIND_COLOR.supplier }}
                                 />
                                 at the supplier
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <i
+                                    className="h-2.5 w-2.5 rounded-[2px]"
+                                    style={{ background: KIND_COLOR.total }}
+                                />
+                                raised through to delivered
                             </span>
                             <span className="inline-flex items-center gap-1.5">
                                 <i className="block h-3 w-0.5 bg-gray-400 dark:bg-gray-500" />

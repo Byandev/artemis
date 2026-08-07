@@ -1,4 +1,10 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { CircleHelp } from 'lucide-react';
 import type { FlowKind, FlowState } from './types';
 
 /** Locale-aware count; em dash for null/undefined. */
@@ -21,6 +27,9 @@ export const pct = (part: number, whole: number) =>
 export const KIND_COLOR: Record<FlowKind, string> = {
     internal: 'var(--po-internal)',
     supplier: 'var(--po-supplier)',
+    // Spans both legs, so it takes neither hue. Neutral also reads as
+    // "summary", which is what a door-to-door figure is.
+    total: 'var(--po-total)',
 };
 
 /** Severity, kept separate from the two series colours above. */
@@ -58,22 +67,63 @@ export const cellClass = 'px-3 py-2.5 align-middle';
 
 export const numCellClass = `${cellClass} text-right text-xs tabular-nums whitespace-nowrap`;
 
+/**
+ * The longer "what is this and how do I read it" note for a panel, behind a
+ * question mark beside the title.
+ *
+ * Separate from the one-line subtitle on purpose: the subtitle says what the
+ * panel shows, and this says how to act on it. Putting both on the page would
+ * bury the numbers under prose, and leaving the second one out means every new
+ * person has to be told the same thing in person.
+ */
+export function PanelHelp({ children }: { children: React.ReactNode }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    // Explanatory, not actionable — so it takes an aria-label
+                    // rather than visible text, and stays reachable by keyboard
+                    // because Radix opens the tooltip on focus as well as hover.
+                    aria-label="What this panel shows"
+                    className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-gray-300 transition-colors hover:text-gray-500 focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none dark:text-gray-600 dark:hover:text-gray-300"
+                >
+                    <CircleHelp className="h-3.5 w-3.5" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent
+                side="bottom"
+                align="start"
+                className="max-w-[380px] px-3.5 py-2.5 text-[12px] leading-relaxed"
+            >
+                {children}
+            </TooltipContent>
+        </Tooltip>
+    );
+}
+
 /** Panel header, matching the rest of the inventory dashboard. */
 export function PanelHead({
     title,
     children,
+    help,
     action,
 }: {
     title: string;
     children: React.ReactNode;
+    /** The longer explanation, shown behind the question mark. */
+    help?: React.ReactNode;
     action?: React.ReactNode;
 }) {
     return (
         <div className="flex flex-col gap-3 p-[18px] sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {title}
-                </h3>
+                <div className="flex items-center gap-1.5">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {title}
+                    </h3>
+                    {help && <PanelHelp>{help}</PanelHelp>}
+                </div>
                 <p className="mt-0.5 max-w-[76ch] text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
                     {children}
                 </p>

@@ -10,15 +10,15 @@ import {
     pct,
     TableSkeleton,
 } from './shared';
-import type { PipelineData, PipelineStage } from './types';
+import type { PipelineData } from './types';
 
 /**
  * The whole demand pipeline in one bar: what still needs ordering, what is
  * ordered but has not left the building, and what a supplier is holding.
  *
  * Segment width is quantity, so the pile you can see is the pile that exists.
- * The stage holding the most *overdue* stock is ringed rather than the largest
- * one — busiest is not the same as blocked.
+ * Naming a blocked stage is the bottleneck panel's job at the top of the page —
+ * this one just shows the shape.
  */
 export default function PipelinePanel({ slug }: { slug: string }) {
     const { data, loading, error, refetch } = useInventoryStat<PipelineData>(
@@ -28,12 +28,27 @@ export default function PipelinePanel({ slug }: { slug: string }) {
 
     const stages = (data?.stages ?? []).filter((s) => s.units > 0);
     const gap = data?.po_needed ?? 0;
-    const peak = worstStage(stages);
 
     return (
         <section className={panelClass}>
             <PanelHead
                 title="The whole pipeline"
+                help={
+                    <>
+                        <b>Every unit between demand and the shelf.</b> The
+                        dashed block is demand with no purchase order behind it
+                        yet. The amber blocks are orders raised but not yet paid
+                        for — nothing has been committed that would make a
+                        supplier start. The blue block is paid for and on its
+                        way.
+                        <br />
+                        <br />
+                        Width is quantity, so the biggest block is the biggest
+                        pile — though busy is not the same as blocked, and which
+                        step is actually holding things up is the question the
+                        panel at the top of the page answers.
+                    </>
+                }
                 action={
                     <RefreshButton
                         onClick={refetch}
@@ -77,31 +92,10 @@ export default function PipelinePanel({ slug }: { slug: string }) {
                                     label={stage.name}
                                     value={stage.units}
                                     color={KIND_COLOR[stage.kind]}
-                                    dim={peak !== null && stage.name !== peak}
-                                    ringed={stage.name === peak}
                                     title={`${stage.name} — ${num(stage.units)} units across ${stage.orders} order${stage.orders === 1 ? '' : 's'}, oldest ${days(stage.oldest)}`}
                                 />
                             ))}
                         </div>
-
-                        {peak && (
-                            <div className="mt-2 flex gap-0.5">
-                                {gap > 0 && <div style={{ flex: gap }} />}
-                                {stages.map((stage) => (
-                                    <div
-                                        key={stage.name}
-                                        style={{ flex: stage.units }}
-                                        className="flex justify-center"
-                                    >
-                                        {stage.name === peak && (
-                                            <span className="rounded bg-red-600 px-1.5 py-0.5 text-[9px] font-bold tracking-[0.1em] whitespace-nowrap text-white uppercase dark:bg-red-500">
-                                                ▲ Bottleneck
-                                            </span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
 
                         {data.internal_units > 0 && data.supplier_units > 0 && (
                             <div className="mt-1.5 flex gap-0.5 text-[11px]">
@@ -156,15 +150,6 @@ export default function PipelinePanel({ slug }: { slug: string }) {
     );
 }
 
-/** The stage holding the most stock past its target, or null when none is. */
-function worstStage(stages: PipelineStage[]): string | null {
-    const overdue = stages
-        .filter((s) => s.overdue_units > 0)
-        .sort((a, b) => b.overdue_units - a.overdue_units);
-
-    return overdue.length ? overdue[0].name : null;
-}
-
 function Segment({
     flex,
     label,
@@ -172,8 +157,6 @@ function Segment({
     title,
     color,
     hollow = false,
-    dim = false,
-    ringed = false,
 }: {
     flex: number;
     label: string;
@@ -181,22 +164,16 @@ function Segment({
     title: string;
     color?: string;
     hollow?: boolean;
-    dim?: boolean;
-    ringed?: boolean;
 }) {
     return (
         <div
             tabIndex={0}
             title={title}
             style={{ flex, background: hollow ? undefined : color }}
-            className={`relative flex min-w-0 flex-col justify-center rounded px-2.5 transition-[filter,opacity] hover:brightness-110 focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:outline-none dark:focus-visible:ring-gray-100 ${
+            className={`relative flex min-w-0 flex-col justify-center rounded px-2.5 transition-[filter] hover:brightness-110 focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:outline-none dark:focus-visible:ring-gray-100 ${
                 hollow
                     ? 'border border-dashed border-gray-400 dark:border-gray-500'
                     : 'text-white'
-            } ${dim ? 'opacity-40' : ''} ${
-                ringed
-                    ? 'z-10 ring-2 ring-red-600 ring-offset-2 ring-offset-white dark:ring-red-500 dark:ring-offset-zinc-900'
-                    : ''
             }`}
         >
             <span

@@ -184,7 +184,11 @@ class InventoryDashboardStatsController extends Controller
 
         $inner = $this->activeItems($request, $workspace)
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            // When this item was last ordered. Joined once rather than looked up
+            // per row, and only here — the other panels have no use for it.
+            ->leftJoinSub($this->lastOrderedQuery(), 'last_po', 'last_po.inventory_item_id', '=', 'inventory_items.id')
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.three_days_average, products.name as product_name')
+            ->selectRaw('last_po.last_issued_at')
             ->selectRaw(InventoryStockColumns::currentStocks().' as current_stocks')
             ->selectRaw(InventoryStockColumns::remainingAfterFulfillment().' as remaining_after_fulfillment');
 
@@ -204,6 +208,9 @@ class InventoryDashboardStatsController extends Controller
             ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
+            // The most recent order across the whole group: any sibling being
+            // ordered means the group was ordered.
+            ->selectRaw('MAX(sub.last_issued_at) as last_issued_at')
             ->selectRaw("$groupPoNeeded as po_needed")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)')
             // Groups already covered need no purchase order — listing them as
@@ -224,6 +231,12 @@ class InventoryDashboardStatsController extends Controller
                 // items list rounds the same way.
                 'po_needed' => (int) round((float) $row->po_needed),
                 'current_stocks' => $row->current_stocks === null ? null : (int) round((float) $row->current_stocks),
+                // Date-only; the client formats it and works out how long ago.
+                // Null means this group has never been ordered at all, which on
+                // a low-stock row is the loudest thing on the line.
+                'last_issued_at' => $row->last_issued_at
+                    ? CarbonImmutable::parse($row->last_issued_at)->toDateString()
+                    : null,
             ]);
 
         return response()->json([
@@ -670,6 +683,25 @@ class InventoryDashboardStatsController extends Controller
         }
 
         return $averages;
+    }
+
+    /**
+     * The date each item was last ordered on.
+     *
+     * Cancelled orders are excluded — an order that was called off is not a
+     * time you ordered the item. Everything else counts, delivered and closed
+     * included: the question is when you last placed an order, not whether it
+     * is still open.
+     */
+    private function lastOrderedQuery(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('inventory_purchased_order_items as poi')
+            ->join('inventory_purchased_orders as po', 'po.id', '=', 'poi.inventory_purchased_order_id')
+            ->where('po.status', '!=', PurchasedOrder::CANCELLED)
+            ->whereNotNull('po.issue_date')
+            ->groupBy('poi.inventory_item_id')
+            ->select('poi.inventory_item_id')
+            ->selectRaw('MAX(po.issue_date) as last_issued_at');
     }
 
     /**

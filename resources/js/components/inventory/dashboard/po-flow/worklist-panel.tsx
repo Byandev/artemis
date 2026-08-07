@@ -33,6 +33,20 @@ export default function WorklistPanel({ slug }: { slug: string }) {
         <section className={panelClass}>
             <PanelHead
                 title="Clear these first"
+                help={
+                    <>
+                        <b>Purchase orders your own business is holding.</b>{' '}
+                        Ranked by how long they have waited, not by size: a
+                        13,000-unit order raised yesterday is fine, and a
+                        400-unit one raised in May is not.
+                        <br />
+                        <br />
+                        <b>Covers</b> is the impact — how many days of demand
+                        that order is holding up. A small order on a
+                        fast-selling item can matter more than a large one on a
+                        slow mover. Anything past the target is flagged red.
+                    </>
+                }
                 action={
                     <div className="flex items-center gap-3">
                         {!loading &&

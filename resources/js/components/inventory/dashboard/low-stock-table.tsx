@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import RefreshButton from './refresh-button';
 import { useInventoryStat } from './use-inventory-stat';
 
@@ -11,6 +12,12 @@ interface LowStockItem {
     child_count: number;
     po_needed: number;
     current_stocks: number | null;
+    /**
+     * Date-only (Y-m-d) of the most recent purchase order raised for anything
+     * in this group, cancelled orders excluded. Null when the group has never
+     * been ordered.
+     */
+    last_issued_at: string | null;
 }
 
 interface LowStockData {
@@ -92,6 +99,9 @@ export default function LowStockTable({ slug }: { slug: string }) {
                             <tr className="border-b border-black/6 dark:border-white/6">
                                 <th className={headClass}>Item</th>
                                 <th className={`${headClass} text-right!`}>
+                                    Last PO Issued
+                                </th>
+                                <th className={`${headClass} text-right!`}>
                                     PO Needed
                                 </th>
                             </tr>
@@ -122,6 +132,17 @@ export default function LowStockTable({ slug }: { slug: string }) {
                                             </div>
                                         )}
                                     </td>
+                                    {/* An item that needs stock and was last
+                                        ordered months ago is a different problem
+                                        from one ordered yesterday — the reorder
+                                        figure alone cannot tell them apart. */}
+                                    <td
+                                        className={`${cellClass} text-right text-xs whitespace-nowrap tabular-nums`}
+                                    >
+                                        <LastOrdered
+                                            iso={item.last_issued_at}
+                                        />
+                                    </td>
                                     <td
                                         className={`${cellClass} text-right text-xs font-semibold whitespace-nowrap text-gray-900 tabular-nums dark:text-gray-100`}
                                     >
@@ -137,13 +158,54 @@ export default function LowStockTable({ slug }: { slug: string }) {
     );
 }
 
-/** Row placeholders echoing the table's two-column rhythm. */
+/**
+ * When this group was last ordered, with how long ago underneath.
+ *
+ * Never-ordered is called out in red: on a row that already says stock is
+ * needed, "no purchase order has ever been raised" is the loudest fact on the
+ * line. Anything past a fortnight is amber — long enough that the reorder is
+ * unlikely to be already in flight.
+ */
+function LastOrdered({ iso }: { iso: string | null }) {
+    if (!iso) {
+        return (
+            <span className="font-medium text-red-600 dark:text-red-400">
+                Never
+            </span>
+        );
+    }
+
+    // parseISO rather than `new Date` so a date-only string lands on local
+    // midnight instead of being read as UTC and slipping a day.
+    const when = parseISO(iso);
+    const ago = differenceInCalendarDays(new Date(), when);
+
+    return (
+        <>
+            <span
+                className={
+                    ago > 14
+                        ? 'text-amber-600 dark:text-amber-500'
+                        : 'text-gray-500 dark:text-gray-400'
+                }
+            >
+                {format(when, 'd MMM yyyy')}
+            </span>
+            <span className="mt-0.5 block text-[10px] text-gray-400 dark:text-gray-500">
+                {ago === 0 ? 'today' : `${ago}d ago`}
+            </span>
+        </>
+    );
+}
+
+/** Row placeholders echoing the table's three-column rhythm. */
 function TableSkeleton() {
     return (
         <div className="flex flex-col gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3">
                     <Skeleton className="h-8 flex-[4]" />
+                    <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-1" />
                 </div>
             ))}

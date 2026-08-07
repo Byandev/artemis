@@ -23,11 +23,11 @@ interface Props {
  * Ordered as a diagnosis, not a gallery: the verdict first, then the evidence
  * behind it, then the lists someone actually works from.
  *
- * The items list counts every raised purchase order as incoming stock — right,
- * since excluding one would have it reordered twice — so an item can read weeks
- * of cover while its stock sits in an approval queue. Nothing on that page is
- * wrong, but it cannot warn you. These panels are where that risk shows up,
- * measured as time rather than quantity.
+ * The items list's waiting-for-delivery column counts every raised purchase
+ * order — right, since the quantity is genuinely committed — so an item can
+ * read weeks of cover while its stock sits unpaid in an approval queue. Nothing
+ * on that page is wrong, but it cannot warn you. These panels are where that
+ * risk shows up, measured as time rather than quantity.
  */
 export default function InventoryDashboard({ workspace }: Props) {
     const slug = workspace.slug;

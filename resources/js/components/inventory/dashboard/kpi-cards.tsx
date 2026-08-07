@@ -8,6 +8,7 @@ import {
     RotateCcw,
     Truck,
 } from 'lucide-react';
+import { PanelHelp } from './po-flow/shared';
 import { useInventoryStat } from './use-inventory-stat';
 
 interface KpiData {
@@ -27,6 +28,8 @@ interface Tile {
     icon: LucideIcon;
     value: (d: KpiData) => number;
     sub: (d: KpiData) => string;
+    /** What the number means and where it comes from, behind the ? icon. */
+    help: React.ReactNode;
     /** Warning tiles only colour themselves when the number is non-zero. */
     tone?: 'warn' | 'bad';
 }
@@ -45,6 +48,7 @@ const TILES: Tile[] = [
         icon: PackageX,
         value: (d) => d.unfulfilled,
         sub: () => 'units of demand not yet met',
+        help: 'Orders taken that stock has not covered. This is the outcome every other panel on this page is trying to explain — if it falls, something upstream got better.',
         tone: 'bad',
     },
     {
@@ -52,6 +56,7 @@ const TILES: Tile[] = [
         icon: ClipboardList,
         value: (d) => d.not_ordered,
         sub: () => 'units the reorder maths still wants',
+        help: 'What to buy on top of everything already on order. Every open purchase order is credited against this first, at any stage — so nothing here is stock you have already ordered. Counted per item group, the way the items list shows it.',
         tone: 'warn',
     },
     {
@@ -62,6 +67,7 @@ const TILES: Tile[] = [
             d.stuck_overdue > 0
                 ? `${d.stuck_overdue.toLocaleString('en-PH')} past the ${d.sla_days}-day target`
                 : 'never sent to a supplier',
+        help: 'Units on purchase orders that have been raised but not yet paid for — sitting in approval, or approved and queued for payment. The quantity is committed, so it will not be reordered; it just has not started moving.',
         tone: 'warn',
     },
     {
@@ -72,6 +78,7 @@ const TILES: Tile[] = [
             d.shippable_skus > 0
                 ? `on the shelf across ${d.shippable_skus} SKU${d.shippable_skus === 1 ? '' : 's'}`
                 : `nothing sitting past ${d.picking_days} days`,
+        help: 'Stock physically here with an unfulfilled order against it, that has been sittable for more than three days. A normal picking queue is excluded — this is the part the warehouse could have shipped and has not.',
         tone: 'bad',
     },
 ];
@@ -129,9 +136,12 @@ function KpiTile({
         // against the border.
         <div className="rounded-[14px] border border-black/6 bg-white p-[18px] pb-6 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
             <div className="flex items-start justify-between gap-3">
-                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
-                    {tile.label}
-                </p>
+                <div className="flex items-center gap-1.5">
+                    <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                        {tile.label}
+                    </p>
+                    <PanelHelp>{tile.help}</PanelHelp>
+                </div>
                 <div className="rounded-lg bg-stone-100 p-2 text-gray-700 dark:bg-zinc-800 dark:text-white/90">
                     <Icon className="h-5 w-5" />
                 </div>

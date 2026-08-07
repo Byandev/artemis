@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -20,12 +21,12 @@ use Modules\Inventory\Support\InventoryStockColumns;
  * has been there, and which of operations, the supplier or the warehouse is
  * holding it.
  *
- * These exist because the items list can no longer warn you on its own. It
- * counts every raised purchase order as incoming stock — correctly, since
- * excluding one would have it reordered twice — which means an item can read
- * weeks of cover while its stock sits in an approval queue. Nothing there is
- * wrong; the risk is simply invisible from a quantity column. It shows up here
- * instead, as time.
+ * These exist because the items list can no longer warn you on its own. Its
+ * waiting-for-delivery column counts every raised purchase order — correctly,
+ * since the quantity is genuinely committed — which means an item can read
+ * weeks of cover while its stock sits unpaid in an approval queue. Nothing
+ * there is wrong; the risk is simply invisible from a quantity column. It
+ * shows up here instead, as time.
  *
  * Every endpoint is team-scoped: purchase orders through PurchasedOrder's
  * visibleTo (which reaches teams via items.inventoryItem.product.shops), and
@@ -71,15 +72,20 @@ class PurchaseOrderFlowController extends Controller
     private const SUPPLIER_TARGET_DAYS = 14;
 
     /**
-     * Fill levels reported for the supplier leg, as a percentage of the ordered
-     * quantity. The clock starts when the order is released, so these measure
-     * the supplier alone rather than the whole cycle.
+     * Fill levels reported for the delivery curve, as a percentage of the
+     * ordered quantity.
      *
-     * Partial delivery is the norm here, so a single "delivered" figure would
-     * hide the shape: an order that lands 90% in a week and dribbles the last
-     * 10% over a month reads very differently from one that arrives whole.
+     * The clock starts at the issue date — the whole door-to-door cycle, not
+     * the supplier leg alone. Two reasons: it is the number that decides
+     * whether stock arrives before you run out, and it needs only an issue date
+     * and deliveries, so it runs over every order rather than the handful
+     * carrying a release timestamp.
+     *
+     * Partial delivery is the norm, so a single "delivered" figure would hide
+     * the shape: an order that lands 90% in a week and dribbles the last 10%
+     * over a month reads very differently from one that arrives whole.
      */
-    private const SUPPLIER_FILL_LEVELS = [30, 60, 90, 100];
+    private const FILL_LEVELS = [30, 60, 90, 100];
 
     /**
      * The four standing figures, in the order the page reads them: what we owe,
@@ -276,8 +282,9 @@ class PurchaseOrderFlowController extends Controller
 
         $samples = array_fill_keys(array_column($steps, 'label'), []);
         $internalTotal = [];
-        $toFirstDelivery = [];
-        $toFill = array_fill_keys(self::SUPPLIER_FILL_LEVELS, []);
+        $toRelease = [];
+        $toFirst = [];
+        $toFill = array_fill_keys(self::FILL_LEVELS, []);
 
         foreach ($orders as $order) {
             $at = fn (string $label) => $order->statusLogs
@@ -305,6 +312,33 @@ class PurchaseOrderFlowController extends Controller
                 continue;
             }
 
+            $first = $order->items->flatMap->deliveries
+                ->filter(fn ($d) => $d->delivery_date)
+                ->min('delivery_date');
+
+            if ($first) {
+                $toRelease[] = round(max(0, $released->copy()->startOfDay()->diffInDays($first, absolute: false)), 2);
+            }
+        }
+
+        // The delivery curve runs over every visible order, not just the ones
+        // carrying a status trail: it needs an issue date and deliveries, both
+        // of which every order has.
+        $withDeliveries = PurchasedOrder::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('status', '!=', PurchasedOrder::CANCELLED)
+            ->whereNotNull('issue_date')
+            ->visibleTo($request->user(), $workspace)
+            ->with('items.deliveries')
+            ->get();
+
+        foreach ($withDeliveries as $order) {
+            $ordered = (int) $order->items->sum('count');
+
+            if ($ordered <= 0) {
+                continue;
+            }
+
             $deliveries = $order->items->flatMap->deliveries
                 ->filter(fn ($d) => $d->delivery_date)
                 ->sortBy(fn ($d) => $d->delivery_date->getTimestamp());
@@ -313,25 +347,20 @@ class PurchaseOrderFlowController extends Controller
                 continue;
             }
 
-            $toFirstDelivery[] = round(max(0, $released->diffInDays($deliveries->first()->delivery_date, absolute: false)), 2);
+            $issuedOn = $order->issue_date;
+            $toFirst[] = round(max(0, $issuedOn->diffInDays($deliveries->first()->delivery_date, absolute: false)), 2);
 
-            // Walk the deliveries once, stamping each fill level with the date
-            // that carried cumulative receipts past it. Several levels land on
-            // the same date when one delivery jumps past them all.
-            $ordered = (int) $order->items->sum('count');
-
-            if ($ordered <= 0) {
-                continue;
-            }
-
+            // Walk the deliveries once, stamping each level with the date that
+            // carried cumulative receipts past it. Several levels land on the
+            // same date when one delivery jumps past them all.
             $cumulative = 0;
             $stamped = [];
 
             foreach ($deliveries as $delivery) {
                 $cumulative += max(0, (int) $delivery->qty);
-                $elapsed = round(max(0, $released->diffInDays($delivery->delivery_date, absolute: false)), 2);
+                $elapsed = round(max(0, $issuedOn->diffInDays($delivery->delivery_date, absolute: false)), 2);
 
-                foreach (self::SUPPLIER_FILL_LEVELS as $level) {
+                foreach (self::FILL_LEVELS as $level) {
                     if (! isset($stamped[$level]) && $cumulative * 100 >= $ordered * $level) {
                         $stamped[$level] = $elapsed;
                         $toFill[$level][] = $elapsed;
@@ -355,20 +384,21 @@ class PurchaseOrderFlowController extends Controller
             ->filter(fn (array $r) => $r['samples'] > 0 && $r['p90'] > 0)
             ->values();
 
-        // The supplier leg, first arrival then each fill level. Levels nothing
-        // has reached are dropped rather than shown empty — an unreached level
-        // is unknown, not instant.
-        $supplierSteps = collect([$describe('Released → first delivery', 'supplier', $toFirstDelivery)])
-            ->concat(collect(self::SUPPLIER_FILL_LEVELS)
-                ->map(fn (int $level) => $describe("Released → {$level}% delivered", 'supplier', $toFill[$level])))
+        // The delivery curve, measured door to door. Levels nothing has reached
+        // are dropped rather than shown empty — an unreached level is unknown,
+        // not instant.
+        $deliverySteps = collect([$describe('Raised → first delivery', 'total', $toFirst)])
+            ->concat(collect(self::FILL_LEVELS)
+                ->map(fn (int $level) => $describe("Raised → {$level}% delivered", 'total', $toFill[$level])))
             ->filter(fn (array $r) => $r['samples'] > 0)
             ->values();
 
         return response()->json([
             'steps' => $rows,
             'internal_total' => $describe('Total inside', 'internal', $internalTotal),
-            'supplier_steps' => $supplierSteps,
-            'fill_levels' => self::SUPPLIER_FILL_LEVELS,
+            'released_to_delivery' => $describe('Released → first delivery', 'supplier', $toRelease),
+            'delivery_steps' => $deliverySteps,
+            'fill_levels' => self::FILL_LEVELS,
             'clustering' => $this->clustering($orders),
             'orders_sampled' => $orders->count(),
         ]);
@@ -387,7 +417,12 @@ class PurchaseOrderFlowController extends Controller
         $this->authorize('View Inventory Items', $workspace);
 
         $items = $this->visibleItems($request, $workspace)
+            // When stock last arrived and last left. On a row that says stock is
+            // sitting here, those two dates are the difference between "nothing
+            // is coming in" and "nothing is going out".
+            ->leftJoinSub($this->lastMovementQuery(), 'mv', 'mv.inventory_item_id', '=', 'inventory_items.id')
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.unfulfilled_count, inventory_items.three_days_average')
+            ->selectRaw('mv.last_in, mv.last_out')
             ->selectRaw(InventoryStockColumns::currentStocks().' as current_stocks')
             ->with('parent:id,sku')
             ->get();
@@ -406,12 +441,18 @@ class PurchaseOrderFlowController extends Controller
                 'here' => 0,
                 'gone' => 0,
                 'avg' => 0.0,
+                'last_in' => null,
+                'last_out' => null,
             ];
 
             $groups[$key]['unfulfilled'] += $unfulfilled;
             $groups[$key]['here'] += min($stock, $unfulfilled);
             $groups[$key]['gone'] += max(0, $unfulfilled - $stock);
             $groups[$key]['avg'] += (float) $item->three_days_average;
+            // The group's latest movement is the latest across its children:
+            // any sibling receiving or shipping means the group moved.
+            $groups[$key]['last_in'] = max($groups[$key]['last_in'], $item->last_in);
+            $groups[$key]['last_out'] = max($groups[$key]['last_out'], $item->last_out);
             // A parent placeholder carries the group's name once it appears.
             if ($item->is_parent) {
                 $groups[$key]['sku'] = (string) $item->sku;
@@ -431,6 +472,9 @@ class PurchaseOrderFlowController extends Controller
                 // Days of demand the shippable part represents — what separates
                 // a normal picking queue from stock nobody is moving.
                 'here_days' => $g['avg'] > 0 ? round($g['here'] / $g['avg'], 1) : null,
+                // Date-only; the client formats them and works out how long ago.
+                'last_in' => $g['last_in'] ? CarbonImmutable::parse($g['last_in'])->toDateString() : null,
+                'last_out' => $g['last_out'] ? CarbonImmutable::parse($g['last_out'])->toDateString() : null,
             ]);
 
         $sitting = $rows->filter(fn ($r) => $r['here_days'] !== null && $r['here_days'] > self::PICKING_DAYS);
@@ -476,7 +520,7 @@ class PurchaseOrderFlowController extends Controller
                 'question' => 'Are we processing purchase orders on time?',
                 'state' => $internalOverdue > 0 ? 'blocked' : ($internalUnits > $supplierUnits ? 'watch' : 'ok'),
                 'value' => $internalUnits,
-                'unit' => 'units never sent to a supplier',
+                'unit' => 'units pending for approval or payment',
                 'facts' => [
                     ['Past the target', $internalOverdue ?: null, 'units'],
                     ['Longest wait', $internal->max('age'), 'days'],
@@ -491,7 +535,7 @@ class PurchaseOrderFlowController extends Controller
                     ? 'blocked'
                     : ($supplierOverdue > 0 ? 'watch' : 'ok'),
                 'value' => $supplierUnits,
-                'unit' => 'units released and in transit',
+                'unit' => 'paid and waiting for delivery',
                 'facts' => [
                     ['Past the target', $supplierOverdue ?: null, 'units'],
                     ['Delivery target', $quoted, 'days'],
@@ -504,7 +548,7 @@ class PurchaseOrderFlowController extends Controller
                 'question' => 'Is stock sitting here that an unfulfilled order could already take?',
                 'state' => $sittingShare > 0.15 ? 'blocked' : ($sittingShare > 0.05 ? 'watch' : 'ok'),
                 'value' => $split['sitting']['units'],
-                'unit' => 'units on the shelf with an order waiting',
+                'unit' => 'orders with available stocks in warehouse',
                 'facts' => [
                     ['Could ship today', $split['here'] ?: null, 'units'],
                     ['SKUs affected', $split['sitting']['skus'] ?: null, 'SKUs'],
@@ -586,6 +630,23 @@ class PurchaseOrderFlowController extends Controller
             // Fully delivered lines owe nothing, so they are not "open" to anyone.
             ->filter(fn ($line) => $line->balance > 0)
             ->values();
+    }
+
+    /**
+     * The last date each item took stock in and the last it sent stock out,
+     * from the transaction ledger.
+     *
+     * "In" and "out" are the purchase-order movements specifically — receipts
+     * and despatches — not RTS returns or write-offs, which say nothing about
+     * whether the warehouse is working.
+     */
+    private function lastMovementQuery(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('inventory_transactions')
+            ->groupBy('inventory_item_id')
+            ->select('inventory_item_id')
+            ->selectRaw('MAX(CASE WHEN po_qty_in > 0 THEN date END) as last_in')
+            ->selectRaw('MAX(CASE WHEN po_qty_out > 0 THEN date END) as last_out');
     }
 
     /**
