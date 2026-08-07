@@ -60,15 +60,22 @@ const dec = (n: number) =>
     });
 const roasText = (n: number | null) => (n && n > 0 ? n.toFixed(2) : '0');
 
-// Colour ROAS so winners/losers read at a glance (≥2 good, ≥1 ok, else weak).
+/**
+ * Colour ROAS so winners and losers read at a glance. 3.00 is the bar: at or
+ * above it is green, between 2 and 3 is short of it, and below 2 is the problem
+ * — the red deepens as it gets worse so a bad day stands out across a room.
+ *
+ * The deep band pairs white text with the dark fill; red-600 on dark text would
+ * not clear contrast.
+ */
 const roasCell = (n: number | null) =>
     n === null || n === 0
         ? 'text-gray-400'
-        : n >= 2
+        : n >= 3
           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
-          : n >= 1
-            ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-            : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400';
+          : n >= 2
+            ? 'bg-red-200 text-red-900 dark:bg-red-400/25 dark:text-red-100'
+            : 'bg-red-600 text-white dark:bg-red-600 dark:text-white';
 
 export default function PageRoasTrackerIndex({
     workspace,
