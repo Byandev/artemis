@@ -37,9 +37,10 @@ export default function PipelinePanel({ slug }: { slug: string }) {
                     <>
                         <b>Every unit between demand and the shelf.</b> The
                         dashed block is demand with no purchase order behind it
-                        yet. The amber blocks are orders raised but still in
-                        your own approval and payment queues — no supplier has
-                        seen them. The blue block is with a supplier.
+                        yet. The amber blocks are orders raised but not yet paid
+                        for — nothing has been committed that would make a
+                        supplier start. The blue block is paid for and on its
+                        way.
                         <br />
                         <br />
                         Width is quantity, so the biggest block is the biggest

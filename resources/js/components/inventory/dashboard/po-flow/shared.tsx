@@ -27,6 +27,9 @@ export const pct = (part: number, whole: number) =>
 export const KIND_COLOR: Record<FlowKind, string> = {
     internal: 'var(--po-internal)',
     supplier: 'var(--po-supplier)',
+    // Spans both legs, so it takes neither hue. Neutral also reads as
+    // "summary", which is what a door-to-door figure is.
+    total: 'var(--po-total)',
 };
 
 /** Severity, kept separate from the two series colours above. */

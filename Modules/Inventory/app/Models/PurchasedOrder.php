@@ -25,7 +25,11 @@ class PurchasedOrder extends Model
         'delivery_fee',
         'total_amount',
         'status',
+        'approved_at',
+        'to_pay_at',
         'paid_at',
+        'for_purchase_at',
+        'purchased_at',
     ];
 
     protected $casts = [
@@ -34,9 +38,29 @@ class PurchasedOrder extends Model
         'delivery_fee' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'status' => 'integer',
-        // Datetime, not date: the ERP's log carries the time of day, and it is
-        // the log entry that this mirrors. Lists render it as a date.
+        // Datetimes, not dates: the ERP stamps these to the second, and the gap
+        // between two stages is often minutes. Lists render them as dates.
+        'approved_at' => 'datetime',
+        'to_pay_at' => 'datetime',
         'paid_at' => 'datetime',
+        'for_purchase_at' => 'datetime',
+        'purchased_at' => 'datetime',
+    ];
+
+    /**
+     * When the order reached each workflow stage, keyed by the field the ERP
+     * sends it as, in workflow order.
+     *
+     * These are the ERP's own stamps. `paid_at` was previously derived from the
+     * status trail and still falls back to it when the ERP omits the field —
+     * see the public purchase-order sync.
+     */
+    public const STAGE_TIMESTAMPS = [
+        'approved_at',
+        'to_pay_at',
+        'paid_at',
+        'for_purchase_at',
+        'purchased_at',
     ];
 
     /**
@@ -94,23 +118,28 @@ class PurchasedOrder extends Model
     public const AWAITING_DELIVERY_STATUSES = [1, 2, 3, 4, 5, 6];
 
     /**
-     * Open orders the supplier has actually been given — the only ones whose
+     * Open orders that are the supplier's problem now — the only ones whose
      * quantities can honestly be called incoming stock.
      *
-     * The reorder maths counts these and not REQUESTED_STATUSES. Counting an
-     * unapproved, unpaid order as stock on hand is what let items sit at zero
-     * while the dashboard reported weeks of cover: the order existed, so
-     * `po_needed` fell to zero, so nobody reordered, while the PO waited in an
-     * approval queue. See InventoryStockColumns::releasedStocks().
+     * Payment is the commitment point: money has moved, the supplier is on the
+     * hook for the goods, and the later stages are our own paperwork catching
+     * up rather than anything that decides whether the stock arrives.
+     *
+     * Note this does NOT gate the reorder maths — that counts every open order,
+     * because a raised PO is committed quantity and excluding it would trigger
+     * a genuine double-order (see InventoryStockColumns::remainingAfterFulfillment).
+     * The split exists so the flow panels can tell stock that is moving from
+     * stock that is merely committed, and age the latter by how long it has sat.
      */
-    public const RELEASED_STATUSES = [5, 6];
+    public const RELEASED_STATUSES = [4, 5, 6];
 
     /**
-     * Open orders still inside the business — raised, but not yet released to a
-     * supplier. Real intent, and worth showing, but not stock. Exact complement
-     * of RELEASED_STATUSES within AWAITING_DELIVERY_STATUSES.
+     * Open orders still inside the business — raised, but not yet paid for.
+     * Real intent, and worth showing, but not stock: nothing has been committed
+     * that would make a supplier start. Exact complement of RELEASED_STATUSES
+     * within AWAITING_DELIVERY_STATUSES.
      */
-    public const REQUESTED_STATUSES = [1, 2, 3, 4];
+    public const REQUESTED_STATUSES = [1, 2, 3];
 
     public function getStatusLabelAttribute(): string
     {

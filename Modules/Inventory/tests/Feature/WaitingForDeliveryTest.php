@@ -37,18 +37,29 @@ function waitingFor(int $itemId, $owner, $workspace): ?int
 }
 
 /**
- * Units owed on orders still awaiting approval or payment. Read straight off
- * the query rather than the page: the items list deliberately shows only the
- * combined "Waiting for Delivery" figure, and this split feeds the PO-flow
- * dashboard and the daily snapshot instead.
+ * Units owed on orders raised but not yet paid for. Read straight off the query
+ * rather than the page: the items list deliberately shows only the combined
+ * "Waiting for Delivery" figure, and this split feeds the PO-flow dashboard and
+ * the daily snapshot instead.
  */
 function requestedFor(int $itemId, $owner, $workspace): ?int
+{
+    return splitColumn($itemId, InventoryStockColumns::requestedStocks());
+}
+
+/** Its other half: units owed on orders already paid for. */
+function releasedFor(int $itemId): ?int
+{
+    return splitColumn($itemId, InventoryStockColumns::releasedStocks());
+}
+
+function splitColumn(int $itemId, string $sql): ?int
 {
     $value = InventoryItem::query()
         ->whereKey($itemId)
         ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
-        ->selectRaw(InventoryStockColumns::requestedStocks().' as requested_stocks')
-        ->value('requested_stocks');
+        ->selectRaw($sql.' as split_value')
+        ->value('split_value');
 
     return $value === null ? null : (int) $value;
 }

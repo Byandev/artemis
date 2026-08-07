@@ -294,31 +294,31 @@ test('a step that always completes instantly is not reported as a queue', functi
         ->not->toContain('Approve → To Pay');
 });
 
-test('supplier fill levels are stamped by the delivery that crossed each one', function () {
+test('fill levels are stamped by the delivery that crossed each one, from the issue date', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
+    // Issued 1 July. The clock runs door to door from here, not from release —
+    // that is the number that decides whether stock arrives before you run out.
     $order = flowOrder($workspace, $item, 6, '2026-07-01', 100);
-    // Released on the 10th; the supplier clock starts there, not at issue.
-    $order->statusLogs()->create(['status' => 'Purchased', 'logged_at' => '2026-07-10 09:00:00']);
 
     $line = $order->items->first();
-    $line->deliveries()->create(['delivery_date' => '2026-07-14', 'qty' => 40]);  // 40% on day 4
-    $line->deliveries()->create(['delivery_date' => '2026-07-20', 'qty' => 55]);  // 95% on day 10
-    $line->deliveries()->create(['delivery_date' => '2026-08-04', 'qty' => 5]);   // 100% on day 25
+    $line->deliveries()->create(['delivery_date' => '2026-07-14', 'qty' => 40]);  // 40% on day 13
+    $line->deliveries()->create(['delivery_date' => '2026-07-20', 'qty' => 55]);  // 95% on day 19
+    $line->deliveries()->create(['delivery_date' => '2026-08-04', 'qty' => 5]);   // 100% on day 34
 
-    $steps = collect(flow($owner, $workspace, 'stage-timings')['supplier_steps'])
+    $steps = collect(flow($owner, $workspace, 'stage-timings')['delivery_steps'])
         ->keyBy('label');
 
-    // First delivery and 30% are both crossed by the day-4 delivery.
-    expect($steps['Released → first delivery']['p50'])->toEqual(4.0)
-        ->and($steps['Released → 30% delivered']['p50'])->toEqual(4.0)
-        // 60% and 90% both land on the day-10 delivery.
-        ->and($steps['Released → 60% delivered']['p50'])->toEqual(10.0)
-        ->and($steps['Released → 90% delivered']['p50'])->toEqual(10.0)
+    // First delivery and 30% are both crossed by the day-13 delivery.
+    expect($steps['Raised → first delivery']['p50'])->toEqual(13.0)
+        ->and($steps['Raised → 30% delivered']['p50'])->toEqual(13.0)
+        // 60% and 90% both land on the day-19 delivery.
+        ->and($steps['Raised → 60% delivered']['p50'])->toEqual(19.0)
+        ->and($steps['Raised → 90% delivered']['p50'])->toEqual(19.0)
         // The last 5% dribbles in a fortnight later — the shape a single
         // "delivered" figure would hide.
-        ->and($steps['Released → 100% delivered']['p50'])->toEqual(25.0);
+        ->and($steps['Raised → 100% delivered']['p50'])->toEqual(34.0);
 });
 
 test('a fill level nothing has reached is absent rather than reported as zero', function () {
@@ -326,13 +326,82 @@ test('a fill level nothing has reached is absent rather than reported as zero', 
     $item = flowItem($workspace, 'SKU-1');
 
     $order = flowOrder($workspace, $item, 6, '2026-07-01', 100);
-    $order->statusLogs()->create(['status' => 'Purchased', 'logged_at' => '2026-07-02 09:00:00']);
     $order->items->first()->deliveries()->create(['delivery_date' => '2026-07-05', 'qty' => 45]);
 
-    $labels = collect(flow($owner, $workspace, 'stage-timings')['supplier_steps'])
+    $labels = collect(flow($owner, $workspace, 'stage-timings')['delivery_steps'])
         ->pluck('label');
 
-    expect($labels)->toContain('Released → 30% delivered')
-        ->not->toContain('Released → 60% delivered')
-        ->not->toContain('Released → 100% delivered');
+    expect($labels)->toContain('Raised → 30% delivered')
+        ->not->toContain('Raised → 60% delivered')
+        ->not->toContain('Raised → 100% delivered');
+});
+
+test('the delivery curve covers orders with no status trail at all', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = flowItem($workspace, 'SKU-1');
+
+    // No status logs anywhere — the internal steps have nothing to measure, but
+    // the delivery curve only needs an issue date and deliveries.
+    $order = flowOrder($workspace, $item, 6, '2026-07-01', 100);
+    $order->items->first()->deliveries()->create(['delivery_date' => '2026-07-08', 'qty' => 100]);
+
+    $data = flow($owner, $workspace, 'stage-timings');
+
+    expect($data['steps'])->toBeEmpty();
+    expect(collect($data['delivery_steps'])->keyBy('label')['Raised → 100% delivered']['p50'])
+        ->toEqual(7.0);
+});
+
+test('the unfulfilled split reports when stock last arrived and last left', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = flowItem($workspace, 'SKU-1');
+    $item->update(['unfulfilled_count' => 50]);
+
+    $tx = fn (string $date, array $cols) => $item->transactions()->create(array_merge([
+        'workspace_id' => $workspace->id,
+        'date' => $date,
+        'ref_no' => 'TX-'.uniqid(),
+    ], $cols));
+
+    $tx('2026-07-01', ['po_qty_in' => 100, 'remaining_qty' => 100]);
+    $tx('2026-07-10', ['po_qty_out' => 30, 'remaining_qty' => 70]);
+    $tx('2026-07-14', ['po_qty_in' => 40, 'remaining_qty' => 110]);
+    // RTS movements are not purchase-order movements and must not count.
+    $tx('2026-07-20', ['rts_goods_out' => 5, 'remaining_qty' => 105]);
+    $tx('2026-07-25', ['rts_goods_in' => 5, 'remaining_qty' => 110]);
+
+    $row = collect(flow($owner, $workspace, 'unfulfilled-split')['items'])
+        ->firstWhere('item', 'SKU-1');
+
+    expect($row['last_in'])->toBe('2026-07-14')
+        ->and($row['last_out'])->toBe('2026-07-10');
+});
+
+test('movement dates roll up to the latest across a group', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = flowItem($workspace, 'PARENT');
+    $parent->update(['is_parent' => true]);
+
+    $childA = flowItem($workspace, 'CHILD-A');
+    $childB = flowItem($workspace, 'CHILD-B');
+    $childA->update(['parent_id' => $parent->id, 'unfulfilled_count' => 20]);
+    $childB->update(['parent_id' => $parent->id, 'unfulfilled_count' => 20]);
+
+    $childA->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => '2026-07-05',
+        'ref_no' => 'TX-A', 'po_qty_out' => 10, 'remaining_qty' => 90,
+    ]);
+    // The newer despatch is on the sibling — the group moved on that date.
+    $childB->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => '2026-07-22',
+        'ref_no' => 'TX-B', 'po_qty_out' => 10, 'remaining_qty' => 90,
+    ]);
+
+    $row = collect(flow($owner, $workspace, 'unfulfilled-split')['items'])
+        ->firstWhere('item', 'PARENT');
+
+    expect($row['last_out'])->toBe('2026-07-22')
+        // Nothing was ever received, so there is no arrival date to report.
+        ->and($row['last_in'])->toBeNull();
 });
