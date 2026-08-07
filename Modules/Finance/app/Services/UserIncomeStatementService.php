@@ -134,9 +134,9 @@ class UserIncomeStatementService
      * order maps to a single product (its unit codes all point to one); orders
      * whose items resolve to no product fall into a "Discrepancy" row (kept last).
      *
-     * Cost of sales here is order-derived (shipping + COD + VAT) plus the user's
-     * ad spend for the product. COGS is excluded (it arrives as a transaction);
-     * other transactions still stay at the user level.
+     * Cost of sales here is order-derived (COGS + shipping + COD + VAT) plus the
+     * user's ad spend for the product. Other transactions still stay at the user
+     * level.
      *
      * Ad spend comes from the user's Ad Spent transactions: each is split across
      * products (a product-share) and charged to users (a charge-to share), so the
@@ -144,7 +144,7 @@ class UserIncomeStatementService
      * user's charge-to fraction of the whole transaction. It therefore sums back
      * to the user's ad spend on the P&L.
      *
-     * @return list<array{product_id:?int, product:string, orders:int, delivered:float, shipping:float, cod_fee:float, vat:float, adspent:float, cost_of_sales:float, gross_profit:float, advisory:float, net_profit:float}>
+     * @return list<array{product_id:?int, product:string, orders:int, delivered:float, cogs:float, shipping:float, cod_fee:float, vat:float, adspent:float, cost_of_sales:float, gross_profit:float, advisory:float, net_profit:float}>
      */
     private function userProductRows(IncomeStatement $statement, User $user): array
     {
@@ -183,11 +183,11 @@ class UserIncomeStatementService
                 ->whereIn('intern_brands_name', $cells)
                 ->whereNotIn('platform', ['Shopee', 'TikTok'])
                 ->whereNotLike('page', '%pikutin%')
-                ->selectRaw('COALESCE(price_final, 0) as revenue')
+                ->selectRaw('COALESCE(price_final, 0) as revenue, COALESCE(total_cog, 0) as cogs')
                 ->selectSub($this->orderProductSubquery(), 'product_id');
 
             $rows = DB::query()->fromSub($delivered, 't')
-                ->selectRaw('product_id, COUNT(*) as orders, COALESCE(SUM(revenue), 0) as revenue')
+                ->selectRaw('product_id, COUNT(*) as orders, COALESCE(SUM(revenue), 0) as revenue, COALESCE(SUM(cogs), 0) as cogs')
                 ->groupBy('product_id')
                 ->get();
         }
@@ -203,7 +203,7 @@ class UserIncomeStatementService
         $orderByKey = [];
         foreach ($rows as $r) {
             $key = $r->product_id === null ? '' : (string) (int) $r->product_id;
-            $orderByKey[$key] = ['orders' => (int) $r->orders, 'revenue' => round((float) $r->revenue, 2)];
+            $orderByKey[$key] = ['orders' => (int) $r->orders, 'revenue' => round((float) $r->revenue, 2), 'cogs' => round((float) $r->cogs, 2)];
         }
 
         $keys = collect(array_keys($orderByKey))->merge(array_keys($adSpendByPid))->unique();
@@ -214,13 +214,14 @@ class UserIncomeStatementService
 
         $mapped = $keys->map(function ($key) use ($orderByKey, $adSpendByPid, $shipping, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner) {
             $pid = $key === '' ? null : (int) $key;
-            $order = $orderByKey[$key] ?? ['orders' => 0, 'revenue' => 0.0];
+            $order = $orderByKey[$key] ?? ['orders' => 0, 'revenue' => 0.0, 'cogs' => 0.0];
             $revenue = round((float) $order['revenue'], 2);
+            $cogs = round((float) $order['cogs'], 2);
             $ship = round((float) $shipping->get($pid, 0), 2);
             $cod = round($revenue * $codRate, 2);
             $vat = round($cod * $vatRate, 2);
             $adspent = round((float) ($adSpendByPid[$key] ?? 0), 2);
-            $costOfSales = round($ship + $cod + $vat + $adspent, 2);
+            $costOfSales = round($cogs + $ship + $cod + $vat + $adspent, 2);
             $gross = round($revenue - $costOfSales, 2);
 
             // Advisory is a % of positive gross profit, gencys-partner only —
@@ -232,6 +233,7 @@ class UserIncomeStatementService
                 'product' => $pid !== null ? ($names[$pid] ?? 'Unknown') : 'Discrepancy',
                 'orders' => (int) $order['orders'],
                 'delivered' => $revenue,
+                'cogs' => $cogs,
                 'shipping' => $ship,
                 'cod_fee' => $cod,
                 'vat' => $vat,

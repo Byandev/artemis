@@ -29,6 +29,7 @@ interface ProductRow {
     product: string;
     orders: number;
     delivered: number;
+    cogs: number;
     shipping: number;
     cod_fee: number;
     vat: number;
@@ -49,6 +50,7 @@ const PRODUCT_LINES: {
 }[] = [
     { key: 'orders', label: 'Orders', money: false },
     { key: 'delivered', label: 'Delivered', money: true, strong: true },
+    { key: 'cogs', label: 'COGS', money: true },
     { key: 'shipping', label: 'Shipping Fee', money: true },
     { key: 'cod_fee', label: 'COD Fee', money: true },
     { key: 'vat', label: 'VAT', money: true },
@@ -205,14 +207,19 @@ export default function IncomeStatementShow({
             : 0
         : (statement.advisory_share ?? 0);
 
+    // On a per-user breakdown (a scoped view) the advisory share is hidden for
+    // now — it's shown per product instead — so Net Profit here is Gross − OPEX.
+    const hideAdvisory = !!scope;
+    const shownAdvisory = hideAdvisory ? 0 : advisoryShare;
+
     const opexTotal = isPreview
         ? sumIncluded(opexRows)
         : (statement.gross_profit ?? 0) -
           (statement.net_profit ?? 0) -
           advisoryShare;
     const netProfit = isPreview
-        ? grossProfit - opexTotal - advisoryShare
-        : (statement.net_profit ?? 0);
+        ? grossProfit - opexTotal - shownAdvisory
+        : (statement.net_profit ?? 0) + (hideAdvisory ? advisoryShare : 0);
 
     const d = statement.delivered || 0;
     const netMargin = d > 0 ? (netProfit / d) * 100 : 0;
@@ -225,12 +232,12 @@ export default function IncomeStatementShow({
             amount: costOfSalesTotal,
             color: FLOW.cost_of_sales,
         },
-        ...(statement.gencys_partner
+        ...(statement.gencys_partner && !hideAdvisory
             ? [
                   {
                       key: 'adv',
                       label: 'Advisory',
-                      amount: advisoryShare,
+                      amount: shownAdvisory,
                       color: FLOW.advisory,
                   },
               ]
@@ -561,17 +568,21 @@ export default function IncomeStatementShow({
                     <div className="divide-y divide-black/5 dark:divide-white/5">
                         {costOfSalesRows.map(renderRow)}
                     </div>
-                    <div className="flex items-center justify-between border-y border-black/6 bg-stone-100 px-5 py-3 dark:border-white/6 dark:bg-zinc-800/60">
-                        <span className="text-[12px] font-semibold tracking-wide text-gray-700 uppercase dark:text-gray-200">
-                            = Gross Profit
-                        </span>
-                        <span className="text-[15px] font-semibold text-gray-800 tabular-nums dark:text-gray-100">
-                            {fmt(grossProfit)}
-                        </span>
-                    </div>
+                    {/* Gross Profit total — hidden on the per-user breakdown for now. */}
+                    {!hideAdvisory && (
+                        <div className="flex items-center justify-between border-y border-black/6 bg-stone-100 px-5 py-3 dark:border-white/6 dark:bg-zinc-800/60">
+                            <span className="text-[12px] font-semibold tracking-wide text-gray-700 uppercase dark:text-gray-200">
+                                = Gross Profit
+                            </span>
+                            <span className="text-[15px] font-semibold text-gray-800 tabular-nums dark:text-gray-100">
+                                {fmt(grossProfit)}
+                            </span>
+                        </div>
+                    )}
 
-                    {/* Advisory share (gencys partners) — deducted from gross profit */}
-                    {statement.gencys_partner && (
+                    {/* Advisory share (gencys partners) — deducted from gross profit.
+                        Hidden on the per-user breakdown (shown per product there). */}
+                    {statement.gencys_partner && !hideAdvisory && (
                         <div className="flex items-center justify-between px-5 py-2.5">
                             <div className="flex items-center gap-2">
                                 <span className="text-[13px] text-gray-800 dark:text-gray-100">
@@ -735,10 +746,10 @@ export default function IncomeStatementShow({
                             </table>
                         </div>
                         <p className="border-t border-black/6 px-5 py-3 text-[10px] text-gray-400 dark:border-white/6">
-                            Cost of Sales here is order-derived (Shipping + COD
-                            + VAT) plus the intern&apos;s Ad Spent for the
-                            product. COGS and other transactions stay at the
-                            intern level below.
+                            Cost of Sales here is order-derived (COGS + Shipping
+                            + COD + VAT) plus the intern&apos;s Ad Spent for the
+                            product. Other transactions stay at the intern level
+                            below.
                         </p>
                     </div>
                 )}
