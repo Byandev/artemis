@@ -151,6 +151,14 @@ export interface UnfulfilledRow {
     /** Nothing behind it — this one is waiting on supply. */
     gone: number;
     here_days: number | null;
+    /**
+     * Date-only (Y-m-d) of the last purchase-order receipt and the last
+     * despatch, from the transaction ledger. Null when the ledger holds no such
+     * movement — which for a busy item usually means the ledger does not reach
+     * back far enough, not that the item never moved.
+     */
+    last_in: string | null;
+    last_out: string | null;
 }
 
 export interface UnfulfilledSplitData {

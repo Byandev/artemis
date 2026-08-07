@@ -351,3 +351,57 @@ test('the delivery curve covers orders with no status trail at all', function ()
     expect(collect($data['delivery_steps'])->keyBy('label')['Raised → 100% delivered']['p50'])
         ->toEqual(7.0);
 });
+
+test('the unfulfilled split reports when stock last arrived and last left', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = flowItem($workspace, 'SKU-1');
+    $item->update(['unfulfilled_count' => 50]);
+
+    $tx = fn (string $date, array $cols) => $item->transactions()->create(array_merge([
+        'workspace_id' => $workspace->id,
+        'date' => $date,
+        'ref_no' => 'TX-'.uniqid(),
+    ], $cols));
+
+    $tx('2026-07-01', ['po_qty_in' => 100, 'remaining_qty' => 100]);
+    $tx('2026-07-10', ['po_qty_out' => 30, 'remaining_qty' => 70]);
+    $tx('2026-07-14', ['po_qty_in' => 40, 'remaining_qty' => 110]);
+    // RTS movements are not purchase-order movements and must not count.
+    $tx('2026-07-20', ['rts_goods_out' => 5, 'remaining_qty' => 105]);
+    $tx('2026-07-25', ['rts_goods_in' => 5, 'remaining_qty' => 110]);
+
+    $row = collect(flow($owner, $workspace, 'unfulfilled-split')['items'])
+        ->firstWhere('item', 'SKU-1');
+
+    expect($row['last_in'])->toBe('2026-07-14')
+        ->and($row['last_out'])->toBe('2026-07-10');
+});
+
+test('movement dates roll up to the latest across a group', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = flowItem($workspace, 'PARENT');
+    $parent->update(['is_parent' => true]);
+
+    $childA = flowItem($workspace, 'CHILD-A');
+    $childB = flowItem($workspace, 'CHILD-B');
+    $childA->update(['parent_id' => $parent->id, 'unfulfilled_count' => 20]);
+    $childB->update(['parent_id' => $parent->id, 'unfulfilled_count' => 20]);
+
+    $childA->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => '2026-07-05',
+        'ref_no' => 'TX-A', 'po_qty_out' => 10, 'remaining_qty' => 90,
+    ]);
+    // The newer despatch is on the sibling — the group moved on that date.
+    $childB->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => '2026-07-22',
+        'ref_no' => 'TX-B', 'po_qty_out' => 10, 'remaining_qty' => 90,
+    ]);
+
+    $row = collect(flow($owner, $workspace, 'unfulfilled-split')['items'])
+        ->firstWhere('item', 'PARENT');
+
+    expect($row['last_out'])->toBe('2026-07-22')
+        // Nothing was ever received, so there is no arrival date to report.
+        ->and($row['last_in'])->toBeNull();
+});

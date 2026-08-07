@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -416,7 +417,12 @@ class PurchaseOrderFlowController extends Controller
         $this->authorize('View Inventory Items', $workspace);
 
         $items = $this->visibleItems($request, $workspace)
+            // When stock last arrived and last left. On a row that says stock is
+            // sitting here, those two dates are the difference between "nothing
+            // is coming in" and "nothing is going out".
+            ->leftJoinSub($this->lastMovementQuery(), 'mv', 'mv.inventory_item_id', '=', 'inventory_items.id')
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.unfulfilled_count, inventory_items.three_days_average')
+            ->selectRaw('mv.last_in, mv.last_out')
             ->selectRaw(InventoryStockColumns::currentStocks().' as current_stocks')
             ->with('parent:id,sku')
             ->get();
@@ -435,12 +441,18 @@ class PurchaseOrderFlowController extends Controller
                 'here' => 0,
                 'gone' => 0,
                 'avg' => 0.0,
+                'last_in' => null,
+                'last_out' => null,
             ];
 
             $groups[$key]['unfulfilled'] += $unfulfilled;
             $groups[$key]['here'] += min($stock, $unfulfilled);
             $groups[$key]['gone'] += max(0, $unfulfilled - $stock);
             $groups[$key]['avg'] += (float) $item->three_days_average;
+            // The group's latest movement is the latest across its children:
+            // any sibling receiving or shipping means the group moved.
+            $groups[$key]['last_in'] = max($groups[$key]['last_in'], $item->last_in);
+            $groups[$key]['last_out'] = max($groups[$key]['last_out'], $item->last_out);
             // A parent placeholder carries the group's name once it appears.
             if ($item->is_parent) {
                 $groups[$key]['sku'] = (string) $item->sku;
@@ -460,6 +472,9 @@ class PurchaseOrderFlowController extends Controller
                 // Days of demand the shippable part represents — what separates
                 // a normal picking queue from stock nobody is moving.
                 'here_days' => $g['avg'] > 0 ? round($g['here'] / $g['avg'], 1) : null,
+                // Date-only; the client formats them and works out how long ago.
+                'last_in' => $g['last_in'] ? CarbonImmutable::parse($g['last_in'])->toDateString() : null,
+                'last_out' => $g['last_out'] ? CarbonImmutable::parse($g['last_out'])->toDateString() : null,
             ]);
 
         $sitting = $rows->filter(fn ($r) => $r['here_days'] !== null && $r['here_days'] > self::PICKING_DAYS);
@@ -615,6 +630,23 @@ class PurchaseOrderFlowController extends Controller
             // Fully delivered lines owe nothing, so they are not "open" to anyone.
             ->filter(fn ($line) => $line->balance > 0)
             ->values();
+    }
+
+    /**
+     * The last date each item took stock in and the last it sent stock out,
+     * from the transaction ledger.
+     *
+     * "In" and "out" are the purchase-order movements specifically — receipts
+     * and despatches — not RTS returns or write-offs, which say nothing about
+     * whether the warehouse is working.
+     */
+    private function lastMovementQuery(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('inventory_transactions')
+            ->groupBy('inventory_item_id')
+            ->select('inventory_item_id')
+            ->selectRaw('MAX(CASE WHEN po_qty_in > 0 THEN date END) as last_in')
+            ->selectRaw('MAX(CASE WHEN po_qty_out > 0 THEN date END) as last_out');
     }
 
     /**

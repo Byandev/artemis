@@ -1,3 +1,4 @@
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import RefreshButton from '../refresh-button';
 import { useInventoryStat } from '../use-inventory-stat';
 import {
@@ -23,6 +24,46 @@ import type { UnfulfilledSplitData } from './types';
  * the same reason the pipeline's "not ordered" segment is, and because a second
  * saturated hue next to green fails colour-blind separation.
  */
+/** A movement past this many days is worth noticing on a row holding stock. */
+const STALE_DAYS = 7;
+
+/**
+ * The date of a ledger movement, with how long ago underneath.
+ *
+ * `stale` marks the despatch column amber on rows that have shippable stock:
+ * an item sitting on stock that last went out a week ago is the warehouse
+ * signal this panel exists to surface. The receipt column is never flagged —
+ * not receiving is a supply story, told elsewhere.
+ */
+function MovementDate({ iso, stale }: { iso: string | null; stale?: boolean }) {
+    if (!iso) {
+        return <span className="text-gray-300 dark:text-gray-600">—</span>;
+    }
+
+    // parseISO rather than `new Date` so a date-only string lands on local
+    // midnight instead of being read as UTC and slipping a day.
+    const when = parseISO(iso);
+    const ago = differenceInCalendarDays(new Date(), when);
+    const flag = stale && ago > STALE_DAYS;
+
+    return (
+        <>
+            <span
+                className={
+                    flag
+                        ? 'text-amber-600 dark:text-amber-500'
+                        : 'text-gray-500 dark:text-gray-400'
+                }
+            >
+                {format(when, 'd MMM')}
+            </span>
+            <span className="mt-0.5 block text-[10px] text-gray-400 dark:text-gray-500">
+                {ago === 0 ? 'today' : `${ago}d ago`}
+            </span>
+        </>
+    );
+}
+
 export default function UnfulfilledSplitPanel({ slug }: { slug: string }) {
     const { data, loading, error, refetch } =
         useInventoryStat<UnfulfilledSplitData>(
@@ -63,7 +104,8 @@ export default function UnfulfilledSplitPanel({ slug }: { slug: string }) {
                 }
             >
                 Unmet demand split by whether stock is on the shelf. Solid means
-                it could ship today; hatched means there is nothing to give.
+                it could ship today; hatched means there is nothing to give. The
+                two dates show when stock last arrived and last went out.
             </PanelHead>
 
             {loading ? (
@@ -152,6 +194,12 @@ export default function UnfulfilledSplitPanel({ slug }: { slug: string }) {
                                         Stock here / none
                                     </th>
                                     <th className={`${headClass} text-right!`}>
+                                        Last In
+                                    </th>
+                                    <th className={`${headClass} text-right!`}>
+                                        Last Out
+                                    </th>
+                                    <th className={`${headClass} text-right!`}>
                                         Can ship
                                     </th>
                                     <th className={`${headClass} text-right!`}>
@@ -202,6 +250,20 @@ export default function UnfulfilledSplitPanel({ slug }: { slug: string }) {
                                                     />
                                                 )}
                                             </div>
+                                        </td>
+                                        {/* Stock arriving and stock leaving. On
+                                            a row with shippable stock, an old
+                                            "out" date is the warehouse sitting
+                                            on it; an old "in" is nothing turning
+                                            up. */}
+                                        <td className={`${numCellClass}`}>
+                                            <MovementDate iso={row.last_in} />
+                                        </td>
+                                        <td className={`${numCellClass}`}>
+                                            <MovementDate
+                                                iso={row.last_out}
+                                                stale={row.here > 0}
+                                            />
                                         </td>
                                         <td
                                             className={`${numCellClass} ${
