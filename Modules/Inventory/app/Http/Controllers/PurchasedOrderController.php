@@ -33,6 +33,7 @@ class PurchasedOrderController extends Controller
                         $q->where('delivery_no', 'like', "%{$value}%")
                             ->orWhere('cust_po_no', 'like', "%{$value}%")
                             ->orWhere('control_no', 'like', "%{$value}%")
+                            ->orWhere('supplier', 'like', "%{$value}%")
                             // Match orders containing an inventory item with this SKU.
                             ->orWhereHas('items.inventoryItem', fn ($item) => $item->where('sku', 'like', "%{$value}%"));
                     });
@@ -44,6 +45,16 @@ class PurchasedOrderController extends Controller
                 AllowedFilter::callback('end_date', function ($query, $value) {
                     $query->whereDate('issue_date', '<=', $value);
                 }),
+                AllowedFilter::exact('supplier'),
+                // Separate from start_date/end_date, which window the issue
+                // date: "paid in July" and "raised in July" are different
+                // questions and finance asks the first one.
+                AllowedFilter::callback('paid_from', function ($query, $value) {
+                    $query->whereDate('paid_at', '>=', $value);
+                }),
+                AllowedFilter::callback('paid_to', function ($query, $value) {
+                    $query->whereDate('paid_at', '<=', $value);
+                }),
             ])
             ->allowedSorts([
                 'issue_date',
@@ -51,9 +62,11 @@ class PurchasedOrderController extends Controller
                 'expected_delivery_date',
                 'cust_po_no',
                 'control_no',
+                'supplier',
                 'delivery_fee',
                 'total_amount',
                 'status',
+                'paid_at',
                 'created_at',
             ])
             ->defaultSort('-issue_date');

@@ -12,6 +12,247 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.27.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Inventory Dashboard — Built-in Explanations',
+                items: [
+                    'Every panel and headline figure on the Inventory Dashboard now carries a question mark that explains how to read it — what the number counts, where it comes from, and what would make it go down — so nobody has to be walked through the page by someone who already knows it',
+                    'The three bottleneck cards spell out exactly what puts each of them in the red: Operations the moment any stock breaches the week-long target, the Supplier once more than 40% of released stock is overdue, the Warehouse above 15% of unmet demand — the verdict is checkable rather than something to take on faith',
+                    'The notes are candid about what the figures can’t tell you — the supplier clock currently runs from when an order was raised rather than released, so it reads harsh on the supplier, and a high warehouse figure can mean the unfulfilled counts are stale rather than that nothing is being picked, worth spot-checking before anyone gets blamed',
+                    'Each explanation opens on keyboard focus as well as hover, so it’s reachable without a mouse',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Supplier delivery times are now counted in whole calendar days — an order released at nine in the morning and delivered four days later was being reported as 3.6 days, because the release carries a time of day while the delivery only carries a date',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.26.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Inventory Dashboard — Rebuilt Around Purchase Order Flow',
+                items: [
+                    'The dashboard now opens with a verdict instead of a chart — it names whichever of Operations, the Supplier or the Warehouse is holding the most stock right now and says why in a sentence, so the first thing you read is the thing to act on',
+                    'The four headline figures have changed to ones you can do something about — units of demand not yet met, units the reorder maths still wants ordered, units stuck inside the business that were never sent to a supplier, and units on the shelf that a waiting order could ship today; the old item and total-stock counts were true but never changed anyone’s mind',
+                    'Underneath, the whole pipeline shows where every open unit is sitting stage by stage, an aging grid shows how stale each pile has got (0–7 days through to 60+), and a timings panel shows how long each step usually takes',
+                    'Two worklists replace the old open-orders table — “Clear these first” for orders held inside the business, longest wait at the top, and “Chase these deliveries” for orders a supplier already has, split into nothing arrived, part delivered, and past the delivery target',
+                    'The unfulfilled total is now broken down by whether the stock is physically here, so the part the warehouse could ship today is separated from the part genuinely waiting on supply',
+                ],
+            },
+            {
+                title: 'Inventory — Ordered vs Actually Moving',
+                items: [
+                    'Stock still owed on purchase orders is now split by whether the order has been paid for — paid means the supplier is on the hook and the goods are genuinely on their way, unpaid means the quantity is committed but nothing has started moving',
+                    'The waiting-for-delivery breakdown says which is which, so an item showing weeks of cover on the back of an order that has sat unpaid for a fortnight is visible rather than buried in a single total',
+                    'PO Needed is unchanged by this: every raised order still counts against what to buy, because an order that exists is committed quantity and ignoring it would have you order the same stock twice — an order stuck in a queue is a flow problem, and the dashboard panels are where it now shows up, measured as time',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Order Timings',
+                items: [
+                    'A new timings panel reads the ERP’s own status trail to show how long each step of a purchase order really takes — raised to approved, approved to paid, paid through to released — with the typical time and the slowest tenth side by side, and steps that are always instant left out rather than drawn as empty bars',
+                    'The supplier’s leg is measured from the moment an order is released, through first delivery and on to 30, 60, 90 and 100% of the ordered quantity landing — partial delivery is the norm, and one “delivered” figure would hide an order that arrives 90% in a week then dribbles the rest out over a month',
+                    'Paid dates can now be rebuilt from the ERP trail, so orders that synced before payment dates were tracked can be filled in rather than left permanently blank',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The Inventory Items list is around four times quicker to load and sort — the stock figures are worked out in a single pass now instead of re-deriving the same handful of lookups once per column',
+                    'The Delivery Lead Time table has moved off the dashboard and onto the Purchase Orders page, alongside the orders it is derived from — it is the reference you consult when setting an item’s lead time, not a daily signal',
+                    'The items in / out chart now sits below a Background divider at the foot of the dashboard: it reports what already happened, which is context rather than something to act on',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.25.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Sales & Marketing — Sales Targets (New)',
+                items: [
+                    'New Sales Targets tab on the Sales & Marketing dashboard — a dated target holding one amount per team, so a day has a single number to hit and every team can see its share of it',
+                    'Tick the teams that are on a target and set each one’s sales target and ad budget; a team can be on the target for its budget alone, with no sales figure to hit, and typing in either box ticks it for you',
+                    'Each target also carries a Target ROAS — the bar teams are judged against on the board; leave it blank and 5.00 is used',
+                    'A date holds at most one target — if you pick one that’s already taken you’re told on the field rather than getting an error page',
+                    'Anyone who can see the dashboard can read the targets; creating, editing and deleting them needs the same permission as editing teams',
+                ],
+            },
+            {
+                title: 'Sales Targets — Public Gameboard (New)',
+                items: [
+                    'New public Sales Targets board behind the same password as the public RMO page and leaderboard, scored on today’s target — or the most recent one if today has none — with six headline tiles: total sales against target, overall achievement, ads budget, ROAS, qualified teams, and how far above or below the day has landed',
+                    'Sales are counted straight from confirmed Pancake orders on the target’s date, so the board reads the same figure as Total Sales does elsewhere; the headline total covers everything the workspace confirmed that day, whoever it came through',
+                    'ROAS here is measured against the ad budget you set rather than money already spent — it answers what the budget you handed out returned',
+                    'Narrow the whole board to a single team from the header, and Refresh pulls fresh numbers in place instead of reloading the page',
+                    'Each panel loads, fails and retries on its own, so one slow or broken figure never blanks the rest of the board',
+                ],
+            },
+            {
+                title: 'Sales Targets — Leader, Teams & Standings (New)',
+                items: [
+                    'A Current Leader banner names the team out front — highest achievement against its own target — with the two qualification criteria ticked or not and a sparkline of its last fortnight of sales',
+                    'Team Performance cards for every team, best first, each showing target, sales, ad budget, achievement, ROAS and the gap either way, with a bar that runs past 100% so beating the target still shows as headroom',
+                    'Teams that clear both the target and the ROAS bar are marked Qualified; anything over 100% of target picks up a Target Breaker flag, so a team can be one without the other',
+                    'A Team Leaderboard table beneath ranks every team across all nine figures at once, showing the top five until you ask for all of them',
+                    'Beside it, Sales vs Target puts each team’s sales next to its target as a pair of bars, and an Achievement Distribution donut counts how many teams sit in each band — teams with only an ad budget are reported separately rather than counted as failing',
+                ],
+            },
+            {
+                title: 'Sales Targets — Present on TV (New)',
+                items: [
+                    'A Present on TV button turns the board into a full-screen rotation for a wall display: an overview slide, then every team in turn with its medal, rank, six figures and achievement bar',
+                    'Choose 5, 10, 15 or 30 seconds a slide, pause it, step back and forward, or jump straight to any slide from the dots along the bottom — a bar across the top counts down to the next turn',
+                    'Arrow keys move between slides, space pauses and Escape leaves, so a presentation remote drives it without a keyboard in reach',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'A Sales Targets link now sits with the other public pages in the sidebar for workspaces with the Sales & Marketing dashboard turned on',
+                    'The board reads in both light and dark, and everything on it steps up a size on a large screen so a wall-mounted TV isn’t showing laptop-sized type',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.24.0',
+        date: '2026-08-06',
+        sections: [
+            {
+                title: 'Inventory — Delivery Lead Time (New)',
+                items: [
+                    'New Delivery Lead Time table on the Inventory Dashboard — for each item, the average number of days from a purchase order being issued to 25%, 50%, 75% and finally all of the ordered quantity landing, so you can see not just how long a supplier takes overall but how much of it arrives early',
+                    'Every figure carries the number of orders it was averaged from — a partly delivered line counts towards the levels it has already passed and not the ones it hasn’t, so the samples thin out towards the right and a solid average is easy to tell from a lone data point',
+                    'Only orders issued in the last 6 months are counted, so the figures track how a supplier is performing now; cancelled orders are left out entirely rather than held against them as deliveries that were never going to arrive',
+                    'A toggle rolls child SKUs up into their parent or breaks them back out, the same grouping the Inventory Items list uses',
+                ],
+            },
+            {
+                title: 'Inventory — Supplier & Paid Dates',
+                items: [
+                    'Purchase orders now carry their supplier and the date they were paid, both coming across from the ERP — the paid date is taken from the ERP’s own audit trail, using the first time the order was marked Paid, so a part-payment still counts as the day money moved',
+                    'New Supplier and Paid Date columns on the Purchase Orders list, both sortable, and the search box now matches on supplier alongside delivery number, PO number, control number and SKU',
+                    'Both are in the Excel export too, and the PO Date column has dropped its “(Paid)” note now that the paid date has a column of its own to be sorted by',
+                    'The dashboard’s Open Purchase Orders table gained a Paid column sitting next to Issued, so the gap between raising an order and settling it reads at a glance',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Order History',
+                items: [
+                    'Opening a purchase order from the dashboard now shows its supplier, issue date and paid date across the top, before you get to the line items',
+                    'Underneath the lines sits the full status history the ERP recorded — every stage, when it happened, and who moved it — so you can see why an order is sitting where it is rather than just that it is; orders synced before this existed simply show no history instead of an error',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Pancake order syncing now spreads across more background workers, so a large sync clears faster',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.23.1',
+        date: '2026-08-05',
+        sections: [
+            {
+                title: 'Inventory — Purchase Orders',
+                items: [
+                    'Open Purchase Orders now lists the most recently issued order first, so the newest commitments are what you see at the top — orders with no issue date still sort to the bottom rather than leading the table',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.23.0',
+        date: '2026-08-05',
+        sections: [
+            {
+                title: 'Inventory — Dashboard Additions',
+                items: [
+                    'New High Unfulfilled Items table — the items owing the most stock, worst first, so you can see where the Unfulfilled tile’s total is actually concentrated instead of just how big it is',
+                    'New Low Stock Items table beside it — the items most in need of a purchase order, ranked by how many units to reorder, with what’s on hand now alongside',
+                    'Both tables count per group rather than per SKU, the same way the items list reads with summarize on — a grouped SKU appears once under its parent with the group’s total, instead of scattered across the table as several smaller rows',
+                    'Each lists the top 20 and shows the total for the rows on screen, so the figure under the heading always describes what you’re looking at rather than the whole workspace',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Orders & Reorder Maths',
+                items: [
+                    'PO Needed was reordering too little — incoming deliveries were being subtracted twice, so the figure came out lower than it should have; it now counts them once, on the dashboard and on the Inventory Items list alike',
+                    'Open Purchase Orders now lists oldest order first — the lines that have been outstanding longest are the ones to chase — with orders that have no issue date sorted to the bottom rather than the top',
+                    'Each open PO line now shows its issue and expected delivery dates, plus a small progress ring for how much of what was ordered has landed',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.22.0',
+        date: '2026-08-05',
+        sections: [
+            {
+                title: 'Inventory — Dashboard (New)',
+                items: [
+                    'New Inventory Dashboard at the top of the Inventory menu — four headline tiles (Inventory Items, Total Stocks, Unfulfilled units, Open POs) each load and refresh on their own, so a slow figure never holds up the rest of the row',
+                    'An Items In / Out chart shows units arriving against units leaving, day by day over the last 7, 14 or 30 days — in above the line, out below; the window ends yesterday so a half-written day doesn’t read as a slump, and write-offs are left out because they’re shrinkage rather than movement',
+                    'An Open Purchase Orders table sits underneath: every line still owing stock, with what was ordered, delivered so far and still waiting, plus a running total of units outstanding — click a row to drill into that PO’s lines',
+                    'Every figure is team-scoped and follows the “viewing as team” switcher, and the counts are worked out the same way the Inventory Items list works them out, so the tiles and the list agree to the unit',
+                ],
+            },
+            {
+                title: 'Inventory — Look Back at Any Day',
+                items: [
+                    'Every inventory item is now frozen nightly, so the Inventory Items list can be pinned to a past date and show that day’s closing stock, averages and computed columns instead of today’s',
+                    'The date picker only offers days that actually have a saved snapshot — everything else is greyed out — and while a day is pinned, add/edit/delete are hidden, because those actions would change today’s items rather than the historical rows on screen',
+                    'New PO QTY column on the items list — the safety buffer on top of lead-time demand (your days of coverage × the daily average), the same figure that feeds PO Needed',
+                ],
+            },
+            {
+                title: 'Inventory — Grouping Fixes',
+                items: [
+                    'Ungrouping now works from the summarised view — selecting a parent breaks up the whole group instead of reporting “0 items ungrouped” and leaving it intact',
+                    'Bulk actions are hidden in the summarised view, where a selected row is a group rather than a single item',
+                    'The summarize toggle now sticks — refreshing or changing another filter no longer springs it back on',
+                ],
+            },
+            {
+                title: 'Finance — Shares & Reference Numbers',
+                items: [
+                    'A transaction won’t save until the charge-to and product shares add up to the full amount — you get told how much is still unallocated and the page scrolls you to the section that needs it, instead of the server bouncing the save',
+                    'Charge To is now marked required on fund requests, and a single allocation row always carries the whole amount rather than keeping a stale share from when the list was longer',
+                    'Fund request reference numbers no longer collide — the next number carries on from the highest one issued rather than the row count, so deleting an older request can’t hand out one that’s still in use',
+                    'The transaction form’s “Transaction” field is now labelled Transaction Description',
+                ],
+            },
+            {
+                title: 'Admin — Module Toggles',
+                items: [
+                    'Ad Spend Goals is now its own admin-toggled module — turn it off and the tab disappears from the S&M dashboard and every one of its routes stops responding',
+                    'RMO management and Leaderboards can now be hidden on their own, without turning off the whole RTS or CSR permission category, and the Creatives module gates its own permissions the same way',
+                    'The stale “View ESC Tracker” permission has been removed along with the role grants that referenced it',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Team schedules — clearing every shift in a week now saves; previously the cleared shifts came back on reload',
+                    'Connecting a shop that’s already in use is now caught up front with a clear message, instead of failing part-way through the POS call',
+                    'RMO management — changing the page, shop or user filter now keeps the rest of your filters and the current page size instead of dropping them',
+                    'Gencys ERP — the daily sales tracker sync now pulls the last 3 days by default rather than just yesterday, so a missed day catches itself up',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.21.0',
         date: '2026-07-30',
         sections: [

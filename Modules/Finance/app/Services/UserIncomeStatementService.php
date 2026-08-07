@@ -521,15 +521,16 @@ class UserIncomeStatementService
     }
 
     /**
-     * The user's charged outflow transactions grouped by type, split into flagged
-     * (cost of sales) and the rest (OPEX).
+     * The user's charged outflow transactions grouped by type, split into cost of
+     * sales and OPEX by each type's `income_statement_section`. Types with a null
+     * section (excluded) are dropped; a deleted/unknown type falls back to OPEX.
      *
      * @return array{0:list<array{type_key:int,type_name:string,amount:float}>, 1:list<array{type_key:int,type_name:string,amount:float}>}
      */
     private function userTransactionBuckets(Workspace $workspace, int $userId, Carbon $from, Carbon $to): array
     {
         $types = TransactionType::where('workspace_id', $workspace->id)
-            ->get(['id', 'name', 'is_gross_profit_deduction'])
+            ->get(['id', 'name', 'income_statement_section'])
             ->keyBy('id');
 
         // A transaction split across users contributes only this user's share.
@@ -543,16 +544,22 @@ class UserIncomeStatementService
             ->groupBy('type_key')
             ->orderByDesc('total')
             ->get()
-            ->map(fn ($r) => [
-                'type_key' => (int) $r->type_key,
-                'type_name' => $r->type_key ? ($types[$r->type_key]->name ?? 'Unknown') : 'Uncategorized',
-                'amount' => (float) $r->total,
-                'flagged' => $r->type_key ? (bool) ($types[$r->type_key]->is_gross_profit_deduction ?? false) : false,
-            ]);
+            ->map(function ($r) use ($types) {
+                $key = (int) $r->type_key;
+                $type = $key ? $types->get($key) : null;
+
+                return [
+                    'type_key' => $key,
+                    'type_name' => $key ? ($type->name ?? 'Unknown') : 'Uncategorized',
+                    'amount' => (float) $r->total,
+                    'section' => $type ? $type->income_statement_section : 'opex',
+                ];
+            })
+            ->reject(fn ($b) => $b['section'] === null);
 
         return [
-            $rows->where('flagged', true)->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),
-            $rows->where('flagged', false)->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),
+            $rows->where('section', 'cost_of_sales')->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),
+            $rows->where('section', 'opex')->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),
         ];
     }
 

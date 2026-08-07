@@ -33,10 +33,16 @@ import { debounce, omit } from 'lodash';
 import { MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
+type Nature = 'debit' | 'credit';
+
+// Where the type lands on the income statement; null = excluded (not shown).
+type IncomeStatementSection = 'cost_of_sales' | 'opex' | null;
+
 interface TransactionType {
     id: number;
     name: string;
-    is_gross_profit_deduction: boolean;
+    nature: Nature;
+    income_statement_section: IncomeStatementSection;
 }
 
 interface Props {
@@ -114,23 +120,54 @@ export default function TransactionTypesIndex({
             },
         },
         {
-            accessorKey: 'is_gross_profit_deduction',
+            accessorKey: 'nature',
+            enableSorting: false,
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                    Nature
+                </div>
+            ),
+            cell: ({ row }) =>
+                row.original.nature === 'credit' ? (
+                    <span className="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-0.5 font-mono text-[11px] text-sky-700 uppercase dark:bg-sky-950/40 dark:text-sky-300">
+                        Credit
+                    </span>
+                ) : (
+                    <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 font-mono text-[11px] text-amber-700 uppercase dark:bg-amber-950/40 dark:text-amber-300">
+                        Debit
+                    </span>
+                ),
+        },
+        {
+            accessorKey: 'income_statement_section',
             enableSorting: false,
             header: () => (
                 <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
                     Income Statement
                 </div>
             ),
-            cell: ({ row }) =>
-                row.original.is_gross_profit_deduction ? (
-                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] text-emerald-700 uppercase dark:bg-emerald-950/40 dark:text-emerald-300">
-                        Gross Profit deduction
+            cell: ({ row }) => {
+                const section = row.original.income_statement_section;
+                if (section === 'cost_of_sales') {
+                    return (
+                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 font-mono text-[11px] text-emerald-700 uppercase dark:bg-emerald-950/40 dark:text-emerald-300">
+                            Cost of Sales
+                        </span>
+                    );
+                }
+                if (section === 'opex') {
+                    return (
+                        <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-0.5 font-mono text-[11px] text-gray-500 uppercase dark:bg-zinc-800 dark:text-gray-400">
+                            OPEX
+                        </span>
+                    );
+                }
+                return (
+                    <span className="inline-flex items-center rounded-full bg-transparent px-2.5 py-0.5 font-mono text-[11px] text-gray-300 uppercase ring-1 ring-black/6 ring-inset dark:text-gray-600 dark:ring-white/6">
+                        Excluded
                     </span>
-                ) : (
-                    <span className="inline-flex items-center rounded-full bg-stone-100 px-2.5 py-0.5 font-mono text-[11px] text-gray-500 uppercase dark:bg-zinc-800 dark:text-gray-400">
-                        OPEX
-                    </span>
-                ),
+                );
+            },
         },
         ...(showActions
             ? [
@@ -283,15 +320,20 @@ function TypeFormDialog({
 }) {
     const isEditing = !!type;
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
-        useForm({ name: '', is_gross_profit_deduction: false });
+        useForm<{
+            name: string;
+            nature: Nature;
+            income_statement_section: IncomeStatementSection;
+        }>({ name: '', nature: 'debit', income_statement_section: 'opex' });
 
     useEffect(() => {
         if (open) {
             if (type) {
                 setData('name', type.name);
+                setData('nature', type.nature);
                 setData(
-                    'is_gross_profit_deduction',
-                    type.is_gross_profit_deduction,
+                    'income_statement_section',
+                    type.income_statement_section,
                 );
             } else {
                 reset();
@@ -350,28 +392,102 @@ function TypeFormDialog({
                             />
                         </Field>
 
-                        <label className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-black/6 bg-stone-50 p-3 dark:border-white/6 dark:bg-zinc-800/50">
-                            <input
-                                type="checkbox"
-                                checked={data.is_gross_profit_deduction}
-                                onChange={(e) =>
-                                    setData(
-                                        'is_gross_profit_deduction',
-                                        e.target.checked,
-                                    )
-                                }
-                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <span className="text-[12px] leading-snug text-gray-600 dark:text-gray-300">
-                                <span className="font-medium text-gray-800 dark:text-gray-100">
-                                    Gross Profit deduction
-                                </span>
-                                <br />
-                                On the income statement this type is a Cost of
-                                Sales line (deducted to reach Gross Profit).
-                                Leave off for Operating Expenses (OPEX).
-                            </span>
-                        </label>
+                        <Field label="Nature" required error={errors.nature}>
+                            <div className="grid grid-cols-2 gap-2">
+                                {(['debit', 'credit'] as Nature[]).map((n) => {
+                                    const active = data.nature === n;
+                                    return (
+                                        <button
+                                            key={n}
+                                            type="button"
+                                            onClick={() => setData('nature', n)}
+                                            className={`h-9 rounded-[10px] border font-mono text-[12px] uppercase transition-all ${
+                                                active
+                                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                                    : 'border-black/6 bg-stone-50 text-gray-500 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-400'
+                                            }`}
+                                        >
+                                            {n}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <p className="mt-1.5 text-[11px] text-gray-400">
+                                Debit — expenses &amp; assets. Credit — income,
+                                liabilities &amp; equity.
+                            </p>
+                        </Field>
+
+                        <Field
+                            label="Income Statement"
+                            error={errors.income_statement_section}
+                        >
+                            <div className="space-y-2">
+                                {(
+                                    [
+                                        {
+                                            value: 'cost_of_sales',
+                                            title: 'Cost of Sales',
+                                            desc: 'Deducted from Delivered to reach Gross Profit.',
+                                        },
+                                        {
+                                            value: 'opex',
+                                            title: 'OPEX',
+                                            desc: 'Deducted from Gross Profit to reach Net Profit.',
+                                        },
+                                        {
+                                            value: null,
+                                            title: 'Excluded',
+                                            desc: 'Not shown on the income statement at all.',
+                                        },
+                                    ] as {
+                                        value: IncomeStatementSection;
+                                        title: string;
+                                        desc: string;
+                                    }[]
+                                ).map((opt) => {
+                                    const active =
+                                        data.income_statement_section ===
+                                        opt.value;
+                                    return (
+                                        <button
+                                            key={opt.title}
+                                            type="button"
+                                            onClick={() =>
+                                                setData(
+                                                    'income_statement_section',
+                                                    opt.value,
+                                                )
+                                            }
+                                            className={`flex w-full items-start gap-3 rounded-[10px] border p-3 text-left transition-all ${
+                                                active
+                                                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30'
+                                                    : 'border-black/6 bg-stone-50 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800/50 dark:hover:bg-zinc-800'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                                                    active
+                                                        ? 'border-emerald-500'
+                                                        : 'border-gray-300 dark:border-gray-600'
+                                                }`}
+                                            >
+                                                {active && (
+                                                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                                )}
+                                            </span>
+                                            <span className="text-[12px] leading-snug text-gray-600 dark:text-gray-300">
+                                                <span className="font-medium text-gray-800 dark:text-gray-100">
+                                                    {opt.title}
+                                                </span>
+                                                <br />
+                                                {opt.desc}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </Field>
                     </div>
 
                     <Footer

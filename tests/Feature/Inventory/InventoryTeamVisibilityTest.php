@@ -13,6 +13,7 @@ use Modules\Inventory\Models\InventoryUnitCode;
 use Modules\Inventory\Models\InventoryUnitCodeItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
+use Modules\Inventory\Support\InventoryStockColumns;
 
 /** A workspace member with a scoped role (no "View All Workspace Data") on the given teams. */
 function scopedInventoryMember(Workspace $workspace, array $teams = []): User
@@ -145,4 +146,71 @@ it('shows no inventory records to a scoped user with no team (fail-closed)', fun
     expect(PurchasedOrder::query()->visibleTo($user, $workspace)->count())->toBe(0);
     expect(InventoryUnitCode::query()->visibleTo($user, $workspace)->count())->toBe(0);
     expect(GencysSyncRun::query()->visibleTo($user, $workspace)->count())->toBe(0);
+});
+
+test('the joined stock columns neither leak across teams nor duplicate rows', function () {
+    $workspace = Workspace::factory()->create();
+    $mine = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $theirs = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    ['item' => $mineItem] = inventoryChainForTeams($workspace, [$mine], 'TEAM-MINE');
+    ['item' => $theirItem] = inventoryChainForTeams($workspace, [$theirs], 'TEAM-THEIRS');
+
+    // Several transactions and deliveries on the visible item. Each derived
+    // table must still contribute exactly one row — otherwise the joins would
+    // multiply the item out and inflate every summed column downstream.
+    foreach (['2026-07-02', '2026-07-03', '2026-07-04'] as $i => $date) {
+        InventoryTransaction::create([
+            'workspace_id' => $workspace->id, 'inventory_item_id' => $mineItem->id,
+            'date' => $date, 'ref_no' => "REF-EXTRA-{$i}", 'remaining_qty' => 100 + $i,
+        ]);
+    }
+
+    $released = PurchasedOrder::create(['workspace_id' => $workspace->id, 'issue_date' => '2026-07-05', 'status' => 6]);
+    $line = PurchasedOrderItem::create([
+        'inventory_purchased_order_id' => $released->id, 'inventory_item_id' => $mineItem->id, 'count' => 50,
+    ]);
+    $line->deliveries()->create(['delivery_date' => '2026-07-06', 'qty' => 10]);
+    $line->deliveries()->create(['delivery_date' => '2026-07-07', 'qty' => 15]);
+
+    $user = scopedInventoryMember($workspace, [$mine]);
+
+    $rows = InventoryItem::query()
+        ->where('inventory_items.workspace_id', $workspace->id)
+        ->visibleTo($user, $workspace)
+        ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
+        ->selectRaw('inventory_items.id, inventory_items.sku')
+        ->selectRaw(InventoryStockColumns::currentStocks().' as current_stocks')
+        ->selectRaw(InventoryStockColumns::waitingStocks().' as waiting_stocks')
+        ->selectRaw(InventoryStockColumns::requestedStocks().' as requested_stocks')
+        ->get();
+
+    // Scoping still holds with three joins in play.
+    expect($rows->pluck('sku')->all())->toBe(['TEAM-MINE']);
+
+    // One row, despite four transactions and two deliveries on this item.
+    expect($rows)->toHaveCount(1);
+
+    $row = $rows->first();
+
+    // The latest transaction wins (highest date, then id) — not a sum of all four.
+    expect((int) $row->current_stocks)->toBe(102);
+    // 25 still owed on the released order, plus the 5 on the status-1 order
+    // the chain helper raised — both are committed quantity.
+    expect((int) $row->waiting_stocks)->toBe(30);
+    // Of that, the 5 nobody has sent to a supplier yet.
+    expect((int) $row->requested_stocks)->toBe(5);
+
+    // The other team's item is untouched by any of it.
+    $ownerRows = InventoryItem::query()
+        ->where('inventory_items.workspace_id', $workspace->id)
+        ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
+        ->selectRaw('inventory_items.id, inventory_items.sku')
+        ->selectRaw(InventoryStockColumns::waitingStocks().' as waiting_stocks')
+        ->get()->keyBy('sku');
+
+    expect($ownerRows)->toHaveCount(2);
+    // The other team's chain has its own status-1 order for 5 units.
+    expect($ownerRows['TEAM-THEIRS']->waiting_stocks)->toEqual(5);
+    expect($ownerRows['TEAM-MINE']->waiting_stocks)->toEqual(30);
 });

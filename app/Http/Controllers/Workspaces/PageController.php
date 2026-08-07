@@ -175,6 +175,28 @@ class PageController extends Controller
             ->with('success', 'Page budget updated successfully.');
     }
 
+    /**
+     * Turn the four-hourly Meta budget snapshot on or off for one page.
+     *
+     * Off is the default: a budget typed on this screen stays put, and the page
+     * keeps whatever it was last set to. Turning it on hands the page over to
+     * the snapshot, which replaces its budget every four hours.
+     */
+    public function updateAutoBudget(Request $request, Workspace $workspace, Page $page)
+    {
+        $this->authorize(Permission::EditPageDailyBudgetRecords->value, $workspace);
+
+        abort_unless($page->workspace_id === $workspace->id, 404);
+
+        $data = $request->validate([
+            'auto_update_ad_budget' => ['required', 'boolean'],
+        ]);
+
+        $page->update(['auto_update_ad_budget' => $data['auto_update_ad_budget']]);
+
+        return back();
+    }
+
     /** Assign (or unassign) the owner of a page inline from the pages table. */
     public function assignOwner(Request $request, Workspace $workspace, Page $page)
     {

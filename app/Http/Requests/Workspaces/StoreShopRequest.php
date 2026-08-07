@@ -22,13 +22,16 @@ class StoreShopRequest extends FormRequest
      */
     public function rules(): array
     {
-        $workspace = $this->route('workspace');
-
         return [
             'shop_id' => [
                 'required',
                 'integer',
-                'exists:shops,id',
+                // A shop row is keyed by its POS shop id, so the same shop can only
+                // ever be connected once across the whole app — the check is global,
+                // not per-workspace. Catching it here means the client gets an inline
+                // field error before the controller makes any POS API call or hits a
+                // duplicate-key error mid-request.
+                'unique:shops,id',
             ],
             'pos_token' => 'required|string|max:255',
         ];
@@ -43,6 +46,9 @@ class StoreShopRequest extends FormRequest
     {
         return [
             'shop_id.required' => 'The shop ID is required.',
+            // The shop may be held by this workspace or another one; the rule cannot
+            // tell them apart, so the message stays true for both.
+            'shop_id.unique' => 'This shop is already connected. Remove it from the workspace that has it before adding it here.',
             'pos_token.required' => 'The POS token is required.',
         ];
     }
