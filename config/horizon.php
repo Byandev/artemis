@@ -230,7 +230,7 @@ return [
             'queue' => ['parcel-notifications'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses' => 2,
+            'maxProcesses' => 5,
             'balanceMaxShift' => 1,
             'balanceCooldown' => 3,
             'maxTime' => 0,
