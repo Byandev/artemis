@@ -12,6 +12,51 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.30.0',
+        date: '2026-08-10',
+        sections: [
+            {
+                title: 'Finance — Product Income Statements (New)',
+                items: [
+                    'New per-product breakdown on a saved income statement — every product’s orders, delivered revenue, cost of sales, gross profit, advisory share and net profit on one page, so you can see which products actually earned the month rather than only what the workspace made in total',
+                    'A margin bar across the top splits the month by product, and each row carries its net margin, so a product turning over a lot at a thin margin stops hiding behind a big delivered figure',
+                    'Revenue that can’t be traced to a product is shown as its own discrepancy row instead of being quietly dropped, with the unit codes behind it listed so you can map them and have the gap close',
+                ],
+            },
+            {
+                title: 'Finance — Commission Rates',
+                items: [
+                    'Each intern can now carry their own commission rate per product, set on their income-statement breakdown, and the commission it works out to shows beside the product’s net profit',
+                    'The rate is a share of a product’s net profit — after cost of goods, shipping, COD, VAT, ad spend and the advisory share — and only products that actually made money count towards it',
+                    'It is shown for reference and changes nothing about the statement itself: net profit, gross profit and the workspace totals all read exactly the same whether a rate is set or not',
+                ],
+            },
+            {
+                title: 'Finance — Transaction Types Rebuilt',
+                items: [
+                    'A transaction type now carries its own nature — Credit for money in, Debit for money out — and the direction of a transaction follows it, so the separate IN/OUT field has gone from the form; picking “Type of Expense” is now the one decision that sets it',
+                    'Where a type lands on the income statement is now a three-way choice rather than a tick — Cost of Sales, OPEX, or Excluded altogether for movements that belong on the balance sheet, like capital spend, dividends and cash advances, which were previously forced into OPEX',
+                    'Both are shown as their own columns on the Transaction Types list, and a workspace can have the standard set of categories seeded in one go, each already tagged, rather than typed in one at a time',
+                ],
+            },
+            {
+                title: 'Finance — Cost of Goods Reworked',
+                items: [
+                    'Cost of goods now comes from a Cost of Goods transaction tagged to a product, bought in bulk, rather than being derived per order — the figure follows what you actually paid the supplier',
+                    'That cost is split between the interns who sold the product by how many delivered orders each of them had, so a product bought once and sold by three people charges each of them their share',
+                    'Ad spend now appears in the per-product breakdown too, apportioned the same way, and the per-intern summary keeps a slim Delivered → Cost of Sales → OPEX → Net shape with the detail moved into the product table underneath',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    '“Back to live data” on the Inventory Items list now clears the date field itself — previously the list underneath went back to live while the picker carried on showing the day you had pinned',
+                    'Remittances has been taken out of the Finance sidebar and off the Live Cashflow page while it is reworked; existing remittances are still reachable by their own links and nothing has been deleted',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.29.0',
         date: '2026-08-10',
         sections: [
