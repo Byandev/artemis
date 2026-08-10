@@ -100,6 +100,71 @@ test('the callback resolves the exact run id echoed back, and a replay is idempo
         ->and(GencysSyncRun::where('inventory_item_id', $item->id)->count())->toBe(2);
 });
 
+test('a success resolves earlier pending and failed runs with the same parameters', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+    $item = makeInventoryItem($workspace);
+    $other = makeInventoryItem($workspace, 'SKU-2');
+
+    $params = ['date' => '06/28/2026'];
+
+    // Earlier attempts at the same item/date that never resolved.
+    $stuck = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY, $params);
+    $failed = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY, $params);
+    $failed->fail('n8n webhook returned HTTP 500');
+
+    // Same item, different date — a genuine gap that must stay failed.
+    $otherDate = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY, ['date' => '06/27/2026']);
+    $otherDate->fail('n8n webhook returned HTTP 500');
+
+    // Same date, different item — likewise untouched.
+    $otherItem = GencysSyncRun::start($workspace->id, $other->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY, $params);
+
+    $run = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY, $params);
+
+    $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', [
+        'items' => [[
+            'id' => $item->id,
+            'sync_run_id' => $run->id,
+            'transactions' => [
+                ['ref_no' => 'TX-1', 'date' => '2026-06-28', 'po_qty_in' => 1, 'inventory_remaining_stock' => 1],
+            ],
+        ]],
+    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
+
+    expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and($stuck->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and($stuck->fresh()->rows_saved)->toBe(1)
+        ->and($stuck->fresh()->message)->toContain("Resolved by sync run #{$run->id}")
+        ->and($failed->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and($otherDate->fresh()->status)->toBe(GencysSyncRun::STATUS_FAILED)
+        ->and($otherItem->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
+});
+
+test('the backfill command resolves runs a later success already covered', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = makeInventoryItem($workspace);
+
+    $params = ['start_date' => '06/01/2026', 'end_date' => '06/30/2026'];
+
+    $stuck = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_PURCHASE_ORDER, $params);
+    $stuck->fail('No callback received within 3h (sync timed out)');
+
+    // Later success for the same parameters — key order deliberately reversed.
+    $success = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_PURCHASE_ORDER, array_reverse($params));
+    $success->forceFill(['status' => GencysSyncRun::STATUS_SUCCESS, 'rows_received' => 4, 'rows_saved' => 4])->save();
+
+    // Opened after the success — still outstanding, so left alone.
+    $later = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_PURCHASE_ORDER, $params);
+
+    $this->artisan('gencys-erp:resolve-superseded-sync-runs')->assertSuccessful();
+
+    expect($stuck->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and($stuck->fresh()->rows_saved)->toBe(4)
+        ->and($stuck->fresh()->message)->toContain("Resolved by sync run #{$success->id}")
+        ->and($later->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
+});
+
 test('a callback without sync_run_id leaves the run pending', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
