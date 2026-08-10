@@ -34,6 +34,8 @@ class GencysSyncRun extends Model
 
     public const TYPE_PAGE_DETAILS = 'page_details';
 
+    public const TYPE_DAILY_SALES_TRACKER = 'daily_sales_tracker';
+
     protected $table = 'gencys_sync_runs';
 
     protected $guarded = [];
