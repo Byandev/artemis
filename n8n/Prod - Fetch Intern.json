@@ -1,0 +1,153 @@
+{
+  "name": "Fetch Intern",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ed367483-6df8-44b7-856a-884dbcdf12c6",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "d42947d4-842b-4643-adf7-10ccd3b65a29",
+      "name": "Webhook",
+      "webhookId": "ed367483-6df8-44b7-856a-884dbcdf12c6"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const username = $json.body.erp_username;\nconst password = $json.body.erp_password;\n\n// Open ERP login page\nawait $page.goto(\n  'https://meta-digitrading.lhike-erp.com/home',\n  {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }\n);\n\n// Wait for login form\nawait $page.waitForSelector('input[name=\"txtusername\"]', {\n  timeout: 30000\n});\n\n// Fill credentials\nawait $page.type('input[name=\"txtusername\"]', username, {\n  delay: 50\n});\n\nawait $page.type('input[name=\"txtpass\"]', password, {\n  delay: 50\n});\n\n// Submit login form\nawait Promise.all([\n  $page.click('button[type=\"submit\"]'),\n  $page.waitForNavigation({\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }).catch(() => null)\n]);\n\n// Check for login error\nconst loginError = await $page.$('.alert-danger');\n\nif (loginError) {\n  const errorText = await $page.evaluate(\n    el => el.textContent.trim(),\n    loginError\n  );\n\n  throw new Error(`Login failed: ${errorText}`);\n}\n\n// Optional: verify login succeeded\nconst currentUrl = $page.url();\n\nif (currentUrl.includes('/login')) {\n  throw new Error('Login may have failed. Still on login page.');\n}\n\n// Get cookies\nconst cookies = await $page.cookies();\n\nreturn [\n  {\n    json: {\n      success: true,\n      currentUrl,\n      cookies\n    }\n  }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        80,
+        0
+      ],
+      "id": "b1897216-cd70-41aa-b340-6232550e05bf",
+      "name": "Login"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies } = $json;\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\nawait $page.setViewport({\n    width: 1512,\n    height: 982,\n    deviceScaleFactor: 1\n});\n\n// ---- Extract every column from the current page (excluding Actions/id) ----\nasync function extractTable() {\n    return await $page.evaluate(() => {\n        const table =\n            document.querySelector('table.dataTable') ||\n            document.querySelector('table');\n        if (!table) return [];\n\n        const headerCells = Array.from(\n            table.querySelectorAll('thead tr:last-child th, thead tr:last-child td')\n        ).map(th => th.innerText.trim());\n\n        return Array.from(table.querySelectorAll('tbody tr'))\n            .map(tr => {\n                const cells = Array.from(tr.querySelectorAll('td'));\n                if (!cells.length) return null;\n\n                const row = {};\n                cells.forEach((td, i) => {\n                    let key = (headerCells[i] && headerCells[i].length)\n                        ? headerCells[i]\n                        : `col_${i}`;\n\n                    // skip the \"Actions\" (or \"id\") column entirely\n                    if (/^(actions?|id)$/i.test(key)) return;\n\n                    if (row[key] !== undefined) key = `${key}_${i}`;\n                    row[key] = (td.innerText ?? '').trim();\n                });\n\n                return row;\n            })\n            .filter(Boolean);\n    });\n}\n\nasync function isNextDisabled() {\n    return await $page.evaluate(() => {\n        const nextLi = document.querySelector('li.next');\n        return !nextLi || nextLi.classList.contains('disabled');\n    });\n}\n\nasync function tbodySignature() {\n    return await $page.evaluate(() => {\n        const body = document.querySelector('table.dataTable tbody, table tbody');\n        return body ? body.innerText.trim() : '';\n    });\n}\n\n// ---- Navigate ----\nawait $page.goto(\n    'https://meta-digitrading.lhike-erp.com/intern/view', {\n        waitUntil: 'networkidle2',\n        timeout: 60000\n    }\n);\nconst landedUrl = $page.url();\nif (!/\\/intern\\/view/i.test(landedUrl)) {\n    throw new Error(\n        `Expected /intern/view but landed on: ${landedUrl} — cookies/session may be invalid.`\n    );\n}\nawait $page.waitForSelector('table', { timeout: 60000 });\n\n// ---- Bump page length to 100 to reduce next-clicks ----\ntry {\n    await $page.select('select[name$=\"_length\"]', '100');\n    await $page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });\n} catch (_) {}\nawait $page.waitForSelector('table');\n\n// ---- Paginate through everything ----\nconst all = [];\nconst seen = new Set();\nlet pageNum = 0;\nconst MAX_PAGES = 1000;\n\nwhile (true) {\n    const pageRows = await extractTable();\n    for (const r of pageRows) {\n        const key = JSON.stringify(r);\n        if (!seen.has(key)) {\n            seen.add(key);\n            all.push(r);\n        }\n    }\n    if (await isNextDisabled()) break;\n    if (++pageNum > MAX_PAGES) break;\n\n    const prevSig = await tbodySignature();\n    await $page.click('li.next a');\n    await $page.waitForFunction(\n        prev => {\n            const body = document.querySelector('table.dataTable tbody, table tbody');\n            const now = body ? body.innerText.trim() : '';\n            return now && now !== prev;\n        },\n        { timeout: 30000 },\n        prevSig\n    );\n}\n\nreturn [{\n    json: {\n        totalRows: all.length,\n        rows: all\n    }\n}];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "33db986d-7941-415c-bf9d-a05727d39407",
+      "name": "Scrape Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get intern rows from the previous node\nconst rawData = $input.first().json.rows;\n\n// Get workspace_id from the Webhook node\nconst workspaceId = $('Webhook').first().json.body.workspace_id;\nconst apiKey = $('Webhook').first().json.body.api_key;\n\n// Clean/map each row into a simple variable object\nconst interns = rawData.map(row => {\n  return {\n    id: row[\"Intern & Brands ID\"]?.trim(),\n    fullName: row[\"Full Name\"]?.trim(),\n    companyName: row[\"Company Name\"]?.trim() || \"\",\n    username: row[\"Username\"]?.trim(),\n    contactNumber: row[\"Contact Number\"]?.trim(),\n    email: row[\"Email\"]?.trim(),\n  };\n});\n\n// Return a single item with everything nested under \"data\"\nreturn [\n  {\n    json: {\n      data: {\n        workspace_id: workspaceId,\n        api_key: apiKey,\n        interns: interns,\n      },\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        0
+      ],
+      "id": "5e404ab5-57e1-4e50-8a64-8b424bc3f1b7",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Webhook').item.json.body.webhook_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ data: $json.data }) }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "7da466be-5ef5-474a-a71d-9978fc1d3759",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login": {
+      "main": [
+        [
+          {
+            "node": "Scrape Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Data": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "1a289a5a-3d5f-4bcf-b1d4-2cd61f3bb7e7",
+  "meta": {
+    "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
+  },
+  "id": "xiKdh50t68lmcjHZ",
+  "tags": []
+}

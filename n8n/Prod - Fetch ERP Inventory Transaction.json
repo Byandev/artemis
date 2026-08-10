@@ -53,7 +53,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return items\n  .filter(item => {\n    const input = item.json;\n\n    return input[\"No\"] != \"No data available in table\";\n  })\n  .map((item) => {\n  const input = item.json;\n   \n  const goodsPO = input['In/Out - Goods (PO)'] ?? \"0\";\n  const damageRTS = input['In - Damage (RTS)'] ?? \"0\";\n  const goodsRTS = input['In/Out - Goods (RTS)'] ?? \"0\";\n  const type = input.Type ?? \"\";\n\n  const date = new Date(input['Transaction Date']);\n  const formatted = date.toISOString().split('T')[0];\n\n  const qty_in  = type === \"OUT\" ? \"0\" : String(goodsPO);\n  const qty_out = type === \"OUT\" ? String(goodsPO) : \"0\";\n  const rts_goods_in  = type === \"OUT\" ? \"0\" : String(goodsRTS);\n  const rts_goods_out = type === \"OUT\" ? String(goodsRTS) : \"0\";\n\n  // keep only non-empty original fields (drops Action, col_11..col_20, Search, etc.)\n  const cleaned = Object.fromEntries(\n    Object.entries(input).filter(([, v]) => v !== \"\" && v !== null && v !== undefined)\n  );\n\n  const remaining = input['Remaining Qty'] ?? 0;\n\n  return {\n    json: {\n      item: input[\"Items\"],\n      date: formatted,\n      ref_no: input[\"Transact By\"] ?? \"\",\n      po_qty_in: qty_in,\n      po_qty_out: qty_out,\n      rts_goods_in,\n      rts_goods_out,\n      rts_bad: damageRTS,\n      inventory_remaining_stock: remaining, \n    },\n  };\n})\n  .filter(item => item.json.item.toLowerCase() ===$('Code in JavaScript').first().json.keyword.toLowerCase());"
+        "jsCode": "return items\n  .filter(item => {\n    const input = item.json;\n\n    return input[\"No\"] != \"No data available in table\";\n  })\n  .map((item) => {\n  const input = item.json;\n   \n  const goodsPO = input['In/Out - Goods (PO)'] ?? \"0\";\n  const damageRTS = input['In - Damage (RTS)'] ?? \"0\";\n  const goodsRTS = input['In/Out - Goods (RTS)'] ?? \"0\";\n  const type = input.Type ?? \"\";\n\n  const date = new Date(input['Transaction Date']);\n  const formatted = date.toISOString().split('T')[0];\n\n  const qty_in  = type === \"OUT\" ? \"0\" : String(goodsPO);\n  const qty_out = type === \"OUT\" ? String(goodsPO) : \"0\";\n  const rts_goods_in  = type === \"OUT\" ? \"0\" : String(goodsRTS);\n  const rts_goods_out = type === \"OUT\" ? String(goodsRTS) : \"0\";\n\n  // keep only non-empty original fields (drops Action, col_11..col_20, Search, etc.)\n  const cleaned = Object.fromEntries(\n    Object.entries(input).filter(([, v]) => v !== \"\" && v !== null && v !== undefined)\n  );\n\n  const remaining = input['Remaining Qty'] ?? 0;\n\n  return {\n    json: {\n      number: input[\"No\"],\n      item: input[\"Items\"],\n      date: formatted,\n      ref_no: input[\"Transact By\"] ?? \"\",\n      po_qty_in: qty_in,\n      po_qty_out: qty_out,\n      rts_goods_in,\n      rts_goods_out,\n      rts_bad: damageRTS,\n      inventory_remaining_stock: remaining, \n    },\n  };\n})\n  .filter(item => item.json.item.toLowerCase() === $('Code in JavaScript').first().json.keyword.toLowerCase());"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -67,7 +67,7 @@
     },
     {
       "parameters": {
-        "method": "POST",
+        "method": "=POST",
         "url": "={{ $json.webhook }}",
         "sendHeaders": true,
         "headerParameters": {
@@ -134,7 +134,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return [\n  {\n    \"id\": $('Code in JavaScript').first().json.id,\n    \"sync_run_id\": $('Code in JavaScript').first().json.sync_run_id,\n    \"transactions\": $input.all().filter(item => Object.keys(item.json).length > 1).map(item => item.json)\n  }\n];"
+        "jsCode": "\nreturn [\n  {\n    \"id\": $('Code in JavaScript').first().json.id,\n    \"sync_run_id\": $('Code in JavaScript').first().json.sync_run_id,\n    \"transactions\": $input.all()\n      .filter(item => Object.keys(item.json).length > 1)\n      .map(item => item.json)\n      .map(item => {\n        return {\n          ...item,\n          po_qty_in: Number(item.po_qty_in.replace(/,/g, \"\")),\n          po_qty_out: Number(item.po_qty_out.replace(/,/g, \"\")),\n          rts_goods_in: Number(item.rts_goods_in.replace(/,/g, \"\")),\n          rts_goods_out: Number(item.rts_goods_out.replace(/,/g, \"\")),\n          rts_bad: Number(item.rts_bad.replace(/,/g, \"\")),\n          inventory_remaining_stock: Number(item.inventory_remaining_stock.replace(/,/g, \"\")),\n        }\n      })\n  }\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -157,9 +157,157 @@
       ],
       "id": "01e9dce5-91af-4efe-bd46-14602b30f46e",
       "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        -192
+      ],
+      "id": "1b655fd5-2f7f-429d-ae43-b43d64e78c1a",
+      "name": "Wait",
+      "webhookId": "f82888e9-c262-402b-97db-6bce50be9e92"
     }
   ],
-  "pinData": {},
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "n8n.byandev.com",
+            "x-real-ip": "165.232.171.5",
+            "x-forwarded-for": "165.232.171.5",
+            "x-forwarded-proto": "https",
+            "connection": "upgrade",
+            "content-length": "1688",
+            "user-agent": "GuzzleHttp/7",
+            "content-type": "application/json",
+            "baggage": "sentry-trace_id=747a61863b5c4e20a4cc5d1e757195a9,sentry-sample_rand=0.210011,sentry-sample_rate=0.1,sentry-public_key=a6821d7e205b79c38c66b9cff573c483,sentry-org_id=4511255889051648,sentry-environment=production",
+            "sentry-trace": "747a61863b5c4e20a4cc5d1e757195a9-b7cc16e7c1364216-0"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "workspace_id": 11,
+            "workspace_api_key": "art_dxkhViuteRWV6YRA5Aiyw3YjOL7aG0itKwWt50a1",
+            "erp_username": "bryan.tech",
+            "erp_password": "meta.tech.erp@2026",
+            "date": "08/07/2026",
+            "webhook_url": "https://artemis.ph/api/v1/public/inventory-items/transactions/bulk-sync",
+            "items": [
+              {
+                "id": 61,
+                "keyword": "PUKITIN PERFUME 2.0",
+                "sync_run_id": 22659
+              },
+              {
+                "id": 62,
+                "keyword": "PIKUTIN HARABAS 2.0",
+                "sync_run_id": 22660
+              },
+              {
+                "id": 63,
+                "keyword": "PIKUTIN SPUTING 2.0",
+                "sync_run_id": 22661
+              },
+              {
+                "id": 64,
+                "keyword": "PIKUTIN HABULIN 2.0",
+                "sync_run_id": 22662
+              },
+              {
+                "id": 65,
+                "keyword": "Pikutin Comb For Men",
+                "sync_run_id": 22663
+              },
+              {
+                "id": 66,
+                "keyword": "Pikutin Travel Atomizer",
+                "sync_run_id": 22664
+              },
+              {
+                "id": 67,
+                "keyword": "Pikutin Perfume 2.0",
+                "sync_run_id": 22665
+              },
+              {
+                "id": 68,
+                "keyword": "Her Reset Ovarra",
+                "sync_run_id": 22666
+              },
+              {
+                "id": 69,
+                "keyword": "Pikutin Padrino 1.0",
+                "sync_run_id": 22667
+              },
+              {
+                "id": 70,
+                "keyword": "Hikari New Life Kidney Therapy Healing Oil (BFM)",
+                "sync_run_id": 22668
+              },
+              {
+                "id": 71,
+                "keyword": "Amazing Life Herbal Spray with Curcumin Extract - BFM",
+                "sync_run_id": 22669
+              },
+              {
+                "id": 72,
+                "keyword": "KidneyCare Herbal Balm - Fast Comfort Formula",
+                "sync_run_id": 22670
+              },
+              {
+                "id": 73,
+                "keyword": "Magnerve Cooling Gel",
+                "sync_run_id": 22671
+              },
+              {
+                "id": 74,
+                "keyword": "Golden Digest Detox Trinitea",
+                "sync_run_id": 22672
+              },
+              {
+                "id": 75,
+                "keyword": "Hikari Liver Care Drops",
+                "sync_run_id": 22673
+              },
+              {
+                "id": 76,
+                "keyword": "Amazing Life Herbal Spray with Curcumin Extract",
+                "sync_run_id": 22674
+              },
+              {
+                "id": 77,
+                "keyword": "Anti-Cancer Miracle Philippine Giant Clam Oil",
+                "sync_run_id": 22675
+              },
+              {
+                "id": 78,
+                "keyword": "Chia Seeds for Diabetes 100g",
+                "sync_run_id": 22676
+              },
+              {
+                "id": 79,
+                "keyword": "Pikutin Habulin-10ml",
+                "sync_run_id": 22677
+              },
+              {
+                "id": 80,
+                "keyword": "Pikutin Sputing-10ml",
+                "sync_run_id": 22678
+              }
+            ]
+          },
+          "webhookUrl": "https://n8n.byandev.com/webhook/f86f8c15-be77-421a-b3f1-f152ede494f6",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
   "connections": {
     "Webhook": {
       "main": [
@@ -249,7 +397,7 @@
       "main": [
         [
           {
-            "node": "Loop Over Items",
+            "node": "Wait",
             "type": "main",
             "index": 0
           }
@@ -266,6 +414,17 @@
           }
         ]
       ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -273,7 +432,7 @@
     "executionOrder": "v1",
     "availableInMCP": false
   },
-  "versionId": "8b4ec997-f435-41cc-95ac-35aa38518cf4",
+  "versionId": "abded979-72e3-4999-9698-398848698206",
   "meta": {
     "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
   },

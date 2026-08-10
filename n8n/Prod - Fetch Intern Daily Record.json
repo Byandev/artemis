@@ -1,0 +1,546 @@
+{
+  "name": "Fetch Intern Daily Record",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "988efff7-516e-44cb-b066-ba8ee3f936de",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -384,
+        224
+      ],
+      "id": "ef6356b3-7b2b-4349-8727-ae277fb3b25b",
+      "name": "Webhook",
+      "webhookId": "988efff7-516e-44cb-b066-ba8ee3f936de"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const username = $json.body.erp_username;\nconst password = $json.body.erp_password;\n\n// Open ERP login page\nawait $page.goto(\n  'https://meta-digitrading.lhike-erp.com/home',\n  {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }\n);\n\n// Wait for login form\nawait $page.waitForSelector('input[name=\"txtusername\"]', {\n  timeout: 30000\n});\n\n// Fill credentials\nawait $page.type('input[name=\"txtusername\"]', username, {\n  delay: 50\n});\n\nawait $page.type('input[name=\"txtpass\"]', password, {\n  delay: 50\n});\n\n// Submit login form\nawait Promise.all([\n  $page.click('button[type=\"submit\"]'),\n  $page.waitForNavigation({\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }).catch(() => null)\n]);\n\n// Check for login error\nconst loginError = await $page.$('.alert-danger');\n\nif (loginError) {\n  const errorText = await $page.evaluate(\n    el => el.textContent.trim(),\n    loginError\n  );\n\n  throw new Error(`Login failed: ${errorText}`);\n}\n\n// Optional: verify login succeeded\nconst currentUrl = $page.url();\n\nif (currentUrl.includes('/login')) {\n  throw new Error('Login may have failed. Still on login page.');\n}\n\n// Get cookies\nconst cookies = await $page.cookies();\n\nreturn [\n  {\n    json: {\n      success: true,\n      currentUrl,\n      cookies\n    }\n  }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        224
+      ],
+      "id": "6154b294-e043-4235-997c-087057a07e22",
+      "name": "Login"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cookies = $input.first().json.cookies;\nconst intern_id = $('Webhook').first().json.body.intern_id;\n\n// Current date\nconst today = new Date();\n\n// First day of current month\nconst startDate = new Date(today.getFullYear(), today.getMonth(), 1);\n\n// Last day of current month\nconst endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);\n\n// Format as YYYY-MM-DD\nconst formatDate = (date) => date.toISOString().split('T')[0];\n\nreturn [\n  {\n    json: {\n      cookies,\n      intern_id,\n      start_date: formatDate(startDate),\n      end_date: formatDate(endDate),\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        224
+      ],
+      "id": "dba4c32c-d91d-4ff4-9ffc-0f7c923c0d37",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst rts_rate = input.totalRts.percent;\nconst delivered = input.totalDelivered.amount;\nconst returned = input.totalReturned.amount;\nconst for_return = input.totalForReturn.amount;\n\nreturn [\n  {\n    json: {\n      date_to_month_sales_order_rts_rate: rts_rate,\n      date_to_month_sales_order_delivered: delivered,\n      date_to_month_sales_order_returned: returned,\n      date_to_month_sales_order_for_return: for_return,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -208
+      ],
+      "id": "c1590f94-9207-4cdf-85d8-2deb4ac0a165",
+      "name": "Format"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, intern_id, start_date, end_date, sumstatus } = $json;\n\n// ---------- Setup ----------\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\nawait $page.setViewport({ width: 1512, height: 982, deviceScaleFactor: 1 });\nawait $page.goto('https://meta-digitrading.lhike-erp.com/totaladspent', {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n});\n\nasync function waitForLoadingToClear() {\n    // FIX: check computed style, not just inline style, so it also clears\n    // when #bgloading is hidden via a CSS class rather than el.style.display.\n    await $page.waitForFunction(() => {\n        const el = document.querySelector('#bgloading');\n        if (!el) return true;\n        return window.getComputedStyle(el).display === 'none';\n    }, { timeout: 60000 });\n    await new Promise(resolve => setTimeout(resolve, 1500));\n}\nawait waitForLoadingToClear();\n\n// ---------- Helper: set a bootstrap-select dropdown ----------\nasync function setBootstrapSelect(selectId, value) {\n    await $page.waitForSelector(`#${selectId}`, { timeout: 15000 });\n    await $page.select(`#${selectId}`, String(value));\n    await $page.evaluate((id) => {\n        const el = document.getElementById(id);\n        el.dispatchEvent(new Event('change', { bubbles: true }));\n        if (window.jQuery) {\n            window.jQuery(el).trigger('change');\n            if (window.jQuery(el).selectpicker) {\n                window.jQuery(el).selectpicker('refresh');\n            }\n        }\n    }, selectId);\n}\n\n// ---------- Filter By (sumstatus) ----------\nif (sumstatus !== undefined && sumstatus !== null && sumstatus !== '') {\n    await setBootstrapSelect('sumstatus', sumstatus);\n}\n\n// ---------- Filter by Intern ----------\nif (intern_id !== undefined && intern_id !== null && intern_id !== '') {\n    await setBootstrapSelect('internid', intern_id);\n}\n\n// ---------- Filter by Date Range ----------\nfunction parseDate(d) {\n    const [y, m, day] = d.split('-').map(Number);\n    return { year: y, month: m, day };\n}\nconst startDate = parseDate(start_date);\nconst endDate = parseDate(end_date);\n\nawait $page.waitForSelector('#conversion-report-range', {\n    visible: true,\n    timeout: 15000\n});\nawait $page.click('#conversion-report-range');\nawait $page.waitForSelector('.daterangepicker', {\n    visible: true,\n    timeout: 15000\n});\n\nfunction monthNameToNumber(name) {\n    const months = [\n        'January', 'February', 'March', 'April', 'May', 'June',\n        'July', 'August', 'September', 'October', 'November', 'December'\n    ];\n    return months.indexOf(name) + 1;\n}\n\n// Returns the text of each visible calendar panel header, e.g. [\"July 2026\", \"August 2026\"]\nasync function getVisibleMonths() {\n    return await $page.evaluate(() =>\n        Array.from(document.querySelectorAll('.daterangepicker .calendar .month'))\n            .map(el => el.textContent.trim())\n    );\n}\n\nasync function clickDayOnSide(side, day) {\n    const cells = await $page.$$(\n        `.daterangepicker .calendar.${side} .calendar-table td.available:not(.off)`\n    );\n    for (const cell of cells) {\n        const text = await $page.evaluate(el => el.textContent.trim(), cell);\n        if (parseInt(text, 10) === day) {\n            await cell.click();\n            return true;\n        }\n    }\n    return false;\n}\n\n// FIX: unified date selector.\n// The left/right panels are linked consecutive months, so the target month can\n// appear on EITHER panel (and for same-month ranges, both start & end land on the\n// same panel). This finds whichever visible panel shows the target month and clicks\n// there, navigating both panels together only when the month isn't currently visible.\nasync function selectDate(targetYear, targetMonth, day) {\n    for (let attempts = 0; attempts < 36; attempts++) {\n        const months = await getVisibleMonths(); // [leftText, rightText]\n\n        for (let i = 0; i < months.length; i++) {\n            const [name, yearStr] = months[i].split(' ');\n            if (monthNameToNumber(name) === targetMonth &&\n                parseInt(yearStr, 10) === targetYear) {\n                const side = i === 0 ? 'left' : 'right';\n                return await clickDayOnSide(side, day);\n            }\n        }\n\n        // Not visible yet — navigate toward the target based on the left panel.\n        const [leftName, leftYearStr] = months[0].split(' ');\n        const currentMonth = monthNameToNumber(leftName);\n        const currentYear = parseInt(leftYearStr, 10);\n        const diff = (targetYear - currentYear) * 12 + (targetMonth - currentMonth);\n\n        const btn = await $page.$(\n            diff > 0\n                ? '.daterangepicker .next.available'\n                : '.daterangepicker .prev.available'\n        );\n        if (!btn) return false;\n\n        await btn.click();\n        await new Promise(resolve => setTimeout(resolve, 300));\n    }\n    return false;\n}\n\n// Select Start Date, then End Date (order matters: daterangepicker expects start first)\nawait selectDate(startDate.year, startDate.month, startDate.day);\nawait new Promise(resolve => setTimeout(resolve, 300));\n\nawait selectDate(endDate.year, endDate.month, endDate.day);\nawait new Promise(resolve => setTimeout(resolve, 300));\n\n// Apply Date Range\nawait $page.click('.daterangepicker .applyBtn');\nawait new Promise(resolve => setTimeout(resolve, 500));\n\n// ---------- Submit Filters ----------\nawait $page.waitForSelector('.search-ads', {\n    visible: true,\n    timeout: 15000\n});\nawait $page.click('.search-ads');\nawait waitForLoadingToClear();\n\n// ---------- Verify Applied Filters ----------\nconst appliedStart = await $page\n    .$eval('#txtdstart', el => el.value)\n    .catch(() => null);\nconst appliedEnd = await $page\n    .$eval('#txtdend', el => el.value)\n    .catch(() => null);\nconst appliedIntern = await $page\n    .$eval('#internid', el =>\n        el.options[el.selectedIndex]\n            ? el.options[el.selectedIndex].textContent.trim()\n            : null\n    )\n    .catch(() => null);\nconst appliedSumstatus = await $page\n    .$eval('#sumstatus', el =>\n        el.options[el.selectedIndex]\n            ? el.options[el.selectedIndex].textContent.trim()\n            : null\n    )\n    .catch(() => null);\n\n// ---------- Extract All Data Rows + Total/Average Rows ----------\nconst tableData = await $page.evaluate(() => {\n    const rows = Array.from(\n        document.querySelectorAll('.roastable table.tg tbody tr')\n    );\n\n    const dataRows = [];\n    let totalRow = null;\n    let averageRow = null;\n\n    rows.forEach(row => {\n        const cells = Array.from(row.querySelectorAll('td')).map(td =>\n            td.textContent.trim().replace(/\\s+/g, ' ')\n        );\n\n        if (!cells.length) return;\n\n        // retview cells are, in order: [Returned AMT, Returned, RTS Rate]\n        const retCells = Array.from(row.querySelectorAll('td.retview'))\n            .map(td => td.textContent.trim().replace(/\\s+/g, ' '));\n\n        // delview cells are, in order: [Delivered AMT, Delivered]\n        const delCells = Array.from(row.querySelectorAll('td.delview'))\n            .map(td => td.textContent.trim().replace(/\\s+/g, ' '));\n\n        // Daily rows\n        if (/^\\d{4}-\\d{2}-\\d{2}$/.test(cells[0])) {\n            dataRows.push({\n                date: cells[0],\n                orders: cells[1],\n                sales: cells[2],\n                ad_spent: cells[3],\n                roas: cells[4],\n                returned_amt: retCells[0] || null,\n                returned: retCells[1] || null,\n                rts_rate: retCells[2] || null,\n                delivered_amt: delCells[0] || null,\n                delivered: delCells[1] || null\n            });\n            return;\n        }\n\n        // Total row (label cell, e.g. \"TOTAL AMOUNT\")\n        if (/^TOTAL/i.test(cells[0])) {\n            totalRow = {\n                label: cells[0],\n                orders: cells[1],\n                sales: cells[2],\n                ad_spent: cells[3],\n                roas: cells[4],\n                returned_amt: retCells[0] || null,\n                returned: retCells[1] || null,\n                rts_rate: retCells[2] || null,\n                delivered_amt: delCells[0] || null,\n                delivered: delCells[1] || null\n            };\n            return;\n        }\n\n        // Average row\n        if (/^AVERAGE/i.test(cells[0])) {\n            averageRow = {\n                label: cells[0],\n                orders: cells[1],\n                sales: cells[2],\n                ad_spent: cells[3],\n                roas: cells[4],\n                returned_amt: retCells[0] || null,\n                returned: retCells[1] || null,\n                rts_rate: retCells[2] || null,\n                delivered_amt: delCells[0] || null,\n                delivered: delCells[1] || null\n            };\n        }\n    });\n\n    return {\n        rows: dataRows,\n        total: totalRow,\n        average: averageRow\n    };\n});\n\n// Optional Label\nconst dateLabel = `${start_date}_${end_date}`;\n\n// ---------- Return ----------\nreturn [\n    {\n        json: {\n            intern_id,\n            start_date,\n            end_date,\n            dateLabel,\n            sumstatus,\n            appliedStart,\n            appliedEnd,\n            appliedIntern,\n            appliedSumstatus,\n            totalRows: tableData.rows.length,\n            rows: tableData.rows,\n            total: tableData.total,\n            average: tableData.average,\n            status: \"success\"\n        }\n    }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        704,
+        512
+      ],
+      "id": "f71f02dc-dfdd-48c6-8d38-24881cc8da74",
+      "name": "AdsSpent & ROAS"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1296,
+        -16
+      ],
+      "id": "a104b418-3495-4f9c-9307-f1b68e923c84",
+      "name": "Merge",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.webhook_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2496,
+        352
+      ],
+      "id": "8249ca2e-69a6-462c-92cc-7faed75c57db",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- 1. Grab both items from the previous node ---\nconst items = $input.all();\n\nconst workspace_id = $('Webhook').first().json.body.workspace_id;\nconst api_key = $('Webhook').first().json.body.api_key;\nconst intern_id = $('Webhook').first().json.body.intern_id;\nconst webhook_url = $('Webhook').first().json.body.webhook_url;\n\n// Main object with rows = the item that has a \"rows\" array\nconst mainItem = items.find(i => Array.isArray(i.json.rows));\n// Extra object = the item WITHOUT rows (the flat metrics object)\nconst extraItem = items.find(i => !Array.isArray(i.json.rows));\n\nconst main = mainItem.json;\n\n// --- 2. Pull out the date + fields to append (everything except \"date\") ---\nconst { date: targetDate, ...extraFields } = extraItem.json;\n\n// --- 3. Merge into the matching row by date ---\nconst mergedRows = main.rows.map(row => {\n    if (row.date === targetDate) {\n        return { ...row, ...extraFields };\n    }\n    return row;\n});\n\n// --- 4. Keep past + today's rows only; drop future placeholders ---\n// FIX: compute \"today\" in the business timezone (Asia/Manila), not server/UTC time,\n// so today's row isn't mistaken for a future date.\nfunction getTodayInTZ(timeZone) {\n    const parts = new Intl.DateTimeFormat('en-CA', {\n        timeZone,\n        year: 'numeric',\n        month: '2-digit',\n        day: '2-digit'\n    }).formatToParts(new Date());\n\n    const y = parts.find(p => p.type === 'year').value;\n    const m = parts.find(p => p.type === 'month').value;\n    const d = parts.find(p => p.type === 'day').value;\n\n    const d2 = new Date(`${y}-${m}-${d}T00:00:00`);\n    d2.setHours(0, 0, 0, 0);\n    return d2;\n}\n\nconst today = getTodayInTZ('Asia/Manila');\n\nconst rowsToSend = mergedRows.filter(row => {\n    const rowDate = new Date(row.date);\n    rowDate.setHours(0, 0, 0, 0);\n\n    // FIX: today is always kept, same as past dates — even if values are\n    // still 0 because the day isn't over yet. Only strictly future dates\n    // (placeholders beyond today) get dropped.\n    return rowDate <= today;\n});\n\n// --- 5. Return the updated object ---\nreturn [\n    {\n        json: {\n            ...main,\n            webhook_url,\n            workspace_id,\n            api_key,\n            rows_count: rowsToSend.length,\n            rows: rowsToSend\n        }\n    }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        352
+      ],
+      "id": "d074041d-7700-48bf-84b4-8cbf856a1c93",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, intern_id, start_date, end_date, sumstatus } = $json;\n \n// ---------- Setup ----------\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\nawait $page.setViewport({ width: 1512, height: 982, deviceScaleFactor: 1 });\nawait $page.goto('https://meta-digitrading.lhike-erp.com/totaladspent', {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n});\n \nasync function waitForLoadingToClear() {\n    // FIX: check computed style, not just inline style, so it also clears\n    // when #bgloading is hidden via a CSS class rather than el.style.display.\n    await $page.waitForFunction(() => {\n        const el = document.querySelector('#bgloading');\n        if (!el) return true;\n        return window.getComputedStyle(el).display === 'none';\n    }, { timeout: 60000 });\n    await new Promise(resolve => setTimeout(resolve, 1500));\n}\nawait waitForLoadingToClear();\n \n// ---------- Helper: set a bootstrap-select dropdown ----------\nasync function setBootstrapSelect(selectId, value) {\n    await $page.waitForSelector(`#${selectId}`, { timeout: 15000 });\n    await $page.select(`#${selectId}`, String(value));\n    await $page.evaluate((id) => {\n        const el = document.getElementById(id);\n        el.dispatchEvent(new Event('change', { bubbles: true }));\n        if (window.jQuery) {\n            window.jQuery(el).trigger('change');\n            if (window.jQuery(el).selectpicker) {\n                window.jQuery(el).selectpicker('refresh');\n            }\n        }\n    }, selectId);\n}\n \n// ---------- Filter By (sumstatus) ----------\nif (sumstatus !== undefined && sumstatus !== null && sumstatus !== '') {\n    await setBootstrapSelect('sumstatus', sumstatus);\n}\n \n// ---------- Filter by Intern ----------\nif (intern_id !== undefined && intern_id !== null && intern_id !== '') {\n    await setBootstrapSelect('internid', intern_id);\n}\n \n// ---------- Filter by Date Range ----------\nfunction parseDate(d) {\n    const [y, m, day] = d.split('-').map(Number);\n    return { year: y, month: m, day };\n}\nconst startDate = parseDate(start_date);\nconst endDate = parseDate(end_date);\n \nawait $page.waitForSelector('#conversion-report-range', {\n    visible: true,\n    timeout: 15000\n});\nawait $page.click('#conversion-report-range');\nawait $page.waitForSelector('.daterangepicker', {\n    visible: true,\n    timeout: 15000\n});\n \nfunction monthNameToNumber(name) {\n    const months = [\n        'January', 'February', 'March', 'April', 'May', 'June',\n        'July', 'August', 'September', 'October', 'November', 'December'\n    ];\n    return months.indexOf(name) + 1;\n}\n \n// Returns the text of each visible calendar panel header, e.g. [\"July 2026\", \"August 2026\"]\nasync function getVisibleMonths() {\n    return await $page.evaluate(() =>\n        Array.from(document.querySelectorAll('.daterangepicker .calendar .month'))\n            .map(el => el.textContent.trim())\n    );\n}\n \nasync function clickDayOnSide(side, day) {\n    const cells = await $page.$$(\n        `.daterangepicker .calendar.${side} .calendar-table td.available:not(.off)`\n    );\n    for (const cell of cells) {\n        const text = await $page.evaluate(el => el.textContent.trim(), cell);\n        if (parseInt(text, 10) === day) {\n            await cell.click();\n            return true;\n        }\n    }\n    return false;\n}\n \n// FIX: unified date selector.\n// The left/right panels are linked consecutive months, so the target month can\n// appear on EITHER panel (and for same-month ranges, both start & end land on the\n// same panel). This finds whichever visible panel shows the target month and clicks\n// there, navigating both panels together only when the month isn't currently visible.\nasync function selectDate(targetYear, targetMonth, day) {\n    for (let attempts = 0; attempts < 36; attempts++) {\n        const months = await getVisibleMonths(); // [leftText, rightText]\n \n        for (let i = 0; i < months.length; i++) {\n            const [name, yearStr] = months[i].split(' ');\n            if (monthNameToNumber(name) === targetMonth &&\n                parseInt(yearStr, 10) === targetYear) {\n                const side = i === 0 ? 'left' : 'right';\n                return await clickDayOnSide(side, day);\n            }\n        }\n \n        // Not visible yet — navigate toward the target based on the left panel.\n        const [leftName, leftYearStr] = months[0].split(' ');\n        const currentMonth = monthNameToNumber(leftName);\n        const currentYear = parseInt(leftYearStr, 10);\n        const diff = (targetYear - currentYear) * 12 + (targetMonth - currentMonth);\n \n        const btn = await $page.$(\n            diff > 0\n                ? '.daterangepicker .next.available'\n                : '.daterangepicker .prev.available'\n        );\n        if (!btn) return false;\n \n        await btn.click();\n        await new Promise(resolve => setTimeout(resolve, 300));\n    }\n    return false;\n}\n \n// Select Start Date, then End Date (order matters: daterangepicker expects start first)\nawait selectDate(startDate.year, startDate.month, startDate.day);\nawait new Promise(resolve => setTimeout(resolve, 300));\n \nawait selectDate(endDate.year, endDate.month, endDate.day);\nawait new Promise(resolve => setTimeout(resolve, 300));\n \n// Apply Date Range\nawait $page.click('.daterangepicker .applyBtn');\nawait new Promise(resolve => setTimeout(resolve, 500));\n \n// ---------- Submit Filters ----------\nawait $page.waitForSelector('.search-ads', {\n    visible: true,\n    timeout: 15000\n});\nawait $page.click('.search-ads');\nawait waitForLoadingToClear();\n \n// ---------- Verify Applied Filters ----------\nconst appliedStart = await $page\n    .$eval('#txtdstart', el => el.value)\n    .catch(() => null);\nconst appliedEnd = await $page\n    .$eval('#txtdend', el => el.value)\n    .catch(() => null);\nconst appliedIntern = await $page\n    .$eval('#internid', el =>\n        el.options[el.selectedIndex]\n            ? el.options[el.selectedIndex].textContent.trim()\n            : null\n    )\n    .catch(() => null);\nconst appliedSumstatus = await $page\n    .$eval('#sumstatus', el =>\n        el.options[el.selectedIndex]\n            ? el.options[el.selectedIndex].textContent.trim()\n            : null\n    )\n    .catch(() => null);\n \n// ---------- Extract TOTAL AMOUNT Only ----------\nconst total = await $page.evaluate(() => {\n    const rows = Array.from(\n        document.querySelectorAll('.roastable table.tg tbody tr')\n    );\n\n    for (const row of rows) {\n        const cells = Array.from(row.querySelectorAll('td')).map(td =>\n            td.textContent.trim().replace(/\\s+/g, ' ')\n        );\n\n        if (!cells.length) continue;\n\n        if (cells[0].toUpperCase().includes('TOTAL AMOUNT')) {\n            return {\n                date_to_month_orders: cells[1],\n                date_to_month_sales: cells[2],\n                date_to_month_ad_spent: cells[3],\n                date_to_month_roas: cells[4]\n            };\n        }\n    }\n\n    return null;\n});\n\nconst currentDate = new Date().toISOString().split('T')[0];\n\nreturn [\n    {\n        json: {\n            date: currentDate,\n            total,\n        }\n    }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        704,
+        720
+      ],
+      "id": "a8bc0175-c1cb-4744-901f-15082f13845e",
+      "name": "Totals"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst rts_rate = input.totalRts.percent;\nconst delivered = input.totalDelivered.amount;\nconst returned = input.totalReturned.amount;\nconst for_return = input.totalForReturn.amount;\n\n\nreturn [\n  {\n    json: {\n      date_to_month_parcel_status_rts_rate: rts_rate,\n      date_to_month_parcel_status_delivered: delivered,\n      date_to_month_parcel_status_returned: returned,\n      date_to_month_parcel_status_for_return: for_return,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        0
+      ],
+      "id": "db0d4b21-f2a8-4e95-8ab4-9e2425c8ebed",
+      "name": "Format2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst rts_rate = input.totalRts.percent;\nconst delivered = input.totalDelivered.amount;\nconst returned = input.totalReturned.amount;\nconst for_return = input.totalForReturn.amount;\n\n\nreturn [\n  {\n    json: {\n      date_to_month_shipped_out_rts_rate: rts_rate,\n      date_to_month_shipped_out_delivered: delivered,\n      date_to_month_shipped_out_returned: returned,\n      date_to_month_shipped_out_for_return: for_return,    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        224
+      ],
+      "id": "0d383b07-00d5-4666-9fe7-99473b61f71b",
+      "name": "Format3"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, intern_id, start_date, end_date } = $json;\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\nawait $page.setViewport({\n    width: 1512,\n    height: 982,\n    deviceScaleFactor: 1\n});\nawait $page.goto(\n    `https://meta-digitrading.lhike-erp.com/dashboard?stat=1&interns=${intern_id}&date_field=ord_date&start=${start_date}&end=${end_date}`,\n    {\n        waitUntil: 'networkidle2',\n        timeout: 60000\n    }\n);\nconst landedUrl = $page.url();\nconst stats = await $page.evaluate(() => {\n    function parseCard(card) {\n        if (!card) return null;\n        const amountText =\n            card.querySelector('.number span')?.textContent?.trim() || null;\n        const descEl = card.querySelector('.desc');\n        const amount = amountText\n            ? parseFloat(amountText.replace(/[^0-9.]/g, ''))\n            : null;\n        const percentText =\n            descEl?.querySelector('b')?.textContent?.trim() || null;\n        const descFullText =\n            descEl?.textContent?.replace(/\\s+/g, ' ').trim() || null;\n        const countMatch = descFullText?.match(/\\((\\d+)\\)/);\n        const count = countMatch\n            ? parseInt(countMatch[1], 10)\n            : null;\n        const percent = percentText\n            ? parseFloat(percentText.replace(/[^0-9.]/g, ''))\n            : null;\n        return {\n            raw: amountText,\n            amount,\n            label: descFullText,\n            count,\n            percent\n        };\n    }\n\n    const salesCard = document.querySelector('#div-list-sales');\n    const rtsCard = document\n        .querySelector('.dashboard-stat.red-thunderbird')\n        ?.closest('.col-lg-4, .col-md-4, .col-sm-6, .col-xs-12');\n    const deliveredCard = document.querySelector('.dashboard-stat.purple');\n    const returnedCard = document.querySelector('.dashboard-stat.red-flamingo');\n    const forReturnCard = [...document.querySelectorAll('.dashboard-stat')]\n        .find(el => /FOR RETURN/i.test(el.querySelector('.desc')?.textContent || ''));\n\n    return {\n        totalSales: parseCard(salesCard),\n        totalRts: parseCard(rtsCard),\n        totalDelivered: parseCard(deliveredCard),\n        totalReturned: parseCard(returnedCard),\n        totalForReturn: parseCard(forReturnCard)\n    };\n});\nreturn [\n    {\n        json: {\n            intern_id,\n            start_date,\n            end_date,\n            landedUrl,\n            ...stats\n        }\n    }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        704,
+        -208
+      ],
+      "id": "5be10e2e-c1ea-47ba-96b0-d53f0b2943f1",
+      "name": "Sales Order date"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, intern_id, start_date, end_date } = $json;\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\nawait $page.setViewport({\n    width: 1512,\n    height: 982,\n    deviceScaleFactor: 1\n});\nawait $page.goto(\n    `https://meta-digitrading.lhike-erp.com/dashboard?stat=2&interns=${intern_id}&date_field=ord_date&start=${start_date}&end=${end_date}`,\n    {\n        waitUntil: 'networkidle2',\n        timeout: 60000\n    }\n);\nconst landedUrl = $page.url();\nconst stats = await $page.evaluate(() => {\n    function parseCard(card) {\n        if (!card) return null;\n        const amountText =\n            card.querySelector('.number span')?.textContent?.trim() || null;\n        const descEl = card.querySelector('.desc');\n        const amount = amountText\n            ? parseFloat(amountText.replace(/[^0-9.]/g, ''))\n            : null;\n        const percentText =\n            descEl?.querySelector('b')?.textContent?.trim() || null;\n        const descFullText =\n            descEl?.textContent?.replace(/\\s+/g, ' ').trim() || null;\n        const countMatch = descFullText?.match(/\\((\\d+)\\)/);\n        const count = countMatch\n            ? parseInt(countMatch[1], 10)\n            : null;\n        const percent = percentText\n            ? parseFloat(percentText.replace(/[^0-9.]/g, ''))\n            : null;\n        return {\n            raw: amountText,\n            amount,\n            label: descFullText,\n            count,\n            percent\n        };\n    }\n\n    const salesCard = document.querySelector('#div-list-sales');\n    const rtsCard = document\n        .querySelector('.dashboard-stat.red-thunderbird')\n        ?.closest('.col-lg-4, .col-md-4, .col-sm-6, .col-xs-12');\n    const deliveredCard = document.querySelector('.dashboard-stat.purple');\n    const returnedCard = document.querySelector('.dashboard-stat.red-flamingo');\n    const forReturnCard = [...document.querySelectorAll('.dashboard-stat')]\n        .find(el => /FOR RETURN/i.test(el.querySelector('.desc')?.textContent || ''));\n\n    return {\n        totalSales: parseCard(salesCard),\n        totalRts: parseCard(rtsCard),\n        totalDelivered: parseCard(deliveredCard),\n        totalReturned: parseCard(returnedCard),\n        totalForReturn: parseCard(forReturnCard)\n    };\n});\nreturn [\n    {\n        json: {\n            intern_id,\n            start_date,\n            end_date,\n            landedUrl,\n            ...stats\n        }\n    }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        704,
+        0
+      ],
+      "id": "208a275e-89fd-4785-809f-011a1ad4b1bd",
+      "name": "Parcel Status date"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, intern_id, start_date, end_date } = $json;\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\nawait $page.setViewport({\n    width: 1512,\n    height: 982,\n    deviceScaleFactor: 1\n});\nawait $page.goto(\n    `https://meta-digitrading.lhike-erp.com/dashboard?stat=3&interns=${intern_id}&date_field=ord_date&start=${start_date}&end=${end_date}`,\n    {\n        waitUntil: 'networkidle2',\n        timeout: 60000\n    }\n);\nconst landedUrl = $page.url();\nconst stats = await $page.evaluate(() => {\n    function parseCard(card) {\n        if (!card) return null;\n        const amountText =\n            card.querySelector('.number span')?.textContent?.trim() || null;\n        const descEl = card.querySelector('.desc');\n        const amount = amountText\n            ? parseFloat(amountText.replace(/[^0-9.]/g, ''))\n            : null;\n        const percentText =\n            descEl?.querySelector('b')?.textContent?.trim() || null;\n        const descFullText =\n            descEl?.textContent?.replace(/\\s+/g, ' ').trim() || null;\n        const countMatch = descFullText?.match(/\\((\\d+)\\)/);\n        const count = countMatch\n            ? parseInt(countMatch[1], 10)\n            : null;\n        const percent = percentText\n            ? parseFloat(percentText.replace(/[^0-9.]/g, ''))\n            : null;\n        return {\n            raw: amountText,\n            amount,\n            label: descFullText,\n            count,\n            percent\n        };\n    }\n\n    const salesCard = document.querySelector('#div-list-sales');\n    const rtsCard = document\n        .querySelector('.dashboard-stat.red-thunderbird')\n        ?.closest('.col-lg-4, .col-md-4, .col-sm-6, .col-xs-12');\n    const deliveredCard = document.querySelector('.dashboard-stat.purple');\n    const returnedCard = document.querySelector('.dashboard-stat.red-flamingo');\n    const forReturnCard = [...document.querySelectorAll('.dashboard-stat')]\n        .find(el => /FOR RETURN/i.test(el.querySelector('.desc')?.textContent || ''));\n\n    return {\n        totalSales: parseCard(salesCard),\n        totalRts: parseCard(rtsCard),\n        totalDelivered: parseCard(deliveredCard),\n        totalReturned: parseCard(returnedCard),\n        totalForReturn: parseCard(forReturnCard)\n    };\n});\nreturn [\n    {\n        json: {\n            intern_id,\n            start_date,\n            end_date,\n            landedUrl,\n            ...stats\n        }\n    }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        704,
+        224
+      ],
+      "id": "323f6134-5b16-44b7-8486-217433cf4630",
+      "name": "Shipped out Date"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1248,
+        640
+      ],
+      "id": "339fc1e8-c703-4688-8834-c7d6780fead3",
+      "name": "Merge1",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Helper: turn \"158,607.00\" / \"14.98%\" / \"\" into a real number ---\nfunction toNumber(val) {\n    if (val === null || val === undefined || val === '') return 0;\n    const cleaned = String(val).replace(/,/g, '').replace(/%/g, '').trim();\n    const n = parseFloat(cleaned);\n    return isNaN(n) ? 0 : n;\n}\n\n// Fields that should be converted from formatted strings to plain numbers\nconst numericFields = [\n    'orders',\n    'sales',\n    'ad_spent',\n    'roas',\n    'returned_amt',\n    'returned',\n    'rts_rate',\n    'delivered_amt',\n    'delivered'\n];\n\nfunction normalizeRow(row) {\n    const out = { ...row };\n    for (const field of numericFields) {\n        if (field in out) {\n            out[field] = toNumber(out[field]);\n        }\n    }\n    return out;\n}\n\n// --- 1. Grab both items from the previous node ---\nconst items = $input.all();\n// Main object with rows = the item that has a \"rows\" array\nconst mainItem = items.find(i => Array.isArray(i.json.rows));\n// Total object = the item that has a \"total\" object\nconst totalItem = items.find(i => i.json.total);\nconst main = mainItem.json;\n\n// --- 2. Pull out the date + total values to append ---\nconst targetDate = totalItem?.json.date;\nconst total = totalItem?.json.total || {};\n\n// --- 3. Merge total into the matching row by date, then normalize numbers ---\nconst mergedRows = main.rows.map(row => {\n    const merged = row.date === targetDate ? { ...row, ...total } : row;\n    return normalizeRow(merged);\n});\n\nconst intern_id = $input.first().json.intern_id;\nconst rows_count = $input.first().json.rows.length;\n\n// --- 4. Return the updated object ---\nreturn [\n    {\n        json: {\n            intern_id,\n            rows_count,\n            rows: mergedRows\n        }\n    }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        640
+      ],
+      "id": "1e682fc4-5736-4e1d-8e80-90206472f8e9",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1840,
+        352
+      ],
+      "id": "c5f08afe-81c2-4f78-8582-44133f7aaec0",
+      "name": "Merge2",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.all().map(item => item.json);\n\n// Merge all objects into one\nconst merged = Object.assign({}, ...data);\n\n// Today's date (Asia/Manila)\nconst date = new Date().toLocaleDateString(\"en-CA\", {\n  timeZone: \"Asia/Manila\",\n});\n\nmerged.date = date;\n\nreturn [\n  {\n    json: merged,\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1504,
+        0
+      ],
+      "id": "030e5f36-9385-4f27-96f7-3ae4eba0d839",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, intern_id, sumstatus } = $json;\n\n// ---------- Setup ----------\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\n\nawait $page.setViewport({\n    width: 1512,\n    height: 982,\n    deviceScaleFactor: 1\n});\n\nawait $page.goto('https://meta-digitrading.lhike-erp.com/totaladspent', {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n});\n\nasync function waitForLoadingToClear() {\n    await $page.waitForFunction(() => {\n        const el = document.querySelector('#bgloading');\n        if (!el) return true;\n        return window.getComputedStyle(el).display === 'none';\n    }, { timeout: 60000 });\n\n    await new Promise(resolve => setTimeout(resolve, 1500));\n}\n\nawait waitForLoadingToClear();\n\n// ---------- Helper: Set Bootstrap Select ----------\nasync function setBootstrapSelect(selectId, value) {\n    await $page.waitForSelector(`#${selectId}`, { timeout: 15000 });\n\n    await $page.select(`#${selectId}`, String(value));\n\n    await $page.evaluate((id) => {\n        const el = document.getElementById(id);\n\n        el.dispatchEvent(new Event('change', { bubbles: true }));\n\n        if (window.jQuery) {\n            window.jQuery(el).trigger('change');\n\n            if (window.jQuery(el).selectpicker) {\n                window.jQuery(el).selectpicker('refresh');\n            }\n        }\n    }, selectId);\n}\n\n// ---------- Apply Filters ----------\nif (sumstatus !== undefined && sumstatus !== null && sumstatus !== '') {\n    await setBootstrapSelect('sumstatus', sumstatus);\n}\n\nif (intern_id !== undefined && intern_id !== null && intern_id !== '') {\n    await setBootstrapSelect('internid', intern_id);\n}\n\n// ---------- Today's Date ----------\nconst today = new Date();\nconst yyyy = today.getFullYear();\nconst mm = String(today.getMonth() + 1).padStart(2, '0');\nconst dd = String(today.getDate()).padStart(2, '0');\n\nconst todayISO = `${yyyy}-${mm}-${dd}`;\n\n// Format expected by the date picker inputs (YYYY-MM-DD)\nconst start_date = todayISO;\nconst end_date = todayISO;\n\n// ---------- Date Picker ----------\nawait $page.waitForSelector('#conversion-report-range', {\n    visible: true,\n    timeout: 15000\n});\n\nawait $page.click('#conversion-report-range');\n\nawait $page.waitForSelector('.daterangepicker', {\n    visible: true,\n    timeout: 15000\n});\n\nfunction monthNameToNumber(name) {\n    return [\n        'January',\n        'February',\n        'March',\n        'April',\n        'May',\n        'June',\n        'July',\n        'August',\n        'September',\n        'October',\n        'November',\n        'December'\n    ].indexOf(name) + 1;\n}\n\nasync function getVisibleMonths() {\n    return await $page.evaluate(() =>\n        Array.from(document.querySelectorAll('.daterangepicker .calendar .month'))\n            .map(el => el.textContent.trim())\n    );\n}\n\nasync function clickDayOnSide(side, day) {\n    const cells = await $page.$$(\n        `.daterangepicker .calendar.${side} .calendar-table td.available:not(.off)`\n    );\n\n    for (const cell of cells) {\n        const text = await $page.evaluate(el => el.textContent.trim(), cell);\n\n        if (parseInt(text, 10) === day) {\n            await cell.click();\n            return true;\n        }\n    }\n\n    return false;\n}\n\nasync function selectDate(targetYear, targetMonth, day) {\n    for (let attempts = 0; attempts < 24; attempts++) {\n        const months = await getVisibleMonths();\n\n        for (let i = 0; i < months.length; i++) {\n            const [name, yearStr] = months[i].split(' ');\n\n            if (\n                monthNameToNumber(name) === targetMonth &&\n                parseInt(yearStr, 10) === targetYear\n            ) {\n                const side = i === 0 ? 'left' : 'right';\n                return await clickDayOnSide(side, day);\n            }\n        }\n\n        const [leftName, leftYearStr] = months[0].split(' ');\n        const leftMonth = monthNameToNumber(leftName);\n        const leftYear = parseInt(leftYearStr, 10);\n\n        const diff =\n            (targetYear - leftYear) * 12 +\n            (targetMonth - leftMonth);\n\n        const btn = await $page.$(\n            diff > 0\n                ? '.daterangepicker .next.available'\n                : '.daterangepicker .prev.available'\n        );\n\n        if (!btn) break;\n\n        await btn.click();\n        await new Promise(resolve => setTimeout(resolve, 300));\n    }\n\n    return false;\n}\n\n// Select today's date as both start and end\nawait selectDate(yyyy, today.getMonth() + 1, today.getDate());\nawait new Promise(resolve => setTimeout(resolve, 300));\n\nawait selectDate(yyyy, today.getMonth() + 1, today.getDate());\nawait new Promise(resolve => setTimeout(resolve, 300));\n\n// Apply\nawait $page.click('.daterangepicker .applyBtn');\nawait new Promise(resolve => setTimeout(resolve, 500));\n\n// ---------- Search ----------\nawait $page.waitForSelector('.search-ads', {\n    visible: true,\n    timeout: 15000\n});\n\nawait $page.click('.search-ads');\n\nawait waitForLoadingToClear();\n\n// ---------- Verify ----------\nconst appliedStart = await $page\n    .$eval('#txtdstart', el => el.value)\n    .catch(() => null);\n\nconst appliedEnd = await $page\n    .$eval('#txtdend', el => el.value)\n    .catch(() => null);\n\nconst appliedIntern = await $page\n    .$eval('#internid', el =>\n        el.options[el.selectedIndex]\n            ? el.options[el.selectedIndex].textContent.trim()\n            : null\n    )\n    .catch(() => null);\n\nconst appliedSumstatus = await $page\n    .$eval('#sumstatus', el =>\n        el.options[el.selectedIndex]\n            ? el.options[el.selectedIndex].textContent.trim()\n            : null\n    )\n    .catch(() => null);\n\n// ---------- Extract Today's Row ----------\nconst todayRow = await $page.evaluate((todayISO) => {\n    const rows = Array.from(\n        document.querySelectorAll('.roastable table.tg tbody tr')\n    );\n\n    for (const row of rows) {\n        const cells = Array.from(row.querySelectorAll('td')).map(td =>\n            td.textContent.trim().replace(/\\s+/g, ' ')\n        );\n\n        if (!cells.length) continue;\n\n        if (cells[0] === todayISO) {\n            const retCells = Array.from(row.querySelectorAll('td.retview'))\n                .map(td => td.textContent.trim().replace(/\\s+/g, ' '));\n\n            return {\n                date: cells[0],\n                orders: cells[1],\n                sales: cells[2],\n                ad_spent: cells[3],\n                roas: cells[4],\n                rts_rate: retCells[2] || null\n            };\n        }\n    }\n\n    return null;\n}, todayISO);\n\n// ---------- Return ----------\nreturn [\n    {\n        json: {\n            intern_id,\n            sumstatus,\n            start_date,\n            end_date,\n            appliedStart,\n            appliedEnd,\n            appliedIntern,\n            appliedSumstatus,\n            row: todayRow,\n            status: todayRow ? \"success\" : \"not_found\"\n        }\n    }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        448,
+        2560
+      ],
+      "id": "6ad0d58c-debc-4290-b932-54197bb3341c",
+      "name": "Puppeteer"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: $input.first().json.row\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        2560
+      ],
+      "id": "b9e78304-fd3b-41a6-a33e-6e744ffe31fe",
+      "name": "Code in JavaScript4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Sales Order date",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AdsSpent & ROAS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Totals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parcel Status date",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Shipped out Date",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AdsSpent & ROAS": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sales Order date": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parcel Status date": {
+      "main": [
+        [
+          {
+            "node": "Format2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shipped out Date": {
+      "main": [
+        [
+          {
+            "node": "Format3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Format3": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Totals": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Puppeteer": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "a6b8f7b2-efc3-4996-946b-a319c1b5e0e4",
+  "meta": {
+    "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
+  },
+  "id": "fdahk5tdOh3RQ7wF",
+  "tags": []
+}

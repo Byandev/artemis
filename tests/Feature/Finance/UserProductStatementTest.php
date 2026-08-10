@@ -72,13 +72,14 @@ test('the per-product statement resolves the product through unit-code order ite
     $service = app(UserIncomeStatementService::class);
     $products = collect($service->userPayload($statement, $user)['products']);
 
-    // WIDGET: 1000 − (COGS 200 + ship 50 + COD 20 + VAT 2.40) = 727.60
+    // WIDGET: 1000 − (ship 50 + COD 20 + VAT 2.40) = 927.60. The order's
+    // `total_cog` is ignored — COGS comes in as a transaction instead.
     $widget = $products->firstWhere('product', 'WIDGET');
     expect($widget)->not->toBeNull()
         ->and($widget['product_id'])->toBe($product->id)
         ->and((float) $widget['delivered'])->toBe(1000.0)
-        ->and((float) $widget['cost_of_sales'])->toBe(272.40)
-        ->and((float) $widget['gross_profit'])->toBe(727.60)
+        ->and((float) $widget['cost_of_sales'])->toBe(72.40)
+        ->and((float) $widget['gross_profit'])->toBe(927.60)
         ->and((int) $widget['orders'])->toBe(1);
 
     // The order whose item resolves to no product lands in "Discrepancy", last.
@@ -88,8 +89,8 @@ test('the per-product statement resolves the product through unit-code order ite
     expect($discrepancy)->not->toBeNull()
         ->and($discrepancy['product_id'])->toBeNull()
         ->and((float) $discrepancy['delivered'])->toBe(500.0)
-        // 500 − (100 + 0 + 10 + 1.20) = 388.80
-        ->and((float) $discrepancy['gross_profit'])->toBe(388.80);
+        // 500 − (ship 0 + COD 10 + VAT 1.20) = 488.80
+        ->and((float) $discrepancy['gross_profit'])->toBe(488.80);
 
     // The unresolved unit code surfaces in the missing-unit-codes warning list;
     // the mapped one does not.
