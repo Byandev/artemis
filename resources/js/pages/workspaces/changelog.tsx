@@ -12,6 +12,36 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.29.0',
+        date: '2026-08-10',
+        sections: [
+            {
+                title: 'Gencys ERP — Sync Health',
+                items: [
+                    'The daily sales tracker now shows up on Sync Health alongside the other ERP syncs — every workspace and date it fetches opens its own run and closes it when the data lands, so a fetch that quietly never came back is visible on the page instead of being noticed days later when a figure looks wrong',
+                    'A successful sync now clears the earlier attempts that asked for exactly the same thing — same workspace, same date, same item — because once the data is in, a run still sitting pending or failed is stale bookkeeping rather than a gap; each one is stamped with the run that resolved it, so the trail still reads',
+                    'Runs that were already stuck before this existed can be swept in one go, across all history or just a recent window, with a dry run first so you can see what would change before anything is written',
+                ],
+            },
+            {
+                title: 'Sales Targets — Team Attribution Corrected',
+                items: [
+                    'A team’s sales on the gameboard are now counted through the shop an order came in on rather than through whoever owns the page — someone can sit on several teams, so an order was being credited to every team its page owner belonged to and inflating all of them at once',
+                    'Shops are assigned to teams deliberately by an admin, so an order now lands on one team unless a shop has been shared on purpose — and the day’s headline total still counts each order once even when it has been',
+                    'This is the same link that decides which orders a team is allowed to see, so a team’s number on the board now reconciles with the orders its members can actually open — expect some team figures to move, downwards where people were being double-counted',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'On the TV slideshow each team’s bar now reads against its own target with the axis ending at 100%, so a team that has beaten its goal sits full instead of the whole scale stretching to make room for it — the exact figure is on the tile above either way',
+                    'The ERP syncs are now staggered a quarter of an hour apart through the morning and afternoon — sales tracker, then intern records, then inventory — rather than landing together and competing for the same ERP session',
+                    'Parcel SMS delivery checks have moved to their own queue with more workers, so a pile-up of status checks no longer holds up the messages waiting to go out',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.28.0',
         date: '2026-08-07',
         sections: [

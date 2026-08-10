@@ -10,17 +10,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\GencysERP\Models\GencysSyncRun;
 
 /**
  * Receives the daily sales tracker rows that the n8n flow scrapes from Gencys
  * ERP and posts back. The payload is the list n8n sends:
  *
  *   [ { "workspace_id": 1, "api_key": "art_…", "webhook_url": "…",
+ *       "sync_run_id": 42,
  *       "orders": [ { "Order Date": "…", "CSR": "…", … }, … ] } ]
  *
  * Each entry is authenticated by its own `api_key` (n8n puts it in the body),
  * and the orders are upserted keyed on Gencys' own order `id`, which is stored
- * as the row's primary key.
+ * as the row's primary key. `sync_run_id` is the run the trigger command opened
+ * for this workspace/date, echoed back so we can close it out.
  */
 class DailySalesTrackerController extends Controller
 {
@@ -61,6 +64,9 @@ class DailySalesTrackerController extends Controller
 
             // n8n sends the rows under "purchase_orders"; older payloads used "orders".
             $rows = Arr::get($entry, 'purchase_orders', Arr::get($entry, 'orders', []));
+
+            // Rows this entry actually wrote — reported back on its sync run.
+            $entrySaved = 0;
 
             foreach ($rows as $order) {
                 // Gencys' own order id ("id" in the payload). It's the stable
@@ -114,6 +120,7 @@ class DailySalesTrackerController extends Controller
                     ['workspace_id' => $workspace->id] + $attributes,
                 );
                 $record->wasRecentlyCreated ? $created++ : $updated++;
+                $entrySaved++;
 
                 // Replace the parsed line items so re-syncs stay idempotent.
                 $record->items()->delete();
@@ -122,6 +129,15 @@ class DailySalesTrackerController extends Controller
                     $record->items()->createMany($items);
                 }
             }
+
+            // Close out the run this entry echoed back. Succeeding it also
+            // resolves earlier pending/failed runs for the same workspace/date.
+            GencysSyncRun::succeedById(
+                $workspace->id,
+                $this->syncRunId($entry),
+                count($rows),
+                $entrySaved,
+            );
         }
 
         return response()->json([
@@ -130,6 +146,14 @@ class DailySalesTrackerController extends Controller
             'skipped' => $skipped,
             'errors' => $errors,
         ], empty($errors) ? 200 : 207);
+    }
+
+    /** Pull the sync run id n8n echoed back, tolerating a couple of key spellings. */
+    private function syncRunId(array $entry): ?int
+    {
+        $id = $entry['sync_run_id'] ?? $entry['syncRunId'] ?? null;
+
+        return ($id === null || $id === '') ? null : (int) $id;
     }
 
     /**

@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Modules\GencysERP\Jobs\FetchDailySalesTrackerJob;
+use Modules\GencysERP\Models\GencysSyncRun;
 
 class TriggerFetchDailySalesTrackerCommand extends Command
 {
@@ -97,6 +98,17 @@ class TriggerFetchDailySalesTrackerCommand extends Command
             }
 
             foreach ($dates as $date) {
+                // Open a pending run per workspace/date and hand its id to n8n
+                // (sync_run_id) so the callback can echo it back for an exact
+                // match; a call that never reports back stays pending until the
+                // stale-run sweeper fails it.
+                $run = GencysSyncRun::start(
+                    $workspace->id,
+                    null,
+                    GencysSyncRun::TYPE_DAILY_SALES_TRACKER,
+                    ['date' => $date],
+                );
+
                 $data = [
                     'workspace_id' => $workspace->id,
                     'workspace_slug' => $workspace->slug,
@@ -106,16 +118,17 @@ class TriggerFetchDailySalesTrackerCommand extends Command
                     'erp_password' => $workspace->erp_password,
                     'date' => $date,
                     'webhook_url' => $callbackUrl,
+                    'sync_run_id' => $run->id,
                 ];
 
                 if ($sync) {
                     // Run inline so the webhook fires immediately — no erp worker needed.
-                    FetchDailySalesTrackerJob::dispatchSync($webhookUrl, $data);
+                    FetchDailySalesTrackerJob::dispatchSync($webhookUrl, $data, [$run->id]);
                     $this->info("Sent for workspace {$workspace->name} (ID: {$workspace->id}) for {$date}");
                 } else {
                     $jobDelaySeconds = $dispatched * $delay;
 
-                    FetchDailySalesTrackerJob::dispatch($webhookUrl, $data)
+                    FetchDailySalesTrackerJob::dispatch($webhookUrl, $data, [$run->id])
                         ->delay(now()->addSeconds($jobDelaySeconds));
 
                     $this->info("Dispatched for workspace {$workspace->name} (ID: {$workspace->id}) for {$date} (delay: {$jobDelaySeconds}s)");
