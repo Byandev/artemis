@@ -35,6 +35,8 @@ class UserIncomeStatementService
 {
     private const DELIVERED_STATUS = 'DELIVERED';
 
+    private const COGS_KEY = -4;
+
     private const SHIPPING_FEE_KEY = -1;
 
     private const COD_FEE_KEY = -2;
@@ -97,6 +99,162 @@ class UserIncomeStatementService
         ];
     }
 
+    /**
+     * The workspace-wide per-product P&L table (products[], total, discrepancy),
+     * each product a row across every intern — the product-side mirror of
+     * {@see listPayload()}. Cost of sales = COGS + shipping + COD + VAT + ad
+     * spend; advisory = % of positive gross (gencys partners). Orders that don't
+     * resolve to a product roll into the "Discrepancy" row.
+     */
+    public function productListPayload(IncomeStatement $statement): array
+    {
+        $workspace = $statement->workspace;
+        [$from, $to] = $this->range($statement);
+
+        $codRate = (float) $statement->cod_fee_rate;
+        $vatRate = (float) $statement->vat_rate;
+        $advisoryRate = (float) $statement->advisory_rate;
+        $gencysPartner = (bool) $workspace->is_gencys_partner;
+
+        // Delivered revenue + orders per product (all interns).
+        $delivered = GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->where('parcel_status', self::DELIVERED_STATUS)
+            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
+            ->selectRaw('COALESCE(price_final, 0) as revenue')
+            ->selectSub($this->orderProductSubquery(), 'product_id');
+
+        $rows = DB::query()->fromSub($delivered, 't')
+            ->selectRaw('product_id, COUNT(*) as orders, COALESCE(SUM(revenue), 0) as revenue')
+            ->groupBy('product_id')
+            ->get();
+
+        // Shipping per product (orders shipped out in the month, all interns).
+        $shipped = GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->whereBetween('shipped_out_date', [$from->toDateString(), $to->toDateString()])
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
+            ->selectRaw('COALESCE(shipping_fee, 0) as shipping')
+            ->selectSub($this->orderProductSubquery(), 'product_id');
+
+        $shipping = DB::query()->fromSub($shipped, 't')
+            ->selectRaw('product_id, COALESCE(SUM(shipping), 0) as shipping')
+            ->groupBy('product_id')
+            ->pluck('shipping', 'product_id');
+
+        // COGS + ad spend per product — the whole transaction share, workspace-wide
+        // (no splitting; COGS is the product's bulk Cost of Goods purchase).
+        $cogsByPid = $this->productTransactionSharesByPid($workspace, $from, $to, ['%cost of goods%']);
+        $adByPid = $this->productTransactionSharesByPid($workspace, $from, $to, ['%adspent%', '%ad spent%', '%ad spend%']);
+
+        $orderByKey = [];
+        foreach ($rows as $r) {
+            $key = $r->product_id === null ? '' : (string) (int) $r->product_id;
+            $orderByKey[$key] = ['orders' => (int) $r->orders, 'revenue' => round((float) $r->revenue, 2)];
+        }
+
+        $keys = collect(array_keys($orderByKey))
+            ->merge(array_keys($adByPid))
+            ->merge(array_keys($cogsByPid))
+            ->unique();
+
+        $names = DB::table('products')
+            ->whereIn('id', $keys->filter(fn ($k) => $k !== '')->map(fn ($k) => (int) $k)->all())
+            ->pluck('name', 'id');
+
+        $mapped = $keys->map(function ($key) use ($orderByKey, $cogsByPid, $adByPid, $shipping, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner) {
+            $pid = $key === '' ? null : (int) $key;
+            $order = $orderByKey[$key] ?? ['orders' => 0, 'revenue' => 0.0];
+            $revenue = round((float) $order['revenue'], 2);
+            $cogs = round((float) ($cogsByPid[$key] ?? 0), 2);
+            $ship = round((float) $shipping->get($pid, 0), 2);
+            $cod = round($revenue * $codRate, 2);
+            $vat = round($cod * $vatRate, 2);
+            $adspent = round((float) ($adByPid[$key] ?? 0), 2);
+            $costOfSales = round($cogs + $ship + $cod + $vat + $adspent, 2);
+            $gross = round($revenue - $costOfSales, 2);
+            $advisory = ($gencysPartner && $gross > 0) ? round($gross * $advisoryRate, 2) : 0.0;
+
+            return [
+                'product_id' => $pid,
+                'name' => $pid !== null ? ($names[$pid] ?? 'Unknown') : 'Discrepancy',
+                'orders' => (int) $order['orders'],
+                'delivered' => $revenue,
+                'cost_of_sales' => $costOfSales,
+                'gross_profit' => $gross,
+                'advisory' => $advisory,
+                'net_profit' => round($gross - $advisory, 2),
+            ];
+        });
+
+        $products = $mapped->filter(fn ($r) => $r['product_id'] !== null)->sortByDesc('delivered')->values()->all();
+        $discrepancy = $mapped->first(fn ($r) => $r['product_id'] === null)
+            ?? ['product_id' => null, 'name' => 'Discrepancy', 'orders' => 0, 'delivered' => 0.0, 'cost_of_sales' => 0.0, 'gross_profit' => 0.0, 'advisory' => 0.0, 'net_profit' => 0.0];
+
+        $sum = fn (string $k) => round(collect($products)->sum($k), 2);
+
+        return [
+            'products' => $products,
+            'total' => [
+                'product_id' => null,
+                'name' => 'Total',
+                'orders' => (int) collect($products)->sum('orders'),
+                'delivered' => $sum('delivered'),
+                'cost_of_sales' => $sum('cost_of_sales'),
+                'gross_profit' => $sum('gross_profit'),
+                'advisory' => $sum('advisory'),
+                'net_profit' => $sum('net_profit'),
+            ],
+            'discrepancy' => $discrepancy,
+        ];
+    }
+
+    /**
+     * Workspace-wide product-share totals for the month, for transaction types
+     * whose name matches any of the given LIKE patterns (lowercased). Keyed by
+     * product id as a string; '' collects shares that match no product.
+     *
+     * @param  list<string>  $namePatterns
+     * @return array<string, float>
+     */
+    private function productTransactionSharesByPid(Workspace $workspace, Carbon $from, Carbon $to, array $namePatterns): array
+    {
+        $rows = DB::table('finance_transaction_products as tp')
+            ->join('finance_transactions as t', 't.id', '=', 'tp.transaction_id')
+            ->join('finance_transaction_types as tt', 'tt.id', '=', 't.transaction_type_id')
+            ->where('t.workspace_id', $workspace->id)
+            ->where('t.type', 'out')
+            ->whereBetween('t.date', [$from->toDateString(), $to->toDateString()])
+            ->where(function ($q) use ($namePatterns) {
+                foreach ($namePatterns as $i => $pattern) {
+                    $i === 0
+                        ? $q->whereRaw('LOWER(tt.name) LIKE ?', [$pattern])
+                        : $q->orWhereRaw('LOWER(tt.name) LIKE ?', [$pattern]);
+                }
+            })
+            ->groupBy('tp.product')
+            ->selectRaw('tp.product as name, SUM(tp.amount) as amount')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $idByName = DB::table('products')
+            ->where('workspace_id', $workspace->id)
+            ->whereIn('name', $rows->pluck('name')->all())
+            ->pluck('id', 'name');
+
+        $byPid = [];
+        foreach ($rows as $r) {
+            $key = isset($idByName[$r->name]) ? (string) $idByName[$r->name] : '';
+            $byPid[$key] = ($byPid[$key] ?? 0) + (float) $r->amount;
+        }
+
+        return $byPid;
+    }
+
     /** The single-user `statement` payload for the overall statement page. */
     public function userPayload(IncomeStatement $statement, User $user): array
     {
@@ -135,15 +293,17 @@ class UserIncomeStatementService
      * order maps to a single product (its unit codes all point to one); orders
      * whose items resolve to no product fall into a "Discrepancy" row (kept last).
      *
-     * Cost of sales here is order-derived (COGS + shipping + COD + VAT) plus the
-     * user's ad spend for the product. Other transactions still stay at the user
-     * level.
+     * Cost of sales here is shipping + COD + VAT + the user's COGS + ad spend for
+     * the product. Other transactions still stay at the user level.
      *
      * Ad spend comes from the user's Ad Spent transactions: each is split across
      * products (a product-share) and charged to users (a charge-to share), so the
      * user's ad spend for a product is that product's share apportioned by the
-     * user's charge-to fraction of the whole transaction. It therefore sums back
-     * to the user's ad spend on the P&L.
+     * user's charge-to fraction of the whole transaction.
+     *
+     * COGS comes from "Cost of Goods" transactions tagged to a product (bulk per
+     * product) and is split across the interns who sold that product by their
+     * number of delivered orders — see {@see userCogsByProduct()}.
      *
      * @return list<array{product_id:?int, product:string, orders:int, delivered:float, cogs:float, shipping:float, cod_fee:float, vat:float, adspent:float, cost_of_sales:float, gross_profit:float, advisory:float, net_profit:float, commission_rate:float, commission:float}>
      */
@@ -184,17 +344,18 @@ class UserIncomeStatementService
                 ->whereIn('intern_brands_name', $cells)
                 ->whereNotIn('platform', ['Shopee', 'TikTok'])
                 ->whereNotLike('page', '%pikutin%')
-                ->selectRaw('COALESCE(price_final, 0) as revenue, COALESCE(total_cog, 0) as cogs')
+                ->selectRaw('COALESCE(price_final, 0) as revenue')
                 ->selectSub($this->orderProductSubquery(), 'product_id');
 
             $rows = DB::query()->fromSub($delivered, 't')
-                ->selectRaw('product_id, COUNT(*) as orders, COALESCE(SUM(revenue), 0) as revenue, COALESCE(SUM(cogs), 0) as cogs')
+                ->selectRaw('product_id, COUNT(*) as orders, COALESCE(SUM(revenue), 0) as revenue')
                 ->groupBy('product_id')
                 ->get();
         }
 
-        // The user's ad spend per product name → resolved to a product id.
+        // The user's ad spend and COGS per product id.
         $adSpendByPid = $this->userAdSpendByProduct($workspace, $user->id, $from, $to);
+        $cogsByPid = $this->userCogsByProduct($workspace, $cells, $from, $to);
 
         if ($rows->isEmpty() && empty($adSpendByPid)) {
             return [];
@@ -204,7 +365,7 @@ class UserIncomeStatementService
         $orderByKey = [];
         foreach ($rows as $r) {
             $key = $r->product_id === null ? '' : (string) (int) $r->product_id;
-            $orderByKey[$key] = ['orders' => (int) $r->orders, 'revenue' => round((float) $r->revenue, 2), 'cogs' => round((float) $r->cogs, 2)];
+            $orderByKey[$key] = ['orders' => (int) $r->orders, 'revenue' => round((float) $r->revenue, 2)];
         }
 
         $keys = collect(array_keys($orderByKey))->merge(array_keys($adSpendByPid))->unique();
@@ -218,11 +379,11 @@ class UserIncomeStatementService
             ->where('user_id', $user->id)
             ->pluck('rate', 'product_id');
 
-        $mapped = $keys->map(function ($key) use ($orderByKey, $adSpendByPid, $shipping, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner, $commissionRates) {
+        $mapped = $keys->map(function ($key) use ($orderByKey, $adSpendByPid, $cogsByPid, $shipping, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner, $commissionRates) {
             $pid = $key === '' ? null : (int) $key;
-            $order = $orderByKey[$key] ?? ['orders' => 0, 'revenue' => 0.0, 'cogs' => 0.0];
+            $order = $orderByKey[$key] ?? ['orders' => 0, 'revenue' => 0.0];
             $revenue = round((float) $order['revenue'], 2);
-            $cogs = round((float) $order['cogs'], 2);
+            $cogs = round((float) ($cogsByPid[$key] ?? 0), 2);
             $ship = round((float) $shipping->get($pid, 0), 2);
             $cod = round($revenue * $codRate, 2);
             $vat = round($cod * $vatRate, 2);
@@ -313,6 +474,104 @@ class UserIncomeStatementService
         }
 
         return $byPid;
+    }
+
+    /**
+     * This user's COGS per product id for the month. A product's COGS is bought
+     * in bulk (its "Cost of Goods" transaction shares) and split across the
+     * interns who sold it by their number of delivered orders:
+     * `product COGS ÷ total delivered orders for the product × this user's orders`.
+     * Keyed by product id as a string; '' collects shares whose product name
+     * matches no product (they land in the per-product "Discrepancy" column).
+     *
+     * @return array<string, float>
+     */
+    private function userCogsByProduct(Workspace $workspace, array $cells, Carbon $from, Carbon $to): array
+    {
+        $typeIds = $this->costOfGoodsTypeIds($workspace);
+        if (empty($typeIds)) {
+            return [];
+        }
+
+        // A product's total bulk COGS this month, resolved to a product id.
+        $cogsRows = DB::table('finance_transaction_products as tp')
+            ->join('finance_transactions as t', 't.id', '=', 'tp.transaction_id')
+            ->where('t.workspace_id', $workspace->id)
+            ->where('t.type', 'out')
+            ->whereIn('t.transaction_type_id', $typeIds)
+            ->whereBetween('t.date', [$from->toDateString(), $to->toDateString()])
+            ->groupBy('tp.product')
+            ->selectRaw('tp.product as name, SUM(tp.amount) as cogs')
+            ->get();
+
+        if ($cogsRows->isEmpty()) {
+            return [];
+        }
+
+        $idByName = DB::table('products')
+            ->where('workspace_id', $workspace->id)
+            ->whereIn('name', $cogsRows->pluck('name')->all())
+            ->pluck('id', 'name');
+
+        $totalByPid = [];
+        foreach ($cogsRows as $r) {
+            $key = isset($idByName[$r->name]) ? (string) $idByName[$r->name] : '';
+            $totalByPid[$key] = ($totalByPid[$key] ?? 0) + (float) $r->cogs;
+        }
+
+        // Order counts to split by: all interns (denominator) vs this user.
+        $allOrders = $this->deliveredOrderCountsByProduct($workspace, null, $from, $to);
+        $myOrders = $this->deliveredOrderCountsByProduct($workspace, $cells, $from, $to);
+
+        $byPid = [];
+        foreach ($totalByPid as $key => $total) {
+            $all = (int) ($allOrders[$key] ?? 0);
+            $mine = (int) ($myOrders[$key] ?? 0);
+            $byPid[$key] = ($all > 0 && $mine > 0) ? round($total * $mine / $all, 2) : 0.0;
+        }
+
+        return $byPid;
+    }
+
+    /**
+     * Delivered order counts per product id for the month, keyed by product id as
+     * a string ('' = orders that resolve to no product). Passing null for $cells
+     * counts every intern's orders; passing a cell list scopes to one intern.
+     *
+     * @return array<string, int>
+     */
+    private function deliveredOrderCountsByProduct(Workspace $workspace, ?array $cells, Carbon $from, Carbon $to): array
+    {
+        $delivered = GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->where('parcel_status', self::DELIVERED_STATUS)
+            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%')
+            ->when($cells !== null, fn ($q) => $q->whereIn('intern_brands_name', $cells))
+            ->selectSub($this->orderProductSubquery(), 'product_id');
+
+        return DB::query()->fromSub($delivered, 't')
+            ->selectRaw('product_id, COUNT(*) as orders')
+            ->groupBy('product_id')
+            ->get()
+            ->mapWithKeys(fn ($r) => [($r->product_id === null ? '' : (string) (int) $r->product_id) => (int) $r->orders])
+            ->all();
+    }
+
+    /**
+     * Ids of the workspace's "Cost of Goods" transaction types — the bulk COGS
+     * purchases folded into the product breakdown and the per-user COGS line
+     * (and, so they are not double-counted, excluded from the charge-to buckets).
+     *
+     * @return list<int>
+     */
+    private function costOfGoodsTypeIds(Workspace $workspace): array
+    {
+        return TransactionType::where('workspace_id', $workspace->id)
+            ->whereRaw('LOWER(name) LIKE ?', ['%cost of goods%'])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     /**
@@ -463,11 +722,19 @@ class UserIncomeStatementService
         $cod = round($revenue * $codRate, 2);
         $vat = round($cod * $vatRate, 2);
 
+        // COGS is the sum of this intern's per-product bulk-COGS shares (split by
+        // order count). "Cost of Goods" types are excluded from the charge-to
+        // buckets below so this is the only place COGS lands.
+        $cogs = round(array_sum($this->userCogsByProduct($workspace, $cells, $from, $to)), 2);
+
         [$flagged, $opexBuckets] = $this->userTransactionBuckets($workspace, $user->id, $from, $to);
         $flaggedTotal = (float) collect($flagged)->sum('amount');
         $opexTotal = (float) collect($opexBuckets)->sum('amount');
 
         $lines = collect();
+        if ($cogs > 0) {
+            $lines->push($this->line(self::COGS_KEY, 'COGS', $cogs, 'cogs', 'cost_of_sales'));
+        }
         if ($shipping > 0) {
             $lines->push($this->line(self::SHIPPING_FEE_KEY, 'Shipping Fee', round($shipping, 2), 'shipping_fee', 'cost_of_sales'));
         }
@@ -484,7 +751,7 @@ class UserIncomeStatementService
             $lines->push($this->line($b['type_key'], $b['type_name'], $b['amount'], 'transaction_type', 'opex'));
         }
 
-        $p = $this->derivePnl(round($revenue, 2), $shipping, $cod, $vat, $flaggedTotal, $opexTotal, $advisoryRate, (bool) $workspace->is_gencys_partner);
+        $p = $this->derivePnl(round($revenue, 2), $cogs, $shipping, $cod, $vat, $flaggedTotal, $opexTotal, $advisoryRate, (bool) $workspace->is_gencys_partner);
 
         return [
             'delivered' => round($revenue, 2),
@@ -501,9 +768,9 @@ class UserIncomeStatementService
     }
 
     /** Two-tier P&L math. */
-    private function derivePnl(float $revenue, float $shipping, float $cod, float $vat, float $flagged, float $opex, float $advisoryRate, bool $gencysPartner): array
+    private function derivePnl(float $revenue, float $cogs, float $shipping, float $cod, float $vat, float $flagged, float $opex, float $advisoryRate, bool $gencysPartner): array
     {
-        $costOfSales = round($shipping + $cod + $vat + $flagged, 2);
+        $costOfSales = round($cogs + $shipping + $cod + $vat + $flagged, 2);
         $gross = round($revenue - $costOfSales, 2);
         $advisory = ($gencysPartner && $gross > 0) ? round($gross * $advisoryRate, 2) : 0.0;
         $net = round($gross - $opex - $advisory, 2);
@@ -621,6 +888,8 @@ class UserIncomeStatementService
      * The user's charged outflow transactions grouped by type, split into cost of
      * sales and OPEX by each type's `income_statement_section`. Types with a null
      * section (excluded) are dropped; a deleted/unknown type falls back to OPEX.
+     * "Cost of Goods" types are dropped too — COGS is attributed by order count in
+     * {@see userCogsByProduct()}, so counting it here would double it.
      *
      * @return array{0:list<array{type_key:int,type_name:string,amount:float}>, 1:list<array{type_key:int,type_name:string,amount:float}>}
      */
@@ -629,6 +898,8 @@ class UserIncomeStatementService
         $types = TransactionType::where('workspace_id', $workspace->id)
             ->get(['id', 'name', 'income_statement_section'])
             ->keyBy('id');
+
+        $cogsTypeIds = $this->costOfGoodsTypeIds($workspace);
 
         // A transaction split across users contributes only this user's share.
         $rows = Transaction::query()
@@ -652,7 +923,7 @@ class UserIncomeStatementService
                     'section' => $type ? $type->income_statement_section : 'opex',
                 ];
             })
-            ->reject(fn ($b) => $b['section'] === null);
+            ->reject(fn ($b) => $b['section'] === null || in_array($b['type_key'], $cogsTypeIds, true));
 
         return [
             $rows->where('section', 'cost_of_sales')->map(fn ($b) => ['type_key' => $b['type_key'], 'type_name' => $b['type_name'], 'amount' => $b['amount']])->values()->all(),

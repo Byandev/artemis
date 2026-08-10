@@ -43,44 +43,6 @@ interface ProductRow {
     product_id: number | null;
 }
 
-// Per-product table lines (rows), top to bottom. Money lines format with `fmt`.
-const PRODUCT_LINES: {
-    key: keyof Omit<ProductRow, 'product'>;
-    label: string;
-    money: boolean;
-    strong?: boolean;
-    signed?: boolean;
-}[] = [
-    { key: 'orders', label: 'Orders', money: false },
-    { key: 'delivered', label: 'Delivered', money: true, strong: true },
-    { key: 'cogs', label: 'COGS', money: true },
-    { key: 'shipping', label: 'Shipping Fee', money: true },
-    { key: 'cod_fee', label: 'COD Fee', money: true },
-    { key: 'vat', label: 'VAT', money: true },
-    { key: 'adspent', label: 'Ad Spent', money: true },
-    {
-        key: 'cost_of_sales',
-        label: 'Cost of Sales',
-        money: true,
-        strong: true,
-    },
-    {
-        key: 'gross_profit',
-        label: 'Gross Profit',
-        money: true,
-        strong: true,
-        signed: true,
-    },
-    { key: 'advisory', label: 'Advisory Share', money: true },
-    {
-        key: 'net_profit',
-        label: 'Net Profit',
-        money: true,
-        strong: true,
-        signed: true,
-    },
-];
-
 interface Statement {
     id: number | null;
     period_month: string; // YYYY-MM-DD
@@ -115,7 +77,7 @@ interface Props {
     commissionUrl?: string;
 }
 
-const AUTO = ['shipping_fee', 'cod_fee', 'vat'];
+const AUTO = ['cogs', 'shipping_fee', 'cod_fee', 'vat'];
 
 // Money-flow segment colors — fixed order, separated in hue AND lightness; every
 // segment is direct-labelled in the legend, so identity is never colour-alone.
@@ -149,7 +111,6 @@ export default function IncomeStatementShow({
     base: baseProp,
     scope,
     readonly = false,
-    commissionUrl,
 }: Props) {
     const base =
         baseProp ?? `/workspaces/${workspace.slug}/finance/income-statements`;
@@ -183,6 +144,8 @@ export default function IncomeStatementShow({
     };
 
     const derivation = (r: ExpenseRow): string | null => {
+        if (r.source === 'cogs')
+            return 'Cost of Goods, split across interns by orders';
         if (r.source === 'shipping_fee') return 'Orders shipped out this month';
         if (r.source === 'cod_fee')
             return `${codPct}% of Total Delivered (${fmt(statement.delivered)})`;
@@ -424,13 +387,22 @@ export default function IncomeStatementShow({
                             Back
                         </Link>
                         {!scope && statement.gencys_partner && statement.id && (
-                            <Link
-                                href={`/workspaces/${workspace.slug}/finance/income-statements/${statement.id}/users`}
-                                className={BTN}
-                            >
-                                <Users className="h-3.5 w-3.5" />
-                                Per-user breakdown
-                            </Link>
+                            <>
+                                <Link
+                                    href={`/workspaces/${workspace.slug}/finance/income-statements/${statement.id}/users`}
+                                    className={BTN}
+                                >
+                                    <Users className="h-3.5 w-3.5" />
+                                    Per-user breakdown
+                                </Link>
+                                <Link
+                                    href={`/workspaces/${workspace.slug}/finance/income-statements/${statement.id}/products`}
+                                    className={BTN}
+                                >
+                                    <ShoppingBag className="h-3.5 w-3.5" />
+                                    Per-product breakdown
+                                </Link>
+                            </>
                         )}
                         {readonly ? null : isPreview ? (
                             <button
@@ -642,124 +614,6 @@ export default function IncomeStatementShow({
                         </div>
                     </div>
                 </div>
-
-                {(statement.products?.length ?? 0) > 0 && (
-                    <div className={`${CARD} mt-6 overflow-hidden`}>
-                        <div className="flex items-center justify-between border-b border-black/6 px-5 py-4 dark:border-white/6">
-                            <div>
-                                <div className="text-[13px] font-semibold text-gray-800 dark:text-gray-100">
-                                    Per Product
-                                </div>
-                                <div className="mt-0.5 text-[11px] text-gray-400">
-                                    Delivered revenue &amp; cost of sales by
-                                    product
-                                </div>
-                            </div>
-                            <span className="rounded-full border border-black/6 px-2.5 py-0.5 text-[10px] tracking-wider text-gray-400 uppercase dark:border-white/6">
-                                {statement.products!.length}{' '}
-                                {statement.products!.length === 1
-                                    ? 'product'
-                                    : 'products'}
-                            </span>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-max border-collapse text-right">
-                                <thead>
-                                    <tr className="border-b border-black/6 dark:border-white/6">
-                                        <th className="sticky left-0 z-10 bg-white px-4 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase dark:bg-zinc-900">
-                                            Line
-                                        </th>
-                                        <th className="bg-stone-50 px-4 py-3 text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:bg-zinc-800/50">
-                                            Total
-                                        </th>
-                                        {statement.products!.map((p) => (
-                                            <th
-                                                key={p.product}
-                                                className="px-4 py-3 text-[10px] font-semibold tracking-wider whitespace-nowrap text-gray-400 uppercase"
-                                            >
-                                                {p.product}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                    {PRODUCT_LINES.filter(
-                                        (line) =>
-                                            statement.gencys_partner ||
-                                            (line.key !== 'advisory' &&
-                                                line.key !== 'net_profit'),
-                                    ).map((line) => {
-                                        const total =
-                                            statement.products!.reduce(
-                                                (s, p) =>
-                                                    s +
-                                                    (Number(p[line.key]) || 0),
-                                                0,
-                                            );
-                                        const cell = (v: number) =>
-                                            line.money
-                                                ? fmt(v)
-                                                : v.toLocaleString();
-                                        const tone = (v: number) =>
-                                            line.signed && v < 0
-                                                ? 'text-rose-600 dark:text-rose-400'
-                                                : line.signed
-                                                  ? 'text-emerald-600 dark:text-emerald-400'
-                                                  : line.strong
-                                                    ? 'text-gray-800 dark:text-gray-100'
-                                                    : 'text-gray-500 dark:text-gray-400';
-
-                                        return (
-                                            <tr
-                                                key={line.key}
-                                                className={
-                                                    line.strong
-                                                        ? 'bg-stone-50/50 dark:bg-zinc-800/20'
-                                                        : ''
-                                                }
-                                            >
-                                                <td
-                                                    className={`sticky left-0 z-10 bg-white px-4 py-2.5 text-left text-[12px] dark:bg-zinc-900 ${
-                                                        line.strong
-                                                            ? 'font-semibold text-gray-800 dark:text-gray-100'
-                                                            : 'text-gray-500 dark:text-gray-400'
-                                                    }`}
-                                                >
-                                                    {line.label}
-                                                </td>
-                                                <td
-                                                    className={`bg-stone-50 px-4 py-2.5 text-[12px] font-semibold tabular-nums dark:bg-zinc-800/50 ${tone(total)}`}
-                                                >
-                                                    {cell(total)}
-                                                </td>
-                                                {statement.products!.map(
-                                                    (p) => (
-                                                        <td
-                                                            key={p.product}
-                                                            className={`px-4 py-2.5 text-[12px] whitespace-nowrap tabular-nums ${tone(Number(p[line.key]))}`}
-                                                        >
-                                                            {cell(
-                                                                Number(
-                                                                    p[line.key],
-                                                                ),
-                                                            )}
-                                                        </td>
-                                                    ),
-                                                )}
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                        <p className="border-t border-black/6 px-5 py-3 text-[10px] text-gray-400 dark:border-white/6">
-                            Cost of Sales here is order-derived (COGS + Shipping
-                            + COD + VAT) plus the intern&apos;s Ad Spent for the
-                            product. Other transactions stay at the intern level
-                            below.
-                        </p>
-                    </div>
-                )}
 
                 <p className="mt-3 text-[11px] text-gray-400">
                     Gross Profit = Delivered − Cost of Sales. Net Profit = Gross

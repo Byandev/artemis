@@ -40,6 +40,21 @@ class UserIncomeStatementController extends Controller
         ]);
     }
 
+    /** Workspace-wide per-product P&L table for the parent statement's month. */
+    public function productIndex(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
+        $this->ensureOwns($workspace, $incomeStatement);
+
+        return Inertia::render('workspaces/finance/product-income-statements/index', [
+            'workspace' => $workspace,
+            'incomeStatement' => $this->statementContext($incomeStatement),
+            ...$this->service->productListPayload($incomeStatement),
+            'missingUnitCodes' => $this->service->missingUnitCodes($incomeStatement),
+        ]);
+    }
+
     /**
      * A single user's statement for the parent month, rendered through the same
      * page as the overall statement (read-only, scoped).
