@@ -27,13 +27,25 @@ use Illuminate\Support\Facades\DB;
  * The totals cover exactly the teams the target included — the ones ticked when
  * it was created — and nothing else. A team left out of the target has no goal on
  * this board, so counting its sales would score the workspace against a target
- * that never asked for it. Attribution runs through the page an order came in on
- * (pages.owner_id → team_user), the same link the workspace metrics use for their
- * team filter.
+ * that never asked for it.
  *
- * The day total is deliberately not the sum of the per-team rows: it filters
- * orders rather than joining through team membership, so an order whose page
- * owner sits on two included teams still counts once.
+ * A team owns an order through the shop the order's page belongs to
+ * (pages.shop_id → team_shop), the same link team-level visibility uses — see
+ * App\Models\Concerns\ScopesToVisibleTeams and Order::visibilityTeamRelation(),
+ * which reaches teams via `page.shop.teams`. Attribution has to match visibility:
+ * a scoped user who may only see their team's shops would otherwise read a team
+ * total built from orders they cannot list.
+ *
+ * This deliberately does *not* attribute through the page's owner
+ * (pages.owner_id → team_user). team_user is many-to-many by design — a user can
+ * sit on several teams — so grouping over it credits one order to every team its
+ * owner belongs to. team_shop is keyed on (team_id, shop_id) and assigned
+ * deliberately by an admin, so one shop lands on one team unless someone chooses
+ * otherwise.
+ *
+ * The day total is still not the sum of the per-team rows: it filters orders
+ * rather than joining through the pivot, so a shop deliberately shared between
+ * two included teams still counts its orders once toward the day.
  *
  * No team *visibility* scoping is applied — every included team's number is
  * shown, which is why this only backs the password-gated public page and not a
@@ -117,8 +129,12 @@ class SalesTargetScoreboardQuery
             ])
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->join('team_user as tu', 'tu.user_id', '=', 'pages.owner_id')
-            ->where('tu.team_id', $teamId)
+            // Filtered, not joined: the sum is grouped by date, so a second
+            // team_shop row for this shop would double every day on the line.
+            ->whereIn('pages.shop_id', fn ($sub) => $sub
+                ->from('team_shop')
+                ->select('shop_id')
+                ->where('team_id', $teamId))
             ->groupBy('date')
             ->selectRaw('DATE(pancake_orders.confirmed_at) as date, SUM(pancake_orders.final_amount) as sales')
             ->pluck('sales', 'date');
@@ -187,9 +203,12 @@ class SalesTargetScoreboardQuery
     }
 
     /**
-     * team id => confirmed sales that day. A team owns an order through the page
-     * it came in on (pages.owner_id → team_user), the same link the workspace
-     * metrics use for a team filter.
+     * team id => confirmed sales that day. A team owns an order through the shop
+     * behind the page it came in on (pages.shop_id → team_shop), the same link
+     * team-level visibility uses.
+     *
+     * team_shop is keyed on (team_id, shop_id), so the join adds at most one row
+     * per order per team and a team's own figure can never count an order twice.
      *
      * @param  array<int, int>  $teamIds
      * @return array<int, float>
@@ -202,10 +221,10 @@ class SalesTargetScoreboardQuery
 
         $rows = $this->ordersQuery($date)
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->join('team_user as tu', 'tu.user_id', '=', 'pages.owner_id')
-            ->whereIn('tu.team_id', $teamIds)
-            ->groupBy('tu.team_id')
-            ->selectRaw('tu.team_id as team_id, SUM(pancake_orders.final_amount) as sales')
+            ->join('team_shop as ts', 'ts.shop_id', '=', 'pages.shop_id')
+            ->whereIn('ts.team_id', $teamIds)
+            ->groupBy('ts.team_id')
+            ->selectRaw('ts.team_id as team_id, SUM(pancake_orders.final_amount) as sales')
             ->get();
 
         $map = [];
@@ -220,9 +239,9 @@ class SalesTargetScoreboardQuery
     /**
      * The day's sales for the teams the target included, counted once each.
      *
-     * Filtering the orders by page owner (rather than joining through team
-     * membership and summing) is what keeps it once: a page owner on two
-     * included teams would otherwise have their orders double-counted.
+     * Filtering the orders by shop (rather than joining through team_shop and
+     * summing) is what keeps it once: a shop shared between two included teams
+     * would otherwise have its orders double-counted in the headline.
      *
      * A target with no teams has nothing to compare, so it totals zero rather
      * than falling back to the whole workspace.
@@ -237,9 +256,9 @@ class SalesTargetScoreboardQuery
 
         $sales = $this->ordersQuery($date)
             ->join('pages', 'pages.id', '=', 'pancake_orders.page_id')
-            ->whereIn('pages.owner_id', fn ($sub) => $sub
-                ->from('team_user')
-                ->select('user_id')
+            ->whereIn('pages.shop_id', fn ($sub) => $sub
+                ->from('team_shop')
+                ->select('shop_id')
                 ->whereIn('team_id', $teamIds))
             ->selectRaw('COALESCE(SUM(pancake_orders.final_amount), 0) as sales')
             ->value('sales');

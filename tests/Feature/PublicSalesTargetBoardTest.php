@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\Order;
 use App\Models\Page;
 use App\Models\SalesTarget;
 use App\Models\SalesTargetTeam;
+use App\Models\Shop;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\Workspace;
@@ -46,8 +48,9 @@ function targetOn(Workspace $workspace, string $date, string $name): SalesTarget
 }
 
 /**
- * A team whose sales land through a page it owns — the pages.owner_id → team_user
- * link the board attributes orders with. Returns the team.
+ * A team whose sales land through a shop it owns — the pages.shop_id → team_shop
+ * link the board attributes orders with, the same one team visibility uses.
+ * Returns the team.
  */
 function teamSelling(Workspace $workspace, float $sales, string $date, string $orderNumber): Team
 {
@@ -55,7 +58,10 @@ function teamSelling(Workspace $workspace, float $sales, string $date, string $o
     $team = Team::factory()->create(['workspace_id' => $workspace->id]);
     $team->members()->attach($owner->id);
 
-    $page = Page::factory()->forWorkspace($workspace)->forOwner($owner)->create();
+    $shop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+    $team->shops()->attach($shop->id);
+
+    $page = Page::factory()->forWorkspace($workspace)->forShop($shop)->forOwner($owner)->create();
 
     DB::table('pancake_orders')->insert([
         'order_number' => $orderNumber,
@@ -191,17 +197,16 @@ it('totals only the teams the target included, not the whole workspace', functio
         ->assertJsonCount(2, 'data');
 });
 
-it('counts an order once when its page owner is on two included teams', function () {
+it('counts an order once in the headline when its shop is on two included teams', function () {
     $workspace = unlockedWorkspace();
     $date = now()->toDateString();
 
     $team = teamSelling($workspace, 1000, $date, 'SHARED');
 
-    // The same owner also sits on a second included team. Summing the per-team
-    // rows would double this order; the headline must still read 1000.
-    $owner = $team->members()->first();
+    // The same shop is deliberately shared with a second included team. Summing
+    // the per-team rows would double this order; the headline must read 1000.
     $second = Team::factory()->create(['workspace_id' => $workspace->id]);
-    $second->members()->attach($owner->id);
+    $second->shops()->attach($team->shops()->first()->id);
 
     targetIncluding($workspace, $date, [$team, $second], goal: 1000);
 
@@ -209,6 +214,71 @@ it('counts an order once when its page owner is on two included teams', function
         ->assertOk()
         ->assertJsonPath('data.today.total_sales', 1000)
         ->assertJsonPath('data.today.target_sales', 2000);
+});
+
+/**
+ * The regression this attribution change was made for.
+ *
+ * A page owner on several teams used to fan one order out across every team they
+ * belonged to, so the cards summed to more than the headline beside them. Team
+ * membership must not move a peso now that shops carry ownership.
+ */
+it('ignores the page owner\'s team membership when crediting sales', function () {
+    $workspace = unlockedWorkspace();
+    $date = now()->toDateString();
+
+    $team = teamSelling($workspace, 1000, $date, 'SHARED');
+
+    // The owner joins two more teams that own no shop of their own.
+    $owner = $team->members()->first();
+    $second = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $third = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $second->members()->attach($owner->id);
+    $third->members()->attach($owner->id);
+
+    targetIncluding($workspace, $date, [$team, $second, $third], goal: 1000);
+
+    $rows = collect(
+        $this->getJson("/public/workspaces/{$workspace->slug}/sales-targets/teams")
+            ->assertOk()
+            ->json('data')
+    )->keyBy('team_id');
+
+    // The shop's team keeps all of it; the other two earned nothing.
+    expect($rows[$team->id]['sales'])->toEqual(1000)
+        ->and($rows[$second->id]['sales'])->toEqual(0)
+        ->and($rows[$third->id]['sales'])->toEqual(0);
+
+    // And the cards reconcile with the headline on the same screen.
+    $headline = $this->getJson("/public/workspaces/{$workspace->slug}/sales-targets/kpis")
+        ->assertOk()
+        ->json('data.today.total_sales');
+
+    expect($rows->sum('sales'))->toEqual($headline);
+});
+
+/**
+ * Attribution has to agree with visibility, or a scoped user reads a team total
+ * built from orders they are not allowed to list.
+ */
+it('credits sales to the same team that team-level visibility does', function () {
+    $workspace = unlockedWorkspace();
+    $date = now()->toDateString();
+
+    $team = teamSelling($workspace, 1000, $date, 'SHARED');
+    targetIncluding($workspace, $date, [$team], goal: 1000);
+
+    // The guard reaches teams through page.shop.teams; the board must land on
+    // the same team for the same order.
+    $visible = Order::where('workspace_id', $workspace->id)
+        ->whereHas('page.shop.teams', fn ($q) => $q->where('teams.id', $team->id))
+        ->sum('final_amount');
+
+    $credited = $this->getJson("/public/workspaces/{$workspace->slug}/sales-targets/teams")
+        ->assertOk()
+        ->json('data.0.sales');
+
+    expect($credited)->toEqual($visible);
 });
 
 it('narrows the total to one team when the board is filtered', function () {

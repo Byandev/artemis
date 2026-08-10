@@ -22,9 +22,14 @@ import { useCallback, useEffect, useState } from 'react';
 
 const INTERVALS = [5, 10, 15, 30];
 
-/** The team bar runs past 100%, so beating the target still shows as headroom. */
-const SLIDE_SCALE_MAX = 125;
-const SLIDE_TICKS = [25, 50, 75, 100, 125];
+/**
+ * The team bar reads against the target itself, so the axis stops at 100% — a
+ * team past its goal sits full, and the exact figure is on the tile above.
+ * Ticks include the 0 so the labels, spread edge to edge, land on the positions
+ * they name.
+ */
+const SLIDE_SCALE_MAX = 100;
+const SLIDE_TICKS = [0, 25, 50, 75, 100];
 
 export interface SlideshowData {
     workspaceName: string;
