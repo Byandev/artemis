@@ -9,7 +9,6 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Finance\Models\Account;
-use Modules\Finance\Models\Remittance;
 use Modules\Finance\Models\Transaction;
 
 class DashboardController extends Controller
@@ -72,8 +71,6 @@ class DashboardController extends Controller
             'accounts' => $accountsData,
             'totalIn' => round((float) ($totals->total_in ?? 0), 2),
             'totalOut' => round((float) ($totals->total_out ?? 0), 2),
-            'unreconciledCount' => Remittance::where('workspace_id', $workspace->id)
-                ->whereNull('transaction_id')->count(),
         ]);
     }
 }

@@ -11,12 +11,12 @@ function isUrl($workspace, string $path = ''): string
     return "/workspaces/{$workspace->slug}/finance/income-statements{$path}";
 }
 
-function makeType($workspace, string $name, bool $grossProfitDeduction = false): TransactionType
+function makeType($workspace, string $name, ?string $section = 'opex'): TransactionType
 {
     return TransactionType::create([
         'workspace_id' => $workspace->id,
         'name' => $name,
-        'is_gross_profit_deduction' => $grossProfitDeduction,
+        'income_statement_section' => $section,
     ]);
 }
 
@@ -54,7 +54,7 @@ function makeGencysOrder($workspace, array $attrs = []): GencysDailySalesOrder
 function seedMay($workspace): array
 {
     $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
-    $adSpent = makeType($workspace, 'Ad Spent', grossProfitDeduction: true);
+    $adSpent = makeType($workspace, 'Ad Spent', section: 'cost_of_sales');
     $expenses = makeType($workspace, 'expenses');
     $transfer = makeType($workspace, 'transfer');
 
@@ -140,7 +140,7 @@ test('a type flagged as gross profit deduction moves from OPEX to cost of sales'
             fn ($rows) => collect($rows)->firstWhere('type_name', 'expenses')['section'] === 'opex',
         ));
 
-    $expenses->update(['is_gross_profit_deduction' => true]);
+    $expenses->update(['income_statement_section' => 'cost_of_sales']);
 
     // Now it's a cost-of-sales line.
     $this->actingAs($user)
@@ -216,20 +216,40 @@ test('regenerate re-pulls with the snapshotted rate and included lines', functio
     $this->assertDatabaseCount('finance_income_statement_expenses', 1);
 });
 
-test('transaction type stores the gross profit deduction flag', function () {
+test('transaction type stores the nature and income statement section', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $this->actingAs($user)
         ->post("/workspaces/{$workspace->slug}/finance/transaction-types", [
             'name' => 'COG',
-            'is_gross_profit_deduction' => true,
+            'nature' => 'debit',
+            'income_statement_section' => 'cost_of_sales',
         ])
         ->assertRedirect();
 
     $this->assertDatabaseHas('finance_transaction_types', [
         'workspace_id' => $workspace->id,
         'name' => 'COG',
-        'is_gross_profit_deduction' => true,
+        'nature' => 'debit',
+        'income_statement_section' => 'cost_of_sales',
+    ]);
+});
+
+test('a transaction type can be excluded from the income statement', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($user)
+        ->post("/workspaces/{$workspace->slug}/finance/transaction-types", [
+            'name' => 'Transfer of Funds',
+            'nature' => 'debit',
+            'income_statement_section' => null,
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('finance_transaction_types', [
+        'workspace_id' => $workspace->id,
+        'name' => 'Transfer of Funds',
+        'income_statement_section' => null,
     ]);
 });
 

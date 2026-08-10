@@ -506,12 +506,6 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceDashboard,
                           },
                           {
-                              title: 'Remittances',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
-                              icon: Send,
-                              permission: PERMISSIONS.ViewFinanceRemittances,
-                          },
-                          {
                               title: 'Fund Requests',
                               href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
                               icon: Banknote,

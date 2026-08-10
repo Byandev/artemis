@@ -151,7 +151,7 @@
     },
     {
       "parameters": {
-        "jsCode": "return {\n  \"webhook\": $('Webhook').first().json.body.webhook_url,\n  \"apiKey\": $('Webhook').first().json.body.workspace_api_key,\n  \"data\": $('Webhook').first().json.body.items.map(item => {\n    return {\n      \"id\": item.id,\n      \"sync_run_id\": item.sync_run_id,\n      \"purchased_orders\": $input.all()\n        .map(po => po.json.formatted)\n        .filter(po => !!po.items.find(poItem => poItem.inventory_item_id == item.id))\n    }\n  })\n}"
+        "jsCode": "const STATUS_FIELDS = {\n  'approve': 'approved_at',\n  'approved': 'approved_at',\n  'to pay': 'to_pay_at',\n  'topay': 'to_pay_at',\n  'paid': 'paid_at',\n  'for purchase': 'for_purchase_at',\n  'purchase': 'for_purchase_at',\n  'purchased': 'purchased_at',\n};\n\nfunction withStatusTimestamps(po) {\n  const stamps = {\n    approved_at: null,\n    to_pay_at: null,\n    paid_at: null,\n    for_purchase_at: null,\n    purchased_at: null,\n  };\n\n  for (const log of po.statusLogs || []) {\n    const key = String(log.status || '').trim().toLowerCase();\n    const field = STATUS_FIELDS[key];\n    const ts = log.timestamp || null;\n    if (!field || !ts) continue;\n    // keep the earliest hit — some POs get approved twice\n    if (!stamps[field] || ts < stamps[field]) stamps[field] = ts;\n  }\n\n  return { ...po, ...stamps };\n}\n\nreturn {\n  \"webhook\": $('Webhook').first().json.body.webhook_url,\n  \"apiKey\": $('Webhook').first().json.body.workspace_api_key,\n  \"data\": $('Webhook').first().json.body.items.map(item => {\n    return {\n      \"id\": item.id,\n      \"sync_run_id\": item.sync_run_id,\n      \"purchased_orders\": $input.all()\n        .map(po => po.json.formatted)\n        .filter(po => !!po.items.find(poItem => poItem.inventory_item_id == item.id))\n        .map(withStatusTimestamps)\n    }\n  })\n}"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -164,7 +164,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.formatted = {\n    issue_date: $input.first().json.issueDate,\n    delivery_no: $input.first().json.deliveryNo,\n    cust_po_no: $input.first().json.customerPoNo,\n    control_no: $input.first().json.controlNo,\n    delivery_fee: $input.first().json.deliveryFee,\n    total_amount: $input.first().json.totalAmount,\n    status: $input.first().json.statusId,\n    created_at: $input.first().json.history.createdDate,\n    items: $input.first().json.items.map(item => {\n      return {\n        inventory_item_id: $('Code in JavaScript9').first().json.inventory_item_id,\n        count: item.qty,\n        amount: item.cog,\n        total_amount: item.amount\n      }\n    }),\n    deliveries: $input.first().json.history.statusLog.filter(i => i.status === 'Delivered').map(item => {\n      function parseDelivery(raw) {\n        if (!raw) return { received: null, date: null };\n      \n        const receivedMatch = raw.match(/Received:\\s*([\\d,]+)/);\n        const dateMatch = raw.match(/\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}(?::\\d{2})?/);\n      \n        return {\n          received: receivedMatch ? Number(receivedMatch[1].replace(/,/g, '')) : null,\n          date: dateMatch ? dateMatch[0] : null,\n        };\n      }\n\n      const { date, received } = parseDelivery(item.detail);\n\n      return { qty: received, created_at: date };\n      \n    })\n  }\n}\n\nreturn $input.all();"
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.formatted = {\n    issue_date: $input.first().json.issueDate,\n    delivery_no: $input.first().json.deliveryNo,\n    cust_po_no: $input.first().json.customerPoNo,\n    control_no: $input.first().json.controlNo,\n    delivery_fee: $input.first().json.deliveryFee,\n    total_amount: $input.first().json.totalAmount,\n    status: $input.first().json.statusId,\n    created_at: $input.first().json.history.createdDate,\n    supplier: $input.first().json.supplier,\n    items: $input.first().json.items.map(item => {\n      return {\n        inventory_item_id: $('Code in JavaScript9').first().json.inventory_item_id,\n        count: item.qty,\n        amount: item.cog,\n        total_amount: item.amount\n      }\n    }),\n    statusLogs: $input.first().json.history.statusLog.filter(i => i.status !== 'Delivered'),\n    deliveries: $input.first().json.history.statusLog.filter(i => i.status === 'Delivered').map(item => {\n      function parseDelivery(raw) {\n        if (!raw) return { received: null, date: null };\n      \n        const receivedMatch = raw.match(/Received:\\s*([\\d,]+)/);\n        const dateMatch = raw.match(/\\d{4}-\\d{2}-\\d{2}[ T]\\d{2}:\\d{2}(?::\\d{2})?/);\n      \n        return {\n          received: receivedMatch ? Number(receivedMatch[1].replace(/,/g, '')) : null,\n          date: dateMatch ? dateMatch[0] : null,\n        };\n      }\n\n      const { date, received } = parseDelivery(item.detail);\n\n      return { qty: received, created_at: date };\n      \n    })\n  }\n}\n\nreturn $input.all();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -314,11 +314,11 @@
             "x-forwarded-for": "165.232.171.5",
             "x-forwarded-proto": "https",
             "connection": "upgrade",
-            "content-length": "4759",
+            "content-length": "5918",
             "user-agent": "GuzzleHttp/7",
             "content-type": "application/json",
-            "baggage": "sentry-trace_id=b2405e4776ff49abb0ea4ea754e3e665,sentry-sample_rand=0.498747,sentry-sample_rate=0.1,sentry-public_key=a6821d7e205b79c38c66b9cff573c483,sentry-org_id=4511255889051648,sentry-environment=production",
-            "sentry-trace": "b2405e4776ff49abb0ea4ea754e3e665-ff24c9ed1dae412d-0"
+            "baggage": "sentry-trace_id=564dd20e3525458290bb129b924bb287,sentry-sample_rand=0.37236,sentry-sample_rate=0.1,sentry-public_key=a6821d7e205b79c38c66b9cff573c483,sentry-org_id=4511255889051648,sentry-environment=production",
+            "sentry-trace": "564dd20e3525458290bb129b924bb287-18d221ec4fcf4f4d-0"
           },
           "params": {},
           "query": {},
@@ -327,109 +327,109 @@
             "workspace_api_key": "art_dxkhViuteRWV6YRA5Aiyw3YjOL7aG0itKwWt50a1",
             "erp_username": "bryan.tech",
             "erp_password": "meta.tech.erp@2026",
-            "start_date": "03/30/2026",
-            "end_date": "06/30/2026",
+            "start_date": "05/06/2026",
+            "end_date": "08/06/2026",
             "webhook_url": "https://artemis.ph/api/v1/public/purchase-orders/bulk-sync",
             "items": [
               {
-                "id": 61,
-                "keyword": "PUKITIN PERFUME 2.0",
-                "sync_run_id": 367
+                "id": 102,
+                "keyword": "ELIXIR OF HORMUZ-Ancient Botanical Body Oil (BFM)",
+                "sync_run_id": 21805
               },
               {
-                "id": 62,
-                "keyword": "PIKUTIN HARABAS 2.0",
-                "sync_run_id": 368
+                "id": 103,
+                "keyword": "Golden Digest Sticker 2.0",
+                "sync_run_id": 21806
               },
               {
-                "id": 63,
-                "keyword": "PIKUTIN SPUTING 2.0",
-                "sync_run_id": 369
+                "id": 104,
+                "keyword": "Golden Digest Sticker",
+                "sync_run_id": 21807
               },
               {
-                "id": 64,
-                "keyword": "PIKUTIN HABULIN 2.0",
-                "sync_run_id": 370
+                "id": 105,
+                "keyword": "PIKUTIN PADRINO STICKER",
+                "sync_run_id": 21808
               },
               {
-                "id": 65,
-                "keyword": "Pikutin Comb For Men",
-                "sync_run_id": 371
+                "id": 106,
+                "keyword": "PIKUTIN SPUTING STICKER",
+                "sync_run_id": 21809
               },
               {
-                "id": 66,
-                "keyword": "Pikutin Travel Atomizer",
-                "sync_run_id": 372
+                "id": 107,
+                "keyword": "PIKUTIN HABULIN STICKER",
+                "sync_run_id": 21810
               },
               {
-                "id": 67,
-                "keyword": "Pikutin Perfume 2.0",
-                "sync_run_id": 373
+                "id": 108,
+                "keyword": "PIKUTIN HARABAS STICKER",
+                "sync_run_id": 21811
               },
               {
-                "id": 68,
-                "keyword": "Her Reset Ovarra",
-                "sync_run_id": 374
+                "id": 109,
+                "keyword": "PIKUTIN PERFUME STICKER",
+                "sync_run_id": 21812
               },
               {
-                "id": 69,
-                "keyword": "Pikutin Padrino 1.0",
-                "sync_run_id": 375
+                "id": 110,
+                "keyword": "PIKUTIN PERFUME BOX",
+                "sync_run_id": 21813
               },
               {
-                "id": 70,
-                "keyword": "Hikari New Life Kidney Therapy Healing Oil (BFM)",
-                "sync_run_id": 376
+                "id": 111,
+                "keyword": "PIKUTIN OB SEALED STICKERS",
+                "sync_run_id": 21814
               },
               {
-                "id": 71,
-                "keyword": "Amazing Life Herbal Spray with Curcumin Extract - BFM",
-                "sync_run_id": 377
+                "id": 112,
+                "keyword": "Anti-CKD Miracle Philippine Giant Clam Oil",
+                "sync_run_id": 21815
               },
               {
-                "id": 72,
-                "keyword": "KidneyCare Herbal Balm - Fast Comfort Formula",
-                "sync_run_id": 378
+                "id": 113,
+                "keyword": "Anti-Diabetes Herbal Foot Patch-01",
+                "sync_run_id": 21816
               },
               {
-                "id": 73,
-                "keyword": "Magnerve Cooling Gel",
-                "sync_run_id": 379
+                "id": 114,
+                "keyword": "Anti-Brain Problem Herbal Neck Patch-0.2",
+                "sync_run_id": 21817
               },
               {
-                "id": 74,
-                "keyword": "Golden Digest Detox Trinitea",
-                "sync_run_id": 380
+                "id": 115,
+                "keyword": "Anti-Stroke Herbal Neck Patch-0.2",
+                "sync_run_id": 21818
               },
               {
-                "id": 75,
-                "keyword": "Hikari Liver Care Drops",
-                "sync_run_id": 381
+                "id": 116,
+                "keyword": "Anti-Stroke Herbal Neck Patch-DISCOUNTED",
+                "sync_run_id": 21819
               },
               {
-                "id": 76,
-                "keyword": "Amazing Life Herbal Spray with Curcumin Extract",
-                "sync_run_id": 382
+                "id": 117,
+                "keyword": "Pikutin Padrino Box",
+                "sync_run_id": 21820
               },
               {
-                "id": 77,
-                "keyword": "Anti-Cancer Miracle Philippine Giant Clam Oil",
-                "sync_run_id": 383
+                "id": 118,
+                "keyword": "Anti-Stroke Herbal Neck Patch-Less",
+                "sync_run_id": 21821
               },
               {
-                "id": 78,
-                "keyword": "Chia Seeds for Diabetes 100g",
-                "sync_run_id": 384
+                "id": 119,
+                "keyword": "Pikutin-Padrino",
+                "sync_run_id": 21822
               },
               {
-                "id": 79,
-                "keyword": "Pikutin Habulin-10ml",
-                "sync_run_id": 385
+                "id": 120,
+                "keyword": "ANTI-STROKE HERBAL NECK PATCH",
+                "sync_run_id": 21823
               },
               {
-                "id": 80,
-                "keyword": "Pikutin Sputing-10ml",
-                "sync_run_id": 386
+                "id": 123,
+                "keyword": "Elixir of Hormuz",
+                "sync_run_id": 21824
               }
             ],
             "delivered_purchase_orders_no": [
@@ -449,6 +449,7 @@
               "CPO-TP643",
               "CPO-TP551",
               "CPO-TP798",
+              "CPO-TP809",
               "CPO-TP771",
               "CPO-TP740",
               "CPO-TP792",
@@ -500,6 +501,7 @@
               "CPO-TP616",
               "CPO-TP609",
               "CPO-TP602",
+              "CPO-TP838",
               "CPO-TP827",
               "CPO-TP806",
               "CPO-TP794",
@@ -510,13 +512,19 @@
               "CPO-TP617",
               "CPO-TP595",
               "CPO-TP586",
+              "CPO-TP825",
               "CPO-TP621",
               "CPO-TP543",
+              "CPO-TP760",
               "CPO-TP639",
               "CPO-TP620",
               "CPO-TP545",
+              "CPO-TP831",
               "CPO-TP828",
               "CPO-TP822",
+              "CPO-TP818",
+              "CPO-TP834",
+              "CPO-TP814",
               "CPO-TP840",
               "CPO-TP835",
               "CPO-TP800",
@@ -534,9 +542,12 @@
               "CPO-TP552",
               "CPO-TP553",
               "CPO-TP519",
+              "CPO-TP824",
+              "CPO-TP759",
               "CPO-TP638",
               "CPO-TP619",
               "CPO-TP544",
+              "CPO-TP823",
               "CPO-TP637",
               "CPO-TP618",
               "CPO-TP542",
@@ -554,6 +565,7 @@
               "CPO-TP565",
               "CPO-TP541",
               "CPO-TP516",
+              "CPO-TP830",
               "CPO-TP804",
               "CPO-TP785",
               "CPO-TP755",
@@ -687,7 +699,86 @@
               "CPO-TP549",
               "CPO-TP529",
               "CPO-TP821",
-              "CPO-TP807"
+              "CPO-TP807",
+              "CPO-TP844",
+              "CPO-TP841",
+              "CPO-TP842",
+              "CPO-TP843",
+              "CPO-TP782",
+              "CPO-TP745",
+              "CPO-TP742",
+              "CPO-TP700",
+              "CPO-TP672",
+              "CPO-TP784",
+              "CPO-TP767",
+              "CPO-TP764",
+              "CPO-TP846",
+              "CPO-TP847",
+              "CPO-TP848",
+              "CPO-TP849",
+              "CPO-TP850",
+              "CPO-TP858",
+              "CPO-TP853",
+              "CPO-TP854",
+              "CPO-TP855",
+              "CPO-TP852",
+              "CPO-TP856",
+              "CPO-TP859",
+              "CPO-TP864",
+              "CPO-TP861",
+              "CPO-TP862",
+              "CPO-TP860",
+              "CPO-TP851",
+              "CPO-TP863",
+              "CPO-TP857",
+              "CPO-TP845",
+              "CPO-TP865",
+              "CPO-TP868",
+              "CPO-TP866",
+              "CPO-TP867",
+              "CPO-TP870",
+              "CPO-TP877",
+              "CPO-TP872",
+              "CPO-TP873",
+              "CPO-TP874",
+              "CPO-TP871",
+              "CPO-TP875",
+              "CPO-TP880",
+              "CPO-TP881",
+              "CPO-TP882",
+              "CPO-TP883",
+              "CPO-TP885",
+              "CPO-TP887",
+              "CPO-TP886",
+              "CPO-TP890",
+              "CPO-TP894",
+              "CPO-TP889",
+              "CPO-TP891",
+              "CPO-TP893",
+              "CPO-TP892",
+              "CPO-TP884",
+              "CPO-TP869",
+              "CPO-TP896",
+              "CPO-TP898",
+              "CPO-TP899",
+              "CPO-TP895",
+              "CPO-TP905",
+              "CPO-TP907",
+              "CPO-TP908",
+              "CPO-TP914",
+              "CPO-TP915",
+              "CPO-TP913",
+              "CPO-TP918",
+              "CPO-TP917",
+              "CPO-TP927",
+              "CPO-TP926",
+              "CPO-TP928",
+              "CPO-TP919",
+              "CPO-TP932",
+              "CPO-TP931",
+              "CPO-TP938",
+              "CPO-TP948",
+              "CPO-TP911"
             ]
           },
           "webhookUrl": "https://n8n.byandev.com/webhook/fc2ac815-3729-43bc-aa11-fb2bb22f7cc8",
@@ -903,7 +994,7 @@
     "executionOrder": "v1",
     "availableInMCP": false
   },
-  "versionId": "23468826-71a2-4fee-97b7-34bb5670072e",
+  "versionId": "f96d7d2a-f763-4132-8e65-e6d7a9c1f2d6",
   "meta": {
     "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
   },

@@ -189,6 +189,18 @@ export function TransactionForm({
     const typeOptions = buildTransactionTypeOptions(transactionTypes);
     const defaultTypeId = typeOptions[0]?.value ?? '';
 
+    // The in/out direction follows the chosen transaction type's nature
+    // ('credit' = money in, 'debit' = money out) instead of a manual field.
+    const natureById = React.useMemo(
+        () =>
+            Object.fromEntries(
+                transactionTypes.map((t) => [String(t.id), t.nature]),
+            ) as Record<string, 'debit' | 'credit' | undefined>,
+        [transactionTypes],
+    );
+    const directionFor = (id: string | number): 'in' | 'out' =>
+        natureById[String(id)] === 'credit' ? 'in' : 'out';
+
     const {
         data,
         setData,
@@ -208,7 +220,7 @@ export function TransactionForm({
         department: '',
         charge_to: [] as ChargeToShare[],
         products: [] as ProductShare[],
-        type: 'in' as 'in' | 'out',
+        type: directionFor(defaultTypeId) as 'in' | 'out',
         transaction_type_id: defaultTypeId,
         amount: '',
         running_balance: '',
@@ -262,6 +274,13 @@ export function TransactionForm({
         data.type,
         data.running_balance,
     ]);
+
+    // Keep the in/out direction pinned to the selected transaction type's nature.
+    useEffect(() => {
+        const derived = directionFor(data.transaction_type_id);
+        if (derived !== data.type) setData('type', derived);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.transaction_type_id]);
 
     const totalAmount = parseFloat(data.amount) || 0;
 
@@ -477,19 +496,39 @@ export function TransactionForm({
                             className={inputCls}
                         />
                     </Field>
-                    <Field label="Type" required error={errors.type}>
+                    <Field
+                        label="Type of Expense"
+                        required
+                        error={errors.transaction_type_id}
+                    >
                         <select
-                            value={data.type}
+                            value={data.transaction_type_id}
                             onChange={(e) =>
-                                setData('type', e.target.value as 'in' | 'out')
+                                setData('transaction_type_id', e.target.value)
                             }
                             className={inputCls}
                         >
-                            <option value="in">IN (deposit)</option>
-                            <option value="out">OUT (withdrawal)</option>
+                            {typeOptions.length === 0 && (
+                                <option value="">
+                                    No types — add one first
+                                </option>
+                            )}
+                            {typeOptions.map((t) => (
+                                <option key={t.value} value={t.value}>
+                                    {t.label}
+                                </option>
+                            ))}
                         </select>
+                        {data.transaction_type_id && (
+                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                Recorded as{' '}
+                                {data.type === 'in'
+                                    ? 'Credit (money in)'
+                                    : 'Debit (money out)'}
+                                , from this type&apos;s nature.
+                            </p>
+                        )}
                     </Field>
-
                     <Wide>
                         <Field
                             label="Fund Request"
@@ -520,36 +559,6 @@ export function TransactionForm({
                                 from the request. Everything stays editable
                                 afterwards.
                             </p>
-                        </Field>
-                    </Wide>
-
-                    <Wide>
-                        <Field
-                            label="Type of Expense"
-                            required
-                            error={errors.transaction_type_id}
-                        >
-                            <select
-                                value={data.transaction_type_id}
-                                onChange={(e) =>
-                                    setData(
-                                        'transaction_type_id',
-                                        e.target.value,
-                                    )
-                                }
-                                className={inputCls}
-                            >
-                                {typeOptions.length === 0 && (
-                                    <option value="">
-                                        No types — add one first
-                                    </option>
-                                )}
-                                {typeOptions.map((t) => (
-                                    <option key={t.value} value={t.value}>
-                                        {t.label}
-                                    </option>
-                                ))}
-                            </select>
                         </Field>
                     </Wide>
 

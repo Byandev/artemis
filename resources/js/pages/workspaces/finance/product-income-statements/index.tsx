@@ -2,7 +2,7 @@ import PageHeader from '@/components/common/PageHeader';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, Check, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check } from 'lucide-react';
 
 interface StatementContext {
     id: number;
@@ -12,14 +12,13 @@ interface StatementContext {
 }
 
 interface PnlRow {
-    user_id: number | null;
+    product_id: number | null;
     name: string;
     orders: number;
     delivered: number;
     cost_of_sales: number;
     gross_profit: number;
     advisory: number;
-    opex: number;
     net_profit: number;
 }
 
@@ -31,7 +30,7 @@ interface MissingUnitCode {
 interface Props {
     workspace: Workspace;
     incomeStatement: StatementContext;
-    users: PnlRow[];
+    products: PnlRow[];
     total: PnlRow;
     discrepancy: PnlRow;
     missingUnitCodes: MissingUnitCode[];
@@ -64,38 +63,20 @@ const PALETTE = [
     '#f43f5e',
 ];
 
-export default function UserIncomeStatementsIndex({
+export default function ProductIncomeStatementsIndex({
     workspace,
     incomeStatement,
-    users,
+    products,
     total,
     discrepancy,
     missingUnitCodes,
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
-    const base = `${finance}/income-statements/${incomeStatement.id}/users`;
 
-    const totalDelivered = total.delivered || 0;
-
-    // Delivered and orders should reconcile to the overall statement; anything
-    // left over is revenue no user is credited with — something to resolve.
     const hasDiscrepancy =
         discrepancy.orders !== 0 || Math.abs(discrepancy.delivered) >= 0.01;
 
     const colorFor = (i: number) => PALETTE[i % PALETTE.length];
-
-    const segments = users
-        .map((u, i) => ({
-            key: String(u.user_id),
-            label: u.name,
-            amount: u.delivered,
-            color: colorFor(i),
-        }))
-        .filter((s) => s.amount > 0)
-        .map((s) => ({
-            ...s,
-            width: totalDelivered > 0 ? (s.amount / totalDelivered) * 100 : 0,
-        }));
 
     const COL = 'px-4 py-3 text-right tabular-nums';
     const HEAD =
@@ -115,9 +96,6 @@ export default function UserIncomeStatementsIndex({
             </td>
             <td className={`${COL} text-gray-500 dark:text-gray-400`}>
                 {fmt(r.advisory)}
-            </td>
-            <td className={`${COL} text-gray-500 dark:text-gray-400`}>
-                {fmt(r.opex)}
             </td>
             <td className="px-4 py-3 text-right">
                 <div
@@ -151,12 +129,12 @@ export default function UserIncomeStatementsIndex({
     return (
         <AppLayout>
             <Head
-                title={`${workspace.name} - Per User · ${incomeStatement.label}`}
+                title={`${workspace.name} - Per Product · ${incomeStatement.label}`}
             />
             <div className="w-full p-4 font-mono md:p-6">
                 <PageHeader
-                    title="Income Statement — Per User"
-                    description={`${incomeStatement.label} · each user's profit & loss`}
+                    title="Income Statement — Per Product"
+                    description={`${incomeStatement.label} · each product's profit & loss`}
                 >
                     <Link
                         href={`${finance}/income-statements/${incomeStatement.id}`}
@@ -167,8 +145,8 @@ export default function UserIncomeStatementsIndex({
                     </Link>
                 </PageHeader>
 
-                {/* Unit codes referenced by orders but missing from the table —
-                    their revenue can't resolve to a product. */}
+                {/* Unit codes referenced by orders but missing — their revenue
+                    can't resolve to a product. */}
                 {missingUnitCodes.length > 0 && (
                     <div className="mb-6 rounded-[14px] border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
                         <div className="flex items-start gap-2.5">
@@ -176,15 +154,12 @@ export default function UserIncomeStatementsIndex({
                             <div className="min-w-0 flex-1">
                                 <div className="text-[13px] font-semibold text-amber-800 dark:text-amber-300">
                                     {missingUnitCodes.length} unit code
-                                    {missingUnitCodes.length === 1
-                                        ? ''
-                                        : 's'}{' '}
-                                    not in your unit codes table
+                                    {missingUnitCodes.length === 1 ? '' : 's'} not
+                                    in your unit codes table
                                 </div>
                                 <p className="mt-0.5 text-[11px] text-amber-700/80 dark:text-amber-400/70">
-                                    Orders using these can’t resolve to a
-                                    product, so their revenue lands in the
-                                    Discrepancy column.{' '}
+                                    Orders using these can’t resolve to a product,
+                                    so their revenue lands in the Discrepancy row.{' '}
                                     <Link
                                         href={`/workspaces/${workspace.slug}/gencys/unit-codes`}
                                         className="font-medium underline underline-offset-2"
@@ -224,70 +199,16 @@ export default function UserIncomeStatementsIndex({
                     </div>
                 )}
 
-                {/* Delivered revenue by user */}
-                {segments.length > 0 && (
-                    <div className={`${CARD} mb-6 p-5`}>
-                        <div className="mb-3 flex items-center justify-between">
-                            <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
-                                Delivered revenue by user
-                            </span>
-                            <span className="text-[10px] text-gray-400">
-                                share of delivered
-                            </span>
-                        </div>
-                        <div className="flex h-3 w-full overflow-hidden rounded-full bg-stone-100 dark:bg-zinc-800">
-                            {segments.map((s, i) => (
-                                <div
-                                    key={s.key}
-                                    className={
-                                        i > 0
-                                            ? 'border-l-2 border-white dark:border-zinc-900'
-                                            : ''
-                                    }
-                                    style={{
-                                        width: `${s.width}%`,
-                                        backgroundColor: s.color,
-                                    }}
-                                />
-                            ))}
-                        </div>
-                        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
-                            {segments.map((s) => (
-                                <div
-                                    key={s.key}
-                                    className="flex items-start gap-2"
-                                >
-                                    <span
-                                        className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-[3px]"
-                                        style={{ backgroundColor: s.color }}
-                                    />
-                                    <div className="min-w-0">
-                                        <div className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-                                            {s.label}
-                                        </div>
-                                        <div className="text-[12px] text-gray-800 tabular-nums dark:text-gray-100">
-                                            {fmt(s.amount)}
-                                            <span className="ml-1 text-gray-400">
-                                                · {s.width.toFixed(1)}%
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {/* P&L table */}
                 <div className={`${CARD} overflow-hidden`}>
                     <div className="flex items-center justify-between border-b border-black/6 px-5 py-4 dark:border-white/6">
                         <div>
                             <div className="text-[13px] font-semibold text-gray-800 dark:text-gray-100">
-                                Per-user P&L
+                                Per-product P&L
                             </div>
                             <div className="mt-0.5 text-[11px] text-gray-400">
-                                {incomeStatement.label} · {int(users.length)}{' '}
-                                {users.length === 1 ? 'user' : 'users'}
+                                {incomeStatement.label} · {int(products.length)}{' '}
+                                {products.length === 1 ? 'product' : 'products'}
                             </div>
                         </div>
                         <span className="rounded-full border border-black/6 px-2.5 py-0.5 text-[10px] tracking-wider text-gray-400 uppercase dark:border-white/6">
@@ -300,24 +221,21 @@ export default function UserIncomeStatementsIndex({
                             <thead>
                                 <tr className="border-b border-black/6 dark:border-white/6">
                                     <th className="px-5 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
-                                        User
+                                        Product
                                     </th>
                                     <th className={HEAD}>Orders</th>
                                     <th className={HEAD}>Delivered</th>
                                     <th className={HEAD}>Cost of Sales</th>
                                     <th className={HEAD}>Gross</th>
                                     <th className={HEAD}>Advisory</th>
-                                    <th className={HEAD}>OPEX</th>
-                                    <th className={`${HEAD} pr-5`}>
-                                        Net Profit
-                                    </th>
+                                    <th className={`${HEAD} pr-5`}>Net Profit</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                {users.length === 0 && (
+                                {products.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={8}
+                                            colSpan={7}
                                             className="px-5 py-12 text-center text-[12px] text-gray-400"
                                         >
                                             No delivered revenue for{' '}
@@ -326,16 +244,13 @@ export default function UserIncomeStatementsIndex({
                                     </tr>
                                 )}
 
-                                {users.map((r, i) => (
+                                {products.map((r, i) => (
                                     <tr
-                                        key={r.user_id ?? r.name}
-                                        className="group transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/40"
+                                        key={r.product_id ?? r.name}
+                                        className="transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/40"
                                     >
                                         <td className="py-3 pr-4 pl-5">
-                                            <Link
-                                                href={`${base}/${r.user_id}`}
-                                                className="flex items-center gap-3"
-                                            >
+                                            <div className="flex items-center gap-3">
                                                 <span
                                                     className="h-7 w-1 shrink-0 rounded-full"
                                                     style={{
@@ -344,15 +259,14 @@ export default function UserIncomeStatementsIndex({
                                                     }}
                                                 />
                                                 <span className="min-w-0">
-                                                    <span className="block truncate text-[13px] font-medium text-gray-800 group-hover:text-primary dark:text-gray-100">
+                                                    <span className="block truncate text-[13px] font-medium text-gray-800 dark:text-gray-100">
                                                         {r.name}
                                                     </span>
                                                     <span className="text-[10px] text-gray-400">
                                                         {int(r.orders)} orders
                                                     </span>
                                                 </span>
-                                                <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-gray-600" />
-                                            </Link>
+                                            </div>
                                         </td>
                                         {dataCols(r)}
                                     </tr>
@@ -387,11 +301,6 @@ export default function UserIncomeStatementsIndex({
                                         {fmt(total.advisory)}
                                     </td>
                                     <td
-                                        className={`${COL} font-semibold text-gray-600 dark:text-gray-300`}
-                                    >
-                                        {fmt(total.opex)}
-                                    </td>
-                                    <td
                                         className={`px-4 py-3.5 pr-5 text-right text-[14px] font-bold tabular-nums ${
                                             total.net_profit < 0
                                                 ? 'text-rose-600 dark:text-rose-400'
@@ -402,9 +311,7 @@ export default function UserIncomeStatementsIndex({
                                     </td>
                                 </tr>
 
-                                {/* Delivered/orders not credited to any user. Zero
-                                    means everything reconciles to the overall
-                                    statement; non-zero is something to resolve. */}
+                                {/* Orders whose items don't resolve to a product. */}
                                 <tr
                                     className={
                                         hasDiscrepancy
@@ -431,8 +338,8 @@ export default function UserIncomeStatementsIndex({
                                                 </span>
                                                 <span className="text-[10px] text-gray-400">
                                                     {hasDiscrepancy
-                                                        ? 'revenue not attributed — resolve'
-                                                        : 'all revenue attributed'}
+                                                        ? 'orders not resolved to a product'
+                                                        : 'all orders resolved'}
                                                 </span>
                                             </span>
                                         </div>
@@ -455,28 +362,29 @@ export default function UserIncomeStatementsIndex({
                                     >
                                         {fmt(discrepancy.delivered)}
                                     </td>
-                                    <td
-                                        className={`${COL} text-gray-300 dark:text-gray-600`}
-                                    >
-                                        —
+                                    <td className={`${COL} text-gray-500`}>
+                                        {fmt(discrepancy.cost_of_sales)}
                                     </td>
                                     <td
-                                        className={`${COL} text-gray-300 dark:text-gray-600`}
+                                        className={`${COL} ${
+                                            discrepancy.gross_profit < 0
+                                                ? 'text-rose-600 dark:text-rose-400'
+                                                : 'text-gray-500'
+                                        }`}
                                     >
-                                        —
+                                        {fmt(discrepancy.gross_profit)}
+                                    </td>
+                                    <td className={`${COL} text-gray-500`}>
+                                        {fmt(discrepancy.advisory)}
                                     </td>
                                     <td
-                                        className={`${COL} text-gray-300 dark:text-gray-600`}
+                                        className={`px-4 py-3 pr-5 text-right tabular-nums ${
+                                            discrepancy.net_profit < 0
+                                                ? 'text-rose-600 dark:text-rose-400'
+                                                : 'text-gray-500'
+                                        }`}
                                     >
-                                        —
-                                    </td>
-                                    <td
-                                        className={`${COL} text-gray-300 dark:text-gray-600`}
-                                    >
-                                        —
-                                    </td>
-                                    <td className="px-4 py-3 pr-5 text-right text-gray-300 dark:text-gray-600">
-                                        —
+                                        {fmt(discrepancy.net_profit)}
                                     </td>
                                 </tr>
                             </tfoot>
@@ -485,11 +393,11 @@ export default function UserIncomeStatementsIndex({
                 </div>
 
                 <p className="mt-3 text-[11px] text-gray-400">
-                    Delivered and Orders reconcile to the overall statement —
-                    the Discrepancy row is what isn’t credited to any user; a
-                    non-zero figure means an intern isn’t linked to a user, so
-                    resolve it. COGS isn’t derived from orders here — it comes
-                    in as a transaction charged to a user.
+                    Cost of Sales = COGS + Shipping + COD + VAT + Ad Spent. COGS
+                    and Ad Spent are the product’s bulk transaction totals (not
+                    split across interns). Advisory is a % of positive Gross
+                    Profit. Orders that don’t resolve to a product land in the
+                    Discrepancy row.
                 </p>
             </div>
         </AppLayout>
