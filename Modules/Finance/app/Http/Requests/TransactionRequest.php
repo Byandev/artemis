@@ -7,6 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 use Modules\Finance\Http\Requests\Concerns\SplitsShares;
+use Modules\Finance\Models\TransactionType;
 
 class TransactionRequest extends FormRequest
 {
@@ -15,6 +16,29 @@ class TransactionRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * The in/out direction is no longer picked by hand — it follows the chosen
+     * transaction type's nature (credit = in, debit = out). Derive it here so the
+     * transaction type stays the single source of truth. Falls back to whatever
+     * `type` was submitted when no (or an unknown) type is selected.
+     */
+    protected function prepareForValidation(): void
+    {
+        $typeId = $this->input('transaction_type_id');
+
+        if (! $typeId) {
+            return;
+        }
+
+        $nature = TransactionType::where('id', $typeId)
+            ->where('workspace_id', $this->route('workspace')?->id)
+            ->value('nature');
+
+        if ($nature) {
+            $this->merge(['type' => $nature === 'credit' ? 'in' : 'out']);
+        }
     }
 
     public function rules(): array

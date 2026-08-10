@@ -960,6 +960,12 @@ export default function ItemIndex({
                             whichever day is pinned. */}
                         <DatePicker
                             id="inventory-items-snapshot-date"
+                            // The picker seeds its display from defaultDate once,
+                            // on mount — changing the prop afterwards leaves the
+                            // old date on screen. Keying on the pinned day remounts
+                            // it so "Back to live data" actually clears the field
+                            // instead of only clearing the list underneath it.
+                            key={dateValue || 'live'}
                             compact
                             placeholder="Live (pick a date)"
                             defaultDate={dateValue || undefined}
