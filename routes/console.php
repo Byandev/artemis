@@ -2,6 +2,16 @@
 
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
 
+// Make the status column agree with reality once a period runs out unpaid.
+// Access is already blocked by isLapsed() either way — this is so the admin
+// list stops showing a green "Active" badge for a workspace that is locked out.
+Schedule::command('subscriptions:mark-past-due')->dailyAt('00:15');
+
+// Bill each active subscription a week before its period ends, so the invoice
+// is in hand before the renewal. Runs at a civil hour because it emails people;
+// the window query means a missed night is picked up the next morning.
+Schedule::command('invoices:generate-renewals')->dailyAt('08:00')->withoutOverlapping();
+
 // Build Artemis-source advertiser performance (Pancake POS + Meta Ads) daily,
 // rebuilding a trailing 3-day window to absorb late Meta attribution.
 Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00')->withoutOverlapping();

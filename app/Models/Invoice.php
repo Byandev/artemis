@@ -26,6 +26,7 @@ class Invoice extends Model
         'bill_to_address',
         'issue_date',
         'due_date',
+        'period_end',
         'currency',
         'line_items',
         'subtotal',
@@ -40,6 +41,7 @@ class Invoice extends Model
     protected $casts = [
         'issue_date' => 'date',
         'due_date' => 'date',
+        'period_end' => 'date',
         'line_items' => 'array',
         'subtotal' => 'decimal:2',
         'tax_rate' => 'decimal:2',
