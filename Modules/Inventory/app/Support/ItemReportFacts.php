@@ -32,11 +32,22 @@ class ItemReportFacts
     public const WINDOWS = [3, 7, 14];
 
     /**
-     * How long a supplier has, once an order is released, before it counts as
-     * delayed. Mirrors PurchaseOrderFlowController::SUPPLIER_TARGET_DAYS — the
-     * report and the dashboard must not disagree about which orders are late.
+     * The fact keys frozen into inventory_item_snapshots, which are also the
+     * column names there — the two are deliberately the same word, so a snapshot
+     * row can be handed to the export as-is with no translation layer to drift.
+     *
+     * demand_as_of is stored alongside them but is provenance rather than a
+     * fact, so it is not listed here.
+     *
+     * @var list<string>
      */
-    private const SUPPLIER_TARGET_DAYS = 14;
+    public const SNAPSHOT_COLUMNS = [
+        'orders_3d', 'units_3d', 'orders_7d', 'units_7d', 'orders_14d', 'units_14d',
+        'last_in_date', 'last_in_count', 'last_out_date', 'last_out_count',
+        'last_po_date', 'last_po_count', 'raised_not_created_days', 'raised_not_created_units',
+        'earliest_expected_date', 'earliest_expected_count', 'longest_waiting_date',
+        'longest_waiting_count', 'delayed_po', 'bottleneck_stage',
+    ];
 
     /** @var array<int, array<string, mixed>> group id => facts */
     private array $facts = [];
@@ -49,7 +60,14 @@ class ItemReportFacts
      */
     private ?CarbonImmutable $demandAsOf = null;
 
-    public function __construct(private Workspace $workspace)
+    /**
+     * @param  list<int>|null  $groupIds  restrict to these groups, or null for all.
+     *                                    The list view passes the page it is about
+     *                                    to render, which keeps the scans
+     *                                    proportional to what is on screen rather
+     *                                    than to the catalogue.
+     */
+    public function __construct(private Workspace $workspace, private ?array $groupIds = null)
     {
         $this->demandWindows();
         $this->movements();
@@ -210,7 +228,15 @@ class ItemReportFacts
         $groupBySku = [];
 
         foreach (DB::table('inventory_items')->where('workspace_id', $this->workspace->id)->get(['id', 'parent_id', 'sku']) as $item) {
-            $groupBySku[mb_strtoupper(trim((string) $item->sku))] = (int) ($item->parent_id ?? $item->id);
+            $group = (int) ($item->parent_id ?? $item->id);
+
+            // Narrowed here rather than after the scan, so an order line naming
+            // only out-of-scope items is skipped before any counting happens.
+            if ($this->groupIds !== null && ! in_array($group, $this->groupIds, true)) {
+                continue;
+            }
+
+            $groupBySku[mb_strtoupper(trim((string) $item->sku))] = $group;
         }
 
         $componentsByCode = [];
@@ -255,6 +281,7 @@ class ItemReportFacts
         $rows = DB::table('inventory_transactions as t')
             ->join('inventory_items as i', 'i.id', '=', 't.inventory_item_id')
             ->where('i.workspace_id', $this->workspace->id)
+            ->when($this->groupIds, fn ($q) => $q->whereIn(DB::raw('COALESCE(i.parent_id, i.id)'), $this->groupIds))
             ->groupByRaw('COALESCE(i.parent_id, i.id), t.date')
             ->selectRaw('COALESCE(i.parent_id, i.id) as group_id, t.date')
             ->selectRaw('SUM(t.po_qty_in) as qty_in, SUM(t.po_qty_out) as qty_out')
@@ -296,6 +323,7 @@ class ItemReportFacts
             ->where('po.workspace_id', $this->workspace->id)
             ->whereIn('po.status', PurchasedOrder::AWAITING_DELIVERY_STATUSES)
             ->whereNotNull('po.issue_date')
+            ->when($this->groupIds, fn ($q) => $q->whereIn(DB::raw('COALESCE(i.parent_id, i.id)'), $this->groupIds))
             ->groupBy('poi.id')
             ->selectRaw('poi.id, COALESCE(i.parent_id, i.id) as group_id, po.id as po_id, po.status, po.issue_date, po.expected_delivery_date')
             ->selectRaw('poi.count as ordered, COALESCE(SUM(d.qty), 0) as delivered')
@@ -331,19 +359,24 @@ class ItemReportFacts
                 $this->facts[$group]['raised_not_created_units'] = ($this->facts[$group]['raised_not_created_units'] ?? 0) + $balance;
             }
 
-            if ($row->expected_delivery_date) {
-                $this->keepEarliest(
-                    $group,
-                    'earliest_expected_date',
-                    'earliest_expected_count',
-                    CarbonImmutable::parse($row->expected_delivery_date)->toDateString(),
-                    $balance,
-                );
+            // Read straight off the order. The standing two-week agreement is
+            // applied when the order is written, not here — see
+            // PurchasedOrder::expectedDeliveryFor — so this is the date the rest
+            // of the app sees rather than a second guess at it.
+            $expected = $row->expected_delivery_date
+                ? CarbonImmutable::parse($row->expected_delivery_date)->toDateString()
+                : null;
+
+            if ($expected !== null) {
+                $this->keepEarliest($group, 'earliest_expected_date', 'earliest_expected_count', $expected, $balance);
             }
 
-            // Counted per order, not per line: one purchase order carrying three
-            // late lines is one conversation with the supplier.
-            if ($released && $age > self::SUPPLIER_TARGET_DAYS) {
+            // Late against the date the order was actually expected, rather than
+            // a fixed age: where a supplier has committed to something other
+            // than the standing two weeks, that commitment is what they missed.
+            // Counted per order, not per line — one purchase order carrying
+            // three late lines is one conversation with the supplier.
+            if ($released && $expected !== null && $expected < $today->toDateString()) {
                 $delayed[$group][(int) $row->po_id] = true;
             }
 

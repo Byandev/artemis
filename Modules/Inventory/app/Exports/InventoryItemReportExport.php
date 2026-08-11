@@ -30,9 +30,36 @@ class InventoryItemReportExport implements FromGenerator, WithHeadings
     private const CRITICAL_LEAD_TIME_SHARE = 0.5;
 
     /**
-     * @param  Builder  $query  the grouped roll-up from buildSummaryQuery()
+     * @param  Builder  $query  the grouped roll-up from buildSummaryQuery(), or its
+     *                          snapshot equivalent for a past date
+     * @param  (callable(object): array<string, mixed>)  $factsFor  where a row's
+     *                                                              group figures come from
+     *
+     * Two sources, one shape. Live, the figures are computed now and looked up by
+     * group; for a past date they were frozen into the snapshot row itself and
+     * are read straight off it. The keys are identical either way — see
+     * ItemReportFacts::SNAPSHOT_COLUMNS — so nothing below this line knows or
+     * cares which date it is rendering.
      */
-    public function __construct(private Builder $query, private ItemReportFacts $facts) {}
+    public function __construct(private Builder $query, private $factsFor) {}
+
+    /** Read the figures live, computing them once for the whole workspace. */
+    public static function live(Builder $query, ItemReportFacts $facts): self
+    {
+        return new self($query, fn (object $row) => $facts->for((int) $row->id));
+    }
+
+    /**
+     * Read the figures as they were frozen on a past date.
+     *
+     * Missing keys default to null rather than zero: a snapshot taken before
+     * these columns existed recorded no demand, which is not the same as having
+     * recorded that demand was nil.
+     */
+    public static function asOf(Builder $query): self
+    {
+        return new self($query, fn (object $row) => ((array) $row) + array_fill_keys(ItemReportFacts::SNAPSHOT_COLUMNS, null));
+    }
 
     public function headings(): array
     {
@@ -74,9 +101,7 @@ class InventoryItemReportExport implements FromGenerator, WithHeadings
     public function generator(): \Generator
     {
         foreach ($this->query->lazy(200) as $row) {
-            // buildSummaryQuery() elects the parent's id as the group's id, which
-            // is the same key ItemReportFacts groups on.
-            $facts = $this->facts->for((int) $row->id);
+            $facts = ($this->factsFor)($row);
 
             $average = (float) $row->three_days_average;
             $stocks = (int) round((float) $row->current_stocks);
@@ -132,8 +157,12 @@ class InventoryItemReportExport implements FromGenerator, WithHeadings
         $columns = [];
 
         foreach (ItemReportFacts::WINDOWS as $days) {
-            $columns[] = round($facts["orders_{$days}d"] / $days, 2);
-            $columns[] = round($facts["units_{$days}d"] / $days, 2);
+            foreach (["orders_{$days}d", "units_{$days}d"] as $key) {
+                // Null survives as null. A snapshot taken before these columns
+                // existed did not record nil demand, it recorded nothing, and a
+                // 0 in a report someone plans against is a lie either way.
+                $columns[] = $facts[$key] === null ? null : round($facts[$key] / $days, 2);
+            }
         }
 
         return $columns;
@@ -150,6 +179,10 @@ class InventoryItemReportExport implements FromGenerator, WithHeadings
      */
     private function trend(array $facts): ?int
     {
+        if ($facts['units_3d'] === null || $facts['units_14d'] === null) {
+            return null;
+        }
+
         $recent = $facts['units_3d'] / 3;
         $baseline = $facts['units_14d'] / 14;
 

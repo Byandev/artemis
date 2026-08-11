@@ -35,7 +35,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Inbox } from 'lucide-react';
+import { CircleHelp, Inbox } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { toBackendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
@@ -266,9 +267,11 @@ type SortableHeaderProps<TData> = {
     title: string
     enabled?: boolean;
     className?: string
+    /** What the column means, behind a question mark next to its title. */
+    help?: React.ReactNode
 }
 
-export function SortableHeader<TData>({ column, title, enabled = true, className = '' }: SortableHeaderProps<TData>) {
+export function SortableHeader<TData>({ column, title, enabled = true, className = '', help }: SortableHeaderProps<TData>) {
     const sorted = column.getIsSorted();
 
     return (
@@ -283,10 +286,46 @@ export function SortableHeader<TData>({ column, title, enabled = true, className
             <p className="font-mono font-medium text-[10px] uppercase tracking-wider text-gray-300 dark:text-gray-600">
                 {title}
             </p>
+            {help && <ColumnHelp>{help}</ColumnHelp>}
             {enabled && <button className="flex flex-col">
                 <TriangleUpIcon className={`-mb-1 ${sorted === 'asc' ? 'text-brand-500' : 'text-gray-300'}`} />
                 <TriangleDownIcon className={`-mt-1 ${sorted === 'desc' ? 'text-brand-500' : 'text-gray-300'}`} />
             </button>}
         </div>
     )
+}
+
+
+/**
+ * A question mark beside a column title, explaining what the column counts.
+ *
+ * Stops the click reaching the header: on a sortable column the whole header is
+ * the sort control, so asking what a column means would otherwise re-sort the
+ * table underneath the answer.
+ */
+export function ColumnHelp({ children }: { children: React.ReactNode }) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    // Explanatory, not actionable — so it takes an aria-label
+                    // rather than visible text, and stays reachable by keyboard
+                    // because Radix opens the tooltip on focus as well as hover.
+                    aria-label="What this column means"
+                    onClick={(e) => e.stopPropagation()}
+                    className="ml-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-gray-300 transition-colors hover:text-gray-500 focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none dark:text-gray-600 dark:hover:text-gray-300"
+                >
+                    <CircleHelp className="h-3 w-3" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent
+                side="bottom"
+                align="start"
+                className="max-w-[320px] px-3.5 py-2.5 text-[12px] leading-relaxed font-normal normal-case"
+            >
+                {children}
+            </TooltipContent>
+        </Tooltip>
+    );
 }

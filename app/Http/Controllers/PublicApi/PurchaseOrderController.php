@@ -113,6 +113,13 @@ class PurchaseOrderController extends Controller
             ['workspace_id' => $workspace->id, 'control_no' => $controlNo],
             [
                 'issue_date' => $this->toDate($po['issue_date'] ?? null),
+                // The ERP sends this on barely any order, so the standing
+                // two-week agreement fills it in at sync time rather than every
+                // reader guessing the same fallback for itself.
+                'expected_delivery_date' => PurchasedOrder::expectedDeliveryFor(
+                    $this->toDate($po['expected_delivery_date'] ?? null),
+                    $this->toDate($po['issue_date'] ?? null),
+                ),
                 'delivery_no' => $po['delivery_no'] ?? null,
                 'cust_po_no' => $po['cust_po_no'] ?? null,
                 'supplier' => $this->trimmed($po['supplier'] ?? null),
