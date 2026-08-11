@@ -60,18 +60,6 @@ class PurchaseOrderFlowController extends Controller
     private const PICKING_DAYS = 3;
 
     /**
-     * How long shippable stock may go without a despatch before it counts as
-     * stalled rather than merely queued.
-     *
-     * Measured in ledger days, never against today — see ledgerDate(). Three
-     * days matches the picking-queue allowance above, but this one is a
-     * stopwatch rather than an inference: it reads the last despatch date, so a
-     * SKU only appears here if nothing actually left while the rest of the
-     * warehouse kept moving.
-     */
-    private const IDLE_DAYS = 3;
-
-    /**
      * How long a supplier has, once an order is released, before it counts as
      * late.
      *
@@ -417,8 +405,7 @@ class PurchaseOrderFlowController extends Controller
     }
 
     /**
-     * Unmet demand split by whether the stock is physically on the shelf, and
-     * for the part that is, how long it has been standing still.
+     * Unmet demand split by whether the stock is physically on the shelf.
      *
      * Computed per SKU then rolled to the group: a customer ordered a specific
      * variant, so stock on one child cannot ship an order placed against
@@ -428,8 +415,6 @@ class PurchaseOrderFlowController extends Controller
     public function unfulfilledSplit(Request $request, Workspace $workspace)
     {
         $this->authorize('View Inventory Items', $workspace);
-
-        $asOf = $this->ledgerDate($workspace);
 
         $items = $this->visibleItems($request, $workspace)
             // When stock last arrived and last left. On a row that says stock is
@@ -490,23 +475,9 @@ class PurchaseOrderFlowController extends Controller
                 // Date-only; the client formats them and works out how long ago.
                 'last_in' => $g['last_in'] ? CarbonImmutable::parse($g['last_in'])->toDateString() : null,
                 'last_out' => $g['last_out'] ? CarbonImmutable::parse($g['last_out'])->toDateString() : null,
-                // Ledger days since the last despatch. Null when the group has
-                // never shipped, which is unknown rather than idle — a brand new
-                // SKU has not stalled, it has not started.
-                'idle_days' => $this->idleDays($g['last_out'], $asOf),
             ]);
 
         $sitting = $rows->filter(fn ($r) => $r['here_days'] !== null && $r['here_days'] > self::PICKING_DAYS);
-
-        // Only stock that could actually ship can be idle. A group with unmet
-        // demand and nothing on the shelf is waiting on supply, not standing
-        // still, and belongs to whichever step upstream is blocked.
-        $shippable = $rows->filter(fn ($r) => $r['here'] > 0);
-        $idle = $shippable->filter(fn ($r) => $r['idle_days'] !== null && $r['idle_days'] >= self::IDLE_DAYS);
-        // Received after the last thing shipped: the sharpest case there is, and
-        // the one that needs no threshold — stock arrived, orders were waiting,
-        // and nothing has gone out since.
-        $arrived = $shippable->filter(fn ($r) => $r['last_in'] && $r['last_out'] && $r['last_in'] > $r['last_out']);
 
         return response()->json([
             'items' => $rows,
@@ -516,20 +487,6 @@ class PurchaseOrderFlowController extends Controller
             'picking_days' => self::PICKING_DAYS,
             'sitting' => ['skus' => $sitting->count(), 'units' => $sitting->sum('here')],
             'worst' => $sitting->sortByDesc('here_days')->first(),
-            'idle_after_days' => self::IDLE_DAYS,
-            'idle' => [
-                'units' => $idle->sum('here'),
-                'skus' => $idle->count(),
-                // The longest wait across all shippable stock, not just the part
-                // over the threshold: a card reporting "longest idle: 3 days"
-                // when one SKU has sat for sixteen would be worse than useless.
-                'longest' => $shippable->max('idle_days'),
-                'worst' => $idle->sortByDesc('idle_days')->first(),
-                // The date every idle figure is measured against. Null when the
-                // ledger is empty, in which case nothing can be called idle.
-                'as_of' => $asOf?->toDateString(),
-            ],
-            'arrived' => ['units' => $arrived->sum('here'), 'skus' => $arrived->count()],
         ]);
     }
 
@@ -553,13 +510,8 @@ class PurchaseOrderFlowController extends Controller
         $supplierOverdue = $supplier->where('age', '>', $quoted)->sum('balance');
 
         $split = $this->unfulfilledSplit($request, $workspace)->getData(true);
-        // Scored against shippable stock rather than all unmet demand: the
-        // question is how much of what the warehouse could ship has stopped
-        // moving. Against the whole demand figure this would read as a rounding
-        // error even with every shelf standing still, because most unmet demand
-        // has no stock behind it at all.
-        $idleUnits = (int) $split['idle']['units'];
-        $idleShare = $idleUnits / max(1, (int) $split['here']);
+        $unfulfilledTotal = max(1, (int) $split['total']);
+        $sittingShare = $split['sitting']['units'] / $unfulfilledTotal;
 
         $owners = [
             [
@@ -593,13 +545,13 @@ class PurchaseOrderFlowController extends Controller
             [
                 'key' => 'warehouse',
                 'name' => 'Warehouse',
-                'question' => 'Is stock sitting here that should already have shipped?',
-                'state' => $idleShare > 0.25 ? 'blocked' : ($idleShare > 0.10 ? 'watch' : 'ok'),
-                'value' => $idleUnits,
-                'unit' => 'units shippable and not moving',
+                'question' => 'Is stock sitting here that an unfulfilled order could already take?',
+                'state' => $sittingShare > 0.15 ? 'blocked' : ($sittingShare > 0.05 ? 'watch' : 'ok'),
+                'value' => $split['sitting']['units'],
+                'unit' => 'orders with available stocks in warehouse',
                 'facts' => [
-                    ['Longest idle', $split['idle']['longest'], 'days'],
-                    ['Arrived, nothing out', $split['arrived']['units'] ?: null, 'units'],
+                    ['Could ship today', $split['here'] ?: null, 'units'],
+                    ['SKUs affected', $split['sitting']['skus'] ?: null, 'SKUs'],
                     ['No stock to give', $split['gone'] ?: null, 'units'],
                 ],
             ],
@@ -611,8 +563,6 @@ class PurchaseOrderFlowController extends Controller
             'internal_units' => $internalUnits,
             'supplier_units' => $supplierUnits,
             'sla_days' => self::INTERNAL_SLA_DAYS,
-            'idle_after_days' => self::IDLE_DAYS,
-            'idle_as_of' => $split['idle']['as_of'],
         ]);
     }
 
@@ -697,38 +647,6 @@ class PurchaseOrderFlowController extends Controller
             ->select('inventory_item_id')
             ->selectRaw('MAX(CASE WHEN po_qty_in > 0 THEN date END) as last_in')
             ->selectRaw('MAX(CASE WHEN po_qty_out > 0 THEN date END) as last_out');
-    }
-
-    /**
-     * The latest date the transaction ledger reaches — the "today" every idle
-     * figure is measured against.
-     *
-     * Deliberately not now(). The ERP feed lands in batches and routinely runs a
-     * few days behind, so counting from the real today reports every SKU in the
-     * workspace as idle by exactly that lag: a feed that stopped five days ago
-     * makes the whole warehouse look five days asleep. Measured against the
-     * ledger's own last day, a SKU only stands out when nothing left it while
-     * the rest of the warehouse kept shipping — which is the actual question.
-     *
-     * Not team-scoped: this is a property of the feed, not of anyone's items.
-     */
-    private function ledgerDate(Workspace $workspace): ?CarbonImmutable
-    {
-        $date = DB::table('inventory_transactions')
-            ->where('workspace_id', $workspace->id)
-            ->max('date');
-
-        return $date ? CarbonImmutable::parse($date)->startOfDay() : null;
-    }
-
-    /** Ledger days between the last despatch and the ledger's own last day. */
-    private function idleDays(?string $lastOut, ?CarbonImmutable $asOf): ?int
-    {
-        if (! $lastOut || ! $asOf) {
-            return null;
-        }
-
-        return max(0, (int) CarbonImmutable::parse($lastOut)->startOfDay()->diffInDays($asOf, absolute: false));
     }
 
     /**
