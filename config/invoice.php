@@ -46,6 +46,19 @@ return [
     // separate for more than one. Leave empty to copy nobody.
     'cc' => env('INVOICE_CC'),
 
+    /*
+     * Days before the due date to chase an unpaid invoice. 0 is the due date
+     * itself. Each fires once and only once per invoice. Set to an empty
+     * string to send no reminders at all.
+     */
+    'reminder_days' => collect(explode(',', (string) env('INVOICE_REMINDER_DAYS', '5,3,0')))
+        ->map(fn ($days) => (int) trim($days))
+        ->filter(fn (int $days) => $days >= 0)
+        ->unique()
+        ->sortDesc()
+        ->values()
+        ->all(),
+
     'currency' => env('INVOICE_CURRENCY', 'PHP'),
     'currency_symbol' => env('INVOICE_CURRENCY_SYMBOL', '₱'),
 ];
