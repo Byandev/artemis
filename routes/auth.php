@@ -25,7 +25,11 @@ Route::middleware('guest')->group(function () {
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 
+    // The password broker only throttles per email address, so without a
+    // per-IP limit one caller can walk a list and send real Brevo mail on
+    // every hit. Same limit the verification-notification route uses.
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:6,1')
         ->name('password.email');
 
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
