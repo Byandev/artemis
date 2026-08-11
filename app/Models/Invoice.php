@@ -36,6 +36,7 @@ class Invoice extends Model
         'notes',
         'status',
         'paid_at',
+        'due_reminder_sent_at',
     ];
 
     protected $casts = [
@@ -48,6 +49,7 @@ class Invoice extends Model
         'tax_amount' => 'decimal:2',
         'total' => 'decimal:2',
         'paid_at' => 'datetime',
+        'due_reminder_sent_at' => 'datetime',
     ];
 
     public function workspace(): BelongsTo
