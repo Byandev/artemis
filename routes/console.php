@@ -9,10 +9,16 @@ Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00
 Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
-// Freeze every inventory item just before midnight, so each date's snapshot is that
-// day's closing state and the items list can be filtered back to it. Runs after the
-// last hourly sync-averages so the averages it captures are the day's final ones.
-Schedule::command('inventory:snapshot-items')->dailyAt('23:50')->withoutOverlapping();
+// Freeze every inventory item and its report figures, several times a day.
+//
+// The items list reads this table rather than computing live, so these runs are
+// what the page shows — not a history sidecar. Midnight opens the new day's row
+// and the daytime runs refresh it in place: the unique key is (item, date), so
+// re-running a day overwrites it and history stays one row per day.
+//
+// Times are working hours plus midnight, which is roughly how often the upstream
+// feeds land — a tighter cadence would rewrite the same numbers.
+Schedule::command('inventory:snapshot-items')->cron('0 0,10,14,17,20 * * *')->withoutOverlapping();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);

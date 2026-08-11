@@ -368,13 +368,13 @@ test('a group with no orders, movements or purchase orders still reports a full 
         ->and($facts['bottleneck_stage'])->toBeNull();
 });
 
-test('the report downloads as a spreadsheet with every column', function () {
+test('the export downloads as a spreadsheet with every column', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     reportItem($workspace, 'WIDGET');
 
     $response = $this->actingAs($owner)
-        ->get("/workspaces/{$workspace->slug}/inventory/items/report");
+        ->get("/workspaces/{$workspace->slug}/inventory/items/export");
 
     $response->assertOk()
         ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

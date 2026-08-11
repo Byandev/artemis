@@ -6,7 +6,7 @@ use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Inventory\Exports\InventoryItemExport;
+use Modules\Inventory\Exports\InventoryItemReportExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Tests\TestCase;
@@ -278,7 +278,7 @@ test('the n8n keywords endpoint excludes parent items', function () {
     expect($ids)->not->toContain($parent->id);
 });
 
-test('the export follows the summarize toggle and rolls children up into one row', function () {
+test('the export rolls children up into one row per group', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
@@ -291,24 +291,22 @@ test('the export follows the summarize toggle and rolls children up into one row
     Excel::matchByRegex();
 
     $this->actingAs($owner)
-        ->get(route('workspaces.inventory.item.export', $workspace).'?summarize=1')
+        ->get(route('workspaces.inventory.item.export', $workspace))
         ->assertOk();
 
-    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemExport $export) {
+    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemReportExport $export) {
         $rows = iterator_to_array($export->generator());
 
         // One row for the whole group, with the children's stock summed.
-        expect($rows)->toHaveCount(1);
-        expect($rows[0][0])->toBe('GROUP');
-        expect((int) $rows[0][2])->toBe(2);       // SKUs in Group
-        expect((int) $rows[0][6])->toBe(42);      // Remaining Qty (30 + 12)
-        expect($export->headings()[2])->toBe('SKUs in Group');
+        expect($rows)->toHaveCount(1)
+            ->and($rows[0][0])->toBe('GROUP')
+            ->and((int) $rows[0][10])->toBe(42);
 
         return true;
     });
 });
 
-test('the export with the summarize toggle off stays flat, one row per SKU', function () {
+test('the export stays rolled up even with the list toggled flat', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
@@ -324,12 +322,10 @@ test('the export with the summarize toggle off stays flat, one row per SKU', fun
         ->get(route('workspaces.inventory.item.export', $workspace).'?summarize=0')
         ->assertOk();
 
-    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemExport $export) {
-        $rows = iterator_to_array($export->generator());
-
-        // Both children listed separately; the parent placeholder is not exported.
-        expect(collect($rows)->pluck(0)->all())->toEqualCanonicalizing(['SUP-A', 'SUP-B']);
-        expect($export->headings())->not->toContain('SKUs in Group');
+    // The demand figures are the group's, so a per-SKU download would split one
+    // reorder decision across several lines and invite double-counting it.
+    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemReportExport $export) {
+        expect(collect(iterator_to_array($export->generator()))->pluck(0)->all())->toBe(['GROUP']);
 
         return true;
     });

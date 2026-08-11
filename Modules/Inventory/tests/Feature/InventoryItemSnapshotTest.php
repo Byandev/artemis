@@ -4,7 +4,7 @@ use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Inventory\Exports\InventoryItemExport;
+use Modules\Inventory\Exports\InventoryItemReportExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryItemSnapshot;
 use Modules\Inventory\Models\InventoryTransaction;
@@ -142,21 +142,55 @@ test('each day keeps its own row so history builds up', function () {
         ->and((int) $byDate['2026-08-02'])->toBe(4);
 });
 
-test('the date filter shows the snapshot for that day, not live stock', function () {
+test('the list reads the newest snapshot, and a date filter reads that day', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     ledger($item, 10, '2026-06-01');
     $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
 
-    // Stock changes after the snapshot was taken.
     ledger($item, 77, '2026-06-02');
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-02']);
 
-    $live = listRows($owner, $workspace, '?summarize=0');
-    expect((int) collect($live)->firstWhere('sku', 'SKU-1')['current_stocks'])->toBe(77);
+    // Everything the list shows arrives by batch sync, so it reads the newest
+    // frozen day rather than recomputing per request.
+    $latest = listRows($owner, $workspace, '?summarize=0');
+    expect((int) collect($latest)->firstWhere('sku', 'SKU-1')['current_stocks'])->toBe(77);
 
     $past = listRows($owner, $workspace, '?summarize=0&filter[date]=2026-08-01');
     expect((int) collect($past)->firstWhere('sku', 'SKU-1')['current_stocks'])->toBe(10);
+});
+
+test('stock moving after the newest snapshot does not change the list until it runs again', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
+
+    ledger($item, 10, '2026-06-01');
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+
+    ledger($item, 77, '2026-06-02');
+
+    // The deliberate trade of reading a snapshot: the page is as-of the last
+    // run, not as-of now.
+    expect((int) collect(listRows($owner, $workspace, '?summarize=0'))->firstWhere('sku', 'SKU-1')['current_stocks'])
+        ->toBe(10);
+
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-02']);
+
+    expect((int) collect(listRows($owner, $workspace, '?summarize=0'))->firstWhere('sku', 'SKU-1')['current_stocks'])
+        ->toBe(77);
+});
+
+test('a workspace with no snapshot at all still renders, computed live', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
+
+    ledger($item, 42, '2026-06-01');
+
+    // Nothing has ever been frozen — falling through to the live query is what
+    // keeps a new workspace from looking empty until the first scheduled run.
+    expect((int) collect(listRows($owner, $workspace, '?summarize=0'))->firstWhere('sku', 'SKU-1')['current_stocks'])
+        ->toBe(42);
 });
 
 test('the summarize roll-up works against a snapshot date', function () {
@@ -214,10 +248,13 @@ test('search and sort still apply on a snapshot date', function () {
     expect(collect($sorted)->pluck('sku')->first())->toBe('BETA');
 });
 
-test('a date with no snapshot falls back to live data', function () {
+test('a date with no snapshot shows nothing rather than live data', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
     ledger($item, 55);
+
+    // Today has been frozen, so the fallback below is not "this workspace is new".
+    $this->artisan('inventory:snapshot-items')->assertSuccessful();
 
     $this->actingAs($owner)
         ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=0&filter[date]=2019-01-01')
@@ -225,9 +262,12 @@ test('a date with no snapshot falls back to live data', function () {
         ->assertInertia(function (Assert $page) {
             $props = $page->toArray()['props'];
 
-            // No snapshot for that date -> the banner stays off and stock reads live.
-            expect($props['snapshotDate'])->toBeNull();
-            expect((int) $props['items']['data'][0]['current_stocks'])->toBe(55);
+            // Answering with today's figures under a heading that names 2019
+            // would be worse than answering with nothing.
+            expect($props['snapshotDate'])->toBeNull()
+                ->and($props['requestedDate'])->toBe('2019-01-01')
+                ->and($props['items']['data'])->toBeEmpty()
+                ->and($props['items']['total'])->toBe(0);
         });
 });
 
@@ -265,33 +305,35 @@ test('one workspace never sees another workspace snapshots', function () {
         });
 });
 
-test('the export follows the pinned date instead of exporting today', function () {
+test('the export follows the pinned date and carries every report column', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $product = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'Widget']);
     $item = InventoryItem::create([
-        'workspace_id' => $workspace->id,
-        'product_id' => $product->id,
-        'sku' => 'SKU-1',
-        'is_active' => true,
+        'workspace_id' => $workspace->id, 'product_id' => $product->id,
+        'sku' => 'SKU-1', 'is_active' => true, 'lead_time' => 5, 'three_days_average' => 4,
     ]);
 
-    ledger($item, 10, '2026-06-01');
+    ledger($item, 10);
     $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
-    ledger($item, 77, '2026-06-02');
+
+    // Stock moves after that day was frozen; the pinned export must ignore it.
+    ledger($item, 99, '2026-06-02');
 
     Excel::fake();
 
-    $this->actingAs($owner)
-        ->get(route('workspaces.inventory.item.export', $workspace).'?summarize=0&filter[date]=2026-08-01')
+    test()->actingAs($owner)
+        ->get(route('workspaces.inventory.item.export', $workspace).'?filter[date]=2026-08-01')
         ->assertOk();
 
-    Excel::assertDownloaded('inventory-items-2026-08-01.xlsx', function (InventoryItemExport $export) {
+    Excel::assertDownloaded('inventory-items-2026-08-01.xlsx', function (InventoryItemReportExport $export) {
         $rows = iterator_to_array($export->generator());
 
-        // SKU, Product, Status, Lead Time, Unfulfilled, Remaining Qty(current_stocks)…
-        expect($rows[0][0])->toBe('SKU-1')
-            ->and($rows[0][1])->toBe('Widget')
-            ->and((int) $rows[0][5])->toBe(10);
+        // One download carries the whole report, not only the columns the table
+        // happened to be showing.
+        expect($export->headings())->toHaveCount(31)
+            ->and($rows[0][0])->toBe('SKU-1')
+            // Current Stocks as frozen on 2026-08-01, not the 99 it is now.
+            ->and((int) $rows[0][10])->toBe(10);
 
         return true;
     });
@@ -307,4 +349,75 @@ test('the workspace option limits the snapshot to one workspace', function () {
     $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--workspace' => $workspaceA->id]);
 
     expect(InventoryItemSnapshot::pluck('sku')->all())->toBe(['A-1']);
+});
+
+test('editing lead time rewrites today\'s snapshot so the list shows it at once', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create([
+        'workspace_id' => $workspace->id, 'sku' => 'GROUP',
+        'is_parent' => true, 'is_active' => true, 'lead_time' => 2,
+    ]);
+    $child = InventoryItem::create([
+        'workspace_id' => $workspace->id, 'sku' => 'CHILD', 'parent_id' => $parent->id,
+        'is_active' => true, 'lead_time' => 2, 'three_days_average' => 3,
+    ]);
+    ledger($child, 50);
+
+    $this->artisan('inventory:snapshot-items')->assertSuccessful();
+
+    test()->actingAs($owner)
+        ->patch(route('workspaces.inventory.item.lead-time.update', ['workspace' => $workspace, 'item' => $parent->id]), ['lead_time' => 10])
+        ->assertRedirect();
+
+    // Frozen against today rather than left for the next scheduled run.
+    expect((int) InventoryItemSnapshot::where('inventory_item_id', $parent->id)
+        ->where('snapshot_date', now()->toDateString())->value('lead_time'))->toBe(10);
+
+    // And the list, which reads that row, agrees: 10 × the group's 3/day.
+    $row = collect(listRows($owner, $workspace, '?summarize=1'))->first();
+    expect((int) $row['lead_time'])->toBe(10)
+        ->and((int) $row['stocks_needed_for_lead_time'])->toBe(30);
+
+    // The child's row was rewritten too, so the group is not half stale.
+    expect((int) InventoryItemSnapshot::where('inventory_item_id', $child->id)
+        ->where('snapshot_date', now()->toDateString())->count())->toBe(1);
+});
+
+test('an edit never invents a snapshot day that does not already exist', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $kept = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'OTHER', 'is_active' => true]);
+    $edited = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'EDITED', 'is_active' => true, 'lead_time' => 1]);
+    ledger($kept, 5);
+    ledger($edited, 5);
+
+    // Only a past day is frozen; nothing exists for today.
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01'])->assertSuccessful();
+
+    test()->actingAs($owner)
+        ->patch(route('workspaces.inventory.item.lead-time.update', ['workspace' => $workspace, 'item' => $edited->id]), ['lead_time' => 9])
+        ->assertRedirect();
+
+    // Writing one row for today would make today the newest day, and the list
+    // reads the newest day — so a single edit would hide every other item.
+    expect(InventoryItemSnapshot::where('snapshot_date', now()->toDateString())->count())->toBe(0)
+        ->and(collect(listRows($owner, $workspace, '?summarize=0')))->toHaveCount(2);
+});
+
+test('the list reports when the snapshot it is showing was last written', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
+    ledger($item, 10);
+
+    $this->artisan('inventory:snapshot-items')->assertSuccessful();
+
+    test()->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('snapshotDate', now()->toDateString())
+            // The day alone does not say how current the page is: the snapshot
+            // is rewritten several times a day and on every edit.
+            ->whereNot('snapshotUpdatedAt', null));
 });

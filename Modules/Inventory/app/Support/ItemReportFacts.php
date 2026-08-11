@@ -60,7 +60,14 @@ class ItemReportFacts
      */
     private ?CarbonImmutable $demandAsOf = null;
 
-    public function __construct(private Workspace $workspace)
+    /**
+     * @param  list<int>|null  $groupIds  restrict to these groups, or null for all.
+     *                                    The list view passes the page it is about
+     *                                    to render, which keeps the scans
+     *                                    proportional to what is on screen rather
+     *                                    than to the catalogue.
+     */
+    public function __construct(private Workspace $workspace, private ?array $groupIds = null)
     {
         $this->demandWindows();
         $this->movements();
@@ -221,7 +228,15 @@ class ItemReportFacts
         $groupBySku = [];
 
         foreach (DB::table('inventory_items')->where('workspace_id', $this->workspace->id)->get(['id', 'parent_id', 'sku']) as $item) {
-            $groupBySku[mb_strtoupper(trim((string) $item->sku))] = (int) ($item->parent_id ?? $item->id);
+            $group = (int) ($item->parent_id ?? $item->id);
+
+            // Narrowed here rather than after the scan, so an order line naming
+            // only out-of-scope items is skipped before any counting happens.
+            if ($this->groupIds !== null && ! in_array($group, $this->groupIds, true)) {
+                continue;
+            }
+
+            $groupBySku[mb_strtoupper(trim((string) $item->sku))] = $group;
         }
 
         $componentsByCode = [];
@@ -266,6 +281,7 @@ class ItemReportFacts
         $rows = DB::table('inventory_transactions as t')
             ->join('inventory_items as i', 'i.id', '=', 't.inventory_item_id')
             ->where('i.workspace_id', $this->workspace->id)
+            ->when($this->groupIds, fn ($q) => $q->whereIn(DB::raw('COALESCE(i.parent_id, i.id)'), $this->groupIds))
             ->groupByRaw('COALESCE(i.parent_id, i.id), t.date')
             ->selectRaw('COALESCE(i.parent_id, i.id) as group_id, t.date')
             ->selectRaw('SUM(t.po_qty_in) as qty_in, SUM(t.po_qty_out) as qty_out')
@@ -307,6 +323,7 @@ class ItemReportFacts
             ->where('po.workspace_id', $this->workspace->id)
             ->whereIn('po.status', PurchasedOrder::AWAITING_DELIVERY_STATUSES)
             ->whereNotNull('po.issue_date')
+            ->when($this->groupIds, fn ($q) => $q->whereIn(DB::raw('COALESCE(i.parent_id, i.id)'), $this->groupIds))
             ->groupBy('poi.id')
             ->selectRaw('poi.id, COALESCE(i.parent_id, i.id) as group_id, po.id as po_id, po.status, po.issue_date, po.expected_delivery_date')
             ->selectRaw('poi.count as ordered, COALESCE(SUM(d.qty), 0) as delivered')
