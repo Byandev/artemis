@@ -163,7 +163,11 @@ class ItemReportFacts
         $starts = [];
 
         foreach (self::WINDOWS as $days) {
-            $starts[$days] = $this->demandAsOf->subDays($days)->startOfDay();
+            // days - 1, because demandAsOf is the end of the latest day and that
+            // day is one of them: subDays(3) from the end of the 11th reaches
+            // the start of the 8th, which is four days of orders divided by
+            // three. Every rate on the page would read a third high.
+            $starts[$days] = $this->demandAsOf->subDays($days - 1)->startOfDay();
         }
 
         $widest = min($starts);

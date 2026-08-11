@@ -7,6 +7,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryItemSnapshot;
 use Modules\Inventory\Support\GencysDemandSync;
 use Modules\Inventory\Support\InventoryItemSnapshotter;
+use Modules\Inventory\Support\ItemReportFacts;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -211,4 +212,53 @@ test('a partial refresh freezes rows without moving the whole workspace demand',
 
     expect($full->demandSynced())->toBe(1)
         ->and((float) $item->fresh()->three_days_average)->toBe(3.0);
+});
+
+test('the stored 3-day average equals the report units-per-day, group and all', function () {
+    $workspace = gencysWorkspace();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
+    $a = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'CHILD-A', 'parent_id' => $parent->id, 'is_active' => true]);
+    $b = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'CHILD-B', 'parent_id' => $parent->id, 'is_active' => true]);
+
+    // Quantities chosen so per-child averages are fractional: rounding each up
+    // before summing would make the group read 4/day against a true 7/3.
+    demandUnitCode($workspace, 'BUNDLE-A', ['CHILD-A' => 2, 'CHILD-B' => 5]);
+    demandOrder($workspace, 'BUNDLE-A', now()->toDateString());
+
+    (new GencysDemandSync($workspace))->run();
+    $facts = (new ItemReportFacts($workspace))->for($parent->id);
+
+    $stored = (float) $a->fresh()->three_days_average + (float) $b->fresh()->three_days_average;
+    $reported = $facts['units_3d'] / 3;
+
+    // Two figures shown side by side on the same row, from the same orders, so
+    // they have to be one number rather than two that nearly agree.
+    //
+    // Compared to a thousandth rather than exactly: three_days_average is stored
+    // per item in decimal(10,4), so summing a group's children can land a single
+    // ten-thousandth away from dividing the group's own demand. That is the
+    // column's precision, not a difference in the maths — the page renders one
+    // decimal place. Rounding each child up, which is what this replaced, put
+    // the two a third apart.
+    expect(abs($stored - $reported))->toBeLessThan(0.001)
+        ->and(abs($stored - 7 / 3))->toBeLessThan(0.001);
+});
+
+test('a three-day window covers three days, not four', function () {
+    $workspace = gencysWorkspace();
+    $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'WIDGET', 'is_active' => true]);
+    demandUnitCode($workspace, 'BUNDLE-A', ['WIDGET' => 3]);
+
+    // One order on each of four consecutive days, the latest being the feed's.
+    foreach ([0, 1, 2, 3] as $daysBack) {
+        demandOrder($workspace, 'BUNDLE-A', now()->subDays($daysBack)->toDateString());
+    }
+
+    (new GencysDemandSync($workspace))->run();
+
+    // Three days of orders, three units each, over three days. Counting the
+    // fourth day and still dividing by three would read 4.
+    expect((float) $item->fresh()->three_days_average)->toBe(3.0)
+        ->and((new ItemReportFacts($workspace))->for($item->id)['units_3d'])->toBe(9);
 });

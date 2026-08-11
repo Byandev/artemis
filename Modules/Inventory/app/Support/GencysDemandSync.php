@@ -102,7 +102,12 @@ class GencysDemandSync
             $key = $this->normalize((string) $item->sku);
 
             InventoryItem::where('id', $item->id)->update([
-                'three_days_average' => ceil(($average[$key] ?? 0) / self::AVERAGE_DAYS),
+                // Stored exact, not rounded up. The column is decimal(10,4) and
+                // the roll-up sums it across a group: rounding each child up
+                // first makes the group's average larger than its own demand
+                // divided by three, so the stored figure and the report's
+                // units-per-day column would disagree on the same page.
+                'three_days_average' => round(($average[$key] ?? 0) / self::AVERAGE_DAYS, 4),
                 'unfulfilled_count' => $unfulfilled[$key] ?? 0,
             ]);
         }
@@ -132,7 +137,10 @@ class GencysDemandSync
 
         $end = $latest ? CarbonImmutable::parse($latest)->endOfDay() : CarbonImmutable::now()->endOfDay();
 
-        return [$end->subDays(self::AVERAGE_DAYS)->startOfDay(), $end];
+        // AVERAGE_DAYS - 1, because $end is the end of the latest day and that
+        // day is one of the three. Subtracting the full three would count four
+        // days of orders and still divide by three.
+        return [$end->subDays(self::AVERAGE_DAYS - 1)->startOfDay(), $end];
     }
 
     /**
