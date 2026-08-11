@@ -211,21 +211,29 @@ export function AppSidebar() {
                   {
                       title: 'SMS',
                       icon: MessageSquare,
+                      anyOf: [
+                          PERMISSIONS.ViewSims,
+                          PERMISSIONS.SendSms,
+                          PERMISSIONS.ViewSmsOutbox,
+                      ],
                       items: [
                           {
                               title: 'SIMs',
                               href: `/workspaces/${slug}/sms/sims`,
                               icon: Smartphone,
+                              permission: PERMISSIONS.ViewSims,
                           },
                           {
                               title: 'Send SMS',
                               href: `/workspaces/${slug}/sms/send`,
                               icon: Send,
+                              permission: PERMISSIONS.SendSms,
                           },
                           {
                               title: 'Outbox',
                               href: `/workspaces/${slug}/sms/outbox`,
                               icon: MessageSquare,
+                              permission: PERMISSIONS.ViewSmsOutbox,
                           },
                       ],
                   },
