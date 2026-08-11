@@ -733,13 +733,13 @@ function SubscriptionModal({
     const fromTrial =
         current?.status === 'trialing' || currentPlan?.code === 'free_trial';
 
+    // Only a trial conversion bills here. Every other move onto a paid plan is
+    // a subscription carrying on, and the nightly renewal run bills those seven
+    // days before the period ends.
     const willInvoice =
+        fromTrial &&
         data.status === 'active' &&
-        parseFloat(selectedPlan?.price_php ?? '0') > 0 &&
-        !(
-            current?.subscription_plan_id === selectedPlan?.id &&
-            current?.status === 'active'
-        );
+        parseFloat(selectedPlan?.price_php ?? '0') > 0;
 
     // Same fallback the server applies: billing address, then the owner.
     const billingRecipient = workspace.billing_email || workspace.owner?.email;
@@ -831,9 +831,8 @@ function SubscriptionModal({
                                 .
                             </p>
                             <p className="mt-0.5 text-amber-800 dark:text-amber-300/80">
-                                {fromTrial
-                                    ? 'Due today — this workspace is coming off the free trial.'
-                                    : 'Due in 7 days.'}
+                                Due today — this workspace is coming off the
+                                free trial.
                             </p>
                             {billingRecipient && (
                                 <p className="mt-0.5 text-amber-800 dark:text-amber-300/80">

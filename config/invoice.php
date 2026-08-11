@@ -25,6 +25,11 @@ return [
     // Default payment terms in days (issue_date + this = due_date).
     'due_days' => (int) env('INVOICE_DUE_DAYS', 7),
 
+    // How far ahead of a subscription's renewal date its invoice is raised.
+    // The invoice falls due on the renewal date itself, so this is also how
+    // long a workspace gets to settle before the new period starts.
+    'renewal_lead_days' => (int) env('INVOICE_RENEWAL_LEAD_DAYS', 7),
+
     // Default tax rate as a percentage (PH VAT is 12). Set 0 for none.
     'tax_rate' => (float) env('INVOICE_TAX_RATE', 0),
 
@@ -36,6 +41,10 @@ return [
         "Account Name: Meta Digitrading Enterprise Co\n".
         'Account Number: 0000071593190'
     ),
+
+    // Addresses copied on every invoice email, for your own records. Comma
+    // separate for more than one. Leave empty to copy nobody.
+    'cc' => env('INVOICE_CC'),
 
     'currency' => env('INVOICE_CURRENCY', 'PHP'),
     'currency_symbol' => env('INVOICE_CURRENCY_SYMBOL', '₱'),

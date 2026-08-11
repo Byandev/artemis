@@ -10,7 +10,7 @@ import { PaginatedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { Download, FileText, Plus, Search, Send, Trash2 } from 'lucide-react';
+import { Download, FileText, Plus, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -22,8 +22,6 @@ interface Invoice {
     currency: string;
     status: 'draft' | 'sent' | 'paid';
     issue_date: string;
-    /** Resolved server-side: the invoice's address, else the workspace's, else its owner's. */
-    recipient: string | null;
     workspace: { id: number; name: string; slug: string } | null;
 }
 
@@ -50,8 +48,8 @@ export default function Index({ invoices, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const status = filters.status || '';
 
-    // Resending is the one action here whose result is invisible on the page,
-    // so its outcome has to be said out loud.
+    // Marking an invoice paid moves the subscription on to its next period,
+    // which the row itself cannot show — so the flash has to say it out loud.
     const { flash } = usePage().props as {
         flash?: { success?: string | null; error?: string | null };
     };
@@ -97,31 +95,6 @@ export default function Index({ invoices, filters }: Props) {
             `/admin/invoices/${invoice.id}/status`,
             { status: next },
             { preserveScroll: true },
-        );
-    }
-
-    const [resending, setResending] = useState<number | null>(null);
-
-    function handleResend(invoice: Invoice) {
-        // Naming the address in the prompt is the whole safeguard — it's the
-        // one thing an admin needs to check before mailing a customer again.
-        if (
-            !confirm(
-                `Email invoice ${invoice.number} to ${invoice.recipient}?\n\nThey will receive it again, with the PDF attached.`,
-            )
-        ) {
-            return;
-        }
-
-        setResending(invoice.id);
-
-        router.post(
-            `/admin/invoices/${invoice.id}/resend`,
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setResending(null),
-            },
         );
     }
 
@@ -233,32 +206,6 @@ export default function Index({ invoices, filters }: Props) {
                             </a>
                         </TooltipTrigger>
                         <TooltipContent>Download as PDF</TooltipContent>
-                    </Tooltip>
-
-                    {/* A draft has never been sent, so there is nothing to
-                        re-send; issuing it from the status column mails it. */}
-                    <Tooltip>
-                        {/* Radix drops events on a disabled trigger, so the
-                            span is what keeps the tooltip reachable — and a
-                            disabled button is exactly when the reason matters. */}
-                        <TooltipTrigger asChild>
-                            <span className="inline-flex">
-                                <button
-                                    type="button"
-                                    onClick={() => handleResend(row.original)}
-                                    disabled={
-                                        row.original.status === 'draft' ||
-                                        !row.original.recipient ||
-                                        resending === row.original.id
-                                    }
-                                    className="inline-flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-zinc-400 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                                    aria-label="Resend invoice"
-                                >
-                                    <Send className="h-4 w-4" />
-                                </button>
-                            </span>
-                        </TooltipTrigger>
-                        <TooltipContent>Resend</TooltipContent>
                     </Tooltip>
 
                     <Tooltip>
