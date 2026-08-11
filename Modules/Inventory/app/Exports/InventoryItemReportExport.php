@@ -74,7 +74,6 @@ class InventoryItemReportExport implements FromGenerator, WithHeadings
             'Demand Trend (3d vs 14d)',
             'Unfulfilled Order Quantity',
             'Unfulfilled Item Needed',
-            'Shippable Stocks',
             'Current Stocks',
             'Current Stocks Can Last (days)',
             'Lead Time',
@@ -115,11 +114,9 @@ class InventoryItemReportExport implements FromGenerator, WithHeadings
                 ...$this->demandColumns($facts),
                 $this->trend($facts),
                 $unfulfilled,
-                // The two halves of what we owe: the part with nothing behind it,
-                // waiting on supply, and the part on the shelf waiting to be
-                // picked. They add up to Unfulfilled Order Quantity.
+                // The part of what we owe with no stock behind it — real orders
+                // waiting on supply rather than on picking.
                 max(0, $unfulfilled - $stocks),
-                (int) round((float) ($row->shippable_stocks ?? 0)),
                 $stocks,
                 $stocksCover,
                 $leadTime,

@@ -87,8 +87,6 @@ interface Item {
     days_it_can_last: number | null;
     po_needed: number | null;
     current_stocks: number | null;
-    /** Stock on the shelf with an unfulfilled order against it — could ship today. */
-    shippable_stocks: number | null;
     discrepancy: number | null;
     discrepancy_counted_qty: number | null;
     discrepancy_date: string | null;
@@ -180,12 +178,6 @@ const COLUMN_OPTIONS: ColumnOption[] = [
         group: 'List',
     },
     { id: 'current_stocks', label: 'Current stocks', group: 'List' },
-    {
-        id: 'shippable_stocks',
-        label: 'Shippable stocks',
-        defaultVisible: false,
-        group: 'List',
-    },
     { id: 'discrepancy', label: 'Discrepancy', group: 'List' },
     {
         id: 'remaining_after_fulfillment',
@@ -332,54 +324,6 @@ const COLUMN_HELP: Record<string, React.ReactNode> = {
         'Units still owed on open purchase orders, at any stage — including orders raised but never sent to a supplier. Committed on paper, not yet on the shelf.',
     current_stocks:
         'Units physically on hand, from the ledger, adjusted by the latest physical count.',
-    shippable_stocks: (
-        <>
-            Stock on the shelf with an unfulfilled order against it — what could
-            physically leave today.
-            <br />
-            <br />
-            Matched per SKU and then summed, since a customer ordered a specific
-            variant and stock on a sibling cannot ship it. So a group holding
-            plenty of one variant and none of another shows only what actually
-            pairs up.
-            <br />
-            <br />
-            The other half of unfulfilled demand is{' '}
-            <b>Unfulfilled with no stock</b>; together the two make up
-            Unfulfilled.
-        </>
-    ),
-    discrepancy:
-        'The gap between the ledger and the last physical count. Positive means more was counted than the ledger expected.',
-    remaining_after_fulfillment:
-        'Current stocks plus everything on order, less what is unfulfilled. What is genuinely free to sell.',
-    days_it_can_last:
-        'How long Remaining After Fulfillment lasts at the 3-day average — so it counts stock suppliers still owe you. Current Stocks Can Last is the stricter version, on hand only.',
-    po_needed:
-        'Units the reorder maths still wants bought, after crediting every open order. Buffer plus lead-time demand, less what is free to sell.',
-
-    orders_3d:
-        'Customer orders per day over the last 3 days of order data. Orders, not units — one order is one pick, however much it contains.',
-    units_3d:
-        'Units of this group ordered per day over the last 3 days, expanded from the unit codes on each order line.',
-    orders_7d: 'Customer orders per day over the last 7 days of order data.',
-    units_7d: 'Units of this group ordered per day over the last 7 days.',
-    orders_14d: 'Customer orders per day over the last 14 days of order data.',
-    units_14d:
-        'Units of this group ordered per day over the last 14 days — the baseline the trend compares against.',
-    demand_trend: (
-        <>
-            The 3-day rate against the 14-day rate, as a percentage. Over 100%
-            means demand is accelerating and the reorder maths is reading low;
-            under 100% means it is fading.
-            <br />
-            <br />
-            All demand windows are measured back from the order feed&rsquo;s own
-            latest day, not from today. The feed lands in batches, so counting
-            from today would report its lag as a collapse in demand.
-        </>
-    ),
-
     stockout_risk: (
         <>
             Cover read against this item&rsquo;s own lead time, which is what
@@ -1502,26 +1446,6 @@ export default function ItemIndex({
                     <MetricCell
                         value={row.original.current_stocks}
                         color="text-violet-600 dark:text-violet-400"
-                    />
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'shippable_stocks',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader
-                    help={COLUMN_HELP['shippable_stocks']}
-                    column={column}
-                    title="Shippable"
-                    className="justify-center"
-                />
-            ),
-            cell: ({ row }) => (
-                <div className="text-center">
-                    <MetricCell
-                        value={row.original.shippable_stocks}
-                        color="text-emerald-600 dark:text-emerald-400"
                     />
                 </div>
             ),
