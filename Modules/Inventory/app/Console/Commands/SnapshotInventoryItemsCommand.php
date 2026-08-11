@@ -12,9 +12,14 @@ use Modules\Inventory\Support\InventoryItemSnapshotter;
  * report's group figures — against a date.
  *
  * This is what the items list reads, so these runs are the page rather than a
- * history sidecar; see routes/console.php for the schedule. Re-running a date is
- * safe: rows are upserted on (inventory_item_id, snapshot_date), so a manual
- * backfill overwrites rather than duplicates.
+ * history sidecar; see routes/console.php for the schedule. Re-running today is
+ * safe: rows are upserted on (inventory_item_id, snapshot_date), so a re-run
+ * overwrites rather than duplicates.
+ *
+ * There is no backfill. Every figure is computed from the present — the current
+ * ledger, the purchase orders as they stand, the latest order feed — so a past
+ * --date would stamp today's state with that date rather than reconstruct it.
+ * The command refuses unless --force says that is genuinely what you want.
  *
  * The writing itself lives in InventoryItemSnapshotter, which an edit to a
  * displayed field also calls so today's row catches up without waiting for the
@@ -25,7 +30,8 @@ class SnapshotInventoryItemsCommand extends Command
     protected $signature = 'inventory:snapshot-items
                             {--date= : Date to tag the snapshot with (Y-m-d), defaults to today}
                             {--workspace= : Limit to a single workspace id}
-                            {--skip-demand : Freeze what is already stored, without recomputing demand first}';
+                            {--skip-demand : Freeze what is already stored, without recomputing demand first}
+                            {--force : Stamp a past date with today\'s figures anyway (see the warning below)}';
 
     protected $description = 'Store a snapshot of every inventory item, its computed stock metrics and its report figures';
 
@@ -34,6 +40,21 @@ class SnapshotInventoryItemsCommand extends Command
         $date = $this->option('date')
             ? Carbon::parse($this->option('date'))->toDateString()
             : Carbon::today()->toDateString();
+
+        // Every figure here is computed from the present: stock from the current
+        // ledger, waiting stock from the purchase orders as they stand now,
+        // demand from the latest order feed. The date is a label, not an as-of.
+        //
+        // That was harmless while the snapshot was history nobody read. The
+        // items list now reads it, so writing today's numbers under last
+        // Tuesday's date does not record last Tuesday — it invents it, and
+        // there is no way to tell the invented day from a real one afterwards.
+        if ($date !== Carbon::today()->toDateString() && ! $this->option('force')) {
+            $this->error("Refusing to write {$date}: these figures are computed from today, so this would record today's state under that date rather than what was true then.");
+            $this->line('Pass --force if you knowingly want today\'s figures stamped with that date.');
+
+            return self::FAILURE;
+        }
 
         $workspaces = Workspace::query()
             ->when($this->option('workspace'), fn ($q, $id) => $q->whereKey($id))

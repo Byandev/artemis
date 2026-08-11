@@ -54,7 +54,7 @@ test('the snapshot command stores every item column and computed metric', functi
     ]);
     ledger($item, 30);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01'])
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true])
         ->assertExitCode(0);
 
     $snap = InventoryItemSnapshot::where('inventory_item_id', $item->id)->firstOrFail();
@@ -93,7 +93,7 @@ test('a snapshot row reproduces the same PO QTY and PO Needed the live list show
     ]);
     ledger($item, 10);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     // The buffer is a stored column, so the two views can only agree if the
     // snapshot captured it — the flat list and the roll-up alike.
@@ -114,11 +114,11 @@ test('re-running the command for a date refreshes rather than duplicates', funct
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
     ledger($item, 10);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     // Stock moves, then the same date is snapshotted again.
     ledger($item, 99, '2026-06-02');
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     $snaps = InventoryItemSnapshot::where('inventory_item_id', $item->id)->get();
     expect($snaps)->toHaveCount(1)
@@ -130,10 +130,10 @@ test('each day keeps its own row so history builds up', function () {
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     ledger($item, 10, '2026-06-01');
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     ledger($item, 4, '2026-06-02');
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-02']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-02', '--force' => true]);
 
     $byDate = InventoryItemSnapshot::where('inventory_item_id', $item->id)
         ->pluck('current_stocks', 'snapshot_date');
@@ -147,10 +147,10 @@ test('the list reads the newest snapshot, and a date filter reads that day', fun
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     ledger($item, 10, '2026-06-01');
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     ledger($item, 77, '2026-06-02');
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-02']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-02', '--force' => true]);
 
     // Everything the list shows arrives by batch sync, so it reads the newest
     // frozen day rather than recomputing per request.
@@ -166,7 +166,7 @@ test('stock moving after the newest snapshot does not change the list until it r
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     ledger($item, 10, '2026-06-01');
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     ledger($item, 77, '2026-06-02');
 
@@ -175,7 +175,7 @@ test('stock moving after the newest snapshot does not change the list until it r
     expect((int) collect(listRows($owner, $workspace, '?summarize=0'))->firstWhere('sku', 'SKU-1')['current_stocks'])
         ->toBe(10);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-02']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-02', '--force' => true]);
 
     expect((int) collect(listRows($owner, $workspace, '?summarize=0'))->firstWhere('sku', 'SKU-1')['current_stocks'])
         ->toBe(77);
@@ -202,7 +202,7 @@ test('the summarize roll-up works against a snapshot date', function () {
     ledger($a, 30);
     ledger($b, 12);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     $rows = listRows($owner, $workspace, '?summarize=1&filter[date]=2026-08-01');
 
@@ -221,7 +221,7 @@ test('the flat snapshot view tags each child with the parent it had that day', f
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
     InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true]);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     $rows = listRows($owner, $workspace, '?summarize=0&filter[date]=2026-08-01');
 
@@ -239,7 +239,7 @@ test('search and sort still apply on a snapshot date', function () {
         ledger($i, $stock);
     }
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     $searched = listRows($owner, $workspace, '?summarize=0&filter[date]=2026-08-01&filter[search]=ALPHA');
     expect(collect($searched)->pluck('sku')->sort()->values()->all())->toBe(['ALPHA', 'ALPHA-2']);
@@ -275,8 +275,8 @@ test('the list reports which dates have snapshots', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-03']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-03', '--force' => true]);
 
     $this->actingAs($owner)
         ->get(route('workspaces.inventory.item.index', $workspace).'?filter[date]=2026-08-03')
@@ -293,7 +293,7 @@ test('one workspace never sees another workspace snapshots', function () {
     ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
 
     InventoryItem::create(['workspace_id' => $workspaceB->id, 'sku' => 'B-ONLY', 'is_active' => true]);
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     $this->actingAs($owner)
         ->get(route('workspaces.inventory.item.index', $workspaceA).'?summarize=0&filter[date]=2026-08-01')
@@ -314,7 +314,7 @@ test('the export follows the pinned date and carries every report column', funct
     ]);
 
     ledger($item, 10);
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01']);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
     // Stock moves after that day was frozen; the pinned export must ignore it.
     ledger($item, 99, '2026-06-02');
@@ -346,7 +346,7 @@ test('the workspace option limits the snapshot to one workspace', function () {
     InventoryItem::create(['workspace_id' => $workspaceA->id, 'sku' => 'A-1', 'is_active' => true]);
     InventoryItem::create(['workspace_id' => $workspaceB->id, 'sku' => 'B-1', 'is_active' => true]);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--workspace' => $workspaceA->id]);
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--workspace' => $workspaceA->id, '--force' => true]);
 
     expect(InventoryItemSnapshot::pluck('sku')->all())->toBe(['A-1']);
 });
@@ -393,7 +393,7 @@ test('an edit never invents a snapshot day that does not already exist', functio
     ledger($edited, 5);
 
     // Only a past day is frozen; nothing exists for today.
-    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01'])->assertSuccessful();
+    $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true])->assertSuccessful();
 
     test()->actingAs($owner)
         ->patch(route('workspaces.inventory.item.lead-time.update', ['workspace' => $workspace, 'item' => $edited->id]), ['lead_time' => 9])
@@ -420,4 +420,25 @@ test('the list reports when the snapshot it is showing was last written', functi
             // The day alone does not say how current the page is: the snapshot
             // is rewritten several times a day and on every edit.
             ->whereNot('snapshotUpdatedAt', null));
+});
+
+test('a past date is refused, because the figures would be today\'s', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
+    ledger($item, 42);
+
+    // Nothing here is computed as-of a date — stock comes from the current
+    // ledger, waiting stock from the purchase orders as they stand. Writing
+    // that under an older date does not record that day, it invents it, and
+    // afterwards nothing distinguishes the invented day from a real one.
+    $this->artisan('inventory:snapshot-items', ['--date' => now()->subDays(3)->toDateString()])
+        ->assertFailed();
+
+    expect(InventoryItemSnapshot::where('workspace_id', $workspace->id)->count())->toBe(0);
+
+    // --force is the way to say that is genuinely what you want.
+    $this->artisan('inventory:snapshot-items', ['--date' => now()->subDays(3)->toDateString(), '--force' => true])
+        ->assertSuccessful();
+
+    expect((int) InventoryItemSnapshot::where('inventory_item_id', $item->id)->value('current_stocks'))->toBe(42);
 });

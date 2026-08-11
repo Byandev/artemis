@@ -49,6 +49,34 @@ class ItemReportFacts
         'longest_waiting_count', 'delayed_po', 'bottleneck_stage',
     ];
 
+    /**
+     * Thresholds behind the bottleneck classification, mirrored from
+     * PurchaseOrderFlowController so the per-item label agrees with the
+     * dashboard flow panel: an item reading "Delay in stocks" here is counting
+     * the same stock the Supplier card is.
+     */
+    private const APPROVAL_SLA_DAYS = 7;
+
+    private const SHIP_TARGET_DAYS = 2;
+
+    /**
+     * Late PO looks back this many days and fires only once a reorder need has
+     * outlived the grace period with no purchase order raised against it — a
+     * need that appears for a day or two is normal reaction time, not a miss.
+     */
+    private const LATE_PO_WINDOW_DAYS = 14;
+
+    private const LATE_PO_GRACE_DAYS = 3;
+
+    /** The four owners a hold-up can belong to. */
+    private const BOTTLENECK_LATE_PO = 'Late PO';
+
+    private const BOTTLENECK_APPROVAL = 'Delay in Payment / Approval';
+
+    private const BOTTLENECK_STOCKS = 'Delay in stocks';
+
+    private const BOTTLENECK_WAREHOUSE = 'Delay in warehouse';
+
     /** @var array<int, array<string, mixed>> group id => facts */
     private array $facts = [];
 
@@ -313,7 +341,8 @@ class ItemReportFacts
     /**
      * What each group's open purchase orders are doing: the most recent, the
      * one held longest inside the business, the earliest arrival a supplier has
-     * committed to, and which stage is holding the most stock.
+     * committed to, and how much stock is past each of the two order-side
+     * targets. The last two feed the bottleneck classification below.
      *
      * Every figure counts the undelivered balance rather than the ordered
      * quantity — a line that is 90% delivered is not still 100% outstanding.
@@ -334,8 +363,9 @@ class ItemReportFacts
             ->get();
 
         $today = CarbonImmutable::now()->startOfDay();
-        $stages = [];
         $delayed = [];
+        $approvalOverdue = [];   // group => un-released units sat past the internal target
+        $stocksOverdue = [];     // group => released units past their committed date
 
         foreach ($rows as $row) {
             $balance = max(0, (int) $row->ordered - (int) $row->delivered);
@@ -361,6 +391,12 @@ class ItemReportFacts
 
             if (! $released) {
                 $this->facts[$group]['raised_not_created_units'] = ($this->facts[$group]['raised_not_created_units'] ?? 0) + $balance;
+
+                // The slice that has outlived the internal target — what the
+                // Payment/Approval bottleneck is weighed on.
+                if ($age > self::APPROVAL_SLA_DAYS) {
+                    $approvalOverdue[$group] = ($approvalOverdue[$group] ?? 0) + $balance;
+                }
             }
 
             // Read straight off the order. The standing two-week agreement is
@@ -382,22 +418,235 @@ class ItemReportFacts
             // three late lines is one conversation with the supplier.
             if ($released && $expected !== null && $expected < $today->toDateString()) {
                 $delayed[$group][(int) $row->po_id] = true;
+                $stocksOverdue[$group] = ($stocksOverdue[$group] ?? 0) + $balance;
             }
-
-            $stage = PurchasedOrder::STATUSES[(int) $row->status] ?? (string) $row->status;
-            $stages[$group][$stage] = ($stages[$group][$stage] ?? 0) + $balance;
         }
 
         foreach ($delayed as $group => $orders) {
             $this->facts[$group]['delayed_po'] = count($orders);
         }
 
-        // The stage holding the most undelivered stock — where this group's
-        // supply is actually stuck, rather than where the loudest order is.
-        foreach ($stages as $group => $byStage) {
-            arsort($byStage);
-            $this->facts[$group]['bottleneck_stage'] = array_key_first($byStage);
+        $this->classifyBottleneck($approvalOverdue, $stocksOverdue);
+    }
+
+    /**
+     * Reduce every hold-up on a group to one of four owners and keep the one
+     * gripping the most units:
+     *
+     *   Late PO                     — a reorder need nobody has raised a PO for.
+     *   Delay in Payment / Approval — a raised PO stuck in our own queue.
+     *   Delay in stocks             — a released PO the supplier is late on.
+     *   Delay in warehouse          — shippable stock sitting unshipped.
+     *
+     * The four are deliberately different questions, so "biggest" compares units
+     * stuck rather than like against like, and the label names wherever the
+     * largest pile happens to sit. A group with nothing past any target keeps
+     * the blank() default of null.
+     *
+     * @param  array<int, int>  $approvalOverdue  group => un-released units past the SLA
+     * @param  array<int, int>  $stocksOverdue  group => released units past their date
+     */
+    private function classifyBottleneck(array $approvalOverdue, array $stocksOverdue): void
+    {
+        $latePo = $this->latePurchaseOrders();
+        $warehouse = $this->warehouseIdle();
+
+        $groups = array_unique(array_merge(
+            array_keys($latePo),
+            array_keys($approvalOverdue),
+            array_keys($stocksOverdue),
+            array_keys($warehouse),
+        ));
+
+        foreach ($groups as $group) {
+            $candidates = [
+                self::BOTTLENECK_LATE_PO => $latePo[$group] ?? 0,
+                self::BOTTLENECK_APPROVAL => $approvalOverdue[$group] ?? 0,
+                self::BOTTLENECK_STOCKS => $stocksOverdue[$group] ?? 0,
+                self::BOTTLENECK_WAREHOUSE => $warehouse[$group] ?? 0,
+            ];
+
+            arsort($candidates);
+            $top = array_key_first($candidates);
+
+            if ($candidates[$top] > 0) {
+                $this->facts[$group]['bottleneck_stage'] = $top;
+            }
         }
+    }
+
+    /**
+     * Groups whose reorder need has outlived the grace period with no purchase
+     * order raised against it — the PO officer has not acted when the numbers
+     * told them to. Returns group => today's uncovered units, the figure the
+     * classifier ranks it by; a group that is not late is absent.
+     *
+     * Read from the frozen snapshots, not recomputed live: po_needed is stored
+     * per day, so "needed on more than three of the last fourteen days" is a
+     * question only the history can answer. Today's own row is not written yet
+     * when this runs inside a snapshot build, so the latest frozen day stands in
+     * for it — a day's lag on a fourteen-day judgement.
+     *
+     * po_needed is rolled to the group the same way the items list rolls it:
+     * lead time and coverage are the parent's when it has one else the group
+     * max, demand and incoming sum. Summing the stored per-item po_needed
+     * instead would count the group's buffer once per sibling.
+     *
+     * @return array<int, int>
+     */
+    private function latePurchaseOrders(): array
+    {
+        $latest = DB::table('inventory_item_snapshots')
+            ->where('workspace_id', $this->workspace->id)
+            ->max('snapshot_date');
+
+        if (! $latest) {
+            return [];
+        }
+
+        $windowStart = CarbonImmutable::parse($latest)->subDays(self::LATE_PO_WINDOW_DAYS)->toDateString();
+
+        $lead = 'COALESCE(MAX(CASE WHEN s.is_parent = 1 THEN s.lead_time END), MAX(s.lead_time))';
+        $cover = 'COALESCE(MAX(CASE WHEN s.is_parent = 1 THEN s.days_of_coverage END), MAX(s.days_of_coverage))';
+        $avg = 'SUM(s.three_days_average)';
+        $remaining = 'COALESCE(SUM(s.remaining_after_fulfillment), 0)';
+        $needed = "GREATEST(0, ($cover * $avg) + ($lead * $avg) - $remaining)";
+
+        $rows = DB::table('inventory_item_snapshots as s')
+            ->where('s.workspace_id', $this->workspace->id)
+            ->where('s.snapshot_date', '>', $windowStart)
+            ->when($this->groupIds, fn ($q) => $q->whereIn(DB::raw('COALESCE(s.parent_id, s.inventory_item_id)'), $this->groupIds))
+            ->groupByRaw('s.snapshot_date, COALESCE(s.parent_id, s.inventory_item_id)')
+            ->selectRaw('s.snapshot_date, COALESCE(s.parent_id, s.inventory_item_id) as group_id')
+            ->selectRaw("$needed as needed")
+            ->get();
+
+        $daysNeeded = [];
+        $todayNeeded = [];
+
+        foreach ($rows as $row) {
+            $group = (int) $row->group_id;
+
+            if ((float) $row->needed > 0) {
+                $daysNeeded[$group] = ($daysNeeded[$group] ?? 0) + 1;
+            }
+
+            if ((string) $row->snapshot_date === (string) $latest) {
+                $todayNeeded[$group] = (int) round((float) $row->needed);
+            }
+        }
+
+        $raisedInWindow = $this->groupsWithPoRaisedSince($windowStart);
+
+        $late = [];
+
+        foreach ($daysNeeded as $group => $days) {
+            // Persisted past the grace period, still needed today, and no PO
+            // raised while it went uncovered: the officer is late on this one.
+            if ($days > self::LATE_PO_GRACE_DAYS
+                && ! isset($raisedInWindow[$group])
+                && ($todayNeeded[$group] ?? 0) > 0) {
+                $late[$group] = $todayNeeded[$group];
+            }
+        }
+
+        return $late;
+    }
+
+    /**
+     * Groups with any purchase order — of any status — raised since the given
+     * date, as a set keyed by group id. A PO raised recently means the officer
+     * acted, so the group is not "late" however much the maths still wants; the
+     * leftover gap belongs to whichever stage that order is now sitting in.
+     *
+     * @return array<int, true>
+     */
+    private function groupsWithPoRaisedSince(string $since): array
+    {
+        $rows = DB::table('inventory_purchased_orders as po')
+            ->join('inventory_purchased_order_items as poi', 'poi.inventory_purchased_order_id', '=', 'po.id')
+            ->join('inventory_items as i', 'i.id', '=', 'poi.inventory_item_id')
+            ->where('po.workspace_id', $this->workspace->id)
+            ->whereNotNull('po.issue_date')
+            ->where('po.issue_date', '>', $since)
+            ->when($this->groupIds, fn ($q) => $q->whereIn(DB::raw('COALESCE(i.parent_id, i.id)'), $this->groupIds))
+            ->groupByRaw('COALESCE(i.parent_id, i.id)')
+            ->selectRaw('COALESCE(i.parent_id, i.id) as group_id')
+            ->pluck('group_id');
+
+        $set = [];
+
+        foreach ($rows as $group) {
+            $set[(int) $group] = true;
+        }
+
+        return $set;
+    }
+
+    /**
+     * Groups sitting on shippable stock that has stopped moving. Shippable is
+     * stock matched by unmet demand — min(on hand, unfulfilled) per SKU, summed
+     * to the group — so a shelf full of the wrong variant does not count. Idle
+     * is measured from the last despatch against the ledger's own last day,
+     * never today: the feed lands in batches, so counted from today a feed that
+     * paused on Friday reports the whole warehouse asleep since Friday.
+     *
+     * Returns group => shippable units for groups idle at least the target. A
+     * group that has never shipped is absent — unknown, not idle.
+     *
+     * @return array<int, int>
+     */
+    private function warehouseIdle(): array
+    {
+        $latest = DB::table('inventory_item_snapshots')
+            ->where('workspace_id', $this->workspace->id)
+            ->max('snapshot_date');
+
+        $asOf = DB::table('inventory_transactions')
+            ->where('workspace_id', $this->workspace->id)
+            ->max('date');
+
+        if (! $latest || ! $asOf) {
+            return [];
+        }
+
+        $asOf = CarbonImmutable::parse($asOf)->startOfDay();
+
+        $rows = DB::table('inventory_item_snapshots as s')
+            ->where('s.workspace_id', $this->workspace->id)
+            ->where('s.snapshot_date', $latest)
+            ->when($this->groupIds, fn ($q) => $q->whereIn(DB::raw('COALESCE(s.parent_id, s.inventory_item_id)'), $this->groupIds))
+            ->groupByRaw('COALESCE(s.parent_id, s.inventory_item_id)')
+            ->selectRaw('COALESCE(s.parent_id, s.inventory_item_id) as group_id')
+            ->selectRaw('SUM(GREATEST(0, LEAST(s.current_stocks, s.unfulfilled_count))) as here')
+            ->get();
+
+        $idle = [];
+
+        foreach ($rows as $row) {
+            $here = (int) round((float) $row->here);
+
+            if ($here <= 0) {
+                continue;
+            }
+
+            $group = (int) $row->group_id;
+            $lastOut = $this->facts[$group]['last_out_date'] ?? null;
+
+            // Never shipped is unknown, not idle — a brand new SKU has not
+            // stalled, it has not started.
+            if ($lastOut === null) {
+                continue;
+            }
+
+            $idleDays = max(0, (int) CarbonImmutable::parse($lastOut)->startOfDay()->diffInDays($asOf, absolute: false));
+
+            if ($idleDays >= self::SHIP_TARGET_DAYS) {
+                $idle[$group] = $here;
+            }
+        }
+
+        return $idle;
     }
 
     /** Keep the later of two dated figures, carrying its count with it. */

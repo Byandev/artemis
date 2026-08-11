@@ -96,6 +96,34 @@ function unitCode(Workspace $workspace, string $code, array $components): void
     }
 }
 
+/**
+ * A frozen snapshot row for the item on $date, with defaults that carry a real
+ * reorder need (10/day against a 10-day cover and 10-day lead, nothing incoming)
+ * and no shippable stock. Override any of it through $cols — e.g. stock and
+ * unfulfilled for the warehouse cases, or a large remaining_after_fulfillment to
+ * close the reorder gap.
+ */
+function reportSnapshot(Workspace $workspace, InventoryItem $item, string $date, array $cols = []): void
+{
+    DB::table('inventory_item_snapshots')->insert(array_merge([
+        'workspace_id' => $workspace->id,
+        'inventory_item_id' => $item->id,
+        'snapshot_date' => $date,
+        'parent_id' => $item->parent_id,
+        'is_parent' => (bool) $item->is_parent,
+        'sku' => $item->sku,
+        'is_active' => true,
+        'lead_time' => 10,
+        'days_of_coverage' => 10,
+        'three_days_average' => 10,
+        'unfulfilled_count' => 0,
+        'current_stocks' => 0,
+        'remaining_after_fulfillment' => 0,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $cols));
+}
+
 test('demand windows expand unit codes into component units and count orders once', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
 
@@ -258,9 +286,11 @@ test('purchase-order facts separate what we have not released from what a suppli
         // Only that one is both released and past its date — the 6-days-overdue
         // order is still sitting in approval, which is our delay, not theirs.
         ->and($facts['delayed_po'])->toBe(1)
-        // 900 units sit with suppliers against 500 held for approval, so that
-        // is where this group's stock is stuck.
-        ->and($facts['bottleneck_stage'])->toBe('Waiting For Delivery');
+        // 500 units have sat un-paid for 20 days against 300 the supplier is
+        // late on, and with no snapshots here neither the Late-PO nor the
+        // warehouse owner can weigh in — so the internal queue is the biggest
+        // pile, and the bottleneck is ours.
+        ->and($facts['bottleneck_stage'])->toBe('Delay in Payment / Approval');
 });
 
 test('an order raised with no expected date is stored as due two weeks later', function () {
@@ -403,7 +433,7 @@ test('the snapshot freezes the report figures and a past date reads them back', 
         'ref_no' => 'TX-1', 'po_qty_in' => 300, 'remaining_qty' => 300,
     ]);
 
-    $this->artisan('inventory:snapshot-items', ['--date' => now()->toDateString()])->assertSuccessful();
+    $this->artisan('inventory:snapshot-items', ['--date' => now()->toDateString(), '--force' => true])->assertSuccessful();
 
     $frozen = DB::table('inventory_item_snapshots')
         ->where('inventory_item_id', $item->id)
@@ -455,7 +485,7 @@ test('a snapshot taken before the report existed reports unknown, not zero', fun
 
     $item = reportItem($workspace, 'WIDGET');
 
-    $this->artisan('inventory:snapshot-items', ['--date' => now()->toDateString()])->assertSuccessful();
+    $this->artisan('inventory:snapshot-items', ['--date' => now()->toDateString(), '--force' => true])->assertSuccessful();
 
     // Blank the frozen figures, as an older snapshot row would have them.
     DB::table('inventory_item_snapshots')
@@ -521,4 +551,112 @@ test('stockout risk is read against the lead time, not a fixed number of days', 
         ->and($bySku['RISKY'][14])->toBe('Critical')
         ->and($bySku['SAFE'][12])->toBe(20.0)
         ->and($bySku['SAFE'][14])->toBe('OK');
+});
+
+test('Late PO fires when a reorder need goes unraised for more than three days', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = reportItem($workspace, 'WIDGET');
+
+    // A real reorder gap frozen on five of the last fourteen days, with no
+    // purchase order ever raised against it — the officer has not acted.
+    foreach ([1, 2, 3, 4, 5] as $daysAgo) {
+        reportSnapshot($workspace, $item, now()->subDays($daysAgo)->toDateString());
+    }
+
+    expect((new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'])
+        ->toBe('Late PO');
+});
+
+test('a persisting gap is not Late PO once a purchase order has been raised', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = reportItem($workspace, 'WIDGET');
+
+    foreach ([1, 2, 3, 4, 5] as $daysAgo) {
+        reportSnapshot($workspace, $item, now()->subDays($daysAgo)->toDateString());
+    }
+
+    // The officer did raise one two days ago — released, nothing yet overdue.
+    // Closing the gap is now someone else's job, not a creation failure, so no
+    // owner is past its target and the row stays blank.
+    $po = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'CN-1',
+        'issue_date' => now()->subDays(2)->toDateString(),
+        'status' => 6,
+    ]);
+    PurchasedOrderItem::create([
+        'inventory_purchased_order_id' => $po->id,
+        'inventory_item_id' => $item->id,
+        'count' => 200,
+    ]);
+
+    expect((new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'])
+        ->toBeNull();
+});
+
+test('the warehouse owns the hold-up when shippable stock sits unshipped', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = reportItem($workspace, 'WIDGET');
+
+    // Shipped five days ago; a receipt since moved the ledger on, so the shelf
+    // has stood four days without a despatch — past the two-day target.
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDays(5)->toDateString(),
+        'ref_no' => 'TX-OUT', 'po_qty_out' => 30, 'remaining_qty' => 70,
+    ]);
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDays(1)->toDateString(),
+        'ref_no' => 'TX-IN', 'po_qty_in' => 100, 'remaining_qty' => 170,
+    ]);
+
+    // 100 on hand against 40 unmet, so 40 could ship. A large incoming figure
+    // closes the reorder gap, keeping Late PO out of it.
+    reportSnapshot($workspace, $item, now()->subDays(1)->toDateString(), [
+        'current_stocks' => 100, 'unfulfilled_count' => 40,
+        'remaining_after_fulfillment' => 100000,
+    ]);
+
+    expect((new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'])
+        ->toBe('Delay in warehouse');
+});
+
+test('a late supplier outranks a smaller idle shelf', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = reportItem($workspace, 'WIDGET');
+
+    // Released a month ago, expected a fortnight ago, still owes 300.
+    $po = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'CN-1',
+        'issue_date' => now()->subDays(30)->toDateString(),
+        'expected_delivery_date' => now()->subDays(14)->toDateString(),
+        'status' => 6,
+    ]);
+    PurchasedOrderItem::create([
+        'inventory_purchased_order_id' => $po->id,
+        'inventory_item_id' => $item->id,
+        'count' => 300,
+    ]);
+
+    // A small idle shelf as well: 40 shippable, past the despatch target.
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDays(5)->toDateString(),
+        'ref_no' => 'TX-OUT', 'po_qty_out' => 10, 'remaining_qty' => 90,
+    ]);
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDays(1)->toDateString(),
+        'ref_no' => 'TX-IN', 'po_qty_in' => 10, 'remaining_qty' => 100,
+    ]);
+    reportSnapshot($workspace, $item, now()->subDays(1)->toDateString(), [
+        'current_stocks' => 100, 'unfulfilled_count' => 40,
+        'remaining_after_fulfillment' => 100000,
+    ]);
+
+    // 300 units late from the supplier beat 40 idle on the shelf.
+    expect((new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'])
+        ->toBe('Delay in stocks');
 });
