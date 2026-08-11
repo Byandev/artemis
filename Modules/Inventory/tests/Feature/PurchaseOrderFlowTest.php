@@ -503,6 +503,33 @@ test('idle stock with nothing behind it is supply, not the warehouse', function 
         ->and($data['arrived']['units'])->toBe(0);
 });
 
+test('shippable now counts everything that could leave today', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    // Shipped this morning, so nothing about it is stalled — but it is still on
+    // the shelf with orders against it, which is all this tile claims.
+    $moving = flowItem($workspace, 'MOVING', dailyAverage: 100);
+    $moving->update(['unfulfilled_count' => 60]);
+    $moving->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->toDateString(),
+        'ref_no' => 'TX-1', 'po_qty_out' => 10, 'remaining_qty' => 500,
+    ]);
+
+    // Owed, with nothing behind it: waiting on supply, not shippable.
+    $bare = flowItem($workspace, 'BARE');
+    $bare->update(['unfulfilled_count' => 200]);
+
+    $kpi = flow($owner, $workspace, 'kpi');
+    $split = flow($owner, $workspace, 'unfulfilled-split');
+
+    expect($kpi['shippable_now'])->toBe(60)
+        ->and($kpi['shippable_now'])->toBe($split['here'])
+        ->and($kpi['shippable_skus'])->toBe(1)
+        // Well under a picking queue's worth of demand, so the older
+        // cover-based figure would have reported nothing at all here.
+        ->and($split['sitting']['units'])->toBe(0);
+});
+
 test('the bottleneck blames the warehouse when stock arrives and stays put', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 

@@ -124,8 +124,12 @@ class PurchaseOrderFlowController extends Controller
             'not_ordered_groups' => $needed['groups'],
             'stuck_inside' => $internal->sum('balance'),
             'stuck_overdue' => $internal->where('age', '>', self::INTERNAL_SLA_DAYS)->sum('balance'),
-            'shippable_now' => $split['sitting']['units'],
-            'shippable_skus' => $split['sitting']['skus'],
+            // Everything that could leave today, not the slice of it covering
+            // more than a picking queue's worth of demand: that narrower figure
+            // is an inference from demand cover, and whether stock has actually
+            // been moving is the warehouse card's question, measured properly.
+            'shippable_now' => $split['here'],
+            'shippable_skus' => collect($split['items'])->where('here', '>', 0)->count(),
             'open_total' => $lines->sum('balance'),
             'sla_days' => self::INTERNAL_SLA_DAYS,
             'picking_days' => self::PICKING_DAYS,
