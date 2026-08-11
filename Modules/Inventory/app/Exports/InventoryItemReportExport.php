@@ -158,10 +158,14 @@ class InventoryItemReportExport implements FromGenerator, WithHeadings
 
         foreach (ItemReportFacts::WINDOWS as $days) {
             foreach (["orders_{$days}d", "units_{$days}d"] as $key) {
+                // Whole units, rounded up: half a unit a day still needs a unit
+                // on the shelf. Applied to the group's own total, once — the
+                // same figure and the same ceiling the list shows.
+                //
                 // Null survives as null. A snapshot taken before these columns
                 // existed did not record nil demand, it recorded nothing, and a
                 // 0 in a report someone plans against is a lie either way.
-                $columns[] = $facts[$key] === null ? null : round($facts[$key] / $days, 2);
+                $columns[] = $facts[$key] === null ? null : (int) ceil($facts[$key] / $days);
             }
         }
 

@@ -232,16 +232,16 @@ test('the stored 3-day average equals the report units-per-day, group and all', 
     $stored = (float) $a->fresh()->three_days_average + (float) $b->fresh()->three_days_average;
     $reported = $facts['units_3d'] / 3;
 
-    // Two figures shown side by side on the same row, from the same orders, so
-    // they have to be one number rather than two that nearly agree.
+    // Both are shown as whole units rounded up, so what has to match is the
+    // figure after that ceiling — the two sit side by side on the same row.
     //
-    // Compared to a thousandth rather than exactly: three_days_average is stored
-    // per item in decimal(10,4), so summing a group's children can land a single
-    // ten-thousandth away from dividing the group's own demand. That is the
-    // column's precision, not a difference in the maths — the page renders one
-    // decimal place. Rounding each child up, which is what this replaced, put
-    // the two a third apart.
-    expect(abs($stored - $reported))->toBeLessThan(0.001)
+    // The ceiling belongs at the group, applied once. Rounding each child up
+    // first and summing, which is what this replaced, gives 1 + 2 = 3 against a
+    // true ceil(7/3) = 3 here, and drifts further the more SKUs a group has.
+    expect((int) ceil($stored))->toBe((int) ceil($reported))
+        ->and((int) ceil($stored))->toBe(3)
+        // Stored exact so the group can do its own rounding: a per-item ceiling
+        // would be baked in and could not be undone at the group.
         ->and(abs($stored - 7 / 3))->toBeLessThan(0.001);
 });
 

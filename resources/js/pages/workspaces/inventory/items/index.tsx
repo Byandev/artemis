@@ -961,9 +961,13 @@ export default function ItemIndex({
             const value = row.original[key];
             return (
                 <div className="text-center">
+                    {/* Whole units, rounded up: half a unit a day still needs a
+                        unit on the shelf. The ceiling is applied to the figure
+                        being shown — never per SKU and then summed, which is
+                        what made this disagree with the 3-day average beside
+                        it. */}
                     <MetricCell
-                        value={value == null ? null : value / days}
-                        decimals={1}
+                        value={value == null ? null : Math.ceil(value / days)}
                     />
                 </div>
             );
@@ -1340,9 +1344,15 @@ export default function ItemIndex({
             ),
             cell: ({ row }) => (
                 <div className="text-center">
+                    {/* Stored exact and rounded up here, so a group ceils its
+                        own summed demand once rather than inheriting a ceiling
+                        from each of its SKUs. */}
                     <MetricCell
-                        value={row.original.three_days_average}
-                        decimals={1}
+                        value={
+                            row.original.three_days_average == null
+                                ? null
+                                : Math.ceil(row.original.three_days_average)
+                        }
                     />
                 </div>
             ),

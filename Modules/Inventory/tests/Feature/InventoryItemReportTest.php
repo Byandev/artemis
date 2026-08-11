@@ -432,10 +432,11 @@ test('the snapshot freezes the report figures and a past date reads them back', 
         )->generator()
     );
 
-    // Column 2 is the 3-day daily unit rate: 5 units over 3 days, as frozen.
+    // Column 2 is the 3-day daily unit rate: 5 units over 3 days as frozen,
+    // shown as whole units rounded up.
     expect($rows)->toHaveCount(1)
         ->and($rows[0][0])->toBe('WIDGET')
-        ->and($rows[0][2])->toBe(round(5 / 3, 2))
+        ->and($rows[0][2])->toBe((int) ceil(5 / 3))
         ->and($rows[0][14])->toBe(now()->subDays(2)->toDateString());
 
     // Live, the same report now sees all three orders.
@@ -446,7 +447,7 @@ test('the snapshot freezes the report figures and a past date reads them back', 
         )->generator()
     );
 
-    expect($live[0][2])->toBe(round(15 / 3, 2));
+    expect($live[0][2])->toBe((int) ceil(15 / 3));
 });
 
 test('a snapshot taken before the report existed reports unknown, not zero', function () {
