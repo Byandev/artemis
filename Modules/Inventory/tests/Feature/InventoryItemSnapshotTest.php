@@ -330,10 +330,10 @@ test('the export follows the pinned date and carries every report column', funct
 
         // One download carries the whole report, not only the columns the table
         // happened to be showing.
-        expect($export->headings())->toHaveCount(31)
+        expect($export->headings())->toHaveCount(32)
             ->and($rows[0][0])->toBe('SKU-1')
             // Current Stocks as frozen on 2026-08-01, not the 99 it is now.
-            ->and((int) $rows[0][10])->toBe(10);
+            ->and((int) $rows[0][11])->toBe(10);
 
         return true;
     });

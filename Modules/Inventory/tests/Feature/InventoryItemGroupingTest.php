@@ -300,7 +300,7 @@ test('the export rolls children up into one row per group', function () {
         // One row for the whole group, with the children's stock summed.
         expect($rows)->toHaveCount(1)
             ->and($rows[0][0])->toBe('GROUP')
-            ->and((int) $rows[0][10])->toBe(42);
+            ->and((int) $rows[0][11])->toBe(42);
 
         return true;
     });
@@ -329,4 +329,35 @@ test('the export stays rolled up even with the list toggled flat', function () {
 
         return true;
     });
+});
+
+test('shippable stock is matched per SKU, so one variant cannot cover another', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
+
+    // Plenty of A on the shelf and nothing owed on it; B is owed 40 with none
+    // on the shelf. The group holds 100 units and owes 40, but not one of them
+    // can ship: a customer ordered B, and A is a different thing.
+    $a = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true]);
+    $b = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-B', 'parent_id' => $parent->id, 'is_active' => true, 'unfulfilled_count' => 40]);
+    stockItem($a, 100);
+    stockItem($b, 0);
+
+    // A third variant with a real overlap: 30 on hand against 12 owed.
+    $c = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-C', 'parent_id' => $parent->id, 'is_active' => true, 'unfulfilled_count' => 12]);
+    stockItem($c, 30);
+
+    $this->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=1')
+        ->assertOk()
+        ->assertInertia(function (Assert $page) {
+            $row = collect($page->toArray()['props']['items']['data'])->first();
+
+            // Only C's 12 pair up. LEAST() of the group's totals would have said
+            // min(130, 52) = 52, letting A's surplus ship B's orders.
+            expect((int) $row['shippable_stocks'])->toBe(12)
+                ->and((int) $row['current_stocks'])->toBe(130)
+                ->and((int) $row['unfulfilled_count'])->toBe(52);
+        });
 });

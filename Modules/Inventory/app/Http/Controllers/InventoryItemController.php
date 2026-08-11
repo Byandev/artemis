@@ -128,6 +128,12 @@ class InventoryItemController extends Controller
             // Undelivered remainder on orders a supplier already has.
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
+            // Stock on the shelf with an unfulfilled order against it — what
+            // could physically leave today. Per SKU, because a customer ordered
+            // a specific variant and stock on a sibling cannot ship it; the
+            // roll-up sums those, never LEAST() of the group's two totals, which
+            // would let one variant's surplus cover another's shortfall.
+            ->selectRaw("GREATEST(0, LEAST(COALESCE({$sql['current_stocks']}, 0), COALESCE(inventory_items.unfulfilled_count, 0))) as shippable_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
             ->selectRaw("{$sql['discrepancy_counted_qty']} as discrepancy_counted_qty")
             ->selectRaw("{$sql['discrepancy_date']} as discrepancy_date")
@@ -231,6 +237,7 @@ class InventoryItemController extends Controller
             ->selectRaw('(SELECT gp.name FROM products gp WHERE gp.id = COALESCE((SELECT p.product_id FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.product_id)) as group_product_name')
             ->selectRaw('(SELECT gp.winning_date FROM products gp WHERE gp.id = COALESCE((SELECT p.product_id FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.product_id)) as group_product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
+            ->selectRaw("GREATEST(0, LEAST(COALESCE({$sql['current_stocks']}, 0), COALESCE(inventory_items.unfulfilled_count, 0))) as shippable_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
             ->selectRaw("{$sql['remaining_after_fulfillment']} as remaining_after_fulfillment")
@@ -311,6 +318,7 @@ class InventoryItemController extends Controller
             ->selectRaw("$groupLeadTime as lead_time")
             ->selectRaw('SUM(sub.unfulfilled_count) as unfulfilled_count')
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
+            ->selectRaw('SUM(sub.shippable_stocks) as shippable_stocks')
             ->selectRaw('SUM(sub.waiting_for_delivery_stocks) as waiting_for_delivery_stocks')
             ->selectRaw('SUM(sub.discrepancy) as discrepancy')
             ->selectRaw('NULL as discrepancy_counted_qty')
@@ -326,7 +334,7 @@ class InventoryItemController extends Controller
 
         // Sorting on the aggregated aliases; anything unknown falls back to SKU.
         $sortable = [
-            'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
+            'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks', 'shippable_stocks',
             'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
             'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'three_days_average', 'days_it_can_last',
         ];
@@ -366,6 +374,12 @@ class InventoryItemController extends Controller
 
         return QueryBuilder::for($base)
             ->select('inventory_item_snapshots.*')
+            // Stock on the shelf with an unfulfilled order against it — what
+            // could physically leave today. Per SKU, because a customer ordered
+            // a specific variant and stock on a sibling cannot ship it; the
+            // roll-up sums those, never LEAST() of the group's two totals, which
+            // would let one variant's surplus cover another's shortfall.
+            ->selectRaw('GREATEST(0, LEAST(COALESCE(inventory_item_snapshots.current_stocks, 0), COALESCE(inventory_item_snapshots.unfulfilled_count, 0))) as shippable_stocks')
             // The list keys rows off `id`; hand it the item's id so row actions and
             // the summarize/flat views stay consistent with the live list.
             ->selectRaw('inventory_item_snapshots.inventory_item_id as id')
@@ -424,6 +438,7 @@ class InventoryItemController extends Controller
             ->where('inventory_item_snapshots.workspace_id', $workspace->id)
             ->where('inventory_item_snapshots.snapshot_date', $date)
             ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.product_id, inventory_item_snapshots.is_active, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.item_created_at as created_at, inventory_item_snapshots.product_name, inventory_item_snapshots.product_winning_date, inventory_item_snapshots.current_stocks, inventory_item_snapshots.waiting_for_delivery_stocks, inventory_item_snapshots.discrepancy, inventory_item_snapshots.remaining_after_fulfillment, inventory_item_snapshots.po_needed')
+            ->selectRaw('GREATEST(0, LEAST(COALESCE(inventory_item_snapshots.current_stocks, 0), COALESCE(inventory_item_snapshots.unfulfilled_count, 0))) as shippable_stocks')
             // Same group identity as the live roll-up, read from that day's rows
             // so a past date reports the grouping as it stood then.
             ->selectRaw('COALESCE((SELECT p.sku FROM inventory_item_snapshots p WHERE p.inventory_item_id = inventory_item_snapshots.parent_id AND p.snapshot_date = inventory_item_snapshots.snapshot_date LIMIT 1), inventory_item_snapshots.sku) as group_sku')
@@ -488,6 +503,7 @@ class InventoryItemController extends Controller
             ->selectRaw("$groupLeadTime as lead_time")
             ->selectRaw('SUM(sub.unfulfilled_count) as unfulfilled_count')
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
+            ->selectRaw('SUM(sub.shippable_stocks) as shippable_stocks')
             ->selectRaw('SUM(sub.waiting_for_delivery_stocks) as waiting_for_delivery_stocks')
             ->selectRaw('SUM(sub.discrepancy) as discrepancy')
             ->selectRaw('NULL as discrepancy_counted_qty')
@@ -509,7 +525,7 @@ class InventoryItemController extends Controller
         }
 
         $sortable = [
-            'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
+            'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks', 'shippable_stocks',
             'waiting_for_delivery_stocks', 'discrepancy', 'remaining_after_fulfillment',
             'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'three_days_average', 'days_it_can_last',
         ];

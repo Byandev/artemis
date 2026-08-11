@@ -87,6 +87,8 @@ interface Item {
     days_it_can_last: number | null;
     po_needed: number | null;
     current_stocks: number | null;
+    /** Stock on the shelf with an unfulfilled order against it — could ship today. */
+    shippable_stocks: number | null;
     discrepancy: number | null;
     discrepancy_counted_qty: number | null;
     discrepancy_date: string | null;
@@ -178,6 +180,12 @@ const COLUMN_OPTIONS: ColumnOption[] = [
         group: 'List',
     },
     { id: 'current_stocks', label: 'Current stocks', group: 'List' },
+    {
+        id: 'shippable_stocks',
+        label: 'Shippable stocks',
+        defaultVisible: false,
+        group: 'List',
+    },
     { id: 'discrepancy', label: 'Discrepancy', group: 'List' },
     {
         id: 'remaining_after_fulfillment',
@@ -324,6 +332,23 @@ const COLUMN_HELP: Record<string, React.ReactNode> = {
         'Units still owed on open purchase orders, at any stage — including orders raised but never sent to a supplier. Committed on paper, not yet on the shelf.',
     current_stocks:
         'Units physically on hand, from the ledger, adjusted by the latest physical count.',
+    shippable_stocks: (
+        <>
+            Stock on the shelf with an unfulfilled order against it — what could
+            physically leave today.
+            <br />
+            <br />
+            Matched per SKU and then summed, since a customer ordered a specific
+            variant and stock on a sibling cannot ship it. So a group holding
+            plenty of one variant and none of another shows only what actually
+            pairs up.
+            <br />
+            <br />
+            The other half of unfulfilled demand is{' '}
+            <b>Unfulfilled with no stock</b>; together the two make up
+            Unfulfilled.
+        </>
+    ),
     discrepancy:
         'The gap between the ledger and the last physical count. Positive means more was counted than the ledger expected.',
     remaining_after_fulfillment:
@@ -1477,6 +1502,26 @@ export default function ItemIndex({
                     <MetricCell
                         value={row.original.current_stocks}
                         color="text-violet-600 dark:text-violet-400"
+                    />
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'shippable_stocks',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader
+                    help={COLUMN_HELP['shippable_stocks']}
+                    column={column}
+                    title="Shippable"
+                    className="justify-center"
+                />
+            ),
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <MetricCell
+                        value={row.original.shippable_stocks}
+                        color="text-emerald-600 dark:text-emerald-400"
                     />
                 </div>
             ),

@@ -384,7 +384,7 @@ test('the export downloads as a spreadsheet with every column', function () {
         new ItemReportFacts($workspace),
     )->headings();
 
-    expect($headings)->toHaveCount(31)
+    expect($headings)->toHaveCount(32)
         ->and($headings[0])->toBe('Item')
         ->and($headings[7])->toBe('Demand Trend (3d vs 14d)')
         ->and(end($headings))->toBe('Bottleneck Stage');
@@ -437,7 +437,7 @@ test('the snapshot freezes the report figures and a past date reads them back', 
     expect($rows)->toHaveCount(1)
         ->and($rows[0][0])->toBe('WIDGET')
         ->and($rows[0][2])->toBe((int) ceil(5 / 3))
-        ->and($rows[0][14])->toBe(now()->subDays(2)->toDateString());
+        ->and($rows[0][15])->toBe(now()->subDays(2)->toDateString());
 
     // Live, the same report now sees all three orders.
     $live = iterator_to_array(
@@ -479,9 +479,9 @@ test('a snapshot taken before the report existed reports unknown, not zero', fun
     expect($rows[0][1])->toBeNull()
         ->and($rows[0][2])->toBeNull()
         ->and($rows[0][7])->toBeNull()
-        ->and($rows[0][14])->toBeNull()
+        ->and($rows[0][15])->toBeNull()
         // Stock columns were always frozen, so they still answer.
-        ->and($rows[0][10])->toBe(0);
+        ->and($rows[0][11])->toBe(0);
 });
 
 test('stockout risk is read against the lead time, not a fixed number of days', function () {
@@ -517,8 +517,8 @@ test('stockout risk is read against the lead time, not a fixed number of days', 
 
     expect($rows)->toHaveCount(2)
         // Column 13 is Stockout Risk, column 11 Current Stocks Can Last.
-        ->and($bySku['RISKY'][11])->toBe(4.0)
-        ->and($bySku['RISKY'][13])->toBe('Critical')
-        ->and($bySku['SAFE'][11])->toBe(20.0)
-        ->and($bySku['SAFE'][13])->toBe('OK');
+        ->and($bySku['RISKY'][12])->toBe(4.0)
+        ->and($bySku['RISKY'][14])->toBe('Critical')
+        ->and($bySku['SAFE'][12])->toBe(20.0)
+        ->and($bySku['SAFE'][14])->toBe('OK');
 });
