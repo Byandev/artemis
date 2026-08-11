@@ -405,3 +405,148 @@ test('movement dates roll up to the latest across a group', function () {
         // Nothing was ever received, so there is no arrival date to report.
         ->and($row['last_in'])->toBeNull();
 });
+
+test('idle is counted in ledger days, not against today', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $stalled = flowItem($workspace, 'STALLED');
+    $moving = flowItem($workspace, 'MOVING');
+    $stalled->update(['unfulfilled_count' => 100]);
+    $moving->update(['unfulfilled_count' => 100]);
+
+    // The whole ledger is a fortnight behind — exactly the ERP feed lag that
+    // would otherwise report every SKU in the workspace as idle by 14 days.
+    $ledgerEnd = now()->subDays(14);
+
+    $stalled->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => $ledgerEnd->copy()->subDays(6)->toDateString(),
+        'ref_no' => 'TX-STALE', 'po_qty_out' => 10, 'remaining_qty' => 500,
+    ]);
+    $moving->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => $ledgerEnd->toDateString(),
+        'ref_no' => 'TX-FRESH', 'po_qty_out' => 10, 'remaining_qty' => 500,
+    ]);
+
+    $data = flow($owner, $workspace, 'unfulfilled-split');
+    $rows = collect($data['items'])->keyBy('item');
+
+    expect($data['idle']['as_of'])->toBe($ledgerEnd->toDateString())
+        // Six ledger days behind the feed's own last day, not twenty.
+        ->and($rows['STALLED']['idle_days'])->toBe(6)
+        // Shipped on the last day the ledger reaches: current, not idle.
+        ->and($rows['MOVING']['idle_days'])->toBe(0);
+
+    expect($data['idle']['units'])->toBe(100)
+        ->and($data['idle']['skus'])->toBe(1)
+        ->and($data['idle']['longest'])->toBe(6)
+        ->and($data['idle']['worst']['item'])->toBe('STALLED');
+});
+
+test('a group that has never shipped is unknown rather than idle', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = flowItem($workspace, 'NEVER-SHIPPED');
+    $item->update(['unfulfilled_count' => 50]);
+
+    // Stock arrived and nothing has ever left, so there is no despatch to date
+    // the wait from. A new SKU has not stalled; it has not started.
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDays(30)->toDateString(),
+        'ref_no' => 'TX-IN', 'po_qty_in' => 200, 'remaining_qty' => 200,
+    ]);
+
+    $data = flow($owner, $workspace, 'unfulfilled-split');
+
+    expect(collect($data['items'])->firstWhere('item', 'NEVER-SHIPPED')['idle_days'])->toBeNull()
+        ->and($data['idle']['units'])->toBe(0)
+        ->and($data['idle']['longest'])->toBeNull();
+});
+
+test('stock received since the last despatch is reported on its own', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = flowItem($workspace, 'RESTOCKED');
+    $item->update(['unfulfilled_count' => 80]);
+
+    $tx = fn (string $date, string $ref, array $cols) => $item->transactions()->create(array_merge([
+        'workspace_id' => $workspace->id, 'date' => $date, 'ref_no' => $ref,
+    ], $cols));
+
+    $tx(now()->subDays(20)->toDateString(), 'TX-OUT', ['po_qty_out' => 10, 'remaining_qty' => 90]);
+    // Arrived after the last thing shipped, with orders already waiting on it.
+    $tx(now()->subDays(4)->toDateString(), 'TX-IN', ['po_qty_in' => 100, 'remaining_qty' => 190]);
+
+    $data = flow($owner, $workspace, 'unfulfilled-split');
+
+    expect($data['arrived']['units'])->toBe(80)
+        ->and($data['arrived']['skus'])->toBe(1);
+});
+
+test('idle stock with nothing behind it is supply, not the warehouse', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = flowItem($workspace, 'NO-STOCK');
+    $item->update(['unfulfilled_count' => 500]);
+
+    // Long past a despatch, but the shelf is empty: this is waiting on supply,
+    // and blaming the warehouse for it would point at the wrong step entirely.
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDays(30)->toDateString(),
+        'ref_no' => 'TX-OUT', 'po_qty_out' => 10, 'remaining_qty' => 0,
+    ]);
+
+    $data = flow($owner, $workspace, 'unfulfilled-split');
+
+    expect($data['here'])->toBe(0)
+        ->and($data['gone'])->toBe(500)
+        ->and($data['idle']['units'])->toBe(0)
+        ->and($data['arrived']['units'])->toBe(0);
+});
+
+test('the bottleneck blames the warehouse when shippable stock stops moving', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = flowItem($workspace, 'SKU-1');
+    $item->update(['unfulfilled_count' => 100]);
+
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDays(10)->toDateString(),
+        'ref_no' => 'TX-1', 'po_qty_out' => 10, 'remaining_qty' => 400,
+    ]);
+    // A second SKU keeps the ledger current, so the stalled one is genuinely
+    // behind rather than merely on the far side of a feed that stopped.
+    $mover = flowItem($workspace, 'SKU-2');
+    $mover->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->toDateString(),
+        'ref_no' => 'TX-2', 'po_qty_out' => 5, 'remaining_qty' => 50,
+    ]);
+
+    $data = flow($owner, $workspace, 'bottleneck');
+    $warehouse = collect($data['owners'])->firstWhere('key', 'warehouse');
+
+    // All 100 shippable units have stood still for ten ledger days.
+    expect($warehouse['state'])->toBe('blocked')
+        ->and($warehouse['value'])->toBe(100)
+        ->and($warehouse['facts'][0])->toBe(['Longest idle', 10, 'days'])
+        ->and($data['idle_after_days'])->toBe(3)
+        ->and($data['idle_as_of'])->toBe(now()->toDateString());
+});
+
+test('a warehouse that is shipping is not blamed for unmet demand', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = flowItem($workspace, 'SKU-1');
+    // Plenty owed and plenty on the shelf, but it went out yesterday — the
+    // shortfall belongs upstream, not here.
+    $item->update(['unfulfilled_count' => 900]);
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDay()->toDateString(),
+        'ref_no' => 'TX-1', 'po_qty_out' => 50, 'remaining_qty' => 900,
+    ]);
+
+    $warehouse = collect(flow($owner, $workspace, 'bottleneck')['owners'])
+        ->firstWhere('key', 'warehouse');
+
+    expect($warehouse['state'])->toBe('ok')
+        ->and($warehouse['value'])->toBe(0);
+});
