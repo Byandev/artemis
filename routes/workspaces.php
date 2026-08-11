@@ -481,6 +481,7 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
         Route::get('/export', [InventoryItemController::class, 'export'])->name('export');
+        Route::get('/report', [InventoryItemController::class, 'exportReport'])->name('report');
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
         Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');

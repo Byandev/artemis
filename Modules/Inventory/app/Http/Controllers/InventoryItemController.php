@@ -15,6 +15,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Inventory\Exports\InventoryItemExport;
+use Modules\Inventory\Exports\InventoryItemReportExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryItemSnapshot;
 use Modules\Inventory\Models\InventoryUnitCodeItem;
@@ -22,6 +23,7 @@ use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Support\InventoryItemMetrics;
 use Modules\Inventory\Support\InventoryStockColumns;
+use Modules\Inventory\Support\ItemReportFacts;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -622,6 +624,28 @@ class InventoryItemController extends Controller
         }
 
         return Excel::download(new InventoryItemExport($query, $summarize), $filename);
+    }
+
+    /**
+     * The wide planning report: the same rolled-up rows the list shows, plus
+     * demand windows, movement dates and purchase-order state.
+     *
+     * Always grouped and always live. Grouped because a parent and its children
+     * share one reorder decision, and live because the extra columns read the
+     * order feed and the transaction ledger directly — neither of which a
+     * snapshot row carries, so a pinned date could not reproduce them honestly.
+     */
+    public function exportReport(Request $request, Workspace $workspace)
+    {
+        $this->authorize('View Inventory Items', $workspace);
+
+        return Excel::download(
+            new InventoryItemReportExport(
+                $this->buildSummaryQuery($request, $workspace),
+                new ItemReportFacts($workspace),
+            ),
+            'inventory-report-'.now()->format('Y-m-d-His').'.xlsx',
+        );
     }
 
     public function syncFromGencys(Workspace $workspace)

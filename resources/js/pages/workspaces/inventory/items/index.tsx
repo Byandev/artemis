@@ -1007,6 +1007,30 @@ export default function ItemIndex({
                             <Download className="h-3.5 w-3.5" />
                             Export
                         </a>
+                        {/* The planning report. Always the grouped, live rows —
+                            it reads the order feed and the ledger directly, and
+                            a snapshot carries neither, so it takes the list's
+                            filters but not its date or summarize toggle. */}
+                        <a
+                            href={`${baseUrl}/report?${new URLSearchParams(
+                                Object.entries({
+                                    'filter[search]': searchValue || '',
+                                    'filter[is_active]': activeOnly
+                                        ? '1'
+                                        : 'all',
+                                    'filter[unassigned]': unassignedOnly
+                                        ? '1'
+                                        : '',
+                                    'filter[product_status]':
+                                        productStatus || '',
+                                    sort: query?.sort ?? '',
+                                }).filter(([, v]) => v !== ''),
+                            ).toString()}`}
+                            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Report
+                        </a>
                         {canCreateItems && workspace.is_gencys_partner && (
                             <button
                                 onClick={() =>
