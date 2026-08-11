@@ -29,10 +29,14 @@ class InvoiceMailer
         return static::deliver($invoice, new InvoiceIssuedNotification($invoice));
     }
 
-    /** Remind the payer that the invoice falls due today. */
-    public static function remind(Invoice $invoice): ?string
+    /**
+     * Remind the payer that the invoice is coming due.
+     *
+     * @param  int  $daysUntilDue  0 on the due date itself.
+     */
+    public static function remind(Invoice $invoice, int $daysUntilDue = 0): ?string
     {
-        return static::deliver($invoice, new InvoiceDueNotification($invoice));
+        return static::deliver($invoice, new InvoiceDueNotification($invoice, $daysUntilDue));
     }
 
     /**
