@@ -15,6 +15,7 @@ import {
     Files,
     LayoutGrid,
     LucideIcon,
+    Mail,
     MessagesSquare,
     Search,
     Settings2,
@@ -44,7 +45,8 @@ interface Workspace {
     name: string;
     slug: string;
     created_at: string;
-    owner?: { name: string };
+    billing_email: string | null;
+    owner?: { name: string; email?: string };
     pages_count: number;
     shops_count: number;
     sms_parcel_journey_pages_count: number;
@@ -317,6 +319,8 @@ export default function Index({ workspaces, plans, filters }: Props) {
     const [editingMaxShops, setEditingMaxShops] = useState<Workspace | null>(
         null,
     );
+    const [editingBillingEmail, setEditingBillingEmail] =
+        useState<Workspace | null>(null);
 
     // Auto-open subscription modal for workspaces with past_due or expired
     // status — but only once, so the admin can still close it without it
@@ -576,6 +580,19 @@ export default function Index({ workspaces, plans, filters }: Props) {
                         <Settings2 className="h-4 w-4" />
                     </button>
 
+                    <button
+                        type="button"
+                        onClick={() => setEditingBillingEmail(row.original)}
+                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-400"
+                        title={
+                            row.original.billing_email
+                                ? `Invoices go to ${row.original.billing_email}`
+                                : 'Billing email (currently the owner)'
+                        }
+                    >
+                        <Mail className="h-4 w-4" />
+                    </button>
+
                     {/* Subscription Adjust Button */}
                     <button
                         onClick={() => setEditingWorkspace(row.original)}
@@ -660,6 +677,13 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 />
             )}
 
+            {editingBillingEmail && (
+                <BillingEmailModal
+                    workspace={editingBillingEmail}
+                    onClose={() => setEditingBillingEmail(null)}
+                />
+            )}
+
             {editingModules && (
                 <ModulesModal
                     workspace={editingModules}
@@ -692,6 +716,33 @@ function SubscriptionModal({
             onSuccess: () => onClose(),
         });
     }
+
+    /**
+     * Mirrors SubscriptionInvoice::shouldBill on the server. Saying up front
+     * that a bill is about to be raised — and when it falls due — beats letting
+     * one appear under the admin's name unannounced.
+     */
+    const current = workspace.subscription;
+    const selectedPlan = plans.find(
+        (p) => p.id.toString() === data.subscription_plan_id,
+    );
+    const currentPlan = plans.find(
+        (p) => p.id === current?.subscription_plan_id,
+    );
+
+    const fromTrial =
+        current?.status === 'trialing' || currentPlan?.code === 'free_trial';
+
+    const willInvoice =
+        data.status === 'active' &&
+        parseFloat(selectedPlan?.price_php ?? '0') > 0 &&
+        !(
+            current?.subscription_plan_id === selectedPlan?.id &&
+            current?.status === 'active'
+        );
+
+    // Same fallback the server applies: billing address, then the owner.
+    const billingRecipient = workspace.billing_email || workspace.owner?.email;
 
     return (
         <div
@@ -769,6 +820,28 @@ function SubscriptionModal({
                             <option value="expired">Expired</option>
                         </select>
                     </div>
+
+                    {willInvoice && (
+                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+                            <p className="font-medium">
+                                Saving raises an invoice for ₱
+                                {parseFloat(
+                                    selectedPlan?.price_php ?? '0',
+                                ).toLocaleString()}
+                                .
+                            </p>
+                            <p className="mt-0.5 text-amber-800 dark:text-amber-300/80">
+                                {fromTrial
+                                    ? 'Due today — this workspace is coming off the free trial.'
+                                    : 'Due in 7 days.'}
+                            </p>
+                            {billingRecipient && (
+                                <p className="mt-0.5 text-amber-800 dark:text-amber-300/80">
+                                    Emailed with its PDF to {billingRecipient}.
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-2 pt-2">
                         <button
@@ -856,6 +929,104 @@ function MaxShopsModal({
                             Leave empty to use the subscription plan limit
                             instead. Currently using {workspace.shops_count}{' '}
                             shop(s).
+                        </p>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+function BillingEmailModal({
+    workspace,
+    onClose,
+}: {
+    workspace: Workspace;
+    onClose: () => void;
+}) {
+    const { data, setData, put, processing, errors } = useForm({
+        billing_email: workspace.billing_email ?? '',
+    });
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        put(`/admin/workspaces/${workspace.slug}/billing-email`, {
+            onSuccess: () => onClose(),
+            preserveScroll: true,
+        });
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={onClose}
+        >
+            <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="mb-5 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            Billing Email
+                        </h3>
+                        <p className="text-sm text-zinc-500">
+                            {workspace.name}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Where invoices are sent
+                        </label>
+                        <input
+                            type="email"
+                            placeholder={
+                                workspace.owner?.email ?? 'accounts@company.com'
+                            }
+                            value={data.billing_email}
+                            onChange={(e) =>
+                                setData('billing_email', e.target.value)
+                            }
+                            className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-zinc-700 dark:bg-zinc-800"
+                        />
+                        {errors.billing_email && (
+                            <p className="mt-1 text-xs text-red-500">
+                                {errors.billing_email}
+                            </p>
+                        )}
+                        <p className="mt-1 text-xs text-zinc-500">
+                            {/* Say where they go now, not just that a fallback exists. */}
+                            Leave empty to send invoices to the workspace owner
+                            {workspace.owner?.email
+                                ? ` (${workspace.owner.email})`
+                                : ''}
+                            .
                         </p>
                     </div>
 

@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Workspace;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\InvoiceMailer;
+use App\Support\InvoicePdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -15,7 +16,9 @@ class AdminInvoiceController extends Controller
     public function index(Request $request)
     {
         $invoices = Invoice::query()
-            ->with('workspace:id,name,slug')
+            // The owner is the fallback billing address, so the list can name
+            // where a resend would actually land.
+            ->with(['workspace:id,name,slug,billing_email,owner_id', 'workspace.owner:id,email'])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->input('search');
                 $query->where(function ($q) use ($search) {
@@ -29,6 +32,14 @@ class AdminInvoiceController extends Controller
             ->orderByDesc('id')
             ->paginate((int) $request->input('per_page', 15))
             ->withQueryString();
+
+        $invoices->through(function (Invoice $invoice) {
+            // Resolved server-side so the page can't disagree with where a
+            // resend actually goes.
+            $invoice->recipient = InvoiceMailer::recipientFor($invoice);
+
+            return $invoice;
+        });
 
         return Inertia::render('admin/invoices/index', [
             'invoices' => $invoices,
@@ -95,22 +106,21 @@ class AdminInvoiceController extends Controller
 
         $invoice->save();
 
+        // A draft stays put; anything issued goes out with its PDF attached.
+        $sentTo = InvoiceMailer::send($invoice);
+
         return redirect()->route('admin.invoices.index')
-            ->with('success', "Invoice {$invoice->number} created.");
+            ->with('success', "Invoice {$invoice->number} created.".
+                ($sentTo ? " Emailed to {$sentTo}." : ''));
     }
 
     public function download(Invoice $invoice)
     {
-        $invoice->load('workspace:id,name,slug');
-
-        $pdf = Pdf::loadView('invoices.pdf', [
-            'invoice' => $invoice,
-            'seller' => config('invoice.seller'),
-            'symbol' => config('invoice.currency_symbol'),
-            'paymentInstructions' => config('invoice.payment_instructions'),
-        ])->setPaper('a4');
-
-        return $pdf->download("{$invoice->number}.pdf");
+        return response()->streamDownload(
+            fn () => print (InvoicePdf::render($invoice)),
+            InvoicePdf::filename($invoice),
+            ['Content-Type' => 'application/pdf'],
+        );
     }
 
     public function updateStatus(Request $request, Invoice $invoice)
@@ -119,13 +129,55 @@ class AdminInvoiceController extends Controller
             'status' => ['required', 'in:draft,sent,paid'],
         ]);
 
+        // Moving a draft to "sent" is the act of sending it, so that is when
+        // the email goes. Marking one paid is bookkeeping — nothing goes out.
+        $isBeingSent = $validated['status'] === Invoice::STATUS_SENT
+            && $invoice->status === Invoice::STATUS_DRAFT;
+
         $invoice->status = $validated['status'];
         $invoice->paid_at = $validated['status'] === Invoice::STATUS_PAID
             ? ($invoice->paid_at ?? Carbon::now())
             : null;
         $invoice->save();
 
-        return back()->with('success', "Invoice {$invoice->number} marked as {$validated['status']}.");
+        $message = "Invoice {$invoice->number} marked as {$validated['status']}.";
+
+        if ($isBeingSent) {
+            $sentTo = InvoiceMailer::send($invoice);
+            $message .= $sentTo
+                ? " Emailed to {$sentTo}."
+                : ' Emailing it failed — check the logs.';
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Email an already-issued invoice again — for a bounced send, a lost email,
+     * or a payer who has changed address since it went out.
+     */
+    public function resend(Invoice $invoice)
+    {
+        if ($invoice->status === Invoice::STATUS_DRAFT) {
+            // Marking it sent is what issues a draft, and that emails it. There
+            // is nothing to re-send here.
+            return back()->with('error', "Invoice {$invoice->number} is still a draft. Mark it as sent to email it.");
+        }
+
+        $recipient = InvoiceMailer::recipientFor($invoice);
+
+        if (! $recipient) {
+            return back()->with('error', "Invoice {$invoice->number} has no address to send to. Set a billing email on the workspace.");
+        }
+
+        $sentTo = InvoiceMailer::send($invoice);
+
+        return back()->with(
+            $sentTo ? 'success' : 'error',
+            $sentTo
+                ? "Invoice {$invoice->number} emailed to {$sentTo}."
+                : "Could not email invoice {$invoice->number} to {$recipient} — check the logs."
+        );
     }
 
     public function destroy(Invoice $invoice)
