@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Mail\BrevoTransport;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Policies\MetricSettingPolicy;
@@ -10,6 +11,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Modules\GencysERP\Models\Intern;
@@ -37,6 +39,13 @@ class AppServiceProvider extends ServiceProvider
             'intern' => Intern::class,
             'user' => User::class,
         ]);
+
+        // Resolved lazily, so a missing key only bites when something sends.
+        Mail::extend('brevo', fn () => new BrevoTransport(
+            (string) config('services.brevo.key'),
+            (string) config('services.brevo.endpoint'),
+            (int) config('services.brevo.timeout'),
+        ));
 
         if (! config('posthog.disabled') && config('posthog.api_key')) {
             PostHog::init(config('posthog.api_key'), [
