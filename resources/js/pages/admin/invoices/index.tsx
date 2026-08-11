@@ -1,12 +1,18 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { Download, FileText, Plus, Search, Trash2 } from 'lucide-react';
+import { Download, FileText, Plus, Search, Send, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 interface Invoice {
     id: number;
@@ -16,6 +22,8 @@ interface Invoice {
     currency: string;
     status: 'draft' | 'sent' | 'paid';
     issue_date: string;
+    /** Resolved server-side: the invoice's address, else the workspace's, else its owner's. */
+    recipient: string | null;
     workspace: { id: number; name: string; slug: string } | null;
 }
 
@@ -41,6 +49,20 @@ function peso(amount: string, currency: string) {
 export default function Index({ invoices, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const status = filters.status || '';
+
+    // Resending is the one action here whose result is invisible on the page,
+    // so its outcome has to be said out loud.
+    const { flash } = usePage().props as {
+        flash?: { success?: string | null; error?: string | null };
+    };
+
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+    }, [flash?.success]);
+
+    useEffect(() => {
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.error]);
 
     const initialSorting = useMemo(() => [], []);
 
@@ -75,6 +97,31 @@ export default function Index({ invoices, filters }: Props) {
             `/admin/invoices/${invoice.id}/status`,
             { status: next },
             { preserveScroll: true },
+        );
+    }
+
+    const [resending, setResending] = useState<number | null>(null);
+
+    function handleResend(invoice: Invoice) {
+        // Naming the address in the prompt is the whole safeguard — it's the
+        // one thing an admin needs to check before mailing a customer again.
+        if (
+            !confirm(
+                `Email invoice ${invoice.number} to ${invoice.recipient}?\n\nThey will receive it again, with the PDF attached.`,
+            )
+        ) {
+            return;
+        }
+
+        setResending(invoice.id);
+
+        router.post(
+            `/admin/invoices/${invoice.id}/resend`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setResending(null),
+            },
         );
     }
 
@@ -175,21 +222,58 @@ export default function Index({ invoices, filters }: Props) {
             header: () => <div className="text-right">Actions</div>,
             cell: ({ row }) => (
                 <div className="flex items-center justify-end gap-1">
-                    <a
-                        href={`/admin/invoices/${row.original.id}/download`}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                    >
-                        <Download className="h-3.5 w-3.5" />
-                        PDF
-                    </a>
-                    <button
-                        type="button"
-                        onClick={() => handleDelete(row.original)}
-                        className="inline-flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
-                        aria-label="Delete invoice"
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <a
+                                href={`/admin/invoices/${row.original.id}/download`}
+                                className="inline-flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                                aria-label="Download PDF"
+                            >
+                                <Download className="h-4 w-4" />
+                            </a>
+                        </TooltipTrigger>
+                        <TooltipContent>Download as PDF</TooltipContent>
+                    </Tooltip>
+
+                    {/* A draft has never been sent, so there is nothing to
+                        re-send; issuing it from the status column mails it. */}
+                    <Tooltip>
+                        {/* Radix drops events on a disabled trigger, so the
+                            span is what keeps the tooltip reachable — and a
+                            disabled button is exactly when the reason matters. */}
+                        <TooltipTrigger asChild>
+                            <span className="inline-flex">
+                                <button
+                                    type="button"
+                                    onClick={() => handleResend(row.original)}
+                                    disabled={
+                                        row.original.status === 'draft' ||
+                                        !row.original.recipient ||
+                                        resending === row.original.id
+                                    }
+                                    className="inline-flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-zinc-400 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                                    aria-label="Resend invoice"
+                                >
+                                    <Send className="h-4 w-4" />
+                                </button>
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Resend</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                onClick={() => handleDelete(row.original)}
+                                className="inline-flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+                                aria-label="Delete invoice"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete</TooltipContent>
+                    </Tooltip>
                 </div>
             ),
         },

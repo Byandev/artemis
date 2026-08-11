@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Workspace;
+use App\Support\InvoiceMailer;
 use App\Support\Metrics\MetricRegistry;
+use App\Support\SubscriptionInvoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -19,7 +22,9 @@ class AdminWorkspaceController extends Controller
     {
         $baseQuery = Workspace::query()
             ->select('workspaces.*')
-            ->with(['owner:id,name', 'subscription.plan', 'metricSetting'])
+            // The owner's email is the fallback billing address, so the admin
+            // page can say where an invoice would actually land.
+            ->with(['owner:id,name,email', 'subscription.plan', 'metricSetting'])
             ->withCount([
                 'pages',
                 'shops',
@@ -107,37 +112,65 @@ class AdminWorkspaceController extends Controller
         $subscription = $workspace->subscription;
         $now = Carbon::now();
 
-        if ($subscription) {
-            $data = [
-                'subscription_plan_id' => $validated['subscription_plan_id'],
-                'status' => $validated['status'],
-            ];
+        // Read the old subscription before the update overwrites it — whether
+        // this is a trial ending is what decides when the invoice falls due.
+        $subscription?->loadMissing('plan');
+        $fromTrial = SubscriptionInvoice::isFromTrial($subscription);
+        $shouldBill = SubscriptionInvoice::shouldBill($subscription, $plan, $validated['status']);
 
-            if ($validated['status'] === 'trialing') {
-                $data['trial_ends_at'] = $now->copy()->addDays($plan->trial_days ?? 30);
-                $data['current_period_start'] = $now;
-                $data['current_period_end'] = $now->copy()->addDays($plan->trial_days ?? 30);
-            } elseif ($validated['status'] === 'active') {
-                $data['trial_ends_at'] = null;
-                $data['current_period_start'] = $now;
-                $data['current_period_end'] = $now->copy()->addMonth();
+        // One transaction, so a workspace can never end up on a paid plan with
+        // no invoice behind it, or invoiced for a plan it was never moved to.
+        $invoice = DB::transaction(function () use ($workspace, $plan, $subscription, $validated, $now, $shouldBill, $fromTrial) {
+            if ($subscription) {
+                $data = [
+                    'subscription_plan_id' => $validated['subscription_plan_id'],
+                    'status' => $validated['status'],
+                ];
+
+                if ($validated['status'] === 'trialing') {
+                    $data['trial_ends_at'] = $now->copy()->addDays($plan->trial_days ?? 30);
+                    $data['current_period_start'] = $now;
+                    $data['current_period_end'] = $now->copy()->addDays($plan->trial_days ?? 30);
+                } elseif ($validated['status'] === 'active') {
+                    $data['trial_ends_at'] = null;
+                    $data['current_period_start'] = $now;
+                    $data['current_period_end'] = $now->copy()->addMonth();
+                }
+
+                $subscription->update($data);
+            } else {
+                Subscription::create([
+                    'workspace_id' => $workspace->id,
+                    'subscription_plan_id' => $validated['subscription_plan_id'],
+                    'status' => $validated['status'],
+                    'trial_ends_at' => $validated['status'] === 'trialing' ? $now->copy()->addDays($plan->trial_days ?? 30) : null,
+                    'current_period_start' => $now,
+                    'current_period_end' => $validated['status'] === 'trialing'
+                        ? $now->copy()->addDays($plan->trial_days ?? 30)
+                        : $now->copy()->addMonth(),
+                ]);
             }
 
-            $subscription->update($data);
-        } else {
-            Subscription::create([
-                'workspace_id' => $workspace->id,
-                'subscription_plan_id' => $validated['subscription_plan_id'],
-                'status' => $validated['status'],
-                'trial_ends_at' => $validated['status'] === 'trialing' ? $now->copy()->addDays($plan->trial_days ?? 30) : null,
-                'current_period_start' => $now,
-                'current_period_end' => $validated['status'] === 'trialing'
-                    ? $now->copy()->addDays($plan->trial_days ?? 30)
-                    : $now->copy()->addMonth(),
-            ]);
+            return $shouldBill
+                ? SubscriptionInvoice::raise($workspace, $plan, $fromTrial)
+                : null;
+        });
+
+        $message = "Subscription updated for {$workspace->name}.";
+
+        if ($invoice) {
+            // Emailed after the commit, never inside it — a mail server having
+            // a bad day must not roll back a bill that was correctly raised.
+            $sentTo = InvoiceMailer::send($invoice);
+
+            // Name the invoice and its terms — an admin shouldn't have to go
+            // looking to find out a bill was just raised in their name.
+            $message .= " Invoice {$invoice->number} raised, due {$invoice->due_date->format('M j, Y')}".
+                ($fromTrial ? ' (today — upgrade from trial)' : '').
+                ($sentTo ? " and emailed to {$sentTo}." : '. Emailing it failed — send it from the invoices page.');
         }
 
-        return back()->with('success', "Subscription updated for {$workspace->name}.");
+        return back()->with('success', $message);
     }
 
     public function updateModules(Request $request, Workspace $workspace)
@@ -177,5 +210,26 @@ class AdminWorkspaceController extends Controller
         $workspace->update($validated);
 
         return back()->with('success', "Max shops updated for {$workspace->name}.");
+    }
+
+    /**
+     * Where this workspace's invoices are emailed. Clearing it falls the
+     * workspace back to its owner rather than leaving invoices undeliverable.
+     */
+    public function updateBillingEmail(Request $request, Workspace $workspace)
+    {
+        $validated = $request->validate([
+            'billing_email' => ['nullable', 'email', 'max:255'],
+        ], [
+            'billing_email.email' => 'That is not an address an invoice could reach.',
+        ]);
+
+        $workspace->update(['billing_email' => $validated['billing_email'] ?: null]);
+
+        $workspace->loadMissing('owner');
+
+        return back()->with('success', $workspace->billing_email
+            ? "Invoices for {$workspace->name} will go to {$workspace->billing_email}."
+            : "Invoices for {$workspace->name} will go to its owner ({$workspace->billingEmail()}).");
     }
 }
