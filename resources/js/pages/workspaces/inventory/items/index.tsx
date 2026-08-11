@@ -1421,11 +1421,18 @@ export default function ItemIndex({
                 />
             ),
             // Clickable when there's anything outstanding — opens the PO breakdown.
+            //
+            // Not on a past day. The breakdown lists purchase orders as they
+            // stand now, and there is no frozen copy of them to read instead —
+            // the snapshot keeps the total, not the orders behind it. Opening it
+            // from an older day would put today's orders under a figure from
+            // that day and invite someone to reconcile two different questions.
             cell: ({ row }) => (
                 <div className="text-center">
-                    {row.original.waiting_for_delivery_stocks == null ? (
+                    {row.original.waiting_for_delivery_stocks == null ||
+                    readOnly ? (
                         <MetricCell
-                            value={null}
+                            value={row.original.waiting_for_delivery_stocks}
                             color="text-blue-500 dark:text-blue-400"
                         />
                     ) : (

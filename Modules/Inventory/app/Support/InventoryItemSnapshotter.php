@@ -16,6 +16,13 @@ use Modules\Inventory\Models\InventoryItem;
  * run and that refresh must write identical rows, which they can only be relied
  * on to do by being the same code.
  *
+ * A full refresh also recomputes demand before freezing it, where the workspace
+ * is wired for it. That belongs here rather than in the caller: three_days_average
+ * and unfulfilled_count are what almost every frozen figure divides by or
+ * subtracts, so a snapshot taken before they are current publishes one run's
+ * demand against the next run's stock. Keeping the two in one method makes that
+ * ordering structural instead of something each caller has to remember.
+ *
  * Re-running a date is safe: rows upsert on (inventory_item_id, snapshot_date),
  * so today's row is overwritten in place and history stays one row per day.
  */
@@ -24,7 +31,26 @@ class InventoryItemSnapshotter
     /** Insert in batches so a large workspace does not build one enormous query. */
     private const CHUNK = 500;
 
-    public function __construct(private Workspace $workspace, private string $date) {}
+    /** Items whose demand this run recomputed, for the caller to report. */
+    private int $demandSynced = 0;
+
+    /**
+     * @param  bool  $syncDemand  recompute demand before freezing, where the
+     *                            workspace qualifies. Off for a caller that
+     *                            wants today's row rewritten from what is
+     *                            already stored.
+     */
+    public function __construct(
+        private Workspace $workspace,
+        private string $date,
+        private bool $syncDemand = true,
+    ) {}
+
+    /** How many items had their demand recomputed by the last refresh(). */
+    public function demandSynced(): int
+    {
+        return $this->demandSynced;
+    }
 
     /**
      * Freeze the workspace's items for the date.
@@ -45,6 +71,14 @@ class InventoryItemSnapshotter
             }
 
             $query->whereIn('inventory_items.id', $itemIds);
+        }
+
+        // Only a full refresh recomputes demand. A partial one is patching a few
+        // rows after an edit, and moving the whole workspace's demand underneath
+        // the rest of the day's figures is not what someone changing a lead time
+        // asked for — nor what they would wait for.
+        if ($itemIds === null && $this->syncDemand && GencysDemandSync::isEligible($this->workspace)) {
+            $this->demandSynced = (new GencysDemandSync($this->workspace))->run();
         }
 
         $facts = new ItemReportFacts($this->workspace, $this->groupsFor($itemIds));

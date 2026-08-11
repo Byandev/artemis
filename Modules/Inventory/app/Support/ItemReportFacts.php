@@ -217,7 +217,7 @@ class ItemReportFacts
      * Normalised order-line sku => [group id => units per bundle].
      *
      * Keyed by both the unit code's label and its own sku, because an order line
-     * names it by either — the same pair SyncInventoryFromGencysOrders accepts.
+     * names it by either — the same pair GencysDemandSync accepts.
      * Components landing on the same group are summed: a bundle holding two
      * variants of one product is that many units against the group's supply.
      *

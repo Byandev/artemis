@@ -9,15 +9,6 @@ Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00
 Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
-// Freeze every inventory item and its report figures, several times a day.
-//
-// The items list reads this table rather than computing live, so these runs are
-// what the page shows — not a history sidecar. Midnight opens the new day's row
-// and the daytime runs refresh it in place: the unique key is (item, date), so
-// re-running a day overwrites it and history stays one row per day.
-//
-// Times are working hours plus midnight, which is roughly how often the upstream
-// feeds land — a tighter cadence would rewrite the same numbers.
 Schedule::command('inventory:snapshot-items')->cron('0 0,10,14,17,20 * * *')->withoutOverlapping();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
@@ -42,10 +33,6 @@ Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('16:1
 Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
-
-//Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('09:45')->withoutOverlapping();
-//Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('13:45')->withoutOverlapping();
-//Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('16:45')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');

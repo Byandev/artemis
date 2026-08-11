@@ -24,7 +24,8 @@ class SnapshotInventoryItemsCommand extends Command
 {
     protected $signature = 'inventory:snapshot-items
                             {--date= : Date to tag the snapshot with (Y-m-d), defaults to today}
-                            {--workspace= : Limit to a single workspace id}';
+                            {--workspace= : Limit to a single workspace id}
+                            {--skip-demand : Freeze what is already stored, without recomputing demand first}';
 
     protected $description = 'Store a snapshot of every inventory item, its computed stock metrics and its report figures';
 
@@ -39,12 +40,22 @@ class SnapshotInventoryItemsCommand extends Command
             ->get();
 
         $written = 0;
+        $synced = 0;
 
         foreach ($workspaces as $workspace) {
-            $written += (new InventoryItemSnapshotter($workspace, $date))->refresh();
+            // Recomputing demand and freezing it is one step, ordered inside the
+            // snapshotter — see InventoryItemSnapshotter::refresh().
+            $snapshotter = new InventoryItemSnapshotter(
+                $workspace,
+                $date,
+                syncDemand: ! $this->option('skip-demand'),
+            );
+
+            $written += $snapshotter->refresh();
+            $synced += $snapshotter->demandSynced();
         }
 
-        $this->info("Snapshotted {$written} inventory item(s) for {$date}.");
+        $this->info("Recomputed demand for {$synced} item(s); snapshotted {$written} item(s) for {$date}.");
 
         return self::SUCCESS;
     }
