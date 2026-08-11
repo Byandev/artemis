@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Permission;
+use App\Notifications\ResetPasswordNotification;
 use BackedEnum;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -57,6 +58,15 @@ class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
         ];
+    }
+
+    /**
+     * Send the password reset link using our own wording rather than the
+     * framework's generic notification.
+     */
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 
     /**
