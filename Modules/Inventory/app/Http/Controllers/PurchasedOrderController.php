@@ -149,7 +149,12 @@ class PurchasedOrderController extends Controller
             'workspace_id' => $workspace->id,
             'issue_date' => $request->issue_date,
             'delivery_no' => $request->delivery_no,
-            'expected_delivery_date' => $request->expected_delivery_date,
+            // Left blank on the form, an order is due two weeks after it is
+            // raised — the same standing agreement the ERP sync applies.
+            'expected_delivery_date' => PurchasedOrder::expectedDeliveryFor(
+                $request->expected_delivery_date,
+                $request->issue_date,
+            ),
             'cust_po_no' => $request->cust_po_no,
             'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
@@ -202,7 +207,12 @@ class PurchasedOrderController extends Controller
         $purchasedOrder->update([
             'issue_date' => $request->issue_date,
             'delivery_no' => $request->delivery_no,
-            'expected_delivery_date' => $request->expected_delivery_date,
+            // Left blank on the form, an order is due two weeks after it is
+            // raised — the same standing agreement the ERP sync applies.
+            'expected_delivery_date' => PurchasedOrder::expectedDeliveryFor(
+                $request->expected_delivery_date,
+                $request->issue_date,
+            ),
             'cust_po_no' => $request->cust_po_no,
             'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,

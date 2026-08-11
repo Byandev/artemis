@@ -2,12 +2,14 @@
 
 namespace Modules\Inventory\Console\Commands;
 
+use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Support\InventoryItemMetrics;
 use Modules\Inventory\Support\InventoryStockColumns;
+use Modules\Inventory\Support\ItemReportFacts;
 
 /**
  * Freeze every inventory item — stored columns and computed metrics alike — against
@@ -27,6 +29,16 @@ class SnapshotInventoryItemsCommand extends Command
 
     /** Insert in batches so a large workspace does not build one enormous query. */
     private const CHUNK = 500;
+
+    /**
+     * The report's group-level figures, built once per workspace.
+     *
+     * Each set is three grouped scans, so building one per chunk — let alone per
+     * item — would repeat that work for no new information.
+     *
+     * @var array<int, ItemReportFacts>
+     */
+    private array $factsByWorkspace = [];
 
     public function handle(): int
     {
@@ -108,6 +120,12 @@ class SnapshotInventoryItemsCommand extends Command
                     'product_name' => $item->product_name,
                     'product_winning_date' => $item->product_winning_date,
 
+                    // The report's figures, which belong to the group rather than
+                    // the SKU. Written onto every row of the group so a snapshot
+                    // row stays self-describing; the roll-up reads them back with
+                    // MAX(), which is exact because they are identical across it.
+                    ...$this->reportFacts($item),
+
                     'created_at' => $now,
                     'updated_at' => $now,
                 ])->all();
@@ -124,6 +142,7 @@ class SnapshotInventoryItemsCommand extends Command
                         'waiting_for_delivery_stocks', 'requested_stocks', 'remaining_after_fulfillment',
                         'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'days_it_can_last',
                         'product_name', 'product_winning_date', 'updated_at',
+                        ...ItemReportFacts::SNAPSHOT_COLUMNS,
                     ]
                 );
 
@@ -133,5 +152,27 @@ class SnapshotInventoryItemsCommand extends Command
         $this->info("Snapshotted {$written} inventory item(s) for {$date}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The report's group-level figures for one item's group, as snapshot columns.
+     *
+     * @return array<string, mixed>
+     */
+    private function reportFacts(InventoryItem $item): array
+    {
+        $workspaceId = (int) $item->workspace_id;
+
+        $this->factsByWorkspace[$workspaceId] ??= new ItemReportFacts(
+            Workspace::findOrFail($workspaceId)
+        );
+
+        $facts = $this->factsByWorkspace[$workspaceId];
+        $group = (int) ($item->parent_id ?? $item->id);
+
+        return [
+            ...array_intersect_key($facts->for($group), array_flip(ItemReportFacts::SNAPSHOT_COLUMNS)),
+            'demand_as_of' => $facts->demandAsOf()?->toDateString(),
+        ];
     }
 }

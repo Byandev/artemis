@@ -405,7 +405,13 @@ class InventoryItemController extends Controller
         $inner = InventoryItemSnapshot::query()
             ->where('inventory_item_snapshots.workspace_id', $workspace->id)
             ->where('inventory_item_snapshots.snapshot_date', $date)
-            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.product_id, inventory_item_snapshots.is_active, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.item_created_at as created_at, inventory_item_snapshots.product_name, inventory_item_snapshots.product_winning_date, inventory_item_snapshots.current_stocks, inventory_item_snapshots.waiting_for_delivery_stocks, inventory_item_snapshots.discrepancy, inventory_item_snapshots.remaining_after_fulfillment, inventory_item_snapshots.po_needed');
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.product_id, inventory_item_snapshots.is_active, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.item_created_at as created_at, inventory_item_snapshots.product_name, inventory_item_snapshots.product_winning_date, inventory_item_snapshots.current_stocks, inventory_item_snapshots.waiting_for_delivery_stocks, inventory_item_snapshots.discrepancy, inventory_item_snapshots.remaining_after_fulfillment, inventory_item_snapshots.po_needed')
+            // The report's frozen group figures, carried through so the
+            // roll-up below can hand them back untouched.
+            ->selectRaw(implode(', ', array_map(
+                fn (string $column) => "inventory_item_snapshots.$column",
+                ItemReportFacts::SNAPSHOT_COLUMNS,
+            )));
 
         $this->applySnapshotActiveFilter($request, $inner);
         $this->applySnapshotSummaryVisibility($request, $inner, $workspace);
@@ -466,6 +472,13 @@ class InventoryItemController extends Controller
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
             ->selectRaw("$groupCreatedAt as created_at")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
+
+        // MAX rather than SUM: these were group figures when they were frozen and
+        // are identical across the group's rows, so MAX returns them exactly.
+        // Summing would multiply each by the number of SKUs in the group.
+        foreach (ItemReportFacts::SNAPSHOT_COLUMNS as $column) {
+            $outer->selectRaw("MAX(sub.$column) as $column");
+        }
 
         $sortable = [
             'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
@@ -630,21 +643,25 @@ class InventoryItemController extends Controller
      * The wide planning report: the same rolled-up rows the list shows, plus
      * demand windows, movement dates and purchase-order state.
      *
-     * Always grouped and always live. Grouped because a parent and its children
-     * share one reorder decision, and live because the extra columns read the
-     * order feed and the transaction ledger directly — neither of which a
-     * snapshot row carries, so a pinned date could not reproduce them honestly.
+     * Always grouped, because a parent and its children share one reorder
+     * decision. Pin a date and the report is rebuilt from that day's snapshot,
+     * which froze these figures alongside the item metrics — recomputing them
+     * from today's orders and ledger would answer a different question while
+     * looking like history.
      */
     public function exportReport(Request $request, Workspace $workspace)
     {
         $this->authorize('View Inventory Items', $workspace);
 
+        $snapshotDate = $this->snapshotDate($request, $workspace);
+
+        $export = $snapshotDate
+            ? InventoryItemReportExport::asOf($this->buildSnapshotSummaryQuery($request, $workspace, $snapshotDate))
+            : InventoryItemReportExport::live($this->buildSummaryQuery($request, $workspace), new ItemReportFacts($workspace));
+
         return Excel::download(
-            new InventoryItemReportExport(
-                $this->buildSummaryQuery($request, $workspace),
-                new ItemReportFacts($workspace),
-            ),
-            'inventory-report-'.now()->format('Y-m-d-His').'.xlsx',
+            $export,
+            'inventory-report-'.($snapshotDate ?? now()->format('Y-m-d-His')).'.xlsx',
         );
     }
 

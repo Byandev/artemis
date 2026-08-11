@@ -208,12 +208,14 @@ test('purchase-order facts separate what we have not released from what a suppli
 
     $item = reportItem($workspace, 'WIDGET');
 
+    // Written the way the sync writes them: an order with no stated expected
+    // date gets the standing two-week agreement stored against it.
     $order = function (int $status, string $issuedAt, int $count, int $delivered = 0, ?string $expected = null) use ($workspace, $item) {
         $po = PurchasedOrder::create([
             'workspace_id' => $workspace->id,
             'control_no' => 'CN-'.uniqid(),
             'issue_date' => $issuedAt,
-            'expected_delivery_date' => $expected,
+            'expected_delivery_date' => PurchasedOrder::expectedDeliveryFor($expected, $issuedAt),
             'status' => $status,
         ]);
 
@@ -228,10 +230,12 @@ test('purchase-order facts separate what we have not released from what a suppli
         }
     };
 
-    // Raised 20 days ago and never released — nobody has told a supplier to start.
+    // Raised 20 days ago and never released — nobody has told a supplier to
+    // start. Its stored expected date is 20 - 14 = 6 days past due.
     $order(1, now()->subDays(20)->toDateString(), 500);
-    // Released 30 days ago, well past the 14-day delivery target, part-delivered.
-    $order(6, now()->subDays(30)->toDateString(), 400, delivered: 100, expected: now()->addDays(5)->toDateString());
+    // Released 30 days ago and part-delivered, with the supplier's own
+    // commitment already a fortnight behind.
+    $order(6, now()->subDays(30)->toDateString(), 400, delivered: 100, expected: now()->subDays(16)->toDateString());
     // Released two days ago: with a supplier, but not late. Sized so the
     // released pair clearly outweighs the unreleased one and the bottleneck
     // stage is not decided by a tie-break.
@@ -247,13 +251,81 @@ test('purchase-order facts separate what we have not released from what a suppli
         // Longest-waiting is the 30-day-old one, owing 300 of its 400.
         ->and($facts['longest_waiting_date'])->toBe(now()->subDays(30)->toDateString())
         ->and($facts['longest_waiting_count'])->toBe(300)
-        ->and($facts['earliest_expected_date'])->toBe(now()->addDays(5)->toDateString())
+        // Earliest of the three stored dates is the supplier's missed
+        // commitment, 16 days ago, against the 300 units it still owes.
+        ->and($facts['earliest_expected_date'])->toBe(now()->subDays(16)->toDateString())
         ->and($facts['earliest_expected_count'])->toBe(300)
-        // One order past the target, counted per order rather than per line.
+        // Only that one is both released and past its date — the 6-days-overdue
+        // order is still sitting in approval, which is our delay, not theirs.
         ->and($facts['delayed_po'])->toBe(1)
         // 900 units sit with suppliers against 500 held for approval, so that
         // is where this group's stock is stuck.
         ->and($facts['bottleneck_stage'])->toBe('Waiting For Delivery');
+});
+
+test('an order raised with no expected date is stored as due two weeks later', function () {
+    expect(PurchasedOrder::expectedDeliveryFor(null, '2026-08-01'))->toBe('2026-08-15')
+        // An explicit commitment is kept, however short.
+        ->and(PurchasedOrder::expectedDeliveryFor('2026-08-04', '2026-08-01'))->toBe('2026-08-04')
+        // Nothing to count from, so nothing is claimed.
+        ->and(PurchasedOrder::expectedDeliveryFor(null, null))->toBeNull();
+});
+
+test('the report reads the expected date the order carries', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = reportItem($workspace, 'WIDGET');
+
+    $po = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'CN-1',
+        'issue_date' => now()->subDays(3)->toDateString(),
+        'expected_delivery_date' => PurchasedOrder::expectedDeliveryFor(null, now()->subDays(3)),
+        'status' => 6,
+    ]);
+
+    PurchasedOrderItem::create([
+        'inventory_purchased_order_id' => $po->id,
+        'inventory_item_id' => $item->id,
+        'count' => 250,
+    ]);
+
+    $facts = (new ItemReportFacts($workspace))->for($item->id);
+
+    expect($facts['earliest_expected_date'])->toBe(now()->addDays(11)->toDateString())
+        ->and($facts['earliest_expected_count'])->toBe(250)
+        // Eleven days still to run, so nobody is late yet.
+        ->and($facts['delayed_po'])->toBe(0);
+});
+
+test('a supplier is late against its own commitment, not a fixed age', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = reportItem($workspace, 'WIDGET');
+
+    $order = function (string $issuedAt, ?string $expected) use ($workspace, $item) {
+        $po = PurchasedOrder::create([
+            'workspace_id' => $workspace->id,
+            'control_no' => 'CN-'.uniqid(),
+            'issue_date' => $issuedAt,
+            'expected_delivery_date' => $expected,
+            'status' => 6,
+        ]);
+
+        PurchasedOrderItem::create([
+            'inventory_purchased_order_id' => $po->id,
+            'inventory_item_id' => $item->id,
+            'count' => 100,
+        ]);
+    };
+
+    // Raised only four days ago, but the supplier promised it in two — late,
+    // even though a fixed 14-day age would call it perfectly healthy.
+    $order(now()->subDays(4)->toDateString(), now()->subDays(2)->toDateString());
+    // Raised a month ago with a commitment still a week out: not late.
+    $order(now()->subDays(30)->toDateString(), now()->addDays(7)->toDateString());
+
+    expect((new ItemReportFacts($workspace))->for($item->id)['delayed_po'])->toBe(1);
 });
 
 test('a fully delivered order is not still waiting on anyone', function () {
@@ -307,15 +379,108 @@ test('the report downloads as a spreadsheet with every column', function () {
     $response->assertOk()
         ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
-    $headings = (new InventoryItemReportExport(
+    $headings = InventoryItemReportExport::live(
         DB::query()->selectRaw('1'),
         new ItemReportFacts($workspace),
-    ))->headings();
+    )->headings();
 
     expect($headings)->toHaveCount(31)
         ->and($headings[0])->toBe('Item')
         ->and($headings[7])->toBe('Demand Trend (3d vs 14d)')
         ->and(end($headings))->toBe('Bottleneck Stage');
+});
+
+test('the snapshot freezes the report figures and a past date reads them back', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = reportItem($workspace, 'WIDGET');
+    $item->update(['unfulfilled_count' => 40]);
+    unitCode($workspace, 'BUNDLE-A', ['WIDGET' => 5]);
+    gencysOrder($workspace, 'BUNDLE-A', now()->toDateString());
+
+    $item->transactions()->create([
+        'workspace_id' => $workspace->id, 'date' => now()->subDays(2)->toDateString(),
+        'ref_no' => 'TX-1', 'po_qty_in' => 300, 'remaining_qty' => 300,
+    ]);
+
+    $this->artisan('inventory:snapshot-items', ['--date' => now()->toDateString()])->assertSuccessful();
+
+    $frozen = DB::table('inventory_item_snapshots')
+        ->where('inventory_item_id', $item->id)
+        ->where('snapshot_date', now()->toDateString())
+        ->first();
+
+    expect((int) $frozen->units_3d)->toBe(5)
+        ->and((int) $frozen->orders_3d)->toBe(1)
+        ->and($frozen->last_in_date)->toBe(now()->subDays(2)->toDateString())
+        ->and((int) $frozen->last_in_count)->toBe(300)
+        ->and($frozen->demand_as_of)->toBe(now()->toDateString());
+
+    // Now move the world on: the order feed and the ledger both change. A pinned
+    // date must keep answering for the day it names, not re-answer for today.
+    gencysOrder($workspace, 'BUNDLE-A', now()->toDateString());
+    gencysOrder($workspace, 'BUNDLE-A', now()->toDateString());
+
+    $controller = new InventoryItemController;
+    $method = new ReflectionMethod($controller, 'buildSnapshotSummaryQuery');
+    $request = Request::create('/');
+    $request->setUserResolver(fn () => $owner);
+
+    $rows = iterator_to_array(
+        InventoryItemReportExport::asOf(
+            $method->invoke($controller, $request, $workspace, now()->toDateString())
+        )->generator()
+    );
+
+    // Column 2 is the 3-day daily unit rate: 5 units over 3 days, as frozen.
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0][0])->toBe('WIDGET')
+        ->and($rows[0][2])->toBe(round(5 / 3, 2))
+        ->and($rows[0][14])->toBe(now()->subDays(2)->toDateString());
+
+    // Live, the same report now sees all three orders.
+    $live = iterator_to_array(
+        InventoryItemReportExport::live(
+            (new ReflectionMethod($controller, 'buildSummaryQuery'))->invoke($controller, $request, $workspace),
+            new ItemReportFacts($workspace),
+        )->generator()
+    );
+
+    expect($live[0][2])->toBe(round(15 / 3, 2));
+});
+
+test('a snapshot taken before the report existed reports unknown, not zero', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = reportItem($workspace, 'WIDGET');
+
+    $this->artisan('inventory:snapshot-items', ['--date' => now()->toDateString()])->assertSuccessful();
+
+    // Blank the frozen figures, as an older snapshot row would have them.
+    DB::table('inventory_item_snapshots')
+        ->where('inventory_item_id', $item->id)
+        ->update(array_fill_keys(ItemReportFacts::SNAPSHOT_COLUMNS, null));
+
+    $controller = new InventoryItemController;
+    $method = new ReflectionMethod($controller, 'buildSnapshotSummaryQuery');
+    $request = Request::create('/');
+    $request->setUserResolver(fn () => $owner);
+
+    $rows = iterator_to_array(
+        InventoryItemReportExport::asOf(
+            $method->invoke($controller, $request, $workspace, now()->toDateString())
+        )->generator()
+    );
+
+    // Demand, trend and the movement dates are unknown rather than nil — that
+    // day recorded nothing, which is not the same as recording that nothing
+    // happened.
+    expect($rows[0][1])->toBeNull()
+        ->and($rows[0][2])->toBeNull()
+        ->and($rows[0][7])->toBeNull()
+        ->and($rows[0][14])->toBeNull()
+        // Stock columns were always frozen, so they still answer.
+        ->and($rows[0][10])->toBe(0);
 });
 
 test('stockout risk is read against the lead time, not a fixed number of days', function () {
@@ -342,7 +507,7 @@ test('stockout risk is read against the lead time, not a fixed number of days', 
     $request->setUserResolver(fn () => $owner);
 
     $rows = collect($method->invoke($controller, $request, $workspace)->get())->keyBy('sku');
-    $export = new InventoryItemReportExport(
+    $export = InventoryItemReportExport::live(
         $method->invoke($controller, $request, $workspace),
         new ItemReportFacts($workspace),
     );
