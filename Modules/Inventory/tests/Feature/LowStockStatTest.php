@@ -24,6 +24,10 @@ function stockLedger(InventoryItem $item, int $remaining): void
 /** The dashboard's low-stock payload for a workspace. */
 function lowStock($user, $workspace): array
 {
+    // The dashboard reads the frozen day, so freeze it first — the same order
+    // the real thing runs in.
+    test()->artisan('inventory:snapshot-items')->assertSuccessful();
+
     return test()->actingAs($user)
         ->getJson("/api/workspaces/{$workspace->slug}/inventory/dashboard/low-stock")
         ->assertOk()

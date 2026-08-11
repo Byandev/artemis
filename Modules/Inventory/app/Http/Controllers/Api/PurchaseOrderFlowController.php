@@ -15,6 +15,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Support\InventoryStockColumns;
+use Modules\Inventory\Support\SnapshotItemScope;
 
 /**
  * The purchase-order flow panels: where ordered stock is sitting, how long it
@@ -434,16 +435,22 @@ class PurchaseOrderFlowController extends Controller
         $this->authorize('View Inventory Items', $workspace);
 
         $asOf = $this->ledgerDate($workspace);
+        $snapshotDate = SnapshotItemScope::date($workspace);
 
-        $items = $this->visibleItems($request, $workspace)
-            // When stock last arrived and last left. On a row that says stock is
-            // sitting here, those two dates are the difference between "nothing
-            // is coming in" and "nothing is going out".
-            ->leftJoinSub($this->lastMovementQuery(), 'mv', 'mv.inventory_item_id', '=', 'inventory_items.id')
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.unfulfilled_count, inventory_items.three_days_average')
-            ->selectRaw('mv.last_in, mv.last_out')
-            ->selectRaw(InventoryStockColumns::currentStocks().' as current_stocks')
-            ->with('parent:id,sku')
+        if ($snapshotDate === null) {
+            return response()->json($this->emptySplit());
+        }
+
+        // Read from the frozen day the items list reads. Stock, demand and the
+        // movement dates are all stored there, so this panel and the table it
+        // summarises cannot disagree — which they did while one computed live
+        // and the other did not.
+        $identity = SnapshotItemScope::groupIdentity();
+
+        $items = SnapshotItemScope::query($request, $workspace, $snapshotDate)
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.current_stocks')
+            ->selectRaw('inventory_item_snapshots.last_in_date as last_in, inventory_item_snapshots.last_out_date as last_out')
+            ->selectRaw("{$identity['group_sku']} as group_sku")
             ->get();
 
         $groups = [];
@@ -455,7 +462,7 @@ class PurchaseOrderFlowController extends Controller
 
             $groups[$key] ??= [
                 'id' => $key,
-                'sku' => (string) ($item->parent?->sku ?? $item->sku),
+                'sku' => (string) ($item->group_sku ?? $item->sku),
                 'unfulfilled' => 0,
                 'here' => 0,
                 'gone' => 0,
@@ -472,10 +479,6 @@ class PurchaseOrderFlowController extends Controller
             // any sibling receiving or shipping means the group moved.
             $groups[$key]['last_in'] = max($groups[$key]['last_in'], $item->last_in);
             $groups[$key]['last_out'] = max($groups[$key]['last_out'], $item->last_out);
-            // A parent placeholder carries the group's name once it appears.
-            if ($item->is_parent) {
-                $groups[$key]['sku'] = (string) $item->sku;
-            }
         }
 
         $rows = collect($groups)
@@ -535,6 +538,30 @@ class PurchaseOrderFlowController extends Controller
             ],
             'arrived' => ['units' => $arrived->sum('here'), 'skus' => $arrived->count()],
         ]);
+    }
+
+    /**
+     * What unfulfilledSplit() answers when the workspace has no snapshot at all.
+     *
+     * Zeroes rather than a live recalculation: the panel's whole claim is that it
+     * agrees with the items list, and the list shows nothing until the first run.
+     *
+     * @return array<string, mixed>
+     */
+    private function emptySplit(): array
+    {
+        return [
+            'items' => [],
+            'here' => 0,
+            'gone' => 0,
+            'total' => 0,
+            'picking_days' => self::PICKING_DAYS,
+            'sitting' => ['skus' => 0, 'units' => 0],
+            'worst' => null,
+            'ship_target_days' => self::SHIP_TARGET_DAYS,
+            'idle' => ['units' => 0, 'skus' => 0, 'longest' => null, 'worst' => null, 'as_of' => null],
+            'arrived' => ['units' => 0, 'skus' => 0],
+        ];
     }
 
     /**
@@ -767,10 +794,16 @@ class PurchaseOrderFlowController extends Controller
      */
     private function poNeededTotal(Request $request, Workspace $workspace): array
     {
-        $inner = $this->visibleItems($request, $workspace)
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent,
-                inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.three_days_average')
-            ->selectRaw(InventoryStockColumns::remainingAfterFulfillment().' as remaining_after_fulfillment');
+        $snapshotDate = SnapshotItemScope::date($workspace);
+
+        if ($snapshotDate === null) {
+            return ['units' => 0, 'groups' => 0];
+        }
+
+        $inner = SnapshotItemScope::query($request, $workspace, $snapshotDate)
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent,
+                inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.three_days_average,
+                inventory_item_snapshots.remaining_after_fulfillment');
 
         // The group's lead time and buffer are the parent's when it has one,
         // else the max across the group — same rule the items list applies.

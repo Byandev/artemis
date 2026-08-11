@@ -17,6 +17,10 @@ uses(TestCase::class, RefreshDatabase::class);
 /** GET one of the PO-flow panels. */
 function flow($user, $workspace, string $panel): array
 {
+    // The item-derived panels read the frozen day, so freeze it first — the
+    // same order the real thing runs in.
+    test()->artisan('inventory:snapshot-items')->assertSuccessful();
+
     return test()->actingAs($user)
         ->getJson("/api/workspaces/{$workspace->slug}/inventory/dashboard/po-flow/{$panel}")
         ->assertOk()
