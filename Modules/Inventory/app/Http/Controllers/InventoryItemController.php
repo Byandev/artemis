@@ -218,6 +218,18 @@ class InventoryItemController extends Controller
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
+            // The group's identity, carried on every row of the group and read
+            // straight off the parent rather than off whichever rows survived the
+            // filters. A search or a product filter can exclude the parent
+            // placeholder, and the roll-up would then take the group's name — and
+            // worse, its id — from an arbitrary child, so an inline edit would
+            // patch a different item than the one on screen.
+            ->selectRaw('COALESCE((SELECT p.sku FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.sku) as group_sku')
+            // The parent's own product, never the children's. A group whose
+            // parent has no product shows none: one of its children's would be an
+            // arbitrary pick dressed up as the group's.
+            ->selectRaw('(SELECT gp.name FROM products gp WHERE gp.id = COALESCE((SELECT p.product_id FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.product_id)) as group_product_name')
+            ->selectRaw('(SELECT gp.winning_date FROM products gp WHERE gp.id = COALESCE((SELECT p.product_id FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.product_id)) as group_product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
@@ -283,12 +295,17 @@ class InventoryItemController extends Controller
         // po_needed and days_it_can_last are recomputed from the summed totals above.
         $outer = DB::query()
             ->fromSub($inner, 'sub')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
+            // The group key itself, so the row's id is the parent's whether or
+            // not the parent row survived the filters — every action the list
+            // offers targets this id.
+            ->selectRaw('COALESCE(sub.parent_id, sub.id) as id')
+            ->selectRaw('MAX(sub.group_sku) as sku')
             ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_id END), MAX(sub.product_id)) as product_id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_winning_date END), MAX(sub.product_winning_date)) as product_winning_date')
-            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            ->selectRaw('MAX(sub.group_product_name) as product_name')
+            ->selectRaw('MAX(sub.group_product_winning_date) as product_winning_date')
+            // Having a parent is what makes a row a group, not whether the parent
+            // placeholder happened to match the filters.
+            ->selectRaw('MAX(sub.parent_id IS NOT NULL) as is_group')
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('MAX(sub.is_active) as is_active')
             ->selectRaw("$groupLeadTime as lead_time")
@@ -407,6 +424,11 @@ class InventoryItemController extends Controller
             ->where('inventory_item_snapshots.workspace_id', $workspace->id)
             ->where('inventory_item_snapshots.snapshot_date', $date)
             ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.product_id, inventory_item_snapshots.is_active, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.item_created_at as created_at, inventory_item_snapshots.product_name, inventory_item_snapshots.product_winning_date, inventory_item_snapshots.current_stocks, inventory_item_snapshots.waiting_for_delivery_stocks, inventory_item_snapshots.discrepancy, inventory_item_snapshots.remaining_after_fulfillment, inventory_item_snapshots.po_needed')
+            // Same group identity as the live roll-up, read from that day's rows
+            // so a past date reports the grouping as it stood then.
+            ->selectRaw('COALESCE((SELECT p.sku FROM inventory_item_snapshots p WHERE p.inventory_item_id = inventory_item_snapshots.parent_id AND p.snapshot_date = inventory_item_snapshots.snapshot_date LIMIT 1), inventory_item_snapshots.sku) as group_sku')
+            ->selectRaw('COALESCE((SELECT p.product_name FROM inventory_item_snapshots p WHERE p.inventory_item_id = inventory_item_snapshots.parent_id AND p.snapshot_date = inventory_item_snapshots.snapshot_date LIMIT 1), CASE WHEN inventory_item_snapshots.parent_id IS NULL THEN inventory_item_snapshots.product_name END) as group_product_name')
+            ->selectRaw('COALESCE((SELECT p.product_winning_date FROM inventory_item_snapshots p WHERE p.inventory_item_id = inventory_item_snapshots.parent_id AND p.snapshot_date = inventory_item_snapshots.snapshot_date LIMIT 1), CASE WHEN inventory_item_snapshots.parent_id IS NULL THEN inventory_item_snapshots.product_winning_date END) as group_product_winning_date')
             // The report's frozen group figures, carried through so the
             // roll-up below can hand them back untouched.
             ->selectRaw(implode(', ', array_map(
@@ -450,12 +472,17 @@ class InventoryItemController extends Controller
 
         $outer = DB::query()
             ->fromSub($inner, 'sub')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
+            // The group key itself, so the row's id is the parent's whether or
+            // not the parent row survived the filters — every action the list
+            // offers targets this id.
+            ->selectRaw('COALESCE(sub.parent_id, sub.id) as id')
+            ->selectRaw('MAX(sub.group_sku) as sku')
             ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_id END), MAX(sub.product_id)) as product_id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_winning_date END), MAX(sub.product_winning_date)) as product_winning_date')
-            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            ->selectRaw('MAX(sub.group_product_name) as product_name')
+            ->selectRaw('MAX(sub.group_product_winning_date) as product_winning_date')
+            // Having a parent is what makes a row a group, not whether the parent
+            // placeholder happened to match the filters.
+            ->selectRaw('MAX(sub.parent_id IS NOT NULL) as is_group')
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('MAX(sub.is_active) as is_active')
             ->selectRaw("$groupLeadTime as lead_time")
