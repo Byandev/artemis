@@ -503,33 +503,31 @@ test('idle stock with nothing behind it is supply, not the warehouse', function 
         ->and($data['arrived']['units'])->toBe(0);
 });
 
-test('the bottleneck blames the warehouse when shippable stock stops moving', function () {
+test('the bottleneck blames the warehouse when stock arrives and stays put', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $item = flowItem($workspace, 'SKU-1');
     $item->update(['unfulfilled_count' => 100]);
 
-    $item->transactions()->create([
-        'workspace_id' => $workspace->id, 'date' => now()->subDays(10)->toDateString(),
-        'ref_no' => 'TX-1', 'po_qty_out' => 10, 'remaining_qty' => 400,
-    ]);
-    // A second SKU keeps the ledger current, so the stalled one is genuinely
-    // behind rather than merely on the far side of a feed that stopped.
-    $mover = flowItem($workspace, 'SKU-2');
-    $mover->transactions()->create([
-        'workspace_id' => $workspace->id, 'date' => now()->toDateString(),
-        'ref_no' => 'TX-2', 'po_qty_out' => 5, 'remaining_qty' => 50,
-    ]);
+    $tx = fn (string $date, string $ref, array $cols) => $item->transactions()->create(array_merge([
+        'workspace_id' => $workspace->id, 'date' => $date, 'ref_no' => $ref,
+    ], $cols));
+
+    $tx(now()->subDays(10)->toDateString(), 'TX-OUT', ['po_qty_out' => 10, 'remaining_qty' => 100]);
+    // Received after that despatch, with the orders already on the books.
+    $tx(now()->subDays(4)->toDateString(), 'TX-IN', ['po_qty_in' => 300, 'remaining_qty' => 400]);
 
     $data = flow($owner, $workspace, 'bottleneck');
     $warehouse = collect($data['owners'])->firstWhere('key', 'warehouse');
 
-    // All 100 shippable units have stood still for ten ledger days.
+    // Every shippable unit landed after the last despatch and has not moved.
     expect($warehouse['state'])->toBe('blocked')
         ->and($warehouse['value'])->toBe(100)
-        ->and($warehouse['facts'][0])->toBe(['Longest idle', 10, 'days'])
-        ->and($data['idle_after_days'])->toBe(3)
-        ->and($data['idle_as_of'])->toBe(now()->toDateString());
+        ->and($warehouse['facts'][0])->toBe(['Target shipped out', 2, 'days'])
+        // Ten ledger days without a despatch, well past the two-day target.
+        ->and($warehouse['facts'][1])->toBe(['Not moving', 100, 'units'])
+        ->and($data['ship_target_days'])->toBe(2)
+        ->and($data['idle_as_of'])->toBe(now()->subDays(4)->toDateString());
 });
 
 test('a warehouse that is shipping is not blamed for unmet demand', function () {
@@ -548,5 +546,7 @@ test('a warehouse that is shipping is not blamed for unmet demand', function () 
         ->firstWhere('key', 'warehouse');
 
     expect($warehouse['state'])->toBe('ok')
-        ->and($warehouse['value'])->toBe(0);
+        ->and($warehouse['value'])->toBe(0)
+        // Nothing has breached the two-day target either.
+        ->and($warehouse['facts'][1])->toBe(['Not moving', null, 'units']);
 });

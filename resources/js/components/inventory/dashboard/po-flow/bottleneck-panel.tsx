@@ -21,7 +21,7 @@ function verdict(data: BottleneckData): { headline: string; why: string } {
                 ? `Stock is being ordered, then held in your own approval and payment queues. ${num(data.internal_units)} units have not been paid for.`
                 : only.key === 'supplier'
                   ? `Orders are leaving the office and then stalling. ${num(data.supplier_units)} units are with suppliers, and too much of it is past the delivery target.`
-                  : `Goods are on the shelf with orders waiting on them — ${num(only.value)} units have not moved in ${data.idle_after_days} days or more.`;
+                  : `Goods arrived and went nowhere — ${num(only.value)} units landed with orders already waiting, and nothing has shipped since.`;
 
         return { headline: only.name, why };
     }
@@ -92,13 +92,13 @@ const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
     warehouse: (
         <>
             <b>
-                Stock on the shelf with an order waiting on it that has not
-                moved.
+                Stock that arrived after the last thing shipped, with orders
+                already waiting on it.
             </b>{' '}
-            Counted per SKU, since stock on one variant cannot ship an order
-            placed against another, and only where a despatch was actually due:
-            a SKU with nothing on the shelf is waiting on supply, not standing
-            still.
+            The clearest case there is, and the one that needs no threshold:
+            goods landed, demand was sitting there, and nothing has gone out
+            since. Counted per SKU, because stock on one variant cannot ship an
+            order placed against another.
             <br />
             <br />
             <b>Measured against the ledger, not against today.</b> The clock
@@ -110,10 +110,9 @@ const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
             shipping.
             <br />
             <br />
-            <b>Longest idle</b> is the worst wait across all shippable stock,
-            over the threshold or not. <b>Arrived, nothing out</b> is the
-            sharpest case and needs no threshold at all: stock was received
-            after the last thing shipped, with orders already waiting on it.
+            <b>Not moving</b> is the wider figure: shippable stock that has gone
+            past the target above without a despatch, whether or not anything
+            new arrived.
             <br />
             <br />
             <b>No stock to give</b> is the other half of unfulfilled demand:
@@ -121,10 +120,10 @@ const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
             above is blocked rather than to the warehouse.
             <br />
             <br />
-            Goes red when more than a quarter of shippable stock has stalled.
-            One caveat: a despatch only counts once the ERP writes it, so a SKU
-            picked today but not yet posted still reads as idle. Worth spot-
-            checking a couple of SKUs before anyone is blamed.
+            Goes red when more than a quarter of shippable stock arrived and
+            stayed put. One caveat: a despatch only counts once the ERP writes
+            it, so a SKU picked today but not yet posted still reads as idle.
+            Worth spot-checking a couple of SKUs before anyone is blamed.
         </>
     ),
 };
@@ -213,8 +212,8 @@ export default function BottleneckPanel({ slug }: { slug: string }) {
                             <br />
                             <b>Warehouse</b> — is stock sitting here that should
                             already have shipped? Blocked when more than a
-                            quarter of shippable stock has gone three ledger
-                            days without a despatch.
+                            quarter of shippable stock arrived after the last
+                            despatch and has not moved since.
                             <br />
                             <br />
                             Each is scored on its own evidence, so clearing one

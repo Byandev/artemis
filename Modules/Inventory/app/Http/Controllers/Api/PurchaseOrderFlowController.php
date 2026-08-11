@@ -61,15 +61,15 @@ class PurchaseOrderFlowController extends Controller
 
     /**
      * How long shippable stock may go without a despatch before it counts as
-     * stalled rather than merely queued.
+     * stalled rather than merely queued — the warehouse's own target, and the
+     * counterpart to SUPPLIER_TARGET_DAYS.
      *
-     * Measured in ledger days, never against today — see ledgerDate(). Three
-     * days matches the picking-queue allowance above, but this one is a
-     * stopwatch rather than an inference: it reads the last despatch date, so a
-     * SKU only appears here if nothing actually left while the rest of the
-     * warehouse kept moving.
+     * Measured in ledger days, never against today — see ledgerDate(). Unlike
+     * the picking-queue allowance above this is a stopwatch rather than an
+     * inference: it reads the last despatch date, so a SKU only appears here if
+     * nothing actually left while the rest of the warehouse kept moving.
      */
-    private const IDLE_DAYS = 3;
+    private const SHIP_TARGET_DAYS = 2;
 
     /**
      * How long a supplier has, once an order is released, before it counts as
@@ -502,7 +502,7 @@ class PurchaseOrderFlowController extends Controller
         // demand and nothing on the shelf is waiting on supply, not standing
         // still, and belongs to whichever step upstream is blocked.
         $shippable = $rows->filter(fn ($r) => $r['here'] > 0);
-        $idle = $shippable->filter(fn ($r) => $r['idle_days'] !== null && $r['idle_days'] >= self::IDLE_DAYS);
+        $idle = $shippable->filter(fn ($r) => $r['idle_days'] !== null && $r['idle_days'] >= self::SHIP_TARGET_DAYS);
         // Received after the last thing shipped: the sharpest case there is, and
         // the one that needs no threshold — stock arrived, orders were waiting,
         // and nothing has gone out since.
@@ -516,7 +516,7 @@ class PurchaseOrderFlowController extends Controller
             'picking_days' => self::PICKING_DAYS,
             'sitting' => ['skus' => $sitting->count(), 'units' => $sitting->sum('here')],
             'worst' => $sitting->sortByDesc('here_days')->first(),
-            'idle_after_days' => self::IDLE_DAYS,
+            'ship_target_days' => self::SHIP_TARGET_DAYS,
             'idle' => [
                 'units' => $idle->sum('here'),
                 'skus' => $idle->count(),
@@ -558,8 +558,8 @@ class PurchaseOrderFlowController extends Controller
         // moving. Against the whole demand figure this would read as a rounding
         // error even with every shelf standing still, because most unmet demand
         // has no stock behind it at all.
-        $idleUnits = (int) $split['idle']['units'];
-        $idleShare = $idleUnits / max(1, (int) $split['here']);
+        $arrivedUnits = (int) $split['arrived']['units'];
+        $arrivedShare = $arrivedUnits / max(1, (int) $split['here']);
 
         $owners = [
             [
@@ -594,12 +594,12 @@ class PurchaseOrderFlowController extends Controller
                 'key' => 'warehouse',
                 'name' => 'Warehouse',
                 'question' => 'Is stock sitting here that should already have shipped?',
-                'state' => $idleShare > 0.25 ? 'blocked' : ($idleShare > 0.10 ? 'watch' : 'ok'),
-                'value' => $idleUnits,
-                'unit' => 'units shippable and not moving',
+                'state' => $arrivedShare > 0.25 ? 'blocked' : ($arrivedShare > 0.10 ? 'watch' : 'ok'),
+                'value' => $arrivedUnits,
+                'unit' => 'units arrived with nothing shipped since',
                 'facts' => [
-                    ['Longest idle', $split['idle']['longest'], 'days'],
-                    ['Arrived, nothing out', $split['arrived']['units'] ?: null, 'units'],
+                    ['Target shipped out', self::SHIP_TARGET_DAYS, 'days'],
+                    ['Not moving', $split['idle']['units'] ?: null, 'units'],
                     ['No stock to give', $split['gone'] ?: null, 'units'],
                 ],
             ],
@@ -611,7 +611,7 @@ class PurchaseOrderFlowController extends Controller
             'internal_units' => $internalUnits,
             'supplier_units' => $supplierUnits,
             'sla_days' => self::INTERNAL_SLA_DAYS,
-            'idle_after_days' => self::IDLE_DAYS,
+            'ship_target_days' => self::SHIP_TARGET_DAYS,
             'idle_as_of' => $split['idle']['as_of'],
         ]);
     }

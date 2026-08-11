@@ -34,8 +34,8 @@ export interface BottleneckData {
     internal_units: number;
     supplier_units: number;
     sla_days: number;
-    /** Ledger days without a despatch before shippable stock counts as idle. */
-    idle_after_days: number;
+    /** Ledger days shippable stock has to leave before it counts as stalled. */
+    ship_target_days: number;
     /** The ledger's own latest day, which idle is measured against. */
     idle_as_of: string | null;
 }
@@ -181,7 +181,7 @@ export interface UnfulfilledSplitData {
     sitting: { skus: number; units: number };
     worst: UnfulfilledRow | null;
     /** Ledger days without a despatch before shippable stock counts as idle. */
-    idle_after_days: number;
+    ship_target_days: number;
     idle: {
         units: number;
         skus: number;
