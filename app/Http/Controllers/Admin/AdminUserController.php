@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\Logging\LogCategory;
+use App\Enums\Logging\LogStatus;
+use App\Facades\Activity;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -60,5 +63,50 @@ class AdminUserController extends Controller
         $url = route('password.reset', ['token' => $token]).'?'.http_build_query(['email' => $user->email]);
 
         return response()->json(['url' => $url]);
+    }
+
+    /**
+     * Grant or revoke platform-wide super admin access.
+     */
+    public function updateSuperAdmin(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'is_super_admin' => ['required', 'boolean'],
+        ]);
+
+        // Revoking your own access locks you out of this page immediately, and
+        // only another super admin could put it back.
+        if ($user->is($request->user()) && ! $validated['is_super_admin']) {
+            return back()->withErrors([
+                'is_super_admin' => 'You cannot revoke your own super admin access.',
+            ]);
+        }
+
+        $user->update(['is_super_admin' => $validated['is_super_admin']]);
+
+        // Granting super admin moves this user's landing page to the admin
+        // panel, which sits behind the `verified` middleware — so an unverified
+        // account would be bounced to the verification notice on its next login
+        // and never reach the access it was just given. The granting super
+        // admin vouching for the account is what verifies it.
+        // Set through the model, not the update above: `email_verified_at` is
+        // not mass-assignable and would be dropped silently.
+        if ($validated['is_super_admin'] && ! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+        }
+
+        // Platform-wide privilege changes are the most security-relevant thing
+        // this panel can do, so each one gets its own audit line.
+        Activity::build()->asUser()
+            ->category(LogCategory::Security)
+            ->action($validated['is_super_admin'] ? 'user.super_admin.granted' : 'user.super_admin.revoked')
+            ->status(LogStatus::Success)
+            ->message(($validated['is_super_admin'] ? 'Super admin granted to ' : 'Super admin revoked from ').$user->email)
+            ->metadata(['target_user_id' => $user->id, 'target_email' => $user->email])
+            ->save();
+
+        return back()->with('success', $validated['is_super_admin']
+            ? "{$user->name} is now a super admin."
+            : "Super admin access revoked from {$user->name}.");
     }
 }
