@@ -6,6 +6,7 @@ use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Modules\Inventory\Support\InventoryItemSnapshotter;
+use Modules\Inventory\Support\SnapshotReadiness;
 
 /**
  * Freeze every inventory item — stored columns, computed metrics and the
@@ -31,7 +32,8 @@ class SnapshotInventoryItemsCommand extends Command
                             {--date= : Date to tag the snapshot with (Y-m-d), defaults to today}
                             {--workspace= : Limit to a single workspace id}
                             {--skip-demand : Freeze what is already stored, without recomputing demand first}
-                            {--force : Stamp a past date with today\'s figures anyway (see the warning below)}';
+                            {--force : Stamp a past date with today\'s figures anyway (see the warning below)}
+                            {--ignore-sync : Freeze even where an upstream ERP sync has failed or is still running}';
 
     protected $description = 'Store a snapshot of every inventory item, its computed stock metrics and its report figures';
 
@@ -62,8 +64,26 @@ class SnapshotInventoryItemsCommand extends Command
 
         $written = 0;
         $synced = 0;
+        $skipped = 0;
 
         foreach ($workspaces as $workspace) {
+            // A half-arrived day frozen into the snapshot is indistinguishable
+            // from a complete one afterwards, and the list reads it as fact.
+            // Skipping leaves yesterday's figures on screen, which is visibly
+            // stale and self-corrects on the next clean run.
+            $blockers = $this->option('ignore-sync') ? [] : SnapshotReadiness::blockers($workspace);
+
+            if ($blockers) {
+                $skipped++;
+                $this->warn("Skipping {$workspace->name}: upstream syncs have not landed cleanly.");
+
+                foreach ($blockers as $blocker) {
+                    $this->line("  - {$blocker}");
+                }
+
+                continue;
+            }
+
             // Recomputing demand and freezing it is one step, ordered inside the
             // snapshotter — see InventoryItemSnapshotter::refresh().
             $snapshotter = new InventoryItemSnapshotter(
@@ -78,6 +98,13 @@ class SnapshotInventoryItemsCommand extends Command
 
         $this->info("Recomputed demand for {$synced} item(s); snapshotted {$written} item(s) for {$date}.");
 
-        return self::SUCCESS;
+        if ($skipped > 0) {
+            $this->warn("Skipped {$skipped} workspace(s) waiting on an ERP sync. Re-run once those land, or pass --ignore-sync.");
+        }
+
+        // Fail only when nothing at all was written and something was held back,
+        // so a scheduler that reports non-zero exits surfaces a feed that has
+        // stopped rather than a partial run that did its job.
+        return $written === 0 && $skipped > 0 ? self::FAILURE : self::SUCCESS;
     }
 }
