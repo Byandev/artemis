@@ -27,7 +27,8 @@ test('the trigger command opens a pending run per workspace and date', function 
 
     Http::fake(['*' => Http::response(['ok' => true])]);
 
-    $this->artisan('gencys-erp:trigger-fetch-daily-sales-tracker', [
+    $this->artisan('gencys-erp:trigger-fetch-data', [
+        '--type' => ['daily_sales_tracker'],
         '--force' => true,
         '--sync' => true,
         '--start-date' => '2026-06-27',

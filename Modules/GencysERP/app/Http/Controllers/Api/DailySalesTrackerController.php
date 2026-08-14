@@ -137,6 +137,7 @@ class DailySalesTrackerController extends Controller
                 $this->syncRunId($entry),
                 count($rows),
                 $entrySaved,
+                GencysSyncRun::executionIdFrom($entry),
             );
         }
 

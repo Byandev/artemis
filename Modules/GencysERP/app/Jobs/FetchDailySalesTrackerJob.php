@@ -6,7 +6,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Jobs\Concerns\TracksSyncRuns;
 use Throwable;
 
 /**
@@ -21,6 +21,7 @@ use Throwable;
 class FetchDailySalesTrackerJob implements ShouldQueue
 {
     use Queueable;
+    use TracksSyncRuns;
 
     public function __construct(
         public string $webhookUrl,
@@ -32,6 +33,8 @@ class FetchDailySalesTrackerJob implements ShouldQueue
 
     public function handle(): void
     {
+        $this->markRunsStarted();
+
         try {
             $response = Http::timeout(30)->post($this->webhookUrl, $this->data);
         } catch (Throwable $e) {
@@ -56,20 +59,5 @@ class FetchDailySalesTrackerJob implements ShouldQueue
 
             $this->failPendingRuns("n8n webhook returned HTTP {$response->status()}");
         }
-    }
-
-    /** Fail this call's pending runs when the outbound call never reaches n8n. */
-    private function failPendingRuns(string $message): void
-    {
-        if (empty($this->syncRunIds)) {
-            return;
-        }
-
-        GencysSyncRun::query()
-            ->whereIn('id', $this->syncRunIds)
-            ->pending()
-            ->get()
-            ->each
-            ->fail($message);
     }
 }

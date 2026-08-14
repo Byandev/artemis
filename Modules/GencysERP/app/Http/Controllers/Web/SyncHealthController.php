@@ -4,9 +4,12 @@ namespace Modules\GencysERP\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\GencysERP\Actions\RetryGencysSyncRuns;
+use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -151,11 +154,42 @@ class SyncHealthController extends Controller
             ->latest('started_at')
             ->first(['sync_type', 'inventory_item_id', 'started_at']);
 
+        // The scheduled sweeps, newest first. `running` here is what makes the
+        // next slot skip this workspace, so it's the first thing to look at when
+        // a slot appears to have produced nothing.
+        $batches = GencysSyncBatch::query()
+            ->where('workspace_id', $workspace->id)
+            ->latest('id')
+            ->limit(15)
+            ->get()
+            ->map(fn (GencysSyncBatch $batch) => [
+                'id' => $batch->id,
+                'trigger' => $batch->trigger,
+                'status' => $batch->status,
+                'sync_types' => $batch->sync_types,
+                'total_runs' => $batch->total_runs,
+                'completed_runs' => $batch->completed_runs,
+                'failed_runs' => $batch->failed_runs,
+                'pending_runs' => max(0, $batch->total_runs - $batch->completed_runs - $batch->failed_runs),
+                'message' => $batch->message,
+                'started_at' => $batch->started_at,
+                'finished_at' => $batch->finished_at,
+                'duration_seconds' => $batch->started_at && $batch->finished_at
+                    ? $batch->started_at->diffInSeconds($batch->finished_at)
+                    : null,
+                // Only a batch with unresolved runs has anything to replay.
+                'can_retry' => $batch->status !== GencysSyncBatch::STATUS_SKIPPED
+                    && ($batch->failed_runs > 0 || $batch->status === GencysSyncBatch::STATUS_RUNNING),
+            ]);
+
         return Inertia::render('workspaces/inventory/sync-health/index', [
             'workspace' => $workspace,
             'summary' => $summary,
             'activeItemsCount' => $items->count(),
             'syncTypes' => self::SYNC_TYPES,
+            'batches' => $batches,
+            'canRetry' => $request->user()->can('Edit Inventory Items', $workspace),
+            'n8nExecutionUrlPrefix' => $this->n8nExecutionUrlPrefix(),
             'recent' => $recent,
             'totalRuns24h' => $totalRuns24h,
             'successRuns24h' => $successRuns24h,
@@ -177,5 +211,50 @@ class SyncHealthController extends Controller
                 'search' => $itemSearch !== '' ? $itemSearch : null,
             ],
         ]);
+    }
+
+    /**
+     * Prefix that turns a run's stored n8n execution id into a deep link into
+     * the n8n editor. Null when either config value is missing — the id is still
+     * shown, just not clickable.
+     */
+    private function n8nExecutionUrlPrefix(): ?string
+    {
+        $base = config('services.n8n.base_url');
+        $workflowId = config('services.n8n.gencys_workflow_id');
+
+        if (! $base || ! $workflowId) {
+            return null;
+        }
+
+        return rtrim($base, '/')."/workflow/{$workflowId}/executions/";
+    }
+
+    /** Replay every failed or still-outstanding run in a batch. */
+    public function retryBatch(Request $request, Workspace $workspace, GencysSyncBatch $batch, RetryGencysSyncRuns $retry): RedirectResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+        // Route model binding resolves the batch by id alone, so confirm it
+        // actually belongs to this workspace before replaying anything.
+        abort_unless($batch->workspace_id === $workspace->id, 404);
+
+        $count = $retry->forBatch($batch);
+
+        return back()->with('success', $count > 0
+            ? "Re-dispatched {$count} sync run(s) for batch #{$batch->id}."
+            : "Batch #{$batch->id} had no runs to retry.");
+    }
+
+    /** Replay a single run from the recent-runs feed. */
+    public function retryRun(Request $request, Workspace $workspace, GencysSyncRun $run, RetryGencysSyncRuns $retry): RedirectResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+        abort_unless($run->workspace_id === $workspace->id, 404);
+
+        $count = $retry->forRun($run);
+
+        return back()->with('success', $count > 0
+            ? "Re-dispatched sync run #{$run->id}."
+            : "Sync run #{$run->id} is a type that can't be retried from here.");
     }
 }

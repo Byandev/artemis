@@ -499,6 +499,16 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('can:View Inventory Items,workspace')
         ->name('workspaces.inventory.sync-health');
 
+    // Replaying a sync writes to the ERP integration, so these sit behind the
+    // manage permission rather than the read-only one the page itself uses.
+    Route::post('/workspaces/{workspace}/inventory/sync-health/batches/{batch}/retry', [GencysSyncHealthController::class, 'retryBatch'])
+        ->middleware('can:Edit Inventory Items,workspace')
+        ->name('workspaces.inventory.sync-health.batches.retry');
+
+    Route::post('/workspaces/{workspace}/inventory/sync-health/runs/{run}/retry', [GencysSyncHealthController::class, 'retryRun'])
+        ->middleware('can:Edit Inventory Items,workspace')
+        ->name('workspaces.inventory.sync-health.runs.retry');
+
     Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');

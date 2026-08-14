@@ -46,6 +46,7 @@ class GencysSyncRun extends Model
         'meta' => 'array',
         'rows_received' => 'integer',
         'rows_saved' => 'integer',
+        'n8n_execution_id' => 'integer',
     ];
 
     /** Team visibility flows through the run's inventory item. */
@@ -64,14 +65,29 @@ class GencysSyncRun extends Model
         return $this->belongsTo(InventoryItem::class);
     }
 
+    /** The scheduled sweep this run belongs to; null for the older per-type commands. */
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(GencysSyncBatch::class, 'batch_id');
+    }
+
     /**
      * Open a pending run for one sync type. $inventoryItemId is the subject for
      * inventory syncs; intern syncs pass null and keep the intern id in $meta.
+     *
+     * $batchId ties the run to a scheduled sweep so the batch knows what it's
+     * still waiting on. Runs opened outside a batch pass null.
      */
-    public static function start(int $workspaceId, ?int $inventoryItemId, string $syncType, array $meta = []): self
-    {
+    public static function start(
+        int $workspaceId,
+        ?int $inventoryItemId,
+        string $syncType,
+        array $meta = [],
+        ?int $batchId = null,
+    ): self {
         return self::create([
             'workspace_id' => $workspaceId,
+            'batch_id' => $batchId,
             'inventory_item_id' => $inventoryItemId,
             'sync_type' => $syncType,
             'status' => self::STATUS_PENDING,
@@ -87,8 +103,13 @@ class GencysSyncRun extends Model
      * A success also clears the earlier runs that asked for exactly the same
      * thing — see resolveEarlierRunsWithSameParameters().
      */
-    public static function succeedById(int $workspaceId, ?int $syncRunId, int $rowsReceived, ?int $rowsSaved = null): void
-    {
+    public static function succeedById(
+        int $workspaceId,
+        ?int $syncRunId,
+        int $rowsReceived,
+        ?int $rowsSaved = null,
+        ?int $n8nExecutionId = null,
+    ): void {
         if (! $syncRunId) {
             return;
         }
@@ -102,14 +123,29 @@ class GencysSyncRun extends Model
             return;
         }
 
-        $run->forceFill([
+        $run->forceFill(array_filter([
             'status' => self::STATUS_SUCCESS,
             'rows_received' => $rowsReceived,
             'rows_saved' => $rowsSaved ?? $rowsReceived,
             'finished_at' => now(),
-        ])->save();
+            // Only overwrite when the callback actually carried one, so a flow
+            // that hasn't been updated to send it doesn't blank an existing id.
+            'n8n_execution_id' => $n8nExecutionId,
+        ], fn ($value) => $value !== null))->save();
 
         $run->resolveEarlierRunsWithSameParameters();
+        $run->refreshBatch();
+    }
+
+    /**
+     * Recount this run's batch after a state change, so it closes as soon as its
+     * last run resolves.
+     *
+     * Runs outside a batch are a no-op.
+     */
+    public function refreshBatch(): void
+    {
+        $this->batch?->refreshCounters();
     }
 
     /**
@@ -135,6 +171,12 @@ class GencysSyncRun extends Model
 
         $resolved = 0;
 
+        // Batches owning the runs we just closed. Those runs belong to *earlier*
+        // sweeps, so without recounting here their batch would sit at `running`
+        // with nothing left to wait for — and the overlap guard would refuse to
+        // dispatch that workspace ever again.
+        $touchedBatchIds = [];
+
         self::query()
             ->where('workspace_id', $this->workspace_id)
             ->where('sync_type', $this->sync_type)
@@ -146,7 +188,7 @@ class GencysSyncRun extends Model
             ->whereIn('status', [self::STATUS_PENDING, self::STATUS_FAILED])
             ->where('id', '<', $this->id)
             ->get()
-            ->each(function (self $earlier) use ($signature, &$resolved) {
+            ->each(function (self $earlier) use ($signature, &$resolved, &$touchedBatchIds) {
                 if (self::parameterSignature($earlier->meta) !== $signature) {
                     return;
                 }
@@ -160,8 +202,18 @@ class GencysSyncRun extends Model
                     'message' => "Resolved by sync run #{$this->id}, which fetched the same data.",
                 ])->save();
 
+                if ($earlier->batch_id) {
+                    $touchedBatchIds[$earlier->batch_id] = true;
+                }
+
                 $resolved++;
             });
+
+        GencysSyncBatch::query()
+            ->whereKey(array_keys($touchedBatchIds))
+            ->get()
+            ->each
+            ->refreshCounters();
 
         return $resolved;
     }
@@ -187,6 +239,52 @@ class GencysSyncRun extends Model
         return json_encode($normalise($meta ?? []));
     }
 
+    /**
+     * Pull the n8n execution id out of a callback entry, tolerating the key
+     * spellings the different flows use.
+     *
+     * The whole point of storing it is that a failed run can be opened straight
+     * in n8n's execution log, so it's read leniently — a missing id costs us
+     * traceability, but a wrong strict match costs us the id entirely.
+     */
+    public static function executionIdFrom(array $entry): ?int
+    {
+        $id = $entry['n8n_execution_id']
+            ?? $entry['execution_id']
+            ?? $entry['executionId']
+            ?? null;
+
+        // n8n sends its execution id as a number, but an expression that
+        // stringifies it shouldn't cost us the id — accept numeric strings too
+        // and reject anything that isn't a number outright.
+        if ($id === null || $id === '' || ! is_numeric($id)) {
+            return null;
+        }
+
+        return (int) $id;
+    }
+
+    /**
+     * Put a resolved run back to pending because its n8n execution is being
+     * replayed. The retried execution re-posts the original payload, so it
+     * carries this same run id and will close this row out again.
+     *
+     * started_at is reset deliberately: the stale sweeper measures from it, and
+     * without the reset a run retried hours later would be failed again on the
+     * sweeper's very next pass, before n8n had a chance to report.
+     */
+    public function reopen(string $message): void
+    {
+        $this->forceFill([
+            'status' => self::STATUS_PENDING,
+            'started_at' => now(),
+            'finished_at' => null,
+            'message' => $message,
+        ])->save();
+
+        $this->refreshBatch();
+    }
+
     public function fail(string $message): void
     {
         $this->forceFill([
@@ -194,6 +292,8 @@ class GencysSyncRun extends Model
             'finished_at' => now(),
             'message' => $message,
         ])->save();
+
+        $this->refreshBatch();
     }
 
     public function scopePending(Builder $query): Builder

@@ -53,7 +53,13 @@ class TransactionHistoryController extends Controller
             $saved = $this->saveTransactions($item, $rows);
 
             // The entry's sync_run_id is the run we opened for this item on dispatch.
-            GencysSyncRun::succeedById($workspace->id, $this->syncRunId($entry), count($rows), $saved);
+            GencysSyncRun::succeedById(
+                $workspace->id,
+                $this->syncRunId($entry),
+                count($rows),
+                $saved,
+                GencysSyncRun::executionIdFrom($entry),
+            );
 
             $results[] = [
                 'inventory_item_id' => $item->id,

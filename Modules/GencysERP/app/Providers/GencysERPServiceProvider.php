@@ -5,9 +5,8 @@ namespace Modules\GencysERP\Providers;
 use Illuminate\Console\Scheduling\Schedule;
 use Modules\GencysERP\Console\Commands\ExpireStaleSyncRuns;
 use Modules\GencysERP\Console\Commands\ResolveSupersededSyncRuns;
-use Modules\GencysERP\Console\Commands\TriggerFetchDailySalesTrackerCommand;
-use Modules\GencysERP\Console\Commands\TriggerFetchERPPurchaseOrders;
-use Modules\GencysERP\Console\Commands\TriggerFetchERPTransactionHistory;
+use Modules\GencysERP\Console\Commands\RunScheduledSyncBatch;
+use Modules\GencysERP\Console\Commands\TriggerFetchGencysERPData;
 use Modules\GencysERP\Console\Commands\TriggerFetchInternDailyRecordsCommand;
 use Modules\GencysERP\Console\Commands\TriggerFetchPageDetailsCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
@@ -30,9 +29,8 @@ class GencysERPServiceProvider extends ModuleServiceProvider
      * @var string[]
      */
     protected array $commands = [
-        TriggerFetchDailySalesTrackerCommand::class,
-        TriggerFetchERPPurchaseOrders::class,
-        TriggerFetchERPTransactionHistory::class,
+        RunScheduledSyncBatch::class,
+        TriggerFetchGencysERPData::class,
         TriggerFetchInternDailyRecordsCommand::class,
         TriggerFetchPageDetailsCommand::class,
         ExpireStaleSyncRuns::class,

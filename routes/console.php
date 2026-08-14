@@ -16,23 +16,19 @@ Schedule::command('trigger-fetch-shops-users')->daily(7);
 
 // Gencys ERP
 Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
-//
-//Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('08:30')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('12:30')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('15:30')->withoutOverlapping();
-//
-//Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('08:45')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('12:45')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('15:45')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('19:00')->withoutOverlapping();
-//
-//Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('09:15')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('13:15')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('16:15')->withoutOverlapping();
-//
-//Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
-//Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
+// Transaction history, daily sales tracker and purchase orders now fire together
+// as one tracked batch per workspace. gencys-erp:sync will skip any workspace
+// whose previous batch is still waiting on n8n callbacks — withoutOverlapping()
+// can't see that, because the dispatching process exits long before the scrape
+// finishes. The three types used to be staggered across separate slots purely to
+// keep concurrent ERP logins down; the batch guard is what enforces that now.
+Schedule::command('gencys-erp:sync')->dailyAt('09:30')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('14:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('19:00')->withoutOverlapping();
+
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');

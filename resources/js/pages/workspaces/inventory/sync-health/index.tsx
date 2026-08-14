@@ -21,6 +21,7 @@ import {
     CheckCircle2,
     Clock,
     Package,
+    RefreshCw,
     Search,
     XCircle,
 } from 'lucide-react';
@@ -58,6 +59,23 @@ interface RecentRun {
     finished_at: string | null;
     duration_seconds: number | null;
     message: string | null;
+    n8n_execution_id: number | null;
+}
+
+interface SyncBatch {
+    id: number;
+    trigger: string;
+    status: string;
+    sync_types: string[] | null;
+    total_runs: number;
+    completed_runs: number;
+    failed_runs: number;
+    pending_runs: number;
+    message: string | null;
+    started_at: string | null;
+    finished_at: string | null;
+    duration_seconds: number | null;
+    can_retry: boolean;
 }
 
 interface Props {
@@ -65,6 +83,9 @@ interface Props {
     summary: PaginatedData<ItemSummary>;
     activeItemsCount: number;
     syncTypes: string[];
+    batches: SyncBatch[];
+    canRetry: boolean;
+    n8nExecutionUrlPrefix: string | null;
     recent: PaginatedData<RecentRun>;
     totalRuns24h: number;
     successRuns24h: number;
@@ -94,6 +115,7 @@ interface Props {
 const TYPE_LABELS: Record<string, string> = {
     transaction_history: 'Transactions',
     purchase_order: 'Purchase Orders',
+    daily_sales_tracker: 'Daily Sales',
 };
 
 function StatusPill({ status }: { status: string | null }) {
@@ -141,6 +163,64 @@ function StatusPill({ status }: { status: string | null }) {
             {c.label}
         </span>
     );
+}
+
+/**
+ * Batch statuses are a different vocabulary to run statuses — `skipped` in
+ * particular is not a failure but a deliberate hold, so it reads amber rather
+ * than red.
+ */
+function BatchStatusPill({ status }: { status: string }) {
+    const config: Record<string, { cls: string; dot: string; label: string }> =
+        {
+            running: {
+                cls: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
+                dot: 'bg-blue-400',
+                label: 'Running',
+            },
+            completed: {
+                cls: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+                dot: 'bg-emerald-500',
+                label: 'Completed',
+            },
+            partial: {
+                cls: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+                dot: 'bg-amber-400',
+                label: 'Partial',
+            },
+            failed: {
+                cls: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400',
+                dot: 'bg-red-400',
+                label: 'Failed',
+            },
+            skipped: {
+                cls: 'bg-stone-100 text-stone-600 dark:bg-zinc-800 dark:text-zinc-400',
+                dot: 'bg-stone-400',
+                label: 'Skipped',
+            },
+        };
+    const c = config[status] ?? config.failed;
+
+    return (
+        <span
+            className={clsx(
+                'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] tracking-wide uppercase',
+                c.cls,
+            )}
+        >
+            <span className={clsx('h-1 w-1 rounded-full', c.dot)} />
+            {c.label}
+        </span>
+    );
+}
+
+/** Clock time a batch started, which is what identifies the sweep. */
+function formatClock(ts: string | null) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 function formatRelative(ts: string | null) {
@@ -247,6 +327,9 @@ export default function InventorySyncHealth({
     summary,
     activeItemsCount,
     syncTypes,
+    batches,
+    canRetry,
+    n8nExecutionUrlPrefix,
     recent,
     totalRuns24h,
     successRuns24h,
@@ -257,6 +340,21 @@ export default function InventorySyncHealth({
     itemsQuery,
 }: Props) {
     const indexUrl = `/workspaces/${workspace.slug}/inventory/sync-health`;
+
+    // Guards the buttons against a double-submit while the replay is in flight.
+    const [retrying, setRetrying] = useState<string | null>(null);
+
+    const retry = (url: string, key: string) => {
+        setRetrying(key);
+        router.post(
+            url,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setRetrying(null),
+            },
+        );
+    };
 
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
@@ -484,6 +582,77 @@ export default function InventorySyncHealth({
                     <span className="text-gray-300 dark:text-gray-600">—</span>
                 ),
         },
+        {
+            id: 'n8n_execution_id',
+            header: () => (
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    n8n
+                </span>
+            ),
+            cell: ({ row }) => {
+                const id = row.original.n8n_execution_id;
+                if (!id)
+                    return (
+                        <span className="text-gray-300 dark:text-gray-600">
+                            —
+                        </span>
+                    );
+
+                // Clickable only when the n8n base URL and workflow id are both
+                // configured; otherwise the id is still useful to paste into n8n.
+                return n8nExecutionUrlPrefix ? (
+                    <a
+                        href={`${n8nExecutionUrlPrefix}${id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-[11px] text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                        {id}
+                    </a>
+                ) : (
+                    <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                        {id}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'actions',
+            header: () => <span className="sr-only">Actions</span>,
+            cell: ({ row }) => {
+                // Only unresolved runs are worth replaying.
+                if (
+                    !canRetry ||
+                    !['failed', 'pending'].includes(row.original.status)
+                ) {
+                    return null;
+                }
+
+                const key = `run-${row.original.id}`;
+
+                return (
+                    <button
+                        type="button"
+                        disabled={retrying === key}
+                        onClick={() =>
+                            retry(
+                                `${indexUrl}/runs/${row.original.id}/retry`,
+                                key,
+                            )
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-black/8 px-2 py-1 font-mono text-[10px] tracking-wide text-gray-600 uppercase transition-colors hover:bg-stone-50 disabled:opacity-40 dark:border-white/10 dark:text-gray-300 dark:hover:bg-zinc-800"
+                    >
+                        <RefreshCw
+                            className={clsx(
+                                'h-3 w-3',
+                                retrying === key && 'animate-spin',
+                            )}
+                        />
+                        Retry
+                    </button>
+                );
+            },
+        },
     ];
 
     return (
@@ -555,6 +724,119 @@ export default function InventorySyncHealth({
                             {pendingRuns === 1 ? '' : 's'} awaiting results from
                             Gencys ERP.
                         </p>
+                    </div>
+                )}
+
+                {batches.length > 0 && (
+                    <div>
+                        <h2 className="mb-3 font-mono text-[10px] font-medium tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
+                            Scheduled sweeps
+                        </h2>
+                        <div className="divide-y divide-black/5 overflow-hidden rounded-[14px] border border-black/6 bg-white dark:divide-white/5 dark:border-white/6 dark:bg-zinc-900">
+                            {batches.map((batch) => {
+                                const done =
+                                    batch.completed_runs + batch.failed_runs;
+                                const pct = batch.total_runs
+                                    ? Math.round(
+                                          (done / batch.total_runs) * 100,
+                                      )
+                                    : 100;
+
+                                return (
+                                    <div
+                                        key={batch.id}
+                                        className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-mono text-[11px] font-medium text-gray-700 dark:text-gray-200">
+                                                    {formatClock(
+                                                        batch.started_at,
+                                                    )}
+                                                </span>
+                                                {batch.trigger !==
+                                                    'schedule' && (
+                                                    <span className="font-mono text-[10px] tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                                                        {batch.trigger}
+                                                    </span>
+                                                )}
+                                                <BatchStatusPill
+                                                    status={batch.status}
+                                                />
+                                                <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                                    #{batch.id} ·{' '}
+                                                    {formatRelative(
+                                                        batch.started_at,
+                                                    )}
+                                                    {batch.duration_seconds !=
+                                                        null &&
+                                                        ` · ${formatDuration(batch.duration_seconds)}`}
+                                                </span>
+                                            </div>
+
+                                            {batch.total_runs > 0 && (
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <div className="h-1 w-full max-w-[220px] overflow-hidden rounded-full bg-stone-100 dark:bg-zinc-800">
+                                                        <div
+                                                            className={clsx(
+                                                                'h-full rounded-full transition-all',
+                                                                batch.failed_runs >
+                                                                    0
+                                                                    ? 'bg-amber-400'
+                                                                    : 'bg-emerald-500',
+                                                            )}
+                                                            style={{
+                                                                width: `${pct}%`,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <span className="font-mono text-[10px] whitespace-nowrap text-gray-400 dark:text-gray-500">
+                                                        {done}/
+                                                        {batch.total_runs}
+                                                        {batch.failed_runs >
+                                                            0 &&
+                                                            ` · ${batch.failed_runs} failed`}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {batch.message && (
+                                                <p className="mt-1.5 font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                                    {batch.message}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {canRetry && batch.can_retry && (
+                                            <button
+                                                type="button"
+                                                disabled={
+                                                    retrying ===
+                                                    `batch-${batch.id}`
+                                                }
+                                                onClick={() =>
+                                                    retry(
+                                                        `${indexUrl}/batches/${batch.id}/retry`,
+                                                        `batch-${batch.id}`,
+                                                    )
+                                                }
+                                                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-black/8 px-2.5 py-1.5 font-mono text-[10px] tracking-wide text-gray-600 uppercase transition-colors hover:bg-stone-50 disabled:opacity-40 dark:border-white/10 dark:text-gray-300 dark:hover:bg-zinc-800"
+                                            >
+                                                <RefreshCw
+                                                    className={clsx(
+                                                        'h-3 w-3',
+                                                        retrying ===
+                                                            `batch-${batch.id}` &&
+                                                            'animate-spin',
+                                                    )}
+                                                />
+                                                Retry
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 

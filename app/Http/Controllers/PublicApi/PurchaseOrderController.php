@@ -84,7 +84,13 @@ class PurchaseOrderController extends Controller
                 }
 
                 // The entry's sync_run_id is the run we opened for this item.
-                GencysSyncRun::succeedById($workspace->id, $entry['sync_run_id'] ?? null, $synced);
+                GencysSyncRun::succeedById(
+                    $workspace->id,
+                    $entry['sync_run_id'] ?? null,
+                    $synced,
+                    null,
+                    GencysSyncRun::executionIdFrom($entry),
+                );
 
                 $results[] = [
                     'inventory_item_id' => $entry['id'] ?? null,

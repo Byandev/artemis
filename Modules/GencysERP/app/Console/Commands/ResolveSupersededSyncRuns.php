@@ -3,6 +3,7 @@
 namespace Modules\GencysERP\Console\Commands;
 
 use Illuminate\Console\Command;
+use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
 
 /**
@@ -52,11 +53,18 @@ class ResolveSupersededSyncRuns extends Command
         $resolved = 0;
         $scanned = 0;
 
+        // Batches owning the runs we resolve. These writes go through forceFill
+        // rather than GencysSyncRun::fail()/succeedById(), so nothing refreshes
+        // the parent batch on our behalf — without recounting at the end a batch
+        // would stay `running` with no outstanding runs, and the overlap guard
+        // would block its workspace from ever dispatching again.
+        $touchedBatchIds = [];
+
         GencysSyncRun::query()
             ->whereIn('status', [GencysSyncRun::STATUS_PENDING, GencysSyncRun::STATUS_FAILED])
             ->when($since, fn ($query) => $query->where('started_at', '>=', $since))
             ->orderBy('id')
-            ->chunkById(500, function ($runs) use ($successBySignature, $dryRun, &$resolved, &$scanned) {
+            ->chunkById(500, function ($runs) use ($successBySignature, $dryRun, &$resolved, &$scanned, &$touchedBatchIds) {
                 foreach ($runs as $run) {
                     $scanned++;
 
@@ -83,8 +91,20 @@ class ResolveSupersededSyncRuns extends Command
                         'finished_at' => now(),
                         'message' => "Resolved by sync run #{$success->id}, which fetched the same data.",
                     ])->save();
+
+                    if ($run->batch_id) {
+                        $touchedBatchIds[$run->batch_id] = true;
+                    }
                 }
             });
+
+        if (! $dryRun && $touchedBatchIds !== []) {
+            GencysSyncBatch::query()
+                ->whereKey(array_keys($touchedBatchIds))
+                ->get()
+                ->each
+                ->refreshCounters();
+        }
 
         $this->info($dryRun
             ? "Would resolve {$resolved} of {$scanned} pending/failed run(s)."

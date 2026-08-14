@@ -49,6 +49,20 @@ return [
         // Public base URL n8n posts callbacks back to (e.g. an ngrok/Herd tunnel
         // in local dev). Falls back to APP_URL when unset.
         'callback_base_url' => env('N8N_CALLBACK_BASE_URL'),
+
+        // The n8n editor's own URL and the id of the consolidated Gencys sync
+        // workflow. Used to turn the execution id stored on a sync run into a
+        // clickable link on Sync Health — set both or neither; when either is
+        // missing the id still shows, just as plain text.
+        'base_url' => env('N8N_BASE_URL'),
+        'gencys_workflow_id' => env('N8N_GENCYS_WORKFLOW_ID'),
+
+        // Public API key (Settings → n8n API in the editor). Lets Artemis retry a
+        // failed execution in place via POST /api/v1/executions/{id}/retry rather
+        // than re-scraping from scratch. Without it, retries fall back to
+        // re-dispatching the webhook.
+        'api_key' => env('N8N_API_KEY'),
+        'api_timeout' => env('N8N_API_TIMEOUT', 15),
     ],
 
     'discord' => [
