@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('workspaces_billing_detail', function (Blueprint $table) {
+        Schema::create('workspace_billing_details', function (Blueprint $table) {
             $table->id();
             $table->foreignId('workspace_id')->unique()->constrained()->cascadeOnDelete();
             // The "bill to" party for this workspace. Nullable because a
@@ -22,6 +22,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('workspaces_billing_detail');
+        Schema::dropIfExists('workspace_billing_details');
     }
 };

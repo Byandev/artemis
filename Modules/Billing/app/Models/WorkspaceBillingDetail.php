@@ -12,8 +12,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class WorkspaceBillingDetail extends Model
 {
-    protected $table = 'workspaces_billing_detail';
-
     protected $fillable = [
         'workspace_id',
         'billing_name',
