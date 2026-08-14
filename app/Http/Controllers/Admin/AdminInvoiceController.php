@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Mail\InvoiceDueTodayMail;
+use App\Mail\InvoiceDueReminderMail;
 use App\Models\Invoice;
 use App\Models\Workspace;
 use App\Support\InvoicePdf;
@@ -125,21 +125,34 @@ class AdminInvoiceController extends Controller
 
         $invoice->save();
 
-        $this->notifyIfDueToday($invoice);
+        $this->notifyIfDueSoon($invoice);
 
         return redirect()->route('admin.invoices.index')
             ->with('success', "Invoice {$invoice->number} created.");
     }
 
+    /** Days before the due date that warrant an email the moment it's raised. */
+    private const NOTICE_OFFSETS = [0, 3, 5];
+
     /**
-     * Email the client straight away when an invoice is raised that already
-     * falls due today. Queued so a slow mail provider can't stall the request,
-     * and swallowed on failure so it can't fail the invoice creation either.
+     * Email the client when an invoice is raised that already falls due today,
+     * or exactly three or five days out. Queued so a slow mail provider can't
+     * stall the request, and swallowed on failure so it can't fail the
+     * creation either.
      */
-    private function notifyIfDueToday(Invoice $invoice): void
+    private function notifyIfDueSoon(Invoice $invoice): void
     {
         // A draft hasn't been issued to the client, and a paid one owes nothing.
-        if ($invoice->status !== Invoice::STATUS_SENT || ! $invoice->due_date?->isToday()) {
+        if ($invoice->status !== Invoice::STATUS_SENT || ! $invoice->due_date) {
+            return;
+        }
+
+        $daysUntilDue = (int) Carbon::today()->diffInDays(
+            $invoice->due_date->copy()->startOfDay(),
+            false
+        );
+
+        if (! in_array($daysUntilDue, self::NOTICE_OFFSETS, true)) {
             return;
         }
 
@@ -150,9 +163,9 @@ class AdminInvoiceController extends Controller
         }
 
         try {
-            Mail::to($recipient)->queue(new InvoiceDueTodayMail($invoice));
+            Mail::to($recipient)->queue(new InvoiceDueReminderMail($invoice, $daysUntilDue));
         } catch (Throwable $e) {
-            Log::error("Invoice due-today notice failed for {$invoice->number}: {$e->getMessage()}");
+            Log::error("Invoice due notice failed for {$invoice->number}: {$e->getMessage()}");
         }
     }
 
