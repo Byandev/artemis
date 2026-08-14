@@ -69,6 +69,7 @@ interface Workspace {
     csr_dashboard_module_enabled: boolean;
     sim_gateway_module_enabled: boolean;
     ad_spend_goals_module_enabled: boolean;
+    billing_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -93,6 +94,7 @@ const MODULE_FIELDS: Array<{
         | 'csr_dashboard_module_enabled'
         | 'sim_gateway_module_enabled'
         | 'ad_spend_goals_module_enabled'
+        | 'billing_module_enabled'
     >;
     label: string;
     description: string;
@@ -187,6 +189,11 @@ const MODULE_FIELDS: Array<{
         label: 'Ad Spend Goals',
         description: 'Per-team daily ad spend goals and milestones',
     },
+    {
+        key: 'billing_module_enabled',
+        label: 'Billing',
+        description: 'Subscription, invoices, and payment records',
+    },
 ];
 
 type ModuleKey = (typeof MODULE_FIELDS)[number]['key'];
@@ -205,6 +212,7 @@ const MODULE_GROUPS: {
             'products_module_enabled',
             'inventory_module_enabled',
             'finance_module_enabled',
+            'billing_module_enabled',
             'gencys_module_enabled',
             'is_gencys_partner',
             'checklist_module_enabled',
@@ -909,6 +917,7 @@ function ModulesModal({
         csr_dashboard_module_enabled: workspace.csr_dashboard_module_enabled,
         sim_gateway_module_enabled: workspace.sim_gateway_module_enabled,
         ad_spend_goals_module_enabled: workspace.ad_spend_goals_module_enabled,
+        billing_module_enabled: workspace.billing_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {
