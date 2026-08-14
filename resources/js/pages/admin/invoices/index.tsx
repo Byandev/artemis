@@ -5,8 +5,24 @@ import { PaginatedData } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { debounce, omit } from 'lodash';
-import { Download, FileText, Plus, Search, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    Download,
+    FileText,
+    Paperclip,
+    Plus,
+    Receipt,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+interface Proof {
+    file_name: string;
+    mime_type: string;
+    size: number;
+    uploaded_at: string | null;
+}
 
 interface Invoice {
     id: number;
@@ -17,6 +33,15 @@ interface Invoice {
     status: 'draft' | 'sent' | 'paid';
     issue_date: string;
     workspace: { id: number; name: string; slug: string } | null;
+    proof: Proof | null;
+}
+
+const MAX_PROOF_MB = 10;
+
+function fileSize(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 interface Props {
@@ -70,12 +95,34 @@ export default function Index({ invoices, filters }: Props) {
         return () => performSearch.cancel();
     }, [search]);
 
+    // Marking paid opens the receipt dialog; the other transitions are a
+    // one-click change and stay that way.
+    const [markingPaid, setMarkingPaid] = useState<Invoice | null>(null);
+    const [uploadingFor, setUploadingFor] = useState<Invoice | null>(null);
+
     function changeStatus(invoice: Invoice, next: Invoice['status']) {
+        if (next === 'paid') {
+            setMarkingPaid(invoice);
+            return;
+        }
+
         router.patch(
             `/admin/invoices/${invoice.id}/status`,
             { status: next },
             { preserveScroll: true },
         );
+    }
+
+    function removeProof(invoice: Invoice) {
+        if (
+            confirm(
+                `Remove the proof of payment for ${invoice.number}? The file is deleted from storage.`,
+            )
+        ) {
+            router.delete(`/admin/invoices/${invoice.id}/proof`, {
+                preserveScroll: true,
+            });
+        }
     }
 
     function handleDelete(invoice: Invoice) {
@@ -170,6 +217,60 @@ export default function Index({ invoices, filters }: Props) {
             ),
         },
         {
+            id: 'proof',
+            enableSorting: false,
+            header: () => <span>Proof of payment</span>,
+            cell: ({ row }) => {
+                const invoice = row.original;
+
+                if (!invoice.proof) {
+                    return (
+                        <button
+                            type="button"
+                            onClick={() => setUploadingFor(invoice)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-zinc-300 px-2.5 py-1.5 text-xs font-medium text-zinc-500 transition-colors hover:border-brand-400 hover:text-brand-600 dark:border-zinc-700 dark:hover:border-brand-500"
+                        >
+                            <Paperclip className="h-3.5 w-3.5" />
+                            Attach
+                        </button>
+                    );
+                }
+
+                return (
+                    <div className="flex items-center gap-1">
+                        <a
+                            href={`/admin/invoices/${invoice.id}/proof`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`${invoice.proof.file_name} · ${fileSize(invoice.proof.size)}`}
+                            className="inline-flex max-w-[10rem] items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-400"
+                        >
+                            <Receipt className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">
+                                {invoice.proof.file_name}
+                            </span>
+                        </a>
+                        <button
+                            type="button"
+                            onClick={() => setUploadingFor(invoice)}
+                            className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+                            title="Replace"
+                        >
+                            <Paperclip className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => removeProof(invoice)}
+                            className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+                            title="Remove"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                );
+            },
+        },
+        {
             id: 'actions',
             enableSorting: false,
             header: () => <div className="text-right">Actions</div>,
@@ -251,6 +352,194 @@ export default function Index({ invoices, filters }: Props) {
                     />
                 </div>
             </div>
+
+            {markingPaid && (
+                <ProofDialog
+                    invoice={markingPaid}
+                    mode="mark-paid"
+                    onClose={() => setMarkingPaid(null)}
+                />
+            )}
+
+            {uploadingFor && (
+                <ProofDialog
+                    invoice={uploadingFor}
+                    mode="attach"
+                    onClose={() => setUploadingFor(null)}
+                />
+            )}
         </AdminSidebarLayout>
+    );
+}
+
+/**
+ * Files the receipt for an invoice — either on its own, or as part of marking
+ * the invoice paid, which is when the receipt is usually in hand.
+ */
+function ProofDialog({
+    invoice,
+    mode,
+    onClose,
+}: {
+    invoice: Invoice;
+    mode: 'mark-paid' | 'attach';
+    onClose: () => void;
+}) {
+    const [file, setFile] = useState<File | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [processing, setProcessing] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const markingPaid = mode === 'mark-paid';
+
+    function pick(selected: File | null) {
+        setError(null);
+
+        if (selected && selected.size > MAX_PROOF_MB * 1024 * 1024) {
+            setError(
+                `That file is ${fileSize(selected.size)}. The limit is ${MAX_PROOF_MB} MB.`,
+            );
+            setFile(null);
+            return;
+        }
+
+        setFile(selected);
+    }
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+
+        // Attaching without a file is the one combination that means nothing;
+        // marking paid without one is legitimate.
+        if (!markingPaid && !file) {
+            setError('Choose a receipt to attach.');
+            return;
+        }
+
+        setProcessing(true);
+
+        const done = {
+            preserveScroll: true,
+            onSuccess: () => onClose(),
+            onError: (errors: Record<string, string>) =>
+                setError(
+                    errors.proof ??
+                        errors.status ??
+                        'Upload failed. Try again.',
+                ),
+            onFinish: () => setProcessing(false),
+        };
+
+        if (markingPaid) {
+            // Inertia switches to multipart automatically once a File is in the
+            // payload, so the status change and the receipt land together.
+            router.post(
+                `/admin/invoices/${invoice.id}/status`,
+                { _method: 'patch', status: 'paid', proof: file },
+                done,
+            );
+            return;
+        }
+
+        router.post(
+            `/admin/invoices/${invoice.id}/proof`,
+            { proof: file },
+            done,
+        );
+    }
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={onClose}
+        >
+            <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="mb-5 flex items-start justify-between">
+                    <div>
+                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                            {markingPaid
+                                ? 'Mark as paid'
+                                : invoice.proof
+                                  ? 'Replace proof of payment'
+                                  : 'Attach proof of payment'}
+                        </h3>
+                        <p className="font-mono text-sm text-zinc-500">
+                            {invoice.number} ·{' '}
+                            {peso(invoice.total, invoice.currency)}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Receipt{markingPaid && ' (optional)'}
+                        </label>
+
+                        <input
+                            ref={inputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+                            onChange={(e) => pick(e.target.files?.[0] ?? null)}
+                            className="hidden"
+                        />
+
+                        <button
+                            type="button"
+                            onClick={() => inputRef.current?.click()}
+                            className="flex w-full items-center gap-2 rounded-md border border-dashed border-zinc-300 px-3 py-3 text-left text-sm text-zinc-500 transition-colors hover:border-brand-400 hover:text-brand-600 dark:border-zinc-700"
+                        >
+                            <Paperclip className="h-4 w-4 shrink-0" />
+                            <span className="truncate">
+                                {file
+                                    ? `${file.name} · ${fileSize(file.size)}`
+                                    : 'Choose a file…'}
+                            </span>
+                        </button>
+
+                        <p className="mt-1 text-xs text-zinc-500">
+                            JPG, PNG, WEBP, HEIC, or PDF up to {MAX_PROOF_MB}{' '}
+                            MB.
+                            {invoice.proof &&
+                                ` Replaces ${invoice.proof.file_name}.`}
+                        </p>
+
+                        {error && (
+                            <p className="mt-1 text-xs text-red-500">{error}</p>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-md border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+                        >
+                            {processing
+                                ? 'Saving…'
+                                : markingPaid
+                                  ? 'Mark paid'
+                                  : 'Upload'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     );
 }
