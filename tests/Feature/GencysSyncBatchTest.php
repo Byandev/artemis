@@ -746,3 +746,43 @@ test('a queued call re-stamps started_at when it actually fires', function () {
 
     expect($run->fresh()->started_at->diffInMinutes(now(), true))->toBeLessThan(1);
 });
+
+test('each type sends n8n exactly the payload keys its branch reads', function () {
+    $workspace = makeErpWorkspace();
+
+    Http::fake(['*' => Http::response(['ok' => true])]);
+    config(['services.n8n.webhook_url' => 'https://n8n.test/webhook/gencys-sync']);
+
+    InventoryItem::create([
+        'workspace_id' => $workspace->id,
+        'sku' => 'SKU-PAYLOAD',
+        'is_active' => true,
+    ]);
+
+    $this->artisan('gencys-erp:trigger-fetch-data', [
+        '--force' => true,
+        '--sync' => true,
+        '--date' => '2026-08-14',
+    ])->assertSuccessful();
+
+    // The consolidated workflow reads these by name, so the shared basePayload()
+    // and each strategy's own keys have to add up to exactly this per branch.
+    $sent = [];
+
+    Http::assertSent(function ($request) use (&$sent) {
+        $sent[$request['type']] = array_keys($request->data());
+
+        return true;
+    });
+
+    expect($sent['transaction_history'])->toEqualCanonicalizing([
+        'type', 'workspace_id', 'workspace_api_key', 'erp_username', 'erp_password',
+        'webhook_url', 'date', 'items',
+    ])->and($sent['purchase_order'])->toEqualCanonicalizing([
+        'type', 'workspace_id', 'workspace_api_key', 'erp_username', 'erp_password',
+        'webhook_url', 'start_date', 'end_date', 'delivered_purchase_orders_no', 'items',
+    ])->and($sent['daily_sales_tracker'])->toEqualCanonicalizing([
+        'type', 'workspace_id', 'workspace_api_key', 'erp_username', 'erp_password',
+        'webhook_url', 'workspace_slug', 'date', 'sync_run_id',
+    ]);
+});

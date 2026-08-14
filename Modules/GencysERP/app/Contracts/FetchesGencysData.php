@@ -5,15 +5,15 @@ namespace Modules\GencysERP\Contracts;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Modules\GencysERP\Support\Fetchers\GencysFetcherFactory;
 
 /**
  * One Gencys ERP data type's fetch strategy: how it resolves dates, which
  * workspace relations its payload needs, how it chunks work, and what it hands
  * n8n.
  *
- * The strategy for a given type is built by
- * {@see \Modules\GencysERP\Support\Fetchers\GencysFetcherFactory}, which is the
- * only place that knows which class serves which type.
+ * The strategy for a given type is built by {@see GencysFetcherFactory}, which
+ * is the only place that knows which class serves which type.
  */
 interface FetchesGencysData
 {
