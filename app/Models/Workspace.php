@@ -29,6 +29,7 @@ class Workspace extends Model
         'name',
         'slug',
         'description',
+        'billing_email',
         'owner_id',
         'monthly_order_volume',
         'max_shops',
@@ -225,6 +226,19 @@ class Workspace extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * Where this workspace's invoices go.
+     *
+     * The billing address when one is set, and the owner otherwise — a bill
+     * with nowhere to go is worse than one landing in a personal inbox.
+     */
+    public function billingEmail(): ?string
+    {
+        $billing = trim((string) $this->billing_email);
+
+        return $billing !== '' ? $billing : $this->owner?->email;
     }
 
     /**
