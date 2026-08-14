@@ -39,7 +39,12 @@ class AdminInvoiceController extends Controller
     public function create(Request $request)
     {
         $workspaces = Workspace::query()
-            ->with(['owner:id,name,email', 'subscription.plan'])
+            ->with([
+                'owner:id,name,email',
+                'subscription.plan',
+                // Prefills the bill-to fields from Workspace Settings → Billing.
+                'billingDetail:id,workspace_id,billing_name,billing_email,billing_address',
+            ])
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'owner_id']);
 
@@ -49,6 +54,9 @@ class AdminInvoiceController extends Controller
                 'name' => $w->name,
                 'owner_name' => $w->owner?->name,
                 'owner_email' => $w->owner?->email,
+                'billing_name' => $w->billingDetail?->billing_name,
+                'billing_email' => $w->billingDetail?->billing_email,
+                'billing_address' => $w->billingDetail?->billing_address,
                 'plan' => $w->subscription?->plan ? [
                     'id' => $w->subscription->plan->id,
                     'name' => $w->subscription->plan->name,

@@ -7,6 +7,7 @@ use App\Http\Controllers\Settings\RmoSettingController;
 use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Modules\Billing\Http\Controllers\Settings\BillingSettingsController;
 use Modules\Inventory\Http\Controllers\Settings\NotificationSettingsController;
 
 Route::middleware('auth')->group(function () {
@@ -60,4 +61,11 @@ Route::middleware('auth')->group(function () {
     Route::put('/workspaces/{workspace}/settings/rmo', [RmoSettingController::class, 'update'])
         ->middleware('can:Manage RMO Settings,workspace')
         ->name('rmo-settings.update');
+
+    // Billing details (the "bill to" party). The controller authorizes View vs
+    // Manage separately, so no `can:` middleware here.
+    Route::get('/workspaces/{workspace}/settings/billing', [BillingSettingsController::class, 'edit'])
+        ->name('billing-settings.edit');
+    Route::put('/workspaces/{workspace}/settings/billing', [BillingSettingsController::class, 'update'])
+        ->name('billing-settings.update');
 });
