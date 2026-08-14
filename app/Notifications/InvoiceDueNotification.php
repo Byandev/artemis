@@ -9,7 +9,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * The reminder that goes out on an invoice's due date.
+ * A reminder that an unpaid invoice is coming due, or is due today.
  *
  * Kept apart from InvoiceIssuedNotification rather than folded into it: this
  * one arrives at a customer who has already had the bill and not paid, and
@@ -19,7 +19,20 @@ class InvoiceDueNotification extends Notification
 {
     use CopiesInvoiceEmail;
 
-    public function __construct(public Invoice $invoice) {}
+    /**
+     * @param  int  $daysUntilDue  How far off the due date is. 0 is today.
+     */
+    public function __construct(public Invoice $invoice, public int $daysUntilDue = 0) {}
+
+    /** "today", "tomorrow", "in 3 days" — how the deadline is described. */
+    private function whenDue(): string
+    {
+        return match ($this->daysUntilDue) {
+            0 => 'today',
+            1 => 'tomorrow',
+            default => "in {$this->daysUntilDue} days",
+        };
+    }
 
     /**
      * @return array<int, string>
@@ -37,8 +50,10 @@ class InvoiceDueNotification extends Notification
         $amount = number_format((float) $this->invoice->total, 2);
         $workspace = $this->invoice->workspace?->name;
 
+        $when = $this->whenDue();
+
         $message = (new MailMessage)
-            ->subject("Payment due today — invoice {$this->invoice->number}")
+            ->subject("Payment due {$when} — invoice {$this->invoice->number}")
             ->greeting('Hi '.$this->invoice->bill_to_name.',');
 
         if ($copies = $this->copies($notifiable)) {
@@ -47,9 +62,15 @@ class InvoiceDueNotification extends Notification
 
         $message
             ->line(sprintf(
-                'A reminder that invoice %s%s is due today.',
+                'A reminder that invoice %s%s is due %s%s.',
                 $this->invoice->number,
-                $workspace ? " for {$workspace}" : ''
+                $workspace ? " for {$workspace}" : '',
+                $when,
+                // Name the date as well when it isn't today — "in 5 days"
+                // alone makes the reader do arithmetic.
+                $this->daysUntilDue > 0 && $this->invoice->due_date
+                    ? ', on '.$this->invoice->due_date->format('F j, Y')
+                    : ''
             ))
             ->line("**Amount due:** {$symbol}{$amount}");
 
