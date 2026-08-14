@@ -101,11 +101,22 @@ class AdminWorkspaceController extends Controller
         $validated = $request->validate([
             'subscription_plan_id' => 'required|exists:subscription_plans,id',
             'status' => 'required|in:trialing,active,past_due,canceled,expired',
+            'current_period_start' => 'nullable|date',
         ]);
 
         $plan = SubscriptionPlan::findOrFail($validated['subscription_plan_id']);
         $subscription = $workspace->subscription;
-        $now = Carbon::now();
+
+        // Every other date is derived from this anchor. It defaults to now, but
+        // an admin can back- or forward-date it so date-driven behaviour (trial
+        // expiry, renewal, invoicing) can be exercised without waiting for the
+        // calendar to catch up.
+        $movedStart = filled($validated['current_period_start'] ?? null);
+        $start = $movedStart
+            ? Carbon::parse($validated['current_period_start'])->startOfDay()
+            : Carbon::now();
+
+        $trialDays = $plan->trial_days ?? 30;
 
         if ($subscription) {
             $data = [
@@ -114,13 +125,18 @@ class AdminWorkspaceController extends Controller
             ];
 
             if ($validated['status'] === 'trialing') {
-                $data['trial_ends_at'] = $now->copy()->addDays($plan->trial_days ?? 30);
-                $data['current_period_start'] = $now;
-                $data['current_period_end'] = $now->copy()->addDays($plan->trial_days ?? 30);
+                $data['trial_ends_at'] = $start->copy()->addDays($trialDays);
+                $data['current_period_start'] = $start;
+                $data['current_period_end'] = $start->copy()->addDays($trialDays);
             } elseif ($validated['status'] === 'active') {
                 $data['trial_ends_at'] = null;
-                $data['current_period_start'] = $now;
-                $data['current_period_end'] = $now->copy()->addMonth();
+                $data['current_period_start'] = $start;
+                $data['current_period_end'] = $start->copy()->addMonth();
+            } elseif ($movedStart) {
+                // past_due / canceled / expired keep whatever dates they already
+                // had, unless the admin explicitly moved the start.
+                $data['current_period_start'] = $start;
+                $data['current_period_end'] = $start->copy()->addMonth();
             }
 
             $subscription->update($data);
@@ -129,11 +145,11 @@ class AdminWorkspaceController extends Controller
                 'workspace_id' => $workspace->id,
                 'subscription_plan_id' => $validated['subscription_plan_id'],
                 'status' => $validated['status'],
-                'trial_ends_at' => $validated['status'] === 'trialing' ? $now->copy()->addDays($plan->trial_days ?? 30) : null,
-                'current_period_start' => $now,
+                'trial_ends_at' => $validated['status'] === 'trialing' ? $start->copy()->addDays($trialDays) : null,
+                'current_period_start' => $start,
                 'current_period_end' => $validated['status'] === 'trialing'
-                    ? $now->copy()->addDays($plan->trial_days ?? 30)
-                    : $now->copy()->addMonth(),
+                    ? $start->copy()->addDays($trialDays)
+                    : $start->copy()->addMonth(),
             ]);
         }
 
