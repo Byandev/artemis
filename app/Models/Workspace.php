@@ -50,6 +50,7 @@ class Workspace extends Model
         'csr_dashboard_module_enabled',
         'sim_gateway_module_enabled',
         'ad_spend_goals_module_enabled',
+        'billing_module_enabled',
         'inventory_sync',
         'public_password',
         'erp_username',
@@ -87,6 +88,7 @@ class Workspace extends Model
         'csr_dashboard_module_enabled' => 'boolean',
         'sim_gateway_module_enabled' => 'boolean',
         'ad_spend_goals_module_enabled' => 'boolean',
+        'billing_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
         // Reversible encryption so the automation pipeline can read it back.
