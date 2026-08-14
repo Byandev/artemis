@@ -165,6 +165,7 @@ enum Permission: string
     // Billing
     case ViewBillingSettings = 'View Billing Settings';
     case ManageBillingSettings = 'Manage Billing Settings';
+    case ViewInvoices = 'View Invoices';
 
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
@@ -310,7 +311,8 @@ enum Permission: string
             self::ManageDiscordNotifications => 'Settings',
 
             self::ViewBillingSettings,
-            self::ManageBillingSettings => 'Billing',
+            self::ManageBillingSettings,
+            self::ViewInvoices => 'Billing',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,
