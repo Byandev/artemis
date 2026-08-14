@@ -101,11 +101,36 @@ class AdminWorkspaceController extends Controller
         $validated = $request->validate([
             'subscription_plan_id' => 'required|exists:subscription_plans,id',
             'status' => 'required|in:trialing,active,past_due,canceled,expired',
+            // Optional manual override of the billing period. Leave either one
+            // blank to fall back to the plan-derived default.
+            'current_period_start' => ['nullable', 'date'],
+            'current_period_end' => ['nullable', 'date', 'after_or_equal:current_period_start'],
         ]);
 
         $plan = SubscriptionPlan::findOrFail($validated['subscription_plan_id']);
         $subscription = $workspace->subscription;
         $now = Carbon::now();
+        $trialDays = $plan->trial_days ?? 30;
+        $isTrialing = $validated['status'] === Subscription::STATUS_TRIALING;
+
+        $startPicked = filled($validated['current_period_start'] ?? null);
+        $endPicked = filled($validated['current_period_end'] ?? null);
+
+        $periodStart = $startPicked
+            ? Carbon::parse($validated['current_period_start'])->startOfDay()
+            : $now->copy();
+
+        // A period ending "today" should run through the end of today, otherwise
+        // Subscription::isLapsed() would treat it as already expired at 00:00.
+        $periodEnd = $endPicked
+            ? Carbon::parse($validated['current_period_end'])->endOfDay()
+            : ($isTrialing
+                ? $periodStart->copy()->addDays($trialDays)
+                : $periodStart->copy()->addMonth());
+
+        // On a trial it's trial_ends_at that gates access, so keep it in step
+        // with the period end — otherwise a hand-picked date would do nothing.
+        $trialEndsAt = $isTrialing ? $periodEnd : null;
 
         if ($subscription) {
             $data = [
@@ -113,14 +138,12 @@ class AdminWorkspaceController extends Controller
                 'status' => $validated['status'],
             ];
 
-            if ($validated['status'] === 'trialing') {
-                $data['trial_ends_at'] = $now->copy()->addDays($plan->trial_days ?? 30);
-                $data['current_period_start'] = $now;
-                $data['current_period_end'] = $now->copy()->addDays($plan->trial_days ?? 30);
-            } elseif ($validated['status'] === 'active') {
-                $data['trial_ends_at'] = null;
-                $data['current_period_start'] = $now;
-                $data['current_period_end'] = $now->copy()->addMonth();
+            // Statuses other than trialing/active leave the dates untouched
+            // unless the admin explicitly picked one.
+            if ($isTrialing || $validated['status'] === Subscription::STATUS_ACTIVE || $startPicked || $endPicked) {
+                $data['trial_ends_at'] = $trialEndsAt;
+                $data['current_period_start'] = $periodStart;
+                $data['current_period_end'] = $periodEnd;
             }
 
             $subscription->update($data);
@@ -129,11 +152,9 @@ class AdminWorkspaceController extends Controller
                 'workspace_id' => $workspace->id,
                 'subscription_plan_id' => $validated['subscription_plan_id'],
                 'status' => $validated['status'],
-                'trial_ends_at' => $validated['status'] === 'trialing' ? $now->copy()->addDays($plan->trial_days ?? 30) : null,
-                'current_period_start' => $now,
-                'current_period_end' => $validated['status'] === 'trialing'
-                    ? $now->copy()->addDays($plan->trial_days ?? 30)
-                    : $now->copy()->addMonth(),
+                'trial_ends_at' => $trialEndsAt,
+                'current_period_start' => $periodStart,
+                'current_period_end' => $periodEnd,
             ]);
         }
 

@@ -1,10 +1,12 @@
 import PageHeader from '@/components/common/PageHeader';
 import { MetricSettingDialog } from '@/components/metrics/metricsetting-dialog-form';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
+import { format } from 'date-fns';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
 import {
@@ -34,6 +36,7 @@ interface Subscription {
     id: number;
     subscription_plan_id: number;
     status: string;
+    current_period_start: string | null;
     current_period_end: string | null;
     trial_ends_at: string | null;
     plan: SubscriptionPlan;
@@ -678,6 +681,11 @@ export default function Index({ workspaces, plans, filters }: Props) {
     );
 }
 
+/** ISO datetime from the API → the `YYYY-MM-DD` an <input type="date"> wants. */
+function toDateInput(value: string | null | undefined): string {
+    return value ? value.slice(0, 10) : '';
+}
+
 function SubscriptionModal({
     workspace,
     plans,
@@ -687,11 +695,17 @@ function SubscriptionModal({
     plans: SubscriptionPlan[];
     onClose: () => void;
 }) {
-    const { data, setData, put, processing } = useForm({
+    const { data, setData, put, processing, errors } = useForm({
         subscription_plan_id:
             workspace.subscription?.subscription_plan_id?.toString() ||
             (plans[0]?.id?.toString() ?? ''),
         status: workspace.subscription?.status || 'active',
+        current_period_start: toDateInput(
+            workspace.subscription?.current_period_start,
+        ),
+        current_period_end: toDateInput(
+            workspace.subscription?.current_period_end,
+        ),
     });
 
     function handleSubmit(e: React.FormEvent) {
@@ -776,6 +790,74 @@ function SubscriptionModal({
                             <option value="canceled">Canceled</option>
                             <option value="expired">Expired</option>
                         </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                Period start
+                            </label>
+                            <DatePicker
+                                id={`subscription-${workspace.id}-period-start`}
+                                mode="single"
+                                fullWidth
+                                placeholder="Auto"
+                                defaultDate={
+                                    data.current_period_start || undefined
+                                }
+                                onChange={(dates) =>
+                                    setData(
+                                        'current_period_start',
+                                        dates.length
+                                            ? format(dates[0], 'yyyy-MM-dd')
+                                            : '',
+                                    )
+                                }
+                            />
+                            {errors.current_period_start && (
+                                <p className="mt-1 text-xs text-red-600">
+                                    {errors.current_period_start}
+                                </p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                Period end
+                            </label>
+                            <DatePicker
+                                id={`subscription-${workspace.id}-period-end`}
+                                mode="single"
+                                fullWidth
+                                placeholder="Auto"
+                                defaultDate={
+                                    data.current_period_end || undefined
+                                }
+                                // Can't end before it starts — the same rule the
+                                // backend enforces with after_or_equal.
+                                minDate={data.current_period_start || undefined}
+                                onChange={(dates) =>
+                                    setData(
+                                        'current_period_end',
+                                        dates.length
+                                            ? format(dates[0], 'yyyy-MM-dd')
+                                            : '',
+                                    )
+                                }
+                            />
+                            {errors.current_period_end && (
+                                <p className="mt-1 text-xs text-red-600">
+                                    {errors.current_period_end}
+                                </p>
+                            )}
+                        </div>
+                        <p className="col-span-2 text-xs text-zinc-500">
+                            Leave blank to auto-calculate —{' '}
+                            {data.status === 'trialing'
+                                ? "the plan's trial length"
+                                : 'one month'}{' '}
+                            from the start date. On a trial, the end date also
+                            sets when the trial lapses.
+                        </p>
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
