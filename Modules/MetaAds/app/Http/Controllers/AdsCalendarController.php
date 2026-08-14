@@ -17,8 +17,8 @@ use Modules\MetaAds\Models\Campaign;
 class AdsCalendarController extends Controller
 {
     /**
-     * Ads Calendar — a month grid showing how many campaigns were created on each
-     * day, broken down per Facebook page. Campaigns carry no page of their own,
+     * Ads Calendar — a month grid showing how many campaigns START on each day,
+     * broken down per Facebook page. Campaigns carry no page of their own,
      * so the page is derived from their ad sets' meta_page_id; a Pancake page's
      * primary key IS that FB page id, so we join straight to `pages` for the name.
      */
@@ -43,11 +43,20 @@ class AdsCalendarController extends Controller
             fn ($p) => is_string($p) && $p !== '' && $p !== 'all',
         ));
 
+        // Optional page-owner filter. Narrows to campaigns whose resolved page
+        // belongs to one of these members; "Unassigned" has no owner, so it
+        // never survives an owner filter.
+        $selectedPageOwners = array_values(array_filter(
+            array_map('intval', (array) $request->query('page_owners', [])),
+            fn ($id) => $id > 0,
+        ));
+
         $pageOptions = $this->pageOptions($workspace, $request->user(), $accountIds->all(), $start, $end);
+        $pageOwnerOptions = $this->pageOwnerOptions($workspace, $request->user());
 
         $rows = $accountIds->isEmpty()
             ? collect()
-            : $this->dailyCampaignCountsPerPage($accountIds->all(), $start, $end, $selectedPages);
+            : $this->dailyCampaignCountsPerPage($accountIds->all(), $start, $end, $selectedPages, $selectedPageOwners);
 
         return Inertia::render('workspaces/integrations/meta-ads/calendar', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
@@ -61,17 +70,19 @@ class AdsCalendarController extends Controller
             'pageTotals' => $this->buildPageTotals($rows),
             'pageOptions' => $pageOptions,
             'selectedPages' => $selectedPages,
+            'pageOwnerOptions' => $pageOwnerOptions,
+            'selectedPageOwners' => array_map('strval', $selectedPageOwners),
         ]);
     }
 
     /**
-     * One row per (day, page) with the number of distinct campaigns created. The
-     * day is the campaign's created date; the page is derived from the campaign's
-     * ad sets (LEFT JOIN so a campaign with no ad set / no known page still
-     * surfaces under "Unassigned"). A campaign whose ad sets span several pages is
+     * One row per (day, page) with the number of distinct campaigns. The day is
+     * the campaign's start_time (not created_time); the page comes from the
+     * campaign's ad sets (LEFT JOIN so a campaign with no ad set / no known page
+     * still surfaces under "Unassigned"). A campaign spanning several pages is
      * counted once per page (COUNT DISTINCT dedupes within a page bucket).
      */
-    private function dailyCampaignCountsPerPage(array $accountIds, Carbon $start, Carbon $end, array $selectedPages = [])
+    private function dailyCampaignCountsPerPage(array $accountIds, Carbon $start, Carbon $end, array $selectedPages = [], array $selectedPageOwners = [])
     {
         return Campaign::query()
             ->leftJoin('meta_ads_sets', 'meta_ads_sets.meta_ads_campaign_id', '=', 'meta_ads_campaigns.id')
@@ -92,6 +103,9 @@ class AdsCalendarController extends Controller
                     }
                 });
             })
+            // Owner scope. An inner condition on pages.owner_id, so campaigns
+            // with no resolvable page drop out — they have no owner to match.
+            ->when(! empty($selectedPageOwners), fn ($q) => $q->whereIn('pages.owner_id', $selectedPageOwners))
             ->groupBy(DB::raw('DATE(meta_ads_campaigns.start_time)'), 'meta_ads_sets.meta_page_id', 'pages.name')
             ->orderBy(DB::raw('DATE(meta_ads_campaigns.start_time)'))
             ->get([
@@ -100,6 +114,33 @@ class AdsCalendarController extends Controller
                 'pages.name AS page_name',
                 DB::raw('COUNT(DISTINCT meta_ads_campaigns.id) AS total'),
             ]);
+    }
+
+    /**
+     * Owners of the pages this member can see. Only members who actually own a
+     * visible page are listed, so the filter can never return an empty calendar
+     * by offering someone with nothing to show.
+     *
+     * @return array<int, array{id: string, name: string}>
+     */
+    private function pageOwnerOptions(Workspace $workspace, User $user): array
+    {
+        return Page::query()
+            ->where('workspace_id', $workspace->id)
+            ->visibleTo($user, $workspace)
+            ->whereNotNull('owner_id')
+            ->with('owner:id,name')
+            ->get(['id', 'owner_id'])
+            ->pluck('owner')
+            ->filter()
+            ->unique('id')
+            ->sortBy('name')
+            ->map(fn ($owner) => [
+                'id' => (string) $owner->id,
+                'name' => $owner->name ?: 'Unnamed member',
+            ])
+            ->values()
+            ->all();
     }
 
     /**

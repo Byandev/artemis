@@ -39,6 +39,8 @@ interface Props {
     pageTotals: PageBreakdown[];
     pageOptions: PageOption[];
     selectedPages: string[];
+    pageOwnerOptions: PageOption[];
+    selectedPageOwners: string[];
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -70,6 +72,8 @@ export default function AdsCalendar({
     pageTotals,
     pageOptions,
     selectedPages,
+    pageOwnerOptions,
+    selectedPageOwners,
 }: Props) {
     const base = `/workspaces/${workspace.slug}/integrations/meta/ads-calendar`;
 
@@ -79,6 +83,10 @@ export default function AdsCalendar({
     const [pending, setPending] = useState<string[]>(selectedPages);
     useEffect(() => setPending(selectedPages), [selectedPages]);
 
+    const [pendingOwners, setPendingOwners] =
+        useState<string[]>(selectedPageOwners);
+    useEffect(() => setPendingOwners(selectedPageOwners), [selectedPageOwners]);
+
     const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Build a calendar URL preserving the active page filter (omit month to land
@@ -87,6 +95,7 @@ export default function AdsCalendar({
         const qs = new URLSearchParams();
         if (targetMonth) qs.set('month', targetMonth);
         pending.forEach((p) => qs.append('pages[]', p));
+        pendingOwners.forEach((o) => qs.append('page_owners[]', o));
         const s = qs.toString();
         return s ? `${base}?${s}` : base;
     };
@@ -94,16 +103,31 @@ export default function AdsCalendar({
     // Apply a new page selection, keeping the current month. `preserveState`
     // keeps the dropdown open across the visit; `replace` avoids stacking a
     // history entry per filter change.
-    const onPagesChange = (values: string[]) => {
-        setPending(values);
+    // Both filters travel together — dropping the other one on every change
+    // would silently reset it the moment you touched either menu.
+    const visit = (pages: string[], owners: string[]) => {
         if (navTimer.current) clearTimeout(navTimer.current);
         navTimer.current = setTimeout(() => {
             router.get(
                 base,
-                values.length ? { month, pages: values } : { month },
+                {
+                    month,
+                    ...(pages.length ? { pages } : {}),
+                    ...(owners.length ? { page_owners: owners } : {}),
+                },
                 { preserveScroll: true, preserveState: true, replace: true },
             );
         }, 350);
+    };
+
+    const onPagesChange = (values: string[]) => {
+        setPending(values);
+        visit(values, pendingOwners);
+    };
+
+    const onPageOwnersChange = (values: string[]) => {
+        setPendingOwners(values);
+        visit(pending, values);
     };
 
     // Map page id → palette colour by month-wide rank, reused in every day cell.
@@ -151,6 +175,17 @@ export default function AdsCalendar({
                             }))}
                             selected={pending}
                             onChange={onPagesChange}
+                        />
+                        <MultiSelect
+                            compact
+                            className="w-56"
+                            placeholder="All page owners"
+                            options={pageOwnerOptions.map((o) => ({
+                                value: o.id,
+                                label: o.name,
+                            }))}
+                            selected={pendingOwners}
+                            onChange={onPageOwnersChange}
                         />
                     </div>
                     <div className="flex items-center gap-2">

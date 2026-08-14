@@ -11,9 +11,10 @@ use Modules\MetaAds\Models\User as MetaUser;
 
 /**
  * Seed a minimal Meta Ads graph for the calendar: a connected meta user, one ad
- * account, three FB pages (whose ids ARE the meta_page_id), and campaigns created
- * on specific days. A campaign's page is derived from its ad set's meta_page_id.
- * Returns the created page models for assertions.
+ * account, three FB pages (whose ids ARE the meta_page_id), and campaigns
+ * STARTING on specific days. The calendar buckets days by
+ * `meta_ads_campaigns.start_time`, not created_time. A campaign's page is
+ * derived from its ad set's meta_page_id. Returns the pages for assertions.
  */
 function seedAdsCalendar($workspace): array
 {
@@ -31,14 +32,14 @@ function seedAdsCalendar($workspace): array
 
     $cid = 5000;
     $sid = 6000;
-    // One campaign created on $createdTime, attributed to $pageId via a single ad
-    // set (the ad set's own created date is irrelevant to the calendar).
-    $makeCampaign = function (string $createdTime, ?int $pageId) use (&$cid, &$sid, $account) {
+    // One campaign starting at $startTime, attributed to $pageId via a single ad
+    // set (the ad set's own dates are irrelevant to the calendar).
+    $makeCampaign = function (string $startTime, ?int $pageId) use (&$cid, &$sid, $account) {
         $campaign = Campaign::create([
             'id' => $cid++,
             'meta_ads_account_id' => $account->id,
             'name' => 'Campaign '.$cid,
-            'created_time' => $createdTime,
+            'start_time' => $startTime,
         ]);
 
         AdSet::create([
@@ -47,7 +48,6 @@ function seedAdsCalendar($workspace): array
             'meta_ads_campaign_id' => $campaign->id,
             'meta_page_id' => $pageId,
             'name' => 'Ad Set '.$sid,
-            'created_time' => $createdTime,
         ]);
 
         return $campaign;
@@ -71,7 +71,7 @@ function adsCalendarUrl($workspace, array $query = []): string
     return route('workspaces.metaads.ads-calendar', ['workspace' => $workspace, ...$query]);
 }
 
-it('renders the calendar with per-day, per-page ad set counts for the month', function () {
+it('renders the calendar with per-day, per-page campaign counts for the month', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsCalendar($workspace);
 
@@ -107,7 +107,7 @@ it('filters the calendar to a single page', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('selectedPages', [(string) $ctx['alpha']->id])
-            // Only Alpha's ad sets remain: 2 on the 10th, 1 on the 15th.
+            // Only Alpha's campaigns remain: 2 on the 10th, 1 on the 15th.
             ->where('days.2026-06-10.total', 2)
             ->where('days.2026-06-15.total', 1)
             ->where('days.2026-06-15.pages.0.name', 'Alpha Page')
@@ -119,7 +119,7 @@ it('filters the calendar to multiple pages at once', function () {
     $ctx = seedAdsCalendar($workspace);
 
     // Alpha + Bravo together: June 10 keeps all 3 (2 Alpha + 1 Bravo), but the
-    // unassigned ad set on June 15 is excluded (only Alpha's 1 remains).
+    // unassigned campaign on June 15 is excluded (only Alpha's 1 remains).
     $this->get(adsCalendarUrl($workspace, [
         'month' => '2026-06',
         'pages' => [(string) $ctx['alpha']->id, (string) $ctx['bravo']->id],
@@ -157,7 +157,7 @@ it('counts a campaign once per page regardless of ad set count', function () {
         'id' => 5500,
         'meta_ads_account_id' => $ctx['account']->id,
         'name' => 'Multi-page Campaign',
-        'created_time' => '2026-06-20 09:00:00',
+        'start_time' => '2026-06-20 09:00:00',
     ]);
     foreach ([[6500, 9101], [6501, 9101], [6502, 9102]] as [$setId, $pageId]) {
         AdSet::create([
@@ -166,7 +166,6 @@ it('counts a campaign once per page regardless of ad set count', function () {
             'meta_ads_campaign_id' => $campaign->id,
             'meta_page_id' => $pageId,
             'name' => 'Ad Set '.$setId,
-            'created_time' => '2026-06-20 09:00:00',
         ]);
     }
 
@@ -181,7 +180,7 @@ it('counts a campaign once per page regardless of ad set count', function () {
         );
 });
 
-it('filters to ad sets with no resolvable page', function () {
+it('filters to campaigns with no resolvable page', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsCalendar($workspace);
 
@@ -189,7 +188,7 @@ it('filters to ad sets with no resolvable page', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('selectedPages', ['none'])
-            // Only the single unassigned ad set on June 15 remains.
+            // Only the single unassigned campaign on June 15 remains.
             ->where('days.2026-06-15.total', 1)
             ->where('days.2026-06-15.pages.0.name', 'Unassigned page')
             ->missing('days.2026-06-10')
