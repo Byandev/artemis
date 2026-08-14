@@ -329,6 +329,7 @@ class AdsManagerController extends Controller
                     'meta_ads_creatives.object_type',
                 ],
                 'search' => 'meta_ads_ads.name',
+                'createdColumn' => 'meta_ads_ads.created_time',
             ],
             'ad_name' => [
                 'model' => Ad::class,
@@ -341,6 +342,7 @@ class AdsManagerController extends Controller
                 ],
                 'groupBy' => ['meta_ads_ads.name'],
                 'search' => 'meta_ads_ads.name',
+                'createdColumn' => 'meta_ads_ads.created_time',
                 // Ads sharing this name (within the selected accounts).
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
@@ -366,6 +368,7 @@ class AdsManagerController extends Controller
                     'meta_ads_campaigns.lifetime_budget',
                 ],
                 'search' => 'meta_ads_campaigns.name',
+                'createdColumn' => 'meta_ads_campaigns.created_time',
                 'adsCount' => ['key' => 'meta_ads_campaign_id', 'joinOn' => 'meta_ads_campaigns.id'],
             ],
             'ad_set' => [
@@ -390,6 +393,7 @@ class AdsManagerController extends Controller
                     'meta_ads_sets.lifetime_budget',
                 ],
                 'search' => 'meta_ads_sets.name',
+                'createdColumn' => 'meta_ads_sets.created_time',
                 'adsCount' => ['key' => 'meta_ads_set_id', 'joinOn' => 'meta_ads_sets.id'],
             ],
             'account' => [
@@ -421,6 +425,7 @@ class AdsManagerController extends Controller
                 ],
                 'groupBy' => [DB::raw(self::AD_TYPE_LABEL_SQL)],
                 'search' => 'meta_ads_ads.name',
+                'createdColumn' => 'meta_ads_ads.created_time',
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
         };
@@ -450,6 +455,10 @@ class AdsManagerController extends Controller
         if ($config['model'] === Ad::class) {
             $this->applyCreatorFilter($base, $creatorFilter);
         }
+
+        // Narrow to entities created inside a window — "ads created in August".
+        // Separate from since/until, which bound the insights, not the ad's age.
+        $this->applyCreatedRange($base, $config, $request);
 
         // Number of ads in each group — shown for every dimension except `ad`
         // (where each row is already a single ad). `ad_name` counts distinct ads
@@ -550,6 +559,12 @@ class AdsManagerController extends Controller
             ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds)
             ->whereRaw("({$case}) IS NOT NULL")
             ->tap(fn ($q) => $this->applyCreatorFilter($q, $creatorFilter))
+            // Custom breakdowns bucket ads, so the ad's own creation date applies.
+            ->tap(fn ($q) => $this->applyCreatedRange(
+                $q,
+                ['createdColumn' => 'meta_ads_ads.created_time'],
+                $request
+            ))
             ->select(array_merge(
                 [
                     DB::raw("({$case}) AS name"),
@@ -834,6 +849,45 @@ class AdsManagerController extends Controller
      * meta_ads_ads table available. Values: a numeric member id, the literal
      * "unassigned" (untagged ads), or null (no constraint).
      */
+    /**
+     * Restrict rows to entities whose own creation date falls in the range.
+     * Dimensions without a creation date of their own (account) are left alone
+     * rather than silently returning nothing.
+     */
+    private function applyCreatedRange($query, array $config, Request $request): void
+    {
+        $column = $config['createdColumn'] ?? null;
+
+        if ($column === null) {
+            return;
+        }
+
+        $from = trim((string) $request->query('created_since', ''));
+        $until = trim((string) $request->query('created_until', ''));
+
+        if ($from === '' && $until === '') {
+            return;
+        }
+
+        // Meta doesn't always give a created_time — anything seeded locally, or
+        // synced before that field was requested, has it NULL. Falling back to
+        // the row's own created_at means those still filter sensibly instead of
+        // vanishing from every range. Column names come from our config, never
+        // from the request.
+        $table = strtok($column, '.');
+        $expr = "COALESCE({$column}, {$table}.created_at)";
+
+        // DATE() so a date-only bound covers the whole day at both ends —
+        // otherwise an ad created at 09:00 falls outside its own end date.
+        if ($from !== '') {
+            $query->whereRaw("DATE({$expr}) >= ?", [$from]);
+        }
+
+        if ($until !== '') {
+            $query->whereRaw("DATE({$expr}) <= ?", [$until]);
+        }
+    }
+
     private function applyCreatorFilter($query, ?string $creatorFilter): void
     {
         if ($creatorFilter === null || $creatorFilter === '') {

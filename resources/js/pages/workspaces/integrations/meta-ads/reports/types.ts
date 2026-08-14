@@ -71,6 +71,13 @@ export type ReportConfig = {
     filters: ReportFilter[];
     /** Internal-creator filter (ad-level). A member id, 'unassigned', or null. */
     creator_id?: number | 'unassigned' | null;
+    /**
+     * Narrows rows to entities created in this window (ISO dates, either end
+     * optional). Distinct from since/until, which bound the insights period
+     * rather than when the ad itself was created.
+     */
+    created_since?: string | null;
+    created_until?: string | null;
     chart: ChartStyle;
     view: ReportView;
 };
@@ -220,6 +227,8 @@ export function defaultConfig(
         sort: '-spend',
         filters: [],
         creator_id: null,
+        created_since: null,
+        created_until: null,
         chart: 'gallery',
         view: { ...DEFAULT_VIEW },
     };

@@ -128,6 +128,13 @@ export default function ReportShow({
         if (config.creator_id != null) {
             qs.set('creator_id', String(config.creator_id));
         }
+        // Ad/campaign/ad-set creation window. Either end may stand alone.
+        if (config.created_since) {
+            qs.set('created_since', config.created_since);
+        }
+        if (config.created_until) {
+            qs.set('created_until', config.created_until);
+        }
         qs.set('per_page', '48');
 
         fetch(`${adsManagerDataUrl(workspace.slug)}?${qs.toString()}`, {
@@ -152,6 +159,8 @@ export default function ReportShow({
         config.until,
         config.sort,
         config.creator_id,
+        config.created_since,
+        config.created_until,
         accountsKey,
         filtersKey,
         workspace.slug,
@@ -319,6 +328,39 @@ export default function ReportShow({
                         <FiltersBar
                             filters={config.filters}
                             onChange={(filters) => patch({ filters })}
+                        />
+
+                        {/* When the ad itself was created — not the insights
+                            window above, which is the period being measured. */}
+                        <DatePicker
+                            id={`report-${report.id}-created-range`}
+                            mode="range"
+                            placeholder="Created: any"
+                            onChange={(dates) => {
+                                if (dates.length === 2) {
+                                    patch({
+                                        created_since: moment(dates[0]).format(
+                                            'YYYY-MM-DD',
+                                        ),
+                                        created_until: moment(dates[1]).format(
+                                            'YYYY-MM-DD',
+                                        ),
+                                    });
+                                } else if (dates.length === 0) {
+                                    patch({
+                                        created_since: null,
+                                        created_until: null,
+                                    });
+                                }
+                            }}
+                            defaultDate={
+                                (config.created_since && config.created_until
+                                    ? [
+                                          config.created_since,
+                                          config.created_until,
+                                      ]
+                                    : undefined) as never
+                            }
                         />
 
                         <Select
