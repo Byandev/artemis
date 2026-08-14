@@ -83,7 +83,7 @@ test('a trialing workspace on a paid plan also counts as coming off trial', func
     expect(Invoice::sole()->due_date->toDateString())->toBe(now()->toDateString());
 });
 
-test('an upgrade that is not from a trial is due in seven days', function () {
+test('a paid-to-paid plan change raises nothing — the renewal run bills it', function () {
     ['admin' => $admin, 'workspace' => $workspace] = adminContext(
         SubscriptionPlan::CODE_STARTER,
         Subscription::STATUS_ACTIVE
@@ -91,17 +91,17 @@ test('an upgrade that is not from a trial is due in seven days', function () {
 
     changePlan($admin, $workspace, SubscriptionPlan::CODE_SCALE);
 
-    expect(Invoice::sole()->due_date->toDateString())
-        ->toBe(now()->addDays(config('invoice.due_days'))->toDateString());
+    // Not a new sale — the subscription carries on, and
+    // invoices:generate-renewals bills it 7 days before the period ends.
+    expect(Invoice::count())->toBe(0);
 });
 
-test('a workspace with no subscription at all is billed on standard terms', function () {
+test('a workspace with no subscription at all raises nothing', function () {
     ['admin' => $admin, 'workspace' => $workspace] = adminContext(onPlan: null);
 
     changePlan($admin, $workspace, SubscriptionPlan::CODE_GROWTH);
 
-    expect(Invoice::sole()->due_date->toDateString())
-        ->toBe(now()->addDays(config('invoice.due_days'))->toDateString());
+    expect(Invoice::count())->toBe(0);
 });
 
 test('moving onto the free trial raises nothing', function () {
@@ -132,16 +132,17 @@ test('a status that is not active raises nothing', function (string $status) {
     expect(Invoice::count())->toBe(0);
 })->with(['trialing', 'past_due', 'canceled', 'expired']);
 
-test('saving the same active plan twice does not bill twice', function () {
+test('saving the upgrade twice does not bill twice', function () {
     ['admin' => $admin, 'workspace' => $workspace] = adminContext();
 
     changePlan($admin, $workspace, SubscriptionPlan::CODE_GROWTH);
+    // The second Save is no longer "from trial" — it is already converted.
     changePlan($admin, $workspace, SubscriptionPlan::CODE_GROWTH);
 
     expect(Invoice::count())->toBe(1);
 });
 
-test('reviving a past-due subscription on the same plan bills for the new period', function () {
+test('reviving a past-due subscription raises nothing', function () {
     ['admin' => $admin, 'workspace' => $workspace] = adminContext(
         SubscriptionPlan::CODE_GROWTH,
         Subscription::STATUS_PAST_DUE
@@ -149,9 +150,9 @@ test('reviving a past-due subscription on the same plan bills for the new period
 
     changePlan($admin, $workspace, SubscriptionPlan::CODE_GROWTH);
 
-    // Not a trial, so standard terms — but it is a real new month, so it bills.
-    expect(Invoice::sole()->due_date->toDateString())
-        ->toBe(now()->addDays(config('invoice.due_days'))->toDateString());
+    // The unpaid invoice for that period already exists; the revived
+    // subscription is billed again by the renewal run, not here.
+    expect(Invoice::count())->toBe(0);
 });
 
 test('each upgrade takes the next invoice number', function () {

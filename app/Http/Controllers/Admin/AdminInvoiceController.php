@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\Workspace;
 use App\Support\InvoiceMailer;
 use App\Support\InvoicePdf;
+use App\Support\SubscriptionInvoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -16,9 +17,7 @@ class AdminInvoiceController extends Controller
     public function index(Request $request)
     {
         $invoices = Invoice::query()
-            // The owner is the fallback billing address, so the list can name
-            // where a resend would actually land.
-            ->with(['workspace:id,name,slug,billing_email,owner_id', 'workspace.owner:id,email'])
+            ->with('workspace:id,name,slug')
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->input('search');
                 $query->where(function ($q) use ($search) {
@@ -32,14 +31,6 @@ class AdminInvoiceController extends Controller
             ->orderByDesc('id')
             ->paginate((int) $request->input('per_page', 15))
             ->withQueryString();
-
-        $invoices->through(function (Invoice $invoice) {
-            // Resolved server-side so the page can't disagree with where a
-            // resend actually goes.
-            $invoice->recipient = InvoiceMailer::recipientFor($invoice);
-
-            return $invoice;
-        });
 
         return Inertia::render('admin/invoices/index', [
             'invoices' => $invoices,
@@ -149,35 +140,18 @@ class AdminInvoiceController extends Controller
                 : ' Emailing it failed — check the logs.';
         }
 
+        // Paying a renewal is what moves the subscription on to its next
+        // period — and restores access, if the old one had already run out.
+        if ($validated['status'] === Invoice::STATUS_PAID
+            && $subscription = SubscriptionInvoice::settle($invoice)) {
+            $message .= sprintf(
+                ' %s now runs to %s.',
+                $invoice->workspace?->name ?? 'The subscription',
+                $subscription->current_period_end->format('M j, Y')
+            );
+        }
+
         return back()->with('success', $message);
-    }
-
-    /**
-     * Email an already-issued invoice again — for a bounced send, a lost email,
-     * or a payer who has changed address since it went out.
-     */
-    public function resend(Invoice $invoice)
-    {
-        if ($invoice->status === Invoice::STATUS_DRAFT) {
-            // Marking it sent is what issues a draft, and that emails it. There
-            // is nothing to re-send here.
-            return back()->with('error', "Invoice {$invoice->number} is still a draft. Mark it as sent to email it.");
-        }
-
-        $recipient = InvoiceMailer::recipientFor($invoice);
-
-        if (! $recipient) {
-            return back()->with('error', "Invoice {$invoice->number} has no address to send to. Set a billing email on the workspace.");
-        }
-
-        $sentTo = InvoiceMailer::send($invoice);
-
-        return back()->with(
-            $sentTo ? 'success' : 'error',
-            $sentTo
-                ? "Invoice {$invoice->number} emailed to {$sentTo}."
-                : "Could not email invoice {$invoice->number} to {$recipient} — check the logs."
-        );
     }
 
     public function destroy(Invoice $invoice)

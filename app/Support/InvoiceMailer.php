@@ -11,9 +11,10 @@ use Throwable;
 /**
  * Emailing an issued invoice to whoever pays for the workspace.
  *
- * Deliberately never throws. An invoice that exists but wasn't emailed is a
- * nuisance an admin can fix by resending; an invoice rolled back because the
- * mail server was down is money quietly not billed.
+ * Deliberately never throws. An invoice that exists but wasn't emailed can
+ * still be put right — flip it to draft and back to sent, or download the PDF
+ * and send it by hand. An invoice rolled back because the mail server was down
+ * is money quietly not billed.
  */
 class InvoiceMailer
 {

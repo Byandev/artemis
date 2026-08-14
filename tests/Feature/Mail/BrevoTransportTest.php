@@ -2,7 +2,7 @@
 
 use App\Mail\BrevoTransport;
 use App\Models\User;
-use App\Notifications\ResetPasswordNotification;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Mailer\Exception\TransportException;
@@ -114,14 +114,17 @@ test('an HTML mail sends both the html and the text part', function () {
 
     $user = User::factory()->create(['email' => 'user@example.com']);
 
-    $user->notify(new ResetPasswordNotification('a-token'));
+    // Any markdown notification will do — this one is what the app really
+    // sends on a password reset, so it is the realistic HTML+text case.
+    $user->notify(new ResetPassword('a-token'));
 
     Http::assertSent(function ($request) {
         $body = $request->data();
 
-        expect($body['htmlContent'])->toContain('Reset password')
-            ->and($body['textContent'])->toContain('Reset password')
-            ->and($body['subject'])->toContain('Reset your')
+        // The same content reaches Brevo in both parts, not just the HTML one.
+        expect($body['htmlContent'])->toContain('Reset Password')
+            ->and($body['textContent'])->toContain('Reset Password')
+            ->and($body['subject'])->toContain('Reset Password')
             ->and(array_column($body['to'], 'email'))->toBe(['user@example.com']);
 
         return true;

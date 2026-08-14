@@ -152,7 +152,7 @@ class AdminWorkspaceController extends Controller
             }
 
             return $shouldBill
-                ? SubscriptionInvoice::raise($workspace, $plan, $fromTrial)
+                ? SubscriptionInvoice::raise($workspace, $plan, SubscriptionInvoice::upgradeDueDate($fromTrial))
                 : null;
         });
 
@@ -165,8 +165,7 @@ class AdminWorkspaceController extends Controller
 
             // Name the invoice and its terms — an admin shouldn't have to go
             // looking to find out a bill was just raised in their name.
-            $message .= " Invoice {$invoice->number} raised, due {$invoice->due_date->format('M j, Y')}".
-                ($fromTrial ? ' (today — upgrade from trial)' : '').
+            $message .= " Invoice {$invoice->number} raised for the trial upgrade, due today".
                 ($sentTo ? " and emailed to {$sentTo}." : '. Emailing it failed — send it from the invoices page.');
         }
 

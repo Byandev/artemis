@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\InvoiceIssuedNotification;
 use App\Support\InvoiceMailer;
+use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
 
 /**
@@ -94,7 +95,7 @@ test('the email carries the invoice PDF as an attachment', function () {
     upgrade($admin, $workspace);
 
     $invoice = Invoice::sole();
-    $mail = (new InvoiceIssuedNotification($invoice))->toMail($invoice);
+    $mail = (new InvoiceIssuedNotification($invoice))->toMail(new AnonymousNotifiable);
 
     expect($mail->subject)->toContain($invoice->number)
         ->and($mail->rawAttachments)->toHaveCount(1)
@@ -161,106 +162,98 @@ test('flipping a draft to sent emails it, and marking it paid does not', functio
     Notification::assertCount(1);
 });
 
-test('an issued invoice can be resent from the invoices page', function () {
-    Notification::fake();
+test('every invoice is copied to the configured address', function () {
+    config(['invoice.cc' => 'accounting@artemis.test']);
 
     ['admin' => $admin, 'workspace' => $workspace] = billingContext('accounts@company.test');
 
     upgrade($admin, $workspace);
+
     $invoice = Invoice::sole();
+    $mail = (new InvoiceIssuedNotification($invoice))
+        ->toMail(new AnonymousNotifiable);
 
-    test()->actingAs($admin)->from('/admin/invoices')
-        ->post("/admin/invoices/{$invoice->id}/resend")
-        ->assertRedirect()
-        ->assertSessionHas('success', "Invoice {$invoice->number} emailed to accounts@company.test.");
-
-    // Once when raised, once on the resend.
-    Notification::assertCount(2);
+    expect($mail->cc)->toBe([['accounting@artemis.test', null]]);
 });
 
-test('a paid invoice can still be resent as a copy', function () {
+test('several copies can be configured, comma separated', function () {
+    config(['invoice.cc' => 'accounting@artemis.test, records@artemis.test']);
+
+    ['workspace' => $workspace] = billingContext();
+
+    $invoice = Invoice::create([
+        'number' => 'INV-TEST-000030',
+        'workspace_id' => $workspace->id,
+        'bill_to_name' => 'Someone',
+        'issue_date' => now(),
+        'line_items' => [],
+        'status' => Invoice::STATUS_SENT,
+    ]);
+
+    $mail = (new InvoiceIssuedNotification($invoice))
+        ->toMail(new AnonymousNotifiable);
+
+    expect(array_column($mail->cc, 0))
+        ->toBe(['accounting@artemis.test', 'records@artemis.test']);
+});
+
+test('a malformed copy address is dropped, not allowed to break the send', function () {
     Notification::fake();
+
+    config(['invoice.cc' => 'not-an-address, accounting@artemis.test']);
 
     ['admin' => $admin, 'workspace' => $workspace] = billingContext('accounts@company.test');
 
+    upgrade($admin, $workspace)->assertSessionHasNoErrors();
+
+    $mail = (new InvoiceIssuedNotification(Invoice::sole()))
+        ->toMail(new AnonymousNotifiable);
+
+    // The customer's bill still goes out; only the bad entry is discarded.
+    expect(array_column($mail->cc, 0))->toBe(['accounting@artemis.test']);
+    Notification::assertSentOnDemand(InvoiceIssuedNotification::class);
+});
+
+test('the recipient is not also copied to itself', function () {
+    config(['invoice.cc' => 'Accounts@Company.test']);
+
+    ['workspace' => $workspace] = billingContext('accounts@company.test');
+
     $invoice = Invoice::create([
-        'number' => 'INV-TEST-000003',
+        'number' => 'INV-TEST-000031',
         'workspace_id' => $workspace->id,
         'bill_to_name' => 'Someone',
         'bill_to_email' => 'accounts@company.test',
         'issue_date' => now(),
         'line_items' => [],
-        'status' => Invoice::STATUS_PAID,
-        'paid_at' => now(),
+        'status' => Invoice::STATUS_SENT,
     ]);
 
-    test()->actingAs($admin)->from('/admin/invoices')
-        ->post("/admin/invoices/{$invoice->id}/resend")
-        ->assertSessionHas('success');
+    // Same address as the To line, differing only in case — one copy, not two.
+    $mail = (new InvoiceIssuedNotification($invoice))
+        ->toMail(Notification::route('mail', 'accounts@company.test'));
 
-    Notification::assertCount(1);
+    expect($mail->cc)->toBeEmpty();
 });
 
-test('a draft cannot be resent', function () {
-    Notification::fake();
+test('no copy is added when none is configured', function () {
+    config(['invoice.cc' => null]);
 
-    ['admin' => $admin, 'workspace' => $workspace] = billingContext('accounts@company.test');
+    ['workspace' => $workspace] = billingContext();
 
     $invoice = Invoice::create([
-        'number' => 'INV-TEST-000004',
+        'number' => 'INV-TEST-000032',
         'workspace_id' => $workspace->id,
         'bill_to_name' => 'Someone',
         'issue_date' => now(),
         'line_items' => [],
-        'status' => Invoice::STATUS_DRAFT,
+        'status' => Invoice::STATUS_SENT,
     ]);
 
-    test()->actingAs($admin)->from('/admin/invoices')
-        ->post("/admin/invoices/{$invoice->id}/resend")
-        ->assertSessionHas('error');
+    $mail = (new InvoiceIssuedNotification($invoice))
+        ->toMail(new AnonymousNotifiable);
 
-    Notification::assertNothingSent();
-});
-
-test('resending falls back to the owner when the workspace has no billing email', function () {
-    Notification::fake();
-
-    ['admin' => $admin, 'owner' => $owner, 'workspace' => $workspace] = billingContext();
-
-    upgrade($admin, $workspace);
-    $invoice = Invoice::sole();
-
-    test()->actingAs($admin)->from('/admin/invoices')
-        ->post("/admin/invoices/{$invoice->id}/resend")
-        ->assertSessionHas('success', "Invoice {$invoice->number} emailed to {$owner->email}.");
-});
-
-test('a non-admin cannot resend an invoice', function () {
-    Notification::fake();
-
-    ['admin' => $admin, 'workspace' => $workspace] = billingContext('accounts@company.test');
-
-    upgrade($admin, $workspace);
-    $invoice = Invoice::sole();
-    Notification::fake(); // reset the count from the raise above
-
-    test()->actingAs(User::factory()->create(['is_super_admin' => false]))
-        ->post("/admin/invoices/{$invoice->id}/resend")
-        ->assertRedirect();
-
-    Notification::assertNothingSent();
-});
-
-test('the invoices list carries the address a resend would go to', function () {
-    ['admin' => $admin, 'owner' => $owner, 'workspace' => $workspace] = billingContext();
-
-    upgrade($admin, $workspace);
-
-    test()->actingAs($admin)
-        ->get('/admin/invoices')
-        ->assertInertia(fn ($page) => $page
-            ->where('invoices.data.0.recipient', $owner->email)
-        );
+    expect($mail->cc)->toBeEmpty();
 });
 
 test('an admin can set and clear a workspace billing email', function () {

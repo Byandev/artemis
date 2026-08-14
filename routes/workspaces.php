@@ -734,8 +734,6 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('invoices.download');
         Route::patch('/invoices/{invoice}/status', [AdminInvoiceController::class, 'updateStatus'])
             ->name('invoices.update-status');
-        Route::post('/invoices/{invoice}/resend', [AdminInvoiceController::class, 'resend'])
-            ->name('invoices.resend');
         Route::delete('/invoices/{invoice}', [AdminInvoiceController::class, 'destroy'])
             ->name('invoices.destroy');
 
