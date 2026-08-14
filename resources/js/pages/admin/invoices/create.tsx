@@ -9,6 +9,10 @@ interface WorkspaceOption {
     name: string;
     owner_name: string | null;
     owner_email: string | null;
+    /** Saved billing details from Workspace Settings → Billing, if any. */
+    billing_name: string | null;
+    billing_email: string | null;
+    billing_address: string | null;
     plan: { id: number; name: string; price_php: string } | null;
 }
 
@@ -66,8 +70,16 @@ export default function Create({ workspaces, defaults }: Props) {
             ...prev,
             workspace_id: id,
             subscription_plan_id: ws.plan?.id ?? null,
-            bill_to_name: prev.bill_to_name || ws.owner_name || ws.name,
-            bill_to_email: prev.bill_to_email || ws.owner_email || '',
+            // Prefer the workspace's saved billing details, falling back to the
+            // owner's account details when they haven't been filled in.
+            bill_to_name:
+                prev.bill_to_name ||
+                ws.billing_name ||
+                ws.owner_name ||
+                ws.name,
+            bill_to_email:
+                prev.bill_to_email || ws.billing_email || ws.owner_email || '',
+            bill_to_address: prev.bill_to_address || ws.billing_address || '',
             line_items: ws.plan
                 ? [
                       {

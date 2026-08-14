@@ -162,6 +162,10 @@ enum Permission: string
     case ManageApiKeys = 'Manage API Keys';
     case ManageDiscordNotifications = 'Manage Discord Notifications';
 
+    // Billing
+    case ViewBillingSettings = 'View Billing Settings';
+    case ManageBillingSettings = 'Manage Billing Settings';
+
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
@@ -304,6 +308,9 @@ enum Permission: string
             self::EditWorkspaceSettings,
             self::ManageApiKeys,
             self::ManageDiscordNotifications => 'Settings',
+
+            self::ViewBillingSettings,
+            self::ManageBillingSettings => 'Billing',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,
