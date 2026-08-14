@@ -732,6 +732,14 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('invoices.download');
         Route::patch('/invoices/{invoice}/status', [AdminInvoiceController::class, 'updateStatus'])
             ->name('invoices.update-status');
+
+        // Proof of payment — the receipt evidencing an invoice was settled.
+        Route::get('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'showProof'])
+            ->name('invoices.proof.show');
+        Route::post('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'storeProof'])
+            ->name('invoices.proof.store');
+        Route::delete('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'destroyProof'])
+            ->name('invoices.proof.destroy');
         Route::delete('/invoices/{invoice}', [AdminInvoiceController::class, 'destroy'])
             ->name('invoices.destroy');
 
