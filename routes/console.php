@@ -12,6 +12,11 @@ Schedule::command('subscriptions:mark-past-due')->dailyAt('00:15');
 // the window query means a missed night is picked up the next morning.
 Schedule::command('invoices:generate-renewals')->dailyAt('08:00')->withoutOverlapping();
 
+// Remind the payer on the day an unpaid invoice falls due. Runs just after the
+// renewal batch so the two never collide, and at the same civil hour because
+// this one lands in a customer's inbox too.
+Schedule::command('invoices:send-due-reminders')->dailyAt('08:30')->withoutOverlapping();
+
 // Build Artemis-source advertiser performance (Pancake POS + Meta Ads) daily,
 // rebuilding a trailing 3-day window to absorb late Meta attribution.
 Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00')->withoutOverlapping();
