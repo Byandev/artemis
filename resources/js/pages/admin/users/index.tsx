@@ -1,16 +1,26 @@
 import PageHeader from '@/components/common/PageHeader';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData, User } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { PaginatedData, SharedData, User } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
-import { Check, Copy, Search } from 'lucide-react';
+import { Check, Copy, Search, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 
@@ -43,6 +53,12 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
     const [search, setSearch] = useState(filters?.search ?? '');
     const [copiedUserId, setCopiedUserId] = useState<number | null>(null);
     const [sendingUserId, setSendingUserId] = useState<number | null>(null);
+
+    // Held until the dialog is confirmed — nothing is sent on the click itself.
+    const [pendingUser, setPendingUser] = useState<AdminUser | null>(null);
+    const [saving, setSaving] = useState(false);
+
+    const currentUserId = usePage<SharedData>().props.auth?.user?.id;
 
     const fetchUsers = useCallback(
         (overrides: Record<string, string | number | undefined> = {}) => {
@@ -90,6 +106,36 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
         } finally {
             setSendingUserId(null);
         }
+    };
+
+    const confirmSuperAdmin = () => {
+        if (!pendingUser) return;
+
+        const granting = !pendingUser.is_super_admin;
+        const name = pendingUser.name;
+
+        setSaving(true);
+        router.patch(
+            `/admin/users/${pendingUser.id}/super-admin`,
+            { is_super_admin: granting },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(
+                        granting
+                            ? `${name} is now a super admin.`
+                            : `Super admin access revoked from ${name}.`,
+                    );
+                    setPendingUser(null);
+                },
+                onError: (errors) =>
+                    toast.error(
+                        errors.is_super_admin ??
+                            'Unable to change super admin access.',
+                    ),
+                onFinish: () => setSaving(false),
+            },
+        );
     };
 
     const columns: ColumnDef<AdminUser>[] = [
@@ -178,15 +224,43 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
             id: 'actions',
             header: () => (
                 <p className="text-right font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Reset password
+                    Actions
                 </p>
             ),
             cell: ({ row }) => {
                 const user = row.original;
                 const copied = copiedUserId === user.id;
+                const isSelf = user.id === currentUserId;
 
                 return (
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            // Revoking your own access would lock you out of
+                            // this page, so it isn't offered.
+                            disabled={isSelf && user.is_super_admin}
+                            title={
+                                isSelf && user.is_super_admin
+                                    ? 'You cannot revoke your own super admin access'
+                                    : undefined
+                            }
+                            onClick={() => setPendingUser(user)}
+                        >
+                            {user.is_super_admin ? (
+                                <>
+                                    <ShieldOff className="mr-1.5 h-3.5 w-3.5" />
+                                    Revoke super admin
+                                </>
+                            ) : (
+                                <>
+                                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5 text-violet-600" />
+                                    Make super admin
+                                </>
+                            )}
+                        </Button>
                         <Button
                             type="button"
                             variant="outline"
@@ -263,6 +337,70 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
                     />
                 </div>
             </div>
+
+            <AlertDialog
+                open={!!pendingUser}
+                onOpenChange={(open) => !open && setPendingUser(null)}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {pendingUser?.is_super_admin
+                                ? 'Revoke super admin access?'
+                                : 'Grant super admin access?'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingUser?.is_super_admin ? (
+                                <>
+                                    <span className="font-medium">
+                                        {pendingUser?.name}
+                                    </span>{' '}
+                                    ({pendingUser?.email}) will lose the admin
+                                    panel and their access to every workspace.
+                                    They keep the workspaces they are a member
+                                    of.
+                                </>
+                            ) : (
+                                <>
+                                    <span className="font-medium">
+                                        {pendingUser?.name}
+                                    </span>{' '}
+                                    ({pendingUser?.email}) will get full access
+                                    to every workspace, all client billing, and
+                                    this admin panel — including the ability to
+                                    make other super admins.
+                                    {!pendingUser?.email_verified_at && (
+                                        <>
+                                            {' '}
+                                            Their email will also be marked
+                                            verified, since the admin panel is
+                                            unreachable without it.
+                                        </>
+                                    )}
+                                </>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={saving}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                confirmSuperAdmin();
+                            }}
+                            disabled={saving}
+                        >
+                            {saving
+                                ? 'Saving...'
+                                : pendingUser?.is_super_admin
+                                  ? 'Revoke access'
+                                  : 'Make super admin'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AdminSidebarLayout>
     );
 }

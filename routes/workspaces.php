@@ -666,7 +666,7 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
 });
 
 // Admin Routes //
-Route::middleware(['auth', 'verified', 'admin'])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -692,6 +692,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('users.index');
         Route::post('/users/{user}/reset-password', [AdminUserController::class, 'generatePasswordReset'])
             ->name('users.reset-password');
+        Route::patch('/users/{user}/super-admin', [AdminUserController::class, 'updateSuperAdmin'])
+            ->name('users.update-super-admin');
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');
@@ -734,6 +736,14 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('invoices.download');
         Route::patch('/invoices/{invoice}/status', [AdminInvoiceController::class, 'updateStatus'])
             ->name('invoices.update-status');
+
+        // Proof of payment — the receipt evidencing an invoice was settled.
+        Route::get('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'showProof'])
+            ->name('invoices.proof.show');
+        Route::post('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'storeProof'])
+            ->name('invoices.proof.store');
+        Route::delete('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'destroyProof'])
+            ->name('invoices.proof.destroy');
         Route::delete('/invoices/{invoice}', [AdminInvoiceController::class, 'destroy'])
             ->name('invoices.destroy');
 

@@ -106,18 +106,47 @@ class AdminWorkspaceController extends Controller
         $validated = $request->validate([
             'subscription_plan_id' => 'required|exists:subscription_plans,id',
             'status' => 'required|in:trialing,active,past_due,canceled,expired',
+            'current_period_start' => 'nullable|date',
         ]);
 
         $plan = SubscriptionPlan::findOrFail($validated['subscription_plan_id']);
         $subscription = $workspace->subscription;
-        $now = Carbon::now();
 
+        // Every other date is derived from this anchor. It defaults to now, but
+        // an admin can back- or forward-date it so date-driven behaviour (trial
+        // expiry, renewal, invoicing) can be exercised without waiting for the
+        // calendar to catch up.
+        $movedStart = filled($validated['current_period_start'] ?? null);
+        $start = $movedStart
+            ? Carbon::parse($validated['current_period_start'])->startOfDay()
+            : Carbon::now();
+
+        $trialDays = $plan->trial_days ?? 30;
+
+        if ($subscription) {
+            $data = [
+                'subscription_plan_id' => $validated['subscription_plan_id'],
+                'status' => $validated['status'],
+            ];
         // Read the old subscription before the update overwrites it — whether
         // this is a trial ending is what decides when the invoice falls due.
         $subscription?->loadMissing('plan');
         $fromTrial = SubscriptionInvoice::isFromTrial($subscription);
         $shouldBill = SubscriptionInvoice::shouldBill($subscription, $plan, $validated['status']);
 
+            if ($validated['status'] === 'trialing') {
+                $data['trial_ends_at'] = $start->copy()->addDays($trialDays);
+                $data['current_period_start'] = $start;
+                $data['current_period_end'] = $start->copy()->addDays($trialDays);
+            } elseif ($validated['status'] === 'active') {
+                $data['trial_ends_at'] = null;
+                $data['current_period_start'] = $start;
+                $data['current_period_end'] = $start->copy()->addMonth();
+            } elseif ($movedStart) {
+                // past_due / canceled / expired keep whatever dates they already
+                // had, unless the admin explicitly moved the start.
+                $data['current_period_start'] = $start;
+                $data['current_period_end'] = $start->copy()->addMonth();
         // One transaction, so a workspace can never end up on a paid plan with
         // no invoice behind it, or invoiced for a plan it was never moved to.
         $invoice = DB::transaction(function () use ($workspace, $plan, $subscription, $validated, $now, $shouldBill, $fromTrial) {
@@ -151,6 +180,18 @@ class AdminWorkspaceController extends Controller
                 ]);
             }
 
+            $subscription->update($data);
+        } else {
+            Subscription::create([
+                'workspace_id' => $workspace->id,
+                'subscription_plan_id' => $validated['subscription_plan_id'],
+                'status' => $validated['status'],
+                'trial_ends_at' => $validated['status'] === 'trialing' ? $start->copy()->addDays($trialDays) : null,
+                'current_period_start' => $start,
+                'current_period_end' => $validated['status'] === 'trialing'
+                    ? $start->copy()->addDays($trialDays)
+                    : $start->copy()->addMonth(),
+            ]);
             return $shouldBill
                 ? SubscriptionInvoice::raise($workspace, $plan, SubscriptionInvoice::upgradeDueDate($fromTrial))
                 : null;

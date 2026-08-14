@@ -1,6 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { MetricSettingDialog } from '@/components/metrics/metricsetting-dialog-form';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import DatePicker from '@/components/ui/date-picker';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -35,6 +36,7 @@ interface Subscription {
     id: number;
     subscription_plan_id: number;
     status: string;
+    current_period_start: string | null;
     current_period_end: string | null;
     trial_ends_at: string | null;
     plan: SubscriptionPlan;
@@ -268,6 +270,21 @@ const statusColors: Record<string, string> = {
     expired:
         'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20',
 };
+
+/**
+ * A server timestamp as the `YYYY-MM-DD` flatpickr shows and the API expects.
+ * Read through the local date parts rather than slicing the ISO string: the app
+ * stores midnight in Asia/Singapore, which serialises as the *previous* day in
+ * UTC, so a naive slice lands the picker a day early. Falls back to today.
+ */
+function toDateInput(value?: string | null): string {
+    const date = value ? new Date(value) : new Date();
+    if (isNaN(date.getTime())) return '';
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 /**
  * Shows how many of a workspace's pages are configured for a given parcel
@@ -703,11 +720,20 @@ function SubscriptionModal({
     plans: SubscriptionPlan[];
     onClose: () => void;
 }) {
+    // Held in a memo rather than read straight off `data`: DatePicker rebuilds
+    // its flatpickr instance whenever `defaultDate` changes identity, so feeding
+    // it the live form value would tear the calendar down on every pick.
+    const initialStart = useMemo(
+        () => toDateInput(workspace.subscription?.current_period_start),
+        [workspace.subscription?.current_period_start],
+    );
+
     const { data, setData, put, processing } = useForm({
         subscription_plan_id:
             workspace.subscription?.subscription_plan_id?.toString() ||
             (plans[0]?.id?.toString() ?? ''),
         status: workspace.subscription?.status || 'active',
+        current_period_start: initialStart,
     });
 
     function handleSubmit(e: React.FormEvent) {
@@ -841,6 +867,27 @@ function SubscriptionModal({
                             )}
                         </div>
                     )}
+
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Subscription start
+                        </label>
+                        <DatePicker
+                            id={`subscription-start-${workspace.id}`}
+                            fullWidth
+                            clearable={false}
+                            defaultDate={initialStart || undefined}
+                            placeholder="Select start date"
+                            onChange={(_dates, dateStr) =>
+                                setData('current_period_start', dateStr)
+                            }
+                        />
+                        <p className="mt-1 text-xs text-zinc-500">
+                            Anchors the billing period — the renewal date and
+                            trial end are derived from it. Back-date it to make
+                            a period fall due now.
+                        </p>
+                    </div>
 
                     <div className="flex justify-end gap-2 pt-2">
                         <button
