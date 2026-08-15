@@ -74,8 +74,8 @@ const roasCell = (n: number | null) =>
         : n >= 3
           ? 'bg-green-700 text-white dark:bg-green-600 dark:text-white'
           : n >= 2
-            ? 'bg-red-200 text-white dark:bg-red-400 dark:text-white'
-            : 'bg-red-600 text-white dark:bg-red-600 dark:text-white';
+            ? 'bg-red-500 text-white dark:bg-red-600 dark:text-white'
+            : 'bg-red-600 text-white dark:bg-red-700 dark:text-white';
 
 export default function PageRoasTrackerIndex({
     workspace,
