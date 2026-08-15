@@ -72,9 +72,9 @@ const roasCell = (n: number | null) =>
     n === null || n === 0
         ? 'text-gray-400'
         : n >= 3
-          ? 'bg-green6700 text-white dark:bg-green-600 dark:text-white'
+          ? 'bg-green-700 text-white dark:bg-green-600 dark:text-white'
           : n >= 2
-            ? 'bg-red-200 text-red-900 dark:bg-red-400/25 dark:text-red-100'
+            ? 'bg-red-200 text-white dark:bg-red-400 dark:text-white'
             : 'bg-red-600 text-white dark:bg-red-600 dark:text-white';
 
 export default function PageRoasTrackerIndex({
@@ -330,7 +330,8 @@ export default function PageRoasTrackerIndex({
                                             <td
                                                 className={cn(
                                                     cell,
-                                                    'bg-amber-200 text-right font-semibold text-gray-900 dark:bg-amber-400/80',
+                                                    'text-right font-semibold',
+                                                    roasCell(page.average.roas),
                                                 )}
                                             >
                                                 {roasText(page.total.roas)}
