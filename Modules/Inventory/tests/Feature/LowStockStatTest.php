@@ -24,10 +24,31 @@ function stockLedger(InventoryItem $item, int $remaining): void
 /** The dashboard's low-stock payload for a workspace. */
 function lowStock($user, $workspace): array
 {
+    // The dashboard reads the frozen day, so freeze it first — the same order
+    // the real thing runs in.
+    test()->artisan('inventory:snapshot-items')->assertSuccessful();
+
     return test()->actingAs($user)
         ->getJson("/api/workspaces/{$workspace->slug}/inventory/dashboard/low-stock")
         ->assertOk()
         ->json();
+}
+
+/** A purchase order for one item at a given stage, issued on a given date. */
+function lowStockOrder($workspace, InventoryItem $item, string $issuedAt, int $count, int $status): void
+{
+    $order = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'CN-'.uniqid(),
+        'issue_date' => $issuedAt,
+        'status' => $status,
+    ]);
+
+    PurchasedOrderItem::create([
+        'inventory_purchased_order_id' => $order->id,
+        'inventory_item_id' => $item->id,
+        'count' => $count,
+    ]);
 }
 
 test('po needed is the buffer plus lead-time demand less stock on hand', function () {
@@ -221,4 +242,46 @@ test('one workspace never sees another workspace items', function () {
 
     expect($data['items'])->toBeEmpty()
         ->and($data['listed_po_needed'])->toBe(0);
+});
+
+test('last PO issued reports the most recent order across the whole group', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create([
+        'workspace_id' => $workspace->id, 'sku' => 'PARENT', 'is_parent' => true,
+        'is_active' => true, 'lead_time' => 10, 'days_of_coverage' => 10, 'three_days_average' => 10,
+    ]);
+    $childA = InventoryItem::create([
+        'workspace_id' => $workspace->id, 'sku' => 'CHILD-A', 'parent_id' => $parent->id,
+        'is_active' => true, 'three_days_average' => 5,
+    ]);
+    $childB = InventoryItem::create([
+        'workspace_id' => $workspace->id, 'sku' => 'CHILD-B', 'parent_id' => $parent->id,
+        'is_active' => true, 'three_days_average' => 5,
+    ]);
+
+    // Delivered orders still count — the question is when you last ordered,
+    // not whether it is still open.
+    lowStockOrder($workspace, $childA, '2026-05-01', 10, PurchasedOrder::DELIVERED);
+    lowStockOrder($workspace, $childB, '2026-07-20', 10, PurchasedOrder::DELIVERED);
+    // A cancelled order is not a time you ordered it, even though it is newer.
+    lowStockOrder($workspace, $childA, '2026-08-01', 10, PurchasedOrder::CANCELLED);
+
+    $row = collect(lowStock($owner, $workspace)['items'])->firstWhere('sku', 'PARENT');
+
+    expect($row['last_issued_at'])->toBe('2026-07-20');
+});
+
+test('a group that has never been ordered reports no date at all', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    InventoryItem::create([
+        'workspace_id' => $workspace->id, 'sku' => 'NEVER-ORDERED', 'is_active' => true,
+        'lead_time' => 10, 'days_of_coverage' => 10, 'three_days_average' => 10,
+    ]);
+
+    $row = collect(lowStock($owner, $workspace)['items'])->firstWhere('sku', 'NEVER-ORDERED');
+
+    // Null, not a zero date — "never" and "long ago" are different answers.
+    expect($row['last_issued_at'])->toBeNull();
 });

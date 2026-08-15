@@ -34,7 +34,7 @@ class CheckParcelUpdateNotification implements ShouldQueue
             if (isset($response['status']) && $response['status'] === '1') {
                 $this->parcelJourneyNotification->update(['status' => 'sent']);
             } elseif (isset($response['status']) && $response['status'] === '0') {
-                dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('parcel-notifications');
+                dispatch(new CheckParcelUpdateNotification($this->parcelJourneyNotification))->delay(now()->addMinutes(5))->onQueue('sms');
             } elseif (isset($response['status']) && $response['status'] === '2') {
                 $this->parcelJourneyNotification->update(['status' => 'failed', 'remarks' => json_encode($response)]);
             } else {

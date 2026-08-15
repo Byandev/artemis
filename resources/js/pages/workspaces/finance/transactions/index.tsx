@@ -80,9 +80,7 @@ interface Props {
             type?: 'in' | 'out';
             account_id?: string | number;
             transaction_type_id?: string | string[];
-            sub_category?: string | string[];
             missing_type?: string | boolean;
-            expenses_missing_sub?: string | boolean;
             date_from?: string;
             date_to?: string;
         };
@@ -140,20 +138,10 @@ export default function TransactionsIndex({
                 : [query.filter.transaction_type_id]
             : [],
     );
-    const [subCategoryFilter, setSubCategoryFilter] = useState<string[]>(
-        query?.filter?.sub_category
-            ? Array.isArray(query.filter.sub_category)
-                ? query.filter.sub_category
-                : [query.filter.sub_category]
-            : [],
-    );
     const boolish = (v: string | boolean | undefined) =>
         v === true || v === '1' || v === 'true';
     const [missingType, setMissingType] = useState<boolean>(
         boolish(query?.filter?.missing_type),
-    );
-    const [expensesMissingSub, setExpensesMissingSub] = useState<boolean>(
-        boolish(query?.filter?.expenses_missing_sub),
     );
     const [dateFrom, setDateFrom] = useState<string | undefined>(
         query?.filter?.date_from,
@@ -210,11 +198,7 @@ export default function TransactionsIndex({
         txnTypeFilter.forEach((v) =>
             params.append('filter[transaction_type_id][]', v),
         );
-        subCategoryFilter.forEach((v) =>
-            params.append('filter[sub_category][]', v),
-        );
         if (missingType) params.set('filter[missing_type]', '1');
-        if (expensesMissingSub) params.set('filter[expenses_missing_sub]', '1');
         const qs = params.toString();
         window.location.href = `${baseUrl}/export${qs ? `?${qs}` : ''}`;
     };
@@ -278,9 +262,7 @@ export default function TransactionsIndex({
                 t: '' | 'in' | 'out',
                 a: string,
                 tt: string[],
-                sc: string[],
                 mt: boolean,
-                ems: boolean,
                 df: string | undefined,
                 dt: string | undefined,
             ) => {
@@ -294,9 +276,7 @@ export default function TransactionsIndex({
                         'filter[transaction_type_id]': tt.length
                             ? tt
                             : undefined,
-                        'filter[sub_category]': sc.length ? sc : undefined,
                         'filter[missing_type]': mt ? 1 : undefined,
-                        'filter[expenses_missing_sub]': ems ? 1 : undefined,
                         'filter[date_from]': df || undefined,
                         'filter[date_to]': dt || undefined,
                         page: 1,
@@ -320,9 +300,7 @@ export default function TransactionsIndex({
             typeFilter,
             accountFilter,
             txnTypeFilter,
-            subCategoryFilter,
             missingType,
-            expensesMissingSub,
             dateFrom,
             dateTo,
         );
@@ -332,9 +310,7 @@ export default function TransactionsIndex({
         typeFilter,
         accountFilter,
         txnTypeFilter,
-        subCategoryFilter,
         missingType,
-        expensesMissingSub,
         dateFrom,
         dateTo,
         performQuery,
@@ -802,14 +778,6 @@ export default function TransactionsIndex({
                         className="w-44"
                         compact
                     />
-                    <MultiSelect
-                        options={SUB_CATEGORIES}
-                        selected={subCategoryFilter}
-                        onChange={setSubCategoryFilter}
-                        placeholder="All sub categories"
-                        className="w-48"
-                        compact
-                    />
                     <div className="inline-flex h-9 overflow-hidden rounded-[10px] border border-black/6 bg-stone-100 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                         {(
                             [
@@ -844,16 +812,6 @@ export default function TransactionsIndex({
                         }`}
                     >
                         No Txn Type
-                    </button>
-                    <button
-                        onClick={() => setExpensesMissingSub((v) => !v)}
-                        className={`h-9 rounded-[10px] border px-3 font-mono! text-[11px]! transition-colors ${
-                            expensesMissingSub
-                                ? 'border-amber-500 bg-amber-500 text-white'
-                                : 'border-black/6 bg-stone-100 text-gray-600 hover:bg-stone-200 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700'
-                        }`}
-                    >
-                        Expenses w/o Sub Cat
                     </button>
                 </div>
 
@@ -944,15 +902,9 @@ export default function TransactionsIndex({
                                         txnTypeFilter.length
                                             ? txnTypeFilter
                                             : undefined,
-                                    'filter[sub_category]':
-                                        subCategoryFilter.length
-                                            ? subCategoryFilter
-                                            : undefined,
                                     'filter[missing_type]': missingType
                                         ? 1
                                         : undefined,
-                                    'filter[expenses_missing_sub]':
-                                        expensesMissingSub ? 1 : undefined,
                                     'filter[date_from]': dateFrom || undefined,
                                     'filter[date_to]': dateTo || undefined,
                                     page: params?.page ?? 1,

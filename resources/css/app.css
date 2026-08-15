@@ -220,7 +220,19 @@
 /*--color-brand-800: #0c644d;*/
 /*--color-brand-900: #0b4b3b;*/
 /*--color-brand-950: #093429;*/
+/*
+ * Purchase-order flow series colours. Two only: inside the company vs with a
+ * supplier, because that split is the question those panels answer — stage
+ * identity comes from labels instead. amber-600 / sky-600 clear the lightness
+ * band, chroma floor, colour-blind separation and 3:1 contrast against both
+ * the white and zinc-900 panel surfaces, so the same pair serves both themes.
+ */
 :root {
+    --po-internal: #d97706;
+    --po-supplier: #0284c7;
+    /* Door-to-door measures span both legs, so they take neither hue. */
+    --po-total: #52525b;
+
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -257,6 +269,8 @@
 }
 
 .dark {
+    --po-total: #a1a1aa;
+
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.145 0 0);

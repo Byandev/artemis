@@ -61,6 +61,14 @@ export function WaitingForDeliveryDialog({
 }: Props) {
     const [orders, setOrders] = useState<PendingOrder[]>([]);
     const [total, setTotal] = useState(0);
+    /**
+     * The balance split by stage: `released` is paid for and so the supplier's
+     * to deliver, `requested` is raised but not yet paid. Both count toward the
+     * item's incoming stock — the split is shown because a large requested
+     * figure means the stock is committed but has not started moving.
+     */
+    const [released, setReleased] = useState(0);
+    const [requested, setRequested] = useState(0);
     const [loading, setLoading] = useState(false);
     const [failed, setFailed] = useState(false);
 
@@ -80,11 +88,15 @@ export function WaitingForDeliveryDialog({
                 if (cancelled) return;
                 setOrders(json.orders ?? []);
                 setTotal(json.total_balance ?? 0);
+                setReleased(json.released_balance ?? 0);
+                setRequested(json.requested_balance ?? 0);
             })
             .catch(() => {
                 if (cancelled) return;
                 setOrders([]);
                 setTotal(0);
+                setReleased(0);
+                setRequested(0);
                 setFailed(true);
             })
             .finally(() => {
@@ -113,6 +125,30 @@ export function WaitingForDeliveryDialog({
                                     {item.sku}
                                 </span>
                                 {isGroup && ' and its variants'}.
+                                {requested > 0 && (
+                                    <>
+                                        {' '}
+                                        <span className="font-mono text-gray-700 dark:text-gray-300">
+                                            {released.toLocaleString('en-PH')}
+                                        </span>{' '}
+                                        with a supplier,{' '}
+                                        <span className="font-mono text-amber-600 dark:text-amber-500">
+                                            {requested.toLocaleString('en-PH')}
+                                        </span>{' '}
+                                        raised but not yet paid for.
+                                    </>
+                                )}{' '}
+                                {/* The list's column is read from a snapshot,
+                                    written a few times a day; these orders are
+                                    read now. Between the two the totals can
+                                    differ, and saying so is cheaper than
+                                    someone trying to reconcile them. */}
+                                <span className="text-gray-400 dark:text-gray-500">
+                                    Orders are shown as they stand right now, so
+                                    the total can differ from the column if
+                                    something has been delivered since the last
+                                    snapshot.
+                                </span>
                             </>
                         ) : (
                             'Pending purchase orders for this item.'

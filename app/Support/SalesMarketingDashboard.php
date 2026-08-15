@@ -25,6 +25,7 @@ final class SalesMarketingDashboard
                 ? ['key' => 'ad-spend-goals', 'label' => 'Ad Spend Goals', 'url' => "{$base}/ad-spend-goals"]
                 : null,
             ['key' => 'ad-spent-summary', 'label' => 'Ad Spent Summary', 'url' => "{$base}/ad-spent-summary"],
+            ['key' => 'sales-targets', 'label' => 'Sales Targets', 'url' => "{$base}/sales-targets"],
         ]));
     }
 }

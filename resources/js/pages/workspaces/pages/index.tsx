@@ -20,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -338,6 +339,23 @@ const Pages = ({ pages, workspace, users, query }: PagesProps) => {
             },
         },
         {
+            accessorKey: 'auto_update_ad_budget',
+            header: ({ column }) => (
+                <SortableHeader
+                    column={column}
+                    title={'Auto Update Budget'}
+                    enabled={false}
+                />
+            ),
+            cell: ({ row }) => (
+                <PageAutoBudgetToggle
+                    workspace={workspace}
+                    page={row.original}
+                    canEdit={canEditPageBudget}
+                />
+            ),
+        },
+        {
             accessorKey: 'deleted_at',
             header: ({ column }) => (
                 <SortableHeader column={column} title={'Sync Status'} />
@@ -654,6 +672,69 @@ function PageOwnerAssign({
             saving={saving}
             onAssign={assign}
         />
+    );
+}
+
+/**
+ * Inline switch for whether the four-hourly Meta snapshot may overwrite this
+ * page's budget. Flips straight away and rolls back if the save fails, so the
+ * table never shows a state the server didn't accept.
+ */
+function PageAutoBudgetToggle({
+    workspace,
+    page,
+    canEdit,
+}: {
+    workspace: Workspace;
+    page: Page;
+    canEdit: boolean;
+}) {
+    const [enabled, setEnabled] = useState(page.auto_update_ad_budget);
+    const [saving, setSaving] = useState(false);
+
+    // Reconcile when server data changes (paging/sorting/reload).
+    useEffect(() => {
+        setEnabled(page.auto_update_ad_budget);
+    }, [page.auto_update_ad_budget]);
+
+    const toggle = (next: boolean) => {
+        const previous = enabled;
+        setEnabled(next);
+
+        router.patch(
+            `/workspaces/${workspace.slug}/pages/${page.id}/auto-budget`,
+            { auto_update_ad_budget: next },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onSuccess: () =>
+                    toast.success(
+                        next
+                            ? 'Budget will update automatically.'
+                            : 'Budget will stay as set.',
+                    ),
+                onError: () => {
+                    setEnabled(previous);
+                    toast.error('Failed to change auto update.');
+                },
+            },
+        );
+    };
+
+    return (
+        <div className="flex items-center gap-2">
+            <Switch
+                checked={enabled}
+                disabled={!canEdit || saving}
+                onCheckedChange={toggle}
+                aria-label={`Auto update ad budget for ${page.name}`}
+            />
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                {enabled ? 'Auto' : 'Manual'}
+            </span>
+        </div>
     );
 }
 

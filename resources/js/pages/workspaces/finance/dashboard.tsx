@@ -4,12 +4,7 @@ import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    ArrowDownRight,
-    ArrowUpRight,
-    Wallet,
-} from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react';
 import { useMemo } from 'react';
 
 interface AccountRow {
@@ -26,7 +21,6 @@ interface Props {
     accounts: AccountRow[];
     totalIn: number;
     totalOut: number;
-    unreconciledCount: number;
 }
 
 const fmt = (v: number) =>
@@ -40,12 +34,8 @@ export default function FinanceDashboard({
     accounts,
     totalIn,
     totalOut,
-    unreconciledCount,
 }: Props) {
     const base = `/workspaces/${workspace.slug}/finance`;
-    const canViewRemittances = usePermission(
-        PERMISSIONS.ViewFinanceRemittances,
-    );
     const canViewAccounts = usePermission(PERMISSIONS.ViewFinanceAccounts);
 
     const active = useMemo(
@@ -63,10 +53,10 @@ export default function FinanceDashboard({
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
                     title="Live Cashflow"
-                    description="Overview of accounts, activity, and unreconciled remittances."
+                    description="Overview of accounts and activity."
                 />
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <StatCard
                         icon={<Wallet className="h-4 w-4" />}
                         label="Total Balance"
@@ -86,28 +76,6 @@ export default function FinanceDashboard({
                         label="Total OUT"
                         value={fmt(totalOut)}
                     />
-                    {canViewRemittances ? (
-                        <Link
-                            href={`${base}/remittances?filter[unreconciled]=1`}
-                            className="block"
-                        >
-                            <StatCard
-                                icon={
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                }
-                                label="Unreconciled Remittances"
-                                value={String(unreconciledCount)}
-                            />
-                        </Link>
-                    ) : (
-                        <StatCard
-                            icon={
-                                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                            }
-                            label="Unreconciled Remittances"
-                            value={String(unreconciledCount)}
-                        />
-                    )}
                 </div>
 
                 <div className="mt-6 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">

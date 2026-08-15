@@ -1,0 +1,309 @@
+{
+  "name": "Fetch Gencys ERP Pages",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "05c02f31-bdf8-45a2-b7f0-756a591ee148",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -16,
+        0
+      ],
+      "id": "323a47e3-c528-40b4-883a-6dfa496f96aa",
+      "name": "Webhook",
+      "webhookId": "05c02f31-bdf8-45a2-b7f0-756a591ee148"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const username = $json.body.erp_username;\nconst password = $json.body.erp_password;\n\n// Open ERP login page\nawait $page.goto(\n  'https://meta-digitrading.lhike-erp.com/home',\n  {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }\n);\n\n// Wait for login form\nawait $page.waitForSelector('input[name=\"txtusername\"]', {\n  timeout: 30000\n});\n\n// Fill credentials\nawait $page.type('input[name=\"txtusername\"]', username, {\n  delay: 50\n});\n\nawait $page.type('input[name=\"txtpass\"]', password, {\n  delay: 50\n});\n\n// Submit login form\nawait Promise.all([\n  $page.click('button[type=\"submit\"]'),\n  $page.waitForNavigation({\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }).catch(() => null)\n]);\n\n// Check for login error\nconst loginError = await $page.$('.alert-danger');\n\nif (loginError) {\n  const errorText = await $page.evaluate(\n    el => el.textContent.trim(),\n    loginError\n  );\n\n  throw new Error(`Login failed: ${errorText}`);\n}\n\n// Optional: verify login succeeded\nconst currentUrl = $page.url();\n\nif (currentUrl.includes('/login')) {\n  throw new Error('Login may have failed. Still on login page.');\n}\n\n// Get cookies\nconst cookies = await $page.cookies();\n\nreturn [\n  {\n    json: {\n      success: true,\n      currentUrl,\n      cookies\n    }\n  }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5abe11ff-1e8e-4afc-bfe9-a18287f11395",
+      "name": "Login"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "a5b7b499-0547-4902-94bc-37a70b3b654a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const existingPages = $('Webhook').first().json.body.pages.map(i => i.toString());\n\nconst pages = $input.first().json.rows.filter(page => !existingPages.includes(page.page_id));\n\nreturn pages;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        0
+      ],
+      "id": "8cf42831-bd39-4909-a742-f055d1af9cfc",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.webhook_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({pages: $json.pages}) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1600,
+        -192
+      ],
+      "id": "076aabf7-8c64-47e5-ac56-8715a548cc9a",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "821ec437-7295-4c87-9866-e6ab5c739d13",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.cookies = $('Login').first().json.cookies;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        16
+      ],
+      "id": "c08cdedb-a9ca-45ef-a448-ef6d02357812",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1840,
+        16
+      ],
+      "id": "7ba7a329-308d-4fa8-9b84-b741e36fa5f2",
+      "name": "Wait",
+      "webhookId": "d76057b4-7160-4476-9786-53a484b525a1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const workspace_id = $('Webhook').first().json.body.workspace_id;\nconst api_key = $('Webhook').first().json.body.api_key;\nconst webhook_url = $('Webhook').first().json.body.webhook_url;\nconst pages = $input.all().map(i => i.json)\n\nreturn [\n  {\n    json: {\n      workspace_id,\n      api_key,\n      webhook_url,\n      pages\n    }\n  }\n]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        -192
+      ],
+      "id": "bd8af0d7-1b33-4afa-95f0-ef7c99aa8444",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies } = $json;\n\n// ---------- Setup ----------\nif (cookies && cookies.length) {\n    await $page.setCookie(...cookies);\n}\nawait $page.setViewport({ width: 1512, height: 982, deviceScaleFactor: 1 });\nawait $page.goto('https://meta-digitrading.lhike-erp.com/pages?arch=0', {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n});\n\nasync function waitForLoadingToClear() {\n    await $page.waitForFunction(() => {\n        const el = document.querySelector('#global-preloader');\n        if (!el) return true;\n        return window.getComputedStyle(el).display === 'none';\n    }, { timeout: 60000 });\n    await new Promise(resolve => setTimeout(resolve, 1500));\n}\nawait waitForLoadingToClear();\n\n// ---------- Wait for the DataTable to finish its AJAX/redraw ----------\nasync function waitForTableSettled() {\n    // #tblpage_processing is DataTables' own spinner\n    await $page.waitForFunction(() => {\n        const p = document.querySelector('#tblpage_processing');\n        if (p && window.getComputedStyle(p).display !== 'none') return false;\n        // require at least one real data row present\n        return document.querySelectorAll('#tblpage tbody tr[role=\"row\"]').length > 0;\n    }, { timeout: 60000 });\n    await new Promise(resolve => setTimeout(resolve, 300));\n}\n\nawait $page.waitForSelector('#tblpage tbody tr', { timeout: 30000 });\nawait waitForTableSettled();\n\nfunction formatDate(date) {\n  const mm = String(date.getMonth() + 1).padStart(2, '0');\n  const dd = String(date.getDate()).padStart(2, '0');\n  const yyyy = date.getFullYear();\n  return `${mm}/${dd}/${yyyy}`;\n}\n\nconst endDate = new Date();\nconst startDate = new Date();\nstartDate.setMonth(startDate.getMonth() - 6);\n\n\nawait $page.type('input#ssdate', formatDate(startDate), {\n    delay: 50\n});\nawait $page.type('input#sedate', formatDate(endDate), {\n    delay: 50\n});\n\nawait $page.click('a#btndtsearch');\n\nawait $page.waitForNetworkIdle({\n    idleTime: 500,\n    timeout: 30000\n});\n\nawait waitForLoadingToClear();\n\nawait waitForTableSettled();\n\n// ---------- Bump page length to 100 to minimize page hops ----------\nawait $page.evaluate(() => {\n    const sel = document.querySelector('select[name=\"tblpage_length\"]');\n    if (sel) {\n        sel.value = '100';\n        sel.dispatchEvent(new Event('change', { bubbles: true }));\n        if (window.jQuery) window.jQuery(sel).trigger('change');\n    }\n});\nawait waitForTableSettled();\n\n// ---------- Extract the currently visible page ----------\n// Columns: No | Date Created | Name | Owner | Intern & Brands | Status | Platform | (Actions - skipped)\nasync function extractCurrentPage() {\n    return await $page.evaluate(() => {\n        const rows = Array.from(\n            document.querySelectorAll('#tblpage tbody tr[role=\"row\"]')\n        );\n\n        return rows.map(row => {\n            const cells = Array.from(row.querySelectorAll('td'));\n            if (cells.length < 7) return null;\n\n            const txt = (el) => el ? el.textContent.trim().replace(/\\s+/g, ' ') : '';\n\n            const nameCell = cells[2];\n            const nameLink = nameCell.querySelector('a');\n            const profileUrl = nameLink ? nameLink.href : null;\n\n            let pageId = null;\n            const dataIdEl = row.querySelector('[data-id]');\n            if (dataIdEl) {\n                pageId = dataIdEl.getAttribute('data-id');\n            } else {\n                const viewLink = row.querySelector('a[href*=\"pages/view/\"], a[href*=\"pages/edit/\"]');\n                if (viewLink) {\n                    const m = viewLink.getAttribute('href').match(/pages\\/(?:view|edit)\\/(\\d+)/);\n                    if (m) pageId = m[1];\n                }\n            }\n\n            // --- Hidden ID #2: Facebook page id from the profile URL ---\n            let fbPageId = null;\n            if (profileUrl) {\n                // handles profile.php?id=..., and also /<vanity>-<digits> style urls\n                const m = profileUrl.match(/[?&]id=(\\d+)/);\n                if (m) fbPageId = m[1];\n            }\n\n            return {\n                no: txt(cells[0]),\n                page_id: pageId,          // internal ERP id (hidden)\n                fb_page_id: fbPageId,     // Facebook numeric id (hidden in URL)\n                date_created: txt(cells[1]),\n                name: txt(nameCell),\n                profile_url: profileUrl,\n                owner: txt(cells[3]),\n                intern_brands: txt(cells[4]),\n                status: txt(cells[5]),\n                platform: txt(cells[6])\n                // cells[7] = Actions -> skipped\n            };\n        }).filter(Boolean);\n    });\n}\n\n// ---------- Walk every page, dedupe by \"No\" ----------\nconst byNo = new Map();\nlet guard = 0; // hard stop against infinite loops\n\nwhile (guard++ < 100) {\n    const pageRows = await extractCurrentPage();\n    pageRows.forEach(r => {\n        const key = r.page_id || r.no; // page_id preferred, No as fallback\n        if (key) byNo.set(key, r);\n    });\n\n    // Is the Next button disabled? -> we're on the last page\n    const isLast = await $page.evaluate(() => {\n        const next = document.querySelector('#tblpage_paginate .next');\n        return !next || next.classList.contains('disabled');\n    });\n    if (isLast) break;\n\n    // Remember the first row's identity so we can detect the redraw\n    const beforeFirst = pageRows.length ? (pageRows[0].page_id || pageRows[0].no) : null;\n\n    await $page.evaluate(() => {\n        const a = document.querySelector('#tblpage_paginate .next a');\n        if (a) a.click();\n    });\n    await waitForTableSettled();\n\n    // Confirm the page actually changed before looping again\n    await $page.waitForFunction((prevKey) => {\n        const row = document.querySelector('#tblpage tbody tr[role=\"row\"]');\n        if (!row) return false;\n        const btn = row.querySelector('[data-id]');\n        const firstNo = row.querySelector('td') ? row.querySelector('td').textContent.trim() : '';\n        const nowKey = btn ? btn.getAttribute('data-id') : firstNo;\n        return nowKey && nowKey !== prevKey;\n    }, { timeout: 30000 }, beforeFirst).catch(() => {}); // don't hard-fail; guard + isLast still protect us\n}\n\nconst allRows = Array.from(byNo.values());\n\n// ---------- Grab the reported total for a sanity check ----------\nconst reportedTotal = await $page.evaluate(() => {\n    const info = document.querySelector('#tblpage_info');\n    if (!info) return null;\n    const m = info.textContent.match(/of\\s+([\\d,]+)\\s+entries/i);\n    return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;\n});\n\n// ---------- Return ----------\nreturn [\n    {\n        json: {\n            totalRows: allRows.length,\n            reportedTotal,          // should match totalRows (e.g. 252)\n            complete: reportedTotal == null ? null : allRows.length === reportedTotal,\n            rows: allRows,\n            status: \"success\"\n        }\n    }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "670f8206-0c46-4f71-9f63-4e80c91a32e6",
+      "name": "List Pages"
+    },
+    {
+      "parameters": {
+        "operation": "runCustomScript",
+        "scriptCode": "const { cookies, page_id, ...info } = $json;\n\nif (cookies?.length) {\n    await $page.setCookie(...cookies);\n}\n\nawait $page.setViewport({\n    width: 1512,\n    height: 982,\n    deviceScaleFactor: 1\n});\n\nawait $page.goto(\n    `https://meta-digitrading.lhike-erp.com/pages/view/${page_id}`,\n    {\n        waitUntil: 'networkidle2',\n        timeout: 60000\n    }\n);\n\nconst data = await $page.evaluate(() => {\n    return {\n        shop_id:\n            document.querySelector('#txtshopid')?.value || null,\n\n        pos_token:\n            document.querySelector('#txtapikey')?.value || null,\n    };\n});\n\nreturn [\n    {\n        json: {\n            page_id,\n            ...data,\n            ...info\n        }\n    }\n];",
+        "options": {
+          "browserWSEndpoint": "ws://chrome:3000"
+        }
+      },
+      "type": "n8n-nodes-puppeteer.puppeteer",
+      "typeVersion": 1,
+      "position": [
+        1632,
+        16
+      ],
+      "id": "d20be0a9-abda-434f-9833-c5fc7d3df0cb",
+      "name": "Get Page Details"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "List Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Get Page Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Pages": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Page Details": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "84d2cd08-4732-41aa-8dfd-8eb82d00c4e4",
+  "meta": {
+    "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
+  },
+  "id": "Phn6l2FDOObTteGT",
+  "tags": []
+}

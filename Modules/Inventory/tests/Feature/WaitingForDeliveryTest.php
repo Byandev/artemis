@@ -6,25 +6,60 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Models\PurchasedOrderItemDelivery;
+use Modules\Inventory\Support\InventoryStockColumns;
 use Tests\TestCase;
 
 // Module test dirs aren't bound by the root tests/Pest.php (->in('Feature') only
 // covers tests/Feature), so extend the app TestCase explicitly to boot the app.
 uses(TestCase::class, RefreshDatabase::class);
 
-/** Read the computed waiting-for-delivery value for an item off the index page. */
-function waitingFor(int $itemId, $owner, $workspace): ?int
+/** Read a computed stock column for an item off the index page. */
+function stockColumn(int $itemId, $owner, $workspace, string $column): ?int
 {
     $value = null;
 
     test()->actingAs($owner)
         ->get(route('workspaces.inventory.item.index', $workspace).'?summarize=0')
         ->assertOk()
-        ->assertInertia(function (Assert $page) use ($itemId, &$value) {
+        ->assertInertia(function (Assert $page) use ($itemId, $column, &$value) {
             $items = $page->toArray()['props']['items']['data'];
             $row = collect($items)->firstWhere('id', $itemId);
-            $value = $row['waiting_for_delivery_stocks'];
+            $value = $row[$column];
         });
+
+    return $value === null ? null : (int) $value;
+}
+
+/** Everything still owed on open orders — released and requested alike. */
+function waitingFor(int $itemId, $owner, $workspace): ?int
+{
+    return stockColumn($itemId, $owner, $workspace, 'waiting_for_delivery_stocks');
+}
+
+/**
+ * Units owed on orders raised but not yet paid for. Read straight off the query
+ * rather than the page: the items list deliberately shows only the combined
+ * "Waiting for Delivery" figure, and this split feeds the PO-flow dashboard and
+ * the daily snapshot instead.
+ */
+function requestedFor(int $itemId, $owner, $workspace): ?int
+{
+    return splitColumn($itemId, InventoryStockColumns::requestedStocks());
+}
+
+/** Its other half: units owed on orders already paid for. */
+function releasedFor(int $itemId): ?int
+{
+    return splitColumn($itemId, InventoryStockColumns::releasedStocks());
+}
+
+function splitColumn(int $itemId, string $sql): ?int
+{
+    $value = InventoryItem::query()
+        ->whereKey($itemId)
+        ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
+        ->selectRaw($sql.' as split_value')
+        ->value('split_value');
 
     return $value === null ? null : (int) $value;
 }
@@ -139,10 +174,13 @@ test('the waiting-for-delivery modal lists the pending purchase orders behind th
         'balance' => 100,
     ]);
 
-    // The listed balances sum to exactly what the list column shows.
-    expect($response->json('total_balance'))
+    // Both listed orders are with a supplier, so the released subtotal is the
+    // whole balance — and it is exactly what the list column shows.
+    expect($response->json('total_balance'))->toBe(150);
+    expect($response->json('released_balance'))
         ->toBe(150)
         ->toBe(waitingFor($item->id, $owner, $workspace));
+    expect($response->json('requested_balance'))->toBe(0);
 });
 
 test('the waiting-for-delivery modal rolls a parent item up over its children', function () {
@@ -201,7 +239,7 @@ test('the waiting-for-delivery modal rejects an item from another workspace', fu
         ->assertNotFound();
 });
 
-test('waiting-for-delivery ignores closed orders but counts open ones from the start', function () {
+test('waiting-for-delivery counts every open order, with the un-sent part broken out', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $item = InventoryItem::create([
@@ -228,12 +266,63 @@ test('waiting-for-delivery ignores closed orders but counts open ones from the s
         ]);
     };
 
-    // Cancelled — closed, so its units never count toward incoming stock.
+    // Cancelled — closed, so its units never count anywhere.
     $makeLine(PurchasedOrder::CANCELLED, 50);
-    expect(waitingFor($item->id, $owner, $workspace))->toBeNull();
+    expect(waitingFor($item->id, $owner, $workspace))->toBeNull()
+        ->and(requestedFor($item->id, $owner, $workspace))->toBeNull();
 
-    // Approved — an early, still-open stage. Counts from the moment it is raised
-    // (see AWAITING_DELIVERY_STATUSES), not only once paid.
+    // Approved — raised but not yet with a supplier. Committed quantity, so it
+    // counts as incoming; also reported separately so the delay is visible.
     $makeLine(2, 50);
-    expect(waitingFor($item->id, $owner, $workspace))->toBe(50);
+    expect(waitingFor($item->id, $owner, $workspace))->toBe(50)
+        ->and(requestedFor($item->id, $owner, $workspace))->toBe(50);
+
+    // Released to the supplier — the total grows, the un-sent part does not.
+    $makeLine(6, 30);
+    expect(waitingFor($item->id, $owner, $workspace))->toBe(80)
+        ->and(requestedFor($item->id, $owner, $workspace))->toBe(50);
+});
+
+test('a raised purchase order is never reordered, whatever stage it sits at', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = InventoryItem::create([
+        'workspace_id' => $workspace->id,
+        'sku' => 'SKU-REORDER',
+        'is_active' => true,
+        'lead_time' => 10,
+        'days_of_coverage' => 10,
+        'three_days_average' => 10,   // 20 days of cover = 200 units wanted
+    ]);
+
+    $order = function (int $status, int $count) use ($workspace, $item) {
+        $po = PurchasedOrder::create([
+            'workspace_id' => $workspace->id,
+            'issue_date' => '2026-06-01',
+            'delivery_fee' => 0,
+            'total_amount' => 0,
+            'status' => $status,
+        ]);
+        PurchasedOrderItem::create([
+            'inventory_purchased_order_id' => $po->id,
+            'inventory_item_id' => $item->id,
+            'count' => $count,
+            'amount' => 0,
+            'total_amount' => 0,
+        ]);
+    };
+
+    // Nothing on hand, nothing ordered: the full 200 is needed.
+    expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(200);
+
+    // 200 raised, still sitting in To Pay. The quantity is committed, so the
+    // need is covered — telling anyone to order another 200 would double-order.
+    // That the order is stuck is a separate signal, carried by requested_stocks.
+    $order(3, 200);
+    expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(0)
+        ->and(requestedFor($item->id, $owner, $workspace))->toBe(200);
+
+    // Once released, the same 200 is still covered — nothing double counts.
+    $order2 = $order;
+    expect(stockColumn($item->id, $owner, $workspace, 'po_needed'))->toBe(0);
 });

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
+use App\Http\Controllers\PublicSalesTargetController;
 use App\Http\Controllers\Workspaces\ActivityLogController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
 use App\Http\Controllers\Workspaces\AskDataController;
@@ -27,6 +28,7 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\SalesMarketingDashboardController;
+use App\Http\Controllers\Workspaces\SalesTargetController;
 use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamAdAccountController;
@@ -94,6 +96,19 @@ use Modules\SimGateway\Http\Controllers\SmsController;
 | member management, and invitation handling.
 |
 */
+Route::get('/public/workspaces/{workspace}/sales-targets', [PublicSalesTargetController::class, 'index'])->name('public-page.sales-targets');
+Route::post('/public/workspaces/{workspace}/sales-targets/verify-password', [PublicSalesTargetController::class, 'verifyPublicPassword'])->name('public-page.sales-targets.verify-password');
+// The board only fetches what it cannot work out for itself: the day's measured
+// totals, each team's goal and actual, and the leader's sparkline. Percentages,
+// ranking, bands and the leaderboard slice are derived client-side.
+Route::get('/public/workspaces/{workspace}/sales-targets/kpis', [PublicSalesTargetController::class, 'kpis'])->name('public-page.sales-targets.kpis');
+Route::get('/public/workspaces/{workspace}/sales-targets/teams', [PublicSalesTargetController::class, 'teams'])->name('public-page.sales-targets.teams');
+Route::get('/public/workspaces/{workspace}/sales-targets/team-trend', [PublicSalesTargetController::class, 'teamTrend'])->name('public-page.sales-targets.team-trend');
+// Last, and digits only, so the literal section paths above always win.
+Route::get('/public/workspaces/{workspace}/sales-targets/{salesTarget}', [PublicSalesTargetController::class, 'index'])
+    ->whereNumber('salesTarget')
+    ->name('public-page.sales-targets.show');
+
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
@@ -145,6 +160,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('workspaces.sales-marketing.dashboard.page-roas-tracker');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spend-goals');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spent-summary');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets', [SalesTargetController::class, 'index'])->name('workspaces.sales-marketing.dashboard.sales-targets');
+    Route::post('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets', [SalesTargetController::class, 'store'])->name('workspaces.sales-marketing.dashboard.sales-targets.store');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'show'])->name('workspaces.sales-marketing.dashboard.sales-targets.show');
+    Route::put('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'update'])->name('workspaces.sales-marketing.dashboard.sales-targets.update');
+    Route::delete('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'destroy'])->name('workspaces.sales-marketing.dashboard.sales-targets.destroy');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
@@ -198,6 +218,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::put('/workspaces/{workspace}/pages/{page}/budget', [PageController::class, 'updateBudget'])->name('workspaces.pages.update-budget');
     Route::patch('/workspaces/{workspace}/pages/{page}/assign-owner', [PageController::class, 'assignOwner'])->name('workspaces.pages.assign-owner');
+    Route::patch('/workspaces/{workspace}/pages/{page}/auto-budget', [PageController::class, 'updateAutoBudget'])->name('workspaces.pages.auto-budget');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
 
@@ -570,8 +591,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/income-statements/{incomeStatement}/regenerate', [FinanceIncomeStatementController::class, 'regenerate'])->name('income-statements.regenerate');
         Route::delete('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'destroy'])->name('income-statements.destroy');
 
+        Route::get('/income-statements/{incomeStatement}/products', [FinanceUserIncomeStatementController::class, 'productIndex'])->name('income-statements.products.index');
         Route::get('/income-statements/{incomeStatement}/users', [FinanceUserIncomeStatementController::class, 'index'])->name('income-statements.users.index');
         Route::get('/income-statements/{incomeStatement}/users/{user}', [FinanceUserIncomeStatementController::class, 'show'])->name('income-statements.users.show');
+        Route::put('/income-statements/{incomeStatement}/users/{user}/commission-rate', [FinanceUserIncomeStatementController::class, 'setCommissionRate'])->name('income-statements.users.commission-rate');
 
         Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
         Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');

@@ -47,6 +47,9 @@ export const TRANSACTION_TYPE_LABEL: Record<TransactionType, string> =
 export interface TransactionTypeItem {
     id: number;
     name: string;
+    // Account nature: 'credit' = money in, 'debit' = money out. Drives the
+    // transaction's in/out direction so it no longer has to be picked by hand.
+    nature: 'debit' | 'credit';
 }
 
 export interface TransactionTypeOption {
