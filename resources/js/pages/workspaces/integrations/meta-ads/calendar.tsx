@@ -21,7 +21,12 @@ interface PageBreakdown {
 interface PageOption {
     id: string;
     name: string;
+    /** The page's owner, shown instead of `name` when the toggle is on Owner. */
+    owner_name: string;
 }
+
+/** Which label the page filter's menu lists its options by. */
+type PageLabel = 'name' | 'owner';
 
 interface DayData {
     total: number;
@@ -39,8 +44,7 @@ interface Props {
     pageTotals: PageBreakdown[];
     pageOptions: PageOption[];
     selectedPages: string[];
-    pageOwnerOptions: PageOption[];
-    selectedPageOwners: string[];
+    pageLabel: PageLabel;
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -72,8 +76,7 @@ export default function AdsCalendar({
     pageTotals,
     pageOptions,
     selectedPages,
-    pageOwnerOptions,
-    selectedPageOwners,
+    pageLabel,
 }: Props) {
     const base = `/workspaces/${workspace.slug}/integrations/meta/ads-calendar`;
 
@@ -83,9 +86,8 @@ export default function AdsCalendar({
     const [pending, setPending] = useState<string[]>(selectedPages);
     useEffect(() => setPending(selectedPages), [selectedPages]);
 
-    const [pendingOwners, setPendingOwners] =
-        useState<string[]>(selectedPageOwners);
-    useEffect(() => setPendingOwners(selectedPageOwners), [selectedPageOwners]);
+    const [label, setLabel] = useState<PageLabel>(pageLabel);
+    useEffect(() => setLabel(pageLabel), [pageLabel]);
 
     const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -95,7 +97,7 @@ export default function AdsCalendar({
         const qs = new URLSearchParams();
         if (targetMonth) qs.set('month', targetMonth);
         pending.forEach((p) => qs.append('pages[]', p));
-        pendingOwners.forEach((o) => qs.append('page_owners[]', o));
+        if (label === 'owner') qs.set('page_label', label);
         const s = qs.toString();
         return s ? `${base}?${s}` : base;
     };
@@ -103,9 +105,7 @@ export default function AdsCalendar({
     // Apply a new page selection, keeping the current month. `preserveState`
     // keeps the dropdown open across the visit; `replace` avoids stacking a
     // history entry per filter change.
-    // Both filters travel together — dropping the other one on every change
-    // would silently reset it the moment you touched either menu.
-    const visit = (pages: string[], owners: string[]) => {
+    const visit = (pages: string[]) => {
         if (navTimer.current) clearTimeout(navTimer.current);
         navTimer.current = setTimeout(() => {
             router.get(
@@ -113,7 +113,7 @@ export default function AdsCalendar({
                 {
                     month,
                     ...(pages.length ? { pages } : {}),
-                    ...(owners.length ? { page_owners: owners } : {}),
+                    ...(label === 'owner' ? { page_label: label } : {}),
                 },
                 { preserveScroll: true, preserveState: true, replace: true },
             );
@@ -122,12 +122,24 @@ export default function AdsCalendar({
 
     const onPagesChange = (values: string[]) => {
         setPending(values);
-        visit(values, pendingOwners);
+        visit(values);
     };
 
-    const onPageOwnersChange = (values: string[]) => {
-        setPendingOwners(values);
-        visit(pending, values);
+    // Relabelling is pure display — the option list already carries both names,
+    // so swap it locally and just rewrite the URL. No server round trip, and no
+    // reload that would close the menu mid-toggle.
+    const onLabelChange = (next: PageLabel) => {
+        setLabel(next);
+
+        const qs = new URLSearchParams(window.location.search);
+        if (next === 'owner') qs.set('page_label', next);
+        else qs.delete('page_label');
+        const s = qs.toString();
+        window.history.replaceState(
+            null,
+            '',
+            s ? `${window.location.pathname}?${s}` : window.location.pathname,
+        );
     };
 
     // Map page id → palette colour by month-wide rank, reused in every day cell.
@@ -171,21 +183,17 @@ export default function AdsCalendar({
                             placeholder="All pages"
                             options={pageOptions.map((p) => ({
                                 value: p.id,
-                                label: p.name,
+                                label:
+                                    label === 'owner' ? p.owner_name : p.name,
                             }))}
                             selected={pending}
                             onChange={onPagesChange}
-                        />
-                        <MultiSelect
-                            compact
-                            className="w-56"
-                            placeholder="All page owners"
-                            options={pageOwnerOptions.map((o) => ({
-                                value: o.id,
-                                label: o.name,
-                            }))}
-                            selected={pendingOwners}
-                            onChange={onPageOwnersChange}
+                            header={
+                                <LabelToggle
+                                    value={label}
+                                    onChange={onLabelChange}
+                                />
+                            }
                         />
                     </div>
                     <div className="flex items-center gap-2">
@@ -320,6 +328,44 @@ export default function AdsCalendar({
                 )}
             </div>
         </AppLayout>
+    );
+}
+
+/**
+ * Segmented switch for what the page filter lists its options by. Only the menu
+ * labels change — the calendar keeps counting and showing per page either way.
+ */
+function LabelToggle({
+    value,
+    onChange,
+}: {
+    value: PageLabel;
+    onChange: (next: PageLabel) => void;
+}) {
+    const options: { value: PageLabel; label: string }[] = [
+        { value: 'name', label: 'Page name' },
+        { value: 'owner', label: 'Page owner' },
+    ];
+
+    return (
+        <div className="flex items-center gap-1 rounded-md bg-stone-100 p-0.5 dark:bg-zinc-700">
+            {options.map((o) => (
+                <button
+                    key={o.value}
+                    type="button"
+                    aria-pressed={value === o.value}
+                    onClick={() => onChange(o.value)}
+                    className={cn(
+                        'flex-1 rounded px-2 py-1 text-[11px] font-medium transition-colors',
+                        value === o.value
+                            ? 'bg-white text-gray-900 shadow-sm dark:bg-zinc-800 dark:text-gray-100'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200',
+                    )}
+                >
+                    {o.label}
+                </button>
+            ))}
+        </div>
     );
 }
 

@@ -14,6 +14,12 @@ interface MultiSelectProps {
     placeholder?: string;
     className?: string;
     compact?: boolean;
+    /**
+     * Rendered inside the open menu, above the search box — for controls that
+     * belong to the filter itself (e.g. switching what the options are labelled
+     * by). Compact mode only.
+     */
+    header?: React.ReactNode;
 }
 
 export function MultiSelect({
@@ -23,6 +29,7 @@ export function MultiSelect({
     placeholder = 'Select items...',
     className = '',
     compact = false,
+    header,
 }: MultiSelectProps) {
     const [open, setOpen] = React.useState(false);
     const [search, setSearch] = React.useState('');
@@ -89,6 +96,11 @@ export function MultiSelect({
 
                 {open && (
                     <div className="absolute z-50 mt-1 w-full min-w-[200px] overflow-hidden rounded-[10px] border border-black/6 bg-white shadow-lg dark:border-white/6 dark:bg-zinc-800">
+                        {header && (
+                            <div className="border-b border-black/6 p-1.5 dark:border-white/6">
+                                {header}
+                            </div>
+                        )}
                         <div className="border-b border-black/6 p-1.5 dark:border-white/6">
                             <input
                                 type="text"
