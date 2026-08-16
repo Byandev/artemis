@@ -46,6 +46,24 @@ function makeWorkspaceWithOwner(): array
 }
 
 /**
+ * The same, for a Gencys-partner workspace.
+ *
+ * The partner flag decides where inventory figures come from: a partner's items
+ * list and dashboard read frozen `inventory_item_snapshots` rows, and only
+ * partners are snapshotted at all. Anything asserting snapshot behaviour needs
+ * this rather than makeWorkspaceWithOwner(), which is deliberately live.
+ *
+ * @return array{user: User, workspace: Workspace}
+ */
+function makeGencysWorkspaceWithOwner(): array
+{
+    $made = makeWorkspaceWithOwner();
+    $made['workspace']->update(['is_gencys_partner' => true]);
+
+    return $made;
+}
+
+/**
  * Create a member user attached to the given workspace with the given pivot role.
  */
 function makeWorkspaceMember(Workspace $workspace, string $role = 'member'): User

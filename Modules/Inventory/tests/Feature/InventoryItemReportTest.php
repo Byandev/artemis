@@ -125,7 +125,7 @@ function reportSnapshot(Workspace $workspace, InventoryItem $item, string $date,
 }
 
 test('demand windows expand unit codes into component units and count orders once', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
     // One bundle carries three of the widget, so one order line is three units.
@@ -146,7 +146,7 @@ test('demand windows expand unit codes into component units and count orders onc
 });
 
 test('one order spanning two bundles of the same item counts as a single order', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
     unitCode($workspace, 'BUNDLE-A', ['WIDGET' => 2]);
@@ -168,7 +168,7 @@ test('one order spanning two bundles of the same item counts as a single order',
 });
 
 test('demand windows are measured from the feed, not from today', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
     unitCode($workspace, 'BUNDLE-A', ['WIDGET' => 1]);
@@ -186,7 +186,7 @@ test('demand windows are measured from the feed, not from today', function () {
 });
 
 test('demand rolls up to the group across its children', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = reportItem($workspace, 'PARENT');
     $parent->update(['is_parent' => true]);
@@ -207,7 +207,7 @@ test('demand rolls up to the group across its children', function () {
 });
 
 test('movement facts report the quantity that moved on the last in and out days', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -232,7 +232,7 @@ test('movement facts report the quantity that moved on the last in and out days'
 });
 
 test('purchase-order facts separate what we have not released from what a supplier is sitting on', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -302,7 +302,7 @@ test('an order raised with no expected date is stored as due two weeks later', f
 });
 
 test('the report reads the expected date the order carries', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -329,7 +329,7 @@ test('the report reads the expected date the order carries', function () {
 });
 
 test('a supplier is late against its own commitment, not a fixed age', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -359,7 +359,7 @@ test('a supplier is late against its own commitment, not a fixed age', function 
 });
 
 test('a fully delivered order is not still waiting on anyone', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -385,7 +385,7 @@ test('a fully delivered order is not still waiting on anyone', function () {
 });
 
 test('a group with no orders, movements or purchase orders still reports a full row', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'QUIET');
 
@@ -399,7 +399,7 @@ test('a group with no orders, movements or purchase orders still reports a full 
 });
 
 test('the export downloads as a spreadsheet with every column', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     reportItem($workspace, 'WIDGET');
 
@@ -421,7 +421,7 @@ test('the export downloads as a spreadsheet with every column', function () {
 });
 
 test('the snapshot freezes the report figures and a past date reads them back', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
     $item->update(['unfulfilled_count' => 40]);
@@ -481,7 +481,7 @@ test('the snapshot freezes the report figures and a past date reads them back', 
 });
 
 test('a snapshot taken before the report existed reports unknown, not zero', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -515,7 +515,7 @@ test('a snapshot taken before the report existed reports unknown, not zero', fun
 });
 
 test('stockout risk is read against the lead time, not a fixed number of days', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     // 10 units a day against a 10-day lead time. 40 units is 4 days of cover —
     // under half the lead time, so ordering now would already be too late.
@@ -554,7 +554,7 @@ test('stockout risk is read against the lead time, not a fixed number of days', 
 });
 
 test('Late PO fires when a reorder need goes unraised for more than three days', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -569,7 +569,7 @@ test('Late PO fires when a reorder need goes unraised for more than three days',
 });
 
 test('a persisting gap is not Late PO once a purchase order has been raised', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -597,7 +597,7 @@ test('a persisting gap is not Late PO once a purchase order has been raised', fu
 });
 
 test('the warehouse owns the hold-up when shippable stock sits unshipped', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 
@@ -624,7 +624,7 @@ test('the warehouse owns the hold-up when shippable stock sits unshipped', funct
 });
 
 test('a late supplier outranks a smaller idle shelf', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = reportItem($workspace, 'WIDGET');
 

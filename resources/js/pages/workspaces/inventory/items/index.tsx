@@ -670,6 +670,10 @@ export default function ItemIndex({
     const [newParentSku, setNewParentSku] = useState('');
 
     const viewingSnapshot = !!snapshotDate;
+    // Whether this list is snapshot-backed at all. The server sends no days for a
+    // workspace that reads live, so there is nothing to pin the list to and the
+    // day picker would offer an empty calendar.
+    const hasSnapshots = snapshotDates.length > 0;
     // snapshotDates arrives newest-first, so the head of it is the current day.
     const newestSnapshot = snapshotDates[0] ?? null;
     const isNewestSnapshot = !!snapshotDate && snapshotDate === newestSnapshot;
@@ -1650,29 +1654,32 @@ export default function ItemIndex({
                             newest snapshot is as current as the data gets — and
                             the export and report follow whichever day is picked.
                             Only days that were actually snapshotted are
-                            selectable. */}
-                        <DatePicker
-                            id="inventory-items-snapshot-date"
-                            // The picker seeds its display from defaultDate once,
-                            // on mount — changing the prop afterwards leaves the
-                            // old date on screen. Keying on the shown day remounts
-                            // it so the field follows the list rather than
-                            // drifting from it.
-                            key={snapshotDate ?? 'none'}
-                            compact
-                            placeholder="No saved data yet"
-                            defaultDate={snapshotDate ?? undefined}
-                            enable={snapshotDates}
-                            onChange={(dates) => {
-                                // Clearing would ask for a day that does not
-                                // exist, so an empty pick keeps the current one.
-                                if (dates.length) {
-                                    handleDateChange(
-                                        format(dates[0], 'yyyy-MM-dd'),
-                                    );
-                                }
-                            }}
-                        />
+                            selectable, and a workspace that reads live gets no
+                            picker at all rather than an empty calendar. */}
+                        {hasSnapshots && (
+                            <DatePicker
+                                id="inventory-items-snapshot-date"
+                                // The picker seeds its display from defaultDate once,
+                                // on mount — changing the prop afterwards leaves the
+                                // old date on screen. Keying on the shown day remounts
+                                // it so the field follows the list rather than
+                                // drifting from it.
+                                key={snapshotDate ?? 'none'}
+                                compact
+                                placeholder="No saved data yet"
+                                defaultDate={snapshotDate ?? undefined}
+                                enable={snapshotDates}
+                                onChange={(dates) => {
+                                    // Clearing would ask for a day that does not
+                                    // exist, so an empty pick keeps the current one.
+                                    if (dates.length) {
+                                        handleDateChange(
+                                            format(dates[0], 'yyyy-MM-dd'),
+                                        );
+                                    }
+                                }}
+                            />
+                        )}
                         <a
                             href={`${baseUrl}/export?${new URLSearchParams(
                                 Object.entries({

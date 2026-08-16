@@ -559,6 +559,22 @@ class InventoryItemController extends Controller
     }
 
     /**
+     * Whether this workspace's item figures come from frozen snapshots.
+     *
+     * Only Gencys partners. Their stock, purchase orders and demand all arrive by
+     * batch sync, so a frozen day is as current as the data ever gets and freezing
+     * it buys a consistent page. Everyone else keeps their inventory in Artemis
+     * directly — a receipt or an adjustment saved a minute ago is the truth — and
+     * reading yesterday's photograph would show them numbers their own edit
+     * already changed. The daily command snapshots every workspace regardless, so
+     * a non-partner does have rows; they are simply not what the page should read.
+     */
+    private function usesSnapshots(Workspace $workspace): bool
+    {
+        return (bool) $workspace->is_gencys_partner;
+    }
+
+    /**
      * The snapshot date the list is pinned to, or null for live data. Only a date
      * that actually has rows counts — a date with no snapshot (the job had not run
      * yet, or predates the feature) falls back to live rather than showing an
@@ -566,6 +582,10 @@ class InventoryItemController extends Controller
      */
     private function snapshotDate(Request $request, Workspace $workspace): ?string
     {
+        if (! $this->usesSnapshots($workspace)) {
+            return null;
+        }
+
         $date = $request->input('filter.date');
 
         if (! $date) {
@@ -602,7 +622,10 @@ class InventoryItemController extends Controller
         $summarize = $request->boolean('summarize', true);
 
         // Which frozen day the list shows: the one asked for, or the newest.
-        $requestedDate = $request->input('filter.date');
+        // A workspace that reads live has no days to pick between, so a stray
+        // `filter[date]` on the URL is ignored rather than treated as a miss.
+        $usesSnapshots = $this->usesSnapshots($workspace);
+        $requestedDate = $usesSnapshots ? $request->input('filter.date') : null;
         $snapshotDate = $this->snapshotDate($request, $workspace);
 
         if ($snapshotDate) {
@@ -619,9 +642,10 @@ class InventoryItemController extends Controller
                 'query' => $request->query(),
             ]);
         } else {
-            // Never snapshotted at all, which is a workspace that has just been
-            // set up rather than a missing day. Computing live keeps it from
-            // looking broken until the first scheduled run lands.
+            // Either a workspace that reads live by policy (see usesSnapshots),
+            // or a partner that has never been snapshotted — one that has just
+            // been set up rather than a missing day, where computing live keeps
+            // it from looking broken until the first scheduled run lands.
             $items = $summarize
                 ? $this->buildSummaryQuery($request, $workspace)->paginate($perPage)->withQueryString()
                 : $this->buildQuery($request, $workspace)->paginate($perPage)->withQueryString();
@@ -657,14 +681,18 @@ class InventoryItemController extends Controller
                     ->max('updated_at')
                 : null,
             // Dates that actually have a snapshot, so the picker can grey out the rest
-            // instead of silently falling back to live data.
-            'snapshotDates' => InventoryItemSnapshot::where('workspace_id', $workspace->id)
-                ->distinct()
-                ->orderByDesc('snapshot_date')
-                ->limit(365)
-                ->pluck('snapshot_date')
-                ->map(fn ($d) => Carbon::parse($d)->toDateString())
-                ->all(),
+            // instead of silently falling back to live data. Empty for a workspace
+            // that reads live, which has no frozen days to offer even though the
+            // daily command wrote rows for it.
+            'snapshotDates' => $usesSnapshots
+                ? InventoryItemSnapshot::where('workspace_id', $workspace->id)
+                    ->distinct()
+                    ->orderByDesc('snapshot_date')
+                    ->limit(365)
+                    ->pluck('snapshot_date')
+                    ->map(fn ($d) => Carbon::parse($d)->toDateString())
+                    ->all()
+                : [],
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
@@ -856,6 +884,12 @@ class InventoryItemController extends Controller
      */
     private function refreshTodaysSnapshot(Workspace $workspace, InventoryItem $item): void
     {
+        // A live workspace has no snapshot to keep in step, and any row it still
+        // carries from before the partner rule is one nothing reads.
+        if (! $this->usesSnapshots($workspace)) {
+            return;
+        }
+
         $today = Carbon::today()->toDateString();
 
         $exists = InventoryItemSnapshot::where('workspace_id', $workspace->id)
