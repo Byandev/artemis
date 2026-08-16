@@ -78,6 +78,13 @@ export type ReportConfig = {
      */
     created_since?: string | null;
     created_until?: string | null;
+    /**
+     * Narrows rows to entities whose delivery started in this window (ISO
+     * dates, either end optional). An ad's start is its ad set's — ads have no
+     * start date of their own.
+     */
+    start_since?: string | null;
+    start_until?: string | null;
     chart: ChartStyle;
     view: ReportView;
 };
@@ -229,6 +236,8 @@ export function defaultConfig(
         creator_id: null,
         created_since: null,
         created_until: null,
+        start_since: null,
+        start_until: null,
         chart: 'gallery',
         view: { ...DEFAULT_VIEW },
     };

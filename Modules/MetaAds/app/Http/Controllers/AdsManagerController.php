@@ -330,6 +330,8 @@ class AdsManagerController extends Controller
                 ],
                 'search' => 'meta_ads_ads.name',
                 'createdColumn' => 'meta_ads_ads.created_time',
+                'startColumn' => 'meta_ads_sets.start_time',
+                'startVia' => ['table' => 'meta_ads_sets', 'localKey' => 'meta_ads_ads.meta_ads_set_id'],
             ],
             'ad_name' => [
                 'model' => Ad::class,
@@ -343,6 +345,8 @@ class AdsManagerController extends Controller
                 'groupBy' => ['meta_ads_ads.name'],
                 'search' => 'meta_ads_ads.name',
                 'createdColumn' => 'meta_ads_ads.created_time',
+                'startColumn' => 'meta_ads_sets.start_time',
+                'startVia' => ['table' => 'meta_ads_sets', 'localKey' => 'meta_ads_ads.meta_ads_set_id'],
                 // Ads sharing this name (within the selected accounts).
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
@@ -369,6 +373,7 @@ class AdsManagerController extends Controller
                 ],
                 'search' => 'meta_ads_campaigns.name',
                 'createdColumn' => 'meta_ads_campaigns.created_time',
+                'startColumn' => 'meta_ads_campaigns.start_time',
                 'adsCount' => ['key' => 'meta_ads_campaign_id', 'joinOn' => 'meta_ads_campaigns.id'],
             ],
             'ad_set' => [
@@ -394,6 +399,7 @@ class AdsManagerController extends Controller
                 ],
                 'search' => 'meta_ads_sets.name',
                 'createdColumn' => 'meta_ads_sets.created_time',
+                'startColumn' => 'meta_ads_sets.start_time',
                 'adsCount' => ['key' => 'meta_ads_set_id', 'joinOn' => 'meta_ads_sets.id'],
             ],
             'account' => [
@@ -426,6 +432,8 @@ class AdsManagerController extends Controller
                 'groupBy' => [DB::raw(self::AD_TYPE_LABEL_SQL)],
                 'search' => 'meta_ads_ads.name',
                 'createdColumn' => 'meta_ads_ads.created_time',
+                'startColumn' => 'meta_ads_sets.start_time',
+                'startVia' => ['table' => 'meta_ads_sets', 'localKey' => 'meta_ads_ads.meta_ads_set_id'],
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
         };
@@ -459,6 +467,10 @@ class AdsManagerController extends Controller
         // Narrow to entities created inside a window — "ads created in August".
         // Separate from since/until, which bound the insights, not the ad's age.
         $this->applyCreatedRange($base, $config, $request);
+
+        // Same idea for when delivery was scheduled to begin — "ads that
+        // started running in August", which can be well after they were made.
+        $this->applyStartRange($base, $config, $request);
 
         // Number of ads in each group — shown for every dimension except `ad`
         // (where each row is already a single ad). `ad_name` counts distinct ads
@@ -563,6 +575,16 @@ class AdsManagerController extends Controller
             ->tap(fn ($q) => $this->applyCreatedRange(
                 $q,
                 ['createdColumn' => 'meta_ads_ads.created_time'],
+                $request
+            ))
+            // Start time lives on the ad set, as it does for every ad-grained
+            // dimension.
+            ->tap(fn ($q) => $this->applyStartRange(
+                $q,
+                [
+                    'startColumn' => 'meta_ads_sets.start_time',
+                    'startVia' => ['table' => 'meta_ads_sets', 'localKey' => 'meta_ads_ads.meta_ads_set_id'],
+                ],
                 $request
             ))
             ->select(array_merge(
@@ -877,8 +899,62 @@ class AdsManagerController extends Controller
         $table = strtok($column, '.');
         $expr = "COALESCE({$column}, {$table}.created_at)";
 
-        // DATE() so a date-only bound covers the whole day at both ends —
-        // otherwise an ad created at 09:00 falls outside its own end date.
+        $this->whereDateRange($query, $expr, $from, $until);
+    }
+
+    /**
+     * Restrict rows to entities whose delivery start date falls in the range —
+     * "ads that started running in August", which can be long after they were
+     * created. Only campaigns and ad sets carry a start_time of their own; an
+     * ad's start is its ad set's, reached with a semi-join so the grouped query
+     * keeps its row shape. Accounts have no start at all and are left alone
+     * rather than silently returning nothing.
+     */
+    private function applyStartRange($query, array $config, Request $request): void
+    {
+        $column = $config['startColumn'] ?? null;
+
+        if ($column === null) {
+            return;
+        }
+
+        $from = trim((string) $request->query('start_since', ''));
+        $until = trim((string) $request->query('start_until', ''));
+
+        if ($from === '' && $until === '') {
+            return;
+        }
+
+        // start_time is NULL on anything seeded locally or synced before the
+        // field was requested. Ageing a target off its creation date instead is
+        // what OptimizationRuleEvaluator already does, so match that order here
+        // rather than dropping those rows from every range. Column names come
+        // from our config, never from the request.
+        $table = strtok($column, '.');
+        $expr = "COALESCE({$column}, {$table}.created_time, {$table}.created_at)";
+
+        $via = $config['startVia'] ?? null;
+
+        if ($via === null) {
+            $this->whereDateRange($query, $expr, $from, $until);
+
+            return;
+        }
+
+        $query->whereIn($via['localKey'], function ($sub) use ($via, $expr, $from, $until) {
+            $sub->select($via['table'].'.id')->from($via['table']);
+
+            $this->whereDateRange($sub, $expr, $from, $until);
+        });
+    }
+
+    /**
+     * Bound a datetime SQL expression by date-only ends, either of which may be
+     * left empty. DATE() so a bound covers the whole day — otherwise an entity
+     * created (or started) at 09:00 falls outside its own end date.
+     */
+    private function whereDateRange($query, string $expr, string $from, string $until): void
+    {
         if ($from !== '') {
             $query->whereRaw("DATE({$expr}) >= ?", [$from]);
         }

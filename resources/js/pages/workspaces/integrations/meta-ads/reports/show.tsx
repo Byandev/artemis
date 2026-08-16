@@ -135,6 +135,14 @@ export default function ReportShow({
         if (config.created_until) {
             qs.set('created_until', config.created_until);
         }
+        // Delivery start window. Ad-grained breakdowns resolve it through the
+        // ad set, which is where a start date actually lives.
+        if (config.start_since) {
+            qs.set('start_since', config.start_since);
+        }
+        if (config.start_until) {
+            qs.set('start_until', config.start_until);
+        }
         qs.set('per_page', '48');
 
         fetch(`${adsManagerDataUrl(workspace.slug)}?${qs.toString()}`, {
@@ -161,6 +169,8 @@ export default function ReportShow({
         config.creator_id,
         config.created_since,
         config.created_until,
+        config.start_since,
+        config.start_until,
         accountsKey,
         filtersKey,
         workspace.slug,
@@ -331,37 +341,83 @@ export default function ReportShow({
                         />
 
                         {/* When the ad itself was created — not the insights
-                            window above, which is the period being measured. */}
-                        <DatePicker
-                            id={`report-${report.id}-created-range`}
-                            mode="range"
-                            placeholder="Created: any"
-                            onChange={(dates) => {
-                                if (dates.length === 2) {
-                                    patch({
-                                        created_since: moment(dates[0]).format(
-                                            'YYYY-MM-DD',
-                                        ),
-                                        created_until: moment(dates[1]).format(
-                                            'YYYY-MM-DD',
-                                        ),
-                                    });
-                                } else if (dates.length === 0) {
-                                    patch({
-                                        created_since: null,
-                                        created_until: null,
-                                    });
+                            window above, which is the period being measured.
+                            Labelled because once dates are picked all three
+                            calendar boxes in this bar look identical. */}
+                        <div className="inline-flex shrink-0 items-center gap-1.5">
+                            <span className="text-[11px] font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                Created
+                            </span>
+                            <DatePicker
+                                id={`report-${report.id}-created-range`}
+                                mode="range"
+                                placeholder="Any"
+                                onChange={(dates) => {
+                                    if (dates.length === 2) {
+                                        patch({
+                                            created_since: moment(
+                                                dates[0],
+                                            ).format('YYYY-MM-DD'),
+                                            created_until: moment(
+                                                dates[1],
+                                            ).format('YYYY-MM-DD'),
+                                        });
+                                    } else if (dates.length === 0) {
+                                        patch({
+                                            created_since: null,
+                                            created_until: null,
+                                        });
+                                    }
+                                }}
+                                defaultDate={
+                                    (config.created_since &&
+                                    config.created_until
+                                        ? [
+                                              config.created_since,
+                                              config.created_until,
+                                          ]
+                                        : undefined) as never
                                 }
-                            }}
-                            defaultDate={
-                                (config.created_since && config.created_until
-                                    ? [
-                                          config.created_since,
-                                          config.created_until,
-                                      ]
-                                    : undefined) as never
-                            }
-                        />
+                            />
+                        </div>
+
+                        {/* When delivery began — often well after the ad was
+                            created, and taken from the ad set for ad rows. */}
+                        <div className="inline-flex shrink-0 items-center gap-1.5">
+                            <span className="text-[11px] font-medium whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                Started
+                            </span>
+                            <DatePicker
+                                id={`report-${report.id}-start-range`}
+                                mode="range"
+                                placeholder="Any"
+                                onChange={(dates) => {
+                                    if (dates.length === 2) {
+                                        patch({
+                                            start_since: moment(
+                                                dates[0],
+                                            ).format('YYYY-MM-DD'),
+                                            start_until: moment(
+                                                dates[1],
+                                            ).format('YYYY-MM-DD'),
+                                        });
+                                    } else if (dates.length === 0) {
+                                        patch({
+                                            start_since: null,
+                                            start_until: null,
+                                        });
+                                    }
+                                }}
+                                defaultDate={
+                                    (config.start_since && config.start_until
+                                        ? [
+                                              config.start_since,
+                                              config.start_until,
+                                          ]
+                                        : undefined) as never
+                                }
+                            />
+                        </div>
 
                         <Select
                             value={
