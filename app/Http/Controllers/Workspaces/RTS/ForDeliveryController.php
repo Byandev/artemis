@@ -19,11 +19,13 @@ use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
 use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\CallLog;
 use App\Models\Page;
+use App\Models\User as SystemUser;
 use App\Models\Workspace;
 use App\Support\PublicWorkspaceGate;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -672,8 +674,38 @@ class ForDeliveryController extends Controller
             ->where('phone_number', $request->input('phone_number'))
             ->whereDate('call_date', $request->input('date'))
             ->orderBy('call_time', 'desc')
-            ->get(['id', 'user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
+            ->get(['id', 'user_id', 'assignee_user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
 
-        return response()->json($logs);
+        return response()->json($this->namedCallers($logs));
+    }
+
+    /**
+     * Stamp each call with the name of whoever actually placed it.
+     *
+     * A log carries whichever id the app that synced it knew about: the older
+     * mobile build sends a Pancake user id in `user_id`, the newer one sends the
+     * system user id in `assignee_user_id`. Resolving both here is what lets the
+     * modal name the real caller — the list isn't filtered by CSR, so two people
+     * who rang the same number on the same day both show up, and the page has no
+     * way to tell them apart on its own.
+     *
+     * @param  Collection<int, CallLog>  $logs
+     * @return Collection<int, CallLog>
+     */
+    private function namedCallers(Collection $logs): Collection
+    {
+        // Two lookups for the whole modal, however many calls it lists.
+        $systemNames = SystemUser::whereIn('id', $logs->pluck('assignee_user_id')->filter()->unique())
+            ->pluck('name', 'id');
+
+        $pancakeNames = User::whereIn('id', $logs->pluck('user_id')->filter()->unique())
+            ->pluck('name', 'id');
+
+        return $logs->each(function (CallLog $log) use ($systemNames, $pancakeNames) {
+            // Left null rather than guessed at when neither id resolves — an
+            // empty cell is honest, a wrong name isn't.
+            $log->setAttribute('called_by', $systemNames->get($log->assignee_user_id)
+                ?? $pancakeNames->get($log->user_id));
+        });
     }
 }
