@@ -3,7 +3,9 @@
 namespace App\Mail;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\SentMessage;
@@ -62,18 +64,45 @@ class BrevoTransport extends AbstractTransport
         }
 
         if ($response->failed()) {
-            // Brevo refuses with {"code": "...", "message": "..."}.
-            throw new TransportException(sprintf(
-                'Brevo rejected the message (HTTP %d): %s',
-                $response->status(),
-                $response->json('message') ?: $response->body()
-            ));
+            // Brevo refuses with {"code": "...", "message": "..."}. Log the reply
+            // whole — it names the server's own IP and the account's setup, which
+            // is exactly what whoever fixes this needs and exactly what nobody
+            // waiting on a signup form should ever be shown.
+            Log::error('Brevo refused a message.', [
+                'status' => $response->status(),
+                'code' => $response->json('code'),
+                'reason' => $response->json('message') ?: $response->body(),
+            ]);
+
+            throw new TransportException($this->refusal($response));
         }
 
         if ($id = $response->json('messageId')) {
             $message->setMessageId((string) $id);
             $email->getHeaders()->addHeader('X-Brevo-Message-ID', (string) $id);
         }
+    }
+
+    /**
+     * Why Brevo said no, in one line, for the log and the Sentry issue.
+     *
+     * Named separately from the raw reply so the common refusals read as the
+     * settings they are rather than as a fault in the app.
+     */
+    private function refusal(Response $response): string
+    {
+        $reason = (string) ($response->json('message') ?: $response->body());
+
+        // The refusal that looks like a bug and isn't: Brevo only answers API
+        // calls from addresses listed under Security → Authorised IPs, so a new
+        // server — or one whose address moved — is turned away until it's added.
+        // The reply quotes the address; this doesn't, because this string is
+        // allowed to travel further than the log entry above.
+        if ($response->status() === 401 && str_contains(strtolower($reason), 'ip address')) {
+            return "Brevo refused the message: this server's IP address is not on the account's authorised IP list. Add it under Brevo → Security → Authorised IPs.";
+        }
+
+        return sprintf('Brevo rejected the message (HTTP %d): %s', $response->status(), $reason);
     }
 
     /**

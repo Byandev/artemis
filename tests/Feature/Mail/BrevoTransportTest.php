@@ -135,6 +135,24 @@ test('a refusal from Brevo surfaces its reason, not a blank failure', function (
         ->toThrow(TransportException::class, 'Sender email is not valid');
 });
 
+test('an unauthorised sending IP reads as the setting it is, without quoting the address', function () {
+    usingBrevo([
+        'code' => 'unauthorized',
+        'message' => 'Unrecognised IP address 203.0.113.7. Please add it in your authorised IPs',
+    ], 401);
+
+    expect(fn () => Mail::raw('Body', fn ($message) => $message->to('to@example.com')->subject('Blocked')))
+        ->toThrow(TransportException::class, 'authorised IP list');
+
+    try {
+        Mail::raw('Body', fn ($message) => $message->to('to@example.com')->subject('Blocked'));
+    } catch (TransportException $e) {
+        // The server's address belongs in the log, not in a string that a
+        // render hook or a debug page might put in front of someone.
+        expect($e->getMessage())->not->toContain('203.0.113.7');
+    }
+});
+
 test('a missing key fails at construction rather than as a 401 later', function () {
     expect(fn () => new BrevoTransport(''))
         ->toThrow(TransportException::class, 'BREVO_API_KEY');
