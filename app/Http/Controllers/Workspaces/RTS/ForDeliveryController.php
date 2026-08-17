@@ -300,9 +300,16 @@ class ForDeliveryController extends Controller
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
                 \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
-            ->withCount(['customerCallLogs', 'riderCallLogs'])
-            ->withSum('customerCallLogs as customer_call_duration', 'duration')
-            ->withSum('riderCallLogs as rider_call_duration', 'duration')
+            // Every caller, not just the assignee — the badge opens the modal,
+            // and the modal has never filtered by CSR. Keeping the assignee
+            // scoping here is what made a row read "0 calls" and then open onto
+            // a full history, most often after the order was reassigned.
+            ->withCount([
+                'allCustomerCallLogs as customer_call_logs_count',
+                'allRiderCallLogs as rider_call_logs_count',
+            ])
+            ->withSum('allCustomerCallLogs as customer_call_duration', 'duration')
+            ->withSum('allRiderCallLogs as rider_call_duration', 'duration')
             ->with([
                 'order' => function ($query) {
                     $query
