@@ -222,7 +222,6 @@ function CallLogModal({
 }) {
     const [logs, setLogs] = useState<CallLog[]>([]);
     const [loading, setLoading] = useState(false);
-    const csrName = localStorage.getItem('user_name') ?? 'CSR';
 
     useEffect(() => {
         if (!open || !phoneNumber) return;
@@ -291,7 +290,7 @@ function CallLogModal({
                                             </span>
                                         </td>
                                         <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
-                                            {csrName}
+                                            {log.called_by ?? '—'}
                                         </td>
                                         <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
                                             {formatDuration(log.duration)}
