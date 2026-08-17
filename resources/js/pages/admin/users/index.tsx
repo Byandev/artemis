@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import RowActionsMenu from '@/components/common/RowActionsMenu';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -10,9 +11,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
-import { Switch } from '@/components/ui/switch';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData, SharedData, User } from '@/types';
@@ -21,7 +20,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
-import { Check, Copy, Search } from 'lucide-react';
+import { Check, Copy, Search, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 
@@ -208,40 +207,17 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
                     Role
                 </p>
             ),
-            cell: ({ row }) => {
-                const user = row.original;
-                const isSelf = user.id === currentUser?.id;
-
-                return (
-                    <div className="flex items-center gap-2">
-                        <Switch
-                            checked={!!user.is_super_admin}
-                            // Demoting yourself locks you out of /admin, so the
-                            // server refuses it and the switch says so first.
-                            disabled={
-                                savingRoleFor === user.id ||
-                                (isSelf && !!user.is_super_admin)
-                            }
-                            onCheckedChange={(grant) =>
-                                setPendingRole({ user, grant })
-                            }
-                            aria-label={`Super Admin access for ${user.name}`}
-                            title={
-                                isSelf && user.is_super_admin
-                                    ? 'You cannot remove your own Super Admin access'
-                                    : undefined
-                            }
-                        />
-                        {user.is_super_admin ? (
-                            <Badge className="border-violet-200/60 bg-violet-50 text-violet-700">
-                                Super Admin
-                            </Badge>
-                        ) : (
-                            <Badge variant="outline">User</Badge>
-                        )}
-                    </div>
-                );
-            },
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2">
+                    {row.original.is_super_admin ? (
+                        <Badge className="border-violet-200/60 bg-violet-50 text-violet-700">
+                            Super Admin
+                        </Badge>
+                    ) : (
+                        <Badge variant="outline">User</Badge>
+                    )}
+                </div>
+            ),
         },
         {
             accessorKey: 'created_at',
@@ -255,38 +231,59 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
             id: 'actions',
             header: () => (
                 <p className="text-right font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Reset password
+                    Actions
                 </p>
             ),
             cell: ({ row }) => {
                 const user = row.original;
                 const copied = copiedUserId === user.id;
+                const sending = sendingUserId === user.id;
+                const isSelf = user.id === currentUser?.id;
+                const isSuperAdmin = !!user.is_super_admin;
 
                 return (
-                    <div className="flex justify-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8"
-                            disabled={sendingUserId === user.id}
-                            onClick={() => copyResetPasswordUrl(user)}
-                        >
-                            {copied ? (
-                                <>
-                                    <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
-                                    Copied
-                                </>
-                            ) : (
-                                <>
-                                    <Copy className="mr-1.5 h-3.5 w-3.5" />
-                                    {sendingUserId === user.id
-                                        ? 'Generating...'
-                                        : 'Copy reset link'}
-                                </>
-                            )}
-                        </Button>
-                    </div>
+                    <RowActionsMenu
+                        width="w-48"
+                        actions={[
+                            {
+                                label: copied
+                                    ? 'Copied'
+                                    : sending
+                                      ? 'Generating...'
+                                      : 'Copy reset link',
+                                icon: copied ? (
+                                    <Check className="text-emerald-600" />
+                                ) : (
+                                    <Copy />
+                                ),
+                                disabled: sending,
+                                onSelect: () => copyResetPasswordUrl(user),
+                            },
+                            {
+                                label: isSuperAdmin
+                                    ? 'Remove super admin'
+                                    : 'Make super admin',
+                                icon: isSuperAdmin ? (
+                                    <ShieldOff />
+                                ) : (
+                                    <ShieldCheck />
+                                ),
+                                // Demoting yourself locks you out of /admin, so
+                                // the server refuses it and the menu greys it out
+                                // first.
+                                disabled:
+                                    savingRoleFor === user.id ||
+                                    (isSelf && isSuperAdmin),
+                                destructive: isSuperAdmin,
+                                separatorBefore: true,
+                                onSelect: () =>
+                                    setPendingRole({
+                                        user,
+                                        grant: !isSuperAdmin,
+                                    }),
+                            },
+                        ]}
+                    />
                 );
             },
         },

@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import RowActionsMenu from '@/components/common/RowActionsMenu';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
@@ -275,23 +276,24 @@ export default function Index({ invoices, filters }: Props) {
             enableSorting: false,
             header: () => <div className="text-right">Actions</div>,
             cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-1">
-                    <a
-                        href={`/admin/invoices/${row.original.id}/download`}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                    >
-                        <Download className="h-3.5 w-3.5" />
-                        PDF
-                    </a>
-                    <button
-                        type="button"
-                        onClick={() => handleDelete(row.original)}
-                        className="inline-flex items-center justify-center rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
-                        aria-label="Delete invoice"
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </button>
-                </div>
+                <RowActionsMenu
+                    width="w-40"
+                    actions={[
+                        {
+                            label: 'Download PDF',
+                            icon: <Download />,
+                            href: `/admin/invoices/${row.original.id}/download`,
+                            external: true,
+                        },
+                        {
+                            label: 'Delete invoice',
+                            icon: <Trash2 />,
+                            onSelect: () => handleDelete(row.original),
+                            destructive: true,
+                            separatorBefore: true,
+                        },
+                    ]}
+                />
             ),
         },
     ];

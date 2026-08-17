@@ -1,4 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
+import RowActionsMenu from '@/components/common/RowActionsMenu';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
@@ -223,20 +224,23 @@ export default function Index({
                 </div>
             ),
             cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-1">
-                    <Link
-                        href={`/admin/sims/${row.original.id}/edit`}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-                    >
-                        <Pencil className="h-4 w-4" />
-                    </Link>
-                    <button
-                        onClick={() => handleDelete(row.original)}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </button>
-                </div>
+                <RowActionsMenu
+                    width="w-36"
+                    actions={[
+                        {
+                            label: 'Edit',
+                            icon: <Pencil />,
+                            href: `/admin/sims/${row.original.id}/edit`,
+                        },
+                        {
+                            label: 'Delete',
+                            icon: <Trash2 />,
+                            onSelect: () => handleDelete(row.original),
+                            destructive: true,
+                            separatorBefore: true,
+                        },
+                    ]}
+                />
             ),
         },
     ];
