@@ -77,6 +77,7 @@ class AdsManagerController extends Controller
         $allAccountIds = $this->accountIdsForWorkspace($workspace, $request->user())->map(fn ($id) => (string) $id);
         $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
         $metricFilters = $this->parseMetricFilters($request);
+        $dateFilters = $this->parseDateFilters($request);
 
         $scopeBy = (string) $request->query('scope_by', '');
         $scopeValue = (string) $request->query('scope', '');
@@ -92,7 +93,7 @@ class AdsManagerController extends Controller
         if ($scopeBy === '' && str_starts_with($groupByRaw, 'custom:')) {
             $breakdownId = (int) substr($groupByRaw, 7);
             $rows = $this->aggregateCustomBreakdown(
-                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters, $creatorFilter
+                $request, $workspace, $accountIds, $since, $until, $breakdownId, $metricFilters, $creatorFilter, $dateFilters
             );
 
             return response()->json(['rows' => $rows]);
@@ -112,7 +113,7 @@ class AdsManagerController extends Controller
             $scope = null;
         }
 
-        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter);
+        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter, $dateFilters);
 
         return response()->json(['rows' => $rows]);
     }
@@ -426,7 +427,7 @@ class AdsManagerController extends Controller
         };
     }
 
-    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null): array
+    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null, array $dateFilters = []): array
     {
         $config = $this->groupByConfig($groupBy);
 
@@ -450,6 +451,9 @@ class AdsManagerController extends Controller
         if ($config['model'] === Ad::class) {
             $this->applyCreatorFilter($base, $creatorFilter);
         }
+
+        // Row-level lifecycle dates — a WHERE, so it runs before aggregation.
+        $this->applyDateFilters($base, $dateFilters, $groupBy);
 
         // Number of ads in each group — shown for every dimension except `ad`
         // (where each row is already a single ad). `ad_name` counts distinct ads
@@ -532,7 +536,8 @@ class AdsManagerController extends Controller
         string $until,
         int $breakdownId,
         array $metricFilters = [],
-        ?string $creatorFilter = null
+        ?string $creatorFilter = null,
+        array $dateFilters = []
     ): array {
         $breakdown = CustomBreakdown::where('workspace_id', $workspace->id)->findOrFail($breakdownId);
 
@@ -558,6 +563,9 @@ class AdsManagerController extends Controller
                 $this->metricSelects(),
             ))
             ->groupBy(DB::raw($case));
+
+        // The base here is meta_ads_ads, so the ad-grained date rules apply.
+        $this->applyDateFilters($base, $dateFilters, 'ad');
 
         $this->applyMetricFilters($base, $metricFilters);
 
@@ -810,6 +818,147 @@ class AdsManagerController extends Controller
         }
 
         return $valid;
+    }
+
+    private const DATE_FILTER_FIELDS = ['created_date', 'started_date'];
+
+    private const DATE_FILTER_OPS = ['on', 'before', 'after', 'between'];
+
+    /**
+     * Row-level lifecycle date filters (`date_filters`), a JSON array mirroring
+     * `metric_filters`. These constrain WHICH rows are included by the entity's
+     * own created/start date — unrelated to `since`/`until`, which pick which
+     * insight days get summed. Malformed entries are dropped, not rejected.
+     */
+    private function parseDateFilters(Request $request): array
+    {
+        $raw = $request->query('date_filters');
+        if (! $raw) {
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 5, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $valid = [];
+        foreach ($decoded as $f) {
+            $field = $f['field'] ?? null;
+            $op = $f['op'] ?? null;
+            $value = $this->asDate($f['value'] ?? null);
+
+            if (! in_array($field, self::DATE_FILTER_FIELDS, true)) {
+                continue;
+            }
+            if (! in_array($op, self::DATE_FILTER_OPS, true) || $value === null) {
+                continue;
+            }
+
+            if ($op === 'between') {
+                $value2 = $this->asDate($f['value2'] ?? null);
+                if ($value2 === null) {
+                    continue;
+                }
+                // Tolerate a reversed range rather than returning nothing.
+                [$from, $to] = $value <= $value2 ? [$value, $value2] : [$value2, $value];
+                $valid[] = ['field' => $field, 'op' => 'between', 'value' => $from, 'value2' => $to];
+
+                continue;
+            }
+
+            $valid[] = ['field' => $field, 'op' => $op, 'value' => $value];
+        }
+
+        return $valid;
+    }
+
+    /**
+     * A `Y-m-d` string, or null when the input isn't one.
+     */
+    private function asDate($value): ?string
+    {
+        if (! is_string($value) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('Y-m-d', $value)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Which column answers each date filter for a given breakdown. Ads carry no
+     * `start_time` of their own, so an ad-grained "started" is answered through
+     * the owning ad set (handled in applyDateFilters). Accounts have neither
+     * date, so both filters are dropped there.
+     */
+    private function dateFilterColumn(string $field, string $groupBy): ?string
+    {
+        if ($field === 'created_date') {
+            return match ($groupBy) {
+                'campaign' => 'meta_ads_campaigns.created_time',
+                'ad_set' => 'meta_ads_sets.created_time',
+                'ad', 'ad_name', 'ad_type' => 'meta_ads_ads.created_time',
+                default => null,
+            };
+        }
+
+        return match ($groupBy) {
+            'campaign' => 'meta_ads_campaigns.start_time',
+            'ad_set' => 'meta_ads_sets.start_time',
+            default => null,
+        };
+    }
+
+    /**
+     * Date filters constrain the rows themselves, so they're plain WHERE
+     * clauses on the pre-aggregation query.
+     */
+    private function applyDateFilters($query, array $filters, string $groupBy): void
+    {
+        foreach ($filters as $f) {
+            $column = $this->dateFilterColumn($f['field'], $groupBy);
+
+            if ($column !== null) {
+                $this->applyDateCondition($query, $column, $f);
+
+                continue;
+            }
+
+            // Ads have no start_time — scope by the ad set that owns them.
+            if ($f['field'] === 'started_date' && in_array($groupBy, ['ad', 'ad_name', 'ad_type'], true)) {
+                $query->whereIn('meta_ads_ads.meta_ads_set_id', function ($sub) use ($f) {
+                    $sub->select('id')->from('meta_ads_sets');
+                    $this->applyDateCondition($sub, 'meta_ads_sets.start_time', $f);
+                });
+            }
+
+            // Anything else (e.g. account breakdowns) has no such date: skip.
+        }
+    }
+
+    /**
+     * The columns are timestamps, so a whole-day comparison spans 00:00:00 to
+     * 23:59:59 rather than matching the bare date.
+     */
+    private function applyDateCondition($query, string $column, array $f): void
+    {
+        $from = $f['value'].' 00:00:00';
+        $to = ($f['value2'] ?? $f['value']).' 23:59:59';
+
+        match ($f['op']) {
+            'before' => $query->where($column, '<', $from),
+            'after' => $query->where($column, '>', $f['value'].' 23:59:59'),
+            default => $query->whereBetween($column, [$from, $to]),
+        };
     }
 
     /**

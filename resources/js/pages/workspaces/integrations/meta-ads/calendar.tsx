@@ -28,6 +28,9 @@ interface DayData {
     pages: PageBreakdown[];
 }
 
+/** Which campaign date the month is bucketed by. */
+type DateBasis = 'created' | 'started';
+
 interface Props {
     workspace: { id: number; name: string; slug: string };
     month: string; // 'YYYY-MM'
@@ -35,11 +38,17 @@ interface Props {
     prevMonth: string;
     nextMonth: string;
     canGoNext: boolean;
+    basis: DateBasis;
     days: Record<string, DayData>;
     pageTotals: PageBreakdown[];
     pageOptions: PageOption[];
     selectedPages: string[];
 }
+
+const BASIS_LABELS: Record<DateBasis, string> = {
+    created: 'Created',
+    started: 'Started',
+};
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -66,6 +75,7 @@ export default function AdsCalendar({
     prevMonth,
     nextMonth,
     canGoNext,
+    basis,
     days,
     pageTotals,
     pageOptions,
@@ -81,14 +91,23 @@ export default function AdsCalendar({
 
     const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Build a calendar URL preserving the active page filter (omit month to land
-    // on the current month — used by the "Today" button).
+    // Build a calendar URL preserving the active date basis and page filter (omit
+    // month to land on the current month — used by the "Today" button).
     const urlFor = (targetMonth?: string) => {
         const qs = new URLSearchParams();
         if (targetMonth) qs.set('month', targetMonth);
+        if (basis === 'started') qs.set('basis', 'started');
         pending.forEach((p) => qs.append('pages[]', p));
         const s = qs.toString();
         return s ? `${base}?${s}` : base;
+    };
+
+    // Switch which campaign date the month buckets by, keeping month + filter.
+    const urlForBasis = (target: DateBasis) => {
+        const qs = new URLSearchParams({ month });
+        if (target === 'started') qs.set('basis', 'started');
+        pending.forEach((p) => qs.append('pages[]', p));
+        return `${base}?${qs.toString()}`;
     };
 
     // Apply a new page selection, keeping the current month. `preserveState`
@@ -100,7 +119,11 @@ export default function AdsCalendar({
         navTimer.current = setTimeout(() => {
             router.get(
                 base,
-                values.length ? { month, pages: values } : { month },
+                {
+                    month,
+                    ...(basis === 'started' ? { basis } : {}),
+                    ...(values.length ? { pages: values } : {}),
+                },
                 { preserveScroll: true, preserveState: true, replace: true },
             );
         }, 350);
@@ -132,15 +155,38 @@ export default function AdsCalendar({
             <div className="w-full space-y-6 p-4 md:p-6">
                 <PageHeader
                     title="Ads Calendar"
-                    description="Campaigns created each day, broken down per Facebook page."
+                    description={`Campaigns ${basis === 'started' ? 'that started running' : 'created'} each day, broken down per Facebook page.`}
                 />
 
-                {/* Page filter + month navigation */}
+                {/* Date basis + page filter + month navigation */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                         <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                             {monthLabel}
                         </h2>
+
+                        {/* Which campaign date the month buckets by. They differ
+                            for anything scheduled ahead of time. */}
+                        <div className="flex h-9 items-center gap-0.5 rounded-[10px] border border-black/6 bg-stone-100 p-0.5 dark:border-white/6 dark:bg-zinc-800">
+                            {(['created', 'started'] as DateBasis[]).map(
+                                (b) => (
+                                    <Link
+                                        key={b}
+                                        href={urlForBasis(b)}
+                                        preserveScroll
+                                        className={cn(
+                                            'flex h-full items-center rounded-lg px-3 font-mono! text-[11px]! transition-all',
+                                            basis === b
+                                                ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-700 dark:text-gray-100'
+                                                : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
+                                        )}
+                                    >
+                                        {BASIS_LABELS[b]}
+                                    </Link>
+                                ),
+                            )}
+                        </div>
+
                         <MultiSelect
                             compact
                             className="w-56"
