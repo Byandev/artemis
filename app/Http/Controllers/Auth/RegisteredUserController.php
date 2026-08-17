@@ -17,6 +17,7 @@ use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class RegisteredUserController extends Controller
 {
@@ -63,7 +64,15 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        event(new Registered($user));
+        try {
+            event(new Registered($user));
+        } catch (TransportExceptionInterface $e) {
+            // The account exists by this point, so a verification email that
+            // couldn't leave the building is no reason to fail the signup and
+            // strand them on the register form. Record it and carry on — the
+            // verify-email screen has a resend button for once mail is back.
+            report($e);
+        }
 
         Auth::login($user);
 
