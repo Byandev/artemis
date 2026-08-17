@@ -1,10 +1,11 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
+import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { debounce, omit } from 'lodash';
+import { debounce, omit, omitBy } from 'lodash';
 import {
     Download,
     FileText,
@@ -46,7 +47,7 @@ function fileSize(bytes: number) {
 
 interface Props {
     invoices: PaginatedData<Invoice>;
-    filters: { search?: string; status?: string };
+    filters: { search?: string; status?: string; sort?: string };
 }
 
 const STATUS_STYLES: Record<Invoice['status'], string> = {
@@ -67,22 +68,29 @@ export default function Index({ invoices, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const status = filters.status || '';
 
-    const initialSorting = useMemo(() => [], []);
+    const sort = filters.sort || '';
+    const initialSorting = useMemo(() => toFrontendSort(sort), [sort]);
 
     const query = useCallback(
-        (params: Record<string, string | number | undefined>) => {
+        (params: Record<string, string | number | undefined | null>) => {
             router.get(
                 '/admin/invoices',
-                {
-                    search: search || undefined,
-                    status: status || undefined,
-                    page: 1,
-                    ...params,
-                },
+                // Carry the current sort/filters so paging or resizing doesn't
+                // silently reset them; `params` overrides whatever it names.
+                omitBy(
+                    {
+                        search: search || undefined,
+                        status: status || undefined,
+                        sort: sort || undefined,
+                        page: 1,
+                        ...params,
+                    },
+                    (v) => v === undefined || v === null || v === '',
+                ),
                 { preserveState: true, replace: true, preserveScroll: true },
             );
         },
-        [search, status],
+        [search, status, sort],
     );
 
     const performSearch = useCallback(
@@ -160,8 +168,9 @@ export default function Index({ invoices, filters }: Props) {
         },
         {
             accessorKey: 'bill_to_name',
-            enableSorting: false,
-            header: () => <span>Bill to</span>,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Bill to" />
+            ),
             cell: ({ row }) => (
                 <span className="text-sm text-zinc-700 dark:text-zinc-300">
                     {row.original.bill_to_name}
@@ -170,8 +179,9 @@ export default function Index({ invoices, filters }: Props) {
         },
         {
             accessorKey: 'total',
-            enableSorting: false,
-            header: () => <span>Total</span>,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Total" />
+            ),
             cell: ({ row }) => (
                 <span className="font-medium text-zinc-900 dark:text-zinc-100">
                     {peso(row.original.total, row.original.currency)}
@@ -180,8 +190,9 @@ export default function Index({ invoices, filters }: Props) {
         },
         {
             accessorKey: 'issue_date',
-            enableSorting: false,
-            header: () => <span>Issued</span>,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Issued" />
+            ),
             cell: ({ row }) => (
                 <span className="text-sm text-zinc-600 dark:text-zinc-400">
                     {new Date(row.original.issue_date).toLocaleDateString(
@@ -197,8 +208,9 @@ export default function Index({ invoices, filters }: Props) {
         },
         {
             accessorKey: 'status',
-            enableSorting: false,
-            header: () => <span>Status</span>,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Status" />
+            ),
             cell: ({ row }) => (
                 <select
                     value={row.original.status}
@@ -347,6 +359,7 @@ export default function Index({ invoices, filters }: Props) {
                             query({
                                 page: params?.page ?? 1,
                                 per_page: params?.per_page ?? undefined,
+                                sort: params?.sort ?? undefined,
                             })
                         }
                     />

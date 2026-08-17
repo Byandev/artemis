@@ -162,6 +162,7 @@ export const PERMISSIONS = {
     // Billing
     ViewBillingSettings: 'View Billing Settings',
     ManageBillingSettings: 'Manage Billing Settings',
+    ViewInvoices: 'View Invoices',
 } as const;
 
 export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

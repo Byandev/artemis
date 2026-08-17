@@ -44,6 +44,7 @@ use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
+use Modules\Billing\Http\Controllers\InvoiceController as BillingInvoiceController;
 use Modules\Botcake\Http\Controllers\Web\FlowController;
 use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
@@ -636,6 +637,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/bulk', [SmsController::class, 'bulkStore'])->name('bulk');
         Route::get('/outbox', [SmsController::class, 'outbox'])->name('outbox');
         Route::get('/sims', [SmsController::class, 'sims'])->name('sims');
+    });
+
+    // A workspace's own invoices — the admin list narrowed to one workspace.
+    Route::prefix('/workspaces/{workspace:slug}/billing')->name('workspaces.billing.')->group(function () {
+        Route::get('/invoices', [BillingInvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/invoices/{invoice}/download', [BillingInvoiceController::class, 'download'])
+            ->name('invoices.download');
     });
 
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
