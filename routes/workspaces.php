@@ -690,6 +690,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('users.index');
         Route::post('/users/{user}/reset-password', [AdminUserController::class, 'generatePasswordReset'])
             ->name('users.reset-password');
+        Route::patch('/users/{user}/super-admin', [AdminUserController::class, 'updateSuperAdmin'])
+            ->name('users.update-super-admin');
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');

@@ -1,11 +1,22 @@
 import PageHeader from '@/components/common/PageHeader';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { Switch } from '@/components/ui/switch';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData, User } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { PaginatedData, SharedData, User } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
@@ -43,6 +54,46 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
     const [search, setSearch] = useState(filters?.search ?? '');
     const [copiedUserId, setCopiedUserId] = useState<number | null>(null);
     const [sendingUserId, setSendingUserId] = useState<number | null>(null);
+
+    const currentUser = usePage<SharedData>().props.auth.user;
+    // The row awaiting confirmation, and which way it is about to go.
+    const [pendingRole, setPendingRole] = useState<{
+        user: AdminUser;
+        grant: boolean;
+    } | null>(null);
+    const [savingRoleFor, setSavingRoleFor] = useState<number | null>(null);
+
+    const applyRoleChange = () => {
+        if (!pendingRole) return;
+
+        const { user, grant } = pendingRole;
+        setSavingRoleFor(user.id);
+
+        router.patch(
+            `/admin/users/${user.id}/super-admin`,
+            { is_super_admin: grant },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () =>
+                    toast.success(
+                        grant
+                            ? `${user.name} is now a Super Admin.`
+                            : `Super Admin access removed from ${user.name}.`,
+                    ),
+                // The self-demotion and last-admin guards come back as
+                // validation errors, so they land here with their own wording.
+                onError: (errors) =>
+                    toast.error(
+                        errors.is_super_admin ?? 'Could not change that role.',
+                    ),
+                onFinish: () => {
+                    setSavingRoleFor(null);
+                    setPendingRole(null);
+                },
+            },
+        );
+    };
 
     const fetchUsers = useCallback(
         (overrides: Record<string, string | number | undefined> = {}) => {
@@ -157,14 +208,40 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
                     Role
                 </p>
             ),
-            cell: ({ row }) =>
-                row.original.is_super_admin ? (
-                    <Badge className="border-violet-200/60 bg-violet-50 text-violet-700">
-                        Super Admin
-                    </Badge>
-                ) : (
-                    <Badge variant="outline">User</Badge>
-                ),
+            cell: ({ row }) => {
+                const user = row.original;
+                const isSelf = user.id === currentUser?.id;
+
+                return (
+                    <div className="flex items-center gap-2">
+                        <Switch
+                            checked={!!user.is_super_admin}
+                            // Demoting yourself locks you out of /admin, so the
+                            // server refuses it and the switch says so first.
+                            disabled={
+                                savingRoleFor === user.id ||
+                                (isSelf && !!user.is_super_admin)
+                            }
+                            onCheckedChange={(grant) =>
+                                setPendingRole({ user, grant })
+                            }
+                            aria-label={`Super Admin access for ${user.name}`}
+                            title={
+                                isSelf && user.is_super_admin
+                                    ? 'You cannot remove your own Super Admin access'
+                                    : undefined
+                            }
+                        />
+                        {user.is_super_admin ? (
+                            <Badge className="border-violet-200/60 bg-violet-50 text-violet-700">
+                                Super Admin
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline">User</Badge>
+                        )}
+                    </div>
+                );
+            },
         },
         {
             accessorKey: 'created_at',
@@ -263,6 +340,44 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
                     />
                 </div>
             </div>
+
+            <AlertDialog
+                open={!!pendingRole}
+                onOpenChange={(open) => {
+                    if (!open) setPendingRole(null);
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {pendingRole?.grant
+                                ? `Make ${pendingRole?.user.name} a Super Admin?`
+                                : `Remove Super Admin from ${pendingRole?.user.name}?`}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingRole?.grant
+                                ? 'Super Admins can reach every workspace and the whole admin area, including billing, users and activity logs. Only grant this to people who should see all of it.'
+                                : 'They keep their workspace memberships, but lose the admin area and their access to workspaces they are not a member of.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(event) => {
+                                // Kept open until the request settles, so the
+                                // dialog can't close over a failed change.
+                                event.preventDefault();
+                                applyRoleChange();
+                            }}
+                            disabled={savingRoleFor !== null}
+                        >
+                            {pendingRole?.grant
+                                ? 'Make Super Admin'
+                                : 'Remove access'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AdminSidebarLayout>
     );
 }
