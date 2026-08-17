@@ -6,6 +6,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, Link, router } from '@inertiajs/react';
@@ -62,7 +63,7 @@ const GROUP_COLORS = [
 /** Per-view copy, so the whole screen reads correctly in either mode. */
 const VIEW_COPY: Record<View, { noun: string; all: string }> = {
     page: { noun: 'page', all: 'All pages' },
-    user: { noun: 'user', all: 'All users' },
+    user: { noun: 'owner', all: 'All owners' },
 };
 
 const formatInt = (n: number) => new Intl.NumberFormat().format(n);
@@ -108,12 +109,14 @@ export default function AdsCalendar({
         return s ? `${base}?${s}` : base;
     };
 
-    // Switching dimension drops the filter — page ids and user ids aren't
+    // Switching dimension drops the filter — page ids and owner ids aren't
     // interchangeable, so carrying the selection over would filter to nothing.
-    const urlForView = (target: View) => {
-        const qs = new URLSearchParams({ month });
-        if (target === 'user') qs.set('view', 'user');
-        return `${base}?${qs.toString()}`;
+    // State is deliberately not preserved, so `pending` resets from the server.
+    const onViewChange = (toOwner: boolean) => {
+        router.get(base, toOwner ? { month, view: 'user' } : { month }, {
+            preserveScroll: true,
+            replace: true,
+        });
     };
 
     // Apply a new selection, keeping the current month and view. `preserveState`
@@ -167,29 +170,41 @@ export default function AdsCalendar({
                     description={`Campaigns created each day, broken down per ${view === 'user' ? 'page owner' : 'Facebook page'}.`}
                 />
 
-                {/* View switch + filter + month navigation */}
+                {/* Filter (with its page/owner switch) + month navigation */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-3">
                         <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                             {monthLabel}
                         </h2>
 
-                        <div className="flex h-8 items-center gap-0.5 rounded-lg border border-black/6 bg-stone-100 p-0.5 dark:border-white/6 dark:bg-zinc-800">
-                            {(['page', 'user'] as View[]).map((v) => (
-                                <Link
-                                    key={v}
-                                    href={urlForView(v)}
-                                    preserveScroll
-                                    className={cn(
-                                        'flex h-full items-center rounded-md px-3 text-[12px] font-semibold tracking-tight transition-all',
-                                        view === v
-                                            ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-700 dark:text-gray-100'
-                                            : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                                    )}
-                                >
-                                    By {v === 'page' ? 'Page' : 'User'}
-                                </Link>
-                            ))}
+                        {/* Switches what the filter lists — page names or their
+                            owners — and re-buckets the calendar to match. */}
+                        <div className="flex h-9 items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 dark:border-white/6 dark:bg-zinc-800">
+                            <span
+                                className={cn(
+                                    'font-mono! text-[11px]! transition-colors',
+                                    view === 'page'
+                                        ? 'text-gray-700 dark:text-gray-200'
+                                        : 'text-gray-400 dark:text-gray-500',
+                                )}
+                            >
+                                Page
+                            </span>
+                            <Switch
+                                checked={view === 'user'}
+                                onCheckedChange={onViewChange}
+                                aria-label="Filter by page owner instead of page"
+                            />
+                            <span
+                                className={cn(
+                                    'font-mono! text-[11px]! transition-colors',
+                                    view === 'user'
+                                        ? 'text-gray-700 dark:text-gray-200'
+                                        : 'text-gray-400 dark:text-gray-500',
+                                )}
+                            >
+                                Owner
+                            </span>
                         </div>
 
                         <MultiSelect
@@ -205,19 +220,34 @@ export default function AdsCalendar({
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button asChild variant="outline" size="sm">
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-[10px]"
+                        >
                             <Link href={urlFor(prevMonth)} preserveScroll>
                                 <ChevronLeft className="h-4 w-4" />
                                 Prev
                             </Link>
                         </Button>
-                        <Button asChild variant="outline" size="sm">
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-[10px]"
+                        >
                             <Link href={urlFor()} preserveScroll>
                                 Today
                             </Link>
                         </Button>
                         {canGoNext ? (
-                            <Button asChild variant="outline" size="sm">
+                            <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="h-9 rounded-[10px]"
+                            >
                                 <Link href={urlFor(nextMonth)} preserveScroll>
                                     Next
                                     <ChevronRight className="h-4 w-4" />
@@ -228,7 +258,7 @@ export default function AdsCalendar({
                                 variant="outline"
                                 size="sm"
                                 disabled
-                                className="opacity-50"
+                                className="h-9 rounded-[10px] opacity-50"
                             >
                                 Next
                                 <ChevronRight className="h-4 w-4" />
