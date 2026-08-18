@@ -52,9 +52,10 @@ class AdsCalendarController extends Controller
             ->visibleTo($request->user(), $workspace)
             ->pluck('meta_ads_accounts.id');
 
-        // Optional multi-page filter ('none' = ad sets with no resolvable page).
-        $selectedPages = array_values(array_filter(
-            (array) $request->query('pages', []),
+        // The filter is keyed per dimension so an existing `?pages[]=…` link keeps
+        // working untouched. ('none' = campaigns with no resolvable page.)
+        $selected = array_values(array_filter(
+            (array) $request->query($view === 'user' ? 'users' : 'pages', []),
             fn ($p) => is_string($p) && $p !== '' && $p !== 'all',
         ));
 
@@ -89,9 +90,21 @@ class AdsCalendarController extends Controller
      */
     private function dailyCampaignCountsPerPage(array $accountIds, Carbon $start, Carbon $end, array $selectedPages = [], string $dateColumn = 'meta_ads_campaigns.created_time')
     {
-        return Campaign::query()
+        $byUser = $view === 'user';
+
+        // Fixed identifiers chosen by $view, never user input — safe to inline.
+        $idColumn = $byUser ? 'users.id' : 'meta_ads_sets.meta_page_id';
+        $nameColumn = $byUser ? 'users.name' : 'pages.name';
+
+        $query = Campaign::query()
             ->leftJoin('meta_ads_sets', 'meta_ads_sets.meta_ads_campaign_id', '=', 'meta_ads_campaigns.id')
-            ->leftJoin('pages', 'pages.id', '=', 'meta_ads_sets.meta_page_id')
+            ->leftJoin('pages', 'pages.id', '=', 'meta_ads_sets.meta_page_id');
+
+        if ($byUser) {
+            $query->leftJoin('users', 'users.id', '=', 'pages.owner_id');
+        }
+
+        return $query
             ->whereIn('meta_ads_campaigns.meta_ads_account_id', $accountIds)
             ->whereNotNull($dateColumn)
             ->whereBetween($dateColumn, [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
@@ -99,12 +112,12 @@ class AdsCalendarController extends Controller
                 $ids = array_values(array_filter($selectedPages, fn ($p) => $p !== 'none'));
                 $includeUnassigned = in_array('none', $selectedPages, true);
 
-                $q->where(function ($w) use ($ids, $includeUnassigned) {
+                $q->where(function ($w) use ($ids, $includeUnassigned, $idColumn) {
                     if (! empty($ids)) {
-                        $w->whereIn('meta_ads_sets.meta_page_id', $ids);
+                        $w->whereIn($idColumn, $ids);
                     }
                     if ($includeUnassigned) {
-                        $w->orWhereNull('meta_ads_sets.meta_page_id');
+                        $w->orWhereNull($idColumn);
                     }
                 });
             })
@@ -175,12 +188,12 @@ class AdsCalendarController extends Controller
 
     /**
      * Calendar payload keyed by `Y-m-d`, each day holding its grand total and a
-     * per-page breakdown sorted by volume. Days with no campaigns are omitted (the
+     * per-group breakdown sorted by volume. Days with no campaigns are omitted (the
      * frontend renders the full grid and treats missing keys as empty).
      *
-     * @return array<string, array{total: int, pages: array<int, array{id: string, name: string, count: int}>}>
+     * @return array<string, array{total: int, groups: array<int, array{id: string, name: string, count: int}>}>
      */
-    private function buildDays($rows): array
+    private function buildDays($rows, string $unassignedLabel): array
     {
         $days = [];
 
@@ -188,42 +201,50 @@ class AdsCalendarController extends Controller
             $day = (string) $row->day;
 
             if (! isset($days[$day])) {
-                $days[$day] = ['total' => 0, 'pages' => []];
+                $days[$day] = ['total' => 0, 'groups' => []];
             }
 
             $count = (int) $row->total;
             $days[$day]['total'] += $count;
-            $days[$day]['pages'][] = [
-                'id' => $row->meta_page_id === null ? 'none' : (string) $row->meta_page_id,
-                'name' => $row->page_name ?: 'Unassigned page',
+            $days[$day]['groups'][] = [
+                'id' => $row->group_id === null ? 'none' : (string) $row->group_id,
+                'name' => $row->group_name ?: $unassignedLabel,
                 'count' => $count,
             ];
         }
 
         foreach ($days as &$day) {
-            usort($day['pages'], fn ($a, $b) => $b['count'] <=> $a['count']);
+            usort($day['groups'], fn ($a, $b) => $b['count'] <=> $a['count']);
         }
 
         return $days;
     }
 
     /**
-     * Per-page totals across the whole month (powers the legend / summary list).
+     * Per-group totals across the whole month (powers the legend / summary list).
      *
      * @return array<int, array{id: string, name: string, count: int}>
      */
-    private function buildPageTotals($rows): array
+    private function buildGroupTotals($rows, string $unassignedLabel): array
     {
         return $rows
-            ->groupBy(fn ($row) => $row->meta_page_id === null ? 'none' : (string) $row->meta_page_id)
+            ->groupBy(fn ($row) => $row->group_id === null ? 'none' : (string) $row->group_id)
             ->map(fn ($group) => [
-                'id' => (string) $group->first()->meta_page_id ?: 'none',
-                'name' => $group->first()->page_name ?: 'Unassigned page',
+                'id' => $group->first()->group_id === null ? 'none' : (string) $group->first()->group_id,
+                'name' => $group->first()->group_name ?: $unassignedLabel,
                 'count' => (int) $group->sum('total'),
             ])
             ->sortByDesc('count')
             ->values()
             ->all();
+    }
+
+    /**
+     * The dimension to break the month down by, from `?view=page|user`.
+     */
+    private function resolveView(Request $request): string
+    {
+        return $request->query('view') === 'user' ? 'user' : 'page';
     }
 
     /**
