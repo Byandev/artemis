@@ -41,6 +41,7 @@ function seedAdsCalendar($workspace): array
             'created_time' => $createdTime,
             // The calendar buckets by start_time, so a campaign with only a
             // created_time is invisible to it.
+            // The calendar buckets campaigns by `start_time`, not `created_time`.
             'start_time' => $createdTime,
         ]);
 
@@ -84,20 +85,20 @@ it('renders the calendar with per-day, per-page ad set counts for the month', fu
             ->component('workspaces/integrations/meta-ads/calendar')
             ->where('month', '2026-06')
             ->where('monthLabel', 'June 2026')
-            ->where('selectedPages', [])
+            ->where('selected', [])
             // June 10: 3 total — Alpha (2) then Bravo (1), sorted by volume.
             ->where('days.2026-06-10.total', 3)
-            ->where('days.2026-06-10.pages.0.name', 'Alpha Page')
-            ->where('days.2026-06-10.pages.0.count', 2)
-            ->where('days.2026-06-10.pages.1.name', 'Bravo Page')
+            ->where('days.2026-06-10.groups.0.name', 'Alpha Page')
+            ->where('days.2026-06-10.groups.0.count', 2)
+            ->where('days.2026-06-10.groups.1.name', 'Bravo Page')
             // June 15: 2 total — Alpha (1) + an unassigned page (1).
             ->where('days.2026-06-15.total', 2)
-            ->where('days.2026-06-15.pages', fn ($pages) => collect($pages)
+            ->where('days.2026-06-15.groups', fn ($pages) => collect($pages)
                 ->pluck('name')
                 ->contains('Unassigned page'))
             // Filter lists ALL workspace pages (incl. Charlie, which has no ad
             // sets) plus the Unassigned bucket (a page-less ad set exists).
-            ->where('pageOptions', fn ($options) => collect($options)->pluck('name')->sort()->values()->all()
+            ->where('groupOptions', fn ($options) => collect($options)->pluck('name')->sort()->values()->all()
                 === ['Alpha Page', 'Bravo Page', 'Charlie Page', 'Unassigned page'])
         );
 });
@@ -109,11 +110,11 @@ it('filters the calendar to a single page', function () {
     $this->get(adsCalendarUrl($workspace, ['month' => '2026-06', 'pages' => [(string) $ctx['alpha']->id]]))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('selectedPages', [(string) $ctx['alpha']->id])
+            ->where('selected', [(string) $ctx['alpha']->id])
             // Only Alpha's ad sets remain: 2 on the 10th, 1 on the 15th.
             ->where('days.2026-06-10.total', 2)
             ->where('days.2026-06-15.total', 1)
-            ->where('days.2026-06-15.pages.0.name', 'Alpha Page')
+            ->where('days.2026-06-15.groups.0.name', 'Alpha Page')
         );
 });
 
@@ -129,7 +130,7 @@ it('filters the calendar to multiple pages at once', function () {
     ]))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('selectedPages', [(string) $ctx['alpha']->id, (string) $ctx['bravo']->id])
+            ->where('selected', [(string) $ctx['alpha']->id, (string) $ctx['bravo']->id])
             ->where('days.2026-06-10.total', 3)
             ->where('days.2026-06-15.total', 1)
         );
@@ -180,8 +181,88 @@ it('counts a campaign once per page regardless of ad set count', function () {
             // Two ad sets on Alpha collapse to a single campaign; the campaign
             // also shows under Bravo → grand total of 2 (1 per page), not 3.
             ->where('days.2026-06-20.total', 2)
-            ->where('days.2026-06-20.pages', fn ($pages) => collect($pages)->firstWhere('name', 'Alpha Page')['count'] === 1
+            ->where('days.2026-06-20.groups', fn ($pages) => collect($pages)->firstWhere('name', 'Alpha Page')['count'] === 1
                 && collect($pages)->firstWhere('name', 'Bravo Page')['count'] === 1)
+        );
+});
+
+it('groups the month by page owner when the user view is requested', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $ctx = seedAdsCalendar($workspace);
+
+    $alphaOwner = $ctx['alpha']->owner;
+    $bravoOwner = $ctx['bravo']->owner;
+
+    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06', 'view' => 'user']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('workspaces/integrations/meta-ads/calendar')
+            ->where('view', 'user')
+            ->where('selected', [])
+            // Same counts as the page view, re-bucketed under each page's owner.
+            ->where('days.2026-06-10.total', 3)
+            ->where('days.2026-06-10.groups.0.name', $alphaOwner->name)
+            ->where('days.2026-06-10.groups.0.count', 2)
+            ->where('days.2026-06-10.groups.1.name', $bravoOwner->name)
+            // Alpha's owner leads the month with 3 (2 on the 10th, 1 on the 15th).
+            ->where('groupTotals.0.name', $alphaOwner->name)
+            ->where('groupTotals.0.count', 3)
+            // A campaign with no resolvable page has no owner either.
+            ->where('days.2026-06-15.groups', fn ($groups) => collect($groups)
+                ->pluck('name')
+                ->contains('Unassigned owner'))
+        );
+});
+
+it('filters the calendar to a single page owner', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $ctx = seedAdsCalendar($workspace);
+
+    $alphaOwner = $ctx['alpha']->owner;
+
+    $this->get(adsCalendarUrl($workspace, [
+        'month' => '2026-06',
+        'view' => 'user',
+        'users' => [(string) $alphaOwner->id],
+    ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('view', 'user')
+            ->where('selected', [(string) $alphaOwner->id])
+            // Only Alpha's owner remains: 2 on the 10th, 1 on the 15th.
+            ->where('days.2026-06-10.total', 2)
+            ->where('days.2026-06-15.total', 1)
+            ->where('days.2026-06-15.groups.0.name', $alphaOwner->name)
+        );
+});
+
+it('offers the page owners as filter options in the user view', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $ctx = seedAdsCalendar($workspace);
+
+    $expected = collect([$ctx['alpha'], $ctx['bravo']])
+        ->map(fn (Page $page) => $page->owner->name)
+        ->push('Unassigned owner');
+
+    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06', 'view' => 'user']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            // Every owner of a visible page is offered, plus the unassigned
+            // bucket (a page-less ad set exists this month).
+            ->where('groupOptions', fn ($options) => $expected
+                ->every(fn ($name) => collect($options)->pluck('name')->contains($name)))
+        );
+});
+
+it('defaults to the page view when no view is given', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsCalendar($workspace);
+
+    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('view', 'page')
+            ->where('days.2026-06-10.groups.0.name', 'Alpha Page')
         );
 });
 
@@ -192,10 +273,10 @@ it('filters to ad sets with no resolvable page', function () {
     $this->get(adsCalendarUrl($workspace, ['month' => '2026-06', 'pages' => ['none']]))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('selectedPages', ['none'])
+            ->where('selected', ['none'])
             // Only the single unassigned ad set on June 15 remains.
             ->where('days.2026-06-15.total', 1)
-            ->where('days.2026-06-15.pages.0.name', 'Unassigned page')
+            ->where('days.2026-06-15.groups.0.name', 'Unassigned page')
             ->missing('days.2026-06-10')
         );
 });
