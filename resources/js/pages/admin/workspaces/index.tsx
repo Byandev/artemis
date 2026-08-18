@@ -1,10 +1,11 @@
 import PageHeader from '@/components/common/PageHeader';
+import RowActionsMenu from '@/components/common/RowActionsMenu';
 import { MetricSettingDialog } from '@/components/metrics/metricsetting-dialog-form';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { PaginatedData } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { omit } from 'lodash';
@@ -549,53 +550,41 @@ export default function Index({ workspaces, plans, filters }: Props) {
                 </div>
             ),
             cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-1 text-right">
-                    <Link
-                        href={`/admin/workspaces/${row.original.slug}/report`}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        title="View client report"
-                    >
-                        <ChartColumnBig className="h-4 w-4" />
-                    </Link>
-                    <Link
-                        href={`/workspaces/${row.original.slug}/dashboard`}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        title="Open workspace dashboard"
-                    >
-                        <ArrowUpRight className="h-4 w-4" />
-                    </Link>
-                    <button
-                        onClick={() => setEditingMaxShops(row.original)}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        title="Set max shops"
-                    >
-                        <Files className="h-4 w-4" />
-                    </button>
-                    <button
-                        onClick={() => setEditingModules(row.original)}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        title="Toggle modules"
-                    >
-                        <Boxes className="h-4 w-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setSelectedWorkspace(row.original)}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
-                        title="Configure Metrics"
-                    >
-                        <Settings2 className="h-4 w-4" />
-                    </button>
-
-                    {/* Subscription Adjust Button */}
-                    <button
-                        onClick={() => setEditingWorkspace(row.original)}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        title="Change subscription"
-                    >
-                        <CreditCard className="h-4 w-4" />
-                    </button>
-                </div>
+                <RowActionsMenu
+                    actions={[
+                        {
+                            label: 'View client report',
+                            icon: <ChartColumnBig />,
+                            href: `/admin/workspaces/${row.original.slug}/report`,
+                        },
+                        {
+                            label: 'Open dashboard',
+                            icon: <ArrowUpRight />,
+                            href: `/workspaces/${row.original.slug}/dashboard`,
+                        },
+                        {
+                            label: 'Set max shops',
+                            icon: <Files />,
+                            onSelect: () => setEditingMaxShops(row.original),
+                            separatorBefore: true,
+                        },
+                        {
+                            label: 'Toggle modules',
+                            icon: <Boxes />,
+                            onSelect: () => setEditingModules(row.original),
+                        },
+                        {
+                            label: 'Configure metrics',
+                            icon: <Settings2 />,
+                            onSelect: () => setSelectedWorkspace(row.original),
+                        },
+                        {
+                            label: 'Change subscription',
+                            icon: <CreditCard />,
+                            onSelect: () => setEditingWorkspace(row.original),
+                        },
+                    ]}
+                />
             ),
         },
     ];
