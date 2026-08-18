@@ -5,6 +5,7 @@ interface Props {
     workspace: { id: number; name: string; slug: string };
     rule: OptimizationRule;
     selectedAdAccountIds: string[];
+    selectedPageIds: string[];
     options: RuleOptions;
 }
 
@@ -12,6 +13,7 @@ export default function EditOptimizationRule({
     workspace,
     rule,
     selectedAdAccountIds,
+    selectedPageIds,
     options,
 }: Props) {
     return (
@@ -20,6 +22,7 @@ export default function EditOptimizationRule({
             workspace={workspace}
             rule={rule}
             selectedAdAccountIds={selectedAdAccountIds}
+            selectedPageIds={selectedPageIds}
             options={options}
         />
     );

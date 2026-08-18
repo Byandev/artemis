@@ -35,7 +35,7 @@ function seedPageAdSet(int $pageId, ?float $daily, ?float $lifetime = null): voi
 
 it('writes the page daily budget record from the summed daily budget', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
-    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 729182576936579]);
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 729182576936579, 'auto_update_ad_budget' => true]);
 
     seedPageAdSet($page->id, daily: 500.00);
 
@@ -50,7 +50,7 @@ it('writes the page daily budget record from the summed daily budget', function 
 
 it('captures the campaign daily budget when the ad set carries none (CBO)', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
-    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509182]);
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509182, 'auto_update_ad_budget' => true]);
 
     // CBO: the budget lives on the campaign and the ad set's own budget is null,
     // but the ad set still tags the page it promotes.
@@ -85,7 +85,7 @@ it('captures the campaign daily budget when the ad set carries none (CBO)', func
 
 it('sums ad-set and campaign daily budgets on the same page', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
-    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509200]);
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509200, 'auto_update_ad_budget' => true]);
 
     $account = AdAccount::firstOrCreate(['id' => 555], ['name' => 'Acct']);
 
@@ -124,7 +124,7 @@ it('sums ad-set and campaign daily budgets on the same page', function () {
 
 it('ignores a campaign budget whose ad sets are all paused', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
-    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509300]);
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509300, 'auto_update_ad_budget' => true]);
 
     $account = AdAccount::firstOrCreate(['id' => 555], ['name' => 'Acct']);
     $campaign = Campaign::create(['id' => 900900920, 'meta_ads_account_id' => $account->id, 'name' => 'CBO', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'daily_budget' => 750.00]);
@@ -146,7 +146,7 @@ it('ignores a campaign budget whose ad sets are all paused', function () {
 
 it('writes a zero page daily budget record for lifetime-only budgets', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
-    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 745492068656489]);
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 745492068656489, 'auto_update_ad_budget' => true]);
 
     seedPageAdSet($page->id, daily: null, lifetime: 9000.00);
 

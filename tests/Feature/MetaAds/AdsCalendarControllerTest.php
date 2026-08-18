@@ -39,6 +39,8 @@ function seedAdsCalendar($workspace): array
             'meta_ads_account_id' => $account->id,
             'name' => 'Campaign '.$cid,
             'created_time' => $createdTime,
+            // The calendar buckets by start_time, so a campaign with only a
+            // created_time is invisible to it.
             // The calendar buckets campaigns by `start_time`, not `created_time`.
             'start_time' => $createdTime,
         ]);

@@ -91,6 +91,8 @@ it('lets the highest-priority approval rule claim a target so there are no compe
             'condition_operator' => 'and',
             'execution_mode' => 'approval',
             'is_active' => true,
+            // isDue() returns false without one, so the rule never runs.
+            'frequency' => 'hourly',
         ], $attrs));
         $rule->adAccounts()->attach($account->id);
         OptimizationRuleCondition::create(array_merge(
