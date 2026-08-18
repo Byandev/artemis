@@ -39,6 +39,9 @@ function seedAdsCalendar($workspace): array
             'meta_ads_account_id' => $account->id,
             'name' => 'Campaign '.$cid,
             'created_time' => $createdTime,
+            // The calendar buckets by start_time, so a campaign with only a
+            // created_time is invisible to it.
+            'start_time' => $createdTime,
         ]);
 
         AdSet::create([
@@ -158,6 +161,7 @@ it('counts a campaign once per page regardless of ad set count', function () {
         'meta_ads_account_id' => $ctx['account']->id,
         'name' => 'Multi-page Campaign',
         'created_time' => '2026-06-20 09:00:00',
+        'start_time' => '2026-06-20 09:00:00',
     ]);
     foreach ([[6500, 9101], [6501, 9101], [6502, 9102]] as [$setId, $pageId]) {
         AdSet::create([
