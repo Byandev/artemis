@@ -17,11 +17,22 @@ use Modules\MetaAds\Models\Campaign;
 class AdsCalendarController extends Controller
 {
     /**
-     * Ads Calendar — a month grid showing how many campaigns were created on each
-     * day, broken down either per Facebook page or per page owner. Campaigns carry
-     * no page of their own, so the page is derived from their ad sets'
-     * meta_page_id; a Pancake page's primary key IS that FB page id, so we join
-     * straight to `pages` for the name. The owner hangs off `pages.owner_id`.
+     * The two campaign lifecycle dates the month can be bucketed by: when the
+     * campaign was made, and when it started running. They differ for anything
+     * scheduled ahead.
+     */
+    private const DATE_BASES = [
+        'created' => 'meta_ads_campaigns.created_time',
+        'started' => 'meta_ads_campaigns.start_time',
+    ];
+
+    /**
+     * Ads Calendar — a month grid showing how many campaigns fall on each day,
+     * broken down per Facebook page. The day comes from either the campaign's
+     * created_time or its start_time (see `?basis=`). Campaigns carry no page of
+     * their own, so the page is derived from their ad sets' meta_page_id; a
+     * Pancake page's primary key IS that FB page id, so we join straight to
+     * `pages` for the name.
      */
     public function index(Request $request, Workspace $workspace): Response
     {
@@ -31,7 +42,8 @@ class AdsCalendarController extends Controller
         $start = $month->copy()->startOfMonth();
         $end = $month->copy()->endOfMonth();
 
-        $view = $this->resolveView($request);
+        $basis = $this->resolveDateBasis($request);
+        $dateColumn = self::DATE_BASES[$basis];
 
         // Only the workspace's actively-synced accounts the member is allowed to
         // see (mirrors the Ads Manager scoping).
@@ -47,15 +59,11 @@ class AdsCalendarController extends Controller
             fn ($p) => is_string($p) && $p !== '' && $p !== 'all',
         ));
 
-        $groupOptions = $view === 'user'
-            ? $this->userOptions($workspace, $request->user(), $accountIds->all(), $start, $end)
-            : $this->pageOptions($workspace, $request->user(), $accountIds->all(), $start, $end);
+        $pageOptions = $this->pageOptions($workspace, $request->user(), $accountIds->all(), $start, $end, $dateColumn);
 
         $rows = $accountIds->isEmpty()
             ? collect()
-            : $this->dailyCampaignCounts($accountIds->all(), $start, $end, $view, $selected);
-
-        $unassignedLabel = $view === 'user' ? 'Unassigned owner' : 'Unassigned page';
+            : $this->dailyCampaignCountsPerPage($accountIds->all(), $start, $end, $selectedPages, $dateColumn);
 
         return Inertia::render('workspaces/integrations/meta-ads/calendar', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
@@ -65,23 +73,22 @@ class AdsCalendarController extends Controller
             'nextMonth' => $start->copy()->addMonthNoOverflow()->format('Y-m'),
             // Disallow paging into the future — there can't be ad sets there yet.
             'canGoNext' => $start->lessThan(Carbon::now()->startOfMonth()),
-            'view' => $view,
-            'days' => $this->buildDays($rows, $unassignedLabel),
-            'groupTotals' => $this->buildGroupTotals($rows, $unassignedLabel),
-            'groupOptions' => $groupOptions,
-            'selected' => $selected,
+            'basis' => $basis,
+            'days' => $this->buildDays($rows),
+            'pageTotals' => $this->buildPageTotals($rows),
+            'pageOptions' => $pageOptions,
+            'selectedPages' => $selectedPages,
         ]);
     }
 
     /**
-     * One row per (day, group) with the number of distinct campaigns created,
-     * where a group is either the page or the page's owner. The day is the
-     * campaign's created date; the page is derived from the campaign's ad sets
-     * (LEFT JOIN so a campaign with no ad set / no known page still surfaces as
-     * unassigned). A campaign whose ad sets span several groups is counted once
-     * per group (COUNT DISTINCT dedupes within a group bucket).
+     * One row per (day, page) with the number of distinct campaigns. The day comes
+     * from $dateColumn (created_time or start_time); the page is derived from the
+     * campaign's ad sets (LEFT JOIN so a campaign with no ad set / no known page
+     * still surfaces under "Unassigned"). A campaign whose ad sets span several
+     * pages is counted once per page (COUNT DISTINCT dedupes within a page bucket).
      */
-    private function dailyCampaignCounts(array $accountIds, Carbon $start, Carbon $end, string $view, array $selected = [])
+    private function dailyCampaignCountsPerPage(array $accountIds, Carbon $start, Carbon $end, array $selectedPages = [], string $dateColumn = 'meta_ads_campaigns.created_time')
     {
         $byUser = $view === 'user';
 
@@ -99,11 +106,11 @@ class AdsCalendarController extends Controller
 
         return $query
             ->whereIn('meta_ads_campaigns.meta_ads_account_id', $accountIds)
-            ->whereNotNull('meta_ads_campaigns.start_time')
-            ->whereBetween('meta_ads_campaigns.start_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
-            ->when(! empty($selected), function ($q) use ($selected, $idColumn) {
-                $ids = array_values(array_filter($selected, fn ($p) => $p !== 'none'));
-                $includeUnassigned = in_array('none', $selected, true);
+            ->whereNotNull($dateColumn)
+            ->whereBetween($dateColumn, [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->when(! empty($selectedPages), function ($q) use ($selectedPages) {
+                $ids = array_values(array_filter($selectedPages, fn ($p) => $p !== 'none'));
+                $includeUnassigned = in_array('none', $selectedPages, true);
 
                 $q->where(function ($w) use ($ids, $includeUnassigned, $idColumn) {
                     if (! empty($ids)) {
@@ -114,12 +121,12 @@ class AdsCalendarController extends Controller
                     }
                 });
             })
-            ->groupBy(DB::raw('DATE(meta_ads_campaigns.start_time)'), $idColumn, $nameColumn)
-            ->orderBy(DB::raw('DATE(meta_ads_campaigns.start_time)'))
+            ->groupBy(DB::raw("DATE({$dateColumn})"), 'meta_ads_sets.meta_page_id', 'pages.name')
+            ->orderBy(DB::raw("DATE({$dateColumn})"))
             ->get([
-                DB::raw('DATE(meta_ads_campaigns.start_time) AS day'),
-                DB::raw($idColumn.' AS group_id'),
-                DB::raw($nameColumn.' AS group_name'),
+                DB::raw("DATE({$dateColumn}) AS day"),
+                'meta_ads_sets.meta_page_id',
+                'pages.name AS page_name',
                 DB::raw('COUNT(DISTINCT meta_ads_campaigns.id) AS total'),
             ]);
     }
@@ -132,7 +139,7 @@ class AdsCalendarController extends Controller
      *
      * @return array<int, array{id: string, name: string}>
      */
-    private function pageOptions(Workspace $workspace, User $user, array $accountIds, Carbon $start, Carbon $end): array
+    private function pageOptions(Workspace $workspace, User $user, array $accountIds, Carbon $start, Carbon $end, string $dateColumn = 'meta_ads_campaigns.created_time'): array
     {
         $options = Page::query()
             ->where('workspace_id', $workspace->id)
@@ -145,44 +152,8 @@ class AdsCalendarController extends Controller
             ])
             ->all();
 
-        return $this->withUnassignedOption($options, $accountIds, $start, $end, 'Unassigned page');
-    }
-
-    /**
-     * Filter options for the per-owner view: the owners of the pages this member
-     * can see, so the option list respects the same page visibility scoping.
-     *
-     * @return array<int, array{id: string, name: string}>
-     */
-    private function userOptions(Workspace $workspace, User $user, array $accountIds, Carbon $start, Carbon $end): array
-    {
-        $options = User::query()
-            ->whereIn('id', Page::query()
-                ->where('workspace_id', $workspace->id)
-                ->visibleTo($user, $workspace)
-                ->select('pages.owner_id'))
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (User $owner) => [
-                'id' => (string) $owner->id,
-                'name' => $owner->name ?: 'Unnamed user',
-            ])
-            ->all();
-
-        return $this->withUnassignedOption($options, $accountIds, $start, $end, 'Unassigned owner');
-    }
-
-    /**
-     * Appends the unassigned bucket to a filter list, but only when the visible
-     * month actually contains campaigns with no resolvable page.
-     *
-     * @param  array<int, array{id: string, name: string}>  $options
-     * @return array<int, array{id: string, name: string}>
-     */
-    private function withUnassignedOption(array $options, array $accountIds, Carbon $start, Carbon $end, string $label): array
-    {
-        if (! empty($accountIds) && $this->hasUnassignedCampaigns($accountIds, $start, $end)) {
-            $options[] = ['id' => 'none', 'name' => $label];
+        if (! empty($accountIds) && $this->hasUnassignedCampaigns($accountIds, $start, $end, $dateColumn)) {
+            $options[] = ['id' => 'none', 'name' => 'Unassigned page'];
         }
 
         return $options;
@@ -193,15 +164,26 @@ class AdsCalendarController extends Controller
      * ad set, or an ad set with a NULL meta_page_id — within the visible accounts.
      * Drives whether the "Unassigned" filter option is offered.
      */
-    private function hasUnassignedCampaigns(array $accountIds, Carbon $start, Carbon $end): bool
+    private function hasUnassignedCampaigns(array $accountIds, Carbon $start, Carbon $end, string $dateColumn = 'meta_ads_campaigns.created_time'): bool
     {
         return Campaign::query()
             ->leftJoin('meta_ads_sets', 'meta_ads_sets.meta_ads_campaign_id', '=', 'meta_ads_campaigns.id')
             ->whereIn('meta_ads_campaigns.meta_ads_account_id', $accountIds)
-            ->whereNotNull('meta_ads_campaigns.start_time')
-            ->whereBetween('meta_ads_campaigns.start_time', [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
+            ->whereNotNull($dateColumn)
+            ->whereBetween($dateColumn, [$start->copy()->startOfDay(), $end->copy()->endOfDay()])
             ->whereNull('meta_ads_sets.meta_page_id')
             ->exists();
+    }
+
+    /**
+     * Which campaign date the month is bucketed by, from `?basis=created|started`.
+     * Defaults to `created` — the calendar is a record of what was made each day.
+     */
+    private function resolveDateBasis(Request $request): string
+    {
+        $value = (string) $request->query('basis', 'created');
+
+        return isset(self::DATE_BASES[$value]) ? $value : 'created';
     }
 
     /**

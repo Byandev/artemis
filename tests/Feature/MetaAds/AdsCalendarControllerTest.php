@@ -281,6 +281,73 @@ it('filters to ad sets with no resolvable page', function () {
         );
 });
 
+it('defaults to bucketing by the campaign created date', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsCalendar($workspace);
+
+    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('basis', 'created')
+            ->where('days.2026-06-10.total', 3)
+        );
+});
+
+it('buckets by the campaign start date when asked', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $ctx = seedAdsCalendar($workspace);
+
+    // Created on June 22, but scheduled to start running on June 25 — the two
+    // bases must put it on different days.
+    $campaign = Campaign::create([
+        'id' => 5600,
+        'meta_ads_account_id' => $ctx['account']->id,
+        'name' => 'Scheduled Campaign',
+        'created_time' => '2026-06-22 09:00:00',
+        'start_time' => '2026-06-25 09:00:00',
+    ]);
+    AdSet::create([
+        'id' => 6600,
+        'meta_ads_account_id' => $ctx['account']->id,
+        'meta_ads_campaign_id' => $campaign->id,
+        'meta_page_id' => $ctx['alpha']->id,
+        'name' => 'Scheduled Ad Set',
+        'created_time' => '2026-06-22 09:00:00',
+    ]);
+
+    // Created basis: it lands on the 22nd, and nothing is on the 25th.
+    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('basis', 'created')
+            ->where('days.2026-06-22.total', 1)
+            ->where('days', fn ($days) => ! isset($days['2026-06-25']))
+        );
+
+    // Started basis: it moves to the 25th. The campaigns seeded with no
+    // start_time drop out entirely, so only this one remains.
+    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06', 'basis' => 'started']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('basis', 'started')
+            ->where('days.2026-06-25.total', 1)
+            ->where('days.2026-06-25.pages.0.name', 'Alpha Page')
+            ->where('days', fn ($days) => ! isset($days['2026-06-22']))
+        );
+});
+
+it('falls back to the created basis for an unknown value', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsCalendar($workspace);
+
+    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06', 'basis' => 'sideways']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('basis', 'created')
+            ->where('days.2026-06-10.total', 3)
+        );
+});
+
 it('defaults to the current month and forbids paging into the future', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     seedAdsCalendar($workspace);
