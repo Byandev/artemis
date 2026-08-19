@@ -1,6 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import DatePicker from '@/components/ui/date-picker';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { PRODUCT_STATUSES, ProductStatus } from '@/constants/product-statuses';
 import AppLayout from '@/layouts/app-layout';
 import workspaces from '@/routes/workspaces';
 import { Product } from '@/types/models/Product';
@@ -22,15 +23,12 @@ const labelClass =
 const fieldClass = 'space-y-1.5';
 const errorClass = 'font-mono text-[11px] text-red-500';
 
-const statuses = ['Testing', 'Scaling', 'Failed', 'Inactive'] as const;
-type Status = (typeof statuses)[number];
-
 const Edit = ({ workspace, product, shops }: PageProps) => {
     const { data, setData, put, processing, errors } = useForm({
         name: product.name || '',
         code: product.code || '',
         category: product.category || '',
-        status: product.status as Status,
+        status: product.status as ProductStatus,
         winning_date: product.winning_date || '',
         description: product.description || '',
         shop_ids: product.shops?.map((s) => s.id) || ([] as number[]),
@@ -137,11 +135,11 @@ const Edit = ({ workspace, product, shops }: PageProps) => {
                                     onChange={(e) =>
                                         setData(
                                             'status',
-                                            e.target.value as Status,
+                                            e.target.value as ProductStatus,
                                         )
                                     }
                                 >
-                                    {statuses.map((s) => (
+                                    {PRODUCT_STATUSES.map((s) => (
                                         <option key={s} value={s}>
                                             {s}
                                         </option>

@@ -6,10 +6,7 @@ import {
     SUB_CATEGORY_LABEL,
     SubCategory,
 } from '@/components/finance/sub-category';
-import {
-    FinanceTransaction,
-    TransactionFormDialog,
-} from '@/components/finance/transaction-form-dialog';
+import { FinanceTransaction } from '@/components/finance/transaction-form';
 import {
     buildTransactionTypeOptions,
     TransactionTypeItem,
@@ -33,7 +30,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
@@ -74,6 +71,7 @@ interface Props {
     accounts: AccountOpt[];
     transactionTypes: TransactionTypeItem[];
     users: { id: number; name: string }[];
+    products: string[];
     totals: Totals;
     query?: {
         sort?: string | null;
@@ -82,9 +80,7 @@ interface Props {
             type?: 'in' | 'out';
             account_id?: string | number;
             transaction_type_id?: string | string[];
-            sub_category?: string | string[];
             missing_type?: string | boolean;
-            expenses_missing_sub?: string | boolean;
             date_from?: string;
             date_to?: string;
         };
@@ -109,7 +105,6 @@ export default function TransactionsIndex({
     transactions,
     accounts,
     transactionTypes,
-    users,
     totals,
     query,
 }: Props) {
@@ -125,9 +120,7 @@ export default function TransactionsIndex({
         () => new Map(transactionTypes.map((t) => [t.id, t.name])),
         [transactionTypes],
     );
-    const [createOpen, setCreateOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
-    const [editing, setEditing] = useState<FinanceTransaction | null>(null);
     const [toDelete, setToDelete] = useState<Row | null>(null);
     const [search, setSearch] = useState(query?.filter?.search ?? '');
     const [typeFilter, setTypeFilter] = useState<'' | 'in' | 'out'>(
@@ -145,20 +138,10 @@ export default function TransactionsIndex({
                 : [query.filter.transaction_type_id]
             : [],
     );
-    const [subCategoryFilter, setSubCategoryFilter] = useState<string[]>(
-        query?.filter?.sub_category
-            ? Array.isArray(query.filter.sub_category)
-                ? query.filter.sub_category
-                : [query.filter.sub_category]
-            : [],
-    );
     const boolish = (v: string | boolean | undefined) =>
         v === true || v === '1' || v === 'true';
     const [missingType, setMissingType] = useState<boolean>(
         boolish(query?.filter?.missing_type),
-    );
-    const [expensesMissingSub, setExpensesMissingSub] = useState<boolean>(
-        boolish(query?.filter?.expenses_missing_sub),
     );
     const [dateFrom, setDateFrom] = useState<string | undefined>(
         query?.filter?.date_from,
@@ -215,11 +198,7 @@ export default function TransactionsIndex({
         txnTypeFilter.forEach((v) =>
             params.append('filter[transaction_type_id][]', v),
         );
-        subCategoryFilter.forEach((v) =>
-            params.append('filter[sub_category][]', v),
-        );
         if (missingType) params.set('filter[missing_type]', '1');
-        if (expensesMissingSub) params.set('filter[expenses_missing_sub]', '1');
         const qs = params.toString();
         window.location.href = `${baseUrl}/export${qs ? `?${qs}` : ''}`;
     };
@@ -283,9 +262,7 @@ export default function TransactionsIndex({
                 t: '' | 'in' | 'out',
                 a: string,
                 tt: string[],
-                sc: string[],
                 mt: boolean,
-                ems: boolean,
                 df: string | undefined,
                 dt: string | undefined,
             ) => {
@@ -299,9 +276,7 @@ export default function TransactionsIndex({
                         'filter[transaction_type_id]': tt.length
                             ? tt
                             : undefined,
-                        'filter[sub_category]': sc.length ? sc : undefined,
                         'filter[missing_type]': mt ? 1 : undefined,
-                        'filter[expenses_missing_sub]': ems ? 1 : undefined,
                         'filter[date_from]': df || undefined,
                         'filter[date_to]': dt || undefined,
                         page: 1,
@@ -325,9 +300,7 @@ export default function TransactionsIndex({
             typeFilter,
             accountFilter,
             txnTypeFilter,
-            subCategoryFilter,
             missingType,
-            expensesMissingSub,
             dateFrom,
             dateTo,
         );
@@ -337,9 +310,7 @@ export default function TransactionsIndex({
         typeFilter,
         accountFilter,
         txnTypeFilter,
-        subCategoryFilter,
         missingType,
-        expensesMissingSub,
         dateFrom,
         dateTo,
         performQuery,
@@ -593,10 +564,17 @@ export default function TransactionsIndex({
                     Reference No.
                 </div>
             ),
+            // The fund request this entry settles sits under the reference, so
+            // the ledger shows what a payout was authorised by.
             cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
-                    {row.original.reference_no || '—'}
-                </span>
+                <div className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                    <span>{row.original.reference_no || '—'}</span>
+                    {row.original.fund_request && (
+                        <span className="mt-0.5 block text-[10px] text-emerald-600 dark:text-emerald-500">
+                            {row.original.fund_request.reference_no}
+                        </span>
+                    )}
+                </div>
             ),
         },
         {
@@ -606,11 +584,34 @@ export default function TransactionsIndex({
                     Charge To
                 </div>
             ),
-            cell: ({ row }) => (
-                <span className="text-[12px] text-gray-700 dark:text-gray-200">
-                    {row.original.charge_to_user?.name || '—'}
-                </span>
-            ),
+            cell: ({ row }) => {
+                const charged = row.original.charge_to_users ?? [];
+
+                if (charged.length === 0) {
+                    return (
+                        <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                            —
+                        </span>
+                    );
+                }
+
+                // A split shows each share so the row still reconciles at a glance.
+                return (
+                    <span
+                        className="text-[12px] text-gray-700 dark:text-gray-200"
+                        title={charged
+                            .map(
+                                (u) =>
+                                    `${u.name}: ${Number(u.pivot?.amount ?? 0).toFixed(2)}`,
+                            )
+                            .join('\n')}
+                    >
+                        {charged.length === 1
+                            ? charged[0].name
+                            : charged.map((u) => u.name).join(', ')}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'status',
@@ -674,59 +675,13 @@ export default function TransactionsIndex({
                                       className="w-36"
                                   >
                                       {canEditTransactions && (
-                                          <DropdownMenuItem
-                                              onClick={() =>
-                                                  setEditing({
-                                                      id: row.original.id,
-                                                      account_id:
-                                                          row.original
-                                                              .account_id,
-                                                      date: String(
-                                                          row.original.date,
-                                                      ).slice(0, 10),
-                                                      description:
-                                                          row.original
-                                                              .description,
-                                                      requested_by:
-                                                          row.original
-                                                              .requested_by,
-                                                      approved_by:
-                                                          row.original
-                                                              .approved_by,
-                                                      department:
-                                                          row.original
-                                                              .department,
-                                                      charge_to:
-                                                          row.original
-                                                              .charge_to,
-                                                      type: row.original.type,
-                                                      transaction_type:
-                                                          row.original
-                                                              .transaction_type,
-                                                      transaction_type_id:
-                                                          row.original
-                                                              .transaction_type_id,
-                                                      amount: row.original
-                                                          .amount,
-                                                      running_balance:
-                                                          row.original
-                                                              .running_balance,
-                                                      reference_no:
-                                                          row.original
-                                                              .reference_no,
-                                                      status: row.original
-                                                          .status,
-                                                      position:
-                                                          row.original.position,
-                                                      sub_category:
-                                                          row.original
-                                                              .sub_category,
-                                                      notes: row.original.notes,
-                                                  })
-                                              }
-                                          >
-                                              <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
-                                              Edit
+                                          <DropdownMenuItem asChild>
+                                              <Link
+                                                  href={`${baseUrl}/${row.original.id}/edit`}
+                                              >
+                                                  <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
+                                                  Edit
+                                              </Link>
                                           </DropdownMenuItem>
                                       )}
                                       {canEditTransactions &&
@@ -777,12 +732,12 @@ export default function TransactionsIndex({
                             >
                                 <Upload className="h-3.5 w-3.5" /> Import CSV
                             </button>
-                            <button
-                                onClick={() => setCreateOpen(true)}
+                            <Link
+                                href={`${baseUrl}/create`}
                                 className="flex h-8 items-center rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white hover:bg-emerald-700"
                             >
                                 Add Transaction
-                            </button>
+                            </Link>
                         </>
                     )}
                 </PageHeader>
@@ -823,14 +778,6 @@ export default function TransactionsIndex({
                         className="w-44"
                         compact
                     />
-                    <MultiSelect
-                        options={SUB_CATEGORIES}
-                        selected={subCategoryFilter}
-                        onChange={setSubCategoryFilter}
-                        placeholder="All sub categories"
-                        className="w-48"
-                        compact
-                    />
                     <div className="inline-flex h-9 overflow-hidden rounded-[10px] border border-black/6 bg-stone-100 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
                         {(
                             [
@@ -865,16 +812,6 @@ export default function TransactionsIndex({
                         }`}
                     >
                         No Txn Type
-                    </button>
-                    <button
-                        onClick={() => setExpensesMissingSub((v) => !v)}
-                        className={`h-9 rounded-[10px] border px-3 font-mono! text-[11px]! transition-colors ${
-                            expensesMissingSub
-                                ? 'border-amber-500 bg-amber-500 text-white'
-                                : 'border-black/6 bg-stone-100 text-gray-600 hover:bg-stone-200 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700'
-                        }`}
-                    >
-                        Expenses w/o Sub Cat
                     </button>
                 </div>
 
@@ -965,15 +902,9 @@ export default function TransactionsIndex({
                                         txnTypeFilter.length
                                             ? txnTypeFilter
                                             : undefined,
-                                    'filter[sub_category]':
-                                        subCategoryFilter.length
-                                            ? subCategoryFilter
-                                            : undefined,
                                     'filter[missing_type]': missingType
                                         ? 1
                                         : undefined,
-                                    'filter[expenses_missing_sub]':
-                                        expensesMissingSub ? 1 : undefined,
                                     'filter[date_from]': dateFrom || undefined,
                                     'filter[date_to]': dateTo || undefined,
                                     page: params?.page ?? 1,
@@ -998,22 +929,6 @@ export default function TransactionsIndex({
                     </li>
                 </ul>
 
-                {(canCreateTransactions || canEditTransactions) && (
-                    <TransactionFormDialog
-                        open={createOpen || editing !== null}
-                        onOpenChange={(o) => {
-                            if (!o) {
-                                setCreateOpen(false);
-                                setEditing(null);
-                            }
-                        }}
-                        transaction={editing}
-                        accounts={accounts}
-                        transactionTypes={transactionTypes}
-                        users={users}
-                        workspaceSlug={workspace.slug}
-                    />
-                )}
                 {canCreateTransactions && (
                     <ImportTransactionsDialog
                         open={importOpen}

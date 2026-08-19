@@ -10,27 +10,60 @@ type PropsType = {
     id: string;
     mode?: "single" | "multiple" | "range" | "time";
     onChange?: Hook | Hook[];
-    defaultDate?: DateOption;
+    /**
+     * A single date, or `[from, to]` in `mode="range"`. The component already
+     * normalises an array at runtime, and flatpickr's own `defaultDate` accepts
+     * both — the type just used to say otherwise.
+     */
+    defaultDate?: DateOption | DateOption[];
     label?: string;
     placeholder?: string;
     fullWidth?: boolean;
     /** Show a clear (×) button when a date is selected. Defaults to true. */
     clearable?: boolean;
     compact?: boolean;
+    /**
+     * Restrict the calendar to these dates (flatpickr's `enable`). Use when only
+     * certain days hold data — everything else renders greyed out and unclickable.
+     * Omit to allow any date.
+     */
+    enable?: DateOption[];
+};
+
+/** Normalise the `defaultDate` prop — single or array, string or Date — to real dates. */
+const toDates = (value?: DateOption | DateOption[]): Date[] => {
+    if (!value) return [];
+    const arr = Array.isArray(value) ? value : [value];
+    return arr.map((d) => new Date(d as string)).filter((d) => !isNaN(d.getTime()));
 };
 
 const fmt     = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtYear = (d: Date) => d.getFullYear().toString();
 
-export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact, clearable = true }: PropsType) {
+export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact, clearable = true, enable }: PropsType) {
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const [selectedDates, setSelectedDates] = useState<Date[]>(() => {
-        if (!defaultDate) return [];
-        const arr = Array.isArray(defaultDate) ? defaultDate : [defaultDate];
-        return arr.map((d) => new Date(d as string)).filter((d) => !isNaN(d.getTime()));
-    });
+    const [selectedDates, setSelectedDates] = useState<Date[]>(() => toDates(defaultDate));
+
+    /**
+     * Follow the prop when the parent changes it.
+     *
+     * The label below renders from `selectedDates`, which flatpickr only updates
+     * when the user picks from the calendar. A parent that clears or moves the
+     * date itself — "Back to live data" on the inventory list, say — fires no
+     * change event, so without this the input keeps showing a date that is no
+     * longer filtering anything.
+     *
+     * Keyed on the serialised value rather than the prop: `mode="range"` callers
+     * pass a fresh array every render, and depending on its identity would reset
+     * the display on every keystroke elsewhere on the page.
+     */
+    const defaultDateKey = JSON.stringify(defaultDate ?? null);
+
+    useEffect(() => {
+        setSelectedDates(toDates(JSON.parse(defaultDateKey) ?? undefined));
+    }, [defaultDateKey]);
 
     useEffect(() => {
         if (!inputRef.current) return;
@@ -51,6 +84,9 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
             appendTo: (dialogRoot ?? document.body) as HTMLElement,
             disableMobile: true,
             onChange: wrappedOnChange,
+            // Only spread when given: flatpickr treats an empty `enable` as
+            // "nothing is selectable", which would lock the calendar entirely.
+            ...(enable?.length ? { enable } : {}),
         });
 
         fpRef.current = Array.isArray(instance) ? instance[0] : instance;
@@ -60,7 +96,7 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
         }
 
         return () => { fpRef.current?.destroy(); fpRef.current = null; };
-    }, [mode, id, defaultDate]);
+    }, [mode, id, defaultDate, enable]);
 
     const isRange  = mode === 'range';
     const hasStart = selectedDates.length >= 1;

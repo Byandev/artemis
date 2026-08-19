@@ -64,6 +64,9 @@ class TransactionTypeController extends Controller
                     ->where('workspace_id', $workspace->id)
                     ->ignore($transactionType?->id),
             ],
+            'nature' => ['required', Rule::in(TransactionType::NATURES)],
+            // null = excluded from the income statement.
+            'income_statement_section' => ['nullable', Rule::in(TransactionType::INCOME_STATEMENT_SECTIONS)],
         ];
     }
 
@@ -77,6 +80,8 @@ class TransactionTypeController extends Controller
         TransactionType::create([
             'workspace_id' => $workspace->id,
             'name' => trim($validated['name']),
+            'nature' => $validated['nature'],
+            'income_statement_section' => $validated['income_statement_section'] ?? null,
         ]);
 
         return redirect()->back()->with('success', 'Transaction type created.');
@@ -90,7 +95,11 @@ class TransactionTypeController extends Controller
 
         $validated = $request->validate($this->rules($workspace, $transactionType));
 
-        $transactionType->update(['name' => trim($validated['name'])]);
+        $transactionType->update([
+            'name' => trim($validated['name']),
+            'nature' => $validated['nature'],
+            'income_statement_section' => $validated['income_statement_section'] ?? null,
+        ]);
 
         return redirect()->back()->with('success', 'Transaction type updated.');
     }

@@ -9,18 +9,13 @@ Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00
 Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
-
-
+Schedule::command('inventory:snapshot-items')->cron('0 0,10,14,17,20 * * *')->withoutOverlapping();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
-//Gencys ERP
+// Gencys ERP
 Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
-
-Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('08:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('12:00')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('15:00')->withoutOverlapping();
 
 Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('08:30')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-erp-transaction-history')->dailyAt('12:30')->withoutOverlapping();
@@ -31,17 +26,23 @@ Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('12:4
 Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('15:45')->withoutOverlapping();
 Schedule::command('gencys-erp:trigger-fetch-erp-purchase-orders')->dailyAt('19:00')->withoutOverlapping();
 
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:15')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:15')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:15')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('09:15')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('13:15')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-daily-sales-tracker')->dailyAt('16:15')->withoutOverlapping();
 
-Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('08:30')->withoutOverlapping();
-Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('12:30')->withoutOverlapping();
-Schedule::command('gencys-erp:sync-inventory-from-orders')->dailyAt('16:30')->withoutOverlapping();
-
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
+Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
+
+// Pull RMO statuses in line with the courier's parcel status for workspaces
+// that opted in. Runs once at midnight, which lands on the default two-day
+// window (today + yesterday) just as the day rolls over — so the day that has
+// only just ended gets closed out, including parcels whose final status the
+// courier reported late in the evening.
+Schedule::command('rmo:apply-auto-tag')->dailyAt('00:00')->withoutOverlapping();
 
 // ── Inventory (Discord) ─────────────────────────────────────────────────
 // Checked hourly (top of each hour); each command posts only for workspaces

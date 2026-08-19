@@ -6,7 +6,7 @@ use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Inventory\Exports\InventoryItemExport;
+use Modules\Inventory\Exports\InventoryItemReportExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Tests\TestCase;
@@ -61,6 +61,48 @@ test('bulkGroup with no parent info ungroups the selected items', function () {
         ->assertRedirect();
 
     expect($child->fresh()->parent_id)->toBeNull();
+});
+
+test('ungrouping a selected parent breaks up the whole group', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'P', 'is_parent' => true, 'is_active' => true]);
+    $childA = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'C-A', 'parent_id' => $parent->id, 'is_active' => true]);
+    $childB = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'C-B', 'parent_id' => $parent->id, 'is_active' => true]);
+
+    // The summary view lists the group under the parent's id, so that is the id
+    // the Ungroup button sends — it must detach the children, not no-op.
+    $this->actingAs($owner)
+        ->post(route('workspaces.inventory.item.bulk-group', $workspace), [
+            'ids' => [$parent->id],
+        ])
+        ->assertRedirect();
+
+    expect($childA->fresh()->parent_id)->toBeNull()
+        ->and($childB->fresh()->parent_id)->toBeNull()
+        // The parent placeholder itself is left alone — it is reusable.
+        ->and($parent->fresh())->not->toBeNull();
+});
+
+test('grouping under a parent is unaffected by the ungroup child expansion', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'P', 'is_parent' => true, 'is_active' => true]);
+    $otherParent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'P2', 'is_parent' => true, 'is_active' => true]);
+    $held = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'HELD', 'parent_id' => $otherParent->id, 'is_active' => true]);
+    $loose = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'LOOSE', 'is_active' => true]);
+
+    // Selecting a parent alongside a leaf while grouping must not drag the other
+    // parent's children along — the expansion only applies to ungrouping.
+    $this->actingAs($owner)
+        ->post(route('workspaces.inventory.item.bulk-group', $workspace), [
+            'ids' => [$loose->id, $otherParent->id],
+            'parent_id' => $parent->id,
+        ])
+        ->assertRedirect();
+
+    expect($loose->fresh()->parent_id)->toBe($parent->id)
+        ->and($held->fresh()->parent_id)->toBe($otherParent->id);
 });
 
 test('summarize view rolls children up under the parent and sums their stock', function () {
@@ -236,7 +278,7 @@ test('the n8n keywords endpoint excludes parent items', function () {
     expect($ids)->not->toContain($parent->id);
 });
 
-test('the export follows the summarize toggle and rolls children up into one row', function () {
+test('the export rolls children up into one row per group', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
@@ -249,24 +291,22 @@ test('the export follows the summarize toggle and rolls children up into one row
     Excel::matchByRegex();
 
     $this->actingAs($owner)
-        ->get(route('workspaces.inventory.item.export', $workspace).'?summarize=1')
+        ->get(route('workspaces.inventory.item.export', $workspace))
         ->assertOk();
 
-    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemExport $export) {
+    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemReportExport $export) {
         $rows = iterator_to_array($export->generator());
 
         // One row for the whole group, with the children's stock summed.
-        expect($rows)->toHaveCount(1);
-        expect($rows[0][0])->toBe('GROUP');
-        expect((int) $rows[0][2])->toBe(2);       // SKUs in Group
-        expect((int) $rows[0][6])->toBe(42);      // Remaining Qty (30 + 12)
-        expect($export->headings()[2])->toBe('SKUs in Group');
+        expect($rows)->toHaveCount(1)
+            ->and($rows[0][0])->toBe('GROUP')
+            ->and((int) $rows[0][10])->toBe(42);
 
         return true;
     });
 });
 
-test('the export with the summarize toggle off stays flat, one row per SKU', function () {
+test('the export stays rolled up even with the list toggled flat', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
@@ -282,12 +322,10 @@ test('the export with the summarize toggle off stays flat, one row per SKU', fun
         ->get(route('workspaces.inventory.item.export', $workspace).'?summarize=0')
         ->assertOk();
 
-    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemExport $export) {
-        $rows = iterator_to_array($export->generator());
-
-        // Both children listed separately; the parent placeholder is not exported.
-        expect(collect($rows)->pluck(0)->all())->toEqualCanonicalizing(['SUP-A', 'SUP-B']);
-        expect($export->headings())->not->toContain('SKUs in Group');
+    // The demand figures are the group's, so a per-SKU download would split one
+    // reorder decision across several lines and invite double-counting it.
+    Excel::assertDownloaded('/inventory-items-.*\.xlsx/', function (InventoryItemReportExport $export) {
+        expect(collect(iterator_to_array($export->generator()))->pluck(0)->all())->toBe(['GROUP']);
 
         return true;
     });

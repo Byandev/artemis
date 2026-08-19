@@ -13,6 +13,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Models\PurchasedOrderItemDelivery;
+use Modules\Inventory\Models\PurchasedOrderStatusLog;
 
 class PurchaseOrderController extends Controller
 {
@@ -35,8 +36,19 @@ class PurchaseOrderController extends Controller
      *           "delivery_fee": 0,
      *           "total_amount": 42752,
      *           "status": 7,              // PurchasedOrder::STATUSES code (1-8)
+     *           "supplier": "BFM",        // free-text name, no supplier table
      *           "items": [ { "count": 800, "amount": 57.23, "total_amount": 45784 } ],
-     *           "deliveries": [ { "qty": 800, "created_at": "2026-06-29 11:07:02" } ]
+     *           "deliveries": [ { "qty": 800, "created_at": "2026-06-29 11:07:02" } ],
+     *           "statusLogs": [           // the ERP's audit trail, any order
+     *             { "status": "Paid", "by": "RENZ LAICA MERCADO",
+     *               "detail": "PAID-50%", "timestamp": "2026-07-24 16:23:30" }
+     *           ],
+     *           // When the order reached each stage. Null until it gets there.
+     *           "approved_at": "2026-07-23 17:32:32",
+     *           "to_pay_at": "2026-07-23 17:33:52",
+     *           "paid_at": "2026-07-24 16:23:30",
+     *           "for_purchase_at": "2026-07-24 16:52:25",
+     *           "purchased_at": "2026-07-24 16:52:34"
      *         }
      *       ]
      *     }
@@ -44,8 +56,8 @@ class PurchaseOrderController extends Controller
      * }
      *
      * These ERP POs carry a single inventory item, so each PO's line is attached
-     * to the entry's item. Deliveries are replaced wholesale each sync. Items not
-     * owned by the authenticated workspace are skipped.
+     * to the entry's item. Deliveries and status logs are replaced wholesale each
+     * sync. Items not owned by the authenticated workspace are skipped.
      */
     public function bulkSync(Request $request): JsonResponse
     {
@@ -85,8 +97,9 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Upsert one purchase order (header, its single item line, and deliveries)
-     * for the given inventory item. Returns false when the PO has no control_no.
+     * Upsert one purchase order (header, its single item line, deliveries and
+     * the ERP's status trail) for the given inventory item. Returns false when
+     * the PO has no control_no.
      */
     private function saveOrder(Workspace $workspace, InventoryItem $item, array $po): bool
     {
@@ -100,13 +113,24 @@ class PurchaseOrderController extends Controller
             ['workspace_id' => $workspace->id, 'control_no' => $controlNo],
             [
                 'issue_date' => $this->toDate($po['issue_date'] ?? null),
+                // The ERP sends this on barely any order, so the standing
+                // two-week agreement fills it in at sync time rather than every
+                // reader guessing the same fallback for itself.
+                'expected_delivery_date' => PurchasedOrder::expectedDeliveryFor(
+                    $this->toDate($po['expected_delivery_date'] ?? null),
+                    $this->toDate($po['issue_date'] ?? null),
+                ),
                 'delivery_no' => $po['delivery_no'] ?? null,
                 'cust_po_no' => $po['cust_po_no'] ?? null,
+                'supplier' => $this->trimmed($po['supplier'] ?? null),
                 'delivery_fee' => $po['delivery_fee'] ?? 0,
                 'total_amount' => $po['total_amount'] ?? 0,
                 'status' => $this->normalizeStatus($po['status'] ?? null),
+                ...$this->stageTimestamps($po),
             ]
         );
+
+        $this->saveStatusLogs($order, $po);
 
         $line = $po['items'][0] ?? [];
 
@@ -136,6 +160,114 @@ class PurchaseOrderController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * The stage timestamps the ERP sends alongside the trail, as columns to
+     * write.
+     *
+     * Only keys actually present are returned: a field the ERP has stopped
+     * sending must leave the stored value alone, while one sent as null is the
+     * ERP saying the order has not reached that stage (or has been moved back),
+     * and does clear it.
+     *
+     * @return array<string, Carbon|null>
+     */
+    private function stageTimestamps(array $po): array
+    {
+        $stamps = [];
+
+        foreach (PurchasedOrder::STAGE_TIMESTAMPS as $field) {
+            if (array_key_exists($field, $po)) {
+                $stamps[$field] = $this->toDateTime($po[$field]);
+            }
+        }
+
+        return $stamps;
+    }
+
+    /**
+     * Replace the order's status trail with what the ERP sent, and — only when
+     * the ERP did not send `paid_at` itself — denormalise the payment date out
+     * of it onto the order.
+     *
+     * Wholesale replacement, like deliveries: the ERP owns this trail and can
+     * revise it, and there is no local id to match entries on. A payload that
+     * omits `statusLogs` entirely leaves both the trail and paid_at untouched —
+     * absent means "not sent", not "cleared".
+     */
+    private function saveStatusLogs(PurchasedOrder $order, array $po): void
+    {
+        if (! array_key_exists('statusLogs', $po)) {
+            return;
+        }
+
+        // Bypasses model events on purpose: a wholesale replace would otherwise
+        // re-derive paid_at once per row. The single recalculate below does the
+        // same work once.
+        PurchasedOrderStatusLog::where('inventory_purchased_order_id', $order->id)->toBase()->delete();
+
+        $now = now();
+        $rows = [];
+
+        foreach (($po['statusLogs'] ?? []) as $log) {
+            $status = $this->trimmed($log['status'] ?? null);
+
+            if ($status === null) {
+                continue;
+            }
+
+            $rows[] = [
+                'inventory_purchased_order_id' => $order->id,
+                'status' => $status,
+                'by' => $this->trimmed($log['by'] ?? null),
+                'detail' => $log['detail'] ?? null,
+                'logged_at' => $this->toDateTime($log['timestamp'] ?? null),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if ($rows) {
+            PurchasedOrderStatusLog::insert($rows);
+        }
+
+        // The ERP's own paid_at is authoritative when it sends one — re-deriving
+        // would overwrite it with a reading of the same trail it came from, and
+        // disagree whenever the ERP knows something the log does not.
+        if (array_key_exists('paid_at', $po)) {
+            return;
+        }
+
+        // Runs even when the trail came back empty, so an order whose Paid entry
+        // the ERP has withdrawn stops reporting a payment date.
+        $order->recalculatePaidAt();
+    }
+
+    /** Trim a scalar to a non-empty string, or null. */
+    private function trimmed(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    /** Parse any date/datetime string into a Carbon instance, or null. */
+    private function toDateTime(?string $value): ?Carbon
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /** Parse any date/datetime string into Y-m-d, or null when empty/unparseable. */

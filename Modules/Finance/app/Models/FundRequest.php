@@ -2,15 +2,17 @@
 
 namespace Modules\Finance\Models;
 
+use App\Models\Department;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FundRequest extends Model
 {
-    protected $table = 'finance_request_funds';
+    protected $table = 'finance_fund_requests';
 
     /**
      * The statuses a fund request can move through.
@@ -20,25 +22,14 @@ class FundRequest extends Model
     /** Statuses that represent a decision made by an approver. */
     public const APPROVED_STATUSES = ['approved', 'released'];
 
-    /** A plain request. */
-    public const TEMPLATE_BLANK = 'blank';
-
-    /** Ad spend request: carries line items and derives its own amount. */
-    public const TEMPLATE_AD_SPENT = 'ad_spent';
-
-    public const TEMPLATES = [self::TEMPLATE_BLANK, self::TEMPLATE_AD_SPENT];
-
     protected $fillable = [
         'workspace_id',
-        'template',
-        'gotyme_number',
         'request_date',
         'reference_no',
         'requested_by',
-        'charge_to',
-        'purpose',
+        'transaction_type_id',
+        'department_id',
         'amount_requested',
-        'date_needed',
         'approved_by',
         'status',
         'remarks',
@@ -46,7 +37,6 @@ class FundRequest extends Model
 
     protected $casts = [
         'request_date' => 'date',
-        'date_needed' => 'date',
         'amount_requested' => 'decimal:2',
     ];
 
@@ -55,14 +45,44 @@ class FundRequest extends Model
         return $this->belongsTo(Workspace::class);
     }
 
-    public function items(): HasMany
+    public function transactionType(): BelongsTo
     {
-        return $this->hasMany(FundRequestItem::class, 'fund_request_id')->orderBy('sort_order');
+        return $this->belongsTo(TransactionType::class, 'transaction_type_id');
     }
 
-    public function isAdSpent(): bool
+    public function department(): BelongsTo
     {
-        return $this->template === self::TEMPLATE_AD_SPENT;
+        return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * The users this request's amount is shared among. Each carries an `amount`
+     * pivot — their share of the request, the shares summing to the amount
+     * requested.
+     */
+    public function chargeToUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'finance_fund_request_user_shares', 'fund_request_id', 'user_id')
+            ->withPivot('amount')
+            ->withTimestamps();
+    }
+
+    /**
+     * The products this request covers, each with its share of the amount. Set
+     * independently of the ad-spend line items.
+     */
+    public function productShares(): HasMany
+    {
+        return $this->hasMany(FundRequestProductShare::class, 'fund_request_id')->orderBy('sort_order');
+    }
+
+    /**
+     * The transactions settling this request. A loose link: several entries may
+     * point here and nothing reconciles their amounts against the request.
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'fund_request_id');
     }
 
     /*
@@ -74,11 +94,6 @@ class FundRequest extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by');
-    }
-
-    public function chargeToUser(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'charge_to');
     }
 
     public function approver(): BelongsTo

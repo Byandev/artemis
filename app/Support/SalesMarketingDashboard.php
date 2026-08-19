@@ -18,11 +18,14 @@ final class SalesMarketingDashboard
     {
         $base = "/workspaces/{$workspace->slug}/sales-marketing/dashboard";
 
-        return [
+        return array_values(array_filter([
             ['key' => 'daily-report', 'label' => 'Daily Report', 'url' => $base],
             ['key' => 'page-roas-tracker', 'label' => 'Page ROAS Tracker', 'url' => "{$base}/page-roas-tracker"],
-            ['key' => 'ad-spend-goals', 'label' => 'Ad Spend Goals', 'url' => "{$base}/ad-spend-goals"],
+            $workspace->ad_spend_goals_module_enabled
+                ? ['key' => 'ad-spend-goals', 'label' => 'Ad Spend Goals', 'url' => "{$base}/ad-spend-goals"]
+                : null,
             ['key' => 'ad-spent-summary', 'label' => 'Ad Spent Summary', 'url' => "{$base}/ad-spent-summary"],
-        ];
+            ['key' => 'sales-targets', 'label' => 'Sales Targets', 'url' => "{$base}/sales-targets"],
+        ]));
     }
 }

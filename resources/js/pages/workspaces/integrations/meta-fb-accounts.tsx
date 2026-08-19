@@ -243,7 +243,10 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
                             asChild
                             className="bg-emerald-600 text-white hover:bg-emerald-700"
                         >
-                            <a className={'font-mono! text-sm'} href={connectUrl}>
+                            <a
+                                className={'font-mono! text-sm'}
+                                href={connectUrl}
+                            >
                                 <Facebook className="mr-2 h-4 w-4" />
                                 Connect Meta Account
                             </a>
@@ -309,9 +312,9 @@ export default function MetaFbAccounts({ workspace, metaUsers, query }: Props) {
                             <span className="font-medium">
                                 {removeTarget?.name}
                             </span>{' '}
-                            and deletes its ad accounts from this workspace. Your
-                            historical campaigns, ad sets, ads, creatives and
-                            insights are kept.
+                            and deletes its ad accounts from this workspace.
+                            Your historical campaigns, ad sets, ads, creatives
+                            and insights are kept.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

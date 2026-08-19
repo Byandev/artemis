@@ -10,6 +10,7 @@ use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
+use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
 
 // Unauthenticated public endpoints (leaderboards, CSR performance widgets)
 Route::group(['prefix' => 'api/public', 'as' => 'api.public.'], function () {
@@ -59,19 +60,44 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/calendar', [VideoEditorDashboardController::class, 'calendar'])->name('calendar');
         });
 
-        // Inventory dashboard — one endpoint per widget so each loads, skeletons
+        // Inventory dashboard — one endpoint per KPI so each loads, skeletons
         // and refreshes independently. See InventoryDashboardStatsController.
-        Route::prefix('inventory/dashboard')->name('inventory.dashboard.')->group(function () {
-            Route::get('/kpis', [InventoryDashboardStatsController::class, 'kpis'])->name('kpis');
-            Route::get('/movement', [InventoryDashboardStatsController::class, 'movement'])->name('movement');
-            Route::get('/po-status', [InventoryDashboardStatsController::class, 'poStatus'])->name('po-status');
-            Route::get('/fulfillment', [InventoryDashboardStatsController::class, 'fulfillment'])->name('fulfillment');
-            Route::get('/shrinkage', [InventoryDashboardStatsController::class, 'shrinkage'])->name('shrinkage');
-            Route::get('/stock-health', [InventoryDashboardStatsController::class, 'stockHealth'])->name('stock-health');
-            Route::get('/upcoming-deliveries', [InventoryDashboardStatsController::class, 'upcomingDeliveries'])->name('upcoming-deliveries');
-            Route::get('/recent-adjustments', [InventoryDashboardStatsController::class, 'recentAdjustments'])->name('recent-adjustments');
-            Route::get('/top-discrepancies', [InventoryDashboardStatsController::class, 'topDiscrepancies'])->name('top-discrepancies');
-            Route::get('/alerts', [InventoryDashboardStatsController::class, 'alerts'])->name('alerts');
+        Route::prefix('inventory/dashboard/kpi')->name('inventory.dashboard.kpi.')->group(function () {
+            Route::get('/inventory-items', [InventoryDashboardStatsController::class, 'inventoryItems'])->name('inventory-items');
+            Route::get('/total-stocks', [InventoryDashboardStatsController::class, 'totalStocks'])->name('total-stocks');
+            Route::get('/unfulfilled', [InventoryDashboardStatsController::class, 'unfulfilled'])->name('unfulfilled');
+            Route::get('/open-pos', [InventoryDashboardStatsController::class, 'openPos'])->name('open-pos');
+        });
+
+        Route::get('/inventory/dashboard/movement', [InventoryDashboardStatsController::class, 'movement'])
+            ->name('inventory.dashboard.movement');
+
+        Route::get('/inventory/dashboard/high-unfulfilled', [InventoryDashboardStatsController::class, 'highUnfulfilled'])
+            ->name('inventory.dashboard.high-unfulfilled');
+
+        Route::get('/inventory/dashboard/low-stock', [InventoryDashboardStatsController::class, 'lowStock'])
+            ->name('inventory.dashboard.low-stock');
+
+        Route::get('/inventory/dashboard/open-purchase-orders', [InventoryDashboardStatsController::class, 'openPurchaseOrders'])
+            ->name('inventory.dashboard.open-purchase-orders');
+
+        Route::get('/inventory/dashboard/purchase-orders/{purchasedOrder}/lines', [InventoryDashboardStatsController::class, 'purchaseOrderLines'])
+            ->name('inventory.dashboard.purchase-order-lines');
+
+        Route::get('/inventory/dashboard/delivery-lead-time', [InventoryDashboardStatsController::class, 'deliveryLeadTime'])
+            ->name('inventory.dashboard.delivery-lead-time');
+
+        // Purchase-order flow: where ordered stock is sitting and who is holding
+        // it. One endpoint per panel, same as the rest of the dashboard, so a
+        // slow panel never blocks the others.
+        Route::prefix('inventory/dashboard/po-flow')->name('inventory.dashboard.po-flow.')->group(function () {
+            Route::get('/kpi', [PurchaseOrderFlowController::class, 'kpi'])->name('kpi');
+            Route::get('/bottleneck', [PurchaseOrderFlowController::class, 'bottleneck'])->name('bottleneck');
+            Route::get('/pipeline', [PurchaseOrderFlowController::class, 'pipeline'])->name('pipeline');
+            Route::get('/worklist', [PurchaseOrderFlowController::class, 'worklist'])->name('worklist');
+            Route::get('/supplier-deliveries', [PurchaseOrderFlowController::class, 'supplierDeliveries'])->name('supplier-deliveries');
+            Route::get('/stage-timings', [PurchaseOrderFlowController::class, 'stageTimings'])->name('stage-timings');
+            Route::get('/unfulfilled-split', [PurchaseOrderFlowController::class, 'unfulfilledSplit'])->name('unfulfilled-split');
         });
     });
 });

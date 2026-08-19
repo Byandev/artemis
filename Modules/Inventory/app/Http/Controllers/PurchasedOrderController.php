@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Inventory\Exports\PurchasedOrderExport;
@@ -32,15 +33,27 @@ class PurchasedOrderController extends Controller
                         $q->where('delivery_no', 'like', "%{$value}%")
                             ->orWhere('cust_po_no', 'like', "%{$value}%")
                             ->orWhere('control_no', 'like', "%{$value}%")
+                            ->orWhere('supplier', 'like', "%{$value}%")
                             // Match orders containing an inventory item with this SKU.
                             ->orWhereHas('items.inventoryItem', fn ($item) => $item->where('sku', 'like', "%{$value}%"));
                     });
                 }),
+                AllowedFilter::exact('status'),
                 AllowedFilter::callback('start_date', function ($query, $value) {
                     $query->whereDate('issue_date', '>=', $value);
                 }),
                 AllowedFilter::callback('end_date', function ($query, $value) {
                     $query->whereDate('issue_date', '<=', $value);
+                }),
+                AllowedFilter::exact('supplier'),
+                // Separate from start_date/end_date, which window the issue
+                // date: "paid in July" and "raised in July" are different
+                // questions and finance asks the first one.
+                AllowedFilter::callback('paid_from', function ($query, $value) {
+                    $query->whereDate('paid_at', '>=', $value);
+                }),
+                AllowedFilter::callback('paid_to', function ($query, $value) {
+                    $query->whereDate('paid_at', '<=', $value);
                 }),
             ])
             ->allowedSorts([
@@ -49,9 +62,11 @@ class PurchasedOrderController extends Controller
                 'expected_delivery_date',
                 'cust_po_no',
                 'control_no',
+                'supplier',
                 'delivery_fee',
                 'total_amount',
                 'status',
+                'paid_at',
                 'created_at',
             ])
             ->defaultSort('-issue_date');
@@ -122,7 +137,7 @@ class PurchasedOrderController extends Controller
             'control_no' => 'nullable|string|max:255',
             'delivery_fee' => 'required|numeric|min:0',
             'total_amount' => 'required|numeric|min:0',
-            'status' => 'required|integer|in:1,2,3,4,5,6,7,8',
+            'status' => ['required', 'integer', Rule::in(array_keys(PurchasedOrder::STATUSES))],
             'items' => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
             'items.*.count' => 'required|integer|min:1',
@@ -134,7 +149,12 @@ class PurchasedOrderController extends Controller
             'workspace_id' => $workspace->id,
             'issue_date' => $request->issue_date,
             'delivery_no' => $request->delivery_no,
-            'expected_delivery_date' => $request->expected_delivery_date,
+            // Left blank on the form, an order is due two weeks after it is
+            // raised — the same standing agreement the ERP sync applies.
+            'expected_delivery_date' => PurchasedOrder::expectedDeliveryFor(
+                $request->expected_delivery_date,
+                $request->issue_date,
+            ),
             'cust_po_no' => $request->cust_po_no,
             'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,
@@ -176,7 +196,7 @@ class PurchasedOrderController extends Controller
             'control_no' => 'nullable|string|max:255',
             'delivery_fee' => 'required|numeric|min:0',
             'total_amount' => 'required|numeric|min:0',
-            'status' => 'required|integer|in:1,2,3,4,5,6,7,8',
+            'status' => ['required', 'integer', Rule::in(array_keys(PurchasedOrder::STATUSES))],
             'items' => 'required|array|min:1',
             'items.*.inventory_item_id' => 'required|exists:inventory_items,id',
             'items.*.count' => 'required|integer|min:1',
@@ -187,7 +207,12 @@ class PurchasedOrderController extends Controller
         $purchasedOrder->update([
             'issue_date' => $request->issue_date,
             'delivery_no' => $request->delivery_no,
-            'expected_delivery_date' => $request->expected_delivery_date,
+            // Left blank on the form, an order is due two weeks after it is
+            // raised — the same standing agreement the ERP sync applies.
+            'expected_delivery_date' => PurchasedOrder::expectedDeliveryFor(
+                $request->expected_delivery_date,
+                $request->issue_date,
+            ),
             'cust_po_no' => $request->cust_po_no,
             'control_no' => $request->control_no,
             'delivery_fee' => $request->delivery_fee,

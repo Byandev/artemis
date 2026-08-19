@@ -2,8 +2,10 @@
 
 namespace Modules\SimGateway\Http\Controllers;
 
+use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,6 +20,8 @@ use Modules\SimGateway\Services\Gateway\GatewayInterface;
 
 class SmsController extends Controller
 {
+    use AuthorizesRequests;
+
     protected function guard(Request $request, Workspace $workspace): void
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -28,6 +32,7 @@ class SmsController extends Controller
     public function create(Request $request, Workspace $workspace): Response
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::SendSms->value, $workspace);
 
         $sims = Sim::where('workspace_id', $workspace->id)
             ->where('status', SimStatus::Active)
@@ -42,6 +47,7 @@ class SmsController extends Controller
     public function store(Request $request, Workspace $workspace, GatewayInterface $gateway): RedirectResponse
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::SendSms->value, $workspace);
 
         $data = $request->validate([
             'sim_id' => ['required', 'integer'],
@@ -65,6 +71,7 @@ class SmsController extends Controller
     public function bulkStore(Request $request, Workspace $workspace, GatewayInterface $gateway): RedirectResponse
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::SendSms->value, $workspace);
 
         $data = $request->validate([
             'sim_id' => ['required', 'integer'],
@@ -89,6 +96,7 @@ class SmsController extends Controller
     public function inbox(Request $request, Workspace $workspace): Response
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewSmsOutbox->value, $workspace);
 
         $messages = SmsMessage::where('workspace_id', $workspace->id)
             ->where('direction', MessageDirection::Inbound)
@@ -105,6 +113,7 @@ class SmsController extends Controller
     public function outbox(Request $request, Workspace $workspace): Response
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewSmsOutbox->value, $workspace);
 
         $sortable = ['created_at', 'to_number', 'status', 'sent_at'];
         $sort = in_array($request->sort, $sortable, true) ? $request->sort : null;
@@ -167,6 +176,7 @@ class SmsController extends Controller
     public function sims(Request $request, Workspace $workspace): Response
     {
         $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewSims->value, $workspace);
 
         $sortable = ['phone_number', 'carrier', 'port_number', 'status', 'inbound_count', 'outbound_count', 'last_activity_at'];
         $sort = in_array($request->sort, $sortable, true) ? $request->sort : null;

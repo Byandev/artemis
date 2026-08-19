@@ -54,6 +54,7 @@ import {
     Sparkles,
     Store,
     Tags,
+    Target,
     Trophy,
     Truck,
     User,
@@ -216,21 +217,29 @@ export function AppSidebar() {
                   {
                       title: 'SMS',
                       icon: MessageSquare,
+                      anyOf: [
+                          PERMISSIONS.ViewSims,
+                          PERMISSIONS.SendSms,
+                          PERMISSIONS.ViewSmsOutbox,
+                      ],
                       items: [
                           {
                               title: 'SIMs',
                               href: `/workspaces/${slug}/sms/sims`,
                               icon: Smartphone,
+                              permission: PERMISSIONS.ViewSims,
                           },
                           {
                               title: 'Send SMS',
                               href: `/workspaces/${slug}/sms/send`,
                               icon: Send,
+                              permission: PERMISSIONS.SendSms,
                           },
                           {
                               title: 'Outbox',
                               href: `/workspaces/${slug}/sms/outbox`,
                               icon: MessageSquare,
+                              permission: PERMISSIONS.ViewSmsOutbox,
                           },
                       ],
                   },
@@ -378,6 +387,12 @@ export function AppSidebar() {
                       ],
                       items: [
                           {
+                              title: 'Dashboard',
+                              href: `/workspaces/${slug}/inventory/dashboard`,
+                              icon: LayoutDashboard,
+                              permission: PERMISSIONS.ViewInventoryItems,
+                          },
+                          {
                               title: 'Inventory Items',
                               href: `/workspaces/${slug}/inventory/items`,
                               icon: Layers,
@@ -499,13 +514,13 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewFinanceTransactions,
                           },
                           {
-                              title: 'Remittances',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
-                              icon: Send,
-                              permission: PERMISSIONS.ViewFinanceRemittances,
+                              title: 'Income Statements',
+                              href: `/workspaces/${currentWorkspace.slug}/finance/income-statements`,
+                              icon: FileText,
+                              permission: PERMISSIONS.ViewFinanceDashboard,
                           },
                           {
-                              title: 'Request Funds',
+                              title: 'Fund Requests',
                               href: `/workspaces/${currentWorkspace.slug}/finance/request-funds`,
                               icon: Banknote,
                               permission: PERMISSIONS.ViewFinanceRequestFunds,
@@ -569,6 +584,9 @@ export function AppSidebar() {
                     leaderboardEnabled={
                         currentWorkspace.leaderboard_module_enabled
                     }
+                    salesTargetsEnabled={
+                        currentWorkspace.sales_marketing_dashboard_module_enabled
+                    }
                 />
             </SidebarContent>
 
@@ -583,14 +601,19 @@ function PublicLinks({
     workspaceSlug,
     rmoEnabled,
     leaderboardEnabled,
+    salesTargetsEnabled,
 }: {
     workspaceSlug: string;
     rmoEnabled: boolean;
     leaderboardEnabled: boolean;
+    salesTargetsEnabled: boolean;
 }) {
     const canViewRmoLink = useAnyPermission([PERMISSIONS.ViewRmoManagement]);
     const canViewLeaderboardLink = useAnyPermission([
         PERMISSIONS.ViewLeaderboards,
+    ]);
+    const canViewSalesTargetsLink = useAnyPermission([
+        PERMISSIONS.ViewSalesMarketingDashboard,
     ]);
 
     const links = [
@@ -609,6 +632,15 @@ function PublicLinks({
                       title: 'Leaderboards',
                       href: `/public/workspaces/${workspaceSlug}/leaderboards`,
                       icon: Trophy,
+                  },
+              ]
+            : []),
+        ...(salesTargetsEnabled && canViewSalesTargetsLink
+            ? [
+                  {
+                      title: 'Sales Targets',
+                      href: `/public/workspaces/${workspaceSlug}/sales-targets`,
+                      icon: Target,
                   },
               ]
             : []),

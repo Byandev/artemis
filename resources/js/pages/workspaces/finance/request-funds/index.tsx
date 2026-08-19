@@ -1,11 +1,15 @@
 import PageHeader from '@/components/common/PageHeader';
-import { PageOption, ProductOption } from '@/components/finance/ad-spent-items';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
 import {
+    DepartmentOption,
+    ProductOption,
     RequestFund,
     RequestFundFormDialog,
-    TEMPLATE_LABELS,
 } from '@/components/finance/request-fund-form-dialog';
+import {
+    TransactionTypeItem,
+    transactionTypeLabel,
+} from '@/components/finance/transaction-type';
 import { StatusFilter } from '@/components/finance/status-filter';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import {
@@ -45,10 +49,9 @@ interface Props {
     requestFunds: PaginatedData<RequestFund>;
     users: UserOption[];
     statuses: string[];
-    templates: string[];
     products: ProductOption[];
-    myPages: PageOption[];
-    myGotymeNumber: string | null;
+    transactionTypes: TransactionTypeItem[];
+    departments: DepartmentOption[];
     canApproveStatus: boolean;
     query?: {
         sort?: string | null;
@@ -87,10 +90,9 @@ export default function RequestFundsIndex({
     requestFunds,
     users,
     statuses,
-    templates,
     products,
-    myPages,
-    myGotymeNumber,
+    transactionTypes,
+    departments,
     canApproveStatus,
     query,
 }: Props) {
@@ -189,25 +191,6 @@ export default function RequestFundsIndex({
             ),
         },
         {
-            accessorKey: 'template',
-            enableSorting: false,
-            header: 'Template',
-            cell: ({ row }) => {
-                const t = row.original.template;
-                return (
-                    <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${
-                            t === 'ad_spent'
-                                ? 'bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400'
-                                : 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400'
-                        }`}
-                    >
-                        {TEMPLATE_LABELS[t] ?? t}
-                    </span>
-                );
-            },
-        },
-        {
             id: 'requester',
             header: 'Requested By',
             cell: ({ row }) => (
@@ -217,11 +200,21 @@ export default function RequestFundsIndex({
             ),
         },
         {
-            id: 'charge_to_user',
-            header: 'Charge To',
+            id: 'type',
+            header: 'Type',
             cell: ({ row }) => (
                 <span className="text-[12px] text-gray-700 dark:text-gray-200">
-                    {row.original.charge_to_user?.name ?? '—'}
+                    {transactionTypeLabel(row.original.transactionType?.name) ||
+                        '—'}
+                </span>
+            ),
+        },
+        {
+            id: 'department',
+            header: 'Department',
+            cell: ({ row }) => (
+                <span className="text-[12px] text-gray-700 dark:text-gray-200">
+                    {row.original.department?.name ?? '—'}
                 </span>
             ),
         },
@@ -239,18 +232,6 @@ export default function RequestFundsIndex({
                 <div className="text-right font-mono text-[12px] font-medium text-gray-800 dark:text-gray-100">
                     {fmt(row.original.amount_requested)}
                 </div>
-            ),
-        },
-        {
-            accessorKey: 'date_needed',
-            enableSorting: true,
-            header: ({ column }) => (
-                <SortableHeader column={column} title="Date Needed" />
-            ),
-            cell: ({ row }) => (
-                <span className="font-mono text-[11px] text-gray-500">
-                    {fmtDate(row.original.date_needed)}
-                </span>
             ),
         },
         {
@@ -383,10 +364,10 @@ export default function RequestFundsIndex({
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Request Funds`} />
+            <Head title={`${workspace.name} - Fund Requests`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
-                    title="Request Funds"
+                    title="Fund Requests"
                     description="Create and track requests for funds and their approvals."
                 >
                     {canCreate && (
@@ -405,7 +386,7 @@ export default function RequestFundsIndex({
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100"
-                            placeholder="Search reference or purpose..."
+                            placeholder="Search reference..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
@@ -460,10 +441,9 @@ export default function RequestFundsIndex({
                         requestFund={editing}
                         workspaceSlug={workspace.slug}
                         users={users}
-                        templates={templates}
                         products={products}
-                        myPages={myPages}
-                        myGotymeNumber={myGotymeNumber}
+                        transactionTypes={transactionTypes}
+                        departments={departments}
                     />
                 )}
                 {canDelete && (

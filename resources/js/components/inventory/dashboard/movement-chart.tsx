@@ -1,82 +1,219 @@
+import { Skeleton } from '@/components/ui/skeleton';
 import { type ApexOptions } from 'apexcharts';
 import { format, parseISO } from 'date-fns';
+import { useEffect, useState } from 'react';
 import Chart from 'react-apexcharts';
-import { tooltipTheme } from './chart-theme';
-import { EmptyState } from './dashboard-card';
-import { type MovementData } from './types';
+import RefreshButton from './refresh-button';
+import { useInventoryStat } from './use-inventory-stat';
 
-const COLORS = {
-    inflow: '#10b981',
-    outflow: '#f59e0b',
-    losses: '#ef4444',
-    remaining: '#6366f1',
-};
+interface MovementDay {
+    date: string;
+    in: number;
+    out: number;
+}
+
+interface MovementData {
+    days: MovementDay[];
+}
 
 /**
- * Combo chart: grouped columns for the day's flows (inflow up, outflow & losses
- * down) with the remaining-stock level as a line on a second axis. Deliberately
- * NOT stacked — a stacked column+line combo trips an ApexCharts bug that blanks
- * the chart.
+ * Diverging pair — warm/cool poles that read as opposite, with the zero line as
+ * the neutral midpoint. Both modes are selected steps validated against their
+ * own surface (not an automatic flip of the light values).
  */
-export default function MovementChart({ data }: { data: MovementData }) {
-    const flowKeys = [
-        'po_qty_in',
-        'rts_goods_in',
-        'po_qty_out',
-        'rts_goods_out',
-        'rts_bad',
-        'lost',
-    ] as const;
-    const hasData = flowKeys.some((k) => data[k].some((v) => v !== 0));
-    if (!hasData) {
-        return <EmptyState message="No inventory movement in this period." />;
+const COLORS = {
+    light: { in: '#2a78d6', out: '#e34948' },
+    dark: { in: '#3987e5', out: '#e66767' },
+};
+
+const INK = {
+    light: { text: '#6B7280', grid: 'rgba(0,0,0,0.06)' },
+    dark: { text: '#9CA3AF', grid: 'rgba(255,255,255,0.08)' },
+};
+
+/** Trailing windows on offer. Must match MOVEMENT_WINDOWS server-side. */
+const WINDOWS = [7, 14, 30] as const;
+type WindowDays = (typeof WINDOWS)[number];
+
+/** Tracks the `dark` class the appearance hook stamps on <html>. */
+function useIsDark(): boolean {
+    const [isDark, setIsDark] = useState(
+        () =>
+            typeof document !== 'undefined' &&
+            document.documentElement.classList.contains('dark'),
+    );
+
+    useEffect(() => {
+        const el = document.documentElement;
+        const observer = new MutationObserver(() =>
+            setIsDark(el.classList.contains('dark')),
+        );
+        observer.observe(el, {
+            attributes: true,
+            attributeFilter: ['class'],
+        });
+
+        return () => observer.disconnect();
+    }, []);
+
+    return isDark;
+}
+
+export default function MovementChart({ slug }: { slug: string }) {
+    const [windowDays, setWindow] = useState<WindowDays>(WINDOWS[0]);
+    const { data, loading, error, refetch } = useInventoryStat<MovementData>(
+        slug,
+        'movement',
+        { days: windowDays },
+    );
+    const isDark = useIsDark();
+
+    return (
+        // `inv-chart-panel` opts this panel's tooltip into the solid bordered
+        // card in app.css — the global rule strips ApexCharts tooltips bare.
+        <div className="inv-chart-panel rounded-[14px] border border-black/6 bg-white p-[18px] pb-6 dark:border-white/6 dark:bg-zinc-900">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        Items In / Out
+                    </h3>
+                    <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
+                        Units moved per day over the last {windowDays} days, up
+                        to yesterday — in above the line, out below.
+                    </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    <RefreshButton
+                        onClick={refetch}
+                        loading={loading}
+                        error={error}
+                        label="movement"
+                    />
+                    <WindowPicker value={windowDays} onChange={setWindow} />
+                </div>
+            </div>
+
+            {loading ? (
+                <ChartSkeleton columns={windowDays} />
+            ) : error ? (
+                <EmptyState message="Couldn't load inventory movement." />
+            ) : (
+                <MovementPlot
+                    days={data?.days ?? []}
+                    window={windowDays}
+                    isDark={isDark}
+                />
+            )}
+        </div>
+    );
+}
+
+/** Segmented control for the trailing window. */
+function WindowPicker({
+    value,
+    onChange,
+}: {
+    value: WindowDays;
+    onChange: (days: WindowDays) => void;
+}) {
+    return (
+        <div
+            role="group"
+            aria-label="Movement window"
+            className="flex items-center gap-0.5 rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800"
+        >
+            {WINDOWS.map((days) => {
+                const active = days === value;
+
+                return (
+                    <button
+                        key={days}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => onChange(days)}
+                        className={
+                            active
+                                ? 'rounded-md bg-white px-2.5 py-1 text-[11px] font-medium text-gray-900 shadow-sm dark:bg-zinc-950 dark:text-gray-100'
+                                : 'rounded-md px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                        }
+                    >
+                        {days}d
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+function MovementPlot({
+    days,
+    window,
+    isDark,
+}: {
+    days: MovementDay[];
+    window: WindowDays;
+    isDark: boolean;
+}) {
+    if (!days.some((d) => d.in !== 0 || d.out !== 0)) {
+        return (
+            <EmptyState
+                message={`No inventory movement in the last ${window} days.`}
+            />
+        );
     }
 
-    const categories = data.categories.map((d) => {
+    const colors = isDark ? COLORS.dark : COLORS.light;
+    const ink = isDark ? INK.dark : INK.light;
+
+    const categories = days.map((d) => {
         try {
-            return format(parseISO(d), 'd MMM');
+            return format(parseISO(d.date), 'd MMM');
         } catch {
-            return d;
+            return d.date;
         }
     });
 
-    const inflow = categories.map(
-        (_, i) => data.po_qty_in[i] + data.rts_goods_in[i],
-    );
-    const outflow = categories.map(
-        (_, i) => -(data.po_qty_out[i] + data.rts_goods_out[i]),
-    );
-    const losses = categories.map((_, i) => -(data.rts_bad[i] + data.lost[i]));
-
+    // "Out" is plotted negative so it mirrors below the baseline. The tooltip
+    // reads it back as an absolute "N units", so nobody sees "-40 units out".
     const series = [
-        { name: 'Inflow', type: 'column', data: inflow },
-        { name: 'Outflow', type: 'column', data: outflow },
-        { name: 'Losses', type: 'column', data: losses },
-        { name: 'Remaining Stock', type: 'line', data: data.remaining_stock },
+        { name: 'In', data: days.map((d) => d.in) },
+        { name: 'Out', data: days.map((d) => -d.out) },
     ];
+
+    // A diverging axis has to carry equal steps per arm, or the two halves are
+    // read on different scales. Left to itself Apex only ticks the taller side,
+    // so bound the axis symmetrically on a round step.
+    const peak = Math.max(1, ...days.map((d) => Math.max(d.in, d.out)));
+    const step = niceStep(peak);
+    const bound = Math.ceil(peak / step) * step;
 
     const options: ApexOptions = {
         chart: {
+            type: 'bar',
+            stacked: true,
             fontFamily: 'DM Sans, sans-serif',
-            type: 'line',
-            stacked: false,
             toolbar: { show: false },
             zoom: { enabled: false },
+            background: 'transparent',
         },
-        colors: [
-            COLORS.inflow,
-            COLORS.outflow,
-            COLORS.losses,
-            COLORS.remaining,
-        ],
+        colors: [colors.in, colors.out],
         plotOptions: {
-            bar: { columnWidth: '58%', borderRadius: 2 },
+            bar: {
+                horizontal: false,
+                // Widen the columns as the window grows, so 30 days reads as a
+                // bar chart rather than 30 hairlines.
+                columnWidth: window <= 7 ? '45%' : window <= 14 ? '60%' : '78%',
+                borderRadius: 4,
+                borderRadiusApplication: 'end',
+            },
         },
+        // A surface-coloured hairline between the two arms, so the fills never
+        // touch across the baseline.
         stroke: {
-            width: [0, 0, 0, 2.5],
-            curve: 'smooth',
+            show: true,
+            width: 2,
+            colors: [isDark ? '#18181b' : '#ffffff'],
         },
-        markers: { size: 0, hover: { size: 5 } },
         dataLabels: { enabled: false },
         legend: {
             show: true,
@@ -85,100 +222,112 @@ export default function MovementChart({ data }: { data: MovementData }) {
             fontSize: '11px',
             fontFamily: 'DM Sans, sans-serif',
             fontWeight: 500,
-            labels: { colors: '#6B7280' },
+            labels: { colors: ink.text },
             markers: { size: 6, shape: 'circle', offsetX: -2 },
-            // Keep all four categories on one horizontal row (no vertical stacking).
             itemMargin: { horizontal: 12, vertical: 0 },
         },
         grid: {
-            borderColor: 'rgba(0,0,0,0.05)',
+            borderColor: ink.grid,
             strokeDashArray: 4,
             xaxis: { lines: { show: false } },
-            padding: { top: 0, right: 12, bottom: 8, left: 8 },
+            padding: { top: 0, right: 12, bottom: 0, left: 8 },
         },
         xaxis: {
             categories,
             axisBorder: { show: false },
             axisTicks: { show: false },
-            // Thin the labels so they never crowd, keep them horizontal, and
-            // drop the separate axis-crosshair tooltip (the shared tooltip's
-            // title already shows the date).
-            tickAmount: Math.min(categories.length, 10),
             tooltip: { enabled: false },
+            // Beyond a week there is no room for a label per column, so thin
+            // them to ~7 evenly spaced dates; the tooltip still names the day.
+            tickAmount: Math.min(window, 7),
             labels: {
                 rotate: 0,
                 hideOverlappingLabels: true,
-                offsetY: 2,
-                style: {
-                    fontSize: '11px',
-                    fontFamily: 'DM Mono, monospace',
-                    colors: '#9CA3AF',
-                },
+                style: { colors: ink.text, fontSize: '11px' },
             },
         },
-        yaxis: [
-            {
-                seriesName: ['Inflow', 'Outflow', 'Losses'],
-                labels: {
-                    formatter: (v) => `${Math.round(v)}`,
-                    style: {
-                        fontSize: '11px',
-                        fontFamily: 'DM Mono, monospace',
-                        colors: ['#9CA3AF'],
-                    },
-                },
-                title: {
-                    text: 'Units moved',
-                    style: {
-                        fontSize: '11px',
-                        color: '#9CA3AF',
-                        fontWeight: 500,
-                    },
-                },
+        yaxis: {
+            min: -bound,
+            max: bound,
+            tickAmount: (bound / step) * 2,
+            labels: {
+                // Signed, NOT Math.abs(): mirroring the arms makes "100" appear
+                // twice, and ApexCharts silently drops duplicate y-axis label
+                // text — which leaves the whole lower arm unlabelled. The
+                // tooltip carries the absolute "N units" reading instead.
+                formatter: (v: number) => Math.round(v).toLocaleString('en-PH'),
+                style: { colors: ink.text, fontSize: '11px' },
             },
-            {
-                seriesName: 'Remaining Stock',
-                opposite: true,
-                min: 0,
-                labels: {
-                    formatter: (v) => `${Math.round(v)}`,
-                    style: {
-                        fontSize: '11px',
-                        fontFamily: 'DM Mono, monospace',
-                        colors: ['#9CA3AF'],
-                    },
-                },
-                title: {
-                    text: 'Remaining',
-                    style: {
-                        fontSize: '11px',
-                        color: '#9CA3AF',
-                        fontWeight: 500,
-                    },
-                },
-            },
-        ],
+        },
         tooltip: {
-            ...tooltipTheme,
+            // Always 'light' — app.css styles the card off
+            // `.apexcharts-theme-light` and swaps its surface under `.dark`,
+            // so Apex's own dark theme would bypass the panel styling entirely.
+            theme: 'light',
             shared: true,
             intersect: false,
+            fillSeriesColor: false,
+            style: { fontSize: '12px', fontFamily: 'DM Sans, sans-serif' },
+            marker: { show: true },
             y: {
-                formatter: (v) =>
-                    v == null ? '—' : `${Math.abs(Math.round(v))} units`,
+                formatter: (v: number) =>
+                    `${Math.abs(v).toLocaleString('en-PH')} units`,
             },
         },
     };
 
+    return <Chart options={options} series={series} type="bar" height={300} />;
+}
+
+/**
+ * A round axis step (1/2/5 × a power of ten) aiming for ~3 ticks per arm, so
+ * the labels read 100/200/300 rather than 89/178/267.
+ */
+function niceStep(peak: number): number {
+    const raw = peak / 3;
+    const magnitude = 10 ** Math.floor(Math.log10(raw));
+    const normalized = raw / magnitude;
+    const step =
+        normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+
+    return step * magnitude;
+}
+
+/** Column placeholder mirrored around a baseline, matching the chart's shape. */
+function ChartSkeleton({ columns }: { columns: number }) {
+    // Tighter gutters as the column count climbs, mirroring the real chart.
+    const gap = columns <= 7 ? 'gap-3' : columns <= 14 ? 'gap-2' : 'gap-1';
+
     return (
-        <div className="custom-scrollbar max-w-full overflow-x-auto">
-            <div className="min-w-[640px]">
-                <Chart
-                    options={options}
-                    series={series}
-                    type="line"
-                    height={320}
-                />
+        <div className="h-[300px]">
+            <div className={`flex h-1/2 items-end ${gap}`}>
+                {Array.from({ length: columns }).map((_, i) => (
+                    <Skeleton
+                        key={i}
+                        className="flex-1"
+                        style={{ height: `${35 + ((i * 29) % 55)}%` }}
+                    />
+                ))}
             </div>
+            <div className={`flex h-1/2 items-start pt-0.5 ${gap}`}>
+                {Array.from({ length: columns }).map((_, i) => (
+                    <Skeleton
+                        key={i}
+                        className="flex-1"
+                        style={{ height: `${25 + ((i * 41) % 45)}%` }}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function EmptyState({ message }: { message: string }) {
+    return (
+        <div className="flex h-[300px] items-center justify-center rounded-[12px] border border-dashed border-zinc-200 dark:border-zinc-800">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                {message}
+            </p>
         </div>
     );
 }

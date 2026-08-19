@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class TeamScheduleController extends Controller
@@ -54,7 +55,9 @@ class TeamScheduleController extends Controller
 
         $validated = $request->validate([
             'week_start' => ['required', 'date'],
-            'schedules' => ['required', 'array'],
+            // `present`, not `required` — clearing every shift in the week submits
+            // an empty array, and `required` rejects that as a missing field.
+            'schedules' => ['present', 'array'],
             'schedules.*.user_id' => ['required', 'exists:users,id'],
             'schedules.*.date' => ['required', 'date'],
             'schedules.*.start_time' => ['nullable', 'date_format:H:i'],
@@ -83,14 +86,24 @@ class TeamScheduleController extends Controller
             ];
         }
 
-        if (! empty($rows)) {
-            // Delete existing schedules for submitted dates then re-insert
+        // The client submits the whole week it is showing, so a date missing from
+        // the payload was cleared on purpose. Clear the full week rather than only
+        // the submitted dates — otherwise removing every shift deletes nothing and
+        // the old rows reappear on reload.
+        $weekStart = Carbon::parse($validated['week_start'])->startOfWeek(Carbon::MONDAY);
+        $weekDates = collect(range(0, 6))
+            ->map(fn ($offset) => $weekStart->copy()->addDays($offset)->toDateString())
+            ->all();
+
+        DB::transaction(function () use ($team, $weekDates, $dates, $rows) {
             TeamMemberSchedule::where('team_id', $team->id)
-                ->whereIn('date', array_unique($dates))
+                ->whereIn('date', array_unique(array_merge($weekDates, $dates)))
                 ->delete();
 
-            TeamMemberSchedule::insert($rows);
-        }
+            if (! empty($rows)) {
+                TeamMemberSchedule::insert($rows);
+            }
+        });
 
         return redirect()->back()->with('success', 'Schedule updated successfully.');
     }

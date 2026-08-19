@@ -17,6 +17,7 @@ class TriggerFetchERPPurchaseOrders extends Command
         {--delay=10 : Seconds to stagger each queued workspace by}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
         {--sync : POST to the webhook immediately in-process instead of queueing (use this to hit an n8n test-mode webhook)}
+        {--without-delivered : Send an empty delivered_purchase_orders_no array so n8n re-fetches every PO instead of skipping delivered ones}
         {--force : Run outside production (by default this command only runs on production)}';
 
     protected $description = 'Trigger n8n webhook for each workspace with ERP credentials to fetch its ERP purchase orders';
@@ -63,6 +64,7 @@ class TriggerFetchERPPurchaseOrders extends Command
         $endDateFormatted = $endDate->format('m/d/Y');
 
         $sync = (bool) $this->option('sync');
+        $withoutDelivered = (bool) $this->option('without-delivered');
         $delay = max(0, (int) $this->option('delay'));
         $itemIds = $this->itemIds();
 
@@ -74,7 +76,7 @@ class TriggerFetchERPPurchaseOrders extends Command
             ->where('erp_username', '!=', '')
             ->whereNotNull('erp_password')
             ->whereHas('apiKeys')
-            ->with(['apiKeys', 'deliveredPurchaseOrders' => function ($query) {
+            ->with(['apiKeys', 'closedPurchasedOrders' => function ($query) {
                 $query->select(['cust_po_no', 'workspace_id']);
             }, 'inventoryItems' => function ($query) use ($itemIds) {
                 // Parent items are grouping placeholders with no ERP SKU — never sync them.
@@ -110,7 +112,7 @@ class TriggerFetchERPPurchaseOrders extends Command
             $workspace->inventoryItems
                 ->chunk(20)
                 ->values()
-                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $webhookUrl, $startDateFormatted, $endDateFormatted) {
+                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $webhookUrl, $startDateFormatted, $endDateFormatted, $withoutDelivered) {
                     $dispatched++;
                     $totalCount += count($chunk);
 
@@ -142,7 +144,9 @@ class TriggerFetchERPPurchaseOrders extends Command
                             'keyword' => $item->sku,
                             'sync_run_id' => $runIds[$item->id],
                         ])->values()->toArray(),
-                        'delivered_purchase_orders_no' => $workspace->deliveredPurchaseOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
+                        'delivered_purchase_orders_no' => $withoutDelivered
+                            ? []
+                            : $workspace->closedPurchasedOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
                     ];
 
                     dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data, $runIds->values()->all()))

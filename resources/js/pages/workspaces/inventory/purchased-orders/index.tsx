@@ -1,4 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
+import { CloseOrderDialog } from '@/components/inventory/close-order-dialog';
+import DeliveryLeadTimeTable from '@/components/inventory/dashboard/delivery-lead-time-table';
 import { DeleteOrderDialog } from '@/components/inventory/delete-order-dialog';
 import {
     DeliveryTarget,
@@ -15,6 +17,11 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { PERMISSIONS } from '@/constants/permissions';
+import {
+    CLOSED_PURCHASED_ORDER_STATUSES,
+    PURCHASED_ORDER_STATUSES,
+    PURCHASED_ORDER_STATUS_OPTIONS,
+} from '@/constants/purchased-order-statuses';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
@@ -86,41 +93,6 @@ const TIMELINESS_BADGE: Record<string, { label: string; color: string }> = {
     },
 };
 
-const STATUSES: Record<number, { label: string; color: string }> = {
-    1: {
-        label: 'For Approval',
-        color: 'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400',
-    },
-    2: {
-        label: 'Approved',
-        color: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
-    },
-    3: {
-        label: 'To Pay',
-        color: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
-    },
-    4: {
-        label: 'Paid',
-        color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
-    },
-    5: {
-        label: 'For Purchase',
-        color: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400',
-    },
-    6: {
-        label: 'Waiting For Delivery',
-        color: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-400',
-    },
-    7: {
-        label: 'Delivered',
-        color: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
-    },
-    8: {
-        label: 'Cancelled',
-        color: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
-    },
-};
-
 interface PurchasedOrder {
     id: number;
     issue_date: string;
@@ -128,6 +100,12 @@ interface PurchasedOrder {
     expected_delivery_date: string | null;
     cust_po_no: string | null;
     control_no: string | null;
+    supplier: string | null;
+    /**
+     * "Y-m-d H:i:s" from the ERP's Paid status log, or null on an order that
+     * has not been paid (or predates the status-log sync).
+     */
+    paid_at: string | null;
     delivery_fee: string;
     total_amount: string;
     status: number;
@@ -178,7 +156,12 @@ interface Props {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
-        filter?: { search?: string; start_date?: string; end_date?: string };
+        filter?: {
+            search?: string;
+            status?: string | number;
+            start_date?: string;
+            end_date?: string;
+        };
     };
 }
 
@@ -191,6 +174,12 @@ export default function PurchasedOrderIndex({
     const [deletingOrder, setDeletingOrder] = useState<PurchasedOrder | null>(
         null,
     );
+    const [closingOrder, setClosingOrder] = useState<{
+        order: PurchasedOrder;
+        status: number;
+        balance: number;
+    } | null>(null);
+    const [closingProcessing, setClosingProcessing] = useState(false);
     const [deliveryFor, setDeliveryFor] = useState<{
         itemId: number;
         balance: number;
@@ -204,6 +193,9 @@ export default function PurchasedOrderIndex({
     const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
+    const [statusValue, setStatusValue] = useState(
+        query?.filter?.status ? String(query.filter.status) : '',
+    );
     const [dateRange, setDateRange] = useState<string[]>(() => [
         query?.filter?.start_date ?? '',
         query?.filter?.end_date ?? '',
@@ -222,19 +214,20 @@ export default function PurchasedOrderIndex({
     const canUsePurchasedOrderActions =
         canCreatePurchasedOrders || canManagePurchasedOrders;
 
-    const buildFilter = (search: string, range: string[]) => ({
+    const buildFilter = (search: string, status: string, range: string[]) => ({
         search: search || undefined,
+        status: status || undefined,
         start_date: range[0] || undefined,
         end_date: range[1] || undefined,
     });
 
     const performQuery = useCallback(
-        debounce((search: string, range: string[]) => {
+        debounce((search: string, status: string, range: string[]) => {
             router.get(
                 baseUrl,
                 {
                     sort: query?.sort,
-                    filter: buildFilter(search, range),
+                    filter: buildFilter(search, status, range),
                     page: 1,
                     per_page: query?.perPage ?? orders.per_page,
                 },
@@ -252,15 +245,17 @@ export default function PurchasedOrderIndex({
     useEffect(() => {
         const filterChanged =
             searchValue !== (query?.filter?.search ?? '') ||
+            statusValue !==
+                (query?.filter?.status ? String(query.filter.status) : '') ||
             (dateRange[0] || undefined) !==
                 (query?.filter?.start_date ?? undefined) ||
             (dateRange[1] || undefined) !==
                 (query?.filter?.end_date ?? undefined);
         if (filterChanged) {
-            performQuery(searchValue, dateRange);
+            performQuery(searchValue, statusValue, dateRange);
         }
         return () => performQuery.cancel();
-    }, [searchValue, dateRange]);
+    }, [searchValue, statusValue, dateRange]);
 
     const columns = useMemo<ColumnDef<PurchasedOrder>[]>(() => {
         const cols: ColumnDef<PurchasedOrder>[] = [
@@ -268,13 +263,42 @@ export default function PurchasedOrderIndex({
                 accessorKey: 'issue_date',
                 enableSorting: true,
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="PO Date (Paid)" />
+                    <SortableHeader column={column} title="PO Date" />
                 ),
                 cell: ({ row }) => (
                     <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 dark:text-gray-400">
                         {row.original.issue_date
                             ? moment(row.original.issue_date).format('MMM D')
                             : '—'}
+                    </span>
+                ),
+            },
+            {
+                // Its own sortable column rather than a parenthetical under the
+                // PO date: finance sorts and filters on when money moved, which
+                // a second line inside another column can't do.
+                accessorKey: 'paid_at',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Paid Date" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 dark:text-gray-400">
+                        {row.original.paid_at
+                            ? moment(row.original.paid_at).format('MMM D')
+                            : '—'}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'supplier',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Supplier" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                        {row.original.supplier || '—'}
                     </span>
                 ),
             },
@@ -309,6 +333,26 @@ export default function PurchasedOrderIndex({
                         {row.original.cust_po_no || '—'}
                     </span>
                 ),
+            },
+            {
+                accessorKey: 'status',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="PO Status" />
+                ),
+                cell: ({ row }) => {
+                    const info = PURCHASED_ORDER_STATUSES[row.original.status];
+                    return (
+                        <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-medium whitespace-nowrap ${
+                                info?.color ??
+                                'bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-400'
+                            }`}
+                        >
+                            {info?.label ?? 'Unknown'}
+                        </span>
+                    );
+                },
             },
             {
                 id: 'item_name',
@@ -462,7 +506,7 @@ export default function PurchasedOrderIndex({
                 enableSorting: false,
                 header: () => (
                     <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                        Status
+                        Fulfillment
                     </span>
                 ),
                 cell: ({ row }) => {
@@ -515,7 +559,7 @@ export default function PurchasedOrderIndex({
                 enableSorting: false,
                 header: () => (
                     <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                        Status
+                        Timeliness
                     </span>
                 ),
                 cell: ({ row }) => {
@@ -564,32 +608,29 @@ export default function PurchasedOrderIndex({
                                             <DropdownMenuLabel className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
                                                 PO Status
                                             </DropdownMenuLabel>
-                                            {Object.entries(STATUSES).map(
-                                                ([value, info]) => {
-                                                    const num = Number(value);
-                                                    return (
-                                                        <DropdownMenuItem
-                                                            key={value}
-                                                            onClick={() =>
-                                                                updateOrderStatus(
-                                                                    order,
-                                                                    num,
-                                                                )
-                                                            }
-                                                            className="text-[12px]"
-                                                        >
-                                                            <Check
-                                                                className={`mr-2 h-3.5 w-3.5 ${
-                                                                    num ===
-                                                                    order.status
-                                                                        ? 'opacity-100'
-                                                                        : 'opacity-0'
-                                                                }`}
-                                                            />
-                                                            {info.label}
-                                                        </DropdownMenuItem>
-                                                    );
-                                                },
+                                            {PURCHASED_ORDER_STATUS_OPTIONS.map(
+                                                ({ value, label }) => (
+                                                    <DropdownMenuItem
+                                                        key={value}
+                                                        onClick={() =>
+                                                            updateOrderStatus(
+                                                                order,
+                                                                value,
+                                                            )
+                                                        }
+                                                        className="text-[12px]"
+                                                    >
+                                                        <Check
+                                                            className={`mr-2 h-3.5 w-3.5 ${
+                                                                value ===
+                                                                order.status
+                                                                    ? 'opacity-100'
+                                                                    : 'opacity-0'
+                                                            }`}
+                                                        />
+                                                        {label}
+                                                    </DropdownMenuItem>
+                                                ),
                                             )}
                                             <DropdownMenuSeparator />
                                         </>
@@ -651,17 +692,42 @@ export default function PurchasedOrderIndex({
         );
     };
 
-    const updateOrderStatus = (order: PurchasedOrder, status: number) => {
-        if (status === order.status) return;
+    const sendOrderStatus = (
+        order: PurchasedOrder,
+        status: number,
+        force = false,
+    ) => {
         router.put(
             `/workspaces/${workspace.slug}/inventory/po-monitoring/orders/${order.id}/status`,
-            { status },
+            force ? { status, force: true } : { status },
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Status updated'),
-                onError: () => toast.error('Failed to update status'),
+                onStart: () => setClosingProcessing(true),
+                onSuccess: () => {
+                    toast.success('Status updated');
+                    setClosingOrder(null);
+                },
+                onError: (errors) =>
+                    toast.error(errors.status || 'Failed to update status'),
+                onFinish: () => setClosingProcessing(false),
             },
         );
+    };
+
+    const updateOrderStatus = (order: PurchasedOrder, status: number) => {
+        if (status === order.status) return;
+
+        // Closing an order removes its outstanding quantity from incoming stock and
+        // reorder maths, so confirm before closing one that still owes units. The
+        // server enforces the same rule; `force` records that the user accepted it.
+        const balance = orderBalance(order);
+
+        if (CLOSED_PURCHASED_ORDER_STATUSES.includes(status) && balance > 0) {
+            setClosingOrder({ order, status, balance });
+            return;
+        }
+
+        sendOrderStatus(order, status);
     };
 
     const deleteDelivery = (delivery: ItemDelivery) => {
@@ -690,6 +756,7 @@ export default function PurchasedOrderIndex({
                             href={`${baseUrl}/export?${new URLSearchParams(
                                 Object.entries({
                                     'filter[search]': searchValue || '',
+                                    'filter[status]': statusValue || '',
                                     'filter[start_date]': dateRange[0] || '',
                                     'filter[end_date]': dateRange[1] || '',
                                     sort: query?.sort ?? '',
@@ -716,11 +783,25 @@ export default function PurchasedOrderIndex({
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pr-3 pl-8 font-mono! text-[12px]! text-gray-800 transition-all outline-none placeholder:text-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"
-                            placeholder="Search Delivery No., Cust PO No., Control No., SKU…"
+                            placeholder="Search Delivery No., Cust PO No., Control No., Supplier, SKU…"
                             value={searchValue}
                             onChange={(e) => setSearchValue(e.target.value)}
                         />
                     </div>
+                    <select
+                        value={statusValue}
+                        onChange={(e) => setStatusValue(e.target.value)}
+                        className="h-9 w-full max-w-[200px] rounded-[10px] border border-black/6 bg-stone-100 px-3 font-mono! text-[12px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
+                    >
+                        <option value="">All PO statuses</option>
+                        {PURCHASED_ORDER_STATUS_OPTIONS.map(
+                            ({ value, label }) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ),
+                        )}
+                    </select>
                     <DatePicker
                         id="purchased-orders-date-range"
                         mode="range"
@@ -755,7 +836,11 @@ export default function PurchasedOrderIndex({
                                 baseUrl,
                                 {
                                     sort: params?.sort,
-                                    filter: buildFilter(searchValue, dateRange),
+                                    filter: buildFilter(
+                                        searchValue,
+                                        statusValue,
+                                        dateRange,
+                                    ),
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??
@@ -793,10 +878,38 @@ export default function PurchasedOrderIndex({
                     </li>
                 </ul>
 
+                {/* Lead-time calibration lives with the orders it is derived
+                    from, not on the dashboard: it is the reference you consult
+                    when setting an item's lead time, not a daily signal. */}
+                <div className="mt-6">
+                    <DeliveryLeadTimeTable slug={workspace.slug} />
+                </div>
+
                 <DeleteOrderDialog
                     order={deletingOrder}
                     workspace={workspace}
                     onClose={() => setDeletingOrder(null)}
+                />
+
+                <CloseOrderDialog
+                    target={
+                        closingOrder
+                            ? {
+                                  balance: closingOrder.balance,
+                                  status: closingOrder.status,
+                                  control_no: closingOrder.order.control_no,
+                              }
+                            : null
+                    }
+                    processing={closingProcessing}
+                    onConfirm={() =>
+                        sendOrderStatus(
+                            closingOrder!.order,
+                            closingOrder!.status,
+                            true,
+                        )
+                    }
+                    onClose={() => setClosingOrder(null)}
                 />
 
                 <RecordDeliveryDialog

@@ -7,6 +7,7 @@ use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Models\PurchasedOrderItemDelivery;
@@ -74,7 +75,24 @@ class PurchaseOrderMonitoringController extends Controller
 
         $validated = $request->validate([
             'status' => ['required', 'integer', Rule::in(array_keys(PurchasedOrder::STATUSES))],
+            // Set once the user has acknowledged they are closing an order that
+            // still owes stock. See the balance guard below.
+            'force' => ['sometimes', 'boolean'],
         ]);
+
+        // Closing an order drops its outstanding quantities out of the incoming-stock
+        // and reorder maths (see PurchasedOrder::AWAITING_DELIVERY_STATUSES), which is
+        // silent and easy to do by accident. Closing short stays possible — a cancelled
+        // order legitimately never arrives — but only deliberately.
+        if (in_array($validated['status'], PurchasedOrder::CLOSED_STATUSES, true) && empty($validated['force'])) {
+            $balance = $purchasedOrder->outstandingBalance();
+
+            if ($balance > 0) {
+                throw ValidationException::withMessages([
+                    'status' => "This order still has {$balance} unit(s) undelivered. Record the remaining deliveries first, or confirm to close it short.",
+                ]);
+            }
+        }
 
         $purchasedOrder->update(['status' => $validated['status']]);
 

@@ -108,7 +108,13 @@ const InventoryFormDialog = ({
             .finally(() => setBaseRemainingLoading(false));
 
         return () => controller.abort();
-    }, [open, data.inventory_item_id, data.date, inventory?.id, workspace.slug]);
+    }, [
+        open,
+        data.inventory_item_id,
+        data.date,
+        inventory?.id,
+        workspace.slug,
+    ]);
 
     // Auto-compute the remaining quantity from the carry-over plus this entry's flows:
     // last remaining + PO in + RTS goods in − PO out − RTS goods out − RTS bad − loss.

@@ -1,25 +1,20 @@
 import PageHeader from '@/components/common/PageHeader';
+import {
+    ColumnsDropdown,
+    useColumnVisibility,
+    type ColumnOption,
+} from '@/components/ui/columns-dropdown';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { cn } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
-import { ColumnDef, VisibilityState } from '@tanstack/react-table';
+import { ColumnDef } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
-import { Columns3, RotateCcw, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import moment from 'moment';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DateOption = flatpickr.Options.DateOption;
@@ -112,7 +107,7 @@ const prettyDate = (iso: string | null) => {
 
 // Column ids double as the sort keys sent to the backend, so they must match the
 // accessorKeys the server sorts on. `required` columns can't be hidden.
-const COLUMN_OPTIONS: { id: string; label: string; required?: boolean }[] = [
+const COLUMN_OPTIONS: ColumnOption[] = [
     { id: 'order_number', label: 'ID', required: true },
     { id: 'customer', label: 'Customer' },
     { id: 'phone_number', label: 'Phone number' },
@@ -126,135 +121,6 @@ const COLUMN_OPTIONS: { id: string; label: string; required?: boolean }[] = [
 ];
 
 const COLUMNS_STORAGE_KEY = 'pancake-orders-cols';
-
-const ALL_VISIBLE: VisibilityState = Object.fromEntries(
-    COLUMN_OPTIONS.map((o) => [o.id, true]),
-);
-
-/**
- * Column visibility, remembered per browser. Unknown/stale ids in storage are
- * dropped so removing a column here can't resurrect it from a saved payload.
- */
-function useColumnVisibility() {
-    const [visibility, setVisibility] = useState<VisibilityState>(() => {
-        try {
-            const raw = window.localStorage.getItem(COLUMNS_STORAGE_KEY);
-            if (!raw) return ALL_VISIBLE;
-            const stored = JSON.parse(raw) as VisibilityState;
-            return {
-                ...ALL_VISIBLE,
-                ...Object.fromEntries(
-                    Object.entries(stored).filter(([id]) => id in ALL_VISIBLE),
-                ),
-            };
-        } catch {
-            return ALL_VISIBLE;
-        }
-    });
-
-    useEffect(() => {
-        try {
-            window.localStorage.setItem(
-                COLUMNS_STORAGE_KEY,
-                JSON.stringify(visibility),
-            );
-        } catch {
-            /* storage unavailable (private mode, quota) — keep in-memory only */
-        }
-    }, [visibility]);
-
-    return { visibility, setVisibility };
-}
-
-// Radix's CheckboxItem only renders its indicator (a bare check) when checked,
-// leaving unchecked rows visually empty. Style the indicator slot into a real
-// box that's visible either way — keeping the primitive's menuitemcheckbox role
-// and aria-checked rather than hand-rolling a control.
-const checkboxItem = [
-    'font-mono text-[12px] py-1.5 cursor-pointer',
-    // the indicator slot → the box
-    '[&>span:first-child]:size-4 [&>span:first-child]:rounded-[4px]',
-    '[&>span:first-child]:border [&>span:first-child]:transition-colors',
-    '[&>span:first-child]:border-black/20 dark:[&>span:first-child]:border-white/25',
-    // the check itself
-    '[&_svg]:size-3 [&_svg]:text-white [&_svg]:stroke-[3]',
-].join(' ');
-
-const checkboxItemChecked =
-    '[&>span:first-child]:border-emerald-600 [&>span:first-child]:bg-emerald-600 dark:[&>span:first-child]:border-emerald-500 dark:[&>span:first-child]:bg-emerald-500';
-
-function ColumnsDropdown({
-    visibility,
-    onChange,
-}: {
-    visibility: VisibilityState;
-    onChange: (next: VisibilityState) => void;
-}) {
-    const hiddenCount = COLUMN_OPTIONS.filter(
-        (o) => visibility[o.id] === false,
-    ).length;
-
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <button className="flex h-9 items-center gap-1.5 rounded-[10px] border border-black/10 bg-white px-3 font-mono! text-[12px]! text-gray-700 transition-colors hover:bg-stone-50 data-[state=open]:border-emerald-500 data-[state=open]:ring-2 data-[state=open]:ring-emerald-500/15 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800">
-                    <Columns3 className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
-                    Columns
-                    {hiddenCount > 0 && (
-                        <span className="ml-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                            {COLUMN_OPTIONS.length - hiddenCount}/
-                            {COLUMN_OPTIONS.length}
-                        </span>
-                    )}
-                </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-1">
-                <DropdownMenuLabel className="px-2 py-1.5 font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                    Toggle columns
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {COLUMN_OPTIONS.map((o) => {
-                    const checked = visibility[o.id] !== false;
-                    return (
-                        <DropdownMenuCheckboxItem
-                            key={o.id}
-                            className={cn(
-                                checkboxItem,
-                                checked && checkboxItemChecked,
-                            )}
-                            checked={checked}
-                            disabled={o.required}
-                            // Keep the menu open so several columns can be
-                            // toggled in one go.
-                            onSelect={(e) => e.preventDefault()}
-                            onCheckedChange={(next) =>
-                                onChange({ ...visibility, [o.id]: next })
-                            }
-                        >
-                            {o.label}
-                            {o.required && (
-                                // Disabled items are pointer-events-none, so a
-                                // title tooltip would never fire — say it inline.
-                                <span className="ml-auto pl-2 text-[10px] text-gray-400 dark:text-gray-500">
-                                    Always
-                                </span>
-                            )}
-                        </DropdownMenuCheckboxItem>
-                    );
-                })}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                    className="cursor-pointer justify-center font-mono text-[12px] text-gray-500 focus:text-gray-700 dark:text-gray-400 dark:focus:text-gray-200"
-                    disabled={hiddenCount === 0}
-                    onSelect={() => onChange(ALL_VISIBLE)}
-                >
-                    <RotateCcw className="mr-1.5 h-3 w-3" />
-                    Reset to default
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
-}
 
 // Tab order mirrors the Pancake POS lifecycle; only statuses that exist show up.
 const TAB_ORDER = [
@@ -342,7 +208,7 @@ export default function PancakeOrdersIndex({
     }, [search, status, dateFrom, dateTo, rider]);
 
     const { visibility: columnVisibility, setVisibility: setColumnVisibility } =
-        useColumnVisibility();
+        useColumnVisibility(COLUMN_OPTIONS, COLUMNS_STORAGE_KEY);
 
     const tabs = useMemo(() => {
         const known = TAB_ORDER.filter((s) => s in statusCounts);
@@ -605,6 +471,7 @@ export default function PancakeOrdersIndex({
                     <div className="md:flex-1" />
 
                     <ColumnsDropdown
+                        options={COLUMN_OPTIONS}
                         visibility={columnVisibility}
                         onChange={setColumnVisibility}
                     />

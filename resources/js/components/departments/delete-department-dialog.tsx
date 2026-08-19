@@ -35,7 +35,10 @@ export function DeleteDepartmentDialog({
         if (!department) return;
 
         destroy(
-            workspaces.departments.destroy.url({ workspace, department: department.id }),
+            workspaces.departments.destroy.url({
+                workspace,
+                department: department.id,
+            }),
             {
                 preserveScroll: true,
                 onSuccess: () => {

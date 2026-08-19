@@ -234,18 +234,26 @@ test('saving the settings form flips the switch, and only for permitted users', 
     $url = route('rmo-settings.update', ['workspace' => $this->workspace->slug]);
 
     $outsider = rmoMemberWithPermissions($this->workspace, [PermissionEnum::ViewRmoManagement->value]);
-    $this->actingAs($outsider)->put($url, ['enable_edit_previous_day' => true])->assertForbidden();
+    $this->actingAs($outsider)->put($url, [
+        'enable_edit_previous_day' => true,
+        'enable_bulk_status_update' => false,
+    ])->assertForbidden();
 
     expect($this->workspace->fresh()->rmoEditPreviousDayEnabled())->toBeFalse();
 
     $manager = rmoMemberWithPermissions($this->workspace, [PermissionEnum::ManageRmoSettings->value]);
-    $this->actingAs($manager)->put($url, ['enable_edit_previous_day' => true])
-        ->assertRedirect(route('rmo-settings.edit', ['workspace' => $this->workspace->slug]));
+    $this->actingAs($manager)->put($url, [
+        'enable_edit_previous_day' => true,
+        'enable_bulk_status_update' => false,
+    ])->assertRedirect(route('rmo-settings.edit', ['workspace' => $this->workspace->slug]));
 
     expect($this->workspace->fresh()->rmoEditPreviousDayEnabled())->toBeTrue();
 
     // And back off again.
-    $this->actingAs($manager)->put($url, ['enable_edit_previous_day' => false])->assertRedirect();
+    $this->actingAs($manager)->put($url, [
+        'enable_edit_previous_day' => false,
+        'enable_bulk_status_update' => false,
+    ])->assertRedirect();
 
     expect($this->workspace->fresh()->rmoEditPreviousDayEnabled())->toBeFalse();
 });

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AdminSubscriptionPlanController;
 use App\Http\Controllers\Admin\AdminSupportTicketController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWorkspaceController;
+use App\Http\Controllers\PublicSalesTargetController;
 use App\Http\Controllers\Workspaces\ActivityLogController;
 use App\Http\Controllers\Workspaces\Admin\MetricSettingController;
 use App\Http\Controllers\Workspaces\AskDataController;
@@ -27,6 +28,7 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\SalesMarketingDashboardController;
+use App\Http\Controllers\Workspaces\SalesTargetController;
 use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamAdAccountController;
@@ -50,13 +52,16 @@ use Modules\Finance\Http\Controllers\AccountController as FinanceAccountControll
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
+use Modules\Finance\Http\Controllers\IncomeStatementController as FinanceIncomeStatementController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
+use Modules\Finance\Http\Controllers\UserIncomeStatementController as FinanceUserIncomeStatementController;
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\InternController as GencysInternController;
 use Modules\GencysERP\Http\Controllers\Web\PageController as GencysPageController;
 use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
+use Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
 use Modules\Inventory\Http\Controllers\PurchasedOrderController;
@@ -91,15 +96,30 @@ use Modules\SimGateway\Http\Controllers\SmsController;
 | member management, and invitation handling.
 |
 */
+Route::get('/public/workspaces/{workspace}/sales-targets', [PublicSalesTargetController::class, 'index'])->name('public-page.sales-targets');
+Route::post('/public/workspaces/{workspace}/sales-targets/verify-password', [PublicSalesTargetController::class, 'verifyPublicPassword'])->name('public-page.sales-targets.verify-password');
+// The board only fetches what it cannot work out for itself: the day's measured
+// totals, each team's goal and actual, and the leader's sparkline. Percentages,
+// ranking, bands and the leaderboard slice are derived client-side.
+Route::get('/public/workspaces/{workspace}/sales-targets/kpis', [PublicSalesTargetController::class, 'kpis'])->name('public-page.sales-targets.kpis');
+Route::get('/public/workspaces/{workspace}/sales-targets/teams', [PublicSalesTargetController::class, 'teams'])->name('public-page.sales-targets.teams');
+Route::get('/public/workspaces/{workspace}/sales-targets/team-trend', [PublicSalesTargetController::class, 'teamTrend'])->name('public-page.sales-targets.team-trend');
+// Last, and digits only, so the literal section paths above always win.
+Route::get('/public/workspaces/{workspace}/sales-targets/{salesTarget}', [PublicSalesTargetController::class, 'index'])
+    ->whereNumber('salesTarget')
+    ->name('public-page.sales-targets.show');
+
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
+Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-status', [ForDeliveryController::class, 'publicBulkUpdateStatus'])->name('public-page.rmo-management.bulkUpdateStatus');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}', [ForDeliveryController::class, 'publicUpdateStatus'])->name('public-page.rmo-management.updateStatus');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/assign', [ForDeliveryController::class, 'publicAssignUser'])->name('public-page.rmo-management.assign');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('public-page.rmo-management.removeAssignee');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('public-page.rmo-management.callLogs');
+Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('public-page.rmo-management.callLogs.export');
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
@@ -147,6 +167,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('workspaces.sales-marketing.dashboard.page-roas-tracker');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spend-goals');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spent-summary');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets', [SalesTargetController::class, 'index'])->name('workspaces.sales-marketing.dashboard.sales-targets');
+    Route::post('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets', [SalesTargetController::class, 'store'])->name('workspaces.sales-marketing.dashboard.sales-targets.store');
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'show'])->name('workspaces.sales-marketing.dashboard.sales-targets.show');
+    Route::put('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'update'])->name('workspaces.sales-marketing.dashboard.sales-targets.update');
+    Route::delete('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'destroy'])->name('workspaces.sales-marketing.dashboard.sales-targets.destroy');
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
@@ -200,6 +225,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/workspaces/{workspace}/pages/{page}', [PageController::class, 'update'])->name('workspaces.pages.update');
     Route::put('/workspaces/{workspace}/pages/{page}/budget', [PageController::class, 'updateBudget'])->name('workspaces.pages.update-budget');
     Route::patch('/workspaces/{workspace}/pages/{page}/assign-owner', [PageController::class, 'assignOwner'])->name('workspaces.pages.assign-owner');
+    Route::patch('/workspaces/{workspace}/pages/{page}/auto-budget', [PageController::class, 'updateAutoBudget'])->name('workspaces.pages.auto-budget');
     Route::post('/workspaces/{workspace}/pages/{page}/archive', [PageController::class, 'archive'])->name('workspaces.pages.archive');
     Route::post('/workspaces/{workspace}/pages/{page}/restore', [PageController::class, 'restore'])->name('workspaces.pages.restore');
 
@@ -409,6 +435,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/remove-assignee', [ForDeliveryController::class, 'publicRemoveAssignee'])->name('workspaces.csr.rmo-management.removeAssignee');
     Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('workspaces.csr.rmo-management.updatePhones');
     Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('workspaces.csr.rmo-management.callLogs');
+    Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('workspaces.csr.rmo-management.callLogs.export');
 
     // Checklist routes
     Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');
@@ -454,6 +481,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/botcake/flows', [FlowController::class, 'index'])->name('workspaces.botcake.flows.index');
     Route::get('/workspaces/{workspace}/botcake/sequences', [SequenceController::class, 'index'])->name('workspaces.botcake.sequences.index');
     Route::get('/workspaces/{workspace}/botcake/sequence-messages', [SequenceMessageController::class, 'index'])->name('workspaces.botcake.sequence-messages.index');
+
+    Route::get('/workspaces/{workspace}/inventory/dashboard', [InventoryDashboardController::class, 'index'])
+        ->name('workspaces.inventory.dashboard');
+
     Route::prefix('/workspaces/{workspace}/inventory/items')->name('workspaces.inventory.item.')->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
         Route::get('/export', [InventoryItemController::class, 'export'])->name('export');
@@ -507,15 +538,26 @@ Route::middleware(['auth'])->group(function () {
 
     Route::prefix('/workspaces/{workspace}/gencys')->name('workspaces.gencys.')->group(function () {
         Route::get('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'index'])->name('daily-sales-tracker.index');
+
+        // Hand-made test orders. TESTING ONLY — not registered in production, so
+        // the endpoints don't exist there at all (the controller also aborts).
+        if (! app()->isProduction()) {
+            Route::post('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'store'])->name('daily-sales-tracker.store');
+            Route::delete('/daily-sales-tracker/{order}', [GencysDailySalesTrackerController::class, 'destroy'])->name('daily-sales-tracker.destroy');
+        }
+
         Route::get('/interns', [GencysInternController::class, 'index'])->name('interns.index');
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');
         Route::patch('/interns/{intern}/toggle-active', [GencysInternController::class, 'toggleActive'])->name('interns.toggle-active');
         Route::patch('/interns/{intern}/assign-user', [GencysInternController::class, 'assignUser'])->name('interns.assign-user');
+        Route::patch('/interns/{intern}/other-names', [GencysInternController::class, 'updateOtherNames'])->name('interns.other-names');
         Route::get('/pages', [GencysPageController::class, 'index'])->name('pages.index');
         Route::post('/pages/sync', [GencysPageController::class, 'sync'])->name('pages.sync');
         Route::get('/unit-codes', [UnitCodeController::class, 'index'])->name('unit-codes.index');
         Route::post('/unit-codes/sync', [UnitCodeController::class, 'sync'])->name('unit-codes.sync');
+        Route::post('/unit-codes/bulk-product', [UnitCodeController::class, 'bulkUpdateProduct'])->name('unit-codes.bulk-product');
         Route::post('/unit-codes', [UnitCodeController::class, 'store'])->name('unit-codes.store');
+        Route::patch('/unit-codes/{unitCode}/product', [UnitCodeController::class, 'updateProduct'])->name('unit-codes.update-product');
         Route::put('/unit-codes/{unitCode}', [UnitCodeController::class, 'update'])->name('unit-codes.update');
         Route::delete('/unit-codes/{unitCode}', [UnitCodeController::class, 'destroy'])->name('unit-codes.destroy');
     });
@@ -538,13 +580,28 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/accounts/{account}', [FinanceAccountController::class, 'destroy'])->name('accounts.destroy');
 
         Route::get('/transactions', [FinanceTransactionController::class, 'index'])->name('transactions.index');
+        Route::get('/transactions/create', [FinanceTransactionController::class, 'create'])->name('transactions.create');
         Route::get('/transactions/export', [FinanceTransactionController::class, 'export'])->name('transactions.export');
+        Route::get('/transactions/{transaction}/edit', [FinanceTransactionController::class, 'edit'])->name('transactions.edit');
         Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
         Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
         Route::put('/transactions/bulk-update-type', [FinanceTransactionController::class, 'bulkUpdateType'])->name('transactions.bulk-update-type');
         Route::put('/transactions/bulk-update-sub-category', [FinanceTransactionController::class, 'bulkUpdateSubCategory'])->name('transactions.bulk-update-sub-category');
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
+
+        Route::get('/income-statements', [FinanceIncomeStatementController::class, 'index'])->name('income-statements.index');
+        Route::get('/income-statements/preview', [FinanceIncomeStatementController::class, 'preview'])->name('income-statements.preview');
+        Route::post('/income-statements', [FinanceIncomeStatementController::class, 'store'])->name('income-statements.store');
+        Route::get('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'show'])->name('income-statements.show');
+        Route::get('/income-statements/{incomeStatement}/export', [FinanceIncomeStatementController::class, 'export'])->name('income-statements.export');
+        Route::post('/income-statements/{incomeStatement}/regenerate', [FinanceIncomeStatementController::class, 'regenerate'])->name('income-statements.regenerate');
+        Route::delete('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'destroy'])->name('income-statements.destroy');
+
+        Route::get('/income-statements/{incomeStatement}/products', [FinanceUserIncomeStatementController::class, 'productIndex'])->name('income-statements.products.index');
+        Route::get('/income-statements/{incomeStatement}/users', [FinanceUserIncomeStatementController::class, 'index'])->name('income-statements.users.index');
+        Route::get('/income-statements/{incomeStatement}/users/{user}', [FinanceUserIncomeStatementController::class, 'show'])->name('income-statements.users.show');
+        Route::put('/income-statements/{incomeStatement}/users/{user}/commission-rate', [FinanceUserIncomeStatementController::class, 'setCommissionRate'])->name('income-statements.users.commission-rate');
 
         Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
         Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');
