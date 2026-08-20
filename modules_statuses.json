@@ -6,5 +6,6 @@
     "MetaAds": true,
     "Creatives": true,
     "GencysERP": true,
-    "SimGateway": true
+    "SimGateway": true,
+    "Billing": true
 }

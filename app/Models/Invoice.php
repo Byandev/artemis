@@ -6,16 +6,47 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Invoice extends Model
+class Invoice extends Model implements HasMedia
 {
-    use HasFactory;
+    use HasFactory, InteractsWithMedia;
 
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_SENT = 'sent';
 
     public const STATUS_PAID = 'paid';
+
+    /**
+     * Receipts, bank transfer slips, and payment screenshots evidencing that
+     * this invoice was settled.
+     */
+    public const PROOF_COLLECTION = 'proof_of_payment';
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(static::PROOF_COLLECTION)
+            // One receipt per invoice: uploading again replaces the old file
+            // rather than leaving an admin to guess which one is current.
+            ->singleFile()
+            // No acceptsMimeTypes() here on purpose. What a receipt may be is
+            // enforced by request validation, which returns a field error the
+            // admin can act on; media-library's own check re-sniffs the mime
+            // from the stored bytes and throws, turning a truncated upload or
+            // an iPhone HEIC reported as image/heif into a 500.
+            ->useDisk(config('filesystems.proof_of_payment_disk'));
+    }
+
+    /**
+     * The proof of payment on file, if one has been attached.
+     */
+    public function proofOfPayment(): ?Media
+    {
+        return $this->getFirstMedia(static::PROOF_COLLECTION);
+    }
 
     protected $fillable = [
         'number',

@@ -33,38 +33,15 @@ interface ProductRow {
     shipping: number;
     cod_fee: number;
     vat: number;
+    adspent: number;
     cost_of_sales: number;
     gross_profit: number;
+    advisory: number;
+    net_profit: number;
+    commission_rate: number;
+    commission: number;
+    product_id: number | null;
 }
-
-// Per-product table lines (rows), top to bottom. Money lines format with `fmt`.
-const PRODUCT_LINES: {
-    key: keyof Omit<ProductRow, 'product'>;
-    label: string;
-    money: boolean;
-    strong?: boolean;
-    signed?: boolean;
-}[] = [
-    { key: 'orders', label: 'Orders', money: false },
-    { key: 'delivered', label: 'Delivered', money: true, strong: true },
-    { key: 'cogs', label: 'COGS', money: true },
-    { key: 'shipping', label: 'Shipping Fee', money: true },
-    { key: 'cod_fee', label: 'COD Fee', money: true },
-    { key: 'vat', label: 'VAT', money: true },
-    {
-        key: 'cost_of_sales',
-        label: 'Cost of Sales',
-        money: true,
-        strong: true,
-    },
-    {
-        key: 'gross_profit',
-        label: 'Gross Profit',
-        money: true,
-        strong: true,
-        signed: true,
-    },
-];
 
 interface Statement {
     id: number | null;
@@ -95,6 +72,9 @@ interface Props {
     scope?: { label?: string; params?: Record<string, string | number> };
     // Live-computed view with no persistence — hides Save/Regenerate/Export.
     readonly?: boolean;
+    // When set (per-user view), the endpoint to PUT a per-product commission
+    // rate to, enabling the editable commission row on the product breakdown.
+    commissionUrl?: string;
 }
 
 const AUTO = ['cogs', 'shipping_fee', 'cod_fee', 'vat'];
@@ -164,7 +144,8 @@ export default function IncomeStatementShow({
     };
 
     const derivation = (r: ExpenseRow): string | null => {
-        if (r.source === 'cogs') return 'Cost of goods sold, from order data';
+        if (r.source === 'cogs')
+            return 'Cost of Goods, split across interns by orders';
         if (r.source === 'shipping_fee') return 'Orders shipped out this month';
         if (r.source === 'cod_fee')
             return `${codPct}% of Total Delivered (${fmt(statement.delivered)})`;
@@ -196,14 +177,19 @@ export default function IncomeStatementShow({
             : 0
         : (statement.advisory_share ?? 0);
 
+    // On a per-user breakdown (a scoped view) the advisory share is hidden for
+    // now — it's shown per product instead — so Net Profit here is Gross − OPEX.
+    const hideAdvisory = !!scope;
+    const shownAdvisory = hideAdvisory ? 0 : advisoryShare;
+
     const opexTotal = isPreview
         ? sumIncluded(opexRows)
         : (statement.gross_profit ?? 0) -
           (statement.net_profit ?? 0) -
           advisoryShare;
     const netProfit = isPreview
-        ? grossProfit - opexTotal - advisoryShare
-        : (statement.net_profit ?? 0);
+        ? grossProfit - opexTotal - shownAdvisory
+        : (statement.net_profit ?? 0) + (hideAdvisory ? advisoryShare : 0);
 
     const d = statement.delivered || 0;
     const netMargin = d > 0 ? (netProfit / d) * 100 : 0;
@@ -216,12 +202,12 @@ export default function IncomeStatementShow({
             amount: costOfSalesTotal,
             color: FLOW.cost_of_sales,
         },
-        ...(statement.gencys_partner
+        ...(statement.gencys_partner && !hideAdvisory
             ? [
                   {
                       key: 'adv',
                       label: 'Advisory',
-                      amount: advisoryShare,
+                      amount: shownAdvisory,
                       color: FLOW.advisory,
                   },
               ]
@@ -401,13 +387,22 @@ export default function IncomeStatementShow({
                             Back
                         </Link>
                         {!scope && statement.gencys_partner && statement.id && (
-                            <Link
-                                href={`/workspaces/${workspace.slug}/finance/income-statements/${statement.id}/users`}
-                                className={BTN}
-                            >
-                                <Users className="h-3.5 w-3.5" />
-                                Per-user breakdown
-                            </Link>
+                            <>
+                                <Link
+                                    href={`/workspaces/${workspace.slug}/finance/income-statements/${statement.id}/users`}
+                                    className={BTN}
+                                >
+                                    <Users className="h-3.5 w-3.5" />
+                                    Per-user breakdown
+                                </Link>
+                                <Link
+                                    href={`/workspaces/${workspace.slug}/finance/income-statements/${statement.id}/products`}
+                                    className={BTN}
+                                >
+                                    <ShoppingBag className="h-3.5 w-3.5" />
+                                    Per-product breakdown
+                                </Link>
+                            </>
                         )}
                         {readonly ? null : isPreview ? (
                             <button
@@ -552,17 +547,21 @@ export default function IncomeStatementShow({
                     <div className="divide-y divide-black/5 dark:divide-white/5">
                         {costOfSalesRows.map(renderRow)}
                     </div>
-                    <div className="flex items-center justify-between border-y border-black/6 bg-stone-100 px-5 py-3 dark:border-white/6 dark:bg-zinc-800/60">
-                        <span className="text-[12px] font-semibold tracking-wide text-gray-700 uppercase dark:text-gray-200">
-                            = Gross Profit
-                        </span>
-                        <span className="text-[15px] font-semibold text-gray-800 tabular-nums dark:text-gray-100">
-                            {fmt(grossProfit)}
-                        </span>
-                    </div>
+                    {/* Gross Profit total — hidden on the per-user breakdown for now. */}
+                    {!hideAdvisory && (
+                        <div className="flex items-center justify-between border-y border-black/6 bg-stone-100 px-5 py-3 dark:border-white/6 dark:bg-zinc-800/60">
+                            <span className="text-[12px] font-semibold tracking-wide text-gray-700 uppercase dark:text-gray-200">
+                                = Gross Profit
+                            </span>
+                            <span className="text-[15px] font-semibold text-gray-800 tabular-nums dark:text-gray-100">
+                                {fmt(grossProfit)}
+                            </span>
+                        </div>
+                    )}
 
-                    {/* Advisory share (gencys partners) — deducted from gross profit */}
-                    {statement.gencys_partner && (
+                    {/* Advisory share (gencys partners) — deducted from gross profit.
+                        Hidden on the per-user breakdown (shown per product there). */}
+                    {statement.gencys_partner && !hideAdvisory && (
                         <div className="flex items-center justify-between px-5 py-2.5">
                             <div className="flex items-center gap-2">
                                 <span className="text-[13px] text-gray-800 dark:text-gray-100">
@@ -615,109 +614,6 @@ export default function IncomeStatementShow({
                         </div>
                     </div>
                 </div>
-
-                {(statement.products?.length ?? 0) > 0 && (
-                    <div className={`${CARD} mt-6 overflow-hidden`}>
-                        <div className="flex items-center justify-between border-b border-black/6 px-5 py-4 dark:border-white/6">
-                            <div>
-                                <div className="text-[13px] font-semibold text-gray-800 dark:text-gray-100">
-                                    Per Product
-                                </div>
-                                <div className="mt-0.5 text-[11px] text-gray-400">
-                                    Delivered revenue &amp; cost of sales by
-                                    product
-                                </div>
-                            </div>
-                            <span className="rounded-full border border-black/6 px-2.5 py-0.5 text-[10px] tracking-wider text-gray-400 uppercase dark:border-white/6">
-                                {statement.products!.length}{' '}
-                                {statement.products!.length === 1
-                                    ? 'product'
-                                    : 'products'}
-                            </span>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-max border-collapse text-right">
-                                <thead>
-                                    <tr className="border-b border-black/6 dark:border-white/6">
-                                        <th className="sticky left-0 z-10 bg-white px-4 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase dark:bg-zinc-900">
-                                            Line
-                                        </th>
-                                        <th className="bg-stone-50 px-4 py-3 text-[10px] font-semibold tracking-wider text-gray-500 uppercase dark:bg-zinc-800/50">
-                                            Total
-                                        </th>
-                                        {statement.products!.map((p) => (
-                                            <th
-                                                key={p.product}
-                                                className="px-4 py-3 text-[10px] font-semibold tracking-wider whitespace-nowrap text-gray-400 uppercase"
-                                            >
-                                                {p.product}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                    {PRODUCT_LINES.map((line) => {
-                                        const total = statement.products!.reduce(
-                                            (s, p) =>
-                                                s + (Number(p[line.key]) || 0),
-                                            0,
-                                        );
-                                        const cell = (v: number) =>
-                                            line.money
-                                                ? fmt(v)
-                                                : v.toLocaleString();
-                                        const tone = (v: number) =>
-                                            line.signed && v < 0
-                                                ? 'text-rose-600 dark:text-rose-400'
-                                                : line.signed
-                                                  ? 'text-emerald-600 dark:text-emerald-400'
-                                                  : line.strong
-                                                    ? 'text-gray-800 dark:text-gray-100'
-                                                    : 'text-gray-500 dark:text-gray-400';
-
-                                        return (
-                                            <tr
-                                                key={line.key}
-                                                className={
-                                                    line.strong
-                                                        ? 'bg-stone-50/50 dark:bg-zinc-800/20'
-                                                        : ''
-                                                }
-                                            >
-                                                <td
-                                                    className={`sticky left-0 z-10 bg-white px-4 py-2.5 text-left text-[12px] dark:bg-zinc-900 ${
-                                                        line.strong
-                                                            ? 'font-semibold text-gray-800 dark:text-gray-100'
-                                                            : 'text-gray-500 dark:text-gray-400'
-                                                    }`}
-                                                >
-                                                    {line.label}
-                                                </td>
-                                                <td
-                                                    className={`bg-stone-50 px-4 py-2.5 text-[12px] font-semibold tabular-nums dark:bg-zinc-800/50 ${tone(total)}`}
-                                                >
-                                                    {cell(total)}
-                                                </td>
-                                                {statement.products!.map((p) => (
-                                                    <td
-                                                        key={p.product}
-                                                        className={`px-4 py-2.5 text-[12px] whitespace-nowrap tabular-nums ${tone(Number(p[line.key]))}`}
-                                                    >
-                                                        {cell(Number(p[line.key]))}
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                        <p className="border-t border-black/6 px-5 py-3 text-[10px] text-gray-400 dark:border-white/6">
-                            Cost of Sales here is order-derived (COGS + Shipping +
-                            COD + VAT). Transactions stay at the intern level below.
-                        </p>
-                    </div>
-                )}
 
                 <p className="mt-3 text-[11px] text-gray-400">
                     Gross Profit = Delivered − Cost of Sales. Net Profit = Gross

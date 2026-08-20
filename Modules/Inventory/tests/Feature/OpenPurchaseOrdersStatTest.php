@@ -80,7 +80,61 @@ test('each line carries what it has taken delivery of, for its progress ring', f
         ->and($data['lines'][0]['waiting_qty'])->toBe(5);
 });
 
-test('lines are ordered by issue date, oldest first, undated last', function () {
+test('each line reports how many days it has been open', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = InventoryItem::create([
+        'workspace_id' => $workspace->id,
+        'sku' => 'SKU-1',
+        'is_active' => true,
+    ]);
+
+    $order = PurchasedOrder::create([
+        'workspace_id' => $workspace->id,
+        'control_no' => 'PO-1',
+        'issue_date' => now()->subDays(12)->toDateString(),
+        'status' => 6,
+    ]);
+    PurchasedOrderItem::create([
+        'inventory_purchased_order_id' => $order->id,
+        'inventory_item_id' => $item->id,
+        'count' => 10,
+    ]);
+
+    expect(openPos($owner, $workspace)['lines'][0]['days_since_po'])->toBe(12);
+});
+
+test('an order issued today is nought days old, and a future-dated one is not negative', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $item = InventoryItem::create([
+        'workspace_id' => $workspace->id,
+        'sku' => 'SKU-1',
+        'is_active' => true,
+    ]);
+
+    foreach ([['TODAY', now()], ['FUTURE', now()->addDays(3)]] as [$control, $issued]) {
+        $order = PurchasedOrder::create([
+            'workspace_id' => $workspace->id,
+            'control_no' => $control,
+            'issue_date' => $issued->toDateString(),
+            'status' => 6,
+        ]);
+        PurchasedOrderItem::create([
+            'inventory_purchased_order_id' => $order->id,
+            'inventory_item_id' => $item->id,
+            'count' => 10,
+        ]);
+    }
+
+    $ages = collect(openPos($owner, $workspace)['lines'])
+        ->pluck('days_since_po', 'control_no');
+
+    expect($ages['TODAY'])->toBe(0)
+        ->and($ages['FUTURE'])->toBe(0);
+});
+
+test('lines are ordered by issue date, newest first, undated last', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $item = InventoryItem::create([
@@ -107,5 +161,5 @@ test('lines are ordered by issue date, oldest first, undated last', function () 
     $data = openPos($owner, $workspace);
 
     expect(array_column($data['lines'], 'control_no'))
-        ->toBe(['OLDEST', 'MIDDLE', 'NEWEST']);
+        ->toBe(['NEWEST', 'MIDDLE', 'OLDEST']);
 });

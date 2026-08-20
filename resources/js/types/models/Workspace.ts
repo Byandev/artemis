@@ -26,6 +26,7 @@ export interface Workspace {
     csr_dashboard_module_enabled: boolean;
     sim_gateway_module_enabled: boolean;
     ad_spend_goals_module_enabled: boolean;
+    billing_module_enabled: boolean;
     /** Whether a public-pages access password is configured. */
     public_password_set?: boolean;
     /** ERP automation username consumed by the n8n integration. */

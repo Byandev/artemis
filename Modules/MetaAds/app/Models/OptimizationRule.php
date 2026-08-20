@@ -2,6 +2,7 @@
 
 namespace Modules\MetaAds\Models;
 
+use App\Models\Page;
 use App\Models\Workspace;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -60,6 +61,20 @@ class OptimizationRule extends Model
             'meta_ads_optimization_rule_ad_account',
             'meta_ads_optimization_rule_id',
             'meta_ads_account_id',
+        );
+    }
+
+    /**
+     * Facebook pages this rule is narrowed to. Empty means every page — the rule
+     * then applies to all targets in its ad accounts.
+     */
+    public function pages(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Page::class,
+            'meta_ads_optimization_rule_page',
+            'meta_ads_optimization_rule_id',
+            'page_id',
         );
     }
 

@@ -1,6 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { PURCHASED_ORDER_STATUSES } from '@/constants/purchased-order-statuses';
-import { format, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import DeliveryProgressRing from './delivery-progress-ring';
@@ -13,10 +13,21 @@ interface OpenPoLine {
     purchased_order_id: number;
     control_no: string | null;
     cust_po_no: string | null;
+    supplier: string | null;
     /** Date-only string (Y-m-d), or null on an order with no issue date. */
     issue_date: string | null;
     /** Date-only string (Y-m-d), or null when no delivery date was promised. */
     expected_delivery_date: string | null;
+    /**
+     * Date-only string (Y-m-d) taken from the ERP's Paid status log, or null on
+     * an order that has not been paid (or predates the status-log sync).
+     */
+    paid_date: string | null;
+    /**
+     * Whole days from the issue date to today, server-computed so "today" is the
+     * app's timezone. Null on an order with no issue date.
+     */
+    days_since_po: number | null;
     status: number;
     status_label: string;
     sku: string | null;
@@ -46,6 +57,18 @@ const poLabel = (line: OpenPoLine) =>
  */
 const issuedOn = (iso: string | null) =>
     iso ? format(parseISO(iso), 'd MMM yyyy') : '—';
+
+/**
+ * Past the delivery date it was promised for. Every row here is still owing
+ * stock, so a passed expected date means the order is late — orders with no
+ * promised date are never overdue, only old.
+ */
+const isOverdue = (line: OpenPoLine) =>
+    line.expected_delivery_date !== null &&
+    differenceInCalendarDays(
+        new Date(),
+        parseISO(line.expected_delivery_date),
+    ) > 0;
 
 const headClass =
     'px-3 py-2 text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
@@ -123,7 +146,16 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                             <tr className="border-b border-black/6 dark:border-white/6">
                                 <th className={headClass}>PO</th>
                                 <th className={headClass}>Issued</th>
+                                {/* Next to Issued, not off with the amounts:
+                                    the gap between the two is the thing worth
+                                    reading. */}
+                                <th className={headClass}>Paid</th>
                                 <th className={headClass}>Expected</th>
+                                {/* Closes the date group: three dates, then how
+                                    long the order has actually been open. */}
+                                <th className={`${headClass} text-right!`}>
+                                    Days Since PO
+                                </th>
                                 <th className={headClass}>Status</th>
                                 <th className={headClass}>Item</th>
                                 <th className={`${headClass} text-right!`}>
@@ -167,10 +199,32 @@ export default function OpenPosTable({ slug }: { slug: string }) {
                                     >
                                         {issuedOn(line.issue_date)}
                                     </td>
+                                    {/* An unpaid open order is the normal state
+                                        early on, so the em dash is left plain
+                                        rather than flagged. */}
+                                    <td
+                                        className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
+                                    >
+                                        {issuedOn(line.paid_date)}
+                                    </td>
                                     <td
                                         className={`${cellClass} text-xs whitespace-nowrap text-gray-500 tabular-nums dark:text-gray-400`}
                                     >
                                         {issuedOn(line.expected_delivery_date)}
+                                    </td>
+                                    {/* Amber once the order is past the date it
+                                        was promised for — the age is only a
+                                        problem relative to that promise, and
+                                        orders with no promised date get no
+                                        colour rather than an invented cutoff. */}
+                                    <td
+                                        className={`${numClass} ${
+                                            isOverdue(line)
+                                                ? 'font-semibold text-amber-600 dark:text-amber-500'
+                                                : 'text-gray-500 dark:text-gray-400'
+                                        }`}
+                                    >
+                                        {num(line.days_since_po)}
                                     </td>
                                     <td className={cellClass}>
                                         <StatusBadge
@@ -259,6 +313,8 @@ function TableSkeleton() {
                     <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
                     <Skeleton className="h-8 flex-[2]" />
+                    <Skeleton className="h-8 flex-[2]" />
+                    <Skeleton className="h-8 flex-1" />
                     <Skeleton className="h-8 flex-[3]" />
                     <Skeleton className="h-8 flex-1" />
                     <Skeleton className="h-8 flex-1" />

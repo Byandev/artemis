@@ -6,26 +6,30 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, Link, router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-interface PageBreakdown {
+/** The dimension the month is broken down by. */
+type View = 'page' | 'user';
+
+interface GroupBreakdown {
     id: string;
     name: string;
     count: number;
 }
 
-interface PageOption {
+interface GroupOption {
     id: string;
     name: string;
 }
 
 interface DayData {
     total: number;
-    pages: PageBreakdown[];
+    groups: GroupBreakdown[];
 }
 
 interface Props {
@@ -35,16 +39,17 @@ interface Props {
     prevMonth: string;
     nextMonth: string;
     canGoNext: boolean;
+    view: View;
     days: Record<string, DayData>;
-    pageTotals: PageBreakdown[];
-    pageOptions: PageOption[];
-    selectedPages: string[];
+    groupTotals: GroupBreakdown[];
+    groupOptions: GroupOption[];
+    selected: string[];
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-/** A stable, color-blind-friendly palette assigned to pages by rank. */
-const PAGE_COLORS = [
+/** A stable, color-blind-friendly palette assigned to groups by rank. */
+const GROUP_COLORS = [
     'bg-emerald-500',
     'bg-sky-500',
     'bg-violet-500',
@@ -54,6 +59,12 @@ const PAGE_COLORS = [
     'bg-indigo-500',
     'bg-orange-500',
 ];
+
+/** Per-view copy, so the whole screen reads correctly in either mode. */
+const VIEW_COPY: Record<View, { noun: string; all: string }> = {
+    page: { noun: 'page', all: 'All pages' },
+    user: { noun: 'owner', all: 'All owners' },
+};
 
 const formatInt = (n: number) => new Intl.NumberFormat().format(n);
 
@@ -66,49 +77,73 @@ export default function AdsCalendar({
     prevMonth,
     nextMonth,
     canGoNext,
+    view,
     days,
-    pageTotals,
-    pageOptions,
-    selectedPages,
+    groupTotals,
+    groupOptions,
+    selected,
 }: Props) {
     const base = `/workspaces/${workspace.slug}/integrations/meta/ads-calendar`;
+    const copy = VIEW_COPY[view];
+
+    // The filter is keyed per dimension so an existing ?pages[]= link keeps
+    // working when the page view is active.
+    const filterParam = view === 'user' ? 'users' : 'pages';
 
     // Local selection drives the dropdown for instant feedback; the server visit
-    // is debounced so toggling several pages doesn't reload (and close) the menu
+    // is debounced so toggling several options doesn't reload (and close) the menu
     // on every click. Re-sync if the server selection changes (e.g. month nav).
-    const [pending, setPending] = useState<string[]>(selectedPages);
-    useEffect(() => setPending(selectedPages), [selectedPages]);
+    const [pending, setPending] = useState<string[]>(selected);
+    useEffect(() => setPending(selected), [selected]);
 
     const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Build a calendar URL preserving the active page filter (omit month to land
-    // on the current month — used by the "Today" button).
+    // Build a calendar URL preserving the active view and filter (omit month to
+    // land on the current month — used by the "Today" button).
     const urlFor = (targetMonth?: string) => {
         const qs = new URLSearchParams();
         if (targetMonth) qs.set('month', targetMonth);
-        pending.forEach((p) => qs.append('pages[]', p));
+        if (view === 'user') qs.set('view', 'user');
+        pending.forEach((v) => qs.append(`${filterParam}[]`, v));
         const s = qs.toString();
         return s ? `${base}?${s}` : base;
     };
 
-    // Apply a new page selection, keeping the current month. `preserveState`
+    // Switching dimension drops the filter — page ids and owner ids aren't
+    // interchangeable, so carrying the selection over would filter to nothing.
+    // State is deliberately not preserved, so `pending` resets from the server.
+    const onViewChange = (toOwner: boolean) => {
+        router.get(base, toOwner ? { month, view: 'user' } : { month }, {
+            preserveScroll: true,
+            replace: true,
+        });
+    };
+
+    // Apply a new selection, keeping the current month and view. `preserveState`
     // keeps the dropdown open across the visit; `replace` avoids stacking a
     // history entry per filter change.
-    const onPagesChange = (values: string[]) => {
+    const onSelectionChange = (values: string[]) => {
         setPending(values);
         if (navTimer.current) clearTimeout(navTimer.current);
         navTimer.current = setTimeout(() => {
             router.get(
                 base,
-                values.length ? { month, pages: values } : { month },
+                {
+                    month,
+                    ...(view === 'user' ? { view: 'user' } : {}),
+                    ...(values.length ? { [filterParam]: values } : {}),
+                },
                 { preserveScroll: true, preserveState: true, replace: true },
             );
         }, 350);
     };
 
-    // Map page id → palette colour by month-wide rank, reused in every day cell.
+    // Map group id → palette colour by month-wide rank, reused in every day cell.
     const colorById = new Map<string, string>(
-        pageTotals.map((p, i) => [p.id, PAGE_COLORS[i % PAGE_COLORS.length]]),
+        groupTotals.map((g, i) => [
+            g.id,
+            GROUP_COLORS[i % GROUP_COLORS.length],
+        ]),
     );
 
     const [year, monthNum] = month.split('-').map(Number);
@@ -132,41 +167,87 @@ export default function AdsCalendar({
             <div className="w-full space-y-6 p-4 md:p-6">
                 <PageHeader
                     title="Ads Calendar"
-                    description="Campaigns created each day, broken down per Facebook page."
+                    description={`Campaigns created each day, broken down per ${view === 'user' ? 'page owner' : 'Facebook page'}.`}
                 />
 
-                {/* Page filter + month navigation */}
+                {/* Filter (with its page/owner switch) + month navigation */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                         <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                             {monthLabel}
                         </h2>
+
+                        {/* Switches what the filter lists — page names or their
+                            owners — and re-buckets the calendar to match. */}
+                        <div className="flex h-9 items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 dark:border-white/6 dark:bg-zinc-800">
+                            <span
+                                className={cn(
+                                    'font-mono! text-[11px]! transition-colors',
+                                    view === 'page'
+                                        ? 'text-gray-700 dark:text-gray-200'
+                                        : 'text-gray-400 dark:text-gray-500',
+                                )}
+                            >
+                                Page
+                            </span>
+                            <Switch
+                                checked={view === 'user'}
+                                onCheckedChange={onViewChange}
+                                aria-label="Filter by page owner instead of page"
+                            />
+                            <span
+                                className={cn(
+                                    'font-mono! text-[11px]! transition-colors',
+                                    view === 'user'
+                                        ? 'text-gray-700 dark:text-gray-200'
+                                        : 'text-gray-400 dark:text-gray-500',
+                                )}
+                            >
+                                Owner
+                            </span>
+                        </div>
+
                         <MultiSelect
                             compact
                             className="w-56"
-                            placeholder="All pages"
-                            options={pageOptions.map((p) => ({
-                                value: p.id,
-                                label: p.name,
+                            placeholder={copy.all}
+                            options={groupOptions.map((g) => ({
+                                value: g.id,
+                                label: g.name,
                             }))}
                             selected={pending}
-                            onChange={onPagesChange}
+                            onChange={onSelectionChange}
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button asChild variant="outline" size="sm">
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-[10px]"
+                        >
                             <Link href={urlFor(prevMonth)} preserveScroll>
                                 <ChevronLeft className="h-4 w-4" />
                                 Prev
                             </Link>
                         </Button>
-                        <Button asChild variant="outline" size="sm">
+                        <Button
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="h-9 rounded-[10px]"
+                        >
                             <Link href={urlFor()} preserveScroll>
                                 Today
                             </Link>
                         </Button>
                         {canGoNext ? (
-                            <Button asChild variant="outline" size="sm">
+                            <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="h-9 rounded-[10px]"
+                            >
                                 <Link href={urlFor(nextMonth)} preserveScroll>
                                     Next
                                     <ChevronRight className="h-4 w-4" />
@@ -177,7 +258,7 @@ export default function AdsCalendar({
                                 variant="outline"
                                 size="sm"
                                 disabled
-                                className="opacity-50"
+                                className="h-9 rounded-[10px] opacity-50"
                             >
                                 Next
                                 <ChevronRight className="h-4 w-4" />
@@ -245,6 +326,7 @@ export default function AdsCalendar({
                                         <DayBreakdown
                                             data={data}
                                             colorById={colorById}
+                                            allLabel={copy.all}
                                         />
                                     )}
                                 </div>
@@ -253,30 +335,30 @@ export default function AdsCalendar({
                     </div>
                 </div>
 
-                {/* Per-page legend / month totals */}
-                {pageTotals.length > 0 && (
+                {/* Per-group legend / month totals */}
+                {groupTotals.length > 0 && (
                     <div className="rounded-xl border border-black/6 bg-white p-4 dark:border-white/8 dark:bg-zinc-900">
                         <p className="mb-3 text-[11px] font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
-                            Campaigns by page · {monthLabel}
+                            Campaigns by {copy.noun} · {monthLabel}
                         </p>
                         <div className="flex flex-wrap gap-x-6 gap-y-2">
-                            {pageTotals.map((p) => (
+                            {groupTotals.map((g) => (
                                 <div
-                                    key={p.id}
+                                    key={g.id}
                                     className="flex items-center gap-2"
                                 >
                                     <span
                                         className={cn(
                                             'h-2.5 w-2.5 shrink-0 rounded-full',
-                                            colorById.get(p.id) ??
+                                            colorById.get(g.id) ??
                                                 'bg-gray-400',
                                         )}
                                     />
                                     <span className="text-[13px] text-gray-700 dark:text-gray-300">
-                                        {p.name}
+                                        {g.name}
                                     </span>
                                     <span className="text-[13px] font-semibold text-gray-900 dark:text-gray-100">
-                                        {formatInt(p.count)}
+                                        {formatInt(g.count)}
                                     </span>
                                 </div>
                             ))}
@@ -288,21 +370,23 @@ export default function AdsCalendar({
     );
 }
 
-/** Per-day page list: shows the top 3 pages inline, the rest behind a popover. */
+/** Per-day list: shows the top 3 groups inline, the rest behind a popover. */
 function DayBreakdown({
     data,
     colorById,
+    allLabel,
 }: {
     data: DayData;
     colorById: Map<string, string>;
+    allLabel: string;
 }) {
-    const visible = data.pages.slice(0, 3);
-    const hidden = data.pages.slice(3);
+    const visible = data.groups.slice(0, 3);
+    const hidden = data.groups.slice(3);
 
     return (
         <div className="space-y-0.5">
-            {visible.map((p) => (
-                <PageRow key={p.id} page={p} colorById={colorById} />
+            {visible.map((g) => (
+                <GroupRow key={g.id} group={g} colorById={colorById} />
             ))}
             {hidden.length > 0 && (
                 <Popover>
@@ -316,13 +400,13 @@ function DayBreakdown({
                     </PopoverTrigger>
                     <PopoverContent className="w-60 p-2" align="start">
                         <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
-                            All pages
+                            {allLabel}
                         </p>
                         <div className="space-y-0.5">
-                            {data.pages.map((p) => (
-                                <PageRow
-                                    key={p.id}
-                                    page={p}
+                            {data.groups.map((g) => (
+                                <GroupRow
+                                    key={g.id}
+                                    group={g}
                                     colorById={colorById}
                                 />
                             ))}
@@ -334,11 +418,11 @@ function DayBreakdown({
     );
 }
 
-function PageRow({
-    page,
+function GroupRow({
+    group,
     colorById,
 }: {
-    page: PageBreakdown;
+    group: GroupBreakdown;
     colorById: Map<string, string>;
 }) {
     return (
@@ -346,17 +430,17 @@ function PageRow({
             <span
                 className={cn(
                     'h-2 w-2 shrink-0 rounded-full',
-                    colorById.get(page.id) ?? 'bg-gray-400',
+                    colorById.get(group.id) ?? 'bg-gray-400',
                 )}
             />
             <span
                 className="flex-1 truncate text-[11px] text-gray-600 dark:text-gray-400"
-                title={page.name}
+                title={group.name}
             >
-                {page.name}
+                {group.name}
             </span>
             <span className="text-[11px] font-medium text-gray-900 dark:text-gray-200">
-                {page.count}
+                {group.count}
             </span>
         </div>
     );

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Modules\Billing\Models\WorkspaceBillingDetail;
 use Modules\GencysERP\Models\Intern;
 use Modules\GencysERP\Models\Page as GencysPage;
 use Modules\Inventory\Models\InventoryItem;
@@ -50,6 +51,7 @@ class Workspace extends Model
         'csr_dashboard_module_enabled',
         'sim_gateway_module_enabled',
         'ad_spend_goals_module_enabled',
+        'billing_module_enabled',
         'inventory_sync',
         'public_password',
         'erp_username',
@@ -87,6 +89,7 @@ class Workspace extends Model
         'csr_dashboard_module_enabled' => 'boolean',
         'sim_gateway_module_enabled' => 'boolean',
         'ad_spend_goals_module_enabled' => 'boolean',
+        'billing_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
         // Reversible encryption so the automation pipeline can read it back.
@@ -115,6 +118,7 @@ class Workspace extends Model
             $this->meta_ads_module_enabled ? null : 'Meta Ads',
             $this->gencys_module_enabled ? null : 'Gencys ERP',
             $this->ad_spend_goals_module_enabled ? null : 'Ad Spend Goals',
+            $this->billing_module_enabled ? null : 'Billing',
         ]));
     }
 
@@ -558,5 +562,13 @@ class Workspace extends Model
     public function inventoryNotificationSetting(): HasOne
     {
         return $this->hasOne(InventoryNotificationSetting::class);
+    }
+
+    /**
+     * The workspace's saved "bill to" details. Prefills the admin invoice form.
+     */
+    public function billingDetail(): HasOne
+    {
+        return $this->hasOne(WorkspaceBillingDetail::class);
     }
 }

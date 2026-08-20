@@ -21,9 +21,15 @@ class PurchasedOrder extends Model
         'expected_delivery_date',
         'cust_po_no',
         'control_no',
+        'supplier',
         'delivery_fee',
         'total_amount',
         'status',
+        'approved_at',
+        'to_pay_at',
+        'paid_at',
+        'for_purchase_at',
+        'purchased_at',
     ];
 
     protected $casts = [
@@ -32,6 +38,29 @@ class PurchasedOrder extends Model
         'delivery_fee' => 'decimal:2',
         'total_amount' => 'decimal:2',
         'status' => 'integer',
+        // Datetimes, not dates: the ERP stamps these to the second, and the gap
+        // between two stages is often minutes. Lists render them as dates.
+        'approved_at' => 'datetime',
+        'to_pay_at' => 'datetime',
+        'paid_at' => 'datetime',
+        'for_purchase_at' => 'datetime',
+        'purchased_at' => 'datetime',
+    ];
+
+    /**
+     * When the order reached each workflow stage, keyed by the field the ERP
+     * sends it as, in workflow order.
+     *
+     * These are the ERP's own stamps. `paid_at` was previously derived from the
+     * status trail and still falls back to it when the ERP omits the field —
+     * see the public purchase-order sync.
+     */
+    public const STAGE_TIMESTAMPS = [
+        'approved_at',
+        'to_pay_at',
+        'paid_at',
+        'for_purchase_at',
+        'purchased_at',
     ];
 
     /**
@@ -88,6 +117,30 @@ class PurchasedOrder extends Model
      */
     public const AWAITING_DELIVERY_STATUSES = [1, 2, 3, 4, 5, 6];
 
+    /**
+     * Open orders that are the supplier's problem now — the only ones whose
+     * quantities can honestly be called incoming stock.
+     *
+     * Payment is the commitment point: money has moved, the supplier is on the
+     * hook for the goods, and the later stages are our own paperwork catching
+     * up rather than anything that decides whether the stock arrives.
+     *
+     * Note this does NOT gate the reorder maths — that counts every open order,
+     * because a raised PO is committed quantity and excluding it would trigger
+     * a genuine double-order (see InventoryStockColumns::remainingAfterFulfillment).
+     * The split exists so the flow panels can tell stock that is moving from
+     * stock that is merely committed, and age the latter by how long it has sat.
+     */
+    public const RELEASED_STATUSES = [4, 5, 6];
+
+    /**
+     * Open orders still inside the business — raised, but not yet paid for.
+     * Real intent, and worth showing, but not stock: nothing has been committed
+     * that would make a supplier start. Exact complement of RELEASED_STATUSES
+     * within AWAITING_DELIVERY_STATUSES.
+     */
+    public const REQUESTED_STATUSES = [1, 2, 3];
+
     public function getStatusLabelAttribute(): string
     {
         return self::STATUSES[$this->status] ?? 'Unknown';
@@ -110,6 +163,16 @@ class PurchasedOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(PurchasedOrderItem::class, 'inventory_purchased_order_id');
+    }
+
+    /**
+     * The ERP's audit trail for this order, oldest first. Synced wholesale —
+     * see PurchasedOrderStatusLog.
+     */
+    public function statusLogs(): HasMany
+    {
+        return $this->hasMany(PurchasedOrderStatusLog::class, 'inventory_purchased_order_id')
+            ->orderBy('logged_at');
     }
 
     /** Aggregate fulfilment across the order's items: waiting | partial | delivered. */
@@ -151,6 +214,35 @@ class PurchasedOrder extends Model
         }
 
         return now()->startOfDay()->gt($expected) ? 'delayed' : 'ontime';
+    }
+
+    /**
+     * Re-derive `paid_at` from the order's status trail and persist it.
+     *
+     * The earliest Paid entry wins: an order marked paid, reverted and paid
+     * again was first settled on the first date, and a 50% payment is still the
+     * date money moved. Null when the trail carries no Paid entry — including
+     * when the ERP has withdrawn one.
+     *
+     * Written with a bare update so it neither touches `updated_at` nor fires
+     * model events: this is a derived column catching up with its source, not a
+     * change to the order.
+     */
+    public function recalculatePaidAt(): void
+    {
+        $paidAt = $this->statusLogs()
+            ->paid()
+            ->whereNotNull('logged_at')
+            ->min('logged_at');
+
+        if ($this->paid_at?->toDateTimeString() === $paidAt) {
+            return;
+        }
+
+        static::withoutTimestamps(fn () => static::whereKey($this->getKey())->toBase()->update(['paid_at' => $paidAt]));
+
+        $this->paid_at = $paidAt;
+        $this->syncOriginalAttribute('paid_at');
     }
 
     /** Total quantity still owed across the order's line items. Requires `items.deliveries`. */

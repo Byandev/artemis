@@ -11,10 +11,16 @@ export interface AdAccountOption {
     name: string;
 }
 
+export interface PageOption {
+    id: string;
+    name: string;
+}
+
 export interface OptimizationRule {
     id: number;
     name: string;
     ad_accounts?: AdAccountOption[];
+    pages?: PageOption[];
     target_type: string;
     condition_operator: string;
     action: string;
@@ -74,6 +80,7 @@ export interface OptimizationRuleLog {
 
 export interface RuleOptions {
     adAccounts: AdAccountOption[];
+    pages: PageOption[];
     metrics: string[];
     operators: string[];
     timeWindows: string[];

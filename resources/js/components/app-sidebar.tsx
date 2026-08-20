@@ -43,6 +43,7 @@ import {
     MessageSquare,
     Package,
     PieChart,
+    ReceiptText,
     RotateCcw,
     ScrollText,
     Send,
@@ -53,6 +54,7 @@ import {
     Sparkles,
     Store,
     Tags,
+    Target,
     Trophy,
     Truck,
     User,
@@ -455,6 +457,23 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        ...(currentWorkspace.billing_module_enabled
+            ? [
+                  {
+                      title: 'Billing',
+                      icon: ReceiptText,
+                      anyOf: [PERMISSIONS.ViewInvoices],
+                      items: [
+                          {
+                              title: 'Invoices',
+                              href: `/workspaces/${slug}/billing/invoices`,
+                              icon: ReceiptText,
+                              permission: PERMISSIONS.ViewInvoices,
+                          },
+                      ],
+                  },
+              ]
+            : []),
         ...(currentWorkspace.finance_module_enabled
             ? [
                   {
@@ -503,12 +522,6 @@ export function AppSidebar() {
                               href: `/workspaces/${currentWorkspace.slug}/finance/income-statements`,
                               icon: FileText,
                               permission: PERMISSIONS.ViewFinanceDashboard,
-                          },
-                          {
-                              title: 'Remittances',
-                              href: `/workspaces/${currentWorkspace.slug}/finance/remittances`,
-                              icon: Send,
-                              permission: PERMISSIONS.ViewFinanceRemittances,
                           },
                           {
                               title: 'Fund Requests',
@@ -575,6 +588,9 @@ export function AppSidebar() {
                     leaderboardEnabled={
                         currentWorkspace.leaderboard_module_enabled
                     }
+                    salesTargetsEnabled={
+                        currentWorkspace.sales_marketing_dashboard_module_enabled
+                    }
                 />
             </SidebarContent>
 
@@ -589,14 +605,19 @@ function PublicLinks({
     workspaceSlug,
     rmoEnabled,
     leaderboardEnabled,
+    salesTargetsEnabled,
 }: {
     workspaceSlug: string;
     rmoEnabled: boolean;
     leaderboardEnabled: boolean;
+    salesTargetsEnabled: boolean;
 }) {
     const canViewRmoLink = useAnyPermission([PERMISSIONS.ViewRmoManagement]);
     const canViewLeaderboardLink = useAnyPermission([
         PERMISSIONS.ViewLeaderboards,
+    ]);
+    const canViewSalesTargetsLink = useAnyPermission([
+        PERMISSIONS.ViewSalesMarketingDashboard,
     ]);
 
     const links = [
@@ -615,6 +636,15 @@ function PublicLinks({
                       title: 'Leaderboards',
                       href: `/public/workspaces/${workspaceSlug}/leaderboards`,
                       icon: Trophy,
+                  },
+              ]
+            : []),
+        ...(salesTargetsEnabled && canViewSalesTargetsLink
+            ? [
+                  {
+                      title: 'Sales Targets',
+                      href: `/public/workspaces/${workspaceSlug}/sales-targets`,
+                      icon: Target,
                   },
               ]
             : []),
