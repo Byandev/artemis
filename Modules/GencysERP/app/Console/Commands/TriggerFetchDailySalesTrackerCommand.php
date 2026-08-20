@@ -81,7 +81,7 @@ class TriggerFetchDailySalesTrackerCommand extends Command
             ? "Sending {$workspaces->count()} workspace(s) synchronously for {$dateLabel}"
             : "Dispatching {$workspaces->count()} workspace(s) with {$delay}s delay between jobs for {$dateLabel}");
 
-        $callbackBase = rtrim(config('app.url'), '/');
+        $callbackBase = rtrim(config('services.n8n.callback_base_url') ?: config('app.url'), '/');
         $callbackUrl = "$callbackBase/api/v1/public/gencys/daily-sales-tracker";
 
         $dispatched = 0;
