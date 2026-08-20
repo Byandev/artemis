@@ -33,10 +33,11 @@ import { PRODUCT_STATUSES } from '@/constants/product-statuses';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import { cn } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import { format, parseISO } from 'date-fns';
 import { debounce, omit } from 'lodash';
@@ -49,6 +50,7 @@ import {
     MoreHorizontal,
     Package,
     Pencil,
+    RefreshCw,
     Search,
     Trash2,
     Ungroup,
@@ -636,6 +638,7 @@ export default function ItemIndex({
 
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [syncingGencys, setSyncingGencys] = useState(false);
+    const [syncingErp, setSyncingErp] = useState(false);
     const [editingItem, setEditingItem] = useState<Item | null>(null);
     const [adjustingItem, setAdjustingItem] = useState<Item | null>(null);
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
@@ -695,6 +698,17 @@ export default function ItemIndex({
     const canDeleteItems =
         usePermission(PERMISSIONS.DeleteInventoryItems) && !readOnly;
     const canUseItemActions = canEditItems || canDeleteItems;
+
+    // Sync actions answer with a redirect carrying a flash message; surface it
+    // as a toast so a started (or refused) sync is visible on the list.
+    const { flash } = usePage().props as {
+        flash?: { success?: string; error?: string };
+    };
+
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.success, flash?.error]);
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/items`;
 
@@ -1702,27 +1716,33 @@ export default function ItemIndex({
                             <Download className="h-3.5 w-3.5" />
                             Export
                         </a>
+
                         {canCreateItems && workspace.is_gencys_partner && (
                             <button
                                 onClick={() =>
                                     router.post(
-                                        `${baseUrl}/sync-gencys`,
+                                        `${baseUrl}/sync-erp`,
                                         {},
                                         {
                                             preserveScroll: true,
-                                            onStart: () =>
-                                                setSyncingGencys(true),
+                                            onStart: () => setSyncingErp(true),
                                             onFinish: () =>
-                                                setSyncingGencys(false),
+                                                setSyncingErp(false),
                                         },
                                     )
                                 }
-                                disabled={syncingGencys}
-                                className="flex h-8 items-center rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
+                                disabled={syncingErp}
+                                className="flex h-8 items-center gap-1.5 rounded-lg border border-black/8 bg-white px-3.5 font-mono! text-[12px]! font-medium text-gray-700 transition-all hover:bg-stone-50 disabled:opacity-50 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:bg-zinc-700"
                             >
-                                {syncingGencys
+                                <RefreshCw
+                                    className={cn(
+                                        'h-3.5 w-3.5',
+                                        syncingErp && 'animate-spin',
+                                    )}
+                                />
+                                {syncingErp
                                     ? 'Syncing…'
-                                    : 'Sync from Unit Codes'}
+                                    : 'Sync from Gencys ERP'}
                             </button>
                         )}
                         {canCreateItems && (

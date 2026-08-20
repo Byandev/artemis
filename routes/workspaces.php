@@ -482,7 +482,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
         Route::get('/export', [InventoryItemController::class, 'export'])->name('export');
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
-        Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
+        Route::post('/sync-erp', [InventoryItemController::class, 'syncFromErp'])->name('sync-erp');
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
         Route::post('/bulk-product', [InventoryItemController::class, 'bulkUpdateProduct'])->name('bulk-product');
         Route::post('/bulk-group', [InventoryItemController::class, 'bulkGroup'])->name('bulk-group');
