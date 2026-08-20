@@ -32,9 +32,6 @@ interface DayData {
     groups: GroupBreakdown[];
 }
 
-/** Which campaign date the month is bucketed by. */
-type DateBasis = 'created' | 'started';
-
 interface Props {
     workspace: { id: number; name: string; slug: string };
     month: string; // 'YYYY-MM'
@@ -42,17 +39,12 @@ interface Props {
     prevMonth: string;
     nextMonth: string;
     canGoNext: boolean;
-    basis: DateBasis;
+    view: View;
     days: Record<string, DayData>;
     groupTotals: GroupBreakdown[];
     groupOptions: GroupOption[];
     selected: string[];
 }
-
-const BASIS_LABELS: Record<DateBasis, string> = {
-    created: 'Created',
-    started: 'Started',
-};
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -85,7 +77,7 @@ export default function AdsCalendar({
     prevMonth,
     nextMonth,
     canGoNext,
-    basis,
+    view,
     days,
     groupTotals,
     groupOptions,
@@ -106,26 +98,28 @@ export default function AdsCalendar({
 
     const navTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Build a calendar URL preserving the active date basis and page filter (omit
-    // month to land on the current month — used by the "Today" button).
+    // Build a calendar URL preserving the active view and filter (omit month to
+    // land on the current month — used by the "Today" button).
     const urlFor = (targetMonth?: string) => {
         const qs = new URLSearchParams();
         if (targetMonth) qs.set('month', targetMonth);
-        if (basis === 'started') qs.set('basis', 'started');
-        pending.forEach((p) => qs.append('pages[]', p));
+        if (view === 'user') qs.set('view', 'user');
+        pending.forEach((v) => qs.append(`${filterParam}[]`, v));
         const s = qs.toString();
         return s ? `${base}?${s}` : base;
     };
 
-    // Switch which campaign date the month buckets by, keeping month + filter.
-    const urlForBasis = (target: DateBasis) => {
-        const qs = new URLSearchParams({ month });
-        if (target === 'started') qs.set('basis', 'started');
-        pending.forEach((p) => qs.append('pages[]', p));
-        return `${base}?${qs.toString()}`;
+    // Switching dimension drops the filter — page ids and owner ids aren't
+    // interchangeable, so carrying the selection over would filter to nothing.
+    // State is deliberately not preserved, so `pending` resets from the server.
+    const onViewChange = (toOwner: boolean) => {
+        router.get(base, toOwner ? { month, view: 'user' } : { month }, {
+            preserveScroll: true,
+            replace: true,
+        });
     };
 
-    // Apply a new page selection, keeping the current month. `preserveState`
+    // Apply a new selection, keeping the current month and view. `preserveState`
     // keeps the dropdown open across the visit; `replace` avoids stacking a
     // history entry per filter change.
     const onSelectionChange = (values: string[]) => {
@@ -136,8 +130,8 @@ export default function AdsCalendar({
                 base,
                 {
                     month,
-                    ...(basis === 'started' ? { basis } : {}),
-                    ...(values.length ? { pages: values } : {}),
+                    ...(view === 'user' ? { view: 'user' } : {}),
+                    ...(values.length ? { [filterParam]: values } : {}),
                 },
                 { preserveScroll: true, preserveState: true, replace: true },
             );
@@ -173,36 +167,44 @@ export default function AdsCalendar({
             <div className="w-full space-y-6 p-4 md:p-6">
                 <PageHeader
                     title="Ads Calendar"
-                    description={`Campaigns ${basis === 'started' ? 'that started running' : 'created'} each day, broken down per Facebook page.`}
+                    description={`Campaigns created each day, broken down per ${view === 'user' ? 'page owner' : 'Facebook page'}.`}
                 />
 
-                {/* Date basis + page filter + month navigation */}
+                {/* Filter (with its page/owner switch) + month navigation */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap items-center gap-3">
                         <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
                             {monthLabel}
                         </h2>
 
-                        {/* Which campaign date the month buckets by. They differ
-                            for anything scheduled ahead of time. */}
-                        <div className="flex h-9 items-center gap-0.5 rounded-[10px] border border-black/6 bg-stone-100 p-0.5 dark:border-white/6 dark:bg-zinc-800">
-                            {(['created', 'started'] as DateBasis[]).map(
-                                (b) => (
-                                    <Link
-                                        key={b}
-                                        href={urlForBasis(b)}
-                                        preserveScroll
-                                        className={cn(
-                                            'flex h-full items-center rounded-lg px-3 font-mono! text-[11px]! transition-all',
-                                            basis === b
-                                                ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-700 dark:text-gray-100'
-                                                : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                                        )}
-                                    >
-                                        {BASIS_LABELS[b]}
-                                    </Link>
-                                ),
-                            )}
+                        {/* Switches what the filter lists — page names or their
+                            owners — and re-buckets the calendar to match. */}
+                        <div className="flex h-9 items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-2.5 dark:border-white/6 dark:bg-zinc-800">
+                            <span
+                                className={cn(
+                                    'font-mono! text-[11px]! transition-colors',
+                                    view === 'page'
+                                        ? 'text-gray-700 dark:text-gray-200'
+                                        : 'text-gray-400 dark:text-gray-500',
+                                )}
+                            >
+                                Page
+                            </span>
+                            <Switch
+                                checked={view === 'user'}
+                                onCheckedChange={onViewChange}
+                                aria-label="Filter by page owner instead of page"
+                            />
+                            <span
+                                className={cn(
+                                    'font-mono! text-[11px]! transition-colors',
+                                    view === 'user'
+                                        ? 'text-gray-700 dark:text-gray-200'
+                                        : 'text-gray-400 dark:text-gray-500',
+                                )}
+                            >
+                                Owner
+                            </span>
                         </div>
 
                         <MultiSelect
