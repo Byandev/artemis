@@ -34,9 +34,10 @@ import {
     breakdownLabel,
     type CustomBreakdownItem,
     DEFAULT_VIEW,
+    isDateFilter,
+    isMetricFilter,
     isNameFilter,
     isoDaysAgo,
-    type MetricFilter,
     type ReportConfig,
     type ReportListItem,
     type ReportRecord,
@@ -89,12 +90,12 @@ export default function ReportShow({
         setDirty(true);
     };
 
-    // The engine accepts one name filter (search + name_op) and any number of
-    // numeric metric filters (HAVING via metric_filters). Split them out.
+    // The engine accepts one name filter (search + name_op), any number of
+    // numeric metric filters (HAVING via metric_filters), and the row-level
+    // date filters (WHERE via date_filters). Split them out.
     const nameFilter = config.filters.find(isNameFilter) ?? null;
-    const metricFilters = config.filters.filter(
-        (f): f is MetricFilter => !isNameFilter(f),
-    );
+    const metricFilters = config.filters.filter(isMetricFilter);
+    const dateFilters = config.filters.filter(isDateFilter);
     const accountsKey = config.accounts.join(',');
     const filtersKey = JSON.stringify(config.filters);
 
@@ -122,6 +123,14 @@ export default function ReportShow({
         );
         if (validMetricFilters.length > 0) {
             qs.set('metric_filters', JSON.stringify(validMetricFilters));
+        }
+        // Row-level lifecycle dates. Only send complete ones — "between" needs
+        // both bounds, and the engine drops anything the breakdown can't answer.
+        const validDateFilters = dateFilters.filter(
+            (f) => f.value && (f.op !== 'between' || f.value2),
+        );
+        if (validDateFilters.length > 0) {
+            qs.set('date_filters', JSON.stringify(validDateFilters));
         }
         // Creator filter (ad-level) — persisted in the report config; the engine
         // applies it only to ad-grained breakdowns and ignores it otherwise.
@@ -318,6 +327,11 @@ export default function ReportShow({
 
                         <FiltersBar
                             filters={config.filters}
+                            groupBy={config.group_by}
+                            dateRange={{
+                                since: config.since,
+                                until: config.until,
+                            }}
                             onChange={(filters) => patch({ filters })}
                         />
 

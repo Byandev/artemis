@@ -9,6 +9,10 @@ interface WorkspaceOption {
     name: string;
     owner_name: string | null;
     owner_email: string | null;
+    /** Saved billing details from Workspace Settings → Billing, if any. */
+    billing_name: string | null;
+    billing_email: string | null;
+    billing_address: string | null;
     plan: { id: number; name: string; price_php: string } | null;
 }
 
@@ -66,8 +70,16 @@ export default function Create({ workspaces, defaults }: Props) {
             ...prev,
             workspace_id: id,
             subscription_plan_id: ws.plan?.id ?? null,
-            bill_to_name: prev.bill_to_name || ws.owner_name || ws.name,
-            bill_to_email: prev.bill_to_email || ws.owner_email || '',
+            // Prefer the workspace's saved billing details, falling back to the
+            // owner's account details when they haven't been filled in.
+            bill_to_name:
+                prev.bill_to_name ||
+                ws.billing_name ||
+                ws.owner_name ||
+                ws.name,
+            bill_to_email:
+                prev.bill_to_email || ws.billing_email || ws.owner_email || '',
+            bill_to_address: prev.bill_to_address || ws.billing_address || '',
             line_items: ws.plan
                 ? [
                       {
@@ -162,7 +174,8 @@ export default function Create({ workspaces, defaults }: Props) {
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="sm:col-span-2">
                                     <label className={labelClass}>
-                                        Workspace
+                                        Workspace{' '}
+                                        <span className="text-red-400">*</span>
                                     </label>
                                     <select
                                         value={data.workspace_id}
@@ -195,7 +208,8 @@ export default function Create({ workspaces, defaults }: Props) {
                                 </div>
                                 <div>
                                     <label className={labelClass}>
-                                        Bill to (name)
+                                        Bill to (name){' '}
+                                        <span className="text-red-400">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -261,7 +275,7 @@ export default function Create({ workspaces, defaults }: Props) {
                                         <div className="col-span-6">
                                             <input
                                                 type="text"
-                                                placeholder="Description"
+                                                placeholder="Description *"
                                                 value={item.description}
                                                 onChange={(e) =>
                                                     updateItem(i, {
@@ -277,7 +291,7 @@ export default function Create({ workspaces, defaults }: Props) {
                                                 type="number"
                                                 min="0"
                                                 step="any"
-                                                placeholder="Qty"
+                                                placeholder="Qty *"
                                                 value={item.quantity}
                                                 onChange={(e) =>
                                                     updateItem(i, {
@@ -293,7 +307,7 @@ export default function Create({ workspaces, defaults }: Props) {
                                                 type="number"
                                                 min="0"
                                                 step="any"
-                                                placeholder="Unit price"
+                                                placeholder="Unit price *"
                                                 value={item.unit_price}
                                                 onChange={(e) =>
                                                     updateItem(i, {
@@ -361,7 +375,8 @@ export default function Create({ workspaces, defaults }: Props) {
                             <div className="space-y-4">
                                 <div>
                                     <label className={labelClass}>
-                                        Issue date
+                                        Issue date{' '}
+                                        <span className="text-red-400">*</span>
                                     </label>
                                     <input
                                         type="date"
@@ -396,7 +411,10 @@ export default function Create({ workspaces, defaults }: Props) {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className={labelClass}>
-                                            Currency
+                                            Currency{' '}
+                                            <span className="text-red-400">
+                                                *
+                                            </span>
                                         </label>
                                         <input
                                             type="text"
@@ -413,7 +431,10 @@ export default function Create({ workspaces, defaults }: Props) {
                                     </div>
                                     <div>
                                         <label className={labelClass}>
-                                            Tax %
+                                            Tax %{' '}
+                                            <span className="text-red-400">
+                                                *
+                                            </span>
                                         </label>
                                         <input
                                             type="number"
@@ -432,7 +453,10 @@ export default function Create({ workspaces, defaults }: Props) {
                                     </div>
                                 </div>
                                 <div>
-                                    <label className={labelClass}>Status</label>
+                                    <label className={labelClass}>
+                                        Status{' '}
+                                        <span className="text-red-400">*</span>
+                                    </label>
                                     <select
                                         value={data.status}
                                         onChange={(e) =>

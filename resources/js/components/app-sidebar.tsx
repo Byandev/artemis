@@ -43,6 +43,7 @@ import {
     MessageSquare,
     Package,
     PieChart,
+    ReceiptText,
     RotateCcw,
     ScrollText,
     Send,
@@ -453,6 +454,23 @@ export function AppSidebar() {
                       href: `/workspaces/${slug}/creatives`,
                       icon: Sparkles,
                       permission: PERMISSIONS.ViewCreatives,
+                  },
+              ]
+            : []),
+        ...(currentWorkspace.billing_module_enabled
+            ? [
+                  {
+                      title: 'Billing',
+                      icon: ReceiptText,
+                      anyOf: [PERMISSIONS.ViewInvoices],
+                      items: [
+                          {
+                              title: 'Invoices',
+                              href: `/workspaces/${slug}/billing/invoices`,
+                              icon: ReceiptText,
+                              permission: PERMISSIONS.ViewInvoices,
+                          },
+                      ],
                   },
               ]
             : []),

@@ -27,8 +27,14 @@ export default function VerifyEmail({ status }: { status?: string }) {
                 {...EmailVerificationNotificationController.store.form()}
                 className="space-y-6 text-center"
             >
-                {({ processing }) => (
+                {({ processing, errors }) => (
                     <>
+                        {errors.email && (
+                            <div className="mb-4 text-sm font-medium text-red-600">
+                                {errors.email}
+                            </div>
+                        )}
+
                         <Button disabled={processing} variant="secondary">
                             {processing && (
                                 <LoaderCircle className="h-4 w-4 animate-spin" />

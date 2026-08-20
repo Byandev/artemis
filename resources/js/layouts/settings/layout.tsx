@@ -10,6 +10,7 @@ import {
     Bell,
     CalendarClock,
     KeyRound,
+    ReceiptText,
     Server,
     User,
     type LucideIcon,
@@ -38,6 +39,9 @@ export default function SettingsLayout({
         PERMISSIONS.ManageDiscordNotifications,
     );
     const canManageRmoSettings = usePermission(PERMISSIONS.ManageRmoSettings);
+    const canViewBillingSettings = usePermission(
+        PERMISSIONS.ViewBillingSettings,
+    );
 
     const groups: SettingsNavGroup[] = [
         {
@@ -96,6 +100,21 @@ export default function SettingsLayout({
                         title: 'RMO Management',
                         href: `/workspaces/${workspace.slug}/settings/rmo`,
                         icon: CalendarClock,
+                    },
+                ],
+            });
+        }
+
+        // Owners hold '*', so the permission check alone would surface a dead
+        // link on workspaces that have the Billing module switched off.
+        if (workspace.billing_module_enabled && canViewBillingSettings) {
+            groups.push({
+                label: 'Billing',
+                items: [
+                    {
+                        title: 'Billing Details',
+                        href: `/workspaces/${workspace.slug}/settings/billing`,
+                        icon: ReceiptText,
                     },
                 ],
             });

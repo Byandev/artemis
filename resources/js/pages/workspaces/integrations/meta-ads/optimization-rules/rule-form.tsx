@@ -28,12 +28,14 @@ interface Props {
     workspace: { id: number; name: string; slug: string };
     rule: OptimizationRule | null;
     selectedAdAccountIds: string[];
+    selectedPageIds: string[];
     options: RuleOptions;
 }
 
 interface FormShape {
     name: string;
     meta_ads_account_ids: string[];
+    meta_ads_page_ids: string[];
     target_type: string;
     condition_operator: string;
     action: string;
@@ -101,6 +103,7 @@ export default function RuleForm({
     workspace,
     rule,
     selectedAdAccountIds,
+    selectedPageIds,
     options,
 }: Props) {
     const isEdit = mode === 'edit';
@@ -112,6 +115,7 @@ export default function RuleForm({
     const form = useForm<FormShape>({
         name: rule?.name ?? '',
         meta_ads_account_ids: selectedAdAccountIds,
+        meta_ads_page_ids: selectedPageIds,
         target_type: rule?.target_type ?? options.targetTypes[0],
         condition_operator:
             rule?.condition_operator ?? options.conditionOperators[0],
@@ -287,6 +291,48 @@ export default function RuleForm({
                                             }
                                             placeholder="Select ad accounts"
                                         />
+                                    )}
+                                </Field>
+
+                                <Field
+                                    label="Pages"
+                                    error={
+                                        errors.meta_ads_page_ids ??
+                                        errors['meta_ads_page_ids.0']
+                                    }
+                                    className="sm:col-span-2"
+                                >
+                                    {options.pages.length === 0 ? (
+                                        <p className="rounded-[10px] border border-dashed border-black/10 px-3 py-2.5 font-mono text-[11px] text-gray-400 dark:border-white/10 dark:text-gray-500">
+                                            No pages in this workspace yet.
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <MultiSelect
+                                                options={options.pages.map(
+                                                    (p) => ({
+                                                        value: p.id,
+                                                        label: p.name,
+                                                    }),
+                                                )}
+                                                selected={
+                                                    data.meta_ads_page_ids
+                                                }
+                                                onChange={(v) =>
+                                                    setData(
+                                                        'meta_ads_page_ids',
+                                                        v,
+                                                    )
+                                                }
+                                                placeholder="All pages"
+                                            />
+                                            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                                                {data.meta_ads_page_ids.length >
+                                                0
+                                                    ? `Only ${data.target_type === 'campaign' ? 'campaigns' : 'ad sets'} on the selected page(s) are evaluated.`
+                                                    : 'Leave empty to evaluate every page.'}
+                                            </p>
+                                        </>
                                     )}
                                 </Field>
 

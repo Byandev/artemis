@@ -20,6 +20,16 @@ export type NameFilterOp = 'is' | 'is_not' | 'contains' | 'not_contains';
 /** Numeric (HAVING) operators the data engine accepts for metric filters. */
 export type MetricFilterOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'range';
 
+/** Date operators for the entity lifecycle filters. */
+export type DateFilterOp = 'on' | 'before' | 'after' | 'between';
+
+/**
+ * The row's own lifecycle dates — when the campaign/ad set/ad was created, and
+ * when it started running. Distinct from the report's `since`/`until`, which
+ * pick which insight days to sum.
+ */
+export type DateFilterField = 'created_date' | 'started_date';
+
 export type NameFilter = {
     field: 'name';
     op: NameFilterOp;
@@ -33,10 +43,60 @@ export type MetricFilter = {
     value2?: number; // upper bound for 'range'
 };
 
-export type ReportFilter = NameFilter | MetricFilter;
+export type DateFilter = {
+    field: DateFilterField;
+    op: DateFilterOp;
+    value: string; // YYYY-MM-DD
+    value2?: string; // upper bound for 'between'
+};
+
+export type ReportFilter = NameFilter | MetricFilter | DateFilter;
 
 export const isNameFilter = (f: ReportFilter): f is NameFilter =>
     f.field === 'name';
+
+export const isDateFilter = (f: ReportFilter): f is DateFilter =>
+    f.field === 'created_date' || f.field === 'started_date';
+
+/**
+ * Positive test rather than "not a name filter" — `MetricFilter.field` is a bare
+ * string, so anything unrecognised would otherwise be swept in as a metric.
+ */
+export const isMetricFilter = (f: ReportFilter): f is MetricFilter =>
+    !isNameFilter(f) && !isDateFilter(f);
+
+export const DATE_OP_LABELS: Record<DateFilterOp, string> = {
+    on: 'is on',
+    before: 'is before',
+    after: 'is after',
+    between: 'is between',
+};
+
+export const DATE_FIELD_LABELS: Record<DateFilterField, string> = {
+    created_date: 'Created date',
+    started_date: 'Started date',
+};
+
+/**
+ * Which breakdowns can answer each date filter. Ads carry no `start_time` of
+ * their own, so an ad-grained "Started date" is answered through the owning ad
+ * set. Accounts have neither date, so neither filter applies there.
+ */
+export const DATE_FIELD_BREAKDOWNS: Record<DateFilterField, GroupByKey[]> = {
+    created_date: ['ad', 'ad_name', 'ad_type', 'ad_set', 'campaign'],
+    started_date: ['ad', 'ad_name', 'ad_type', 'ad_set', 'campaign'],
+};
+
+/**
+ * Whether a date filter can be applied to the report's current breakdown.
+ * Custom breakdowns aggregate ads, so they follow the ad-grained rules.
+ */
+export const dateFilterSupported = (
+    field: DateFilterField,
+    groupBy: BreakdownValue,
+): boolean =>
+    groupBy.startsWith('custom:') ||
+    DATE_FIELD_BREAKDOWNS[field].includes(groupBy as GroupByKey);
 
 export const METRIC_OP_LABELS: Record<MetricFilterOp, string> = {
     gt: 'greater than',
