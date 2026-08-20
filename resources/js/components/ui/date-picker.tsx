@@ -28,6 +28,13 @@ type PropsType = {
      * Omit to allow any date.
      */
     enable?: DateOption[];
+    /**
+     * Bound the calendar. Worth setting even though the input can't be typed
+     * into — flatpickr's header year is a number field, so a stray keystroke
+     * there can still land the picker on a year no column would take.
+     */
+    minDate?: DateOption;
+    maxDate?: DateOption;
 };
 
 /** Normalise the `defaultDate` prop — single or array, string or Date — to real dates. */
@@ -40,7 +47,7 @@ const toDates = (value?: DateOption | DateOption[]): Date[] => {
 const fmt     = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const fmtYear = (d: Date) => d.getFullYear().toString();
 
-export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact, clearable = true, enable }: PropsType) {
+export default function DatePicker({ id, mode, onChange, label, defaultDate, placeholder, fullWidth, compact, clearable = true, enable, minDate, maxDate }: PropsType) {
     const fpRef    = useRef<flatpickr.Instance | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -87,6 +94,8 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
             // Only spread when given: flatpickr treats an empty `enable` as
             // "nothing is selectable", which would lock the calendar entirely.
             ...(enable?.length ? { enable } : {}),
+            ...(minDate ? { minDate } : {}),
+            ...(maxDate ? { maxDate } : {}),
         });
 
         fpRef.current = Array.isArray(instance) ? instance[0] : instance;
@@ -96,7 +105,7 @@ export default function DatePicker({ id, mode, onChange, label, defaultDate, pla
         }
 
         return () => { fpRef.current?.destroy(); fpRef.current = null; };
-    }, [mode, id, defaultDate, enable]);
+    }, [mode, id, defaultDate, enable, minDate, maxDate]);
 
     const isRange  = mode === 'range';
     const hasStart = selectedDates.length >= 1;

@@ -1,3 +1,4 @@
+import DatePicker from '@/components/ui/date-picker';
 import {
     Dialog,
     DialogContent,
@@ -8,12 +9,70 @@ import {
 import { currencyFormatter } from '@/lib/utils';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
-import { useEffect, useId } from 'react';
+import { format } from 'date-fns';
+import { useEffect, useId, useState } from 'react';
 import { toast } from 'sonner';
 
 export interface TeamOption {
     id: number;
     name: string;
+}
+
+/**
+ * The bounds the server enforces, kept in step with SalesTargetController.
+ *
+ * The picker below is bounded by these too, so this is the second line rather
+ * than the first — but its header year is still a typable number field, and a
+ * year the `date` column can't hold used to surface as a server error rather
+ * than a message on the field.
+ */
+const MIN_DATE = '2000-01-01';
+const MAX_DATE = '2100-12-31';
+
+/** decimal(15,2) and decimal(10,2) respectively, matching the columns. */
+const MAX_AMOUNT = 9_999_999_999_999.99;
+const MAX_ROAS = 99_999_999.99;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Whether the calendar actually has that day. Date rolls Feb 30 forward into
+ * March rather than rejecting it, so the round trip is the check.
+ */
+function isRealDate(iso: string): boolean {
+    const [year, month, day] = iso.split('-').map(Number);
+    const parsed = new Date(year, month - 1, day);
+
+    return (
+        parsed.getFullYear() === year &&
+        parsed.getMonth() === month - 1 &&
+        parsed.getDate() === day
+    );
+}
+
+function dateIssue(value: string): string | null {
+    if (value === '') return 'Pick a date.';
+    if (!ISO_DATE.test(value)) return 'Pick a full date from the calendar.';
+    if (!isRealDate(value)) return 'That day is not on the calendar.';
+    // Both sides are fixed-width ISO by now, so string order is date order.
+    if (value < MIN_DATE || value > MAX_DATE) {
+        return 'Pick a date between 2000 and 2100.';
+    }
+
+    return null;
+}
+
+/** Blank is not an error — an empty box means "not set", not zero. */
+function amountIssue(value: string, label: string, max: number): string | null {
+    if (value === '') return null;
+
+    const parsed = Number(value);
+
+    if (!Number.isFinite(parsed)) return `${label} must be a number.`;
+    if (parsed < 0) return `${label} cannot be negative.`;
+    if (parsed > max) return `${label} is too large.`;
+
+    return null;
 }
 
 export interface SalesTargetShape {
@@ -68,11 +127,22 @@ export function SalesTargetFormDialog({
         });
 
     // The server validates a `teams` array, which isn't a key of the form data
-    // above, so its error arrives outside the typed error map.
-    const teamsError = (errors as Record<string, string | undefined>).teams;
+    // above, so its errors arrive outside the typed error map.
+    const serverErrors = errors as Record<string, string | undefined>;
+    const teamsError = serverErrors.teams;
+
+    /**
+     * Whether a save has been tried. The checks below normally keep the button
+     * off, which means the messages have to stand on their own — nothing here
+     * waits for a submit that a blocked button will never deliver. This only
+     * covers the ways a form submits anyway, like Enter in a text field.
+     */
+    const [attempted, setAttempted] = useState(false);
 
     useEffect(() => {
         if (!open) return;
+
+        setAttempted(false);
 
         if (target) {
             setData({
@@ -135,8 +205,67 @@ export function SalesTargetFormDialog({
     const totalSales = sum(data.amounts);
     const totalBudget = sum(data.budgets);
 
+    /**
+     * Everything the server would reject, checked here so the form can say so
+     * on the spot instead of round-tripping to a 422 — the date especially,
+     * which is the one field a user can put a value in that no column will take.
+     */
+    const rowIssues: Record<string, string> = {};
+
+    for (const team of selected) {
+        const key = String(team.id);
+        const issue =
+            amountIssue(data.amounts[key] ?? '', 'Sales target', MAX_AMOUNT) ??
+            amountIssue(data.budgets[key] ?? '', 'Ad budget', MAX_AMOUNT);
+
+        if (issue) rowIssues[key] = issue;
+    }
+
+    const issues = {
+        date: dateIssue(data.date),
+        name:
+            data.name.trim() === ''
+                ? 'Give the target a name.'
+                : data.name.length > 255
+                  ? 'Keep the name to 255 characters.'
+                  : null,
+        target_roas: amountIssue(data.target_roas, 'Target ROAS', MAX_ROAS),
+        teams: selected.length === 0 ? 'Select at least one team.' : null,
+    };
+
+    // Read down the form, so the hint points at the first thing to fix.
+    const blocking =
+        issues.date ??
+        issues.name ??
+        issues.target_roas ??
+        issues.teams ??
+        Object.values(rowIssues)[0] ??
+        null;
+
+    /**
+     * A field only nags once it holds something wrong, or once a save has been
+     * tried — an untouched form shouldn't open in red. The footer carries the
+     * blocking reason in the meantime, so the disabled button is never silent.
+     */
+    const show = (field: 'date' | 'name' | 'target_roas') =>
+        (attempted || data[field] !== '' ? issues[field] : null) ??
+        serverErrors[field];
+
+    const teamsMessage = (attempted ? issues.teams : null) ?? teamsError;
+
+    /** Server errors on the teams array come back keyed by payload index. */
+    const rowError = (teamId: number, index: number) =>
+        rowIssues[String(teamId)] ??
+        serverErrors[`teams.${index}.sales_target`] ??
+        serverErrors[`teams.${index}.ad_budget`] ??
+        serverErrors[`teams.${index}.team_id`];
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        setAttempted(true);
+
+        if (blocking) return;
 
         const options = {
             preserveScroll: true,
@@ -175,8 +304,9 @@ export function SalesTargetFormDialog({
         if (!next) reset();
     };
 
+    // h-9 to sit level with the date picker beside it, which is fixed at that.
     const inputClass =
-        'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
+        'h-9 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
     const labelClass =
         'block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
     const cellClass =
@@ -209,18 +339,30 @@ export function SalesTargetFormDialog({
                                 >
                                     Date <span className="text-red-400">*</span>
                                 </label>
-                                <input
+                                {/* Picked, never typed — a calendar can't
+                                    produce a day that isn't one. `key` gives
+                                    each target a fresh flatpickr instance. */}
+                                <DatePicker
+                                    key={`${fieldId}-${target?.id ?? 'new'}-${open}`}
                                     id={`${fieldId}-date`}
-                                    type="date"
-                                    value={data.date}
-                                    onChange={(e) =>
-                                        setData('date', e.target.value)
+                                    mode="single"
+                                    fullWidth
+                                    placeholder="Select date"
+                                    defaultDate={data.date || undefined}
+                                    minDate={MIN_DATE}
+                                    maxDate={MAX_DATE}
+                                    onChange={(dates) =>
+                                        setData(
+                                            'date',
+                                            dates.length
+                                                ? format(dates[0], 'yyyy-MM-dd')
+                                                : '',
+                                        )
                                     }
-                                    className={inputClass}
                                 />
-                                {errors.date && (
+                                {show('date') && (
                                     <p className="font-mono text-[11px] text-red-500">
-                                        {errors.date}
+                                        {show('date')}
                                     </p>
                                 )}
                             </div>
@@ -242,9 +384,9 @@ export function SalesTargetFormDialog({
                                     }
                                     className={inputClass}
                                 />
-                                {errors.name && (
+                                {show('name') && (
                                     <p className="font-mono text-[11px] text-red-500">
-                                        {errors.name}
+                                        {show('name')}
                                     </p>
                                 )}
                             </div>
@@ -269,9 +411,9 @@ export function SalesTargetFormDialog({
                                     }
                                     className={inputClass}
                                 />
-                                {errors.target_roas && (
+                                {show('target_roas') && (
                                     <p className="font-mono text-[11px] text-red-500">
-                                        {errors.target_roas}
+                                        {show('target_roas')}
                                     </p>
                                 )}
                             </div>
@@ -308,90 +450,104 @@ export function SalesTargetFormDialog({
 
                                     {teams.map((team) => {
                                         const included = isIncluded(team.id);
+                                        const message = included
+                                            ? rowError(
+                                                  team.id,
+                                                  selected.indexOf(team),
+                                              )
+                                            : undefined;
 
                                         return (
                                             <div
                                                 key={team.id}
-                                                className={`flex items-center gap-3 border-t border-black/5 px-3 py-2 dark:border-white/5 ${
+                                                className={`border-t border-black/5 px-3 py-2 dark:border-white/5 ${
                                                     included
                                                         ? 'bg-emerald-50/40 dark:bg-emerald-500/5'
                                                         : ''
                                                 }`}
                                             >
-                                                <div className="flex flex-1 items-center gap-2.5 truncate">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex flex-1 items-center gap-2.5 truncate">
+                                                        <input
+                                                            id={`${fieldId}-team-${team.id}`}
+                                                            type="checkbox"
+                                                            checked={included}
+                                                            onChange={(e) =>
+                                                                toggleTeam(
+                                                                    team.id,
+                                                                    e.target
+                                                                        .checked,
+                                                                )
+                                                            }
+                                                            className="h-3.5 w-3.5 shrink-0 accent-emerald-500"
+                                                        />
+                                                        <label
+                                                            htmlFor={`${fieldId}-team-${team.id}`}
+                                                            className="truncate text-[12px] text-gray-700 dark:text-gray-300"
+                                                        >
+                                                            {team.name}
+                                                        </label>
+                                                    </div>
+
                                                     <input
-                                                        id={`${fieldId}-team-${team.id}`}
-                                                        type="checkbox"
-                                                        checked={included}
+                                                        aria-label={`${team.name} sales target`}
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        inputMode="decimal"
+                                                        placeholder="—"
+                                                        value={
+                                                            data.amounts[
+                                                                String(team.id)
+                                                            ] ?? ''
+                                                        }
                                                         onChange={(e) =>
-                                                            toggleTeam(
+                                                            setAmount(
+                                                                'amounts',
                                                                 team.id,
-                                                                e.target
-                                                                    .checked,
+                                                                e.target.value,
                                                             )
                                                         }
-                                                        className="h-3.5 w-3.5 shrink-0 accent-emerald-500"
+                                                        className={cellClass}
                                                     />
-                                                    <label
-                                                        htmlFor={`${fieldId}-team-${team.id}`}
-                                                        className="truncate text-[12px] text-gray-700 dark:text-gray-300"
-                                                    >
-                                                        {team.name}
-                                                    </label>
+
+                                                    <input
+                                                        aria-label={`${team.name} ad budget`}
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        inputMode="decimal"
+                                                        placeholder="—"
+                                                        value={
+                                                            data.budgets[
+                                                                String(team.id)
+                                                            ] ?? ''
+                                                        }
+                                                        onChange={(e) =>
+                                                            setAmount(
+                                                                'budgets',
+                                                                team.id,
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className={cellClass}
+                                                    />
                                                 </div>
 
-                                                <input
-                                                    aria-label={`${team.name} sales target`}
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    inputMode="decimal"
-                                                    placeholder="—"
-                                                    value={
-                                                        data.amounts[
-                                                            String(team.id)
-                                                        ] ?? ''
-                                                    }
-                                                    onChange={(e) =>
-                                                        setAmount(
-                                                            'amounts',
-                                                            team.id,
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    className={cellClass}
-                                                />
-
-                                                <input
-                                                    aria-label={`${team.name} ad budget`}
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    inputMode="decimal"
-                                                    placeholder="—"
-                                                    value={
-                                                        data.budgets[
-                                                            String(team.id)
-                                                        ] ?? ''
-                                                    }
-                                                    onChange={(e) =>
-                                                        setAmount(
-                                                            'budgets',
-                                                            team.id,
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    className={cellClass}
-                                                />
+                                                {message && (
+                                                    <p className="mt-1 text-right font-mono text-[11px] text-red-500">
+                                                        {message}
+                                                    </p>
+                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
                             )}
 
-                            {teamsError && (
+                            {teamsMessage && (
                                 <p className="font-mono text-[11px] text-red-500">
-                                    {teamsError}
+                                    {teamsMessage}
                                 </p>
                             )}
 
@@ -416,8 +572,7 @@ export function SalesTargetFormDialog({
                     <div className="flex items-center justify-between gap-2 border-t border-black/6 px-5 py-4 dark:border-white/6">
                         {/* Say why the button is off rather than just disabling it. */}
                         <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                            {selected.length === 0 &&
-                                'Select at least one team'}
+                            {blocking}
                         </span>
                         <div className="flex gap-2">
                             <button
@@ -429,7 +584,7 @@ export function SalesTargetFormDialog({
                             </button>
                             <button
                                 type="submit"
-                                disabled={processing || selected.length === 0}
+                                disabled={processing || blocking !== null}
                                 className="h-9 rounded-lg bg-brand-600 px-4 font-mono! text-[12px]! font-medium text-white shadow-sm transition-all hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {processing

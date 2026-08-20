@@ -2,6 +2,11 @@
 
 Schedule::command('subscriptions:expire-trials')->dailyAt('00:05');
 
+// Warn workspaces 5 days, 3 days, and on the day their subscription falls due.
+// Runs after expire-trials so a subscription that lapsed overnight isn't still
+// being reminded about as if it were live.
+Schedule::command('subscriptions:send-due-reminders')->dailyAt('08:00')->withoutOverlapping();
+
 // Build Artemis-source advertiser performance (Pancake POS + Meta Ads) daily,
 // rebuilding a trailing 3-day window to absorb late Meta attribution.
 Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00')->withoutOverlapping();

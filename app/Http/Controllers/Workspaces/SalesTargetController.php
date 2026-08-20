@@ -22,6 +22,18 @@ class SalesTargetController extends Controller
 {
     use AuthorizesRequests;
 
+    /**
+     * The window a target's date may fall in, mirrored by the form dialog.
+     *
+     * The form picks its date from a calendar rather than a text box, but the
+     * picker's header year is still a typable number field, and a year the
+     * `date` column cannot hold used to get past validation and fail at the
+     * insert instead of coming back as a message on the field.
+     */
+    private const MIN_DATE = '2000-01-01';
+
+    private const MAX_DATE = '2100-12-31';
+
     public function index(Request $request, Workspace $workspace)
     {
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
@@ -130,10 +142,22 @@ class SalesTargetController extends Controller
 
         $this->guardOwnership($workspace, $salesTarget);
 
+        // Where the delete was fired from, while the record still resolves.
+        $cameFromItsOwnPage = parse_url(url()->previous(), PHP_URL_PATH) === parse_url(
+            route('workspaces.sales-marketing.dashboard.sales-targets.show', [$workspace, $salesTarget]),
+            PHP_URL_PATH
+        );
+
         // Team rows go with it via the FK's cascade.
         $salesTarget->delete();
 
-        return redirect()->back()->with('success', 'Sales target deleted.');
+        // A delete fired from the target's own detail page can't go `back()` —
+        // back is the record that was just deleted, so it would land on a 404.
+        // From the list, `back()` is right: it keeps the page and query string.
+        return ($cameFromItsOwnPage
+            ? redirect()->route('workspaces.sales-marketing.dashboard.sales-targets', $workspace)
+            : redirect()->back()
+        )->with('success', 'Sales target deleted.');
     }
 
     /**
@@ -149,8 +173,16 @@ class SalesTargetController extends Controller
     {
         $validated = $request->validate([
             'date' => [
+                // One message at a time — a date that isn't a date has nothing
+                // useful to say about its range or its uniqueness.
+                'bail',
                 'required',
-                'date',
+                // The form posts ISO, so anything else is malformed. Stricter
+                // than `date`, which takes "next tuesday" and rolls a day the
+                // calendar doesn't have — Feb 30 was stored as Mar 2.
+                'date_format:Y-m-d',
+                'after_or_equal:'.self::MIN_DATE,
+                'before_or_equal:'.self::MAX_DATE,
                 // One target per date. Backed by a unique index; validated here
                 // so the user gets a message on the field instead of a 500.
                 Rule::unique('sales_targets', 'date')
@@ -164,6 +196,10 @@ class SalesTargetController extends Controller
             'teams.*.sales_target' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
             'teams.*.ad_budget' => ['nullable', 'numeric', 'min:0', 'max:9999999999999.99'],
         ], [
+            'date.required' => 'Pick a date for the target.',
+            'date.date_format' => 'Enter a real calendar date as YYYY-MM-DD.',
+            'date.after_or_equal' => 'Pick a date between 2000 and 2100.',
+            'date.before_or_equal' => 'Pick a date between 2000 and 2100.',
             'date.unique' => 'A sales target already exists for this date.',
             'teams.required' => 'Add at least one team to the target.',
             'teams.*.team_id.distinct' => 'Each team can only appear once.',

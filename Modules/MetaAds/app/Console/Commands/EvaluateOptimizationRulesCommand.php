@@ -22,7 +22,7 @@ class EvaluateOptimizationRulesCommand extends Command
 
         $rules = OptimizationRule::query()
             ->where('is_active', true)
-            ->with(['adAccounts', 'conditions'])
+            ->with(['adAccounts', 'conditions', 'pages'])
             // When two rules contest a target, the higher priority claims it;
             // ties fall back to the older rule for a deterministic result.
             ->orderByDesc('priority')
