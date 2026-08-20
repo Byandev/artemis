@@ -12,6 +12,66 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.31.0',
+        date: '2026-08-20',
+        sections: [
+            {
+                title: 'Billing — Invoices (New)',
+                items: [
+                    'Billing is now its own admin-toggled module: a workspace switched onto it gets an Invoices screen listing every invoice raised against it — number, who it is billed to, total, issue and due dates and status — searchable, sortable, and each one downloadable as a PDF, so the people actually being billed can pull their own copy rather than asking for one',
+                    'An invoice past its due date and still unpaid is marked overdue on that list instead of sitting quietly as “sent”, so the ones worth chasing are the ones that stand out',
+                    'Workspace Settings gains a Billing page holding the name, address and email invoices should be made out to — these prefill the bill-to fields when an admin raises an invoice, and anything left blank falls back to the workspace owner’s own account details',
+                    'Proof of payment can be filed against an invoice at the moment it is marked paid, in the same step rather than a second one that is easy to forget, and viewed or replaced from the admin invoice list afterwards',
+                    'Raising an invoice that already falls due today, or in three or five days’ time, emails the client straight away with the invoice attached, rather than waiting for the next morning’s run to catch it',
+                ],
+            },
+            {
+                title: 'Billing — Subscription Reminders',
+                items: [
+                    'Every workspace whose subscription ends in five days, three days, or today now gets an email each morning — a trial reminds against its trial end date and a paid subscription against its renewal date, and an account already past due is chased rather than left alone',
+                    'The reminder goes to the workspace’s billing email where one is set and to the owner’s address otherwise, and it names the plan and what it costs, so whoever reads it knows exactly what is about to renew',
+                    'A subscription’s billing period can now be set by hand when an admin edits it instead of always being worked out from the plan — leave either date blank and that side falls back to the plan’s own dates, and a period ending today runs through the end of the day rather than lapsing at midnight',
+                ],
+            },
+            {
+                title: 'Inventory — The Planning Report on the Items List (New)',
+                items: [
+                    'The Items list gains a Columns chooser and, behind it, the whole planning report: orders and units per day over three, seven and fourteen days, whether demand is rising or falling, stockout risk, when stock last came in and last went out, the last PO raised, what has been raised but not released to a supplier, the earliest expected delivery, the longest-waiting order, how many are delayed, and which stage is holding the group up',
+                    'Each of those headers explains what it counts, and your choice of columns is remembered in your own browser — so a screen set up for reordering stays that way without being imposed on everyone else',
+                    'The spreadsheet export carries every report column whether or not it is switched on, because a download is read away from the app and a column someone forgot to tick is one they cannot get back without asking for another file',
+                    'The list now shows every item the workspace holds and reads the day’s saved figures onto it, so an item added or synced since the last save appears straight away with dashes where its figures would be — previously it stayed invisible until the next overnight run, which made a fresh sync look like it had done nothing',
+                    'Those figures are now saved five times through the day rather than once at night, and each save recomputes demand from the order feed in the same pass, so the page can no longer show one run’s demand against the next run’s stock',
+                ],
+            },
+            {
+                title: 'Inventory — Purchase Orders & Shippable Stock',
+                items: [
+                    'Every purchase order now carries an expected delivery date — the one you enter, or two weeks from the issue date if you leave it blank, which is the standing agreement — so “is this late?” has one answer wherever it is asked rather than each screen inventing its own',
+                    'An item now names the stage actually holding it up — a PO never raised, an approval sitting too long, or stock a supplier has still not shipped — so a row asking you to buy stock also tells you who to chase',
+                    'The dashboard’s shippable-stock tile now counts everything that could leave today, matched per SKU because stock on one variant cannot ship an order placed against another, and it reads as plain reporting rather than an alarm — whether any of that stock has stalled is the warehouse card’s question, not this one',
+                ],
+            },
+            {
+                title: 'Meta Ads — Calendar, Reports & Rules',
+                items: [
+                    'The Ads Calendar can be grouped by page owner as well as by page, switched with a toggle, and the filter beside it follows whichever you are looking at — so “who launched what this week” is one click away from “which pages launched what this week”',
+                    'Ad reports gain date filters on the rows themselves — is on, before, after, or between two dates — each one seeded to the report’s own window rather than to today, so adding a filter narrows the report instead of blanking it and looking broken',
+                    'An optimization rule can now be narrowed to particular Facebook pages instead of applying to everything in the ad accounts it covers; leave the pages empty and the rule behaves exactly as it always has',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'SMS is now permission-controlled — SIMs, Send SMS and Outbox each have their own permission, and nobody but an owner sees them until a role has been granted them, so check your roles after this release if your team sends SMS',
+                    'A forgotten password can be reset from the sign-in screen: the link arrives by email, expires, and works only once, with a cap on how often one can be requested',
+                    'A row’s call badge on RMO Management now counts every call made against the order rather than only the current assignee’s, and the log names whoever actually placed each one — previously a reassigned order could read “0 calls” and then open onto a full history',
+                    'RMO rows now carry the upsell price and order details from Gencys, kept as they read at the time rather than following later edits to the source order',
+                    'Dashboard breakdowns can be read as a sortable table instead of bars, ordered by name or by the figure, showing the same rows either way',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.30.0',
         date: '2026-08-10',
         sections: [
