@@ -5,6 +5,7 @@ namespace Modules\Pancake\Actions;
 use App\Models\Page;
 use App\Models\Workspace;
 use Carbon\Carbon;
+use Modules\GencysERP\Support\RmoUpsellStamper;
 use Modules\Pancake\Models\Order;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\ParcelJourney;
@@ -17,6 +18,7 @@ readonly class SyncParcelTrackingAction
     public function __construct(
         private JourneyUpdateNormalizer $normalizer,
         private MessageRenderer $renderer,
+        private RmoUpsellStamper $upsellStamper,
     ) {}
 
     public function execute(Order $savedOrder, array $order, Page $page, Workspace $workspace): void
@@ -107,6 +109,16 @@ readonly class SyncParcelTrackingAction
                 $order_for_delivery->update([
                     'parcel_status' => $parcel_status,
                 ]);
+
+                // The RMO row exists now, so pull the Gencys upsell figures onto
+                // it in the same pass. Fetch-orders runs on a schedule and keeps
+                // re-touching this row while the parcel is out, so a row created
+                // before its Gencys order landed gets stamped on a later pass —
+                // no separate catch-up sweep needed. One indexed lookup, and only
+                // for a Gencys workspace row still missing a value.
+                if ($workspace->is_gencys_partner) {
+                    $this->upsellStamper->stampRow($order_for_delivery);
+                }
             }
 
             if ($this->isNotifiable($savedOrder, $journey) && $page->parcel_journey_enabled) {

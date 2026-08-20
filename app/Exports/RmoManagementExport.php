@@ -25,6 +25,9 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
         'location_rts' => 'Location RTS',
         'updated_status' => 'Updated Status',
         'csr' => 'CSR',
+        'upsell_date' => 'Upsell Date',
+        'upsell_price' => 'Upsell',
+        'order_details' => 'Order Details',
     ];
 
     private array $columns;
@@ -72,6 +75,9 @@ class RmoManagementExport implements FromQuery, WithHeadings, WithMapping
             'csr' => $this->preferPancakeAssignee
                 ? ($row->pancakeAssignee?->name ?? $row->assignee?->name)
                 : ($row->assignee?->name ?? $row->pancakeAssignee?->name),
+            'upsell_date' => $row->upsell_date,
+            'upsell_price' => $row->upsell_price,
+            'order_details' => $row->order_details,
         ];
 
         return array_map(fn ($key) => $allValues[$key] ?? null, $this->columns);

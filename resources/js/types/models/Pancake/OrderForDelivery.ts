@@ -125,6 +125,9 @@ export interface OrderForDelivery {
     rider_phone: string;
     customer_name: string | null;
     customer_phone: string | null;
+    upsell_date: string | null; // ISO date
+    upsell_price: string | null; // decimal(12,2)
+    order_details: string | null;
     customer_call_logs_count: number;
     rider_call_logs_count: number;
     customer_call_duration: number | null;
