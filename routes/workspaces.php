@@ -44,6 +44,7 @@ use App\Http\Controllers\Workspaces\WorkspaceMemberController;
 use App\Http\Controllers\Workspaces\WorkspaceSetupController;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Route;
+use Modules\Billing\Http\Controllers\InvoiceController as BillingInvoiceController;
 use Modules\Botcake\Http\Controllers\Web\FlowController;
 use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
@@ -482,7 +483,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/', [InventoryItemController::class, 'index'])->name('index');
         Route::get('/export', [InventoryItemController::class, 'export'])->name('export');
         Route::post('/', [InventoryItemController::class, 'store'])->name('store');
-        Route::post('/sync-gencys', [InventoryItemController::class, 'syncFromGencys'])->name('sync-gencys');
+        Route::post('/sync-erp', [InventoryItemController::class, 'syncFromErp'])->name('sync-erp');
         Route::post('/bulk-status', [InventoryItemController::class, 'bulkUpdateStatus'])->name('bulk-status');
         Route::post('/bulk-product', [InventoryItemController::class, 'bulkUpdateProduct'])->name('bulk-product');
         Route::post('/bulk-group', [InventoryItemController::class, 'bulkGroup'])->name('bulk-group');
@@ -638,6 +639,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/sims', [SmsController::class, 'sims'])->name('sims');
     });
 
+    // A workspace's own invoices — the admin list narrowed to one workspace.
+    Route::prefix('/workspaces/{workspace:slug}/billing')->name('workspaces.billing.')->group(function () {
+        Route::get('/invoices', [BillingInvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/invoices/{invoice}/download', [BillingInvoiceController::class, 'download'])
+            ->name('invoices.download');
+    });
+
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');
     Route::post('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'store'])->name('support.store');
     Route::patch('/workspaces/{workspace:slug}/support/{ticket}', [SupportTicketController::class, 'update'])->name('support.update');
@@ -690,6 +698,8 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('users.index');
         Route::post('/users/{user}/reset-password', [AdminUserController::class, 'generatePasswordReset'])
             ->name('users.reset-password');
+        Route::patch('/users/{user}/super-admin', [AdminUserController::class, 'updateSuperAdmin'])
+            ->name('users.update-super-admin');
 
         Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])
             ->name('support-tickets.index');
@@ -732,6 +742,14 @@ Route::middleware(['auth', 'verified', 'admin'])
             ->name('invoices.download');
         Route::patch('/invoices/{invoice}/status', [AdminInvoiceController::class, 'updateStatus'])
             ->name('invoices.update-status');
+
+        // Proof of payment — the receipt evidencing an invoice was settled.
+        Route::get('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'showProof'])
+            ->name('invoices.proof.show');
+        Route::post('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'storeProof'])
+            ->name('invoices.proof.store');
+        Route::delete('/invoices/{invoice}/proof', [AdminInvoiceController::class, 'destroyProof'])
+            ->name('invoices.proof.destroy');
         Route::delete('/invoices/{invoice}', [AdminInvoiceController::class, 'destroy'])
             ->name('invoices.destroy');
 

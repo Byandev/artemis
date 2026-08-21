@@ -1,16 +1,40 @@
 import PageHeader from '@/components/common/PageHeader';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
 import { toFrontendSort } from '@/lib/sort';
-import { PaginatedData, User } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { PaginatedData, SharedData, User } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import { omit } from 'lodash';
 import debounce from 'lodash/debounce';
-import { Check, Copy, Search } from 'lucide-react';
+import {
+    Check,
+    Copy,
+    MoreHorizontal,
+    Search,
+    ShieldCheck,
+    ShieldOff,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 
@@ -43,6 +67,46 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
     const [search, setSearch] = useState(filters?.search ?? '');
     const [copiedUserId, setCopiedUserId] = useState<number | null>(null);
     const [sendingUserId, setSendingUserId] = useState<number | null>(null);
+
+    const currentUser = usePage<SharedData>().props.auth.user;
+    // The row awaiting confirmation, and which way its role is about to go.
+    const [pendingRole, setPendingRole] = useState<{
+        user: AdminUser;
+        grant: boolean;
+    } | null>(null);
+    const [savingRoleFor, setSavingRoleFor] = useState<number | null>(null);
+
+    const applyRoleChange = () => {
+        if (!pendingRole) return;
+
+        const { user, grant } = pendingRole;
+        setSavingRoleFor(user.id);
+
+        router.patch(
+            `/admin/users/${user.id}/super-admin`,
+            { is_super_admin: grant },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () =>
+                    toast.success(
+                        grant
+                            ? `${user.name} is now a Super Admin.`
+                            : `Super Admin access removed from ${user.name}.`,
+                    ),
+                // The self-demotion and last-admin guards come back as
+                // validation errors, so they land here with their own wording.
+                onError: (errors) =>
+                    toast.error(
+                        errors.is_super_admin ?? 'Could not change that role.',
+                    ),
+                onFinish: () => {
+                    setSavingRoleFor(null);
+                    setPendingRole(null);
+                },
+            },
+        );
+    };
 
     const fetchUsers = useCallback(
         (overrides: Record<string, string | number | undefined> = {}) => {
@@ -178,37 +242,85 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
             id: 'actions',
             header: () => (
                 <p className="text-right font-mono text-[10px] font-medium tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Reset password
+                    Actions
                 </p>
             ),
             cell: ({ row }) => {
                 const user = row.original;
                 const copied = copiedUserId === user.id;
+                const isSelf = user.id === currentUser?.id;
 
                 return (
                     <div className="flex justify-end">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8"
-                            disabled={sendingUserId === user.id}
-                            onClick={() => copyResetPasswordUrl(user)}
-                        >
-                            {copied ? (
-                                <>
-                                    <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-600" />
-                                    Copied
-                                </>
-                            ) : (
-                                <>
-                                    <Copy className="mr-1.5 h-3.5 w-3.5" />
-                                    {sendingUserId === user.id
-                                        ? 'Generating...'
-                                        : 'Copy reset link'}
-                                </>
-                            )}
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    disabled={savingRoleFor === user.id}
+                                >
+                                    <span className="sr-only">
+                                        Actions for {user.name}
+                                    </span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                    disabled={sendingUserId === user.id}
+                                    onSelect={() => copyResetPasswordUrl(user)}
+                                >
+                                    {copied ? (
+                                        <Check className="text-emerald-600" />
+                                    ) : (
+                                        <Copy />
+                                    )}
+                                    {copied
+                                        ? 'Copied'
+                                        : sendingUserId === user.id
+                                          ? 'Generating...'
+                                          : 'Copy reset link'}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {user.is_super_admin ? (
+                                    <DropdownMenuItem
+                                        variant="destructive"
+                                        // Demoting yourself locks you out of
+                                        // /admin, so the server refuses it and
+                                        // the menu says so first.
+                                        disabled={isSelf}
+                                        title={
+                                            isSelf
+                                                ? 'You cannot remove your own Super Admin access'
+                                                : undefined
+                                        }
+                                        onSelect={() =>
+                                            setPendingRole({
+                                                user,
+                                                grant: false,
+                                            })
+                                        }
+                                    >
+                                        <ShieldOff />
+                                        Remove Super Admin
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem
+                                        onSelect={() =>
+                                            setPendingRole({
+                                                user,
+                                                grant: true,
+                                            })
+                                        }
+                                    >
+                                        <ShieldCheck />
+                                        Make Super Admin
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 );
             },
@@ -263,6 +375,44 @@ export default function AdminUsersIndex({ users, filters, query }: Props) {
                     />
                 </div>
             </div>
+
+            <AlertDialog
+                open={!!pendingRole}
+                onOpenChange={(open) => {
+                    if (!open) setPendingRole(null);
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {pendingRole?.grant
+                                ? `Make ${pendingRole?.user.name} a Super Admin?`
+                                : `Remove Super Admin from ${pendingRole?.user.name}?`}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingRole?.grant
+                                ? 'Super Admins can reach every workspace and the whole admin area, including billing, users and activity logs. Only grant this to people who should see all of it.'
+                                : 'They keep their workspace memberships, but lose the admin area and their access to workspaces they are not a member of.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(event) => {
+                                // Kept open until the request settles, so the
+                                // dialog can't close over a failed change.
+                                event.preventDefault();
+                                applyRoleChange();
+                            }}
+                            disabled={savingRoleFor !== null}
+                        >
+                            {pendingRole?.grant
+                                ? 'Make Super Admin'
+                                : 'Remove access'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AdminSidebarLayout>
     );
 }

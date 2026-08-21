@@ -399,10 +399,23 @@ class OptimizationRuleEvaluator
 
     private function resolveTargets(OptimizationRule $rule, AdAccount $adAccount): Collection
     {
+        // Empty page list = every page, which is how rules behaved before they
+        // could be narrowed.
+        $pageIds = $rule->pages->pluck('id')->all();
+
         if ($rule->target_type === 'campaign') {
-            return $adAccount->campaigns()->get();
+            return $adAccount->campaigns()
+                // A campaign has no page of its own — it counts as being on a
+                // page when any of its ad sets promotes that page.
+                ->when($pageIds, fn ($q) => $q->whereHas(
+                    'adSets',
+                    fn ($sets) => $sets->whereIn('meta_page_id', $pageIds),
+                ))
+                ->get();
         }
 
-        return $adAccount->adSets()->get();
+        return $adAccount->adSets()
+            ->when($pageIds, fn ($q) => $q->whereIn('meta_page_id', $pageIds))
+            ->get();
     }
 }

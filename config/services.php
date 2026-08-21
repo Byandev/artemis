@@ -28,6 +28,12 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    'brevo' => [
+        'key' => env('BREVO_API_KEY'),
+        'endpoint' => env('BREVO_ENDPOINT', 'https://api.brevo.com/v3/smtp/email'),
+        'timeout' => env('BREVO_TIMEOUT', 15),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
@@ -40,6 +46,7 @@ return [
         'purchase_order_webhook_url' => env('N8N_PURCHASE_ORDER_WEBHOOK_URL'),
         'transaction_history_webhook_url' => env('N8N_TRANSACTION_HISTORY_WEBHOOK_URL'),
         'inventory_unit_code_webhook_url' => env('N8N_INVENTORY_UNIT_CODE_WEBHOOK_URL'),
+        'gencys_inventory_items_webhook_url' => env('N8N_GENCYS_INVENTORY_ITEMS_WEBHOOK_URL'),
         'gencys_daily_sales_webhook_url' => env('N8N_GENCYS_DAILY_SALES_WEBHOOK_URL'),
         'gencys_interns_webhook_url' => env('N8N_GENCYS_INTERNS_WEBHOOK_URL'),
         'gencys_intern_daily_records_webhook_url' => env('N8N_GENCYS_INTERN_DAILY_RECORDS_WEBHOOK_URL'),

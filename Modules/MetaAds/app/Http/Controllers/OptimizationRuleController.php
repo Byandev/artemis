@@ -3,6 +3,7 @@
 namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Page;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
 use Illuminate\Http\RedirectResponse;
@@ -95,13 +96,18 @@ class OptimizationRuleController extends Controller
 
         $this->authorizeRule($workspace, $optimizationRule);
 
-        $optimizationRule->load(['conditions', 'adAccounts:id,name']);
+        $optimizationRule->load(['conditions', 'adAccounts:id,name', 'pages:id,name']);
 
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/edit', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'rule' => $optimizationRule,
             // String ids so large Meta account ids stay precise in JSON.
             'selectedAdAccountIds' => $optimizationRule->adAccounts
+                ->pluck('id')
+                ->map(fn ($id) => (string) $id)
+                ->values(),
+            // Empty means the rule is not narrowed to any page.
+            'selectedPageIds' => $optimizationRule->pages
                 ->pluck('id')
                 ->map(fn ($id) => (string) $id)
                 ->values(),
@@ -476,6 +482,7 @@ class OptimizationRuleController extends Controller
 
         $rule = OptimizationRule::create($this->ruleAttributes($data, $workspace));
         $rule->adAccounts()->sync($data['meta_ads_account_ids']);
+        $rule->pages()->sync($data['meta_ads_page_ids'] ?? []);
         $this->replaceConditions($rule, $data['conditions']);
 
         return redirect()
@@ -491,6 +498,7 @@ class OptimizationRuleController extends Controller
 
         $optimizationRule->update($this->ruleAttributes($data, $workspace));
         $optimizationRule->adAccounts()->sync($data['meta_ads_account_ids']);
+        $optimizationRule->pages()->sync($data['meta_ads_page_ids'] ?? []);
         $this->replaceConditions($optimizationRule, $data['conditions']);
 
         return redirect()
@@ -626,6 +634,16 @@ class OptimizationRuleController extends Controller
                     'name' => $account->name,
                 ])
                 ->values(),
+            'pages' => Page::query()
+                ->where('workspace_id', $workspace->id)
+                ->visibleTo(request()->user(), $workspace)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Page $page) => [
+                    'id' => (string) $page->id,
+                    'name' => $page->name ?: 'Untitled page',
+                ])
+                ->values(),
             'metrics' => self::METRICS,
             'operators' => self::OPERATORS,
             'timeWindows' => self::TIME_WINDOWS,
@@ -652,10 +670,21 @@ class OptimizationRuleController extends Controller
             ->map(fn ($id) => (string) $id)
             ->all();
 
+        $workspacePageIds = Page::query()
+            ->where('workspace_id', $workspace->id)
+            ->visibleTo($request->user(), $workspace)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'meta_ads_account_ids' => ['required', 'array', 'min:1'],
             'meta_ads_account_ids.*' => [Rule::in($workspaceAccountIds)],
+            // Optional: no pages selected = every page, matching how rules
+            // behaved before they could be narrowed.
+            'meta_ads_page_ids' => ['sometimes', 'array'],
+            'meta_ads_page_ids.*' => [Rule::in($workspacePageIds)],
             'target_type' => ['required', Rule::in(['campaign', 'ad_set'])],
             'condition_operator' => ['required', Rule::in(['and', 'or'])],
             'action' => ['required', Rule::in(self::ACTIONS)],

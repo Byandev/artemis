@@ -29,7 +29,7 @@ class SnapshotReadiness
      * Zero means today only.
      */
     private const REQUIRED = [
-        GencysSyncRun::TYPE_DAILY_SALES_TRACKER => 3,
+//        GencysSyncRun::TYPE_DAILY_SALES_TRACKER => 3,
         GencysSyncRun::TYPE_TRANSACTION_HISTORY => 0,
         GencysSyncRun::TYPE_PURCHASE_ORDER => 0,
     ];

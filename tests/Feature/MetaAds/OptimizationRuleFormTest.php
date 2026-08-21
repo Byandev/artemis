@@ -30,6 +30,8 @@ it('rejects the automatic execution mode on save while it is disabled', function
         'action' => 'pause',
         'is_active' => true,
         'priority' => 0,
+        // Required since rules became scheduled.
+        'frequency' => 'hourly',
         'conditions' => [['metric' => 'roas', 'operator' => '<', 'value' => 3, 'time_window' => 'today']],
     ];
 

@@ -222,7 +222,6 @@ function CallLogModal({
 }) {
     const [logs, setLogs] = useState<CallLog[]>([]);
     const [loading, setLoading] = useState(false);
-    const csrName = localStorage.getItem('user_name') ?? 'CSR';
 
     useEffect(() => {
         if (!open || !phoneNumber) return;
@@ -291,7 +290,7 @@ function CallLogModal({
                                             </span>
                                         </td>
                                         <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
-                                            {csrName}
+                                            {log.called_by ?? '—'}
                                         </td>
                                         <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
                                             {formatDuration(log.duration)}
@@ -998,6 +997,21 @@ function RmoManagement({
                 cell: ({ row }) => {
                     const items = row.original.order.items ?? [];
                     const trackingCode = row.original.order.tracking_code;
+                    // `upsell_price` is a decimal column, so it arrives as a
+                    // string over the wire. Gencys sends "0.00" for an order
+                    // that was never upsold, so compare on the number.
+                    const upsellPrice = Number(row.original.upsell_price ?? 0);
+                    const hasUpsell = upsellPrice > 0;
+                    // Once an order has been upsold, the Pancake items are the
+                    // line-up as originally confirmed. Gencys' order details are
+                    // what actually went out, as a comma-separated list.
+                    const upsoldItems =
+                        hasUpsell && row.original.order_details
+                            ? row.original.order_details
+                                  .split(',')
+                                  .map((item) => item.trim())
+                                  .filter(Boolean)
+                            : null;
                     const key = (
                         row.original.parcel_status ??
                         row.original.order.parcel_status ??
@@ -1009,19 +1023,26 @@ function RmoManagement({
                     return (
                         <div className="space-y-1.5">
                             <div className="space-y-0.5">
-                                {items.map((item, i) => (
-                                    <p
-                                        key={i}
-                                        className="text-[12px] leading-snug font-medium text-gray-800 dark:text-gray-200"
-                                    >
-                                        {item.name}
-                                    </p>
-                                ))}
+                                {(upsoldItems ?? items.map((i) => i.name)).map(
+                                    (name, i) => (
+                                        <p
+                                            key={i}
+                                            className="text-[12px] leading-snug font-medium text-gray-800 dark:text-gray-200"
+                                        >
+                                            {name}
+                                        </p>
+                                    ),
+                                )}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="space-y-0.5">
                                 {trackingCode && (
-                                    <span className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                    <span className="block font-mono text-[11px] text-gray-400 dark:text-gray-500">
                                         {trackingCode}
+                                    </span>
+                                )}
+                                {hasUpsell && (
+                                    <span className="block font-mono text-[11px] font-medium text-emerald-600 tabular-nums dark:text-emerald-400">
+                                        Upsell {currencyFormatter(upsellPrice)}
                                     </span>
                                 )}
                             </div>
