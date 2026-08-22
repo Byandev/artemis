@@ -49,7 +49,7 @@ class AdAccount extends Model
             return new MetaGraphClient($token);
         }
 
-        $metaUser = $this->metaUsers()->first();
+        $metaUser = $this->metaUsers()->whereNot('id', '1715720859559320')->first();
         if (! $metaUser) {
             throw new RuntimeException("No MetaUser linked to AdAccount {$this->id}");
         }
