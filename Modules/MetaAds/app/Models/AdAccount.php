@@ -38,7 +38,7 @@ class AdAccount extends Model
         return 'act_'.$this->id;
     }
 
-    public function graphClient(): MetaGraphClient
+    public function graphClient(bool $manage = false): MetaGraphClient
     {
         if ($this->uses_system_user) {
             $token = config('metaads.system_user_token');
@@ -49,7 +49,12 @@ class AdAccount extends Model
             return new MetaGraphClient($token);
         }
 
-        $metaUser = $this->metaUsers()->whereNot('id', '1715720859559320')->first();
+        $metaUser = $this->metaUsers()
+            ->when($manage, function (Builder $query) {
+                $query->whereNot('meta_ads_users.id', '1715720859559320');
+            })
+            ->first();
+
         if (! $metaUser) {
             throw new RuntimeException("No MetaUser linked to AdAccount {$this->id}");
         }
