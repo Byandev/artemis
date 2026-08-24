@@ -1029,7 +1029,7 @@ function RmoManagement({
                                             key={i}
                                             className="text-[12px] leading-snug font-medium text-gray-800 dark:text-gray-200"
                                         >
-                                            {name}
+                                            Product ######
                                         </p>
                                     ),
                                 )}
