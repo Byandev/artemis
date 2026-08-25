@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\BatchRunner;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
@@ -59,7 +60,7 @@ class PurchaseOrderController extends Controller
      * to the entry's item. Deliveries and status logs are replaced wholesale each
      * sync. Items not owned by the authenticated workspace are skipped.
      */
-    public function bulkSync(Request $request): JsonResponse
+    public function bulkSync(Request $request, BatchRunner $runner): JsonResponse
     {
         $workspace = $request->attributes->get('workspace');
 
@@ -92,6 +93,10 @@ class PurchaseOrderController extends Controller
                 ];
             }
         });
+
+        // Every run this callback covered is now resolved, so whichever batch
+        // they belonged to can send its next group.
+        $runner->tick();
 
         return response()->json(['data' => $results]);
     }

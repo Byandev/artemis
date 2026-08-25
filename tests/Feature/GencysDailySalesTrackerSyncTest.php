@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Http;
-use Modules\GencysERP\Jobs\FetchDailySalesTrackerJob;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
 
 /** One daily sales tracker row as n8n scrapes it. */
@@ -20,7 +20,7 @@ function dailySalesRow(int $id, string $orderNo = 'ORD-1'): array
     ];
 }
 
-test('the trigger command opens a pending run per workspace and date', function () {
+test('the trigger command queues a batch with a run per workspace and date, and sends only the first', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     makeApiKey($workspace);
     $workspace->update(['erp_username' => 'erp-user', 'erp_password' => 'erp-pass']);
@@ -34,13 +34,24 @@ test('the trigger command opens a pending run per workspace and date', function 
         '--end-date' => '2026-06-28',
     ])->assertSuccessful();
 
-    $runs = GencysSyncRun::where('sync_type', GencysSyncRun::TYPE_DAILY_SALES_TRACKER)->get();
+    $runs = GencysSyncRun::where('sync_type', GencysSyncRun::TYPE_DAILY_SALES_TRACKER)
+        ->orderBy('id')
+        ->get();
+
+    $batch = GencysSyncBatch::sole();
 
     expect($runs)->toHaveCount(2)
-        ->and($runs->pluck('status')->unique()->all())->toBe([GencysSyncRun::STATUS_PENDING])
-        ->and($runs->pluck('meta.date')->all())->toBe(['06/27/2026', '06/28/2026']);
+        ->and($runs->pluck('meta.date')->all())->toBe(['06/27/2026', '06/28/2026'])
+        ->and($runs->pluck('gencys_sync_batch_id')->unique()->all())->toBe([$batch->id])
+        ->and($batch->status)->toBe(GencysSyncBatch::STATUS_RUNNING);
 
-    // Each run's id rides along in the payload for n8n to echo back.
+    // n8n takes one date per call, so only the first date is in flight — the
+    // second waits for its callback.
+    expect($runs->first()->status)->toBe(GencysSyncRun::STATUS_PENDING)
+        ->and($runs->last()->status)->toBe(GencysSyncRun::STATUS_QUEUED);
+
+    // The in-flight run's id rides along in the payload for n8n to echo back.
+    Http::assertSentCount(1);
     Http::assertSent(fn ($request) => $request['sync_run_id'] === $runs->first()->id
         && $request['date'] === '06/27/2026');
 });
@@ -110,21 +121,4 @@ test('a daily sales callback without a sync_run_id still saves the orders', func
 
     expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING)
         ->and(GencysDailySalesOrder::count())->toBe(1);
-});
-
-test('the daily sales job fails its pending run when the n8n handshake fails', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    Http::fake(['*' => Http::response('error', 500)]);
-
-    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_DAILY_SALES_TRACKER, ['date' => '06/28/2026']);
-
-    (new FetchDailySalesTrackerJob(
-        'https://n8n.test/webhook',
-        ['workspace_id' => $workspace->id, 'date' => '06/28/2026'],
-        [$run->id],
-    ))->handle();
-
-    expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_FAILED)
-        ->and($run->fresh()->message)->toContain('HTTP 500');
 });

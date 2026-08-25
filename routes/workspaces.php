@@ -61,6 +61,7 @@ use Modules\Finance\Http\Controllers\UserIncomeStatementController as FinanceUse
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\InternController as GencysInternController;
 use Modules\GencysERP\Http\Controllers\Web\PageController as GencysPageController;
+use Modules\GencysERP\Http\Controllers\Web\SyncBatchController as GencysSyncBatchController;
 use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
 use Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
@@ -499,6 +500,27 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/inventory/sync-health', [GencysSyncHealthController::class, 'index'])
         ->middleware('can:View Inventory Items,workspace')
         ->name('workspaces.inventory.sync-health');
+
+    // The ERP sync queue: batches waiting for, holding, or done with the ERP.
+    // Raising or cancelling one changes what the ERP is asked for, so those are
+    // gated on edit rather than view.
+    Route::prefix('/workspaces/{workspace}/inventory/sync-batches')->name('workspaces.inventory.sync-batches.')->group(function () {
+        Route::get('/', [GencysSyncBatchController::class, 'index'])
+            ->middleware('can:View Inventory Items,workspace')
+            ->name('index');
+
+        Route::get('/{batch}', [GencysSyncBatchController::class, 'show'])
+            ->middleware('can:View Inventory Items,workspace')
+            ->name('show');
+
+        Route::post('/', [GencysSyncBatchController::class, 'store'])
+            ->middleware('can:Edit Inventory Items,workspace')
+            ->name('store');
+
+        Route::post('/{batch}/cancel', [GencysSyncBatchController::class, 'cancel'])
+            ->middleware('can:Edit Inventory Items,workspace')
+            ->name('cancel');
+    });
 
     Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');

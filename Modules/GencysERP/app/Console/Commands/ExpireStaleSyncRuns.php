@@ -24,6 +24,10 @@ class ExpireStaleSyncRuns extends Command
 
         $stale = GencysSyncRun::query()
             ->pending()
+            // Runs inside a batch have their own, much tighter timeout and their
+            // own retry policy — sweeping them here would fail runs the batch is
+            // legitimately still waiting on. See BatchRunner::expireTimedOutRuns().
+            ->whereNull('gencys_sync_batch_id')
             ->where('started_at', '<', now()->subHours($hours))
             ->get();
 

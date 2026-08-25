@@ -417,6 +417,12 @@ export function AppSidebar() {
                               icon: Activity,
                               permission: PERMISSIONS.ViewInventoryItems,
                           },
+                          {
+                              title: 'Sync Batches',
+                              href: `/workspaces/${slug}/inventory/sync-batches`,
+                              icon: Layers,
+                              permission: PERMISSIONS.ViewInventoryItems,
+                          },
                       ],
                   },
               ]

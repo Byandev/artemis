@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\BatchRunner;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 
@@ -18,7 +19,7 @@ class TransactionHistoryController extends Controller
      * `id` is the inventory item id and `sync_run_id` is the run we opened on
      * dispatch and n8n echoes back so we can mark it done.
      */
-    public function bulkSync(Request $request): JsonResponse
+    public function bulkSync(Request $request, BatchRunner $runner): JsonResponse
     {
         $workspace = $request->attributes->get('workspace');
 
@@ -62,6 +63,10 @@ class TransactionHistoryController extends Controller
                 'status' => 'synced',
             ];
         }
+
+        // Every run this callback covered is now resolved, so whichever batch
+        // they belonged to can send its next group.
+        $runner->tick();
 
         return response()->json(['data' => $results]);
     }

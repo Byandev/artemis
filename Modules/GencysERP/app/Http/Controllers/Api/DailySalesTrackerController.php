@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\BatchRunner;
 
 /**
  * Receives the daily sales tracker rows that the n8n flow scrapes from Gencys
@@ -27,7 +28,7 @@ use Modules\GencysERP\Models\GencysSyncRun;
  */
 class DailySalesTrackerController extends Controller
 {
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, BatchRunner $runner): JsonResponse
     {
         // Inspect exactly what n8n sends. Remove once the flow is verified.
         Log::info('Gencys daily sales tracker request', [
@@ -139,6 +140,10 @@ class DailySalesTrackerController extends Controller
                 $entrySaved,
             );
         }
+
+        // Every run this callback covered is now resolved, so whichever batch
+        // they belonged to can send its next group.
+        $runner->tick();
 
         return response()->json([
             'created' => $created,

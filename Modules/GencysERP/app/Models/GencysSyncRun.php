@@ -10,21 +10,33 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Inventory\Models\InventoryItem;
 
 /**
- * One attempt to sync a single inventory item from Gencys ERP. Created as
- * `pending` when the sync is dispatched, then flipped to `success` when n8n
- * posts the data back (matched by the run id it echoes), to `failed` if the
- * outbound webhook handshake fails, or to `failed` by the stale-run sweeper
- * when no callback ever arrives.
+ * One attempt to sync a single subject — an inventory item, an intern, a page, a
+ * date — from Gencys ERP.
+ *
+ * Runs belonging to a batch start `queued` and are flipped to `pending` when the
+ * batch actually sends them to n8n. Runs dispatched outside a batch (the legacy
+ * fire-and-forget path) go straight to `pending`. Either way `pending` means the
+ * request is out and we're waiting on the callback: n8n posting the data back
+ * flips it to `success`, a failed handshake or an expired timeout flips it to
+ * `failed` — or back to `queued` for another attempt while the batch still has
+ * retries left for it.
  */
 class GencysSyncRun extends Model
 {
     use ScopesToVisibleTeams;
 
+    /** In a batch, waiting its turn. Not yet sent to n8n. */
+    public const STATUS_QUEUED = 'queued';
+
+    /** Sent to n8n, waiting on the callback. */
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_SUCCESS = 'success';
 
     public const STATUS_FAILED = 'failed';
+
+    /** Its batch was cancelled before the run was ever sent. */
+    public const STATUS_CANCELLED = 'cancelled';
 
     public const TYPE_TRANSACTION_HISTORY = 'transaction_history';
 
@@ -42,10 +54,13 @@ class GencysSyncRun extends Model
 
     protected $casts = [
         'started_at' => 'datetime',
+        'sent_at' => 'datetime',
+        'timeout_at' => 'datetime',
         'finished_at' => 'datetime',
         'meta' => 'array',
         'rows_received' => 'integer',
         'rows_saved' => 'integer',
+        'attempt' => 'integer',
     ];
 
     /** Team visibility flows through the run's inventory item. */
@@ -59,6 +74,11 @@ class GencysSyncRun extends Model
         return $this->belongsTo(Workspace::class);
     }
 
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(GencysSyncBatch::class, 'gencys_sync_batch_id');
+    }
+
     public function inventoryItem(): BelongsTo
     {
         return $this->belongsTo(InventoryItem::class);
@@ -67,6 +87,9 @@ class GencysSyncRun extends Model
     /**
      * Open a pending run for one sync type. $inventoryItemId is the subject for
      * inventory syncs; intern syncs pass null and keep the intern id in $meta.
+     *
+     * This is the un-batched path: the run is pending the moment it's created
+     * because the caller sends it to n8n immediately.
      */
     public static function start(int $workspaceId, ?int $inventoryItemId, string $syncType, array $meta = []): self
     {
@@ -76,13 +99,38 @@ class GencysSyncRun extends Model
             'sync_type' => $syncType,
             'status' => self::STATUS_PENDING,
             'started_at' => now(),
+            'sent_at' => now(),
+            'meta' => $meta ?: null,
+        ]);
+    }
+
+    /**
+     * Open a queued run belonging to a batch. Nothing is sent yet — the batch
+     * decides when this run's group goes out.
+     */
+    public static function queue(
+        GencysSyncBatch $batch,
+        int $workspaceId,
+        ?int $inventoryItemId,
+        string $syncType,
+        string $groupKey,
+        array $meta = [],
+    ): self {
+        return self::create([
+            'workspace_id' => $workspaceId,
+            'gencys_sync_batch_id' => $batch->id,
+            'inventory_item_id' => $inventoryItemId,
+            'sync_type' => $syncType,
+            'group_key' => $groupKey,
+            'status' => self::STATUS_QUEUED,
+            'started_at' => now(),
             'meta' => $meta ?: null,
         ]);
     }
 
     /**
      * Mark the run n8n echoed back as succeeded. A missing or unknown id is a
-     * no-op — the run stays pending and the stale sweeper handles it.
+     * no-op — the run stays pending and the batch's timeout handles it.
      *
      * A success also clears the earlier runs that asked for exactly the same
      * thing — see resolveEarlierRunsWithSameParameters().
@@ -110,30 +158,39 @@ class GencysSyncRun extends Model
         ])->save();
 
         $run->resolveEarlierRunsWithSameParameters();
+
+        // Deliberately no BatchRunner::tick() here: a bulk callback resolves many
+        // runs in one request and the batch can't move until the last of them
+        // lands, so the controllers tick once when they're done rather than once
+        // per item.
     }
 
     /**
      * Flip earlier pending/failed runs that asked the ERP for exactly the same
      * thing to success.
      *
-     * Retries and the thrice-daily schedule mean the same item/date is fetched
-     * again and again. Once one of those attempts comes back, the data those
-     * earlier attempts were waiting on is in the database — a run left pending
-     * (no callback) or failed (n8n handshake, stale sweeper) is stale bookkeeping,
-     * not a data gap, so it's resolved rather than left glaring on Sync Health.
+     * Retries and the several-times-daily schedule mean the same item/date is
+     * fetched again and again. Once one of those attempts comes back, the data
+     * those earlier attempts were waiting on is in the database — a run left
+     * pending (no callback) or failed (n8n handshake, timeout) is stale
+     * bookkeeping, not a data gap, so it's resolved rather than left glaring on
+     * Sync Health.
      *
      * "Same thing" is same workspace + sync type + inventory item + identical
      * meta (the parameters we sent n8n: date, date range, intern id, page id).
      * Only lower ids are touched — a run opened after this one is a separate,
-     * still-outstanding attempt.
+     * still-outstanding attempt. Queued runs are left alone: they haven't been
+     * sent, so they're future work, not stale bookkeeping.
      *
-     * Returns the number of runs resolved.
+     * Returns the batch ids of the runs it resolved.
+     *
+     * @return array<int, int>
      */
-    public function resolveEarlierRunsWithSameParameters(): int
+    public function resolveEarlierRunsWithSameParameters(): array
     {
         $signature = self::parameterSignature($this->meta);
 
-        $resolved = 0;
+        $batchIds = [];
 
         self::query()
             ->where('workspace_id', $this->workspace_id)
@@ -146,7 +203,7 @@ class GencysSyncRun extends Model
             ->whereIn('status', [self::STATUS_PENDING, self::STATUS_FAILED])
             ->where('id', '<', $this->id)
             ->get()
-            ->each(function (self $earlier) use ($signature, &$resolved) {
+            ->each(function (self $earlier) use ($signature, &$batchIds) {
                 if (self::parameterSignature($earlier->meta) !== $signature) {
                     return;
                 }
@@ -157,13 +214,14 @@ class GencysSyncRun extends Model
                     'rows_received' => $this->rows_received,
                     'rows_saved' => $this->rows_saved,
                     'finished_at' => now(),
+                    'timeout_at' => null,
                     'message' => "Resolved by sync run #{$this->id}, which fetched the same data.",
                 ])->save();
 
-                $resolved++;
+                $batchIds[] = $earlier->gencys_sync_batch_id;
             });
 
-        return $resolved;
+        return array_values(array_unique(array_filter($batchIds)));
     }
 
     /**
@@ -187,13 +245,65 @@ class GencysSyncRun extends Model
         return json_encode($normalise($meta ?? []));
     }
 
+    /** Record that this run has gone out to n8n and start its callback clock. */
+    public function markSent(int $timeoutSeconds): void
+    {
+        $this->forceFill([
+            'status' => self::STATUS_PENDING,
+            'sent_at' => now(),
+            'timeout_at' => now()->addSeconds($timeoutSeconds),
+        ])->save();
+    }
+
+    /**
+     * Put the run back in its batch's queue for another attempt. Retries go out
+     * on their own rather than back into a group, so one bad subject can't keep
+     * taking its neighbours down with it.
+     */
+    public function requeueForRetry(string $message): void
+    {
+        $this->forceFill([
+            'status' => self::STATUS_QUEUED,
+            'attempt' => $this->attempt + 1,
+            'sent_at' => null,
+            'timeout_at' => null,
+            'message' => $message,
+        ])->save();
+    }
+
     public function fail(string $message): void
     {
         $this->forceFill([
             'status' => self::STATUS_FAILED,
             'finished_at' => now(),
+            'timeout_at' => null,
             'message' => $message,
         ])->save();
+    }
+
+    public function cancel(string $message): void
+    {
+        $this->forceFill([
+            'status' => self::STATUS_CANCELLED,
+            'finished_at' => now(),
+            'timeout_at' => null,
+            'message' => $message,
+        ])->save();
+    }
+
+    /** True once the run has an outcome and the batch can stop waiting on it. */
+    public function isFinished(): bool
+    {
+        return in_array($this->status, [
+            self::STATUS_SUCCESS,
+            self::STATUS_FAILED,
+            self::STATUS_CANCELLED,
+        ], true);
+    }
+
+    public function scopeQueued(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_QUEUED);
     }
 
     public function scopePending(Builder $query): Builder
