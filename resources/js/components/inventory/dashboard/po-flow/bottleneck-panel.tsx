@@ -21,7 +21,7 @@ function verdict(data: BottleneckData): { headline: string; why: string } {
                 ? `Stock is being ordered, then held in your own approval and payment queues. ${num(data.internal_units)} units have not been paid for.`
                 : only.key === 'supplier'
                   ? `Orders are leaving the office and then stalling. ${num(data.supplier_units)} units are with suppliers, and too much of it is past the delivery target.`
-                  : `Goods are on the shelf with orders waiting on them — ${num(only.value)} units could have shipped days ago.`;
+                  : `Goods arrived and went nowhere — ${num(only.value)} units landed with orders already waiting, and nothing has shipped since.`;
 
         return { headline: only.name, why };
     }
@@ -91,10 +91,28 @@ const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
     ),
     warehouse: (
         <>
-            <b>Stock physically here with an unfulfilled order against it.</b>{' '}
-            The headline counts only what has been sittable more than three days
-            — <b>could ship today</b> is the full figure including the normal
-            picking queue.
+            <b>
+                Stock that arrived after the last thing shipped, with orders
+                already waiting on it.
+            </b>{' '}
+            The clearest case there is, and the one that needs no threshold:
+            goods landed, demand was sitting there, and nothing has gone out
+            since. Counted per SKU, because stock on one variant cannot ship an
+            order placed against another.
+            <br />
+            <br />
+            <b>Measured against the ledger, not against today.</b> The clock
+            stops at the last date the transaction feed reaches, because that
+            feed routinely lands a few days late — counted from today, a feed
+            that paused on Friday would report the entire warehouse as idle
+            since Friday. Against the ledger&rsquo;s own last day, a SKU only
+            appears here if nothing left it while the rest of the warehouse kept
+            shipping.
+            <br />
+            <br />
+            <b>Not moving</b> is the wider figure: shippable stock that has gone
+            past the target above without a despatch, whether or not anything
+            new arrived.
             <br />
             <br />
             <b>No stock to give</b> is the other half of unfulfilled demand:
@@ -102,10 +120,10 @@ const OWNER_HELP: Record<FlowOwner['key'], React.ReactNode> = {
             above is blocked rather than to the warehouse.
             <br />
             <br />
-            Goes red above 15% of unmet demand. One caveat: this is a snapshot,
-            not a stopwatch — a high number can also mean the unfulfilled counts
-            are stale rather than that nothing is being picked. Worth spot-
-            checking a couple of SKUs before anyone is blamed.
+            Goes red when more than a quarter of shippable stock arrived and
+            stayed put. One caveat: a despatch only counts once the ERP writes
+            it, so a SKU picked today but not yet posted still reads as idle.
+            Worth spot-checking a couple of SKUs before anyone is blamed.
         </>
     ),
 };
@@ -192,10 +210,10 @@ export default function BottleneckPanel({ slug }: { slug: string }) {
                             have released to them? Blocked when more than 40% of
                             in-transit stock is past the delivery target.
                             <br />
-                            <b>Warehouse</b> — is stock sitting here that an
-                            unfulfilled order could already take? Blocked when
-                            more than 15% of unmet demand has stock on the shelf
-                            behind it.
+                            <b>Warehouse</b> — is stock sitting here that should
+                            already have shipped? Blocked when more than a
+                            quarter of shippable stock arrived after the last
+                            despatch and has not moved since.
                             <br />
                             <br />
                             Each is scored on its own evidence, so clearing one

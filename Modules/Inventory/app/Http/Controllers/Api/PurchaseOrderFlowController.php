@@ -15,6 +15,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Support\InventoryStockColumns;
+use Modules\Inventory\Support\SnapshotItemScope;
 
 /**
  * The purchase-order flow panels: where ordered stock is sitting, how long it
@@ -58,6 +59,18 @@ class PurchaseOrderFlowController extends Controller
      * normal picking queue, not a backlog — every warehouse has one in flight.
      */
     private const PICKING_DAYS = 3;
+
+    /**
+     * How long shippable stock may go without a despatch before it counts as
+     * stalled rather than merely queued — the warehouse's own target, and the
+     * counterpart to SUPPLIER_TARGET_DAYS.
+     *
+     * Measured in ledger days, never against today — see ledgerDate(). Unlike
+     * the picking-queue allowance above this is a stopwatch rather than an
+     * inference: it reads the last despatch date, so a SKU only appears here if
+     * nothing actually left while the rest of the warehouse kept moving.
+     */
+    private const SHIP_TARGET_DAYS = 2;
 
     /**
      * How long a supplier has, once an order is released, before it counts as
@@ -112,8 +125,12 @@ class PurchaseOrderFlowController extends Controller
             'not_ordered_groups' => $needed['groups'],
             'stuck_inside' => $internal->sum('balance'),
             'stuck_overdue' => $internal->where('age', '>', self::INTERNAL_SLA_DAYS)->sum('balance'),
-            'shippable_now' => $split['sitting']['units'],
-            'shippable_skus' => $split['sitting']['skus'],
+            // Everything that could leave today, not the slice of it covering
+            // more than a picking queue's worth of demand: that narrower figure
+            // is an inference from demand cover, and whether stock has actually
+            // been moving is the warehouse card's question, measured properly.
+            'shippable_now' => $split['here'],
+            'shippable_skus' => collect($split['items'])->where('here', '>', 0)->count(),
             'open_total' => $lines->sum('balance'),
             'sla_days' => self::INTERNAL_SLA_DAYS,
             'picking_days' => self::PICKING_DAYS,
@@ -405,7 +422,8 @@ class PurchaseOrderFlowController extends Controller
     }
 
     /**
-     * Unmet demand split by whether the stock is physically on the shelf.
+     * Unmet demand split by whether the stock is physically on the shelf, and
+     * for the part that is, how long it has been standing still.
      *
      * Computed per SKU then rolled to the group: a customer ordered a specific
      * variant, so stock on one child cannot ship an order placed against
@@ -416,15 +434,23 @@ class PurchaseOrderFlowController extends Controller
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        $items = $this->visibleItems($request, $workspace)
-            // When stock last arrived and last left. On a row that says stock is
-            // sitting here, those two dates are the difference between "nothing
-            // is coming in" and "nothing is going out".
-            ->leftJoinSub($this->lastMovementQuery(), 'mv', 'mv.inventory_item_id', '=', 'inventory_items.id')
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.unfulfilled_count, inventory_items.three_days_average')
-            ->selectRaw('mv.last_in, mv.last_out')
-            ->selectRaw(InventoryStockColumns::currentStocks().' as current_stocks')
-            ->with('parent:id,sku')
+        $asOf = $this->ledgerDate($workspace);
+        $snapshotDate = SnapshotItemScope::date($workspace);
+
+        if ($snapshotDate === null) {
+            return response()->json($this->emptySplit());
+        }
+
+        // Read from the frozen day the items list reads. Stock, demand and the
+        // movement dates are all stored there, so this panel and the table it
+        // summarises cannot disagree — which they did while one computed live
+        // and the other did not.
+        $identity = SnapshotItemScope::groupIdentity();
+
+        $items = SnapshotItemScope::query($request, $workspace, $snapshotDate)
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.current_stocks')
+            ->selectRaw('inventory_item_snapshots.last_in_date as last_in, inventory_item_snapshots.last_out_date as last_out')
+            ->selectRaw("{$identity['group_sku']} as group_sku")
             ->get();
 
         $groups = [];
@@ -436,7 +462,7 @@ class PurchaseOrderFlowController extends Controller
 
             $groups[$key] ??= [
                 'id' => $key,
-                'sku' => (string) ($item->parent?->sku ?? $item->sku),
+                'sku' => (string) ($item->group_sku ?? $item->sku),
                 'unfulfilled' => 0,
                 'here' => 0,
                 'gone' => 0,
@@ -453,10 +479,6 @@ class PurchaseOrderFlowController extends Controller
             // any sibling receiving or shipping means the group moved.
             $groups[$key]['last_in'] = max($groups[$key]['last_in'], $item->last_in);
             $groups[$key]['last_out'] = max($groups[$key]['last_out'], $item->last_out);
-            // A parent placeholder carries the group's name once it appears.
-            if ($item->is_parent) {
-                $groups[$key]['sku'] = (string) $item->sku;
-            }
         }
 
         $rows = collect($groups)
@@ -475,9 +497,23 @@ class PurchaseOrderFlowController extends Controller
                 // Date-only; the client formats them and works out how long ago.
                 'last_in' => $g['last_in'] ? CarbonImmutable::parse($g['last_in'])->toDateString() : null,
                 'last_out' => $g['last_out'] ? CarbonImmutable::parse($g['last_out'])->toDateString() : null,
+                // Ledger days since the last despatch. Null when the group has
+                // never shipped, which is unknown rather than idle — a brand new
+                // SKU has not stalled, it has not started.
+                'idle_days' => $this->idleDays($g['last_out'], $asOf),
             ]);
 
         $sitting = $rows->filter(fn ($r) => $r['here_days'] !== null && $r['here_days'] > self::PICKING_DAYS);
+
+        // Only stock that could actually ship can be idle. A group with unmet
+        // demand and nothing on the shelf is waiting on supply, not standing
+        // still, and belongs to whichever step upstream is blocked.
+        $shippable = $rows->filter(fn ($r) => $r['here'] > 0);
+        $idle = $shippable->filter(fn ($r) => $r['idle_days'] !== null && $r['idle_days'] >= self::SHIP_TARGET_DAYS);
+        // Received after the last thing shipped: the sharpest case there is, and
+        // the one that needs no threshold — stock arrived, orders were waiting,
+        // and nothing has gone out since.
+        $arrived = $shippable->filter(fn ($r) => $r['last_in'] && $r['last_out'] && $r['last_in'] > $r['last_out']);
 
         return response()->json([
             'items' => $rows,
@@ -487,7 +523,45 @@ class PurchaseOrderFlowController extends Controller
             'picking_days' => self::PICKING_DAYS,
             'sitting' => ['skus' => $sitting->count(), 'units' => $sitting->sum('here')],
             'worst' => $sitting->sortByDesc('here_days')->first(),
+            'ship_target_days' => self::SHIP_TARGET_DAYS,
+            'idle' => [
+                'units' => $idle->sum('here'),
+                'skus' => $idle->count(),
+                // The longest wait across all shippable stock, not just the part
+                // over the threshold: a card reporting "longest idle: 3 days"
+                // when one SKU has sat for sixteen would be worse than useless.
+                'longest' => $shippable->max('idle_days'),
+                'worst' => $idle->sortByDesc('idle_days')->first(),
+                // The date every idle figure is measured against. Null when the
+                // ledger is empty, in which case nothing can be called idle.
+                'as_of' => $asOf?->toDateString(),
+            ],
+            'arrived' => ['units' => $arrived->sum('here'), 'skus' => $arrived->count()],
         ]);
+    }
+
+    /**
+     * What unfulfilledSplit() answers when the workspace has no snapshot at all.
+     *
+     * Zeroes rather than a live recalculation: the panel's whole claim is that it
+     * agrees with the items list, and the list shows nothing until the first run.
+     *
+     * @return array<string, mixed>
+     */
+    private function emptySplit(): array
+    {
+        return [
+            'items' => [],
+            'here' => 0,
+            'gone' => 0,
+            'total' => 0,
+            'picking_days' => self::PICKING_DAYS,
+            'sitting' => ['skus' => 0, 'units' => 0],
+            'worst' => null,
+            'ship_target_days' => self::SHIP_TARGET_DAYS,
+            'idle' => ['units' => 0, 'skus' => 0, 'longest' => null, 'worst' => null, 'as_of' => null],
+            'arrived' => ['units' => 0, 'skus' => 0],
+        ];
     }
 
     /**
@@ -510,8 +584,13 @@ class PurchaseOrderFlowController extends Controller
         $supplierOverdue = $supplier->where('age', '>', $quoted)->sum('balance');
 
         $split = $this->unfulfilledSplit($request, $workspace)->getData(true);
-        $unfulfilledTotal = max(1, (int) $split['total']);
-        $sittingShare = $split['sitting']['units'] / $unfulfilledTotal;
+        // Scored against shippable stock rather than all unmet demand: the
+        // question is how much of what the warehouse could ship has stopped
+        // moving. Against the whole demand figure this would read as a rounding
+        // error even with every shelf standing still, because most unmet demand
+        // has no stock behind it at all.
+        $arrivedUnits = (int) $split['arrived']['units'];
+        $arrivedShare = $arrivedUnits / max(1, (int) $split['here']);
 
         $owners = [
             [
@@ -545,13 +624,13 @@ class PurchaseOrderFlowController extends Controller
             [
                 'key' => 'warehouse',
                 'name' => 'Warehouse',
-                'question' => 'Is stock sitting here that an unfulfilled order could already take?',
-                'state' => $sittingShare > 0.15 ? 'blocked' : ($sittingShare > 0.05 ? 'watch' : 'ok'),
-                'value' => $split['sitting']['units'],
-                'unit' => 'orders with available stocks in warehouse',
+                'question' => 'Is stock sitting here that should already have shipped?',
+                'state' => $arrivedShare > 0.25 ? 'blocked' : ($arrivedShare > 0.10 ? 'watch' : 'ok'),
+                'value' => $arrivedUnits,
+                'unit' => 'units arrived with nothing shipped since',
                 'facts' => [
-                    ['Could ship today', $split['here'] ?: null, 'units'],
-                    ['SKUs affected', $split['sitting']['skus'] ?: null, 'SKUs'],
+                    ['Target shipped out', self::SHIP_TARGET_DAYS, 'days'],
+                    ['Not moving', $split['idle']['units'] ?: null, 'units'],
                     ['No stock to give', $split['gone'] ?: null, 'units'],
                 ],
             ],
@@ -563,6 +642,8 @@ class PurchaseOrderFlowController extends Controller
             'internal_units' => $internalUnits,
             'supplier_units' => $supplierUnits,
             'sla_days' => self::INTERNAL_SLA_DAYS,
+            'ship_target_days' => self::SHIP_TARGET_DAYS,
+            'idle_as_of' => $split['idle']['as_of'],
         ]);
     }
 
@@ -650,6 +731,38 @@ class PurchaseOrderFlowController extends Controller
     }
 
     /**
+     * The latest date the transaction ledger reaches — the "today" every idle
+     * figure is measured against.
+     *
+     * Deliberately not now(). The ERP feed lands in batches and routinely runs a
+     * few days behind, so counting from the real today reports every SKU in the
+     * workspace as idle by exactly that lag: a feed that stopped five days ago
+     * makes the whole warehouse look five days asleep. Measured against the
+     * ledger's own last day, a SKU only stands out when nothing left it while
+     * the rest of the warehouse kept shipping — which is the actual question.
+     *
+     * Not team-scoped: this is a property of the feed, not of anyone's items.
+     */
+    private function ledgerDate(Workspace $workspace): ?CarbonImmutable
+    {
+        $date = DB::table('inventory_transactions')
+            ->where('workspace_id', $workspace->id)
+            ->max('date');
+
+        return $date ? CarbonImmutable::parse($date)->startOfDay() : null;
+    }
+
+    /** Ledger days between the last despatch and the ledger's own last day. */
+    private function idleDays(?string $lastOut, ?CarbonImmutable $asOf): ?int
+    {
+        if (! $lastOut || ! $asOf) {
+            return null;
+        }
+
+        return max(0, (int) CarbonImmutable::parse($lastOut)->startOfDay()->diffInDays($asOf, absolute: false));
+    }
+
+    /**
      * Daily demand per item group, summed across the group's visible children.
      *
      * @return array<int, float>
@@ -681,10 +794,16 @@ class PurchaseOrderFlowController extends Controller
      */
     private function poNeededTotal(Request $request, Workspace $workspace): array
     {
-        $inner = $this->visibleItems($request, $workspace)
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent,
-                inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.three_days_average')
-            ->selectRaw(InventoryStockColumns::remainingAfterFulfillment().' as remaining_after_fulfillment');
+        $snapshotDate = SnapshotItemScope::date($workspace);
+
+        if ($snapshotDate === null) {
+            return ['units' => 0, 'groups' => 0];
+        }
+
+        $inner = SnapshotItemScope::query($request, $workspace, $snapshotDate)
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent,
+                inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.three_days_average,
+                inventory_item_snapshots.remaining_after_fulfillment');
 
         // The group's lead time and buffer are the parent's when it has one,
         // else the max across the group — same rule the items list applies.

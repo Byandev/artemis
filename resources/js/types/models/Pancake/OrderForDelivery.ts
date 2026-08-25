@@ -133,7 +133,6 @@ export interface OrderForDelivery {
     customer_call_duration: number | null;
     rider_call_duration: number | null;
     rider_rts_rate: number | null;
-    risk_score: number | null;
     caller_id: string | null;
     conferrer_id: string | null;
     delivery_date: string; // ISO date

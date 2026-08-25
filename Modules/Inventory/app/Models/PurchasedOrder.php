@@ -4,6 +4,7 @@ namespace Modules\Inventory\Models;
 
 use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -46,6 +47,35 @@ class PurchasedOrder extends Model
         'for_purchase_at' => 'datetime',
         'purchased_at' => 'datetime',
     ];
+
+    /**
+     * The standing delivery agreement: an order is due two weeks after it is
+     * raised unless someone says otherwise.
+     *
+     * Stored rather than assumed at read time. The ERP sends an expected date on
+     * barely any order, and a column that is null on 99% of rows forces every
+     * reader to re-invent the same fallback — which is exactly how two readers
+     * come to disagree about whether an order is late.
+     */
+    public const DEFAULT_DELIVERY_DAYS = 14;
+
+    /**
+     * The expected delivery date to store: whatever was supplied, else the
+     * standing agreement measured from the issue date.
+     *
+     * Null only when there is no issue date to count from — an order nobody has
+     * dated cannot be expected on any particular day.
+     */
+    public static function expectedDeliveryFor(mixed $supplied, mixed $issueDate): ?string
+    {
+        if ($supplied) {
+            return CarbonImmutable::parse($supplied)->toDateString();
+        }
+
+        return $issueDate
+            ? CarbonImmutable::parse($issueDate)->addDays(self::DEFAULT_DELIVERY_DAYS)->toDateString()
+            : null;
+    }
 
     /**
      * When the order reached each workflow stage, keyed by the field the ERP

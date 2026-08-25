@@ -34,6 +34,10 @@ export interface BottleneckData {
     internal_units: number;
     supplier_units: number;
     sla_days: number;
+    /** Ledger days shippable stock has to leave before it counts as stalled. */
+    ship_target_days: number;
+    /** The ledger's own latest day, which idle is measured against. */
+    idle_as_of: string | null;
 }
 
 export interface PipelineStage {
@@ -159,6 +163,13 @@ export interface UnfulfilledRow {
      */
     last_in: string | null;
     last_out: string | null;
+    /**
+     * Ledger days since the last despatch, measured against the ledger's own
+     * latest day rather than today — the ERP feed lags, and counting from today
+     * would report that lag as idleness on every SKU alike. Null when the group
+     * has never shipped: unknown, not idle.
+     */
+    idle_days: number | null;
 }
 
 export interface UnfulfilledSplitData {
@@ -169,4 +180,17 @@ export interface UnfulfilledSplitData {
     picking_days: number;
     sitting: { skus: number; units: number };
     worst: UnfulfilledRow | null;
+    /** Ledger days without a despatch before shippable stock counts as idle. */
+    ship_target_days: number;
+    idle: {
+        units: number;
+        skus: number;
+        /** Longest wait across all shippable stock, not just the part over the threshold. */
+        longest: number | null;
+        worst: UnfulfilledRow | null;
+        /** The ledger's latest day. Null when the ledger is empty. */
+        as_of: string | null;
+    };
+    /** Stock received after the last despatch — arrived, and nothing has left since. */
+    arrived: { units: number; skus: number };
 }

@@ -137,7 +137,18 @@ export function WaitingForDeliveryDialog({
                                         </span>{' '}
                                         raised but not yet paid for.
                                     </>
-                                )}
+                                )}{' '}
+                                {/* The list's column is read from a snapshot,
+                                    written a few times a day; these orders are
+                                    read now. Between the two the totals can
+                                    differ, and saying so is cheaper than
+                                    someone trying to reconcile them. */}
+                                <span className="text-gray-400 dark:text-gray-500">
+                                    Orders are shown as they stand right now, so
+                                    the total can differ from the column if
+                                    something has been delivered since the last
+                                    snapshot.
+                                </span>
                             </>
                         ) : (
                             'Pending purchase orders for this item.'

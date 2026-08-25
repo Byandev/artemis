@@ -2,12 +2,16 @@ import BarChart from '@/components/charts/BarChart';
 import BarChartSkeleton from '@/components/charts/skeletons/BarChartSkeleton';
 import DropdownSelect from '@/components/common/DropdownSelect';
 import { FilterValue } from '@/components/filters/Filters';
+import { ViewMode, ViewToggle } from '@/components/rts/rts-shared';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import BreakdownTable, {
+    BreakdownTableSkeleton,
+} from '@/pages/workspaces/dashboard/partials/BreakdownTable';
 import { metricConfigs, MetricKey } from '@/types/metrics';
 import { Workspace } from '@/types/models/Workspace';
 import axios from 'axios';
@@ -41,6 +45,7 @@ export default function ShopBreakdown({
     const [error, setError] = useState<string | null>(null);
     const [option, setOption] = useState(metrics?.[0] ?? 'totalSales');
     const [reload, setReload] = useState(false);
+    const [view, setView] = useState<ViewMode>('chart');
 
     const startDate = moment(dateRange[0]).format('YYYY-MM-DD');
     const endDate = moment(dateRange[1]).format('YYYY-MM-DD');
@@ -146,6 +151,16 @@ export default function ShopBreakdown({
         ];
     }, [breakdown, option]);
 
+    const tableRows = useMemo(
+        () =>
+            breakdown.map((item) => ({
+                id: item.shop_id,
+                label: item.shop_name,
+                value: Number(item.value),
+            })),
+        [breakdown],
+    );
+
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
@@ -185,11 +200,17 @@ export default function ShopBreakdown({
 
                         <TooltipContent>Refresh</TooltipContent>
                     </Tooltip>
+
+                    <ViewToggle value={view} onChange={setView} />
                 </div>
             </div>
 
             {loading ? (
-                <BarChartSkeleton />
+                view === 'chart' ? (
+                    <BarChartSkeleton />
+                ) : (
+                    <BreakdownTableSkeleton />
+                )
             ) : error ? (
                 <div className="flex h-60 flex-col items-center justify-center space-y-4 rounded-lg border border-gray-200 bg-gray-50">
                     <p className="text-red-500">{error}</p>
@@ -223,12 +244,19 @@ export default function ShopBreakdown({
                         Try adjusting your filters or date range
                     </p>
                 </div>
-            ) : (
+            ) : view === 'chart' ? (
                 <BarChart
                     categories={categories}
                     series={series}
                     formatValue={formatValue}
                     abbreviateLabels
+                />
+            ) : (
+                <BreakdownTable
+                    rows={tableRows}
+                    entityLabel="Shop"
+                    metricName={activeMetric?.name ?? 'Value'}
+                    formatValue={formatValue}
                 />
             )}
         </div>

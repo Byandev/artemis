@@ -126,7 +126,6 @@ class ForDeliveryNewController extends Controller
             ->addSelect([
                 'pancake_order_for_delivery.*',
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
-                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
             ->withCount(['customerCallLogsByAssignee as customer_call_logs_count', 'riderCallLogsByAssignee as rider_call_logs_count'])
             ->withSum('customerCallLogsByAssignee as customer_call_duration', 'duration')
@@ -218,7 +217,6 @@ class ForDeliveryNewController extends Controller
                 AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
                 AllowedSort::custom('rider_rts_rate', new RiderRtsSort),
-                AllowedSort::custom('risk_score', new RiskScoreSort),
                 AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
             ->whereDate('delivery_date', $deliveryDate)
@@ -320,7 +318,6 @@ class ForDeliveryNewController extends Controller
             ->addSelect([
                 'pancake_order_for_delivery.*',
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
-                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
             ->withCount(['customerCallLogsByAssignee as customer_call_logs_count', 'riderCallLogsByAssignee as rider_call_logs_count'])
             ->withSum('customerCallLogsByAssignee as customer_call_duration', 'duration')
@@ -413,7 +410,6 @@ class ForDeliveryNewController extends Controller
                 AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
                 AllowedSort::custom('rider_rts_rate', new RiderRtsSort),
-                AllowedSort::custom('risk_score', new RiskScoreSort),
                 AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
             ->whereDate('delivery_date', $deliveryDate)
@@ -502,7 +498,6 @@ class ForDeliveryNewController extends Controller
         $query = QueryBuilder::for($baseQuery)
             ->addSelect([
                 'pancake_order_for_delivery.*',
-                \DB::raw('('.RiskScoreSort::sql().') as risk_score'),
             ])
             ->with([
                 'order' => function ($query) {
