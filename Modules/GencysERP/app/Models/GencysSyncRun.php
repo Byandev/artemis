@@ -20,6 +20,11 @@ use Modules\Inventory\Models\InventoryItem;
  * flips it to `success`, a failed handshake or an expired timeout flips it to
  * `failed` — or back to `queued` for another attempt while the batch still has
  * retries left for it.
+ *
+ * `n8n_execution_id` is whatever execution handled the run, echoed back on the
+ * callback. It is a tracing aid and nothing keys off it: when a run fails or
+ * comes back short, it is what you paste into n8n to see what happened. It is
+ * cleared on retry, since the next attempt is a different execution.
  */
 class GencysSyncRun extends Model
 {
@@ -135,8 +140,13 @@ class GencysSyncRun extends Model
      * A success also clears the earlier runs that asked for exactly the same
      * thing — see resolveEarlierRunsWithSameParameters().
      */
-    public static function succeedById(int $workspaceId, ?int $syncRunId, int $rowsReceived, ?int $rowsSaved = null): void
-    {
+    public static function succeedById(
+        int $workspaceId,
+        ?int $syncRunId,
+        int $rowsReceived,
+        ?int $rowsSaved = null,
+        ?string $executionId = null,
+    ): void {
         $run = self::lookup($workspaceId, $syncRunId);
 
         if (! $run) {
@@ -148,6 +158,7 @@ class GencysSyncRun extends Model
             'rows_received' => $rowsReceived,
             'rows_saved' => $rowsSaved ?? $rowsReceived,
             'finished_at' => now(),
+            'n8n_execution_id' => $executionId ?? $run->n8n_execution_id,
         ])->save();
 
         $run->resolveEarlierRunsWithSameParameters();
@@ -183,8 +194,13 @@ class GencysSyncRun extends Model
      * Pushing timeout_at forward is the important part: without it a long sync
      * would be failed by the sweeper mid-stream and retried from the top.
      */
-    public static function heartbeatById(int $workspaceId, ?int $syncRunId, int $rowsReceived, ?int $rowsSaved = null): ?self
-    {
+    public static function heartbeatById(
+        int $workspaceId,
+        ?int $syncRunId,
+        int $rowsReceived,
+        ?int $rowsSaved = null,
+        ?string $executionId = null,
+    ): ?self {
         $run = self::lookup($workspaceId, $syncRunId);
 
         // Only a run still in flight can be fed. A chunk arriving for a run that
@@ -198,6 +214,7 @@ class GencysSyncRun extends Model
             'rows_received' => $run->rows_received + $rowsReceived,
             'rows_saved' => $run->rows_saved + ($rowsSaved ?? $rowsReceived),
             'timeout_at' => now()->addSeconds($run->timeoutSeconds()),
+            'n8n_execution_id' => $executionId ?? $run->n8n_execution_id,
         ])->save();
 
         return $run;
@@ -216,11 +233,17 @@ class GencysSyncRun extends Model
         ?int $rowsSaved = null,
         bool $failed = false,
         ?string $message = null,
+        ?string $executionId = null,
     ): ?self {
         $run = self::lookup($workspaceId, $syncRunId);
 
         if (! $run || $run->isFinished()) {
             return $run;
+        }
+
+        // Stamped before the branch so a failure is just as traceable as a success.
+        if ($executionId) {
+            $run->forceFill(['n8n_execution_id' => $executionId])->save();
         }
 
         if ($failed) {
@@ -351,6 +374,9 @@ class GencysSyncRun extends Model
             'attempt' => $this->attempt + 1,
             'sent_at' => null,
             'timeout_at' => null,
+            // A retry is a fresh n8n execution; keeping the old id would point
+            // at the run that already gave up.
+            'n8n_execution_id' => null,
             'message' => $message,
         ])->save();
     }

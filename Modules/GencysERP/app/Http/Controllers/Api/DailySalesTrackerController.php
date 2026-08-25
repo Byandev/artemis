@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\SyncCallbackFields;
 
 /**
  * Receives the daily sales tracker rows that the n8n flow scrapes from Gencys
@@ -143,11 +144,26 @@ class DailySalesTrackerController extends Controller
             // posting the rest. The counts accumulate, the callback deadline is
             // pushed out, and the run stays pending until n8n posts to
             // /api/v1/public/gencys/sync-runs/finish.
+            $runId = SyncCallbackFields::runId($entry, $request);
+
+            // Rows that arrive without a run id are still saved, but nothing is
+            // credited for them: the run they belong to stays pending until it
+            // times out and gets retried, re-fetching data that is already in.
+            // Silent when it happens, expensive afterwards — so say so.
+            if (! $runId) {
+                Log::warning('Gencys daily sales tracker rows arrived with no sync_run_id', [
+                    'workspace_id' => $workspace->id,
+                    'rows' => count($rows),
+                    'hint' => 'The n8n flow must echo sync_run_id back on each chunk, and POST /api/v1/public/gencys/sync-runs/finish when it is done.',
+                ]);
+            }
+
             GencysSyncRun::heartbeatById(
                 $workspace->id,
-                $this->syncRunId($entry),
+                $runId,
                 count($rows),
                 $entrySaved,
+                SyncCallbackFields::executionId($entry, $request),
             );
         }
 
@@ -157,14 +173,6 @@ class DailySalesTrackerController extends Controller
             'skipped' => $skipped,
             'errors' => $errors,
         ], empty($errors) ? 200 : 207);
-    }
-
-    /** Pull the sync run id n8n echoed back, tolerating a couple of key spellings. */
-    private function syncRunId(array $entry): ?int
-    {
-        $id = $entry['sync_run_id'] ?? $entry['syncRunId'] ?? null;
-
-        return ($id === null || $id === '') ? null : (int) $id;
     }
 
     /**

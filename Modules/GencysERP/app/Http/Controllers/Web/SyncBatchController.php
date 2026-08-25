@@ -12,6 +12,7 @@ use Inertia\Response;
 use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\N8nApi;
 use Modules\GencysERP\Support\SyncFlows\SyncFlowRegistry;
 use Modules\Inventory\Models\InventoryItem;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -103,6 +104,7 @@ class SyncBatchController extends Controller
                 : $run->sync_type,
             'status' => $run->status,
             'attempt' => $run->attempt,
+            'n8n_execution_id' => $run->n8n_execution_id,
             'group_key' => $run->group_key,
             'subject' => $run->inventoryItem?->sku ?? $this->subjectFromMeta($run),
             'rows_received' => $run->rows_received,
@@ -120,6 +122,10 @@ class SyncBatchController extends Controller
             'workspace' => $workspace,
             'batch' => $this->present($batch->load('createdBy:id,name')),
             'runs' => $runs,
+            // Same per-run actions as the Sync Runs page: ask n8n how a run went,
+            // and re-send a failed one when the queue is clear.
+            'n8nApiConfigured' => N8nApi::make()->isConfigured(),
+            'queueBusy' => GencysSyncBatch::query()->active()->exists(),
             'query' => [
                 ...$request->only(['sort', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),

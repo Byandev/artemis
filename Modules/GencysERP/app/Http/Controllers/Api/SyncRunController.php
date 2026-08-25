@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\SyncCallbackFields;
 
 /**
  * Lets n8n say "that run is done" as a separate call from the data itself.
@@ -22,7 +23,8 @@ use Modules\GencysERP\Support\BatchRunner;
  *   POST /api/v1/public/gencys/sync-runs/finish
  *   { "api_key": "art_…", "sync_run_id": 42,
  *     "rows_received": 4210, "rows_saved": 4210,   // optional
- *     "status": "success" | "failed", "message": "…" }   // optional
+ *     "status": "success" | "failed", "message": "…",   // optional
+ *     "n8n_execution_id": "10427" }                     // optional, for tracing
  *
  * Row counts are optional — leave them out and the totals the chunks accumulated
  * stand. Calling it twice is harmless.
@@ -48,6 +50,8 @@ class SyncRunController extends Controller
             'message' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
+        $executionId = SyncCallbackFields::executionId($request);
+
         $run = GencysSyncRun::finishById(
             workspaceId: (int) $apiKey->workspace_id,
             syncRunId: (int) $validated['sync_run_id'],
@@ -55,6 +59,7 @@ class SyncRunController extends Controller
             rowsSaved: $validated['rows_saved'] ?? null,
             failed: ($validated['status'] ?? 'success') === 'failed',
             message: $validated['message'] ?? null,
+            executionId: $executionId,
         );
 
         if (! $run) {
@@ -71,6 +76,7 @@ class SyncRunController extends Controller
             'status' => $run->status,
             'rows_received' => $run->rows_received,
             'rows_saved' => $run->rows_saved,
+            'n8n_execution_id' => $run->n8n_execution_id,
             'finished_at' => $run->finished_at,
         ]);
     }

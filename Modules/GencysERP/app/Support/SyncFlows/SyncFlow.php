@@ -43,6 +43,16 @@ abstract class SyncFlow
     abstract public function defaultParameters(): array;
 
     /**
+     * The batch parameters that would re-run exactly one run and nothing else.
+     *
+     * Used to retry a single run: rather than reopening a batch that has already
+     * finished, a fresh batch is raised for just that subject. It also means the
+     * retry re-reads everything that might have moved on — ERP credentials, the
+     * delivered-PO list — instead of replaying a stale payload.
+     */
+    abstract public function parametersForRun(GencysSyncRun $run): array;
+
+    /**
      * The n8n request body for one group of runs. Every run in the group shares a
      * group key, so they're always one workspace and one set of parameters.
      *

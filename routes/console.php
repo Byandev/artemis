@@ -14,7 +14,6 @@ Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00
 Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
-Schedule::command('inventory:snapshot-items')->cron('0 0,10,14,17,20 * * *')->withoutOverlapping();
 
 Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
@@ -36,11 +35,15 @@ Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
 // Five passes a day. The individual gencys-erp:trigger-fetch-* commands still
 // exist for re-running a specific date or item by hand; they're just no longer
 // scheduled.
-Schedule::command('gencys-erp:sync')->dailyAt('09:30')->withoutOverlapping();
-Schedule::command('gencys-erp:sync')->dailyAt('12:00')->withoutOverlapping();
-Schedule::command('gencys-erp:sync')->dailyAt('15:30')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('13:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('16:00')->withoutOverlapping();
 Schedule::command('gencys-erp:sync')->dailyAt('19:00')->withoutOverlapping();
-Schedule::command('gencys-erp:sync')->dailyAt('21:00')->withoutOverlapping();
+
+Schedule::command('inventory:snapshot-items')->dailyAt('10:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('14:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('17:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapping();
 
 // Intern daily records still fan out on the old fixed-timer path.
 Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();

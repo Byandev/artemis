@@ -53,6 +53,14 @@ class TransactionHistoryFlow extends SyncFlow
         ];
     }
 
+    public function parametersForRun(GencysSyncRun $run): array
+    {
+        return array_filter([
+            'dates' => array_filter([data_get($run->meta, 'date')]),
+            'item_ids' => array_filter([$run->inventory_item_id]),
+        ]);
+    }
+
     public function buildRuns(GencysSyncBatch $batch): int
     {
         $parameters = $batch->parametersFor($this->type());

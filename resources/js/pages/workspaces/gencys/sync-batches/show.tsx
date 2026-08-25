@@ -1,7 +1,9 @@
 import PageHeader from '@/components/common/PageHeader';
 import {
     BatchStatusPill,
+    ExecutionId,
     ProgressBar,
+    RunActions,
     RunStatusPill,
     SyncBatch,
     SyncBatchRun,
@@ -34,6 +36,8 @@ interface Props {
     workspace: Workspace;
     batch: SyncBatch;
     runs: PaginatedData<SyncBatchRun>;
+    n8nApiConfigured: boolean;
+    queueBusy: boolean;
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -47,6 +51,8 @@ export default function SyncBatchShow({
     workspace,
     batch,
     runs,
+    n8nApiConfigured,
+    queueBusy,
     query,
 }: Props) {
     const indexUrl = `/workspaces/${workspace.slug}/gencys/sync-batches`;
@@ -115,6 +121,17 @@ export default function SyncBatchShow({
                   } as ColumnDef<SyncBatchRun>,
               ]
             : []),
+        {
+            id: 'n8n',
+            header: () => (
+                <span className="font-mono text-[10px] tracking-wider uppercase">
+                    n8n
+                </span>
+            ),
+            cell: ({ row }) => (
+                <ExecutionId id={row.original.n8n_execution_id} />
+            ),
+        },
         {
             id: 'subject',
             header: () => (
@@ -192,6 +209,18 @@ export default function SyncBatchShow({
                         ? `times out ${formatRelative(row.original.timeout_at)}`
                         : formatDuration(row.original.duration_seconds)}
                 </span>
+            ),
+        },
+        {
+            id: 'actions',
+            header: () => null,
+            cell: ({ row }) => (
+                <RunActions
+                    run={row.original}
+                    workspaceSlug={workspace.slug}
+                    n8nApiConfigured={n8nApiConfigured}
+                    queueBusy={queueBusy}
+                />
             ),
         },
         {

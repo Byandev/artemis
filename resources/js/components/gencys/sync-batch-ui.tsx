@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import clsx from 'clsx';
 import {
     Activity,
@@ -5,8 +6,13 @@ import {
     CheckCircle2,
     CircleDashed,
     Clock,
+    ExternalLink,
+    Loader2,
+    RotateCcw,
+    SearchCheck,
     XCircle,
 } from 'lucide-react';
+import { useState } from 'react';
 
 /** A batch as the SyncBatchController presents it. */
 export interface SyncBatch {
@@ -39,6 +45,8 @@ export interface SyncBatchRun {
     sync_label: string;
     status: string;
     attempt: number;
+    /** The n8n execution that handled this run, for tracing it in n8n. */
+    n8n_execution_id: string | null;
     group_key: string | null;
     subject: string | null;
     rows_received: number | null;
@@ -254,4 +262,252 @@ export function summariseTypes(batch: Pick<SyncBatch, 'sync_labels'>, max = 2) {
     const rest = batch.sync_labels.length - max;
 
     return rest > 0 ? `${shown} +${rest}` : shown;
+}
+
+/**
+ * The n8n execution behind a run, click-to-copy.
+ *
+ * The whole point of storing it is pasting it into n8n when something looks
+ * wrong, so copying is one click rather than a careful drag-select.
+ */
+export function ExecutionId({ id }: { id: string | null }) {
+    const [copied, setCopied] = useState(false);
+
+    if (!id) {
+        return (
+            <span className="font-mono text-[10px] text-gray-300 dark:text-gray-600">
+                —
+            </span>
+        );
+    }
+
+    const copy = () => {
+        navigator.clipboard
+            ?.writeText(id)
+            .then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1200);
+            })
+            .catch(() => {
+                // Clipboard access can be refused; the id is on screen anyway.
+            });
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={copy}
+            title={`n8n execution ${id} — click to copy`}
+            className={clsx(
+                'font-mono text-[10px] transition-colors',
+                copied
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
+            )}
+        >
+            {copied ? 'copied' : id}
+        </button>
+    );
+}
+
+/** What the execution-lookup endpoint answers with. */
+export interface ExecutionLookup {
+    state:
+        | 'found'
+        | 'unknown'
+        | 'not_found'
+        | 'unconfigured'
+        | 'unauthorized'
+        | 'unreachable';
+    message?: string | null;
+    execution?: {
+        id: string;
+        status: string;
+        finished: boolean;
+        started_at: string | null;
+        stopped_at: string | null;
+        workflow_id: string | null;
+        mode: string | null;
+        error: string | null;
+        url: string | null;
+    };
+}
+
+const N8N_STATUS_TONE: Record<string, string> = {
+    success: 'text-emerald-600 dark:text-emerald-400',
+    error: 'text-red-500 dark:text-red-400',
+    crashed: 'text-red-500 dark:text-red-400',
+    canceled: 'text-stone-500 dark:text-zinc-500',
+    running: 'text-blue-600 dark:text-blue-400',
+    waiting: 'text-amber-600 dark:text-amber-400',
+};
+
+/**
+ * Per-run actions: ask n8n how its execution went, and send the work again.
+ *
+ * The lookup is a plain fetch rather than an Inertia visit — it's a question
+ * about a third-party system for one row, it can be slow, and a miss shouldn't
+ * disturb the page.
+ */
+export function RunActions({
+    run,
+    workspaceSlug,
+    n8nApiConfigured,
+    queueBusy,
+}: {
+    run: SyncBatchRun;
+    workspaceSlug: string;
+    n8nApiConfigured: boolean;
+    queueBusy: boolean;
+}) {
+    const [lookup, setLookup] = useState<ExecutionLookup | null>(null);
+    const [checking, setChecking] = useState(false);
+    const [retrying, setRetrying] = useState(false);
+
+    const base = `/workspaces/${workspaceSlug}/gencys/sync-runs/${run.id}`;
+
+    const check = async () => {
+        setChecking(true);
+        try {
+            const response = await fetch(`${base}/execution`, {
+                headers: { Accept: 'application/json' },
+            });
+            setLookup(await response.json());
+        } catch {
+            setLookup({
+                state: 'not_found',
+                message: 'Could not reach the server.',
+            });
+        } finally {
+            setChecking(false);
+        }
+    };
+
+    // Only a failed run is worth sending again — a success has its data and a
+    // cancellation was deliberate. And since one batch holds the ERP at a time,
+    // a retry raised now would just queue behind whatever is working.
+    const retryable = run.status === 'failed';
+    const retryBlockedReason = queueBusy
+        ? 'A sync is already in progress — retry once the queue is clear'
+        : null;
+
+    const retry = () => {
+        setRetrying(true);
+        router.post(
+            `${base}/retry`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setRetrying(false),
+            },
+        );
+    };
+
+    return (
+        <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-1">
+                {n8nApiConfigured && (
+                    <button
+                        type="button"
+                        onClick={check}
+                        disabled={checking}
+                        title={
+                            run.n8n_execution_id
+                                ? `Ask n8n how execution ${run.n8n_execution_id} went`
+                                : 'No n8n execution was recorded for this run'
+                        }
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 font-mono text-[10px] text-gray-400 transition-colors hover:bg-stone-100 hover:text-gray-600 disabled:opacity-50 dark:text-gray-500 dark:hover:bg-zinc-800 dark:hover:text-gray-300"
+                    >
+                        {checking ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                            <SearchCheck className="h-3 w-3" />
+                        )}
+                        check
+                    </button>
+                )}
+
+                {retryable && (
+                    <button
+                        type="button"
+                        onClick={retry}
+                        disabled={retrying || !!retryBlockedReason}
+                        title={
+                            retryBlockedReason ??
+                            'Send this work to n8n again as a new batch'
+                        }
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 font-mono text-[10px] text-gray-400 transition-colors hover:bg-stone-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:text-gray-500 dark:hover:bg-zinc-800 dark:hover:text-gray-300"
+                    >
+                        {retrying ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                            <RotateCcw className="h-3 w-3" />
+                        )}
+                        retry
+                    </button>
+                )}
+            </div>
+
+            {lookup && <ExecutionResult lookup={lookup} />}
+        </div>
+    );
+}
+
+function ExecutionResult({ lookup }: { lookup: ExecutionLookup }) {
+    if (lookup.state !== 'found' || !lookup.execution) {
+        // A rejected API key is something someone has to go and fix, so it reads
+        // as a warning rather than as a shrug like the other empty answers.
+        const needsAttention = lookup.state === 'unauthorized';
+
+        return (
+            <span
+                className={clsx(
+                    'max-w-[220px] text-right text-[10px]',
+                    needsAttention
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-gray-400 dark:text-gray-500',
+                )}
+            >
+                {lookup.message ?? 'No answer from n8n.'}
+            </span>
+        );
+    }
+
+    const { status, error, url, stopped_at } = lookup.execution;
+
+    return (
+        <div className="flex flex-col items-end gap-0.5 text-right">
+            <span
+                className={clsx(
+                    'font-mono text-[10px] tracking-wide uppercase',
+                    N8N_STATUS_TONE[status] ??
+                        'text-gray-500 dark:text-gray-400',
+                )}
+            >
+                n8n: {status}
+                {stopped_at && ` · ${formatRelative(stopped_at)}`}
+            </span>
+
+            {error && (
+                <span
+                    className="line-clamp-2 max-w-[220px] text-[10px] text-red-500 dark:text-red-400"
+                    title={error}
+                >
+                    {error}
+                </span>
+            )}
+
+            {url && (
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-mono text-[10px] text-gray-400 hover:underline dark:text-gray-500"
+                >
+                    open in n8n
+                    <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+            )}
+        </div>
+    );
 }

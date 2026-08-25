@@ -1,7 +1,9 @@
 import PageHeader from '@/components/common/PageHeader';
 import {
     BatchStatusPill,
+    ExecutionId,
     ProgressBar,
+    RunActions,
     RunStatusPill,
     SyncBatchRun,
     describeBatchWindows,
@@ -55,6 +57,9 @@ interface Props {
     batches: PaginatedData<BatchRow>;
     syncTypes: { value: string; label: string }[];
     inlineRunLimit: number;
+    n8nApiConfigured: boolean;
+    /** True while a batch holds the ERP — retries wait until it's clear. */
+    queueBusy: boolean;
     query?: {
         syncType?: string | null;
         status?: string | null;
@@ -79,6 +84,8 @@ export default function GencysSyncRuns({
     batches,
     syncTypes,
     inlineRunLimit,
+    n8nApiConfigured,
+    queueBusy,
     query,
 }: Props) {
     const indexUrl = `/workspaces/${workspace.slug}/gencys/sync-runs`;
@@ -224,6 +231,8 @@ export default function GencysSyncRuns({
                                 open={expanded.includes(batch.id)}
                                 loading={loadingId === batch.id}
                                 inlineRunLimit={inlineRunLimit}
+                                n8nApiConfigured={n8nApiConfigured}
+                                queueBusy={queueBusy}
                                 onToggle={() => toggle(batch)}
                             />
                         ))}
@@ -250,6 +259,8 @@ function BatchAccordion({
     open,
     loading,
     inlineRunLimit,
+    n8nApiConfigured,
+    queueBusy,
     onToggle,
 }: {
     batch: BatchRow;
@@ -257,6 +268,9 @@ function BatchAccordion({
     open: boolean;
     loading: boolean;
     inlineRunLimit: number;
+    n8nApiConfigured: boolean;
+    /** True while a batch holds the ERP — retries wait until it's clear. */
+    queueBusy: boolean;
     onToggle: () => void;
 }) {
     const ok = batch.counts.success ?? 0;
@@ -363,6 +377,9 @@ function BatchAccordion({
                     <RunTable
                         runs={batch.runs}
                         showSyncColumn={batch.sync_types.length > 1}
+                        workspaceSlug={workspaceSlug}
+                        n8nApiConfigured={n8nApiConfigured}
+                        queueBusy={queueBusy}
                     />
 
                     {batch.runs_truncated && (
@@ -386,9 +403,15 @@ function BatchAccordion({
 function RunTable({
     runs,
     showSyncColumn,
+    workspaceSlug,
+    n8nApiConfigured,
+    queueBusy,
 }: {
     runs: SyncBatchRun[] | null;
     showSyncColumn: boolean;
+    workspaceSlug: string;
+    n8nApiConfigured: boolean;
+    queueBusy: boolean;
 }) {
     if (runs === null) {
         return (
@@ -408,10 +431,11 @@ function RunTable({
 
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="w-full min-w-[760px]">
                 <thead>
                     <tr className="border-b border-black/6 dark:border-white/6">
                         <Th>Run</Th>
+                        <Th>n8n</Th>
                         {showSyncColumn && <Th>Sync</Th>}
                         <Th>Subject</Th>
                         <Th>Status</Th>
@@ -419,6 +443,7 @@ function RunTable({
                         <Th>Sent</Th>
                         <Th>Took</Th>
                         <Th>Note</Th>
+                        <Th> </Th>
                     </tr>
                 </thead>
                 <tbody>
@@ -429,6 +454,9 @@ function RunTable({
                         >
                             <Td className="font-mono text-gray-400 dark:text-gray-500">
                                 #{run.id}
+                            </Td>
+                            <Td>
+                                <ExecutionId id={run.n8n_execution_id} />
                             </Td>
                             {showSyncColumn && (
                                 <Td className="text-gray-500 dark:text-gray-400">
@@ -477,6 +505,14 @@ function RunTable({
                                 >
                                     {run.message ?? '—'}
                                 </span>
+                            </Td>
+                            <Td>
+                                <RunActions
+                                    run={run}
+                                    workspaceSlug={workspaceSlug}
+                                    n8nApiConfigured={n8nApiConfigured}
+                                    queueBusy={queueBusy}
+                                />
                             </Td>
                         </tr>
                     ))}

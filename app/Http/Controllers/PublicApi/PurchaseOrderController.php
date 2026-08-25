@@ -10,6 +10,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\SyncCallbackFields;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
@@ -73,7 +74,7 @@ class PurchaseOrderController extends Controller
 
         $results = [];
 
-        DB::transaction(function () use ($entries, $workspace, $itemsById, &$results) {
+        DB::transaction(function () use ($entries, $workspace, $itemsById, $request, &$results) {
             foreach ($entries as $entry) {
                 $item = $itemsById->get($entry['id'] ?? null);
 
@@ -85,7 +86,12 @@ class PurchaseOrderController extends Controller
                 }
 
                 // The entry's sync_run_id is the run we opened for this item.
-                GencysSyncRun::succeedById($workspace->id, $entry['sync_run_id'] ?? null, $synced);
+                GencysSyncRun::succeedById(
+                    $workspace->id,
+                    SyncCallbackFields::runId($entry, $request),
+                    $synced,
+                    executionId: SyncCallbackFields::executionId($entry, $request),
+                );
 
                 $results[] = [
                     'inventory_item_id' => $entry['id'] ?? null,

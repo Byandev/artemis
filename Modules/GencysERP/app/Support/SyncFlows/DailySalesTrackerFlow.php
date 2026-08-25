@@ -47,6 +47,13 @@ class DailySalesTrackerFlow extends SyncFlow
         ];
     }
 
+    public function parametersForRun(GencysSyncRun $run): array
+    {
+        return array_filter([
+            'dates' => array_filter([data_get($run->meta, 'date')]),
+        ]);
+    }
+
     public function buildRuns(GencysSyncBatch $batch): int
     {
         $dates = (array) data_get($batch->parametersFor($this->type()), 'dates', []);
@@ -81,6 +88,7 @@ class DailySalesTrackerFlow extends SyncFlow
             'erp_password' => $workspace->erp_password,
             'date' => data_get($run->meta, 'date'),
             'webhook_url' => $this->callbackUrl('api/v1/public/gencys/daily-sales-tracker'),
+            'finish_webhook_url' => $this->callbackUrl('api/v1/public/gencys/sync-runs/finish'),
             'sync_run_id' => $run->id,
         ];
     }

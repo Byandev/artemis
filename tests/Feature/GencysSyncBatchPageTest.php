@@ -74,6 +74,10 @@ test('the detail page lists the batch runs visible to this workspace', function 
             ->where('batch.id', $batch->id)
             ->has('runs.data', 2)
             ->where('runs.data.0.subject', 'SKU-1')
+            // The same per-run actions as the Sync Runs page need these two.
+            ->has('n8nApiConfigured')
+            ->where('queueBusy', true)
+            ->has('runs.data.0.n8n_execution_id')
         );
 });
 

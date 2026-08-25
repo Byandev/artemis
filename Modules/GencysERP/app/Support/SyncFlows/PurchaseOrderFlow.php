@@ -52,6 +52,15 @@ class PurchaseOrderFlow extends SyncFlow
         ];
     }
 
+    public function parametersForRun(GencysSyncRun $run): array
+    {
+        return array_filter([
+            'start_date' => data_get($run->meta, 'start_date'),
+            'end_date' => data_get($run->meta, 'end_date'),
+            'item_ids' => array_filter([$run->inventory_item_id]),
+        ]);
+    }
+
     public function buildRuns(GencysSyncBatch $batch): int
     {
         $parameters = $batch->parametersFor($this->type());

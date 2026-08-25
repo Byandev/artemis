@@ -225,3 +225,65 @@ test('finish rejects a bad key and a run from another workspace', function () {
 
     expect($otherRun->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
 });
+
+test('the n8n execution id echoed back on a chunk is stored on the run', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeTrackerWorkspace();
+
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_DAILY_SALES_TRACKER, ['date' => '08/24/2026']);
+
+    $this->postJson('/api/v1/public/gencys/daily-sales-tracker', [[
+        'workspace_id' => $workspace->id,
+        'api_key' => $raw,
+        'sync_run_id' => $run->id,
+        'n8n_execution_id' => '10427',
+        'purchase_orders' => [trackerRow(1)],
+    ]])->assertOk();
+
+    expect($run->fresh()->n8n_execution_id)->toBe('10427');
+});
+
+test('finish records the execution id, and reports it back', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeTrackerWorkspace();
+
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_DAILY_SALES_TRACKER, ['date' => '08/24/2026']);
+
+    $this->postJson('/api/v1/public/gencys/sync-runs/finish', [
+        'api_key' => $raw,
+        'sync_run_id' => $run->id,
+        'execution_id' => '99001',
+    ])->assertOk()->assertJson(['n8n_execution_id' => '99001']);
+
+    expect($run->fresh()->n8n_execution_id)->toBe('99001');
+});
+
+test('an execution id on a failed finish is kept, so the failure stays traceable', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeTrackerWorkspace();
+
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_DAILY_SALES_TRACKER, ['date' => '08/24/2026']);
+
+    $this->postJson('/api/v1/public/gencys/sync-runs/finish', [
+        'api_key' => $raw,
+        'sync_run_id' => $run->id,
+        'status' => 'failed',
+        'message' => 'ERP login rejected',
+        'n8n_execution_id' => '99002',
+    ])->assertOk();
+
+    $run->refresh();
+
+    expect($run->status)->toBe(GencysSyncRun::STATUS_FAILED)
+        ->and($run->n8n_execution_id)->toBe('99002');
+});
+
+test('a run with no execution id echoed back is left null rather than blanked', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeTrackerWorkspace();
+
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_DAILY_SALES_TRACKER, ['date' => '08/24/2026']);
+
+    // Chunk one carries the id; chunk two doesn't. The id must survive.
+    postTrackerChunk($raw, $workspace->id, $run->id, [1]);
+    $run->forceFill(['n8n_execution_id' => '555'])->save();
+    postTrackerChunk($raw, $workspace->id, $run->id, [2]);
+
+    expect($run->fresh()->n8n_execution_id)->toBe('555');
+});

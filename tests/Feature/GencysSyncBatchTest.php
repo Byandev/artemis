@@ -61,10 +61,13 @@ function reportInFlightRuns(GencysSyncBatch $batch, string $raw, int $rows = 1):
 }
 
 beforeEach(function () {
-    // One stub whose status the test can move — Http::fake() accumulates stubs
-    // and the first match wins, so re-faking inside a test would be ignored.
+    // One stub the test can steer — Http::fake() accumulates stubs and the first
+    // match wins, so re-faking inside a test would be silently ignored.
     $this->n8nStatus = 200;
-    Http::fake(fn () => Http::response(['ok' => true], $this->n8nStatus));
+    $this->n8nBody = ['ok' => true];
+    $this->n8nHeaders = [];
+
+    Http::fake(fn () => Http::response($this->n8nBody, $this->n8nStatus, $this->n8nHeaders));
 
     config(['gencyserp.batch.group_size' => 2]);
 });
@@ -480,4 +483,79 @@ test('a timed-out run shows up in the tallies while the batch is still going', f
         ->and($batch->succeeded_runs)->toBe(1)
         ->and($batch->failed_runs)->toBe(1)
         ->and($batch->progressPercent())->toBe(50);
+});
+
+test('the execution id lands on inventory runs too, and clears on retry', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 2);
+
+    config(['gencyserp.batch.max_retries' => 1]);
+
+    $batch = queueTransactionBatch();
+    $runs = $batch->runs()->pending()->orderBy('id')->get();
+
+    $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', [
+        // One execution handled the whole group, so it rides at the top level.
+        'n8n_execution_id' => '77123',
+        'items' => [[
+            'id' => $runs->first()->inventory_item_id,
+            'sync_run_id' => $runs->first()->id,
+            'transactions' => [['ref_no' => 'TX-1', 'date' => '2026-08-24', 'po_qty_in' => 1, 'inventory_remaining_stock' => 1]],
+        ]],
+    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
+
+    expect($runs->first()->fresh()->n8n_execution_id)->toBe('77123');
+
+    // The other run times out. Its next attempt will be a different execution,
+    // so the stale id must not follow it into the retry.
+    $stuck = $runs->last();
+    $stuck->forceFill(['n8n_execution_id' => '77123'])->save();
+
+    $this->travel(11)->minutes();
+    app(BatchRunner::class)->expireTimedOutRuns();
+
+    $stuck->refresh();
+
+    expect($stuck->status)->toBe(GencysSyncRun::STATUS_QUEUED)
+        ->and($stuck->attempt)->toBe(1)
+        ->and($stuck->n8n_execution_id)->toBeNull();
+});
+
+test('the execution id n8n answers with is stamped on the group it took', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
+
+    // n8n reports the execution it started in the response to our call.
+    $this->n8nBody = ['executionId' => '88231'];
+
+    $batch = queueTransactionBatch();
+
+    expect($batch->runs()->pluck('n8n_execution_id')->unique()->all())->toBe(['88231']);
+});
+
+test('the execution id is found inside a wrapped response', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 1);
+
+    $this->n8nBody = ['data' => ['execution_id' => '4410']];
+
+    expect(queueTransactionBatch()->runs()->sole()->n8n_execution_id)->toBe('4410');
+});
+
+test('the execution id is found in a response header', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 1);
+
+    // n8n's default body says nothing useful, but the header carries it.
+    $this->n8nBody = ['message' => 'Workflow was started'];
+    $this->n8nHeaders = ['x-n8n-execution-id' => '4411'];
+
+    expect(queueTransactionBatch()->runs()->sole()->n8n_execution_id)->toBe('4411');
+});
+
+test('a response with no execution id leaves the runs unstamped rather than failing', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
+
+    $this->n8nBody = ['message' => 'Workflow was started'];
+
+    $batch = queueTransactionBatch();
+
+    expect($batch->runs()->pending()->count())->toBe(2)
+        ->and($batch->runs()->whereNotNull('n8n_execution_id')->count())->toBe(0);
 });

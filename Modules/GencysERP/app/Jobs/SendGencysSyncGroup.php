@@ -4,9 +4,11 @@ namespace Modules\GencysERP\Jobs;
 
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\SyncCallbackFields;
 use Throwable;
 
 /**
@@ -15,8 +17,11 @@ use Throwable;
  * the flow already built.
  *
  * A successful handshake means nothing has synced yet; it means n8n took the job.
- * The runs stay pending until n8n posts the data back (which advances the batch)
- * or their timeout expires. Only the handshake failing is this job's business:
+ * What the response does carry is the id of the execution n8n started, which is
+ * stamped onto the group's runs so they can be traced even if no callback ever
+ * arrives. The runs stay pending until n8n posts the data back (which advances
+ * the batch) or their timeout expires. Only the handshake failing is this job's
+ * business:
  * that request is never going to produce a callback, so the runs go back in the
  * queue for another attempt, or are failed once the batch's retries are spent.
  *
@@ -54,6 +59,8 @@ class SendGencysSyncGroup implements ShouldQueue
         }
 
         if ($response->successful()) {
+            $this->recordExecutionId($response);
+
             return;
         }
 
@@ -65,6 +72,35 @@ class SendGencysSyncGroup implements ShouldQueue
             'status' => $response->status(),
             'body' => $response->body(),
         ]);
+    }
+
+    /**
+     * Stamp the n8n execution that took this group onto its runs.
+     *
+     * n8n reports the execution it started in the response to our call, which is
+     * the earliest and most reliable moment to capture it: a run whose callback
+     * never arrives is exactly the one you want to look up in n8n, and by then
+     * there is no callback to carry the id.
+     *
+     * Runs that already have an id are left alone — a callback that came back
+     * before this response was processed got there first, and it is the same
+     * execution either way.
+     */
+    private function recordExecutionId(Response $response): void
+    {
+        $executionId = SyncCallbackFields::executionIdFromResponse(
+            $response->json(),
+            $response->headers(),
+        );
+
+        if (! $executionId || empty($this->syncRunIds)) {
+            return;
+        }
+
+        GencysSyncRun::query()
+            ->whereIn('id', $this->syncRunIds)
+            ->whereNull('n8n_execution_id')
+            ->update(['n8n_execution_id' => $executionId]);
     }
 
     /**
