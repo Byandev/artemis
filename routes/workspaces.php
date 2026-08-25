@@ -48,6 +48,7 @@ use Modules\Billing\Http\Controllers\InvoiceController as BillingInvoiceControll
 use Modules\Botcake\Http\Controllers\Web\FlowController;
 use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
+use Modules\Courses\Http\Controllers\CoursesController;
 use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
@@ -644,6 +645,16 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/invoices', [BillingInvoiceController::class, 'index'])->name('invoices.index');
         Route::get('/invoices/{invoice}/download', [BillingInvoiceController::class, 'download'])
             ->name('invoices.download');
+    });
+
+    Route::prefix('/workspaces/{workspace:slug}/courses')->name('workspaces.courses.')->group(function () {
+        Route::get('/', [CoursesController::class, 'index'])->name('index');
+        Route::post('/', [CoursesController::class, 'store'])->name('store');
+        Route::get('/{course}', [CoursesController::class, 'show'])->name('show');
+        Route::put('/{course}', [CoursesController::class, 'update'])->name('update');
+        Route::delete('/{course}', [CoursesController::class, 'destroy'])->name('destroy');
+        // The bucket is private, so course media is reached through the app.
+        Route::get('/{course}/media/{media}', [CoursesController::class, 'showMedia'])->name('media.show');
     });
 
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');

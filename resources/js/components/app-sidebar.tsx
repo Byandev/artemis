@@ -32,6 +32,7 @@ import {
     ExternalLink,
     Facebook,
     FileText,
+    GraduationCap,
     History,
     Landmark,
     Layers,
@@ -469,6 +470,23 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/billing/invoices`,
                               icon: ReceiptText,
                               permission: PERMISSIONS.ViewInvoices,
+                          },
+                      ],
+                  },
+              ]
+            : []),
+        ...(currentWorkspace.courses_module_enabled
+            ? [
+                  {
+                      title: 'Courses',
+                      icon: GraduationCap,
+                      anyOf: [PERMISSIONS.ViewCourses],
+                      items: [
+                          {
+                              title: 'All Courses',
+                              href: `/workspaces/${slug}/courses`,
+                              icon: GraduationCap,
+                              permission: PERMISSIONS.ViewCourses,
                           },
                       ],
                   },

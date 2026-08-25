@@ -35,6 +35,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Course Media Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where course thumbnails, videos, and attachments are stored. S3 in every
+    | deployed environment; override to "local" on machines with no AWS
+    | credentials. The bucket is private, so these are served through the app
+    | via a short-lived signed URL, never a public one.
+    |
+    | Deliberately NOT named MEDIA_DISK, for the same reason as the disk above:
+    | that env var is media-library's own (`disk_name`) and setting it would
+    | repoint every other collection at this bucket too.
+    |
+    */
+
+    'course_media_disk' => env('COURSE_MEDIA_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

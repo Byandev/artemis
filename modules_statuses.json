@@ -7,5 +7,6 @@
     "Creatives": true,
     "GencysERP": true,
     "SimGateway": true,
-    "Billing": true
+    "Billing": true,
+    "Courses": true
 }
