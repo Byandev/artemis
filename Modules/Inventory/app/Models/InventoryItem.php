@@ -30,6 +30,9 @@ class InventoryItem extends Model
         'unfulfilled_count',
         'three_days_average',
         'remaining_qty',
+        // The item's id in Gencys ERP, stamped by the ERP sync so a later run
+        // matches the same record even if its SKU is renamed there.
+        'reference_id',
     ];
 
     protected $casts = [

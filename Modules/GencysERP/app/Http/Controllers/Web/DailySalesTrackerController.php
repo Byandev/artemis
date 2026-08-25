@@ -169,7 +169,7 @@ class DailySalesTrackerController extends Controller
      *
      * Line items are picked from the workspace's unit codes, which is how real
      * Gencys orders work: each `gencys_order_items.sku` is a unit-code label,
-     * and downstream jobs (SyncInventoryFromGencysOrders) expand it into its
+     * and the inventory snapshot (GencysDemandSync) expands it into its
      * component inventory items. `order_details` is rebuilt from those picks in
      * Gencys' own "{qty}x{unit code}" format so the table and the product
      * groupings that read it behave the same as for synced rows.

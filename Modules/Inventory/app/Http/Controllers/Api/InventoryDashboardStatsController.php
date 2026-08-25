@@ -18,6 +18,7 @@ use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Models\PurchasedOrderItemDelivery;
 use Modules\Inventory\Support\InventoryStockColumns;
+use Modules\Inventory\Support\SnapshotItemScope;
 
 /**
  * Per-KPI endpoints for the inventory dashboard. Each statistic is resolved on
@@ -37,6 +38,9 @@ use Modules\Inventory\Support\InventoryStockColumns;
 class InventoryDashboardStatsController extends Controller
 {
     use AuthorizesRequests;
+
+    /** Memoised snapshot date; see snapshotDate(). */
+    private ?string $snapshotDate = null;
 
     /**
      * Trailing windows the movement chart offers, in days. The first is the
@@ -74,7 +78,7 @@ class InventoryDashboardStatsController extends Controller
 
         $count = $this->activeItems($request, $workspace)
             ->distinct()
-            ->count(DB::raw('COALESCE(inventory_items.parent_id, inventory_items.id)'));
+            ->count(DB::raw('COALESCE(inventory_item_snapshots.parent_id, inventory_item_snapshots.inventory_item_id)'));
 
         return response()->json(['value' => $count]);
     }
@@ -88,7 +92,7 @@ class InventoryDashboardStatsController extends Controller
         $this->authorize('View Inventory Items', $workspace);
 
         $total = $this->activeItems($request, $workspace)
-            ->sum(DB::raw('COALESCE('.InventoryStockColumns::currentStocks().', 0)'));
+            ->sum(DB::raw('COALESCE(inventory_item_snapshots.current_stocks, 0)'));
 
         return response()->json(['value' => (int) round((float) $total)]);
     }
@@ -124,9 +128,12 @@ class InventoryDashboardStatsController extends Controller
         // Per-item rows first (parents included, so their children roll into
         // them), then aggregated by group below — mirrors
         // InventoryItemController::buildSummaryQuery().
+        $identity = SnapshotItemScope::groupIdentity();
+
         $inner = $this->activeItems($request, $workspace)
-            ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.unfulfilled_count, products.name as product_name');
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.unfulfilled_count')
+            ->selectRaw("{$identity['group_sku']} as group_sku")
+            ->selectRaw("{$identity['group_product_name']} as group_product_name");
 
         $groupUnfulfilled = 'COALESCE(SUM(sub.unfulfilled_count), 0)';
 
@@ -134,10 +141,10 @@ class InventoryDashboardStatsController extends Controller
             ->fromSub($inner, 'sub')
             // Identity comes from the parent when the group has one, else from
             // the standalone item itself.
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
-            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            ->selectRaw('COALESCE(sub.parent_id, sub.id) as id')
+            ->selectRaw('MAX(sub.group_sku) as sku')
+            ->selectRaw('MAX(sub.group_product_name) as product_name')
+            ->selectRaw('MAX(sub.parent_id IS NOT NULL) as is_group')
             // Excludes the parent placeholder, so a standalone item is a group of one.
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw("$groupUnfulfilled as unfulfilled_count")
@@ -182,15 +189,21 @@ class InventoryDashboardStatsController extends Controller
     {
         $this->authorize('View Inventory Items', $workspace);
 
+        $identity = SnapshotItemScope::groupIdentity();
+
         $inner = $this->activeItems($request, $workspace)
-            ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
-            // When this item was last ordered. Joined once rather than looked up
-            // per row, and only here — the other panels have no use for it.
-            ->leftJoinSub($this->lastOrderedQuery(), 'last_po', 'last_po.inventory_item_id', '=', 'inventory_items.id')
-            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.three_days_average, products.name as product_name')
+            // When this group was last ordered at all — including orders since
+            // delivered. Still read live, and deliberately not the snapshot's
+            // last_po_date, which answers a different question: the most recent
+            // order *still owing* stock. On a low-stock row "we last ordered
+            // this in March" is the point, and an order that has since arrived
+            // does not stop being when we last ordered.
+            ->leftJoinSub($this->lastOrderedQuery(), 'last_po', 'last_po.inventory_item_id', '=', 'inventory_item_snapshots.inventory_item_id')
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.three_days_average')
             ->selectRaw('last_po.last_issued_at')
-            ->selectRaw(InventoryStockColumns::currentStocks().' as current_stocks')
-            ->selectRaw(InventoryStockColumns::remainingAfterFulfillment().' as remaining_after_fulfillment');
+            ->selectRaw('inventory_item_snapshots.current_stocks, inventory_item_snapshots.remaining_after_fulfillment')
+            ->selectRaw("{$identity['group_sku']} as group_sku")
+            ->selectRaw("{$identity['group_product_name']} as group_product_name");
 
         // The group's lead time and buffer are the parent's when it has one,
         // else the max across the group — same rule the items list applies.
@@ -202,10 +215,10 @@ class InventoryDashboardStatsController extends Controller
 
         $rows = DB::query()
             ->fromSub($inner, 'sub')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
-            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            ->selectRaw('COALESCE(sub.parent_id, sub.id) as id')
+            ->selectRaw('MAX(sub.group_sku) as sku')
+            ->selectRaw('MAX(sub.group_product_name) as product_name')
+            ->selectRaw('MAX(sub.parent_id IS NOT NULL) as is_group')
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
             // The most recent order across the whole group: any sibling being
@@ -711,15 +724,21 @@ class InventoryDashboardStatsController extends Controller
      */
     private function activeItems(Request $request, Workspace $workspace): Builder
     {
-        $query = InventoryItem::where('inventory_items.workspace_id', $workspace->id)
-            ->where('inventory_items.is_active', true);
+        // Reads the frozen day the items list reads, not a live recomputation.
+        // The tiles summarise that table; computing them separately is how the
+        // dashboard and the list came to show different totals for the same
+        // workspace. Columns keep their live names, so the aggregation above
+        // this line is unchanged.
+        return SnapshotItemScope::query($request, $workspace, $this->snapshotDate($workspace) ?? '1970-01-01');
+    }
 
-        // Every stock fragment reads from the derived tables these attach.
-        InventoryStockColumns::applyJoins($query);
-
-        $this->applyTeamVisibility($request, $query, $workspace);
-
-        return $query;
+    /**
+     * The day the item figures are as of, or null when nothing has been frozen.
+     * Cached per request: several tiles ask, and it is the same answer.
+     */
+    private function snapshotDate(Workspace $workspace): ?string
+    {
+        return $this->snapshotDate ??= SnapshotItemScope::date($workspace);
     }
 
     /**

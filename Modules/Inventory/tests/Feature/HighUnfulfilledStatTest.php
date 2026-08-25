@@ -6,9 +6,17 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-/** The dashboard's high-unfulfilled payload for a workspace. */
+/**
+ * The dashboard's high-unfulfilled payload for a workspace.
+ *
+ * Freezes first, because the dashboard reads inventory_item_snapshots rather
+ * than recomputing — the same order the real thing runs in, where the scheduled
+ * snapshot lands and someone then opens the page.
+ */
 function highUnfulfilled($user, $workspace): array
 {
+    test()->artisan('inventory:snapshot-items')->assertSuccessful();
+
     return test()->actingAs($user)
         ->getJson("/api/workspaces/{$workspace->slug}/inventory/dashboard/high-unfulfilled")
         ->assertOk()

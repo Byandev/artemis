@@ -105,6 +105,11 @@ enum Permission: string
     case ViewBotcakeSequenceMessages = 'View Botcake Sequence Messages';
     case ViewBotcakeFlows = 'View Botcake Flows';
 
+    // SMS
+    case ViewSims = 'View SIMs';
+    case SendSms = 'Send SMS';
+    case ViewSmsOutbox = 'View SMS Outbox';
+
     // Finance
     case ViewFinanceDashboard = 'View Finance Dashboard';
     case ViewFinanceAccounts = 'View Finance Accounts';
@@ -295,6 +300,10 @@ enum Permission: string
             self::ViewBotcakeSequences,
             self::ViewBotcakeSequenceMessages,
             self::ViewBotcakeFlows => 'Botcake',
+
+            self::ViewSims,
+            self::SendSms,
+            self::ViewSmsOutbox => 'SMS',
 
             self::ViewPageDailyBudgetRecords,
             self::CreatePageDailyBudgetRecords,

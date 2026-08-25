@@ -77,9 +77,11 @@ const TILES: Tile[] = [
         sub: (d) =>
             d.shippable_skus > 0
                 ? `on the shelf across ${d.shippable_skus} SKU${d.shippable_skus === 1 ? '' : 's'}`
-                : `nothing sitting past ${d.picking_days} days`,
-        help: 'Stock physically here with an unfulfilled order against it, that has been sittable for more than three days. A normal picking queue is excluded — this is the part the warehouse could have shipped and has not.',
-        tone: 'bad',
+                : 'nothing on the shelf to ship',
+        // Deliberately toneless: stock ready to go out is neither good news nor
+        // bad on its own. Whether any of it has stalled is a separate question,
+        // and the warehouse card answers it from despatch dates.
+        help: 'Stock physically here with an unfulfilled order against it — everything that could leave today. Matched per SKU, since stock on one variant cannot ship an order placed against another. This counts what is ready, not what is late: the warehouse card is where stock that has stopped moving shows up.',
     },
 ];
 
@@ -187,9 +189,14 @@ function KpiTile({
                                     'h-1.5 w-1.5 shrink-0 rounded-full',
                                     !active
                                         ? 'bg-emerald-500'
-                                        : tile.tone === 'bad'
-                                          ? 'bg-red-500'
-                                          : 'bg-amber-500',
+                                        : // A toneless tile is reporting, not
+                                          // warning — it gets a neutral dot
+                                          // rather than falling through to amber.
+                                          !tile.tone
+                                          ? 'bg-gray-300 dark:bg-gray-600'
+                                          : tile.tone === 'bad'
+                                            ? 'bg-red-500'
+                                            : 'bg-amber-500',
                                 )}
                             />
                             {tile.sub(data)}

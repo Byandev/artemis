@@ -9,19 +9,22 @@ use App\Support\TeamVisibility;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use Modules\Inventory\Exports\InventoryItemExport;
+use Modules\Inventory\Exports\InventoryItemReportExport;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryItemSnapshot;
-use Modules\Inventory\Models\InventoryUnitCodeItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Support\InventoryItemMetrics;
+use Modules\Inventory\Support\InventoryItemSnapshotter;
 use Modules\Inventory\Support\InventoryStockColumns;
+use Modules\Inventory\Support\ItemReportFacts;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -215,6 +218,18 @@ class InventoryItemController extends Controller
             ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
             ->tap(fn ($q) => InventoryStockColumns::applyJoins($q))
             ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.lead_time, inventory_items.days_of_coverage, inventory_items.unfulfilled_count, inventory_items.three_days_average, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
+            // The group's identity, carried on every row of the group and read
+            // straight off the parent rather than off whichever rows survived the
+            // filters. A search or a product filter can exclude the parent
+            // placeholder, and the roll-up would then take the group's name — and
+            // worse, its id — from an arbitrary child, so an inline edit would
+            // patch a different item than the one on screen.
+            ->selectRaw('COALESCE((SELECT p.sku FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.sku) as group_sku')
+            // The parent's own product, never the children's. A group whose
+            // parent has no product shows none: one of its children's would be an
+            // arbitrary pick dressed up as the group's.
+            ->selectRaw('(SELECT gp.name FROM products gp WHERE gp.id = COALESCE((SELECT p.product_id FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.product_id)) as group_product_name')
+            ->selectRaw('(SELECT gp.winning_date FROM products gp WHERE gp.id = COALESCE((SELECT p.product_id FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.product_id)) as group_product_winning_date')
             ->selectRaw("{$sql['current_stocks']} as current_stocks")
             ->selectRaw("{$sql['waiting_for_delivery_stocks']} as waiting_for_delivery_stocks")
             ->selectRaw("{$sql['discrepancy']} as discrepancy")
@@ -280,12 +295,17 @@ class InventoryItemController extends Controller
         // po_needed and days_it_can_last are recomputed from the summed totals above.
         $outer = DB::query()
             ->fromSub($inner, 'sub')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
+            // The group key itself, so the row's id is the parent's whether or
+            // not the parent row survived the filters — every action the list
+            // offers targets this id.
+            ->selectRaw('COALESCE(sub.parent_id, sub.id) as id')
+            ->selectRaw('MAX(sub.group_sku) as sku')
             ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_id END), MAX(sub.product_id)) as product_id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_winning_date END), MAX(sub.product_winning_date)) as product_winning_date')
-            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            ->selectRaw('MAX(sub.group_product_name) as product_name')
+            ->selectRaw('MAX(sub.group_product_winning_date) as product_winning_date')
+            // Having a parent is what makes a row a group, not whether the parent
+            // placeholder happened to match the filters.
+            ->selectRaw('MAX(sub.parent_id IS NOT NULL) as is_group')
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('MAX(sub.is_active) as is_active')
             ->selectRaw("$groupLeadTime as lead_time")
@@ -324,98 +344,207 @@ class InventoryItemController extends Controller
     }
 
     /**
-     * The flat list as it stood on a past date, read from inventory_item_snapshots.
-     * The snapshot table stores the computed metrics under the same aliases the live
-     * query derives, so this is the same shape with plain columns instead of
-     * correlated subqueries — and the frontend cannot tell the two apart.
+     * Left-join the day's snapshot row onto an inventory_items query, as `snap`.
+     *
+     * Left rather than inner on purpose: an item with no row for that day — one
+     * created or synced after the snapshot ran — has to survive the join and show
+     * "—" in its metric columns rather than drop out of the list entirely.
+     */
+    private function joinSnapshot($query, Workspace $workspace, string $date): void
+    {
+        $query->leftJoin('inventory_item_snapshots as snap', function ($join) use ($workspace, $date) {
+            $join->on('snap.inventory_item_id', '=', 'inventory_items.id')
+                ->where('snap.workspace_id', $workspace->id)
+                ->where('snap.snapshot_date', $date);
+        });
+    }
+
+    /**
+     * The measured columns a snapshot froze, read from the snapshot row alone.
+     *
+     * Never coalesced to the item's live value: a row with no snapshot for the
+     * day has no figure for that day, and today's number shown under a past date
+     * would be history the workspace never recorded. NULL reaches the list as "—".
+     */
+    private function snapshotMetricColumns(): array
+    {
+        return [
+            'unfulfilled_count',
+            'three_days_average',
+            'remaining_qty',
+            'current_stocks',
+            'waiting_for_delivery_stocks',
+            'requested_stocks',
+            'discrepancy',
+            'discrepancy_counted_qty',
+            'discrepancy_date',
+            'remaining_after_fulfillment',
+            'stocks_needed_for_lead_time',
+            'po_qty',
+            'po_needed',
+            'days_it_can_last',
+            'demand_as_of',
+            ...ItemReportFacts::SNAPSHOT_COLUMNS,
+        ];
+    }
+
+    /**
+     * The flat list for a snapshot date — every saved item, with that day's
+     * figures joined on.
+     *
+     * Anchored on inventory_items rather than on the snapshot table. Reading the
+     * snapshot table directly listed only the items that had a row for the day,
+     * so anything created or synced since the last run was invisible until the
+     * next one — a fresh ERP sync looked like it had done nothing. Now the items
+     * are the list and the snapshot supplies the numbers; an item without a row
+     * for the day shows "—" across its metric columns.
+     *
+     * Identity (SKU, product, active) and the editable config come from the item,
+     * so a row says what an edit to it would change. The metrics stay frozen as
+     * the snapshot recorded them.
      */
     private function buildSnapshotQuery(Request $request, Workspace $workspace, string $date): QueryBuilder
     {
-        $base = InventoryItemSnapshot::where('inventory_item_snapshots.workspace_id', $workspace->id)
-            ->where('inventory_item_snapshots.snapshot_date', $date)
+        $base = InventoryItem::where('inventory_items.workspace_id', $workspace->id)
             // Same as the live list: parents carry no stock of their own and would
             // show as an empty row here.
-            ->where('inventory_item_snapshots.is_parent', false)
+            ->where('inventory_items.is_parent', false)
             ->visibleTo($request->user(), $workspace);
 
-        $this->applySnapshotActiveFilter($request, $base);
+        $this->applyActiveFilter($request, $base);
+        $this->joinSnapshot($base, $workspace, $date);
 
-        // The parent's SKU as recorded that day, so a child row still shows what it
-        // was grouped under even if the grouping has changed since.
-        $parentSkuSql = '(SELECT p.sku FROM inventory_item_snapshots p WHERE p.inventory_item_id = inventory_item_snapshots.parent_id AND p.snapshot_date = inventory_item_snapshots.snapshot_date LIMIT 1)';
+        // Parent's SKU for child rows, so the flat list can show what each SKU is
+        // grouped under. NULL for parents and standalone items.
+        $parentSkuSql = '(SELECT p.sku FROM inventory_items p WHERE p.id = inventory_items.parent_id)';
 
         return QueryBuilder::for($base)
-            ->select('inventory_item_snapshots.*')
-            // The list keys rows off `id`; hand it the item's id so row actions and
-            // the summarize/flat views stay consistent with the live list.
-            ->selectRaw('inventory_item_snapshots.inventory_item_id as id')
+            ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->select([
+                'inventory_items.id',
+                'inventory_items.workspace_id',
+                'inventory_items.product_id',
+                'inventory_items.parent_id',
+                'inventory_items.is_parent',
+                'inventory_items.sku',
+                'inventory_items.is_active',
+                'inventory_items.sales_keywords',
+                'inventory_items.transaction_keywords',
+                'inventory_items.days_of_coverage',
+                'inventory_items.created_at',
+            ])
+            ->with(['product'])
             ->selectRaw("$parentSkuSql as parent_sku")
+            // Lead time is configuration, not a measurement: show the day's frozen
+            // value when there is one, else the item's own, so the inline editor
+            // always has a number to edit rather than a dash.
+            ->selectRaw('COALESCE(snap.lead_time, inventory_items.lead_time) as lead_time')
+            ->selectRaw(implode(', ', array_map(
+                fn (string $column) => "snap.$column as $column",
+                $this->snapshotMetricColumns(),
+            )))
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
-                    $query->where('inventory_item_snapshots.sku', 'like', "%{$value}%");
+                    $query->where('inventory_items.sku', 'like', "%{$value}%");
                 }),
-                AllowedFilter::exact('product_id', 'inventory_item_snapshots.product_id'),
+                AllowedFilter::exact('product_id', 'inventory_items.product_id'),
                 AllowedFilter::callback('unassigned', function ($query, $value) {
                     if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
-                        $query->whereNull('inventory_item_snapshots.product_id');
+                        $query->whereNull('inventory_items.product_id');
                     }
                 }),
-                // Product status is a live attribute — there is no historical copy of
-                // it — so it reads off the product as it stands today.
                 AllowedFilter::callback('product_status', function ($query, $value) {
-                    $query->whereHas('product', fn ($p) => $p->whereIn('status', (array) $value));
+                    $query->whereIn('products.status', (array) $value);
                 }),
                 // Applied manually above / consumed by index(); registered so
                 // QueryBuilder doesn't reject the keys.
                 AllowedFilter::callback('is_active', function () {}),
                 AllowedFilter::callback('date', function () {}),
             ])
+            // Every sort is table-qualified: both sides of the join carry columns
+            // of the same name, and a bare one is ambiguous to MySQL.
             ->allowedSorts([
-                'id',
-                'product_id',
-                'sku',
-                'is_active',
-                'product_name',
-                'lead_time',
-                'unfulfilled_count',
-                'remaining_qty',
-                'three_days_average',
-                'current_stocks',
-                'waiting_for_delivery_stocks',
-                'remaining_after_fulfillment',
-                'days_it_can_last',
-                'po_needed',
-                'stocks_needed_for_lead_time',
-                'po_qty',
-                'discrepancy',
-                AllowedSort::field('created_at', 'item_created_at'),
+                AllowedSort::field('id', 'inventory_items.id'),
+                AllowedSort::field('product_id', 'inventory_items.product_id'),
+                AllowedSort::field('sku', 'inventory_items.sku'),
+                AllowedSort::field('is_active', 'inventory_items.is_active'),
+                AllowedSort::field('product_name', 'products.name'),
+                AllowedSort::callback('lead_time', function ($query, $descending) {
+                    $query->orderByRaw('COALESCE(snap.lead_time, inventory_items.lead_time) '.($descending ? 'DESC' : 'ASC'));
+                }),
+                AllowedSort::field('unfulfilled_count', 'snap.unfulfilled_count'),
+                AllowedSort::field('remaining_qty', 'snap.remaining_qty'),
+                AllowedSort::field('three_days_average', 'snap.three_days_average'),
+                AllowedSort::field('current_stocks', 'snap.current_stocks'),
+                AllowedSort::field('waiting_for_delivery_stocks', 'snap.waiting_for_delivery_stocks'),
+                AllowedSort::field('remaining_after_fulfillment', 'snap.remaining_after_fulfillment'),
+                AllowedSort::field('days_it_can_last', 'snap.days_it_can_last'),
+                AllowedSort::field('po_needed', 'snap.po_needed'),
+                AllowedSort::field('stocks_needed_for_lead_time', 'snap.stocks_needed_for_lead_time'),
+                AllowedSort::field('po_qty', 'snap.po_qty'),
+                AllowedSort::field('discrepancy', 'snap.discrepancy'),
+                AllowedSort::field('created_at', 'inventory_items.created_at'),
             ])
-            ->defaultSort('item_created_at');
+            ->defaultSort('created_at');
     }
 
     /**
-     * The parent/child roll-up for a past date. Mirrors buildSummaryQuery over the
-     * snapshot table: same grouping key, same representative-row rules, and the same
-     * non-additive recomputation of po_needed / days_it_can_last from summed parts.
+     * The parent/child roll-up for a snapshot date. Same anchoring as
+     * buildSnapshotQuery — every saved item is grouped, the day's snapshot rows
+     * supply the figures — over the live grouping, so an item synced today rolls
+     * into the parent it is under today rather than vanishing.
+     *
+     * A group whose items have no rows for the day sums to NULL throughout, which
+     * the list renders as "—" rather than as a confident zero.
      */
     private function buildSnapshotSummaryQuery(Request $request, Workspace $workspace, string $date): Builder
     {
-        $inner = InventoryItemSnapshot::query()
-            ->where('inventory_item_snapshots.workspace_id', $workspace->id)
-            ->where('inventory_item_snapshots.snapshot_date', $date)
-            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.product_id, inventory_item_snapshots.is_active, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.item_created_at as created_at, inventory_item_snapshots.product_name, inventory_item_snapshots.product_winning_date, inventory_item_snapshots.current_stocks, inventory_item_snapshots.waiting_for_delivery_stocks, inventory_item_snapshots.discrepancy, inventory_item_snapshots.remaining_after_fulfillment, inventory_item_snapshots.po_needed');
+        // Per-item rows for the whole workspace (parents included, so their
+        // children roll into them).
+        $inner = InventoryItem::query()
+            ->where('inventory_items.workspace_id', $workspace->id)
+            ->leftJoin('products', 'products.id', '=', 'inventory_items.product_id')
+            ->selectRaw('inventory_items.id, inventory_items.parent_id, inventory_items.is_parent, inventory_items.sku, inventory_items.product_id, inventory_items.is_active, inventory_items.created_at, products.name as product_name, products.winning_date as product_winning_date')
+            // Configuration: the day's frozen value when it recorded one, else the
+            // item's own — the group formulas below need a number either way.
+            ->selectRaw('COALESCE(snap.lead_time, inventory_items.lead_time) as lead_time')
+            ->selectRaw('COALESCE(snap.days_of_coverage, inventory_items.days_of_coverage) as days_of_coverage')
+            // Measurements: the snapshot's alone. NULL where the day has no row.
+            ->selectRaw('snap.unfulfilled_count as unfulfilled_count')
+            ->selectRaw('snap.three_days_average as three_days_average')
+            ->selectRaw('snap.current_stocks as current_stocks')
+            ->selectRaw('snap.waiting_for_delivery_stocks as waiting_for_delivery_stocks')
+            ->selectRaw('snap.discrepancy as discrepancy')
+            ->selectRaw('snap.remaining_after_fulfillment as remaining_after_fulfillment')
+            ->selectRaw('snap.po_needed as po_needed')
+            // The group's identity, carried on every row of the group and read
+            // straight off the parent rather than off whichever rows survived the
+            // filters — see buildSummaryQuery for why that matters.
+            ->selectRaw('COALESCE((SELECT p.sku FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.sku) as group_sku')
+            ->selectRaw('(SELECT gp.name FROM products gp WHERE gp.id = COALESCE((SELECT p.product_id FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.product_id)) as group_product_name')
+            ->selectRaw('(SELECT gp.winning_date FROM products gp WHERE gp.id = COALESCE((SELECT p.product_id FROM inventory_items p WHERE p.id = inventory_items.parent_id), inventory_items.product_id)) as group_product_winning_date')
+            // The report's frozen group figures, carried through so the roll-up
+            // below can hand them back untouched.
+            ->selectRaw(implode(', ', array_map(
+                fn (string $column) => "snap.$column as $column",
+                ItemReportFacts::SNAPSHOT_COLUMNS,
+            )));
 
-        $this->applySnapshotActiveFilter($request, $inner);
-        $this->applySnapshotSummaryVisibility($request, $inner, $workspace);
+        $this->joinSnapshot($inner, $workspace, $date);
+        $this->applyActiveFilter($request, $inner);
+        $this->applySummaryVisibility($request, $inner, $workspace);
 
         if ($search = $request->input('filter.search')) {
-            $inner->where('inventory_item_snapshots.sku', 'like', "%{$search}%");
+            $inner->where('inventory_items.sku', 'like', "%{$search}%");
         }
 
         if ($productId = $request->input('filter.product_id')) {
-            $inner->where('inventory_item_snapshots.product_id', $productId);
+            $inner->where('inventory_items.product_id', $productId);
         }
 
+        // Keeps the parent placeholder whenever any of its children match — a
+        // parent has no product of its own, and filtering it out would strip the
+        // group of the row that supplies its SKU and lead time.
         if ($productStatus = $request->input('filter.product_status')) {
             $statuses = (array) $productStatus;
             $onStatus = fn ($q) => $q->whereHas('product', fn ($p) => $p->whereIn('status', $statuses));
@@ -424,7 +553,7 @@ class InventoryItemController extends Controller
         }
 
         if ($request->boolean('filter.unassigned')) {
-            $inner->whereNull('inventory_item_snapshots.product_id');
+            $inner->whereNull('inventory_items.product_id');
         }
 
         // Identical group-level formulas to the live roll-up — see buildSummaryQuery
@@ -437,16 +566,24 @@ class InventoryItemController extends Controller
         $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
         $groupCoverageBuffer = "($groupDaysOfCoverage * $summedThreeDayAvg)";
         $groupPoNeeded = "GREATEST(0, $groupCoverageBuffer + $groupStocksNeeded - $summedRemaining)";
-        $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
+        // The NULL arm is what separates "the day recorded nothing for this group"
+        // from "it sold nothing that day": without it a group with no snapshot
+        // rows would report 0 days of cover, which reads as an emergency.
+        $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg IS NULL THEN NULL WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
 
         $outer = DB::query()
             ->fromSub($inner, 'sub')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.id END), MAX(sub.id)) as id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.sku END), MAX(sub.sku)) as sku')
+            // The group key itself, so the row's id is the parent's whether or
+            // not the parent row survived the filters — every action the list
+            // offers targets this id.
+            ->selectRaw('COALESCE(sub.parent_id, sub.id) as id')
+            ->selectRaw('MAX(sub.group_sku) as sku')
             ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_id END), MAX(sub.product_id)) as product_id')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_name END), MAX(sub.product_name)) as product_name')
-            ->selectRaw('COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.product_winning_date END), MAX(sub.product_winning_date)) as product_winning_date')
-            ->selectRaw('MAX(CASE WHEN sub.is_parent = 1 THEN 1 ELSE 0 END) as is_group')
+            ->selectRaw('MAX(sub.group_product_name) as product_name')
+            ->selectRaw('MAX(sub.group_product_winning_date) as product_winning_date')
+            // Having a parent is what makes a row a group, not whether the parent
+            // placeholder happened to match the filters.
+            ->selectRaw('MAX(sub.parent_id IS NOT NULL) as is_group')
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('MAX(sub.is_active) as is_active')
             ->selectRaw("$groupLeadTime as lead_time")
@@ -464,6 +601,13 @@ class InventoryItemController extends Controller
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
             ->selectRaw("$groupCreatedAt as created_at")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
+
+        // MAX rather than SUM: these were group figures when they were frozen and
+        // are identical across the group's rows, so MAX returns them exactly.
+        // Summing would multiply each by the number of SKUs in the group.
+        foreach (ItemReportFacts::SNAPSHOT_COLUMNS as $column) {
+            $outer->selectRaw("MAX(sub.$column) as $column");
+        }
 
         $sortable = [
             'sku', 'is_active', 'lead_time', 'unfulfilled_count', 'current_stocks',
@@ -483,38 +627,6 @@ class InventoryItemController extends Controller
         return $outer;
     }
 
-    /** applyActiveFilter's semantics against the snapshot table's columns. */
-    private function applySnapshotActiveFilter(Request $request, $query): void
-    {
-        $isActiveFilter = $request->input('filter.is_active');
-
-        if ($isActiveFilter === null) {
-            $query->where('inventory_item_snapshots.is_active', true);
-        } elseif ($isActiveFilter !== 'all') {
-            $query->where('inventory_item_snapshots.is_active', filter_var($isActiveFilter, FILTER_VALIDATE_BOOLEAN));
-        }
-    }
-
-    /** applySummaryVisibility's parent-preserving team scoping, over snapshot rows. */
-    private function applySnapshotSummaryVisibility(Request $request, $query, Workspace $workspace): void
-    {
-        $teamIds = TeamVisibility::scopeTeamIds($request->user(), $workspace);
-
-        if ($teamIds === null) {
-            return;
-        }
-
-        if (empty($teamIds)) {
-            $query->whereRaw('1 = 0');
-
-            return;
-        }
-
-        $inTeams = fn ($q) => $q->whereHas('product.shops.teams', fn ($t) => $t->whereIn('teams.id', $teamIds));
-
-        $query->where(fn ($q) => $inTeams($q)->orWhereHas('children', $inTeams));
-    }
-
     /**
      * The snapshot date the list is pinned to, or null for live data. Only a date
      * that actually has rows counts — a date with no snapshot (the job had not run
@@ -526,7 +638,14 @@ class InventoryItemController extends Controller
         $date = $request->input('filter.date');
 
         if (! $date) {
-            return null;
+            // No date asked for: the newest day we hold. The list is a snapshot
+            // view now rather than a live one — everything it shows arrives by
+            // batch sync anyway, so computing it per request only ever bought a
+            // fresher-looking copy of the same figures at page-load cost. Null
+            // here means the workspace has no snapshot at all, and the caller
+            // falls back to computing live so a new workspace is not blank.
+            return InventoryItemSnapshot::where('workspace_id', $workspace->id)
+                ->max('snapshot_date');
         }
 
         try {
@@ -551,14 +670,27 @@ class InventoryItemController extends Controller
         // to get the flat per-SKU list.
         $summarize = $request->boolean('summarize', true);
 
-        // A date filter pins the list to that day's snapshot; without one it reads live.
+        // Which frozen day the list shows: the one asked for, or the newest.
+        $requestedDate = $request->input('filter.date');
         $snapshotDate = $this->snapshotDate($request, $workspace);
 
         if ($snapshotDate) {
             $items = $summarize
                 ? $this->buildSnapshotSummaryQuery($request, $workspace, $snapshotDate)->paginate($perPage)->withQueryString()
                 : $this->buildSnapshotQuery($request, $workspace, $snapshotDate)->paginate($perPage)->withQueryString();
+        } elseif ($requestedDate) {
+            // A specific day was asked for and nothing was recorded for it.
+            // Falling back to live figures would answer for today while the page
+            // claims to be showing the day someone picked — so show nothing and
+            // let the page say why.
+            $items = new LengthAwarePaginator([], 0, $perPage, 1, [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]);
         } else {
+            // Never snapshotted at all, which is a workspace that has just been
+            // set up rather than a missing day. Computing live keeps it from
+            // looking broken until the first scheduled run lands.
             $items = $summarize
                 ? $this->buildSummaryQuery($request, $workspace)->paginate($perPage)->withQueryString()
                 : $this->buildQuery($request, $workspace)->paginate($perPage)->withQueryString();
@@ -578,9 +710,21 @@ class InventoryItemController extends Controller
                 ->orderBy('sku')
                 ->get(['id', 'sku']),
             'workspace' => $workspace,
-            // The date being shown, or null when the list is live. Resolved server-side
-            // so the banner can never claim a snapshot the list did not actually read.
+            // The day being shown. Resolved server-side so the picker can never
+            // claim a snapshot the list did not actually read. Null only for a
+            // workspace that has never been snapshotted, which falls back to live.
             'snapshotDate' => $snapshotDate,
+            // What was asked for, whether or not it exists. An empty list needs
+            // to name the day it found nothing for.
+            'requestedDate' => $requestedDate,
+            // When that day's rows were last written. The snapshot is refreshed
+            // several times a day and again whenever someone edits a field, so
+            // the date alone does not say how current the page is.
+            'snapshotUpdatedAt' => $snapshotDate
+                ? InventoryItemSnapshot::where('workspace_id', $workspace->id)
+                    ->where('snapshot_date', $snapshotDate)
+                    ->max('updated_at')
+                : null,
             // Dates that actually have a snapshot, so the picker can grey out the rest
             // instead of silently falling back to live data.
             'snapshotDates' => InventoryItemSnapshot::where('workspace_id', $workspace->id)
@@ -599,62 +743,80 @@ class InventoryItemController extends Controller
         ]);
     }
 
+    /**
+     * Download the items as a spreadsheet.
+     *
+     * One export, carrying every column the report defines rather than only the
+     * ones the table happens to show — a download is read away from the app, so
+     * a column someone forgot to switch on is a column they cannot get back
+     * without asking for another file.
+     *
+     * Always rolled up to the group: a parent and its children share one reorder
+     * decision, and the demand figures are the group's, so per-SKU rows would
+     * split one decision across several lines and invite double-counting.
+     *
+     * Follows whichever day the list is showing. That day's rows already carry
+     * the report figures, frozen when they were written — recomputing them from
+     * today's feeds would answer a different question while looking like history.
+     */
     public function export(Request $request, Workspace $workspace)
     {
         $this->authorize('View Inventory Items', $workspace);
 
-        // Mirror whatever the list is showing: with the summarize toggle on, export the
-        // parent/child roll-up rather than the flat per-SKU rows. Same default as index().
-        $summarize = $request->boolean('summarize', true);
-        // ...and the same for a pinned date — export the day on screen, not today.
         $snapshotDate = $this->snapshotDate($request, $workspace);
 
-        $filename = 'inventory-items-'.($snapshotDate ?? now()->format('Y-m-d-His')).'.xlsx';
+        $export = $snapshotDate
+            ? InventoryItemReportExport::asOf($this->buildSnapshotSummaryQuery($request, $workspace, $snapshotDate))
+            : InventoryItemReportExport::live($this->buildSummaryQuery($request, $workspace), new ItemReportFacts($workspace));
 
-        if ($snapshotDate) {
-            $query = $summarize
-                ? $this->buildSnapshotSummaryQuery($request, $workspace, $snapshotDate)
-                : $this->buildSnapshotQuery($request, $workspace, $snapshotDate);
-        } else {
-            $query = $summarize
-                ? $this->buildSummaryQuery($request, $workspace)
-                : $this->buildQuery($request, $workspace);
-        }
-
-        return Excel::download(new InventoryItemExport($query, $summarize), $filename);
+        return Excel::download(
+            $export,
+            'inventory-items-'.($snapshotDate ?? now()->format('Y-m-d-His')).'.xlsx',
+        );
     }
 
-    public function syncFromGencys(Workspace $workspace)
+    public function syncFromErp(Workspace $workspace)
     {
         $this->authorize('Create Inventory Items', $workspace);
 
         abort_unless($workspace->is_gencys_partner, 403);
 
-        $codes = InventoryUnitCodeItem::query()
-            ->where('workspace_id', $workspace->id)
-            ->whereNotNull('item_code')
-            ->where('item_code', '!=', '')
-            ->distinct()
-            ->pluck('item_code');
+        $webhookUrl = config('services.n8n.gencys_inventory_items_webhook_url')
+            ?: config('services.n8n.webhook_url');
 
-        $created = 0;
-
-        foreach ($codes as $code) {
-            // Match on (workspace_id, sku); don't touch product_id on existing
-            // items so a manually linked product survives re-syncs. New items get
-            // a null product_id from the column default.
-            $item = InventoryItem::updateOrCreate(
-                ['workspace_id' => $workspace->id, 'sku' => $code],
-            );
-
-            if ($item->wasRecentlyCreated) {
-                $created++;
-            }
+        if (empty($webhookUrl)) {
+            return back()->with('error', 'Gencys ERP item sync is not configured yet. Please contact support.');
         }
 
-        return redirect()
-            ->route('workspaces.inventory.item.index', $workspace->slug)
-            ->with('success', "Synced {$created} new inventory item(s) from Gencys.");
+        if (blank($workspace->erp_username) || blank($workspace->erp_password)) {
+            return back()->with('error', 'This workspace is not connected to the ERP. Add ERP credentials and an API key first.');
+        }
+
+        $count = 0;
+
+        try {
+            $response = Http::timeout(30)->post($webhookUrl, [
+                'erp_username' => $workspace->erp_username,
+                'erp_password' => $workspace->erp_password,
+            ])->throw();
+
+            $data = $response->json();
+
+            foreach ($data as $item) {
+                InventoryItem::updateOrCreate([
+                    'workspace_id' => $workspace->id,
+                    'sku' => $item['name'],
+                ], [
+                    'reference_id' => $item['id'],
+                ]);
+
+                $count++;
+            }
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Could not reach the sync service. Please try again.'."\n".$e->getMessage());
+        }
+
+        return back()->with('success', "Synced {$count} inventory item(s) from Gencys ERP.");
     }
 
     public function store(Request $request, Workspace $workspace)
@@ -745,7 +907,53 @@ class InventoryItemController extends Controller
 
         $item->update(['lead_time' => $validated['lead_time']]);
 
+        // The list reads today's snapshot, so an edit that is not written back
+        // into it would appear to do nothing until the next scheduled run.
+        // Lead time feeds stocks_needed_for_lead_time and po_needed, both of
+        // which the list shows.
+        $this->refreshTodaysSnapshot($workspace, $item);
+
         return redirect()->back()->with('success', 'Lead time updated.');
+    }
+
+    /**
+     * Rewrite today's snapshot rows for an item's group, so an edit shows up
+     * immediately instead of waiting for the next scheduled run.
+     *
+     * Two deliberate limits. It refreshes the whole group, not the one row
+     * edited, because the roll-up derives the group's figures from every row in
+     * it — rewriting one and leaving its siblings stale would show a group half
+     * from before the edit and half from after.
+     *
+     * And it only ever updates a day that already exists. Writing today's row
+     * when today has not been snapshotted would make it the newest day, and the
+     * list reads the newest day — so a single edit would replace the whole list
+     * with the one group it touched. With no row for today the list is reading
+     * an older day anyway, and the next scheduled run is what moves it on.
+     *
+     * Past days are never touched: a snapshot is what was true then, and editing
+     * a field now does not change what was true then.
+     */
+    private function refreshTodaysSnapshot(Workspace $workspace, InventoryItem $item): void
+    {
+        $today = Carbon::today()->toDateString();
+
+        $exists = InventoryItemSnapshot::where('workspace_id', $workspace->id)
+            ->where('snapshot_date', $today)
+            ->exists();
+
+        if (! $exists) {
+            return;
+        }
+
+        $groupId = (int) ($item->parent_id ?? $item->id);
+
+        $ids = InventoryItem::where('workspace_id', $workspace->id)
+            ->where(fn ($q) => $q->whereKey($groupId)->orWhere('parent_id', $groupId))
+            ->pluck('id')
+            ->all();
+
+        (new InventoryItemSnapshotter($workspace, $today))->refresh($ids);
     }
 
     /**

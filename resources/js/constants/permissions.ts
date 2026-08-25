@@ -103,6 +103,11 @@ export const PERMISSIONS = {
     ViewBotcakeSequenceMessages: 'View Botcake Sequence Messages',
     ViewBotcakeFlows: 'View Botcake Flows',
 
+    // SMS
+    ViewSims: 'View SIMs',
+    SendSms: 'Send SMS',
+    ViewSmsOutbox: 'View SMS Outbox',
+
     // Finance
     ViewFinanceDashboard: 'View Finance Dashboard',
     ViewFinanceAccounts: 'View Finance Accounts',
