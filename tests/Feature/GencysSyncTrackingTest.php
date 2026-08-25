@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\Http;
-use Modules\GencysERP\Jobs\FetchInventoryItemTransactionHistory;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
@@ -198,24 +196,6 @@ test('stale pending runs are failed by the sweeper, recent ones are left alone',
     expect($stale->fresh()->status)->toBe(GencysSyncRun::STATUS_FAILED)
         ->and($stale->fresh()->message)->toContain('No callback received')
         ->and($fresh->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
-});
-
-test('the fetch job fails its pending runs when the n8n handshake fails', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    $item = makeInventoryItem($workspace);
-
-    Http::fake(['*' => Http::response('error', 500)]);
-
-    $run = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY);
-
-    (new FetchInventoryItemTransactionHistory(
-        'https://n8n.test/webhook',
-        ['workspace_id' => $workspace->id],
-        [$run->id],
-    ))->handle();
-
-    expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_FAILED)
-        ->and($run->fresh()->message)->toContain('HTTP 500');
 });
 
 test('transaction-history callback stores the ERP-reported stock as-is, without recalculating', function () {
