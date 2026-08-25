@@ -2,162 +2,103 @@
 
 namespace Modules\GencysERP\Console\Commands;
 
-use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
-use Modules\GencysERP\Jobs\FetchInventoryItemPurchaseOrders;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\SyncFlows\SyncFlowRegistry;
 
 class TriggerFetchERPPurchaseOrders extends Command
 {
     protected $signature = 'gencys-erp:trigger-fetch-erp-purchase-orders
-        {--start-date= : Start of the PO date range in Y-m-d format (defaults to 3 months ago)}
-        {--end-date= : End of the PO date range in Y-m-d format (defaults to today)}
+        {--start-date= : Start of the PO date range in Y-m-d format}
+        {--end-date= : End of the PO date range in Y-m-d format (defaults to today when --start-date is given)}
         {--item=* : Limit to specific inventory item id(s); repeat (--item=1 --item=2) or comma-separate (--item=1,2). Omit for all active items}
-        {--delay=10 : Seconds to stagger each queued workspace by}
+        {--workspace= : Limit the batch to one workspace id. Omit to cover every ERP-connected workspace}
+        {--delay= : Deprecated and ignored — the batch paces itself by waiting for each group to report back}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
-        {--sync : POST to the webhook immediately in-process instead of queueing (use this to hit an n8n test-mode webhook)}
+        {--sync : POST to the webhook in-process instead of handing it to the erp queue worker (use this to hit an n8n test-mode webhook)}
         {--without-delivered : Send an empty delivered_purchase_orders_no array so n8n re-fetches every PO instead of skipping delivered ones}
         {--force : Run outside production (by default this command only runs on production)}';
 
-    protected $description = 'Trigger n8n webhook for each workspace with ERP credentials to fetch its ERP purchase orders';
+    protected $description = 'Queue a Gencys ERP batch that fetches purchase orders (the schedule uses gencys-erp:sync)';
 
-    public function handle()
+    public function handle(BatchRunner $runner, SyncFlowRegistry $flows): int
     {
-        if (! app()->environment('production') && ! $this->option('force')) {
-            $this->warn('This command only runs on production. Re-run with --force to override (current environment: '.app()->environment().').');
+        if (! app()->environment('production') && ! $this->option('force') && ! $this->option('sync')) {
+            $this->warn('This command only runs on production. Re-run with --force (or --sync) to override (current environment: '.app()->environment().').');
 
-            return 0;
+            return self::SUCCESS;
         }
 
-        $webhookUrl = $this->option('webhook') ?: config('services.n8n.purchase_order_webhook_url');
-
-        $this->info($webhookUrl);
-
-        if (empty($webhookUrl)) {
-            $this->error('n8n purchase order webhook URL is not configured (services.n8n.purchase_order_webhook_url). Pass --webhook= to override.');
-
-            return 1;
+        if ($this->option('delay')) {
+            $this->warn('--delay is ignored: the batch sends the next group only once the previous one reports back.');
         }
 
-        try {
-            $startDate = $this->option('start-date')
-                ? Carbon::createFromFormat('Y-m-d', $this->option('start-date'))->startOfDay()
-                : Carbon::now()->subMonths(3)->startOfDay();
+        $flow = $flows->for(GencysSyncRun::TYPE_PURCHASE_ORDER);
 
-            $endDate = $this->option('end-date')
-                ? Carbon::createFromFormat('Y-m-d', $this->option('end-date'))->startOfDay()
-                : Carbon::today();
-        } catch (\Exception $e) {
-            $this->error('Invalid date. Expected format: Y-m-d (e.g. 2026-06-24).');
+        // No date options at all means "whatever the scheduled sync would do".
+        if (! $this->option('start-date') && ! $this->option('end-date')) {
+            $range = $flow->defaultParameters();
+        } else {
+            try {
+                $startDate = $this->option('start-date')
+                    ? Carbon::createFromFormat('Y-m-d', $this->option('start-date'))->startOfDay()
+                    : Carbon::now()->subMonths(3)->startOfDay();
 
-            return 1;
+                $endDate = $this->option('end-date')
+                    ? Carbon::createFromFormat('Y-m-d', $this->option('end-date'))->startOfDay()
+                    : Carbon::today();
+            } catch (\Exception $e) {
+                $this->error('Invalid date. Expected format: Y-m-d (e.g. 2026-06-24).');
+
+                return self::FAILURE;
+            }
+
+            if ($startDate->greaterThan($endDate)) {
+                $this->error("Start date ({$startDate->format('Y-m-d')}) cannot be after end date ({$endDate->format('Y-m-d')}).");
+
+                return self::FAILURE;
+            }
+
+            $range = [
+                'start_date' => $startDate->format('m/d/Y'),
+                'end_date' => $endDate->format('m/d/Y'),
+            ];
         }
 
-        if ($startDate->greaterThan($endDate)) {
-            $this->error("Start date ({$startDate->format('Y-m-d')}) cannot be after end date ({$endDate->format('Y-m-d')}).");
+        $rangeLabel = $range['start_date'].' – '.$range['end_date'];
 
-            return 1;
+        $batch = $runner->queue(
+            syncTypes: [GencysSyncRun::TYPE_PURCHASE_ORDER],
+            parameters: [
+                GencysSyncRun::TYPE_PURCHASE_ORDER => array_filter([
+                    ...$range,
+                    'item_ids' => $this->itemIds(),
+                    'without_delivered' => (bool) $this->option('without-delivered') ?: null,
+                    'webhook' => $this->option('webhook') ?: null,
+                    'inline' => (bool) $this->option('sync') ?: null,
+                ]),
+            ],
+            workspaceId: $this->option('workspace') ? (int) $this->option('workspace') : null,
+        );
+
+        if (! $batch->wasRecentlyCreated) {
+            $this->info("An identical batch (#{$batch->id}) is already queued for {$rangeLabel} — nothing new to add.");
+
+            return self::SUCCESS;
         }
 
-        $startDateFormatted = $startDate->format('m/d/Y');
-        $endDateFormatted = $endDate->format('m/d/Y');
+        if ($batch->total_runs === 0) {
+            $this->warn('No workspaces found with ERP credentials, an API key and syncable items.');
 
-        $sync = (bool) $this->option('sync');
-        $withoutDelivered = (bool) $this->option('without-delivered');
-        $delay = max(0, (int) $this->option('delay'));
-        $itemIds = $this->itemIds();
-
-        if (! empty($itemIds)) {
-            $this->info('Limiting to inventory item id(s): '.implode(', ', $itemIds));
+            return self::SUCCESS;
         }
 
-        $workspaces = Workspace::whereNotNull('erp_username')
-            ->where('erp_username', '!=', '')
-            ->whereNotNull('erp_password')
-            ->whereHas('apiKeys')
-            ->with(['apiKeys', 'closedPurchasedOrders' => function ($query) {
-                $query->select(['cust_po_no', 'workspace_id']);
-            }, 'inventoryItems' => function ($query) use ($itemIds) {
-                // Parent items are grouping placeholders with no ERP SKU — never sync them.
-                $query->where('is_parent', false);
+        $this->info("Queued batch #{$batch->id}: {$batch->total_runs} run(s) for {$rangeLabel}.");
+        $this->line("Status: {$batch->status}. Watch it with: php artisan gencys-erp:sync-batches");
 
-                // A specific --item selection wins over the active-only default so a
-                // single item can be re-synced (or tested) even when it's inactive.
-                if (empty($itemIds)) {
-                    $query->where('is_active', true);
-                } else {
-                    $query->whereIn('id', $itemIds);
-                }
-            }])
-            ->get();
-
-        if ($workspaces->isEmpty()) {
-            $this->warn('No workspaces found with ERP credentials and an API key.');
-
-            return 0;
-        }
-
-        $this->info(($sync ? 'Sending' : 'Queueing')." ERP purchase orders for {$startDateFormatted} – {$endDateFormatted}…");
-
-        $dispatched = 0;
-        $totalCount = 0;
-
-        foreach ($workspaces as $workspace) {
-            $apiKey = $workspace->apiKeys->first();
-
-            // One payload per workspace carrying every item, so n8n logs into the ERP
-            // once and loops the items reusing that session. This is what avoids the
-            // per-item logins that were tripping the ERP's rate limit (429).
-            $workspace->inventoryItems
-                ->chunk(20)
-                ->values()
-                ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $webhookUrl, $startDateFormatted, $endDateFormatted, $withoutDelivered) {
-                    $dispatched++;
-                    $totalCount += count($chunk);
-
-                    $callbackBase = rtrim(config('app.url'), '/');
-
-                    // Open a pending sync run per item, keyed by item id. We hand
-                    // each run's id to n8n (sync_run_id) so it can echo it back on
-                    // the callback for an exact match; items that never report back
-                    // stay pending until the stale-run sweeper fails them.
-                    $runIds = $chunk->mapWithKeys(fn ($item) => [
-                        $item->id => GencysSyncRun::start(
-                            $workspace->id,
-                            $item->id,
-                            GencysSyncRun::TYPE_PURCHASE_ORDER,
-                            ['start_date' => $startDateFormatted, 'end_date' => $endDateFormatted],
-                        )->id,
-                    ]);
-
-                    $data = [
-                        'workspace_id' => $workspace->id,
-                        'workspace_api_key' => $apiKey->reveal(),
-                        'erp_username' => $workspace->erp_username,
-                        'erp_password' => $workspace->erp_password,
-                        'start_date' => $startDateFormatted,
-                        'end_date' => $endDateFormatted,
-                        'webhook_url' => "{$callbackBase}/api/v1/public/purchase-orders/bulk-sync",
-                        'items' => $chunk->map(fn ($item) => [
-                            'id' => $item->id,
-                            'keyword' => $item->sku,
-                            'sync_run_id' => $runIds[$item->id],
-                        ])->values()->toArray(),
-                        'delivered_purchase_orders_no' => $withoutDelivered
-                            ? []
-                            : $workspace->closedPurchasedOrders->map(fn ($item) => $item->cust_po_no)->toArray(),
-                    ];
-
-                    dispatch(new FetchInventoryItemPurchaseOrders($webhookUrl, $data, $runIds->values()->all()))
-                        ->delay(now()->addMinutes(($dispatched - 1) * 3));
-                });
-        }
-
-        $this->newLine();
-        $this->info(($sync ? 'Sent' : 'Queued')." {$totalCount} workspace(s).");
-
-        return 0;
+        return self::SUCCESS;
     }
 
     /**
