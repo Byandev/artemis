@@ -103,8 +103,6 @@ class BatchRunner
             return $batch;
         }
 
-        return
-
         // Runs are built type by type in the order given, and the queue walks
         // them by id, so that order is also the order they'll be sent.
         $created = 0;
