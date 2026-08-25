@@ -137,14 +137,7 @@ class GencysSyncRun extends Model
      */
     public static function succeedById(int $workspaceId, ?int $syncRunId, int $rowsReceived, ?int $rowsSaved = null): void
     {
-        if (! $syncRunId) {
-            return;
-        }
-
-        $run = self::query()
-            ->where('workspace_id', $workspaceId)
-            ->whereKey($syncRunId)
-            ->first();
+        $run = self::lookup($workspaceId, $syncRunId);
 
         if (! $run) {
             return;
@@ -163,6 +156,97 @@ class GencysSyncRun extends Model
         // runs in one request and the batch can't move until the last of them
         // lands, so the controllers tick once when they're done rather than once
         // per item.
+    }
+
+    /** Find one of this workspace's runs by the id n8n echoed back. */
+    private static function lookup(int $workspaceId, ?int $syncRunId): ?self
+    {
+        if (! $syncRunId) {
+            return null;
+        }
+
+        return self::query()
+            ->where('workspace_id', $workspaceId)
+            ->whereKey($syncRunId)
+            ->first();
+    }
+
+    /**
+     * Record one chunk of a run that arrives in pieces, without closing it.
+     *
+     * Some ERP pulls are too big for a single callback — the daily sales tracker
+     * comes back a thousand rows at a time — so the row counts accumulate and the
+     * callback deadline is pushed out rather than the run being marked done. The
+     * run stays `pending` until something calls finishById(), which is what lets
+     * the batch keep holding the ERP until n8n is genuinely finished.
+     *
+     * Pushing timeout_at forward is the important part: without it a long sync
+     * would be failed by the sweeper mid-stream and retried from the top.
+     */
+    public static function heartbeatById(int $workspaceId, ?int $syncRunId, int $rowsReceived, ?int $rowsSaved = null): ?self
+    {
+        $run = self::lookup($workspaceId, $syncRunId);
+
+        // Only a run still in flight can be fed. A chunk arriving for a run that
+        // already finished (a late retry, a duplicate post) is ignored rather
+        // than reopening it.
+        if (! $run || $run->status !== self::STATUS_PENDING) {
+            return $run;
+        }
+
+        $run->forceFill([
+            'rows_received' => $run->rows_received + $rowsReceived,
+            'rows_saved' => $run->rows_saved + ($rowsSaved ?? $rowsReceived),
+            'timeout_at' => now()->addSeconds($run->timeoutSeconds()),
+        ])->save();
+
+        return $run;
+    }
+
+    /**
+     * Close a chunked run out. Row counts default to whatever the chunks
+     * accumulated, so a caller that doesn't track totals can just say "done".
+     *
+     * Idempotent: finishing an already-finished run leaves it alone.
+     */
+    public static function finishById(
+        int $workspaceId,
+        ?int $syncRunId,
+        ?int $rowsReceived = null,
+        ?int $rowsSaved = null,
+        bool $failed = false,
+        ?string $message = null,
+    ): ?self {
+        $run = self::lookup($workspaceId, $syncRunId);
+
+        if (! $run || $run->isFinished()) {
+            return $run;
+        }
+
+        if ($failed) {
+            $run->fail($message ?: 'Reported as failed by n8n.');
+
+            return $run;
+        }
+
+        $run->forceFill([
+            'status' => self::STATUS_SUCCESS,
+            'rows_received' => $rowsReceived ?? $run->rows_received,
+            'rows_saved' => $rowsSaved ?? $rowsReceived ?? $run->rows_saved,
+            'finished_at' => now(),
+            'timeout_at' => null,
+            'message' => $message,
+        ])->save();
+
+        $run->resolveEarlierRunsWithSameParameters();
+
+        return $run;
+    }
+
+    /** How long this run waits on a callback — its batch's setting, or the default. */
+    public function timeoutSeconds(): int
+    {
+        return (int) ($this->batch?->timeout_seconds ?? config('gencyserp.batch.timeout_seconds', 600));
     }
 
     /**

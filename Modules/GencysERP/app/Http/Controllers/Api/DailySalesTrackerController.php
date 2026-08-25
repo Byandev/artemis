@@ -11,7 +11,6 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\GencysSyncRun;
-use Modules\GencysERP\Support\BatchRunner;
 
 /**
  * Receives the daily sales tracker rows that the n8n flow scrapes from Gencys
@@ -24,11 +23,18 @@ use Modules\GencysERP\Support\BatchRunner;
  * Each entry is authenticated by its own `api_key` (n8n puts it in the body),
  * and the orders are upserted keyed on Gencys' own order `id`, which is stored
  * as the row's primary key. `sync_run_id` is the run the trigger command opened
- * for this workspace/date, echoed back so we can close it out.
+ * for this workspace/date, echoed back so we can attribute the rows to it.
+ *
+ * A date's rows are too big for one post, so n8n sends them a thousand at a time
+ * and this endpoint does NOT close the run — it accumulates the counts and pushes
+ * the run's callback deadline out. n8n closes the run with a single call to
+ * /api/v1/public/gencys/sync-runs/finish once it has sent the last chunk. Without
+ * that call the run times out (and retries) roughly one timeout after the last
+ * chunk landed.
  */
 class DailySalesTrackerController extends Controller
 {
-    public function store(Request $request, BatchRunner $runner): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         // Inspect exactly what n8n sends. Remove once the flow is verified.
         Log::info('Gencys daily sales tracker request', [
@@ -131,19 +137,19 @@ class DailySalesTrackerController extends Controller
                 }
             }
 
-            // Close out the run this entry echoed back. Succeeding it also
-            // resolves earlier pending/failed runs for the same workspace/date.
-            GencysSyncRun::succeedById(
+            // Feed the run rather than close it. This date's rows arrive a
+            // thousand at a time, so closing here would finish the run on the
+            // first chunk and let the batch release the ERP while n8n was still
+            // posting the rest. The counts accumulate, the callback deadline is
+            // pushed out, and the run stays pending until n8n posts to
+            // /api/v1/public/gencys/sync-runs/finish.
+            GencysSyncRun::heartbeatById(
                 $workspace->id,
                 $this->syncRunId($entry),
                 count($rows),
                 $entrySaved,
             );
         }
-
-        // Every run this callback covered is now resolved, so whichever batch
-        // they belonged to can send its next group.
-        $runner->tick();
 
         return response()->json([
             'created' => $created,

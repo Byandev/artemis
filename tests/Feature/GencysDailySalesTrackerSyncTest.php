@@ -56,7 +56,7 @@ test('the trigger command queues a batch with a run per workspace and date, and 
         && $request['date'] === '06/27/2026');
 });
 
-test('the callback resolves the echoed run and records its row counts', function () {
+test('the callback records the rows against the run, and finish closes it', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
 
@@ -71,11 +71,23 @@ test('the callback resolves the echoed run and records its row counts', function
 
     $run->refresh();
 
+    // A date's rows arrive in chunks, so the data callback never closes the run.
+    expect($run->status)->toBe(GencysSyncRun::STATUS_PENDING)
+        ->and($run->rows_received)->toBe(2)
+        ->and($run->finished_at)->toBeNull()
+        ->and(GencysDailySalesOrder::count())->toBe(2);
+
+    $this->postJson('/api/v1/public/gencys/sync-runs/finish', [
+        'api_key' => $raw,
+        'sync_run_id' => $run->id,
+    ])->assertOk();
+
+    $run->refresh();
+
     expect($run->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
         ->and($run->rows_received)->toBe(2)
         ->and($run->rows_saved)->toBe(2)
-        ->and($run->finished_at)->not->toBeNull()
-        ->and(GencysDailySalesOrder::count())->toBe(2);
+        ->and($run->finished_at)->not->toBeNull();
 });
 
 test('a daily sales success resolves earlier stuck runs for the same date only', function () {
@@ -99,6 +111,14 @@ test('a daily sales success resolves earlier stuck runs for the same date only',
         'sync_run_id' => $run->id,
         'purchase_orders' => [dailySalesRow(9001)],
     ]])->assertOk();
+
+    // The predecessors are cleared when the run is closed, not when its rows land.
+    expect($stuck->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
+
+    $this->postJson('/api/v1/public/gencys/sync-runs/finish', [
+        'api_key' => $raw,
+        'sync_run_id' => $run->id,
+    ])->assertOk();
 
     expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
         ->and($stuck->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
