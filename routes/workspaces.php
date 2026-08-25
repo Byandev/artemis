@@ -538,9 +538,9 @@ Route::middleware(['auth'])->group(function () {
 
         // ERP syncing lives together under Gencys: the runs for this workspace
         // and the batch queue that sends them, both gated on "View Gencys Sync".
+        // Per-run actions offered beside a batch's runs. No listing route: runs
+        // are read on the batch pages, these are just the things you can do to one.
         Route::prefix('/sync-runs')->name('sync-runs.')->middleware('can:View Gencys Sync,workspace')->group(function () {
-            Route::get('/', [GencysSyncRunController::class, 'index'])->name('index');
-
             // Asked from the page per row, so JSON rather than an Inertia reload.
             Route::get('/{run}/execution', [GencysSyncRunController::class, 'execution'])->name('execution');
             Route::post('/{run}/retry', [GencysSyncRunController::class, 'retry'])->name('retry');

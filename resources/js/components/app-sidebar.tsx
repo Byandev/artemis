@@ -447,12 +447,6 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewGencysPages,
                           },
                           {
-                              title: 'Sync Runs',
-                              href: `/workspaces/${slug}/gencys/sync-runs`,
-                              icon: ListChecks,
-                              permission: PERMISSIONS.ViewGencysSync,
-                          },
-                          {
                               title: 'Sync Batches',
                               href: `/workspaces/${slug}/gencys/sync-batches`,
                               icon: Layers,

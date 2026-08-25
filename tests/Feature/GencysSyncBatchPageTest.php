@@ -1,5 +1,10 @@
 <?php
 
+use App\Enums\Permission as PermissionEnum;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
@@ -29,6 +34,26 @@ function makeErpWorkspaceWithOwner(int $items = 2): array
     }
 
     return ['user' => $user, 'workspace' => $workspace];
+}
+
+/** A workspace member whose role carries exactly $permissions. */
+function gencysMemberWithPermissions($workspace, array $permissions): User
+{
+    $user = User::factory()->create();
+
+    $role = Role::create(['workspace_id' => $workspace->id, 'name' => 'Role '.uniqid()]);
+
+    foreach ($permissions as $name) {
+        $permission = Permission::firstOrCreate(['name' => $name], ['category' => 'Gencys ERP']);
+        DB::table('role_permissions')->insert([
+            'role_id' => $role->id,
+            'permission_id' => $permission->id,
+        ]);
+    }
+
+    $workspace->users()->attach($user->id, ['role_id' => $role->id]);
+
+    return $user;
 }
 
 beforeEach(function () {
@@ -203,4 +228,50 @@ test('someone outside the workspace cannot see its sync batches', function () {
     $this->actingAs($outsider)
         ->get(syncBatchesUrl($workspace))
         ->assertForbidden();
+});
+
+test('every sync page and run action needs View Gencys Sync', function () {
+    ['workspace' => $workspace] = makeErpWorkspaceWithOwner();
+
+    $batch = app(BatchRunner::class)->queue(
+        [GencysSyncRun::TYPE_TRANSACTION_HISTORY],
+        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => ['dates' => ['08/24/2026']]],
+    );
+
+    $run = $batch->runs()->first();
+
+    // The pages moved out of Inventory, so inventory access no longer opens them.
+    $without = gencysMemberWithPermissions($workspace, [
+        PermissionEnum::ViewGencysPages->value,
+        PermissionEnum::ViewInventoryItems->value,
+    ]);
+    $with = gencysMemberWithPermissions($workspace, [PermissionEnum::ViewGencysSync->value]);
+
+    $base = "/workspaces/{$workspace->slug}/gencys";
+
+    foreach (["{$base}/sync-batches", "{$base}/sync-batches/{$batch->id}"] as $url) {
+        $this->actingAs($without)->get($url)->assertForbidden();
+        $this->actingAs($with)->get($url)->assertOk();
+    }
+
+    // The per-run actions are gated the same way.
+    $this->actingAs($without)->getJson("{$base}/sync-runs/{$run->id}/execution")->assertForbidden();
+    $this->actingAs($without)->post("{$base}/sync-runs/{$run->id}/retry")->assertForbidden();
+    $this->actingAs($with)->getJson("{$base}/sync-runs/{$run->id}/execution")->assertOk();
+});
+
+test('the batch page tells the UI when the n8n lookup is unavailable', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeErpWorkspaceWithOwner();
+
+    $batch = app(BatchRunner::class)->queue(
+        [GencysSyncRun::TYPE_TRANSACTION_HISTORY],
+        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => ['dates' => ['08/24/2026']]],
+    );
+
+    config(['services.n8n.api_url' => null, 'services.n8n.api_key' => null]);
+
+    $this->actingAs($user)
+        ->get(syncBatchesUrl($workspace, "/{$batch->id}"))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('n8nApiConfigured', false));
 });

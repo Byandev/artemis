@@ -136,7 +136,7 @@ test('an unreachable n8n degrades quietly', function () {
         ->assertJson(['state' => 'unreachable']);
 });
 
-test('without n8n API config the lookup says so and the page knows not to offer it', function () {
+test('without n8n API config the lookup says so, without calling out', function () {
     ['user' => $user, 'workspace' => $workspace] = makeN8nWorkspace();
     $run = finishedRun($workspace);
 
@@ -148,11 +148,6 @@ test('without n8n API config the lookup says so and the page knows not to offer 
         ->getJson(n8nRunUrl($workspace, $run, '/execution'))
         ->assertOk()
         ->assertJson(['state' => 'unconfigured']);
-
-    $this->actingAs($user)
-        ->get("/workspaces/{$workspace->slug}/gencys/sync-runs")
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page->where('n8nApiConfigured', false));
 
     Http::assertNothingSent();
 });
@@ -229,9 +224,11 @@ test('a retry is refused while the queue is still busy', function () {
     // Only the batch that was already running — no retry batch was added.
     expect(GencysSyncBatch::count())->toBe(1);
 
-    // The page tells the UI to grey the button out for the same reason.
+    // The batch page tells the UI to grey the button out for the same reason.
+    $running = GencysSyncBatch::query()->running()->sole();
+
     $this->actingAs($user)
-        ->get("/workspaces/{$workspace->slug}/gencys/sync-runs")
+        ->get("/workspaces/{$workspace->slug}/gencys/sync-batches/{$running->id}")
         ->assertOk()
         ->assertInertia(fn ($page) => $page->where('queueBusy', true));
 });

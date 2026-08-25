@@ -19,22 +19,9 @@ Schedule::command('save-parcel-journey-notification-log')->monthlyOn(14);
 Schedule::command('trigger-fetch-shops-users')->daily(7);
 
 // Gencys ERP
-//
-// Syncing no longer fans out to n8n on a fixed timer. `gencys-erp:sync` queues a
-// single batch covering every sync type, and batches drain one at a time, each
-// sending its next group of runs only once the previous group has reported back.
-// Nothing is ever cancelled to make room, so a pass that lands while the one
-// before it is still working simply waits its turn — and one that would duplicate
-// a batch nobody has started yet collapses into it instead of stacking up.
-//
-// The sweeper is what keeps that queue honest: it times out runs whose callback
-// never arrived and nudges the queue forward.
 Schedule::command('gencys-erp:sweep-sync-batches')->everyMinute()->withoutOverlapping();
 Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
 
-// Five passes a day. The individual gencys-erp:trigger-fetch-* commands still
-// exist for re-running a specific date or item by hand; they're just no longer
-// scheduled.
 Schedule::command('gencys-erp:sync')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('gencys-erp:sync')->dailyAt('13:00')->withoutOverlapping();
 Schedule::command('gencys-erp:sync')->dailyAt('16:00')->withoutOverlapping();
@@ -46,9 +33,9 @@ Schedule::command('inventory:snapshot-items')->dailyAt('17:30')->withoutOverlapp
 Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapping();
 
 // Intern daily records still fan out on the old fixed-timer path.
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
-Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
+// Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('09:30')->withoutOverlapping();
+// Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
+// Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
