@@ -3,6 +3,7 @@
 namespace Modules\Courses\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
+use Modules\Courses\Console\Commands\PrunePendingLessonUploadsCommand;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class CoursesServiceProvider extends ModuleServiceProvider
@@ -22,7 +23,9 @@ class CoursesServiceProvider extends ModuleServiceProvider
      *
      * @var string[]
      */
-    // protected array $commands = [];
+    protected array $commands = [
+        PrunePendingLessonUploadsCommand::class,
+    ];
 
     /**
      * Provider classes to register.

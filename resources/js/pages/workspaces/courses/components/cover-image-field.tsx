@@ -1,5 +1,6 @@
 import { ImageUp, Loader2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { putToBucket, requestPresign } from '../lib/presign';
 
 /** Mirrors the `mimes:` rule on CoursesController@rules. */
 const ACCEPTED = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
@@ -7,9 +8,16 @@ const ACCEPTED = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
 const MAX_KB = 10240;
 
 interface Props {
+    /** Endpoint that signs a cover upload for this workspace. */
+    presignUrl: string;
     /** The newly picked file, or null when nothing is staged. */
     file: File | null;
     onFileChange: (file: File | null) => void;
+    /**
+     * Bucket key once the file has been uploaded. Null while it is still
+     * uploading, or when the disk could not sign and the file itself is posted.
+     */
+    onKeyChange: (key: string | null) => void;
     /** Set once the user clears a cover that is already saved. */
     removed: boolean;
     onRemovedChange: (removed: boolean) => void;
@@ -17,8 +25,8 @@ interface Props {
     existing: { file_name: string; size: number } | null;
     /** Route that signs a URL for the saved cover, for the preview. */
     existingUrl?: string;
-    /** Upload progress 0–100 while the form is submitting. */
-    progress: number | null;
+    /** Reports whether an upload is in flight, so the form can block submit. */
+    onUploadingChange: (uploading: boolean) => void;
     /** Server-side error for this field. */
     error?: string;
 }
@@ -48,19 +56,22 @@ const labelClass =
     'block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
 
 export default function CoverImageField({
+    presignUrl,
     file,
     onFileChange,
+    onKeyChange,
     removed,
     onRemovedChange,
     existing,
     existingUrl,
-    progress,
+    onUploadingChange,
     error,
 }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
     const [clientError, setClientError] = useState<string | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [progress, setProgress] = useState<number | null>(null);
 
     // Object URLs have to be revoked or the blob leaks for the tab's lifetime.
     useEffect(() => {
@@ -73,7 +84,7 @@ export default function CoverImageField({
         return () => URL.revokeObjectURL(url);
     }, [file]);
 
-    function accept(picked: File | null) {
+    async function accept(picked: File | null) {
         if (!picked) return;
 
         const problem = localError(picked);
@@ -82,10 +93,43 @@ export default function CoverImageField({
 
         onFileChange(picked);
         onRemovedChange(false);
+        onKeyChange(null);
+
+        // Straight to the bucket as soon as it's picked, so submitting the form
+        // is a small JSON request rather than a multipart upload through PHP.
+        setProgress(0);
+        onUploadingChange(true);
+
+        try {
+            const presign = await requestPresign(
+                presignUrl,
+                picked,
+                'image/jpeg',
+            );
+
+            if (presign.supported && presign.url && presign.key) {
+                await putToBucket(
+                    presign.url,
+                    presign.headers ?? {},
+                    picked,
+                    setProgress,
+                );
+                onKeyChange(presign.key);
+            }
+            // When the disk cannot sign, the key stays null and the form posts
+            // the file itself instead.
+        } catch (e) {
+            setClientError(e instanceof Error ? e.message : 'Upload failed.');
+            onFileChange(null);
+        } finally {
+            setProgress(null);
+            onUploadingChange(false);
+        }
     }
 
     function clear() {
         onFileChange(null);
+        onKeyChange(null);
         setClientError(null);
         if (inputRef.current) inputRef.current.value = '';
         // Only meaningful when a saved cover is being taken away.
