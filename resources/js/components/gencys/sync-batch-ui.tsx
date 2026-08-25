@@ -236,7 +236,9 @@ export function describeWindow(parameters: Record<string, unknown> | null) {
  * A batch's parameters are keyed by sync type, so pair each type up with the
  * window it was asked for.
  */
-export function describeBatchWindows(batch: SyncBatch) {
+export function describeBatchWindows(
+    batch: Pick<SyncBatch, 'sync_types' | 'sync_labels' | 'parameters'>,
+) {
     return batch.sync_types.map((type, i) => ({
         type,
         label: batch.sync_labels[i] ?? type,
@@ -247,7 +249,7 @@ export function describeBatchWindows(batch: SyncBatch) {
 }
 
 /** A compact "Transactions, POs +1" style label for a batch in a table cell. */
-export function summariseTypes(batch: SyncBatch, max = 2) {
+export function summariseTypes(batch: Pick<SyncBatch, 'sync_labels'>, max = 2) {
     const shown = batch.sync_labels.slice(0, max).join(', ');
     const rest = batch.sync_labels.length - max;
 

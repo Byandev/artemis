@@ -62,7 +62,7 @@ use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as Gencys
 use Modules\GencysERP\Http\Controllers\Web\InternController as GencysInternController;
 use Modules\GencysERP\Http\Controllers\Web\PageController as GencysPageController;
 use Modules\GencysERP\Http\Controllers\Web\SyncBatchController as GencysSyncBatchController;
-use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
+use Modules\GencysERP\Http\Controllers\Web\SyncRunController as GencysSyncRunController;
 use Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
@@ -496,32 +496,6 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
 
-    // Gencys ERP sync health for inventory items (per-item transaction + PO sync status).
-    Route::get('/workspaces/{workspace}/inventory/sync-health', [GencysSyncHealthController::class, 'index'])
-        ->middleware('can:View Inventory Items,workspace')
-        ->name('workspaces.inventory.sync-health');
-
-    // The ERP sync queue: batches waiting for, holding, or done with the ERP.
-    // Raising or cancelling one changes what the ERP is asked for, so those are
-    // gated on edit rather than view.
-    Route::prefix('/workspaces/{workspace}/inventory/sync-batches')->name('workspaces.inventory.sync-batches.')->group(function () {
-        Route::get('/', [GencysSyncBatchController::class, 'index'])
-            ->middleware('can:View Inventory Items,workspace')
-            ->name('index');
-
-        Route::get('/{batch}', [GencysSyncBatchController::class, 'show'])
-            ->middleware('can:View Inventory Items,workspace')
-            ->name('show');
-
-        Route::post('/', [GencysSyncBatchController::class, 'store'])
-            ->middleware('can:Edit Inventory Items,workspace')
-            ->name('store');
-
-        Route::post('/{batch}/cancel', [GencysSyncBatchController::class, 'cancel'])
-            ->middleware('can:Edit Inventory Items,workspace')
-            ->name('cancel');
-    });
-
     Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
@@ -561,6 +535,19 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'store'])->name('daily-sales-tracker.store');
             Route::delete('/daily-sales-tracker/{order}', [GencysDailySalesTrackerController::class, 'destroy'])->name('daily-sales-tracker.destroy');
         }
+
+        // ERP syncing lives together under Gencys: the runs for this workspace
+        // and the batch queue that sends them, both gated on "View Gencys Sync".
+        Route::get('/sync-runs', [GencysSyncRunController::class, 'index'])
+            ->middleware('can:View Gencys Sync,workspace')
+            ->name('sync-runs.index');
+
+        Route::prefix('/sync-batches')->name('sync-batches.')->middleware('can:View Gencys Sync,workspace')->group(function () {
+            Route::get('/', [GencysSyncBatchController::class, 'index'])->name('index');
+            Route::get('/{batch}', [GencysSyncBatchController::class, 'show'])->name('show');
+            Route::post('/', [GencysSyncBatchController::class, 'store'])->name('store');
+            Route::post('/{batch}/cancel', [GencysSyncBatchController::class, 'cancel'])->name('cancel');
+        });
 
         Route::get('/interns', [GencysInternController::class, 'index'])->name('interns.index');
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');

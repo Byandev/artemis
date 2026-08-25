@@ -411,18 +411,6 @@ export function AppSidebar() {
                               icon: Activity,
                               permission: PERMISSIONS.ViewUnitCode,
                           },
-                          {
-                              title: 'Sync Health',
-                              href: `/workspaces/${slug}/inventory/sync-health`,
-                              icon: Activity,
-                              permission: PERMISSIONS.ViewInventoryItems,
-                          },
-                          {
-                              title: 'Sync Batches',
-                              href: `/workspaces/${slug}/inventory/sync-batches`,
-                              icon: Layers,
-                              permission: PERMISSIONS.ViewInventoryItems,
-                          },
                       ],
                   },
               ]
@@ -437,6 +425,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewGencysInterns,
                           PERMISSIONS.ViewGencysInternDailyRecords,
                           PERMISSIONS.ViewGencysPages,
+                          PERMISSIONS.ViewGencysSync,
                       ],
                       items: [
                           {
@@ -456,6 +445,18 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/gencys/pages`,
                               icon: FileText,
                               permission: PERMISSIONS.ViewGencysPages,
+                          },
+                          {
+                              title: 'Sync Runs',
+                              href: `/workspaces/${slug}/gencys/sync-runs`,
+                              icon: ListChecks,
+                              permission: PERMISSIONS.ViewGencysSync,
+                          },
+                          {
+                              title: 'Sync Batches',
+                              href: `/workspaces/${slug}/gencys/sync-batches`,
+                              icon: Layers,
+                              permission: PERMISSIONS.ViewGencysSync,
                           },
                       ],
                   },

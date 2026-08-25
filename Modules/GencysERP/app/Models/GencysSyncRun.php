@@ -174,7 +174,7 @@ class GencysSyncRun extends Model
      * those earlier attempts were waiting on is in the database — a run left
      * pending (no callback) or failed (n8n handshake, timeout) is stale
      * bookkeeping, not a data gap, so it's resolved rather than left glaring on
-     * Sync Health.
+     * the Sync Runs page.
      *
      * "Same thing" is same workspace + sync type + inventory item + identical
      * meta (the parameters we sent n8n: date, date range, intern id, page id).

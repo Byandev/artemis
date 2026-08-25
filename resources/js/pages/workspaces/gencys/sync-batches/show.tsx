@@ -49,7 +49,7 @@ export default function SyncBatchShow({
     runs,
     query,
 }: Props) {
-    const indexUrl = `/workspaces/${workspace.slug}/inventory/sync-batches`;
+    const indexUrl = `/workspaces/${workspace.slug}/gencys/sync-batches`;
     const showUrl = `${indexUrl}/${batch.id}`;
 
     const initialSorting = useMemo(

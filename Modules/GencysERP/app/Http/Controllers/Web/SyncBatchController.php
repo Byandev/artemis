@@ -51,7 +51,7 @@ class SyncBatchController extends Controller
 
         $batches->through(fn (GencysSyncBatch $batch) => $this->present($batch));
 
-        return Inertia::render('workspaces/inventory/sync-batches/index', [
+        return Inertia::render('workspaces/gencys/sync-batches/index', [
             'workspace' => $workspace,
             'batches' => $batches,
             'syncTypes' => collect($this->flows->all())
@@ -116,7 +116,7 @@ class SyncBatchController extends Controller
             'message' => $run->message,
         ]);
 
-        return Inertia::render('workspaces/inventory/sync-batches/show', [
+        return Inertia::render('workspaces/gencys/sync-batches/show', [
             'workspace' => $workspace,
             'batch' => $this->present($batch->load('createdBy:id,name')),
             'runs' => $runs,

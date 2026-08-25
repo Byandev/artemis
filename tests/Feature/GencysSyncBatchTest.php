@@ -428,3 +428,56 @@ test('a pass with nothing to sync leaves no empty batch behind', function () {
     expect(GencysSyncBatch::count())->toBe(0)
         ->and(GencysSyncRun::count())->toBe(0);
 });
+
+test('the batch tallies keep up as its groups report back, not only at the end', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 4);
+
+    $batch = queueTransactionBatch();
+
+    expect($batch->succeeded_runs)->toBe(0)
+        ->and($batch->progressPercent())->toBe(0);
+
+    // First group of two comes back — the batch is still running, but its
+    // counters (which are what the UI draws progress from) must already say so.
+    reportInFlightRuns($batch, $raw);
+
+    $batch->refresh();
+
+    expect($batch->status)->toBe(GencysSyncBatch::STATUS_RUNNING)
+        ->and($batch->total_runs)->toBe(4)
+        ->and($batch->succeeded_runs)->toBe(2)
+        ->and($batch->progressPercent())->toBe(50);
+
+    reportInFlightRuns($batch, $raw);
+
+    $batch->refresh();
+
+    expect($batch->status)->toBe(GencysSyncBatch::STATUS_COMPLETED)
+        ->and($batch->succeeded_runs)->toBe(4)
+        ->and($batch->progressPercent())->toBe(100);
+});
+
+test('a timed-out run shows up in the tallies while the batch is still going', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 4);
+
+    config(['gencyserp.batch.max_retries' => 0]);
+
+    $batch = queueTransactionBatch();
+    $runner = app(BatchRunner::class);
+
+    $good = $batch->runs()->pending()->orderBy('id')->first();
+    GencysSyncRun::succeedById($workspace->id, $good->id, 1, 1);
+
+    $this->travel(11)->minutes();
+    $runner->expireTimedOutRuns();
+    $runner->tick();
+
+    $batch->refresh();
+
+    // Two runs resolved (one ok, one failed) out of four, and the batch has
+    // moved on to its next group rather than sitting at zero.
+    expect($batch->status)->toBe(GencysSyncBatch::STATUS_RUNNING)
+        ->and($batch->succeeded_runs)->toBe(1)
+        ->and($batch->failed_runs)->toBe(1)
+        ->and($batch->progressPercent())->toBe(50);
+});

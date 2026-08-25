@@ -8,7 +8,7 @@ use Modules\Inventory\Models\InventoryItem;
 
 function syncBatchesUrl($workspace, string $suffix = ''): string
 {
-    return "/workspaces/{$workspace->slug}/inventory/sync-batches".$suffix;
+    return "/workspaces/{$workspace->slug}/gencys/sync-batches".$suffix;
 }
 
 /** An ERP-connected workspace with active items, plus its owner. */
@@ -47,7 +47,7 @@ test('the index lists batches with their progress and what is holding the ERP', 
         ->get(syncBatchesUrl($workspace))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('workspaces/inventory/sync-batches/index')
+            ->component('workspaces/gencys/sync-batches/index')
             ->has('batches.data', 1)
             ->where('batches.data.0.status', GencysSyncBatch::STATUS_RUNNING)
             ->where('batches.data.0.sync_types', [GencysSyncRun::TYPE_TRANSACTION_HISTORY])
@@ -70,7 +70,7 @@ test('the detail page lists the batch runs visible to this workspace', function 
         ->get(syncBatchesUrl($workspace, "/{$batch->id}"))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('workspaces/inventory/sync-batches/show')
+            ->component('workspaces/gencys/sync-batches/show')
             ->where('batch.id', $batch->id)
             ->has('runs.data', 2)
             ->where('runs.data.0.subject', 'SKU-1')

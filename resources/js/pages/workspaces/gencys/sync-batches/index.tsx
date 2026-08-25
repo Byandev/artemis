@@ -66,7 +66,7 @@ export default function SyncBatchesIndex({
     itemCount,
     query,
 }: Props) {
-    const indexUrl = `/workspaces/${workspace.slug}/inventory/sync-batches`;
+    const indexUrl = `/workspaces/${workspace.slug}/gencys/sync-batches`;
 
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),

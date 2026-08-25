@@ -206,6 +206,14 @@ class BatchRunner
                 return;
             }
 
+            // Bring the denormalised tallies up to date before anything else.
+            // Callbacks resolve runs one at a time and never touch the batch row,
+            // so this — which runs on every tick — is what keeps the progress the
+            // UI draws honest while the batch is still working. Refreshing here
+            // rather than after the early return below matters: a batch with a
+            // group still in flight is exactly the case you're watching.
+            $batch->refreshCounts();
+
             // A group is still out with n8n — nothing to do until it reports back
             // or its timeout expires.
             if ($batch->runs()->pending()->exists()) {
