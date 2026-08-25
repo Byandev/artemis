@@ -56,6 +56,13 @@ return [
         // Public base URL n8n posts callbacks back to (e.g. an ngrok/Herd tunnel
         // in local dev). Falls back to APP_URL when unset.
         'callback_base_url' => env('N8N_CALLBACK_BASE_URL'),
+
+        // n8n's own REST API, used to look up how an execution actually went and
+        // to link into the editor. Base URL of the n8n instance (no /api/v1) plus
+        // a public API key from Settings → n8n API. Both optional: without them
+        // the sync pages simply don't offer the lookup.
+        'api_url' => env('N8N_API_URL'),
+        'api_key' => env('N8N_API_KEY'),
     ],
 
     'discord' => [

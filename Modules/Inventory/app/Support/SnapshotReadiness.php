@@ -5,6 +5,7 @@ namespace Modules\Inventory\Support;
 use App\Models\Workspace;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
 
 /**
@@ -21,6 +22,14 @@ use Modules\GencysERP\Models\GencysSyncRun;
  * time in the last three days still poisons a 3-day average. Transactions and
  * purchase orders are today's stock and today's commitments — yesterday's are
  * already in, so only today matters.
+ *
+ * Two things about batched syncs shape the query below. A run now spends most of
+ * its life `queued` — opened, but waiting for its batch's turn and then for its
+ * group's — and that is data that has not arrived every bit as much as `pending`
+ * is. And because batches drain serially, the evening pass can still be working
+ * after midnight, so its runs carry yesterday's started_at while being very much
+ * in flight; a batch that is still queued or running blocks whatever its runs'
+ * timestamps say.
  */
 class SnapshotReadiness
 {
@@ -29,13 +38,22 @@ class SnapshotReadiness
      * Zero means today only.
      */
     private const REQUIRED = [
-//        GencysSyncRun::TYPE_DAILY_SALES_TRACKER => 3,
+        //        GencysSyncRun::TYPE_DAILY_SALES_TRACKER => 3,
         GencysSyncRun::TYPE_TRANSACTION_HISTORY => 0,
         GencysSyncRun::TYPE_PURCHASE_ORDER => 0,
     ];
 
-    /** A run in either of these states has not delivered its data. */
-    private const UNFINISHED = [GencysSyncRun::STATUS_PENDING, GencysSyncRun::STATUS_FAILED];
+    /**
+     * A run in any of these states has not delivered its data.
+     *
+     * `cancelled` is deliberately absent: someone chose to stop that sync, which
+     * is a decision rather than a silent gap, and --ignore-sync covers the rest.
+     */
+    private const UNFINISHED = [
+        GencysSyncRun::STATUS_QUEUED,
+        GencysSyncRun::STATUS_PENDING,
+        GencysSyncRun::STATUS_FAILED,
+    ];
 
     /**
      * Why this workspace should not be frozen right now, in plain words.
@@ -45,19 +63,24 @@ class SnapshotReadiness
      */
     public static function blockers(Workspace $workspace): array
     {
-        $counts = DB::table('gencys_sync_runs')
-            ->where('workspace_id', $workspace->id)
-            ->whereIn('status', self::UNFINISHED)
-            ->whereIn('sync_type', array_keys(self::REQUIRED))
+        $counts = DB::table('gencys_sync_runs as r')
+            ->leftJoin('gencys_sync_batches as b', 'b.id', '=', 'r.gencys_sync_batch_id')
+            ->where('r.workspace_id', $workspace->id)
+            ->whereIn('r.status', self::UNFINISHED)
+            ->whereIn('r.sync_type', array_keys(self::REQUIRED))
             ->where(function ($q) {
                 foreach (self::REQUIRED as $type => $days) {
                     $q->orWhere(fn ($w) => $w
-                        ->where('sync_type', $type)
-                        ->where('started_at', '>=', self::since($days)));
+                        ->where('r.sync_type', $type)
+                        ->where('r.started_at', '>=', self::since($days)));
                 }
+
+                // A batch that hasn't finished is working on today's data
+                // whenever its runs happened to be opened.
+                $q->orWhereIn('b.status', GencysSyncBatch::ACTIVE_STATUSES);
             })
-            ->groupBy('sync_type', 'status')
-            ->selectRaw('sync_type, status, COUNT(*) as runs')
+            ->groupBy('r.sync_type', 'r.status')
+            ->selectRaw('r.sync_type as sync_type, r.status as status, COUNT(*) as runs')
             ->get();
 
         $blockers = [];

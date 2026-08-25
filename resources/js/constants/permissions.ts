@@ -87,6 +87,7 @@ export const PERMISSIONS = {
     ViewGencysInterns: 'View Gencys Interns',
     ViewGencysInternDailyRecords: 'View Gencys Intern Daily Records',
     ViewGencysPages: 'View Gencys Pages',
+    ViewGencysSync: 'View Gencys Sync',
     ViewUnitCode: 'View Unit Code',
     CreateUnitCode: 'Create Unit Code',
     EditUnitCode: 'Edit Unit Code',

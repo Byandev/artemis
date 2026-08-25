@@ -2,173 +2,119 @@
 
 namespace Modules\GencysERP\Console\Commands;
 
-use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Modules\GencysERP\Jobs\FetchInventoryItemTransactionHistory;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\SyncFlows\SyncFlowRegistry;
 
+/**
+ * Queues a transaction-history batch by hand. The schedule uses
+ * `gencys-erp:sync` instead — this exists for re-running a specific date or item.
+ */
 class TriggerFetchERPTransactionHistory extends Command
 {
     protected $signature = 'gencys-erp:trigger-fetch-erp-transaction-history
         {--date= : Sync a single transaction history date in Y-m-d format. Shortcut that overrides --start-date/--end-date}
-        {--start-date= : Start of the date range in Y-m-d format (defaults to yesterday)}
-        {--end-date= : End of the date range in Y-m-d format (defaults to today)}
+        {--start-date= : Start of the date range in Y-m-d format}
+        {--end-date= : End of the date range in Y-m-d format (defaults to today when --start-date is given)}
         {--item=* : Limit to specific inventory item id(s); repeat (--item=1 --item=2) or comma-separate (--item=1,2). Omit for all active items}
-        {--delay=180 : Seconds to stagger each queued workspace by}
+        {--workspace= : Limit the batch to one workspace id. Omit to cover every ERP-connected workspace}
+        {--delay= : Deprecated and ignored — the batch paces itself by waiting for each group to report back}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
-        {--sync : POST to the webhook immediately in-process instead of queueing (use this to hit an n8n test-mode webhook)}
+        {--sync : POST to the webhook in-process instead of handing it to the erp queue worker (use this to hit an n8n test-mode webhook)}
         {--force : Run outside production (by default this command only runs on production)}';
 
-    protected $description = 'Trigger n8n webhook for each workspace with ERP credentials to fetch its ERP transaction history';
+    protected $description = 'Queue a Gencys ERP batch that fetches transaction history (the schedule uses gencys-erp:sync)';
 
-    public function handle()
+    public function handle(BatchRunner $runner, SyncFlowRegistry $flows): int
     {
-        if (! app()->environment('production') && ! $this->option('force')) {
-            $this->warn('This command only runs on production. Re-run with --force to override (current environment: '.app()->environment().').');
+        if (! app()->environment('production') && ! $this->option('force') && ! $this->option('sync')) {
+            $this->warn('This command only runs on production. Re-run with --force (or --sync) to override (current environment: '.app()->environment().').');
 
-            return 0;
+            return self::SUCCESS;
         }
 
-        $webhookUrl = $this->option('webhook') ?: config('services.n8n.transaction_history_webhook_url');
-
-        if (empty($webhookUrl)) {
-            $this->error('n8n transaction history webhook URL is not configured (services.n8n.transaction_history_webhook_url). Pass --webhook= to override.');
-
-            return 1;
+        if ($this->option('delay')) {
+            $this->warn('--delay is ignored: the batch sends the next group only once the previous one reports back.');
         }
+
+        $flow = $flows->for(GencysSyncRun::TYPE_TRANSACTION_HISTORY);
 
         try {
-            $dates = $this->resolveDates();
+            $dates = $this->explicitDates();
         } catch (\InvalidArgumentException $e) {
             $this->error($e->getMessage());
 
-            return 1;
+            return self::FAILURE;
         }
 
-        $sync = (bool) $this->option('sync');
-        $delay = max(0, (int) $this->option('delay'));
-        $itemIds = $this->itemIds();
+        // No date options at all means "whatever the scheduled sync would do".
+        $dateParameters = $dates
+            ? ['dates' => $dates->map(fn (Carbon $date) => $date->format('m/d/Y'))->all()]
+            : $flow->defaultParameters();
 
-        if (! empty($itemIds)) {
-            $this->info('Limiting to inventory item id(s): '.implode(', ', $itemIds));
+        $batch = $runner->queue(
+            syncTypes: [GencysSyncRun::TYPE_TRANSACTION_HISTORY],
+            parameters: [
+                GencysSyncRun::TYPE_TRANSACTION_HISTORY => array_filter([
+                    ...$dateParameters,
+                    'item_ids' => $this->itemIds(),
+                    'webhook' => $this->option('webhook') ?: null,
+                    'inline' => (bool) $this->option('sync') ?: null,
+                ]),
+            ],
+            workspaceId: $this->option('workspace') ? (int) $this->option('workspace') : null,
+        );
+
+        $all = $batch->parametersFor(GencysSyncRun::TYPE_TRANSACTION_HISTORY)['dates'] ?? [];
+        $rangeLabel = count($all) === 1 ? $all[0] : ($all[0] ?? '?').' – '.(end($all) ?: '?');
+
+        if (! $batch->wasRecentlyCreated) {
+            $this->info("An identical batch (#{$batch->id}) is already queued for {$rangeLabel} — nothing new to add.");
+
+            return self::SUCCESS;
         }
 
-        $workspaces = Workspace::whereNotNull('erp_username')
-            ->where('erp_username', '!=', '')
-            ->whereNotNull('erp_password')
-            ->whereHas('apiKeys')
-            ->with(['apiKeys', 'inventoryItems' => function ($query) use ($itemIds) {
-                // Parent items are grouping placeholders with no ERP SKU — never sync them.
-                $query->where('is_parent', false);
+        if ($batch->total_runs === 0) {
+            $this->warn('No workspaces found with ERP credentials, an API key and syncable items.');
 
-                // A specific --item selection wins over the active-only default so a
-                // single item can be re-synced (or tested) even when it's inactive.
-                if (empty($itemIds)) {
-                    $query->where('is_active', true);
-                } else {
-                    $query->whereIn('id', $itemIds);
-                }
-            }])
-            ->get();
-
-        if ($workspaces->isEmpty()) {
-            $this->warn('No workspaces found with ERP credentials and an API key.');
-
-            return 0;
+            return self::SUCCESS;
         }
 
-        $rangeLabel = $dates->count() === 1
-            ? $dates->first()->format('m/d/Y')
-            : $dates->first()->format('m/d/Y').' – '.$dates->last()->format('m/d/Y');
+        $this->info("Queued batch #{$batch->id}: {$batch->total_runs} run(s) for {$rangeLabel}.");
+        $this->line("Status: {$batch->status}. Watch it with: php artisan gencys-erp:sync-batches");
 
-        $this->info(($sync ? 'Sending' : 'Queueing')." ERP transaction history for {$rangeLabel}…");
-
-        $dispatched = 0;
-        $totalCount = 0;
-
-        foreach ($dates as $date) {
-            $transactionDate = $date->format('m/d/Y');
-
-            foreach ($workspaces as $workspace) {
-                $apiKey = $workspace->apiKeys->first();
-
-                // One payload per workspace carrying every item, so n8n logs into the ERP
-                // once and loops the items reusing that session. This is what avoids the
-                // per-item logins that were tripping the ERP's rate limit (429).
-                $workspace->inventoryItems
-                    ->chunk(20)
-                    ->values()
-                    ->each(function ($chunk) use (&$dispatched, &$totalCount, $apiKey, $workspace, $transactionDate, $webhookUrl) {
-                        $dispatched++;
-                        $totalCount += count($chunk);
-
-                        $callbackBase = rtrim(config('app.url'), '/');
-
-                        // Open a pending sync run per item, keyed by item id. We hand
-                        // each run's id to n8n (sync_run_id) so it can echo it back on
-                        // the callback for an exact match; items that never report back
-                        // stay pending until the stale-run sweeper fails them.
-                        $runIds = $chunk->mapWithKeys(fn ($item) => [
-                            $item->id => GencysSyncRun::start(
-                                $workspace->id,
-                                $item->id,
-                                GencysSyncRun::TYPE_TRANSACTION_HISTORY,
-                                ['date' => $transactionDate],
-                            )->id,
-                        ]);
-
-                        $data = [
-                            'workspace_id' => $workspace->id,
-                            'workspace_api_key' => $apiKey->reveal(),
-                            'erp_username' => $workspace->erp_username,
-                            'erp_password' => $workspace->erp_password,
-                            'date' => $transactionDate,
-                            'webhook_url' => "{$callbackBase}/api/v1/public/inventory-items/transactions/bulk-sync",
-                            'items' => $chunk->map(fn ($item) => [
-                                'id' => $item->id,
-                                'keyword' => $item->sku,
-                                'sync_run_id' => $runIds[$item->id],
-                            ])->values()->toArray(),
-                        ];
-
-                        dispatch(new FetchInventoryItemTransactionHistory($webhookUrl, $data, $runIds->values()->all()))
-                            ->delay(now()->addMinutes(($dispatched - 1) * 2));
-                    });
-            }
-        }
-
-        $this->newLine();
-        $this->info(($sync ? 'Sent' : 'Queued')." {$totalCount} workspace(s).");
-
-        return 0;
+        return self::SUCCESS;
     }
 
     /**
-     * Resolve the inclusive list of dates to sync.
+     * The dates the operator asked for, or null when they gave none and the
+     * flow's own default window should be used instead.
      *
      * --date is a shortcut for a single day and wins over the range options.
-     * Otherwise the range runs from --start-date (default: yesterday) through
-     * --end-date (default: today).
+     * A --start-date on its own runs through to today.
      *
-     * @return Collection<int, Carbon>
+     * @return Collection<int, Carbon>|null
      *
      * @throws \InvalidArgumentException
      */
-    private function resolveDates(): Collection
+    private function explicitDates(): ?Collection
     {
         if ($single = $this->option('date')) {
             return collect([$this->parseDate($single, 'date')]);
         }
 
-        $start = ($startOption = $this->option('start-date'))
-            ? $this->parseDate($startOption, 'start-date')
-            : Carbon::yesterday();
+        $startOption = $this->option('start-date');
+        $endOption = $this->option('end-date');
 
-        $end = ($endOption = $this->option('end-date'))
-            ? $this->parseDate($endOption, 'end-date')
-            : Carbon::today();
+        if (! $startOption && ! $endOption) {
+            return null;
+        }
+
+        $start = $startOption ? $this->parseDate($startOption, 'start-date') : Carbon::yesterday();
+        $end = $endOption ? $this->parseDate($endOption, 'end-date') : Carbon::today();
 
         if ($start->gt($end)) {
             throw new \InvalidArgumentException(

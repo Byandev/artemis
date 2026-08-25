@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\SyncCallbackFields;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 
@@ -18,7 +20,7 @@ class TransactionHistoryController extends Controller
      * `id` is the inventory item id and `sync_run_id` is the run we opened on
      * dispatch and n8n echoes back so we can mark it done.
      */
-    public function bulkSync(Request $request): JsonResponse
+    public function bulkSync(Request $request, BatchRunner $runner): JsonResponse
     {
         $workspace = $request->attributes->get('workspace');
 
@@ -53,7 +55,13 @@ class TransactionHistoryController extends Controller
             $saved = $this->saveTransactions($item, $rows);
 
             // The entry's sync_run_id is the run we opened for this item on dispatch.
-            GencysSyncRun::succeedById($workspace->id, $this->syncRunId($entry), count($rows), $saved);
+            GencysSyncRun::succeedById(
+                $workspace->id,
+                SyncCallbackFields::runId($entry, $request),
+                count($rows),
+                $saved,
+                SyncCallbackFields::executionId($entry, $request),
+            );
 
             $results[] = [
                 'inventory_item_id' => $item->id,
@@ -63,15 +71,11 @@ class TransactionHistoryController extends Controller
             ];
         }
 
+        // Every run this callback covered is now resolved, so whichever batch
+        // they belonged to can send its next group.
+        $runner->tick();
+
         return response()->json(['data' => $results]);
-    }
-
-    /** Pull the sync run id n8n echoed back, tolerating a couple of key spellings. */
-    private function syncRunId(array $entry): ?int
-    {
-        $id = $entry['sync_run_id'] ?? $entry['syncRunId'] ?? null;
-
-        return ($id === null || $id === '') ? null : (int) $id;
     }
 
     /**
