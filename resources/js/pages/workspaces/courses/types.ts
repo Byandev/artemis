@@ -66,6 +66,8 @@ export interface CourseStats {
     draft_courses: number;
     active_courses: number;
     total_lessons: number;
+    /** Courses the learner has started. */
+    my_courses: number;
     /** Lessons the learner has finished across the courses they started. */
     completed_lessons: number;
     /** Team-wide average — managers only. */

@@ -64,18 +64,18 @@ it('shows a manager every course, draft included', function () {
     );
 });
 
-it('shows a learner only the courses they started', function () {
+it('shows a learner every published course, started or not', function () {
     $started = courseWithLesson($this->workspace, 'Started');
     courseWithLesson($this->workspace, 'Never Opened');
 
     $user = learner($this->workspace);
     $this->actingAs($user)->post("{$this->url}/{$started->id}/start");
 
+    // The catalogue stays browsable, or there would be no way to start one.
     $this->actingAs($user)->get($this->url)->assertOk()->assertInertia(
         fn ($page) => $page
             ->where('stats.can_manage', false)
-            ->has('courses.data', 1)
-            ->where('courses.data.0.id', $started->id),
+            ->has('courses.data', 2),
     );
 });
 
@@ -88,6 +88,24 @@ it('hides a draft course from a learner even once started', function () {
     // Unpublishing a course should take it off a learner's list.
     $this->actingAs($user)->get($this->url)->assertOk()->assertInertia(
         fn ($page) => $page->has('courses.data', 0),
+    );
+});
+
+it('counts all published courses and only the started ones separately', function () {
+    $started = courseWithLesson($this->workspace, 'Started');
+    courseWithLesson($this->workspace, 'Untouched');
+    courseWithLesson($this->workspace, 'Hidden Draft', 'draft');
+
+    $user = learner($this->workspace);
+    $this->actingAs($user)->post("{$this->url}/{$started->id}/start");
+
+    $this->actingAs($user)->get($this->url)->assertOk()->assertInertia(
+        fn ($page) => $page
+            // All Courses counts published only — the draft is not offered.
+            ->where('stats.total_courses', 2)
+            ->where('stats.active_courses', 2)
+            // My Courses counts what they picked up.
+            ->where('stats.my_courses', 1),
     );
 });
 
@@ -111,7 +129,7 @@ it('reports a learner\'s own completion instead of the team average', function (
             ->where('stats.my_completion', 50)
             ->where('stats.completed_lessons', 1)
             ->where('stats.total_lessons', 2)
-            ->where('stats.total_courses', 2),
+            ->where('stats.my_courses', 2),
     );
 });
 
@@ -139,10 +157,12 @@ it('counts only started courses toward a learner\'s percentage', function () {
 it('reports 0% for a learner who has started nothing', function () {
     courseWithLesson($this->workspace, 'Published');
 
+    // They can still see and start it — the list is not empty, only My Courses.
     $this->actingAs(learner($this->workspace))->get($this->url)->assertOk()->assertInertia(
         fn ($page) => $page
-            ->has('courses.data', 0)
-            ->where('stats.my_completion', 0)
-            ->where('stats.total_courses', 0),
+            ->has('courses.data', 1)
+            ->where('stats.total_courses', 1)
+            ->where('stats.my_courses', 0)
+            ->where('stats.my_completion', 0),
     );
 });

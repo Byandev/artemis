@@ -30,8 +30,8 @@ class CoursesController extends Controller
         $this->authorize(Permission::ViewCourses->value, $workspace);
 
         // Someone who can edit courses is administering them and sees the whole
-        // catalogue; everyone else is a learner and sees only the published
-        // courses they have actually started.
+        // catalogue, drafts included; everyone else sees the published courses
+        // only — all of them, so they can still find something to start.
         $canManage = $request->user()->hasPermission(Permission::EditCourses->value, $workspace);
 
         // Aggregated once for the whole page rather than per card, so the grid
@@ -44,9 +44,7 @@ class CoursesController extends Controller
         $startedIds = $this->startedCourseIds($request, $workspace);
 
         $courses = Course::ofWorkspace($workspace)
-            ->unless($canManage, fn ($q) => $q
-                ->where('status', 'published')
-                ->whereIn('id', $startedIds))
+            ->unless($canManage, fn ($q) => $q->where('status', 'published'))
             // `media` is eager loaded so the cover column doesn't fire a query
             // per row on a full page of courses.
             ->with('media')
@@ -74,7 +72,7 @@ class CoursesController extends Controller
             'courses' => $courses,
             'stats' => $canManage
                 ? $this->workspaceStats($workspace, $lessonTotals, $completions, $memberCount)
-                : $this->learnerStats($request, $startedIds, $lessonTotals),
+                : $this->learnerStats($request, $workspace, $startedIds, $lessonTotals),
             'leaderboard' => $this->completionLeaderboard($workspace, array_sum($lessonTotals)),
             'openCreateOnMount' => $request->boolean('new'),
         ]);
@@ -154,15 +152,15 @@ class CoursesController extends Controller
     }
 
     /**
-     * What a learner sees instead of the team-wide figures: their own progress
-     * across the courses they have started. A team average would tell them
-     * nothing about their own standing.
+     * What a learner sees instead of the team-wide figures: the catalogue open
+     * to them, how much of it they have picked up, and how far through those
+     * they are. A team average would say nothing about their own standing.
      *
      * @param  array<int, int>  $startedIds
      * @param  array<int, int>  $lessonTotals
      * @return array<string, mixed>
      */
-    private function learnerStats(Request $request, array $startedIds, array $lessonTotals): array
+    private function learnerStats(Request $request, Workspace $workspace, array $startedIds, array $lessonTotals): array
     {
         // Only lessons inside the courses they started count, so finishing
         // everything they picked up reads as 100% rather than a fraction of
@@ -176,11 +174,16 @@ class CoursesController extends Controller
             ->where('course_lesson_completions.user_id', $request->user()->getKey())
             ->count();
 
+        $published = Course::ofWorkspace($workspace)->where('status', 'published')->count();
+
         return [
             'can_manage' => false,
-            'total_courses' => count($startedIds),
+            // Every published course, which is what their list shows.
+            'total_courses' => $published,
             'draft_courses' => 0,
-            'active_courses' => count($startedIds),
+            'active_courses' => $published,
+            // The ones they have actually picked up.
+            'my_courses' => count($startedIds),
             'total_lessons' => $lessons,
             'completed_lessons' => $done,
             'avg_completion' => 0,
@@ -205,6 +208,7 @@ class CoursesController extends Controller
             'draft_courses' => $total - $published,
             'active_courses' => $published,
             'total_lessons' => $lessons,
+            'my_courses' => 0,
             'completed_lessons' => 0,
             'my_completion' => 0,
             'avg_completion' => $lessons > 0

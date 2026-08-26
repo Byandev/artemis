@@ -77,7 +77,7 @@ function CourseCard({
     return (
         <div className={`overflow-hidden ${CARD_HOVER}`}>
             <div
-                className={`relative flex h-32 items-start justify-between bg-gradient-to-br p-3 ${coverUrl ? '' : banner}`}
+                className={`relative flex h-24 items-start justify-between gap-2 bg-gradient-to-br p-2.5 ${coverUrl ? '' : banner}`}
                 style={
                     coverUrl
                         ? {
@@ -91,12 +91,12 @@ function CourseCard({
                 }
             >
                 {course.category && (
-                    <span className="rounded-md bg-black/30 px-2 py-1 font-mono text-[10px] font-medium tracking-wider text-white/90 uppercase backdrop-blur-sm">
+                    <span className="min-w-0 truncate rounded-md bg-black/30 px-2 py-1 font-mono text-[10px] font-medium tracking-wider text-white/90 uppercase backdrop-blur-sm">
                         {course.category}
                     </span>
                 )}
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex shrink-0 items-center gap-1.5">
                     <span
                         className={`rounded-md px-2 py-1 font-mono text-[10px] font-medium tracking-wider uppercase ${
                             live
@@ -114,7 +114,7 @@ function CourseCard({
                 </div>
             </div>
 
-            <div className="space-y-3 p-4">
+            <div className="space-y-2.5 p-3.5">
                 <div>
                     <Link
                         href={`${baseUrl}/${course.id}`}
@@ -135,7 +135,7 @@ function CourseCard({
                     />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[13px] text-gray-500 tabular-nums dark:text-gray-400">
                         Team {course.team_percent ?? 0}%
                     </span>
@@ -216,7 +216,7 @@ export default function CoursesIndex({
                                       ? ` · ${stats.draft_courses} in draft`
                                       : ''
                               }`
-                            : `${plural(stats.total_courses, 'course')} in progress`
+                            : `${plural(stats.total_courses, 'course')} available · ${stats.my_courses} started`
                     }
                 >
                     {canCreate && (
@@ -228,21 +228,40 @@ export default function CoursesIndex({
                 </PageHeader>
 
                 {/* Stat tiles */}
-                <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                <div
+                    className={`mb-5 grid grid-cols-1 gap-3.5 ${
+                        stats.can_manage ? 'sm:grid-cols-2' : 'sm:grid-cols-3'
+                    }`}
+                >
                     <div className={`${CARD} p-5`}>
                         <p className={LABEL}>
                             {stats.can_manage
                                 ? 'Active Courses'
-                                : 'Courses Started'}
+                                : 'All Courses'}
                         </p>
                         <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
                             {stats.active_courses}
                         </p>
                         <p className={`mt-0.5 ${MUTED}`}>
-                            {plural(stats.total_lessons, 'lesson')} across{' '}
-                            {plural(stats.total_courses, 'course')}
+                            {stats.can_manage
+                                ? `${plural(stats.total_lessons, 'lesson')} across ${plural(stats.total_courses, 'course')}`
+                                : 'published and open to you'}
                         </p>
                     </div>
+
+                    {!stats.can_manage && (
+                        <div className={`${CARD} p-5`}>
+                            <p className={LABEL}>My Courses</p>
+                            <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
+                                {stats.my_courses}
+                            </p>
+                            <p className={`mt-0.5 ${MUTED}`}>
+                                {stats.my_courses === 0
+                                    ? 'nothing started yet'
+                                    : `${plural(stats.total_lessons, 'lesson')} to work through`}
+                            </p>
+                        </div>
+                    )}
 
                     {stats.can_manage ? (
                         <div className={`${CARD} p-5`}>
@@ -270,27 +289,27 @@ export default function CoursesIndex({
                             </div>
                             <p className={`mt-1.5 ${MUTED}`}>
                                 {stats.completed_lessons} of{' '}
-                                {plural(stats.total_lessons, 'lesson')} across
-                                the courses you started
+                                {plural(stats.total_lessons, 'lesson')} in the
+                                courses you started
                             </p>
                         </div>
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
                     {/* Course grid */}
-                    <div className="lg:col-span-2">
+                    <div className="lg:col-span-3">
                         {courses.data.length === 0 ? (
                             <div className={EMPTY}>
                                 <GraduationCap className="h-6 w-6 text-gray-300 dark:text-gray-600" />
                                 <p className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
                                     {stats.can_manage
                                         ? 'No courses yet'
-                                        : "You haven't started a course yet"}
+                                        : 'No published courses yet'}
                                 </p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
                                 {courses.data.map((course) => (
                                     <CourseCard
                                         key={course.id}
