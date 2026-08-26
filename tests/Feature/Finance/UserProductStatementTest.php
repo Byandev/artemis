@@ -98,3 +98,93 @@ test('the per-product statement resolves the product through unit-code order ite
     expect($missing)->toContain('NOPE')
         ->and($missing)->not->toContain('UC1');
 });
+
+/** The per-user statement page, seeded with one mapped product + one unmapped order. */
+function ups_seed(): array
+{
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    Intern::create([
+        'workspace_id' => $workspace->id,
+        'intern_id' => 1,
+        'full_name' => 'Juan Dela Cruz',
+        'active' => true,
+        'user_id' => $user->id,
+    ]);
+
+    $product = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'WIDGET']);
+
+    InventoryUnitCode::create([
+        'workspace_id' => $workspace->id,
+        'unit_code' => 'UC1',
+        'product_id' => $product->id,
+    ]);
+
+    ups_order(810001, $workspace, 'Juan Dela Cruz', [
+        'price_final' => 1000, 'shipping_fee' => 50,
+    ], 'UC1');
+    ups_order(810002, $workspace, 'Juan Dela Cruz', [
+        'price_final' => 500, 'shipping_fee' => 0,
+    ], 'NOPE');
+
+    $statement = IncomeStatement::create([
+        'workspace_id' => $workspace->id,
+        'period_month' => '2026-05-01',
+        'cod_fee_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+        'status' => 'final',
+    ]);
+
+    return [$user, $workspace, $statement, $product];
+}
+
+test('the per-user statement page carries the product breakdown', function () {
+    [$user, $workspace, $statement, $product] = ups_seed();
+
+    $this->actingAs($user)
+        ->get("/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/users/{$user->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('workspaces/finance/income-statements/show')
+            ->where('scope.label', $user->name)
+            // The commission endpoint the breakdown's rate input posts to.
+            ->where('commissionUrl', "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/users/{$user->id}/commission-rate")
+            ->where('statement.products', fn ($products) => collect($products)->firstWhere('product', 'WIDGET') !== null
+                && (float) collect($products)->firstWhere('product', 'WIDGET')['delivered'] === 1000.0
+                && (float) collect($products)->firstWhere('product', 'WIDGET')['commission_rate'] === 0.0
+                // The unresolved order is kept, last, as "Discrepancy".
+                && collect($products)->last()['product'] === 'Discrepancy')
+        );
+});
+
+test('saving a commission rate feeds the product breakdown', function () {
+    [$user, $workspace, $statement, $product] = ups_seed();
+
+    $base = "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/users/{$user->id}";
+
+    $this->actingAs($user)
+        ->put("{$base}/commission-rate", ['product_id' => $product->id, 'rate' => 0.05])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('finance_commission_rates', [
+        'workspace_id' => $workspace->id,
+        'user_id' => $user->id,
+        'product_id' => $product->id,
+        'rate' => 0.05,
+    ]);
+
+    // WIDGET nets 927.60 gross; a gencys partner isn't set, so net = gross.
+    // Commission = 5% of net profit.
+    $this->actingAs($user)
+        ->get($base)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('statement.products', function ($products) {
+                $widget = collect($products)->firstWhere('product', 'WIDGET');
+
+                return (float) $widget['commission_rate'] === 0.05
+                    && (float) $widget['commission'] === round((float) $widget['net_profit'] * 0.05, 2);
+            })
+        );
+});
