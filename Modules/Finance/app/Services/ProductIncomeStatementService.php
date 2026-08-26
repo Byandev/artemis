@@ -132,18 +132,15 @@ class ProductIncomeStatementService
 
     /**
      * The cost of the goods actually delivered in the month, per product id,
-     * summed off the orders themselves ('' = orders resolving to no product).
+     * summed off the orders themselves ('' = items resolving to no product).
+     * Split across a multi-product order by quantity, the same way revenue is.
      *
      * @return array<string, float>
      */
     private function deliveredCogsByProduct(Workspace $workspace, Carbon $from, Carbon $to): array
     {
-        $delivered = $this->deliveredOrders($workspace, $from, $to)
-            ->selectRaw('COALESCE(total_cog, 0) as cog')
-            ->selectSub($this->orderProductSubquery(), 'product_id');
-
-        return DB::query()->fromSub($delivered, 't')
-            ->selectRaw('product_id, COALESCE(SUM(cog), 0) as cog')
+        return DB::query()->fromSub($this->deliveredItems($workspace, null, $from, $to), 't')
+            ->selectRaw('product_id, COALESCE(SUM(cog * share), 0) as cog')
             ->groupBy('product_id')
             ->get()
             ->mapWithKeys(fn ($r) => [$this->productKey($r->product_id) => round((float) $r->cog, 2)])

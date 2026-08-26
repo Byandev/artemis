@@ -37,17 +37,59 @@ trait ResolvesProductOrders
     /** The month's delivered orders, with the statement-wide exclusions applied. */
     private function deliveredOrders(Workspace $workspace, Carbon $from, Carbon $to)
     {
-        return GencysDailySalesOrder::where('workspace_id', $workspace->id)
-            ->where('parcel_status', self::DELIVERED_STATUS)
-            ->whereNotIn('platform', self::EXCLUDED_PLATFORMS)
-            ->whereNotLike('page', self::EXCLUDED_PAGE_LIKE)
-            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()]);
+        // Columns are qualified: callers join the items and unit-code tables on
+        // top of this, and `workspace_id` sits on more than one of them.
+        return GencysDailySalesOrder::where('gencys_orders.workspace_id', $workspace->id)
+            ->where('gencys_orders.parcel_status', self::DELIVERED_STATUS)
+            ->whereNotIn('gencys_orders.platform', self::EXCLUDED_PLATFORMS)
+            ->whereNotLike('gencys_orders.page', self::EXCLUDED_PAGE_LIKE)
+            ->whereBetween('gencys_orders.parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()]);
+    }
+
+    /**
+     * One row per (delivered order, line item), each carrying the item's product
+     * and the fraction of the order it accounts for.
+     *
+     * An order can hold several different products, so the money on it has to be
+     * divided rather than pinned to one. `price_final` and `total_cog` are only
+     * recorded per order, and the items carry no price of their own, so quantity
+     * is the only split available: an item is worth its quantity over the
+     * order's total quantity.
+     *
+     * Left joins throughout, so an order with no items — or with items whose sku
+     * matches no unit code — still comes through, on a null product, rather than
+     * dropping out of the month entirely.
+     */
+    private function deliveredItems(Workspace $workspace, ?array $cells, Carbon $from, Carbon $to)
+    {
+        $orderQuantities = DB::table('gencys_order_items')
+            ->selectRaw('order_id, SUM(GREATEST(COALESCE(quantity, 1), 1)) as total_qty')
+            ->groupBy('order_id');
+
+        return $this->deliveredOrders($workspace, $from, $to)
+            ->when($cells !== null, fn ($q) => $q->whereIn('gencys_orders.intern_brands_name', $cells))
+            ->leftJoin('gencys_order_items as goi', 'goi.order_id', '=', 'gencys_orders.id')
+            ->leftJoin('inventory_unit_codes as uc', fn ($join) => $join
+                ->on('uc.unit_code', '=', 'goi.sku')
+                ->whereColumn('uc.workspace_id', 'gencys_orders.workspace_id'))
+            ->leftJoinSub($orderQuantities, 'q', 'q.order_id', '=', 'gencys_orders.id')
+            ->selectRaw('gencys_orders.id as order_id')
+            ->selectRaw('uc.product_id as product_id')
+            ->selectRaw('COALESCE(gencys_orders.price_final, 0) as revenue')
+            ->selectRaw('COALESCE(gencys_orders.total_cog, 0) as cog')
+            // No items (or a zero quantity) means the whole order is one share.
+            ->selectRaw('CASE WHEN COALESCE(q.total_qty, 0) = 0 THEN 1
+                ELSE GREATEST(COALESCE(goi.quantity, 1), 1) / q.total_qty END as share');
     }
 
     /**
      * Delivered parcel count and revenue per product id for the month, keyed by
-     * product id as a string ('' = orders that resolve to no product). Passing
+     * product id as a string ('' = items that resolve to no product). Passing
      * null for $cells covers every intern; a cell list scopes it to one.
+     *
+     * Revenue is split across the products an order carries by quantity, while
+     * the count is of whole orders — a parcel holding two products is one parcel
+     * for each of them, so the counts can add up to more than the month's orders.
      *
      * @return array<string, array{orders:int, revenue:float}>
      */
@@ -57,13 +99,8 @@ trait ResolvesProductOrders
             return [];
         }
 
-        $delivered = $this->deliveredOrders($workspace, $from, $to)
-            ->when($cells !== null, fn ($q) => $q->whereIn('intern_brands_name', $cells))
-            ->selectRaw('COALESCE(price_final, 0) as revenue')
-            ->selectSub($this->orderProductSubquery(), 'product_id');
-
-        return DB::query()->fromSub($delivered, 't')
-            ->selectRaw('product_id, COUNT(*) as orders, COALESCE(SUM(revenue), 0) as revenue')
+        return DB::query()->fromSub($this->deliveredItems($workspace, $cells, $from, $to), 't')
+            ->selectRaw('product_id, COUNT(DISTINCT order_id) as orders, COALESCE(SUM(revenue * share), 0) as revenue')
             ->groupBy('product_id')
             ->get()
             ->mapWithKeys(fn ($r) => [
