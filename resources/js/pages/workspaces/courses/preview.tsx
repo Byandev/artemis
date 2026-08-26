@@ -11,6 +11,23 @@ import {
     Play,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { clock, duration } from './lib/format';
+import {
+    BAR,
+    BTN_OUTLINE,
+    BTN_PRIMARY,
+    BTN_SECONDARY,
+    CARD,
+    CHIP_ACCENT,
+    CHIP_NEUTRAL,
+    LABEL,
+    MUTED,
+    NUM,
+    PAGE,
+    SECTION_BORDER,
+    TITLE,
+    TRACK,
+} from './lib/ui';
 import {
     type CourseLesson,
     type CourseProgress,
@@ -35,27 +52,6 @@ interface FlatLesson {
     completeUrl: string;
     index: number;
 }
-
-/** Seconds as m:ss, or h:mm:ss once past an hour. */
-function clock(seconds: number): string {
-    const s = Math.floor(seconds % 60);
-    const m = Math.floor((seconds / 60) % 60);
-    const h = Math.floor(seconds / 3600);
-    const mm = h > 0 ? String(m).padStart(2, '0') : String(m);
-
-    return `${h > 0 ? `${h}:` : ''}${mm}:${String(s).padStart(2, '0')}`;
-}
-
-/** Course total, written the way a duration is read rather than as a clock. */
-function totalLength(seconds: number): string {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.round((seconds % 3600) / 60);
-
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
-
-const metaClass =
-    'font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
 
 export default function CoursePreview({
     workspace,
@@ -122,7 +118,7 @@ export default function CoursePreview({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={course.name} />
 
-            <div className="p-4 md:p-7">
+            <div className={PAGE}>
                 {/* Header */}
                 <div className="mb-5 flex items-start justify-between gap-4">
                     <div className="min-w-0">
@@ -134,22 +130,22 @@ export default function CoursePreview({
                                 <ArrowLeft className="h-3 w-3" />
                                 All Courses
                             </Link>
-                            <span className={`${metaClass} truncate`}>
+                            <span className={`${LABEL} truncate`}>
                                 {course.name}
                             </span>
                         </div>
 
-                        <h1 className="mt-1 truncate text-[22px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
+                        <h1 className={`mt-1 truncate ${TITLE}`}>
                             {course.name}
                         </h1>
 
-                        <p className="mt-0.5 text-[13px] text-gray-500 dark:text-gray-400">
+                        <p className={`mt-0.5 ${MUTED}`}>
                             {modules.length}{' '}
                             {modules.length === 1 ? 'module' : 'modules'} ·{' '}
                             {flat.length}{' '}
                             {flat.length === 1 ? 'lesson' : 'lessons'}
                             {totalSeconds > 0
-                                ? ` · ${totalLength(totalSeconds)}`
+                                ? ` · ${duration(totalSeconds)}`
                                 : ''}
                         </p>
                     </div>
@@ -157,15 +153,15 @@ export default function CoursePreview({
                     <div className="flex shrink-0 items-center gap-3">
                         {progress.total_lessons > 0 && (
                             <div className="hidden w-40 sm:block">
-                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-800">
+                                <div className={TRACK}>
                                     <div
-                                        className="h-full rounded-full bg-emerald-600 transition-all"
+                                        className={BAR}
                                         style={{
                                             width: `${progress.percent}%`,
                                         }}
                                     />
                                 </div>
-                                <p className="mt-1 text-right font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-500">
+                                <p className={`mt-1 text-right ${NUM}`}>
                                     {progress.completed_count}/
                                     {progress.total_lessons} ·{' '}
                                     {progress.percent}%
@@ -210,14 +206,16 @@ export default function CoursePreview({
                         </div>
 
                         {active && (
-                            <div className="rounded-xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                            <div className={CARD}>
                                 <div className="p-5">
                                     <div className="flex items-center gap-2">
-                                        <span className="rounded-md bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:bg-zinc-800 dark:text-gray-400">
+                                        <span className={CHIP_NEUTRAL}>
                                             {active.moduleName}
                                         </span>
                                         {activeDone && (
-                                            <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider text-emerald-700 uppercase dark:bg-emerald-950/40 dark:text-emerald-400">
+                                            <span
+                                                className={`${CHIP_ACCENT} flex items-center gap-1`}
+                                            >
                                                 <Check className="h-3 w-3" />
                                                 Completed
                                             </span>
@@ -228,7 +226,9 @@ export default function CoursePreview({
                                         {active.lesson.name}
                                     </h2>
 
-                                    <div className="mt-1.5 flex items-center gap-3 font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                                    <div
+                                        className={`mt-1.5 flex items-center gap-3 ${NUM}`}
+                                    >
                                         {active.lesson.duration_seconds && (
                                             <span className="flex items-center gap-1">
                                                 <Clock className="h-3 w-3" />
@@ -245,16 +245,18 @@ export default function CoursePreview({
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-2 border-t border-black/6 px-5 py-3 dark:border-white/6">
+                                <div
+                                    className={`flex flex-wrap items-center gap-2 border-t ${SECTION_BORDER} px-5 py-3`}
+                                >
                                     <button
                                         onClick={() =>
                                             setComplete(active, !activeDone)
                                         }
-                                        className={`flex h-9 items-center gap-1.5 rounded-lg px-4 font-mono! text-[12px]! font-medium transition-all ${
+                                        className={
                                             activeDone
-                                                ? 'border border-emerald-600/20 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-950/40 dark:text-emerald-400'
-                                                : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                        }`}
+                                                ? `${BTN_OUTLINE} border-emerald-600/20 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-950/40 dark:text-emerald-400`
+                                                : BTN_PRIMARY
+                                        }
                                     >
                                         <Check className="h-4 w-4" />
                                         {activeDone
@@ -269,7 +271,7 @@ export default function CoursePreview({
                                                 setActiveId(prev.lesson.id)
                                             }
                                             disabled={!prev}
-                                            className="flex h-9 items-center gap-1 rounded-lg border border-black/8 px-3 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-30 dark:border-white/8 dark:text-gray-300 dark:hover:bg-zinc-800"
+                                            className={`${BTN_OUTLINE} px-3`}
                                         >
                                             <ChevronLeft className="h-4 w-4" />
                                             Previous
@@ -280,7 +282,7 @@ export default function CoursePreview({
                                                 setActiveId(next.lesson.id)
                                             }
                                             disabled={!next}
-                                            className="flex h-9 items-center gap-1 rounded-lg border border-black/8 bg-stone-100 px-3 font-mono! text-[12px]! font-medium text-gray-800 transition-all hover:bg-stone-200 disabled:pointer-events-none disabled:opacity-30 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:hover:bg-zinc-700"
+                                            className={`${BTN_SECONDARY} px-3`}
                                         >
                                             Next
                                             <ChevronRight className="h-4 w-4" />
@@ -293,11 +295,9 @@ export default function CoursePreview({
                                         onClick={() =>
                                             setActiveId(next.lesson.id)
                                         }
-                                        className="flex w-full items-center gap-2 border-t border-black/6 px-5 py-2.5 text-left transition-all hover:bg-stone-50 dark:border-white/6 dark:hover:bg-zinc-800/50"
+                                        className={`flex w-full items-center gap-2 border-t ${SECTION_BORDER} px-5 py-2.5 text-left transition-all hover:bg-stone-50 dark:hover:bg-zinc-800/50`}
                                     >
-                                        <span className={metaClass}>
-                                            Up next
-                                        </span>
+                                        <span className={LABEL}>Up next</span>
                                         <span className="min-w-0 flex-1 truncate text-[13px] text-gray-600 dark:text-gray-300">
                                             {next.lesson.name}
                                         </span>
@@ -312,14 +312,18 @@ export default function CoursePreview({
                     <aside className="lg:col-span-1">
                         {/* Sticky so the outline stays reachable while the
                             lesson notes scroll. */}
-                        <div className="overflow-hidden rounded-xl border border-black/6 bg-white lg:sticky lg:top-4 dark:border-white/6 dark:bg-zinc-900">
-                            <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
-                                <p className={metaClass}>
+                        <div
+                            className={`overflow-hidden ${CARD} lg:sticky lg:top-4`}
+                        >
+                            <div
+                                className={`border-b ${SECTION_BORDER} px-4 py-3`}
+                            >
+                                <p className={LABEL}>
                                     {course.name} · {flat.length}{' '}
                                     {flat.length === 1 ? 'lesson' : 'lessons'}
                                 </p>
                                 {flat.length > 0 && (
-                                    <p className="mt-0.5 font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                                    <p className={`mt-0.5 ${NUM}`}>
                                         {progress.completed_count} of{' '}
                                         {flat.length} completed
                                     </p>
@@ -367,7 +371,7 @@ export default function CoursePreview({
                                             >
                                                 {entry.lesson.name}
                                             </span>
-                                            <span className="shrink-0 font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-500">
+                                            <span className={`shrink-0 ${NUM}`}>
                                                 {entry.lesson.duration_seconds
                                                     ? clock(
                                                           entry.lesson

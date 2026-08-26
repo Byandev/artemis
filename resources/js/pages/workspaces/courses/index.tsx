@@ -1,11 +1,28 @@
+import PageHeader from '@/components/common/PageHeader';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, PaginatedData } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { GraduationCap, Plus, Trash2 } from 'lucide-react';
+import { GraduationCap, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import CourseFormDialog from './components/course-form-dialog';
+import { duration, plural } from './lib/format';
+import {
+    BAR,
+    BTN_PRIMARY,
+    CARD,
+    CARD_HOVER,
+    EMPTY,
+    ICON_BTN,
+    LABEL,
+    MUTED,
+    PAGE,
+    PILL_ACCENT,
+    PILL_OUTLINE,
+    TRACK,
+    TRACK_THIN,
+} from './lib/ui';
 import {
     type Course,
     type CourseStats,
@@ -20,16 +37,6 @@ interface Props {
     leaderboard: LeaderboardRow[];
     /** Set by ?new=1 so the player's "New course" button lands ready to type. */
     openCreateOnMount?: boolean;
-}
-
-const metaClass =
-    'font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
-
-/** Total video length, written the way a duration is read. */
-function length(seconds: number): string {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.round((seconds % 3600) / 60);
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 /**
@@ -68,7 +75,7 @@ function CourseCard({
     const live = course.status === 'published';
 
     return (
-        <div className="overflow-hidden rounded-xl border border-black/6 bg-white transition-all hover:border-black/12 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/12">
+        <div className={`overflow-hidden ${CARD_HOVER}`}>
             <div
                 className={`relative flex h-32 items-start justify-between bg-gradient-to-br p-3 ${coverUrl ? '' : banner}`}
                 style={
@@ -101,7 +108,7 @@ function CourseCard({
                     </span>
                     {(course.duration_seconds ?? 0) > 0 && (
                         <span className="font-mono text-[11px] text-white/80 tabular-nums">
-                            {length(course.duration_seconds ?? 0)}
+                            {duration(course.duration_seconds ?? 0)}
                         </span>
                     )}
                 </div>
@@ -115,15 +122,15 @@ function CourseCard({
                     >
                         {course.name}
                     </Link>
-                    <p className="mt-0.5 text-[13px] text-gray-500 dark:text-gray-400">
+                    <p className={`mt-0.5 ${MUTED}`}>
                         {course.modules_count ?? 0} modules ·{' '}
                         {course.lessons_count ?? 0} lessons
                     </p>
                 </div>
 
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-800">
+                <div className={TRACK}>
                     <div
-                        className="h-full rounded-full bg-emerald-600 transition-all"
+                        className={BAR}
                         style={{ width: `${course.team_percent ?? 0}%` }}
                     />
                 </div>
@@ -138,23 +145,22 @@ function CourseCard({
                             <button
                                 onClick={onDelete}
                                 aria-label="Delete course"
-                                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-all hover:bg-stone-100 hover:text-red-600 dark:hover:bg-zinc-800"
+                                className={`${ICON_BTN} hover:text-red-600`}
                             >
                                 <Trash2 className="h-3.5 w-3.5" />
                             </button>
                         )}
                         {canEdit && (
-                            <button
-                                onClick={onEdit}
-                                className="flex h-8 items-center rounded-lg border border-black/8 px-3 font-mono! text-[11px]! font-medium tracking-wider text-gray-600 uppercase transition-all hover:bg-stone-100 dark:border-white/8 dark:text-gray-300 dark:hover:bg-zinc-800"
-                            >
+                            <button onClick={onEdit} className={PILL_OUTLINE}>
+                                <Pencil className="h-3 w-3" />
                                 Edit
                             </button>
                         )}
                         <Link
                             href={`${baseUrl}/${course.id}/preview`}
-                            className="flex h-8 items-center rounded-lg border border-emerald-600/20 bg-emerald-50 px-3 font-mono! text-[11px]! font-medium tracking-wider text-emerald-700 uppercase transition-all hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            className={PILL_ACCENT}
                         >
+                            <Play className="h-3 w-3" />
                             Open
                         </Link>
                     </div>
@@ -200,54 +206,43 @@ export default function CoursesIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Courses" />
 
-            <div className="p-4 md:p-7">
-                {/* Header */}
-                <div className="mb-5 flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                        <p className={metaClass}>Course Management</p>
-                        <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-gray-800 dark:text-gray-100">
-                            Courses
-                        </h1>
-                        <p className="mt-0.5 text-[13px] text-gray-500 dark:text-gray-400">
-                            {stats.total_courses}{' '}
-                            {stats.total_courses === 1 ? 'course' : 'courses'}
-                            {stats.draft_courses > 0
-                                ? ` · ${stats.draft_courses} in draft`
-                                : ''}
-                        </p>
-                    </div>
-
+            <div className={PAGE}>
+                <PageHeader
+                    title="Courses"
+                    description={`${plural(stats.total_courses, 'course')}${
+                        stats.draft_courses > 0
+                            ? ` · ${stats.draft_courses} in draft`
+                            : ''
+                    }`}
+                >
                     {canCreate && (
-                        <button
-                            onClick={openCreate}
-                            className="flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-[13px] font-medium text-white transition-all hover:bg-emerald-700"
-                        >
+                        <button onClick={openCreate} className={BTN_PRIMARY}>
                             <Plus className="h-4 w-4" />
                             New course
                         </button>
                     )}
-                </div>
+                </PageHeader>
 
                 {/* Stat tiles */}
                 <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                    <div className="rounded-xl border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900">
-                        <p className={metaClass}>Active Courses</p>
+                    <div className={`${CARD} p-5`}>
+                        <p className={LABEL}>Active Courses</p>
                         <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
                             {stats.active_courses}
                         </p>
-                        <p className="mt-0.5 text-[13px] text-gray-500 dark:text-gray-400">
+                        <p className={`mt-0.5 ${MUTED}`}>
                             {stats.total_lessons} lessons across{' '}
                             {stats.total_courses}{' '}
                             {stats.total_courses === 1 ? 'course' : 'courses'}
                         </p>
                     </div>
 
-                    <div className="rounded-xl border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900">
-                        <p className={metaClass}>Avg Completion</p>
+                    <div className={`${CARD} p-5`}>
+                        <p className={LABEL}>Avg Completion</p>
                         <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-amber-600 tabular-nums dark:text-amber-500">
                             {stats.avg_completion}%
                         </p>
-                        <p className="mt-0.5 text-[13px] text-gray-500 dark:text-gray-400">
+                        <p className={`mt-0.5 ${MUTED}`}>
                             team average across all courses
                         </p>
                     </div>
@@ -257,7 +252,7 @@ export default function CoursesIndex({
                     {/* Course grid */}
                     <div className="lg:col-span-2">
                         {courses.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-black/12 bg-stone-50 py-16 text-center dark:border-white/12 dark:bg-zinc-900">
+                            <div className={EMPTY}>
                                 <GraduationCap className="h-6 w-6 text-gray-300 dark:text-gray-600" />
                                 <p className="mt-2 font-mono text-[12px] text-gray-500 dark:text-gray-400">
                                     No courses yet
@@ -285,8 +280,8 @@ export default function CoursesIndex({
 
                     {/* Leaderboard */}
                     <aside className="lg:col-span-1">
-                        <div className="rounded-xl border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900">
-                            <p className={metaClass}>Completion Leaderboard</p>
+                        <div className={`${CARD} p-5`}>
+                            <p className={LABEL}>Completion Leaderboard</p>
 
                             {leaderboard.length === 0 ? (
                                 <p className="mt-3 font-mono text-[11px] text-gray-400 dark:text-gray-500">
@@ -311,9 +306,11 @@ export default function CoursesIndex({
                                                         {row.percent}%
                                                     </span>
                                                 </div>
-                                                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-800">
+                                                <div
+                                                    className={`mt-1 ${TRACK_THIN}`}
+                                                >
                                                     <div
-                                                        className="h-full rounded-full bg-emerald-600"
+                                                        className={BAR}
                                                         style={{
                                                             width: `${row.percent}%`,
                                                         }}

@@ -7,18 +7,23 @@ import {
 import { Link, router } from '@inertiajs/react';
 import { Check, MoreHorizontal, Plus, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { clock } from '../lib/format';
+import {
+    ADD_ROW,
+    BAR,
+    CARD,
+    EMPTY,
+    ICON_BTN,
+    LABEL,
+    NUM,
+    PILL_ACCENT,
+    PILL_DISABLED,
+    ROW_DIVIDE,
+    SECTION_BORDER,
+    TRACK_THIN,
+} from '../lib/ui';
 import { uploadLessonVideo } from '../lib/upload-video';
 import { type CourseModule } from '../types';
-
-/** Seconds as m:ss, or h:mm:ss once past an hour. */
-function clock(seconds: number): string {
-    const sec = Math.floor(seconds % 60);
-    const min = Math.floor((seconds / 60) % 60);
-    const hr = Math.floor(seconds / 3600);
-    const mm = hr > 0 ? String(min).padStart(2, '0') : String(min);
-
-    return `${hr > 0 ? `${hr}:` : ''}${mm}:${String(sec).padStart(2, '0')}`;
-}
 
 interface Props {
     baseUrl: string;
@@ -262,7 +267,7 @@ export default function CourseStructure({
             )}
 
             {modules.length === 0 && !canEdit && (
-                <div className="rounded-xl border border-dashed border-black/12 bg-stone-50 py-10 text-center dark:border-white/12 dark:bg-zinc-900">
+                <div className={EMPTY}>
                     <p className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
                         No lessons yet
                     </p>
@@ -279,9 +284,11 @@ export default function CourseStructure({
                     return (
                         <div
                             key={module.id}
-                            className="overflow-hidden rounded-xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900"
+                            className={`overflow-hidden ${CARD}`}
                         >
-                            <div className="flex items-center gap-2 border-b border-black/6 px-4 py-3 dark:border-white/6">
+                            <div
+                                className={`flex items-center gap-2 border-b ${SECTION_BORDER} px-4 py-3`}
+                            >
                                 <EditableName
                                     value={module.name}
                                     action={moduleUrl}
@@ -290,12 +297,12 @@ export default function CourseStructure({
                                         setEditingModule(on ? module.id : null)
                                     }
                                     canEdit={canEdit}
-                                    className="min-w-0 flex-1 truncate font-mono text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:text-gray-400"
+                                    className={`min-w-0 flex-1 truncate ${LABEL}`}
                                 />
 
                                 <span
                                     title={`${doneHere} of ${module.lessons.length} lessons completed`}
-                                    className="shrink-0 font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500"
+                                    className={`shrink-0 ${NUM}`}
                                 >
                                     {doneHere}/{module.lessons.length}
                                 </span>
@@ -305,7 +312,7 @@ export default function CourseStructure({
                                         <DropdownMenuTrigger asChild>
                                             <button
                                                 aria-label="Module actions"
-                                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-stone-100 hover:text-gray-700 dark:hover:bg-zinc-800"
+                                                className={`${ICON_BTN} h-6 w-6`}
                                             >
                                                 <MoreHorizontal className="h-4 w-4" />
                                             </button>
@@ -328,7 +335,7 @@ export default function CourseStructure({
                                 )}
                             </div>
 
-                            <div className="divide-y divide-black/4 dark:divide-white/4">
+                            <div className={ROW_DIVIDE}>
                                 {module.lessons.map((lesson) => {
                                     const lessonUrl = `${moduleUrl}/lessons/${lesson.id}`;
                                     const isDone = done.has(lesson.id);
@@ -381,7 +388,7 @@ export default function CourseStructure({
                                                 }`}
                                             />
 
-                                            <span className="shrink-0 font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                                            <span className={`shrink-0 ${NUM}`}>
                                                 {lesson.duration_seconds
                                                     ? clock(
                                                           lesson.duration_seconds,
@@ -392,9 +399,11 @@ export default function CourseStructure({
                                             {uploading[lesson.id] !==
                                             undefined ? (
                                                 <div className="flex w-24 shrink-0 items-center gap-2">
-                                                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-700">
+                                                    <div
+                                                        className={`flex-1 ${TRACK_THIN}`}
+                                                    >
                                                         <div
-                                                            className="h-full rounded-full bg-emerald-600 transition-all"
+                                                            className={BAR}
                                                             style={{
                                                                 width: `${uploading[lesson.id]}%`,
                                                             }}
@@ -409,14 +418,20 @@ export default function CourseStructure({
                                                     {lesson.video ? (
                                                         <Link
                                                             href={`${courseUrl}/preview?lesson=${lesson.id}`}
-                                                            className="flex h-7 shrink-0 items-center rounded-md border border-emerald-600/20 bg-emerald-50 px-2.5 font-mono! text-[10px]! font-medium tracking-wider text-emerald-700 uppercase transition-all hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                                            className={
+                                                                PILL_ACCENT
+                                                            }
                                                         >
                                                             {isDone
                                                                 ? 'Replay'
                                                                 : 'Play'}
                                                         </Link>
                                                     ) : (
-                                                        <span className="flex h-7 shrink-0 items-center rounded-md border border-black/8 px-2.5 font-mono! text-[10px]! font-medium tracking-wider text-gray-300 uppercase dark:border-white/8 dark:text-gray-600">
+                                                        <span
+                                                            className={
+                                                                PILL_DISABLED
+                                                            }
+                                                        >
                                                             Play
                                                         </span>
                                                     )}
@@ -436,7 +451,9 @@ export default function CourseStructure({
                                                                         `${lessonUrl}/video`,
                                                                     )
                                                                 }
-                                                                className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-stone-100 hover:text-gray-700 dark:hover:bg-zinc-800"
+                                                                className={
+                                                                    ICON_BTN
+                                                                }
                                                             >
                                                                 <Upload className="h-3.5 w-3.5" />
                                                             </button>
@@ -448,7 +465,7 @@ export default function CourseStructure({
                                                                         `Delete lesson "${lesson.name}"?`,
                                                                     )
                                                                 }
-                                                                className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-all hover:bg-stone-100 hover:text-red-600 dark:hover:bg-zinc-800"
+                                                                className={`${ICON_BTN} hover:text-red-600`}
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />
                                                             </button>
@@ -479,7 +496,7 @@ export default function CourseStructure({
                     <button
                         onClick={addModule}
                         disabled={busy}
-                        className="flex w-full items-center gap-1.5 rounded-xl border border-dashed border-black/12 px-4 py-3 font-mono text-[12px] text-gray-400 transition-all hover:border-emerald-500/40 hover:text-emerald-600 disabled:opacity-50 dark:border-white/12 dark:hover:border-emerald-400/40 dark:hover:text-emerald-400"
+                        className={ADD_ROW}
                     >
                         <Plus className="h-4 w-4" />
                         New Module
