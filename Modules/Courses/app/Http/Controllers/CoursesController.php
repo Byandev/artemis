@@ -29,6 +29,11 @@ class CoursesController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewCourses->value, $workspace);
 
+        // Someone who can edit courses is administering them and sees the whole
+        // catalogue; everyone else is a learner and sees only the published
+        // courses they have actually started.
+        $canManage = $request->user()->hasPermission(Permission::EditCourses->value, $workspace);
+
         // Aggregated once for the whole page rather than per card, so the grid
         // costs a fixed handful of queries however many courses there are.
         $lessonTotals = $this->lessonTotalsByCourse($workspace);
@@ -36,7 +41,12 @@ class CoursesController extends Controller
         $completions = $this->completionsByCourse($workspace);
         $memberCount = max(1, $workspace->users()->count());
 
+        $startedIds = $this->startedCourseIds($request, $workspace);
+
         $courses = Course::ofWorkspace($workspace)
+            ->unless($canManage, fn ($q) => $q
+                ->where('status', 'published')
+                ->whereIn('id', $startedIds))
             // `media` is eager loaded so the cover column doesn't fire a query
             // per row on a full page of courses.
             ->with('media')
@@ -62,7 +72,9 @@ class CoursesController extends Controller
         return Inertia::render('workspaces/courses/index', [
             'workspace' => $workspace->only(['id', 'name', 'slug']),
             'courses' => $courses,
-            'stats' => $this->workspaceStats($workspace, $lessonTotals, $completions, $memberCount),
+            'stats' => $canManage
+                ? $this->workspaceStats($workspace, $lessonTotals, $completions, $memberCount)
+                : $this->learnerStats($request, $startedIds, $lessonTotals),
             'leaderboard' => $this->completionLeaderboard($workspace, array_sum($lessonTotals)),
             'openCreateOnMount' => $request->boolean('new'),
         ]);
@@ -126,6 +138,57 @@ class CoursesController extends Controller
     }
 
     /**
+     * Ids of the courses in this workspace the current user has started.
+     *
+     * @return array<int, int>
+     */
+    private function startedCourseIds(Request $request, Workspace $workspace): array
+    {
+        return DB::table('course_enrollments')
+            ->join('courses', 'course_enrollments.course_id', '=', 'courses.id')
+            ->where('courses.workspace_id', $workspace->id)
+            ->where('course_enrollments.user_id', $request->user()->getKey())
+            ->pluck('course_enrollments.course_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * What a learner sees instead of the team-wide figures: their own progress
+     * across the courses they have started. A team average would tell them
+     * nothing about their own standing.
+     *
+     * @param  array<int, int>  $startedIds
+     * @param  array<int, int>  $lessonTotals
+     * @return array<string, mixed>
+     */
+    private function learnerStats(Request $request, array $startedIds, array $lessonTotals): array
+    {
+        // Only lessons inside the courses they started count, so finishing
+        // everything they picked up reads as 100% rather than a fraction of
+        // the whole catalogue.
+        $lessons = array_sum(array_intersect_key($lessonTotals, array_flip($startedIds)));
+
+        $done = $startedIds === [] ? 0 : DB::table('course_lesson_completions')
+            ->join('course_lessons', 'course_lesson_completions.course_lesson_id', '=', 'course_lessons.id')
+            ->join('course_modules', 'course_lessons.course_module_id', '=', 'course_modules.id')
+            ->whereIn('course_modules.course_id', $startedIds)
+            ->where('course_lesson_completions.user_id', $request->user()->getKey())
+            ->count();
+
+        return [
+            'can_manage' => false,
+            'total_courses' => count($startedIds),
+            'draft_courses' => 0,
+            'active_courses' => count($startedIds),
+            'total_lessons' => $lessons,
+            'completed_lessons' => $done,
+            'avg_completion' => 0,
+            'my_completion' => $lessons > 0 ? (int) round($done / $lessons * 100) : 0,
+        ];
+    }
+
+    /**
      * @param  array<int, int>  $lessonTotals
      * @param  array<int, int>  $completions
      * @return array<string, mixed>
@@ -137,10 +200,13 @@ class CoursesController extends Controller
         $lessons = array_sum($lessonTotals);
 
         return [
+            'can_manage' => true,
             'total_courses' => $total,
             'draft_courses' => $total - $published,
             'active_courses' => $published,
             'total_lessons' => $lessons,
+            'completed_lessons' => 0,
+            'my_completion' => 0,
             'avg_completion' => $lessons > 0
                 ? (int) round(array_sum($completions) / ($memberCount * $lessons) * 100)
                 : 0,

@@ -209,11 +209,15 @@ export default function CoursesIndex({
             <div className={PAGE}>
                 <PageHeader
                     title="Courses"
-                    description={`${plural(stats.total_courses, 'course')}${
-                        stats.draft_courses > 0
-                            ? ` · ${stats.draft_courses} in draft`
-                            : ''
-                    }`}
+                    description={
+                        stats.can_manage
+                            ? `${plural(stats.total_courses, 'course')}${
+                                  stats.draft_courses > 0
+                                      ? ` · ${stats.draft_courses} in draft`
+                                      : ''
+                              }`
+                            : `${plural(stats.total_courses, 'course')} in progress`
+                    }
                 >
                     {canCreate && (
                         <button onClick={openCreate} className={BTN_PRIMARY}>
@@ -226,26 +230,51 @@ export default function CoursesIndex({
                 {/* Stat tiles */}
                 <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     <div className={`${CARD} p-5`}>
-                        <p className={LABEL}>Active Courses</p>
+                        <p className={LABEL}>
+                            {stats.can_manage
+                                ? 'Active Courses'
+                                : 'Courses Started'}
+                        </p>
                         <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
                             {stats.active_courses}
                         </p>
                         <p className={`mt-0.5 ${MUTED}`}>
-                            {stats.total_lessons} lessons across{' '}
-                            {stats.total_courses}{' '}
-                            {stats.total_courses === 1 ? 'course' : 'courses'}
+                            {plural(stats.total_lessons, 'lesson')} across{' '}
+                            {plural(stats.total_courses, 'course')}
                         </p>
                     </div>
 
-                    <div className={`${CARD} p-5`}>
-                        <p className={LABEL}>Avg Completion</p>
-                        <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-amber-600 tabular-nums dark:text-amber-500">
-                            {stats.avg_completion}%
-                        </p>
-                        <p className={`mt-0.5 ${MUTED}`}>
-                            team average across all courses
-                        </p>
-                    </div>
+                    {stats.can_manage ? (
+                        <div className={`${CARD} p-5`}>
+                            <p className={LABEL}>Avg Completion</p>
+                            <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-amber-600 tabular-nums dark:text-amber-500">
+                                {stats.avg_completion}%
+                            </p>
+                            <p className={`mt-0.5 ${MUTED}`}>
+                                team average across all courses
+                            </p>
+                        </div>
+                    ) : (
+                        <div className={`${CARD} p-5`}>
+                            <p className={LABEL}>My Completion</p>
+                            <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-emerald-600 tabular-nums dark:text-emerald-500">
+                                {stats.my_completion}%
+                            </p>
+                            <div className={`mt-2 ${TRACK}`}>
+                                <div
+                                    className={BAR}
+                                    style={{
+                                        width: `${stats.my_completion}%`,
+                                    }}
+                                />
+                            </div>
+                            <p className={`mt-1.5 ${MUTED}`}>
+                                {stats.completed_lessons} of{' '}
+                                {plural(stats.total_lessons, 'lesson')} across
+                                the courses you started
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
@@ -254,8 +283,10 @@ export default function CoursesIndex({
                         {courses.data.length === 0 ? (
                             <div className={EMPTY}>
                                 <GraduationCap className="h-6 w-6 text-gray-300 dark:text-gray-600" />
-                                <p className="mt-2 font-mono text-[12px] text-gray-500 dark:text-gray-400">
-                                    No courses yet
+                                <p className="font-mono text-[12px] text-gray-500 dark:text-gray-400">
+                                    {stats.can_manage
+                                        ? 'No courses yet'
+                                        : "You haven't started a course yet"}
                                 </p>
                             </div>
                         ) : (

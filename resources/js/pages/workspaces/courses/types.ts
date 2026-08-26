@@ -60,11 +60,18 @@ export interface CourseProgress {
 }
 
 export interface CourseStats {
+    /** False for a learner: the page is scoped to their own started courses. */
+    can_manage: boolean;
     total_courses: number;
     draft_courses: number;
     active_courses: number;
     total_lessons: number;
+    /** Lessons the learner has finished across the courses they started. */
+    completed_lessons: number;
+    /** Team-wide average — managers only. */
     avg_completion: number;
+    /** The learner's own progress across the courses they started. */
+    my_completion: number;
 }
 
 export interface LeaderboardRow {
