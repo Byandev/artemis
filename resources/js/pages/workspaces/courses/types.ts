@@ -39,8 +39,38 @@ export interface Course {
     updated_at: string | null;
     cover_image: CourseMedia | null;
     modules_count?: number;
+    lessons_count?: number;
+    duration_seconds?: number;
+    /** Average completion across every workspace member. */
+    team_percent?: number;
     /** Only loaded on the detail page. */
     modules?: CourseModule[];
+}
+
+/** The current user's own run through a course. */
+export interface CourseProgress {
+    started: boolean;
+    started_at: string | null;
+    completed_at: string | null;
+    resume_lesson_id: number | null;
+    completed_lesson_ids: number[];
+    completed_count: number;
+    total_lessons: number;
+    percent: number;
+}
+
+export interface CourseStats {
+    total_courses: number;
+    draft_courses: number;
+    active_courses: number;
+    total_lessons: number;
+    avg_completion: number;
+}
+
+export interface LeaderboardRow {
+    id: number;
+    name: string;
+    percent: number;
 }
 
 export interface CourseWorkspace {

@@ -1,6 +1,8 @@
 import { ImageUp, Loader2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { fileSize } from '../lib/format';
 import { putToBucket, requestPresign } from '../lib/presign';
+import { BAR, FIELD_ERROR, LABEL, TRACK_THIN } from '../lib/ui';
 
 /** Mirrors the `mimes:` rule on CoursesController@rules. */
 const ACCEPTED = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
@@ -31,12 +33,6 @@ interface Props {
     error?: string;
 }
 
-function fileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 /**
  * Rejects what the server would reject anyway, but without a round trip. The
  * server still validates — this only saves the user a failed submit.
@@ -51,9 +47,6 @@ function localError(file: File): string | null {
     }
     return null;
 }
-
-const labelClass =
-    'block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
 
 export default function CoverImageField({
     presignUrl,
@@ -147,7 +140,7 @@ export default function CoverImageField({
 
     return (
         <div className="space-y-1.5">
-            <label className={labelClass}>Cover Image</label>
+            <label className={`block ${LABEL}`}>Cover Image</label>
 
             {shownName ? (
                 <div className="flex items-center gap-3 rounded-[10px] border border-black/8 bg-stone-50 p-2.5 dark:border-white/8 dark:bg-zinc-800">
@@ -173,9 +166,9 @@ export default function CoverImageField({
                         </p>
 
                         {progress !== null && (
-                            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-700">
+                            <div className={`mt-1.5 ${TRACK_THIN}`}>
                                 <div
-                                    className="h-full rounded-full bg-emerald-600 transition-all"
+                                    className={BAR}
                                     style={{ width: `${progress}%` }}
                                 />
                             </div>
@@ -235,9 +228,7 @@ export default function CoverImageField({
                 onChange={(e) => accept(e.target.files?.[0] ?? null)}
             />
 
-            {message && (
-                <p className="font-mono text-[11px] text-red-500">{message}</p>
-            )}
+            {message && <p className={FIELD_ERROR}>{message}</p>}
         </div>
     );
 }

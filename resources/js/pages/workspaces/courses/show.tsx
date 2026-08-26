@@ -1,62 +1,70 @@
-import PageHeader from '@/components/common/PageHeader';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { GraduationCap, Pencil, Play } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { ArrowLeft, Pencil, Play } from 'lucide-react';
 import { useState } from 'react';
 import CourseFormDialog from './components/course-form-dialog';
 import CourseStructure from './components/course-structure';
+import { duration, initials } from './lib/format';
+import {
+    BAR,
+    BTN_PRIMARY,
+    CARD,
+    CHIP_ACCENT,
+    CHIP_CATEGORY,
+    CHIP_NEUTRAL,
+    ICON_BTN,
+    LABEL,
+    MUTED,
+    NUM,
+    PAGE,
+    TITLE,
+    TRACK,
+    TRACK_THIN,
+} from './lib/ui';
 import {
     type Course,
+    type CourseProgress,
     type CourseWorkspace,
-    STATUS_LABELS,
-    STATUS_STYLES,
+    type LeaderboardRow,
 } from './types';
 
 interface Props {
     workspace: CourseWorkspace;
     course: Course;
+    progress: CourseProgress;
+    team: LeaderboardRow[];
 }
 
-const labelClass =
-    'font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
-const cardClass =
-    'rounded-xl border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900';
+/** Avatar tint, keyed off the user id so it stays put between renders. */
+const AVATARS = [
+    'bg-sky-500',
+    'bg-emerald-500',
+    'bg-amber-500',
+    'bg-violet-500',
+    'bg-rose-500',
+    'bg-red-500',
+];
 
-function longDate(value: string | null) {
-    if (!value) return '—';
-    return new Date(value).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
-}
-
-/** One labelled row in the details panel. */
-function DetailRow({
-    label,
-    children,
-}: {
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="flex items-baseline justify-between gap-3 py-2.5">
-            <span className={labelClass}>{label}</span>
-            <div className="min-w-0 text-right">{children}</div>
-        </div>
-    );
-}
-
-export default function ShowCourse({ workspace, course }: Props) {
+export default function ShowCourse({
+    workspace,
+    course,
+    progress,
+    team,
+}: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/courses`;
     const canEdit = usePermission(PERMISSIONS.EditCourses);
     const [editOpen, setEditOpen] = useState(false);
 
     const modules = course.modules ?? [];
     const lessonCount = modules.reduce((n, m) => n + m.lessons.length, 0);
+    const totalSeconds = modules.reduce(
+        (sum, m) =>
+            sum + m.lessons.reduce((s, l) => s + (l.duration_seconds ?? 0), 0),
+        0,
+    );
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Courses', href: baseUrl },
@@ -67,64 +75,117 @@ export default function ShowCourse({ workspace, course }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={course.name} />
 
-            <div className="p-4 md:p-7">
-                <PageHeader
-                    title={course.name}
-                    description={`${modules.length} ${modules.length === 1 ? 'module' : 'modules'} · ${lessonCount} ${lessonCount === 1 ? 'lesson' : 'lessons'}`}
-                >
-                    <Link
-                        href={`${baseUrl}/${course.id}/preview`}
-                        className="flex h-9 items-center gap-1.5 rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
-                    >
-                        <Play className="h-4 w-4" />
-                        Preview
-                    </Link>
-                    {canEdit && (
-                        <button
-                            onClick={() => setEditOpen(true)}
-                            className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+            <div className={PAGE}>
+                {/* Header */}
+                <div className="mb-5">
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href={baseUrl}
+                            className="flex items-center gap-1 font-mono text-[10px] font-medium tracking-wider text-emerald-600 uppercase transition-colors hover:text-emerald-700 dark:text-emerald-400"
                         >
-                            <Pencil className="h-4 w-4" />
-                            Edit
-                        </button>
-                    )}
-                </PageHeader>
+                            <ArrowLeft className="h-3 w-3" />
+                            All Courses
+                        </Link>
+                        <span className={`${LABEL} truncate`}>
+                            {course.name}
+                        </span>
+                    </div>
+
+                    <h1 className={`mt-1 truncate ${TITLE}`}>{course.name}</h1>
+
+                    <p className={`mt-0.5 ${MUTED}`}>
+                        {modules.length}{' '}
+                        {modules.length === 1 ? 'module' : 'modules'} ·{' '}
+                        {lessonCount} {lessonCount === 1 ? 'lesson' : 'lessons'}
+                        {totalSeconds > 0 ? ` · ${duration(totalSeconds)}` : ''}
+                    </p>
+                </div>
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-                    {/* Main column: the course's own content. */}
-                    <div className="space-y-5 lg:col-span-2">
-                        <div className="overflow-hidden rounded-xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                            <div
-                                className="flex aspect-[21/9] items-center justify-center bg-stone-100 bg-cover bg-center dark:bg-zinc-800"
-                                style={
-                                    course.cover_image
-                                        ? {
-                                              // The bucket is private, so the
-                                              // image is reached through the
-                                              // app, which signs a short-lived
-                                              // URL.
-                                              backgroundImage: `url(${baseUrl}/${course.id}/media/${course.cover_image.id})`,
-                                          }
-                                        : undefined
-                                }
-                            >
-                                {!course.cover_image && (
-                                    <GraduationCap className="h-8 w-8 text-gray-300 dark:text-gray-600" />
-                                )}
+                    <div className="space-y-3.5 lg:col-span-2">
+                        {/* Summary */}
+                        <div className={`${CARD} p-5`}>
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                    {course.category && (
+                                        <span className={CHIP_CATEGORY}>
+                                            {course.category}
+                                        </span>
+                                    )}
+                                    <span
+                                        className={
+                                            course.status === 'published'
+                                                ? CHIP_ACCENT
+                                                : CHIP_NEUTRAL
+                                        }
+                                    >
+                                        {course.status === 'published'
+                                            ? 'Published'
+                                            : 'Draft'}
+                                    </span>
+                                    <span className={NUM}>
+                                        {totalSeconds > 0
+                                            ? `${duration(totalSeconds)} · `
+                                            : ''}
+                                        {lessonCount} lessons
+                                    </span>
+                                </div>
+
+                                <div className="flex shrink-0 items-center gap-2">
+                                    {canEdit && (
+                                        <button
+                                            onClick={() => setEditOpen(true)}
+                                            aria-label="Edit course"
+                                            className={`${ICON_BTN} h-9 w-9 rounded-lg border border-black/8 dark:border-white/8`}
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() =>
+                                            router.post(
+                                                `${baseUrl}/${course.id}/start`,
+                                            )
+                                        }
+                                        disabled={lessonCount === 0}
+                                        title={
+                                            lessonCount === 0
+                                                ? 'This course has no lessons yet'
+                                                : undefined
+                                        }
+                                        className={BTN_PRIMARY}
+                                    >
+                                        <Play className="h-4 w-4" />
+                                        {progress.started
+                                            ? 'Continue'
+                                            : 'Start course'}
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="space-y-2 p-5">
-                                <h2 className={labelClass}>Description</h2>
-                                {course.description ? (
-                                    <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-gray-600 dark:text-gray-400">
-                                        {course.description}
+                            {course.description && (
+                                <p className="mt-4 text-[14px] leading-relaxed whitespace-pre-wrap text-gray-600 dark:text-gray-300">
+                                    {course.description}
+                                </p>
+                            )}
+
+                            {lessonCount > 0 && (
+                                <div className="mt-4">
+                                    <div className={TRACK}>
+                                        <div
+                                            className={BAR}
+                                            style={{
+                                                width: `${progress.percent}%`,
+                                            }}
+                                        />
+                                    </div>
+                                    <p className={`mt-1.5 ${NUM}`}>
+                                        {progress.completed_count} of{' '}
+                                        {progress.total_lessons} lessons done ·{' '}
+                                        {progress.percent}%
                                     </p>
-                                ) : (
-                                    <p className="font-mono text-[12px] text-gray-400 dark:text-gray-500">
-                                        No description
-                                    </p>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
 
                         <CourseStructure
@@ -132,67 +193,61 @@ export default function ShowCourse({ workspace, course }: Props) {
                             courseId={course.id}
                             modules={modules}
                             canEdit={canEdit}
+                            completedLessonIds={progress.completed_lesson_ids}
                         />
                     </div>
 
-                    {/* Side column: everything recorded about the course. */}
+                    {/* Team */}
                     <aside className="lg:col-span-1">
-                        <div className={cardClass}>
-                            <h2 className={`${labelClass} mb-1`}>
-                                Course Details
-                            </h2>
+                        <div className={`${CARD} p-5 lg:sticky lg:top-4`}>
+                            <p className={LABEL}>How The Team Is Doing</p>
 
-                            <div className="divide-y divide-black/6 dark:divide-white/6">
-                                <DetailRow label="Status">
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium ${STATUS_STYLES[course.status]}`}
-                                    >
-                                        {STATUS_LABELS[course.status]}
-                                    </span>
-                                </DetailRow>
+                            {team.length === 0 ? (
+                                <p className={`mt-3 ${NUM}`}>
+                                    Nobody has started this course yet
+                                </p>
+                            ) : (
+                                <ul className="mt-4 space-y-3.5">
+                                    {team.map((member) => (
+                                        <li
+                                            key={member.id}
+                                            className="flex items-center gap-3"
+                                        >
+                                            <span
+                                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-mono text-[11px] font-medium text-white ${
+                                                    AVATARS[
+                                                        member.id %
+                                                            AVATARS.length
+                                                    ]
+                                                }`}
+                                            >
+                                                {initials(member.name)}
+                                            </span>
 
-                                <DetailRow label="Category">
-                                    {course.category ? (
-                                        <span className="rounded-md bg-stone-100 px-2 py-0.5 font-mono text-[11px] text-gray-600 dark:bg-zinc-800 dark:text-gray-300">
-                                            {course.category}
-                                        </span>
-                                    ) : (
-                                        <span className="font-mono text-[12px] text-gray-400 dark:text-gray-500">
-                                            —
-                                        </span>
-                                    )}
-                                </DetailRow>
-
-                                <DetailRow label="Modules">
-                                    <span className="font-mono text-[13px] text-gray-700 tabular-nums dark:text-gray-200">
-                                        {modules.length}
-                                    </span>
-                                </DetailRow>
-
-                                <DetailRow label="Lessons">
-                                    <span className="font-mono text-[13px] text-gray-700 tabular-nums dark:text-gray-200">
-                                        {lessonCount}
-                                    </span>
-                                </DetailRow>
-
-                                <DetailRow label="Cover Image">
-                                    <span className="truncate font-mono text-[12px] text-gray-600 dark:text-gray-300">
-                                        {course.cover_image?.file_name ?? '—'}
-                                    </span>
-                                </DetailRow>
-
-                                <DetailRow label="Created">
-                                    <span className="font-mono text-[12px] text-gray-600 tabular-nums dark:text-gray-300">
-                                        {longDate(course.created_at)}
-                                    </span>
-                                </DetailRow>
-
-                                <DetailRow label="Updated">
-                                    <span className="font-mono text-[12px] text-gray-600 tabular-nums dark:text-gray-300">
-                                        {longDate(course.updated_at)}
-                                    </span>
-                                </DetailRow>
-                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-baseline justify-between gap-2">
+                                                    <span className="truncate text-[13px] text-gray-700 dark:text-gray-200">
+                                                        {member.name}
+                                                    </span>
+                                                    <span className="shrink-0 font-mono text-[11px] font-medium text-gray-600 tabular-nums dark:text-gray-300">
+                                                        {member.percent}%
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    className={`mt-1 ${TRACK_THIN}`}
+                                                >
+                                                    <div
+                                                        className={BAR}
+                                                        style={{
+                                                            width: `${member.percent}%`,
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     </aside>
                 </div>
