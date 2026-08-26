@@ -43,8 +43,16 @@ class CoursesController extends Controller
 
         $startedIds = $this->startedCourseIds($request, $workspace);
 
+        $search = trim((string) $request->string('search'));
+        $categories = array_filter((array) $request->input('categories', []));
+
         $courses = Course::ofWorkspace($workspace)
             ->unless($canManage, fn ($q) => $q->where('status', 'published'))
+            ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('category', 'like', "%{$search}%")))
+            ->when($categories !== [], fn ($q) => $q->whereIn('category', $categories))
             // `media` is eager loaded so the cover column doesn't fire a query
             // per row on a full page of courses.
             ->with('media')
@@ -75,6 +83,12 @@ class CoursesController extends Controller
                 : $this->learnerStats($request, $workspace, $startedIds, $lessonTotals),
             'leaderboard' => $this->completionLeaderboard($workspace, array_sum($lessonTotals)),
             'openCreateOnMount' => $request->boolean('new'),
+            // Echoed back so the toolbar can render what is currently applied.
+            'filters' => [
+                'search' => $search,
+                'categories' => array_values($categories),
+            ],
+            'categoryOptions' => $this->categoryOptions($workspace, $canManage),
         ]);
     }
 
@@ -132,6 +146,24 @@ class CoursesController extends Controller
             ->selectRaw('course_modules.course_id as course_id, count(*) as aggregate')
             ->pluck('aggregate', 'course_id')
             ->map(fn ($n) => (int) $n)
+            ->all();
+    }
+
+    /**
+     * Categories actually in use, so the filter never offers an option that
+     * would return nothing. Scoped to what the viewer can see.
+     *
+     * @return array<int, string>
+     */
+    private function categoryOptions(Workspace $workspace, bool $canManage): array
+    {
+        return Course::ofWorkspace($workspace)
+            ->unless($canManage, fn ($q) => $q->where('status', 'published'))
+            ->whereNotNull('category')
+            ->where('category', '!=', '')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category')
             ->all();
     }
 

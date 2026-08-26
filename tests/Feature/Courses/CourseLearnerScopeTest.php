@@ -1,33 +1,13 @@
 <?php
 
-use App\Models\Permission;
-use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
-use Illuminate\Support\Facades\DB;
 use Modules\Courses\Models\Course;
 
-/** A member holding exactly the given permissions. */
-function learner(Workspace $workspace, array $names = ['View Courses']): User
+/** A member who can view courses but not edit them. */
+function learner(Workspace $workspace): User
 {
-    $user = User::factory()->create();
-
-    $role = Role::create([
-        'workspace_id' => $workspace->id,
-        'name' => 'Role '.uniqid(),
-    ]);
-
-    foreach ($names as $name) {
-        $permission = Permission::firstOrCreate(['name' => $name], ['category' => 'Courses']);
-        DB::table('role_permissions')->insert([
-            'role_id' => $role->id,
-            'permission_id' => $permission->id,
-        ]);
-    }
-
-    $workspace->users()->attach($user->id, ['role_id' => $role->id]);
-
-    return $user;
+    return makeMemberWithPermissions($workspace, ['View Courses']);
 }
 
 /** A course with one lesson, so completion maths is easy to read. */
