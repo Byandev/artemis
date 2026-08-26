@@ -14,7 +14,7 @@ import {
     Users,
 } from 'lucide-react';
 import moment from 'moment';
-import { ComponentType, useState } from 'react';
+import { ComponentType, Fragment, useState } from 'react';
 
 interface ExpenseRow {
     type_key: number;
@@ -27,6 +27,11 @@ interface ExpenseRow {
 
 interface ProductRow {
     product: string;
+    // The product's own totals across every intern, and this user's share of
+    // them — `delivered` below is only this user's slice.
+    product_orders: number;
+    product_delivered: number;
+    intern_share: number;
     orders: number;
     delivered: number;
     cogs: number;
@@ -37,6 +42,25 @@ interface ProductRow {
     cost_of_sales: number;
     gross_profit: number;
     advisory: number;
+    // Share of the company's delivered parcels — how much of each shared OPEX
+    // pool this product carries.
+    parcel_share: number;
+    opex_lines: {
+        type_key: number;
+        type_name: string;
+        // Which company metric this pool is split by, and this product's share
+        // of it — configured per transaction type.
+        basis: string;
+        basis_label: string;
+        share: number;
+        // Tagged to this product outright vs. its slice of the shared pool.
+        direct: number;
+        shared: number;
+        amount: number;
+    }[];
+    opex: number;
+    // Last month's loss on this product, brought forward.
+    previous_loss: number;
     net_profit: number;
     commission_rate: number;
     commission: number;
@@ -264,6 +288,8 @@ export default function IncomeStatementShow({
 
     const productTotal = namedProducts.reduce(
         (a, r) => ({
+            product_orders: a.product_orders + r.product_orders,
+            product_delivered: a.product_delivered + r.product_delivered,
             orders: a.orders + r.orders,
             delivered: a.delivered + r.delivered,
             cogs: a.cogs + r.cogs,
@@ -274,10 +300,15 @@ export default function IncomeStatementShow({
             cost_of_sales: a.cost_of_sales + r.cost_of_sales,
             gross_profit: a.gross_profit + r.gross_profit,
             advisory: a.advisory + r.advisory,
+            parcel_share: a.parcel_share + r.parcel_share,
+            opex: a.opex + r.opex,
+            previous_loss: a.previous_loss + r.previous_loss,
             net_profit: a.net_profit + r.net_profit,
             commission: a.commission + r.commission,
         }),
         {
+            product_orders: 0,
+            product_delivered: 0,
             orders: 0,
             delivered: 0,
             cogs: 0,
@@ -288,10 +319,60 @@ export default function IncomeStatementShow({
             cost_of_sales: 0,
             gross_profit: 0,
             advisory: 0,
+            parcel_share: 0,
+            opex: 0,
+            previous_loss: 0,
             net_profit: 0,
             commission: 0,
         },
     );
+
+    // Across all products the intern share is weighted by parcels, not a sum of
+    // the per-product ratios.
+    const internShareTotal =
+        productTotal.product_orders > 0
+            ? productTotal.orders / productTotal.product_orders
+            : 0;
+
+    // Shared OPEX pools. Every product carries the same ordered set of lines,
+    // so the first row supplies the labels. Pools are grouped by the basis they
+    // are split on, so each group can show the share it was split by.
+    const opexLines = products[0]?.opex_lines ?? [];
+
+    type OpexPart = 'direct' | 'shared';
+    const opexPart = (r: ProductRow, typeKey: number, part: OpexPart) =>
+        r.opex_lines.find((l) => l.type_key === typeKey)?.[part] ?? 0;
+    const opexPartTotal = (typeKey: number, part: OpexPart) =>
+        namedProducts.reduce((sum, r) => sum + opexPart(r, typeKey, part), 0);
+
+    // A pool reaches a product two ways: tagged to it outright, or shared out at
+    // its basis. A type can do both, and then appears in both sections.
+    const linesWith = (part: OpexPart) =>
+        opexLines.filter((l) =>
+            products.some((r) => opexPart(r, l.type_key, part) !== 0),
+        );
+    const directLines = linesWith('direct');
+    const sharedLines = linesWith('shared');
+
+    const opexGroups = sharedLines.reduce<
+        { basis: string; label: string; lines: typeof opexLines }[]
+    >((groups, line) => {
+        const group = groups.find((g) => g.basis === line.basis);
+        if (group) group.lines.push(line);
+        else
+            groups.push({
+                basis: line.basis,
+                label: line.basis_label,
+                lines: [line],
+            });
+        return groups;
+    }, []);
+
+    // A product's share for a basis — the same on every pool in the group.
+    const basisShare = (r: ProductRow, basis: string) =>
+        r.opex_lines.find((l) => l.basis === basis)?.share ?? 0;
+    const basisShareTotal = (basis: string) =>
+        namedProducts.reduce((sum, r) => sum + basisShare(r, basis), 0);
 
     /**
      * Save a product's commission rate. Typed as a percentage, stored as a
@@ -371,7 +452,9 @@ export default function IncomeStatementShow({
             integer?: boolean;
             emphasis?: boolean;
             signed?: boolean;
+            percent?: boolean;
             note?: string;
+            rowKey?: string;
         } = {},
     ) => {
         const {
@@ -380,15 +463,19 @@ export default function IncomeStatementShow({
             integer = false,
             emphasis = false,
             signed = false,
+            percent = false,
             note,
+            rowKey,
         } = opts;
 
         const show = (v: number) => {
+            if (percent) return `${(v * 100).toFixed(2)}%`;
             const body = integer ? int(v) : fmt(v);
             return deduction ? `(${body})` : body;
         };
 
         const colorFor = (v: number) => {
+            if (percent) return 'text-gray-500 dark:text-gray-400';
             if (signed)
                 return v < 0
                     ? 'text-rose-600 dark:text-rose-400'
@@ -398,7 +485,7 @@ export default function IncomeStatementShow({
         };
 
         return (
-            <tr key={label}>
+            <tr key={rowKey ?? label}>
                 <th
                     scope="row"
                     className={`${PLABEL} ${PBG[tone]} ${
@@ -955,119 +1042,277 @@ export default function IncomeStatementShow({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {lineRow(
-                                            'Delivered',
-                                            (r) => r.delivered,
-                                            productTotal.delivered,
-                                            { emphasis: true },
-                                        )}
-                                        {lineRow(
-                                            'Total Parcels',
-                                            (r) => r.orders,
-                                            productTotal.orders,
-                                            { integer: true },
-                                        )}
+                                        {
+                                            <>
+                                                {/* The product itself, across every
+                                                intern — the figure this user's
+                                                slice is taken out of. */}
+                                                {lineRow(
+                                                    'Delivered',
+                                                    (r) => r.product_delivered,
+                                                    productTotal.product_delivered,
+                                                    {
+                                                        emphasis: true,
+                                                        note: 'all interns',
+                                                    },
+                                                )}
+                                                {lineRow(
+                                                    'Parcels',
+                                                    (r) => r.product_orders,
+                                                    productTotal.product_orders,
+                                                    {
+                                                        integer: true,
+                                                        note: 'all interns',
+                                                    },
+                                                )}
+                                                {lineRow(
+                                                    'Intern Share',
+                                                    (r) => r.intern_share,
+                                                    internShareTotal,
+                                                    {
+                                                        percent: true,
+                                                        note: 'of this product',
+                                                    },
+                                                )}
 
-                                        {sectionRow('Less — Cost of Sales')}
-                                        {lineRow(
-                                            'COGS',
-                                            (r) => r.cogs,
-                                            productTotal.cogs,
-                                            {
-                                                deduction: true,
-                                                note: 'split by orders',
-                                            },
-                                        )}
-                                        {lineRow(
-                                            'Shipping Fee',
-                                            (r) => r.shipping,
-                                            productTotal.shipping,
-                                            { deduction: true },
-                                        )}
-                                        {lineRow(
-                                            'COD Fee',
-                                            (r) => r.cod_fee,
-                                            productTotal.cod_fee,
-                                            {
-                                                deduction: true,
-                                                note: `${codPct}% of delivered`,
-                                            },
-                                        )}
-                                        {lineRow(
-                                            'VAT',
-                                            (r) => r.vat,
-                                            productTotal.vat,
-                                            {
-                                                deduction: true,
-                                                note: `${vatPct}% of COD fee`,
-                                            },
-                                        )}
-                                        {lineRow(
-                                            'Ad Spent',
-                                            (r) => r.adspent,
-                                            productTotal.adspent,
-                                            { deduction: true },
-                                        )}
-                                        {lineRow(
-                                            'Total Cost of Sales',
-                                            (r) => r.cost_of_sales,
-                                            productTotal.cost_of_sales,
-                                            {
-                                                deduction: true,
-                                                tone: 'muted',
-                                                emphasis: true,
-                                            },
-                                        )}
+                                                {/* This user's slice of it. */}
+                                                {lineRow(
+                                                    '= Total Delivered',
+                                                    (r) => r.delivered,
+                                                    productTotal.delivered,
+                                                    {
+                                                        tone: 'band',
+                                                        emphasis: true,
+                                                    },
+                                                )}
+                                                {lineRow(
+                                                    'Total Parcels',
+                                                    (r) => r.orders,
+                                                    productTotal.orders,
+                                                    { integer: true },
+                                                )}
+                                                {lineRow(
+                                                    'Parcel Share',
+                                                    (r) => r.parcel_share,
+                                                    productTotal.parcel_share,
+                                                    {
+                                                        percent: true,
+                                                        note: 'of company parcels',
+                                                    },
+                                                )}
 
-                                        {lineRow(
-                                            '= Gross Profit',
-                                            (r) => r.gross_profit,
-                                            productTotal.gross_profit,
-                                            {
-                                                tone: 'band',
-                                                emphasis: true,
-                                                signed: true,
-                                            },
-                                        )}
+                                                {sectionRow(
+                                                    'Less — Cost of Sales',
+                                                )}
+                                                {lineRow(
+                                                    'COGS',
+                                                    (r) => r.cogs,
+                                                    productTotal.cogs,
+                                                    {
+                                                        deduction: true,
+                                                        note: 'split by orders',
+                                                    },
+                                                )}
+                                                {lineRow(
+                                                    'Shipping Fee',
+                                                    (r) => r.shipping,
+                                                    productTotal.shipping,
+                                                    { deduction: true },
+                                                )}
+                                                {lineRow(
+                                                    'COD Fee',
+                                                    (r) => r.cod_fee,
+                                                    productTotal.cod_fee,
+                                                    {
+                                                        deduction: true,
+                                                        note: `${codPct}% of delivered`,
+                                                    },
+                                                )}
+                                                {lineRow(
+                                                    'VAT',
+                                                    (r) => r.vat,
+                                                    productTotal.vat,
+                                                    {
+                                                        deduction: true,
+                                                        note: `${vatPct}% of COD fee`,
+                                                    },
+                                                )}
+                                                {lineRow(
+                                                    'Ad Spent',
+                                                    (r) => r.adspent,
+                                                    productTotal.adspent,
+                                                    { deduction: true },
+                                                )}
+                                                {lineRow(
+                                                    'Total Cost of Sales',
+                                                    (r) => r.cost_of_sales,
+                                                    productTotal.cost_of_sales,
+                                                    {
+                                                        deduction: true,
+                                                        tone: 'muted',
+                                                        emphasis: true,
+                                                    },
+                                                )}
 
-                                        {statement.gencys_partner &&
-                                            sectionRow('Less')}
-                                        {statement.gencys_partner &&
-                                            lineRow(
-                                                'Advisory Share',
-                                                (r) => r.advisory,
-                                                productTotal.advisory,
-                                                {
-                                                    deduction: true,
-                                                    note: `${advisoryPct}% of positive gross`,
-                                                },
-                                            )}
+                                                {lineRow(
+                                                    '= Gross Profit',
+                                                    (r) => r.gross_profit,
+                                                    productTotal.gross_profit,
+                                                    {
+                                                        tone: 'band',
+                                                        emphasis: true,
+                                                        signed: true,
+                                                    },
+                                                )}
 
-                                        {lineRow(
-                                            '= Net Profit',
-                                            (r) => r.net_profit,
-                                            productTotal.net_profit,
-                                            {
-                                                tone: 'band',
-                                                emphasis: true,
-                                                signed: true,
-                                            },
-                                        )}
+                                                {statement.gencys_partner &&
+                                                    sectionRow('Less')}
+                                                {statement.gencys_partner &&
+                                                    lineRow(
+                                                        'Advisory Share',
+                                                        (r) => r.advisory,
+                                                        productTotal.advisory,
+                                                        {
+                                                            deduction: true,
+                                                            note: `${advisoryPct}% of positive gross`,
+                                                        },
+                                                    )}
 
-                                        {rateRow()}
-                                        {lineRow(
-                                            'Commission',
-                                            (r) => r.commission,
-                                            productTotal.commission,
-                                        )}
+                                                {directLines.length > 0 && (
+                                                    <>
+                                                        {sectionRow(
+                                                            'Less — Operating Expenses (charged to the product)',
+                                                        )}
+                                                        {directLines.map((l) =>
+                                                            lineRow(
+                                                                l.type_name,
+                                                                (r) =>
+                                                                    opexPart(
+                                                                        r,
+                                                                        l.type_key,
+                                                                        'direct',
+                                                                    ),
+                                                                opexPartTotal(
+                                                                    l.type_key,
+                                                                    'direct',
+                                                                ),
+                                                                {
+                                                                    deduction: true,
+                                                                    rowKey: `direct-${l.type_key}`,
+                                                                },
+                                                            ),
+                                                        )}
+                                                    </>
+                                                )}
+
+                                                {sharedLines.length > 0 && (
+                                                    <>
+                                                        {sectionRow(
+                                                            'Less — Operating Expenses (shared)',
+                                                        )}
+                                                        {opexGroups.map((g) => (
+                                                            <Fragment
+                                                                key={g.basis}
+                                                            >
+                                                                {lineRow(
+                                                                    `Share — ${g.label}`,
+                                                                    (r) =>
+                                                                        basisShare(
+                                                                            r,
+                                                                            g.basis,
+                                                                        ),
+                                                                    basisShareTotal(
+                                                                        g.basis,
+                                                                    ),
+                                                                    {
+                                                                        percent: true,
+                                                                        rowKey: `share-${g.basis}`,
+                                                                    },
+                                                                )}
+                                                                {g.lines.map(
+                                                                    (l) =>
+                                                                        lineRow(
+                                                                            l.type_name,
+                                                                            (
+                                                                                r,
+                                                                            ) =>
+                                                                                opexPart(
+                                                                                    r,
+                                                                                    l.type_key,
+                                                                                    'shared',
+                                                                                ),
+                                                                            opexPartTotal(
+                                                                                l.type_key,
+                                                                                'shared',
+                                                                            ),
+                                                                            {
+                                                                                deduction: true,
+                                                                                rowKey: `opex-${l.type_key}`,
+                                                                            },
+                                                                        ),
+                                                                )}
+                                                            </Fragment>
+                                                        ))}
+                                                    </>
+                                                )}
+
+                                                {(directLines.length > 0 ||
+                                                    sharedLines.length > 0) &&
+                                                    lineRow(
+                                                        'Total OPEX',
+                                                        (r) => r.opex,
+                                                        productTotal.opex,
+                                                        {
+                                                            deduction: true,
+                                                            tone: 'muted',
+                                                            emphasis: true,
+                                                        },
+                                                    )}
+
+                                                {/* A product that lost money last month
+                                                brings that loss into this one. */}
+                                                {productTotal.previous_loss >
+                                                    0 &&
+                                                    lineRow(
+                                                        'Previous Month Loss',
+                                                        (r) => r.previous_loss,
+                                                        productTotal.previous_loss,
+                                                        {
+                                                            deduction: true,
+                                                            note: 'carried forward',
+                                                        },
+                                                    )}
+
+                                                {lineRow(
+                                                    '= Net Profit',
+                                                    (r) => r.net_profit,
+                                                    productTotal.net_profit,
+                                                    {
+                                                        tone: 'band',
+                                                        emphasis: true,
+                                                        signed: true,
+                                                    },
+                                                )}
+
+                                                {rateRow()}
+                                                {lineRow(
+                                                    'Commission',
+                                                    (r) => r.commission,
+                                                    productTotal.commission,
+                                                )}
+                                            </>
+                                        }
                                     </tbody>
                                 </table>
                             </div>
                         </div>
 
                         <p className="mt-3 text-[11px] text-gray-400">
-                            Per product: Gross = Delivered − (COGS + Shipping +
-                            COD + VAT + Ad Spent).
+                            Delivered is the product&rsquo;s total across every
+                            intern; Total Delivered is this user&rsquo;s slice
+                            of it, at their share of the product&rsquo;s
+                            parcels. Gross = Total Delivered − (COGS + Shipping
+                            + COD + VAT + Ad Spent).
                             {statement.gencys_partner
                                 ? ' Advisory is a % of positive gross profit.'
                                 : ''}{' '}
@@ -1079,8 +1324,13 @@ export default function IncomeStatementShow({
                             {commissionUrl
                                 ? ' Edit a rate to save it for this user and product.'
                                 : ''}{' '}
-                            OPEX is not split per product yet &mdash; it sits at
-                            the user level in the statement above.
+                            OPEX tagged to a product is charged to it outright;
+                            whatever is left of a pool is shared out, each
+                            product carrying the slice matching its share of
+                            that pool&rsquo;s metric. Which metric a pool splits
+                            on is set per transaction type on the Transaction
+                            Types page. A product that lost money last month
+                            brings that loss forward.
                         </p>
                     </>
                 )}

@@ -12,6 +12,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Finance\Models\CommissionRate;
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 
 /**
@@ -23,7 +24,10 @@ class UserIncomeStatementController extends Controller
 {
     use AuthorizesRequests;
 
-    public function __construct(private readonly UserIncomeStatementService $service) {}
+    public function __construct(
+        private readonly UserIncomeStatementService $service,
+        private readonly ProductIncomeStatementService $productService,
+    ) {}
 
     /** Per-user P&L table for the parent statement's month. */
     public function index(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
@@ -50,7 +54,7 @@ class UserIncomeStatementController extends Controller
         return Inertia::render('workspaces/finance/product-income-statements/index', [
             'workspace' => $workspace,
             'incomeStatement' => $this->statementContext($incomeStatement),
-            ...$this->service->productListPayload($incomeStatement),
+            ...$this->productService->payload($incomeStatement),
             'missingUnitCodes' => $this->service->missingUnitCodes($incomeStatement),
         ]);
     }

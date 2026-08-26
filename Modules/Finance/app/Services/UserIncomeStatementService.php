@@ -5,13 +5,13 @@ namespace Modules\Finance\Services;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\Carbon;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\CommissionRate;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Models\UserIncomeStatement;
+use Modules\Finance\Services\Concerns\ResolvesProductOrders;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\Intern;
 use Modules\GencysERP\Support\InternResolver;
@@ -33,7 +33,7 @@ use Modules\GencysERP\Support\InternResolver;
  */
 class UserIncomeStatementService
 {
-    private const DELIVERED_STATUS = 'DELIVERED';
+    use ResolvesProductOrders;
 
     private const COGS_KEY = -4;
 
@@ -305,12 +305,20 @@ class UserIncomeStatementService
      * product) and is split across the interns who sold that product by their
      * number of delivered orders — see {@see userCogsByProduct()}.
      *
-     * @return list<array{product_id:?int, product:string, orders:int, delivered:float, cogs:float, shipping:float, cod_fee:float, vat:float, adspent:float, cost_of_sales:float, gross_profit:float, advisory:float, net_profit:float, commission_rate:float, commission:float}>
+     * Shared OPEX is company-wide and split across products by the basis each
+     * type is configured with (delivered parcels, total orders or delivered
+     * revenue); anything tagged to a product is charged to it outright instead.
+     * A product that lost money last month brings that loss forward, so Net
+     * Profit is `Gross − Advisory − OPEX − last month's loss`.
+     *
+     * @return list<array{product_id:?int, product:string, product_orders:int, product_delivered:float, intern_share:float, orders:int, delivered:float, cogs:float, shipping:float, cod_fee:float, vat:float, adspent:float, cost_of_sales:float, gross_profit:float, advisory:float, parcel_share:float, opex_lines:list<array{type_key:int,type_name:string,basis:string,basis_label:string,share:float,direct:float,shared:float,amount:float}>, opex:float, previous_loss:float, net_profit:float, commission_rate:float, commission:float}>
      */
-    private function userProductRows(IncomeStatement $statement, User $user): array
+    private function userProductRows(IncomeStatement $statement, User $user, ?Carbon $month = null, bool $carryForward = true): array
     {
         $workspace = $statement->workspace;
-        [$from, $to] = $this->range($statement);
+        [$from, $to] = $month
+            ? [$month->copy()->startOfMonth(), $month->copy()->endOfMonth()]
+            : $this->range($statement);
 
         $codRate = (float) $statement->cod_fee_rate;
         $vatRate = (float) $statement->vat_rate;
@@ -319,7 +327,6 @@ class UserIncomeStatementService
 
         $cells = $this->cellsForUser($workspace, $user->id, $from, $to);
 
-        $rows = collect();
         $shipping = collect();
 
         if (! empty($cells)) {
@@ -337,35 +344,20 @@ class UserIncomeStatementService
                 ->groupBy('product_id')
                 ->pluck('shipping', 'product_id');
 
-            // Delivered revenue per product.
-            $delivered = GencysDailySalesOrder::where('workspace_id', $workspace->id)
-                ->where('parcel_status', self::DELIVERED_STATUS)
-                ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-                ->whereIn('intern_brands_name', $cells)
-                ->whereNotIn('platform', ['Shopee', 'TikTok'])
-                ->whereNotLike('page', '%pikutin%')
-                ->selectRaw('COALESCE(price_final, 0) as revenue')
-                ->selectSub($this->orderProductSubquery(), 'product_id');
-
-            $rows = DB::query()->fromSub($delivered, 't')
-                ->selectRaw('product_id, COUNT(*) as orders, COALESCE(SUM(revenue), 0) as revenue')
-                ->groupBy('product_id')
-                ->get();
         }
+
+        // This user's delivered revenue per product, and the same figures for the
+        // whole company — a product's Delivered is its total across every intern,
+        // and this user's slice of it is their share of that product's parcels.
+        $orderByKey = $this->deliveredByProduct($workspace, $cells, $from, $to);
+        $companyByKey = $this->deliveredByProduct($workspace, null, $from, $to);
 
         // The user's ad spend and COGS per product id.
         $adSpendByPid = $this->userAdSpendByProduct($workspace, $user->id, $from, $to);
         $cogsByPid = $this->userCogsByProduct($workspace, $cells, $from, $to);
 
-        if ($rows->isEmpty() && empty($adSpendByPid)) {
+        if (empty($orderByKey) && empty($adSpendByPid)) {
             return [];
-        }
-
-        // Order economics keyed by product id ('' = the unresolved discrepancy).
-        $orderByKey = [];
-        foreach ($rows as $r) {
-            $key = $r->product_id === null ? '' : (string) (int) $r->product_id;
-            $orderByKey[$key] = ['orders' => (int) $r->orders, 'revenue' => round((float) $r->revenue, 2)];
         }
 
         $keys = collect(array_keys($orderByKey))->merge(array_keys($adSpendByPid))->unique();
@@ -379,10 +371,39 @@ class UserIncomeStatementService
             ->where('user_id', $user->id)
             ->pluck('rate', 'product_id');
 
-        $mapped = $keys->map(function ($key) use ($orderByKey, $adSpendByPid, $cogsByPid, $shipping, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner, $commissionRates) {
+        // Shared OPEX is company-wide. Each pool is carried by products in
+        // proportion to the company metric its type is configured against, so a
+        // pool split by total orders and one split by delivered parcels land
+        // differently. Shares are measured on the product's whole volume across
+        // every intern. The default basis is always computed — the Parcel Share
+        // row shows it whether or not a pool uses it.
+        $opexPools = $this->companyOpexPools($workspace, $from, $to);
+        $bases = collect($opexPools)
+            ->pluck('basis')
+            ->push(TransactionType::DEFAULT_ALLOCATION_BASIS)
+            ->unique();
+        $shares = $bases
+            ->mapWithKeys(fn ($basis) => [
+                $basis => $this->allocationShares($workspace, $from, $to, $basis),
+            ])
+            ->all();
+
+        // A product that lost money last month brings that loss into this one.
+        $previousLosses = $carryForward
+            ? $this->previousMonthLosses($statement, $user, $from)
+            : [];
+
+        $mapped = $keys->map(function ($key) use ($orderByKey, $companyByKey, $adSpendByPid, $cogsByPid, $shipping, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner, $commissionRates, $opexPools, $shares, $previousLosses) {
             $pid = $key === '' ? null : (int) $key;
             $order = $orderByKey[$key] ?? ['orders' => 0, 'revenue' => 0.0];
             $revenue = round((float) $order['revenue'], 2);
+
+            // The product's company-wide delivered figures — its total across
+            // every intern, not just this one — and this user's share of them.
+            $company = $companyByKey[$key] ?? ['orders' => 0, 'revenue' => 0.0];
+            $internShare = $company['orders'] > 0
+                ? $order['orders'] / $company['orders']
+                : 0.0;
             $cogs = round((float) ($cogsByPid[$key] ?? 0), 2);
             $ship = round((float) $shipping->get($pid, 0), 2);
             $cod = round($revenue * $codRate, 2);
@@ -394,7 +415,38 @@ class UserIncomeStatementService
             // Advisory is a % of positive gross profit, gencys-partner only —
             // the same rule the statement and per-user rows use.
             $advisory = ($gencysPartner && $gross > 0) ? round($gross * $advisoryRate, 2) : 0.0;
-            $net = round($gross - $advisory, 2);
+
+            // This product's slice of each shared OPEX pool, at that pool's own
+            // basis. Every product carries the same set of lines (a zero slice
+            // included) so the breakdown table lines up.
+            $opexLines = array_map(function ($pool) use ($shares, $key) {
+                $poolShare = $shares[$pool['basis']][$key] ?? 0.0;
+
+                // Tagged to this product = charged to it outright; the rest of
+                // the type is shared out at its basis.
+                $direct = round((float) ($pool['direct'][$key] ?? 0), 2);
+                $shared = round($pool['amount'] * $poolShare, 2);
+
+                return [
+                    'type_key' => $pool['type_key'],
+                    'type_name' => $pool['type_name'],
+                    'basis' => $pool['basis'],
+                    'basis_label' => $pool['basis_label'],
+                    'share' => round($poolShare, 6),
+                    'direct' => $direct,
+                    'shared' => $shared,
+                    'amount' => round($direct + $shared, 2),
+                ];
+            }, $opexPools);
+            $opex = round(array_sum(array_column($opexLines, 'amount')), 2);
+
+            // Informational: the product's share of the company's delivered
+            // parcels, across every intern.
+            $share = $shares[TransactionType::DEFAULT_ALLOCATION_BASIS][$key] ?? 0.0;
+
+            $previousLoss = round((float) ($previousLosses[$key] ?? 0), 2);
+
+            $net = round($gross - $advisory - $opex - $previousLoss, 2);
 
             // Commission: the intern's cut of a product's *positive* net profit,
             // at their per-product rate. Display-only — it does not change net.
@@ -404,6 +456,11 @@ class UserIncomeStatementService
             return [
                 'product_id' => $pid,
                 'product' => $pid !== null ? ($names[$pid] ?? 'Unknown') : 'Discrepancy',
+                // Company-wide for the product (every intern).
+                'product_orders' => (int) $company['orders'],
+                'product_delivered' => round((float) $company['revenue'], 2),
+                'intern_share' => round($internShare, 6),
+                // This user's slice.
                 'orders' => (int) $order['orders'],
                 'delivered' => $revenue,
                 'cogs' => $cogs,
@@ -414,6 +471,10 @@ class UserIncomeStatementService
                 'cost_of_sales' => $costOfSales,
                 'gross_profit' => $gross,
                 'advisory' => $advisory,
+                'parcel_share' => round($share, 6),
+                'opex_lines' => $opexLines,
+                'opex' => $opex,
+                'previous_loss' => $previousLoss,
                 'net_profit' => $net,
                 'commission_rate' => $commissionRate,
                 'commission' => $commission,
@@ -428,6 +489,225 @@ class UserIncomeStatementService
         $discrepancy = $mapped->first(fn ($r) => $r['product_id'] === null);
 
         return $discrepancy ? $products->push($discrepancy)->all() : $products->all();
+    }
+
+    /**
+     * Last month's loss per product for this user, keyed by product id as a
+     * string: the size of a negative net profit, absent when the product made
+     * money. Computed with carry-forward off, so the chain stops at one month
+     * rather than walking back through the year.
+     *
+     * The current statement's rates are reused for the prior month — they are
+     * workspace defaults that rarely move, and last month's statement may not
+     * exist at all.
+     *
+     * @return array<string, float>
+     */
+    private function previousMonthLosses(IncomeStatement $statement, User $user, Carbon $from): array
+    {
+        $previous = $this->userProductRows(
+            $statement,
+            $user,
+            $from->copy()->subMonthNoOverflow(),
+            carryForward: false,
+        );
+
+        $losses = [];
+
+        foreach ($previous as $row) {
+            if ($row['net_profit'] < 0) {
+                $key = $row['product_id'] === null ? '' : (string) $row['product_id'];
+                $losses[$key] = round(abs($row['net_profit']), 2);
+            }
+        }
+
+        return $losses;
+    }
+
+    /**
+     * A product's share of a company metric, keyed by product id as a string
+     * ('' = orders resolving to no product) — the fraction of any pool split on
+     * that basis the product carries.
+     *
+     * Measured on the product's whole volume, every intern's, not just this
+     * statement's: a shared cost follows the product, so two interns selling the
+     * same product see the same slice of it.
+     *
+     * @return array<string, float>
+     */
+    private function allocationShares(Workspace $workspace, Carbon $from, Carbon $to, string $basis): array
+    {
+        $denominator = $this->basisDenominator($workspace, $from, $to, $basis);
+
+        if ($denominator <= 0) {
+            return [];
+        }
+
+        return array_map(
+            fn ($weight) => $weight / $denominator,
+            $this->basisWeightsByProduct($workspace, $from, $to, $basis),
+        );
+    }
+
+    /**
+     * The orders an allocation basis measures. `total_orders` counts everything
+     * placed in the month whatever became of it (a CSR handles the returns too);
+     * the others count only what was delivered.
+     */
+    private function basisOrderQuery(Workspace $workspace, Carbon $from, Carbon $to, string $basis)
+    {
+        $query = GencysDailySalesOrder::where('workspace_id', $workspace->id)
+            ->whereNotIn('platform', ['Shopee', 'TikTok'])
+            ->whereNotLike('page', '%pikutin%');
+
+        return $basis === TransactionType::BASIS_TOTAL_ORDERS
+            ? $query->whereBetween('order_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
+            : $query->where('parcel_status', self::DELIVERED_STATUS)
+                ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()]);
+    }
+
+    /** The company-wide denominator for a basis. */
+    private function basisDenominator(Workspace $workspace, Carbon $from, Carbon $to, string $basis): float
+    {
+        $query = $this->basisOrderQuery($workspace, $from, $to, $basis);
+
+        return $basis === TransactionType::BASIS_DELIVERED_REVENUE
+            ? (float) $query->sum('price_final')
+            : (float) $query->count();
+    }
+
+    /**
+     * The company-wide per-product numerator for a basis, keyed by product id as
+     * a string ('' = orders resolving to no product).
+     *
+     * @return array<string, float>
+     */
+    private function basisWeightsByProduct(Workspace $workspace, Carbon $from, Carbon $to, string $basis): array
+    {
+        $inner = $this->basisOrderQuery($workspace, $from, $to, $basis)
+            ->selectRaw('COALESCE(price_final, 0) as revenue')
+            ->selectSub($this->orderProductSubquery(), 'product_id');
+
+        $aggregate = $basis === TransactionType::BASIS_DELIVERED_REVENUE
+            ? 'COALESCE(SUM(revenue), 0) as weight'
+            : 'COUNT(*) as weight';
+
+        return DB::query()->fromSub($inner, 't')
+            ->selectRaw("product_id, {$aggregate}")
+            ->groupBy('product_id')
+            ->get()
+            ->mapWithKeys(fn ($r) => [
+                ($r->product_id === null ? '' : (string) (int) $r->product_id) => (float) $r->weight,
+            ])
+            ->all();
+    }
+
+    /**
+     * The month's company-wide OPEX pools, one per transaction type, biggest
+     * first. These are shared running costs (salary, subscriptions, chat fuel
+     * and the like): they aren't attributable to one product, so each product
+     * carries the slice matching its share of the company's delivered parcels.
+     *
+     * Types whose `income_statement_section` is null are excluded, the same rule
+     * the workspace statement applies; uncategorised outflow falls to OPEX.
+     *
+     * Each pool carries the allocation basis configured on its type — which
+     * company metric its slice is measured against — plus any amounts tagged
+     * directly to a product, which are held back from the shared `amount`.
+     *
+     * @return list<array{type_key:int, type_name:string, amount:float, direct:array<string,float>, basis:string, basis_label:string}>
+     */
+    private function companyOpexPools(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        $types = TransactionType::where('workspace_id', $workspace->id)
+            ->get(['id', 'name', 'income_statement_section', 'opex_allocation_basis'])
+            ->keyBy('id');
+
+        $tagged = $this->taggedOpexByType($workspace, $from, $to);
+
+        return Transaction::where('workspace_id', $workspace->id)
+            ->where('type', 'out')
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->selectRaw('COALESCE(transaction_type_id, 0) as type_key, SUM(amount) as total')
+            ->groupBy('type_key')
+            ->orderByDesc('total')
+            ->get()
+            ->map(function ($r) use ($types, $tagged) {
+                $key = (int) $r->type_key;
+                $type = $key ? $types->get($key) : null;
+
+                $basis = $type
+                    ? $type->allocationBasis()
+                    : TransactionType::DEFAULT_ALLOCATION_BASIS;
+
+                // Whatever is tagged to a product is already spoken for; only
+                // the remainder is shared out.
+                $direct = $tagged[$key] ?? [];
+                $pool = max(0.0, (float) $r->total - array_sum($direct));
+
+                return [
+                    'type_key' => $key,
+                    'type_name' => $key ? ($type->name ?? 'Unknown') : 'Uncategorized',
+                    'amount' => $pool,
+                    'direct' => $direct,
+                    'section' => $type ? $type->income_statement_section : 'opex',
+                    'basis' => $basis,
+                    'basis_label' => TransactionType::ALLOCATION_BASES[$basis]
+                        ?? TransactionType::ALLOCATION_BASES[TransactionType::DEFAULT_ALLOCATION_BASIS],
+                ];
+            })
+            ->where('section', 'opex')
+            ->map(fn ($b) => [
+                'type_key' => $b['type_key'],
+                'type_name' => $b['type_name'],
+                'amount' => $b['amount'],
+                'direct' => $b['direct'],
+                'basis' => $b['basis'],
+                'basis_label' => $b['basis_label'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The month's outflow shares tagged to a product, as
+     * `[transaction_type_id => [productKey => amount]]` (key 0 = uncategorized,
+     * product key '' = a tag matching no product).
+     *
+     * A share tagged to a product is that product's cost outright — a sticker
+     * run for one brand isn't spread over the others — so it is held back from
+     * the type's shared pool.
+     *
+     * @return array<int, array<string, float>>
+     */
+    private function taggedOpexByType(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        $rows = DB::table('finance_transaction_products as tp')
+            ->join('finance_transactions as t', 't.id', '=', 'tp.transaction_id')
+            ->where('t.workspace_id', $workspace->id)
+            ->where('t.type', 'out')
+            ->whereBetween('t.date', [$from->toDateString(), $to->toDateString()])
+            ->groupBy('t.transaction_type_id', 'tp.product')
+            ->selectRaw('COALESCE(t.transaction_type_id, 0) as type_key, tp.product as name, SUM(tp.amount) as amount')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $idByName = DB::table('products')
+            ->where('workspace_id', $workspace->id)
+            ->whereIn('name', $rows->pluck('name')->unique()->all())
+            ->pluck('id', 'name');
+
+        $byType = [];
+        foreach ($rows as $r) {
+            $productKey = isset($idByName[$r->name]) ? (string) $idByName[$r->name] : '';
+            $typeKey = (int) $r->type_key;
+            $byType[$typeKey][$productKey] = ($byType[$typeKey][$productKey] ?? 0) + (float) $r->amount;
+        }
+
+        return $byType;
     }
 
     /**
@@ -534,60 +814,17 @@ class UserIncomeStatementService
     }
 
     /**
-     * Delivered order counts per product id for the month, keyed by product id as
-     * a string ('' = orders that resolve to no product). Passing null for $cells
-     * counts every intern's orders; passing a cell list scopes to one intern.
+     * Delivered order counts per product id — {@see deliveredByProduct()} with
+     * the revenue dropped, for the COGS split.
      *
      * @return array<string, int>
      */
     private function deliveredOrderCountsByProduct(Workspace $workspace, ?array $cells, Carbon $from, Carbon $to): array
     {
-        $delivered = GencysDailySalesOrder::where('workspace_id', $workspace->id)
-            ->where('parcel_status', self::DELIVERED_STATUS)
-            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->whereNotIn('platform', ['Shopee', 'TikTok'])
-            ->whereNotLike('page', '%pikutin%')
-            ->when($cells !== null, fn ($q) => $q->whereIn('intern_brands_name', $cells))
-            ->selectSub($this->orderProductSubquery(), 'product_id');
-
-        return DB::query()->fromSub($delivered, 't')
-            ->selectRaw('product_id, COUNT(*) as orders')
-            ->groupBy('product_id')
-            ->get()
-            ->mapWithKeys(fn ($r) => [($r->product_id === null ? '' : (string) (int) $r->product_id) => (int) $r->orders])
-            ->all();
-    }
-
-    /**
-     * Ids of the workspace's "Cost of Goods" transaction types — the bulk COGS
-     * purchases folded into the product breakdown and the per-user COGS line
-     * (and, so they are not double-counted, excluded from the charge-to buckets).
-     *
-     * @return list<int>
-     */
-    private function costOfGoodsTypeIds(Workspace $workspace): array
-    {
-        return TransactionType::where('workspace_id', $workspace->id)
-            ->whereRaw('LOWER(name) LIKE ?', ['%cost of goods%'])
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-    }
-
-    /**
-     * A correlated subquery resolving the outer `gencys_orders` row to a single
-     * product id via its items: `gencys_order_items.sku` matches an
-     * `inventory_unit_codes.unit_code` whose `product_id` is the product. MIN
-     * picks one when an order carries several unit codes (all of one product).
-     */
-    private function orderProductSubquery(): Builder
-    {
-        return DB::table('inventory_unit_codes as uc')
-            ->join('gencys_order_items as goi', 'goi.sku', '=', 'uc.unit_code')
-            ->whereColumn('uc.workspace_id', 'gencys_orders.workspace_id')
-            ->whereColumn('goi.order_id', 'gencys_orders.id')
-            ->whereNotNull('uc.product_id')
-            ->selectRaw('MIN(uc.product_id)');
+        return array_map(
+            fn ($r) => $r['orders'],
+            $this->deliveredByProduct($workspace, $cells, $from, $to),
+        );
     }
 
     /**
@@ -991,13 +1228,5 @@ class UserIncomeStatementService
             'expenses' => [],
             'products' => [],
         ];
-    }
-
-    /** @return array{0:Carbon, 1:Carbon} [from, to] for the statement's month. */
-    private function range(IncomeStatement $statement): array
-    {
-        $start = $statement->period_month->copy()->startOfMonth();
-
-        return [$start, $start->copy()->endOfMonth()];
     }
 }

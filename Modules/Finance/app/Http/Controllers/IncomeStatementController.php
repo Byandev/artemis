@@ -15,6 +15,7 @@ use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
+use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 
@@ -110,7 +111,7 @@ class IncomeStatementController extends Controller
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace, UserIncomeStatementService $userStatements)
+    public function store(Request $request, Workspace $workspace, UserIncomeStatementService $userStatements, ProductIncomeStatementService $productStatements)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
@@ -148,6 +149,7 @@ class IncomeStatementController extends Controller
         );
 
         $userStatements->snapshot($statement);
+        $productStatements->snapshot($statement);
 
         return redirect()
             ->route('workspaces.finance.income-statements.show', [$workspace->slug, $statement->id])
@@ -192,7 +194,7 @@ class IncomeStatementController extends Controller
     }
 
     /** Re-pull the month's numbers with the snapshotted rates + included lines. */
-    public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement, UserIncomeStatementService $userStatements)
+    public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement, UserIncomeStatementService $userStatements, ProductIncomeStatementService $productStatements)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
@@ -231,6 +233,7 @@ class IncomeStatementController extends Controller
         );
 
         $userStatements->snapshot($statement);
+        $productStatements->snapshot($statement);
 
         return redirect()->back()->with('success', 'Income statement regenerated.');
     }

@@ -48,6 +48,11 @@ class TransactionTypeController extends Controller
         return Inertia::render('workspaces/finance/transaction-types/index', [
             'workspace' => $workspace,
             'types' => $types,
+            // Options for the OPEX allocation-basis select.
+            'allocationBases' => collect(TransactionType::ALLOCATION_BASES)
+                ->map(fn ($label, $value) => ['value' => $value, 'label' => $label])
+                ->values(),
+            'defaultAllocationBasis' => TransactionType::DEFAULT_ALLOCATION_BASIS,
             'query' => [
                 ...$request->only(['sort', 'per_page', 'page']),
                 'filter' => $request->input('filter', []),
@@ -67,6 +72,8 @@ class TransactionTypeController extends Controller
             'nature' => ['required', Rule::in(TransactionType::NATURES)],
             // null = excluded from the income statement.
             'income_statement_section' => ['nullable', Rule::in(TransactionType::INCOME_STATEMENT_SECTIONS)],
+            // How an OPEX pool is split across products; null = the default.
+            'opex_allocation_basis' => ['nullable', Rule::in(array_keys(TransactionType::ALLOCATION_BASES))],
         ];
     }
 
@@ -82,6 +89,7 @@ class TransactionTypeController extends Controller
             'name' => trim($validated['name']),
             'nature' => $validated['nature'],
             'income_statement_section' => $validated['income_statement_section'] ?? null,
+            'opex_allocation_basis' => $validated['opex_allocation_basis'] ?? null,
         ]);
 
         return redirect()->back()->with('success', 'Transaction type created.');
@@ -99,6 +107,7 @@ class TransactionTypeController extends Controller
             'name' => trim($validated['name']),
             'nature' => $validated['nature'],
             'income_statement_section' => $validated['income_statement_section'] ?? null,
+            'opex_allocation_basis' => $validated['opex_allocation_basis'] ?? null,
         ]);
 
         return redirect()->back()->with('success', 'Transaction type updated.');

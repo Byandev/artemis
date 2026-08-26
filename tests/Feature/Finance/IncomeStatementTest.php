@@ -261,3 +261,57 @@ test('a member without finance permission is forbidden', function () {
         ->get(isUrl($workspace))
         ->assertForbidden();
 });
+
+test('an OPEX type stores the basis its pool is split across products by', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $url = "/workspaces/{$workspace->slug}/finance/transaction-types";
+
+    $this->actingAs($user)
+        ->post($url, [
+            'name' => 'CSR Salary',
+            'nature' => 'debit',
+            'income_statement_section' => 'opex',
+            'opex_allocation_basis' => 'total_orders',
+        ])
+        ->assertRedirect();
+
+    $this->assertDatabaseHas('finance_transaction_types', [
+        'workspace_id' => $workspace->id,
+        'name' => 'CSR Salary',
+        'income_statement_section' => 'opex',
+        'opex_allocation_basis' => 'total_orders',
+    ]);
+
+    // An unknown basis is rejected rather than silently stored.
+    $this->actingAs($user)
+        ->post($url, [
+            'name' => 'Nonsense',
+            'nature' => 'debit',
+            'income_statement_section' => 'opex',
+            'opex_allocation_basis' => 'phase_of_the_moon',
+        ])
+        ->assertSessionHasErrors('opex_allocation_basis');
+
+    // Left unset, the type falls back to the default basis.
+    $this->actingAs($user)
+        ->post($url, ['name' => 'Rent', 'nature' => 'debit', 'income_statement_section' => 'opex'])
+        ->assertRedirect();
+
+    $rent = TransactionType::where('name', 'Rent')->first();
+    expect($rent->opex_allocation_basis)->toBeNull()
+        ->and($rent->allocationBasis())->toBe('delivered_parcels');
+});
+
+test('the transaction types page offers the allocation bases', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $this->actingAs($user)
+        ->get("/workspaces/{$workspace->slug}/finance/transaction-types")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('defaultAllocationBasis', 'delivered_parcels')
+            ->where('allocationBases', fn ($bases) => collect($bases)->pluck('value')->all() === [
+                'delivered_parcels', 'total_orders', 'delivered_revenue',
+            ])
+        );
+});

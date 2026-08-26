@@ -58,4 +58,13 @@ class IncomeStatement extends Model
     {
         return $this->hasMany(UserIncomeStatement::class, 'income_statement_id');
     }
+
+    /**
+     * Saved per-product slices of this statement — workspace-wide, across every
+     * intern (rebuilt on save/regenerate).
+     */
+    public function productStatements(): HasMany
+    {
+        return $this->hasMany(ProductIncomeStatement::class, 'income_statement_id');
+    }
 }
