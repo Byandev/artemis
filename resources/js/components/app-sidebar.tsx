@@ -94,13 +94,33 @@ export function AppSidebar() {
                   },
               ]
             : []),
+        // Sales & Marketing — a collapsible group holding the module's Daily
+        // Report page and the tabbed dashboard.
         ...(currentWorkspace.sales_marketing_dashboard_module_enabled
             ? [
                   {
-                      title: 'S&M Dashboard',
-                      href: `/workspaces/${slug}/sales-marketing/dashboard`,
+                      title: 'Sales & Marketing',
                       icon: Megaphone,
                       permission: PERMISSIONS.ViewSalesMarketingDashboard,
+                      items: [
+                          {
+                              title: 'Daily Report',
+                              href: `/workspaces/${slug}/sales-marketing/daily-report`,
+                              icon: BarChart2,
+                              permission:
+                                  PERMISSIONS.ViewSalesMarketingDashboard,
+                          },
+                          {
+                              // The bare dashboard path redirects, so link the
+                              // first tab: it is a real destination and
+                              // highlights correctly.
+                              title: 'Dashboard',
+                              href: `/workspaces/${slug}/sales-marketing/dashboard/page-roas-tracker`,
+                              icon: Megaphone,
+                              permission:
+                                  PERMISSIONS.ViewSalesMarketingDashboard,
+                          },
+                      ],
                   },
               ]
             : []),

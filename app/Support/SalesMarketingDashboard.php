@@ -19,7 +19,8 @@ final class SalesMarketingDashboard
         $base = "/workspaces/{$workspace->slug}/sales-marketing/dashboard";
 
         return array_values(array_filter([
-            ['key' => 'daily-report', 'label' => 'Daily Report', 'url' => $base],
+            // Daily Report is no longer a tab — it is a standalone page owned by
+            // the SalesMarketing module. Page ROAS Tracker is now the first tab.
             ['key' => 'page-roas-tracker', 'label' => 'Page ROAS Tracker', 'url' => "{$base}/page-roas-tracker"],
             $workspace->ad_spend_goals_module_enabled
                 ? ['key' => 'ad-spend-goals', 'label' => 'Ad Spend Goals', 'url' => "{$base}/ad-spend-goals"]

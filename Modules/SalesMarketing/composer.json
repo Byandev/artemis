@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/salesmarketing",
+    "description": "Sales & marketing planning, targets, and reporting.",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\SalesMarketing\\": "app/",
+            "Modules\\SalesMarketing\\Database\\Factories\\": "database/factories/",
+            "Modules\\SalesMarketing\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\SalesMarketing\\Tests\\": "tests/"
+        }
+    }
+}

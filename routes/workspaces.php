@@ -27,7 +27,6 @@ use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
-use App\Http\Controllers\Workspaces\SalesMarketingDashboardController;
 use App\Http\Controllers\Workspaces\SalesTargetController;
 use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
@@ -90,6 +89,7 @@ use Modules\MetaAds\Http\Controllers\ReportController;
 use Modules\MetaAds\Http\Controllers\SyncHealthController;
 use Modules\Pancake\Http\Controllers\CourierShipmentController;
 use Modules\Pancake\Http\Controllers\OrderController;
+use Modules\SalesMarketing\Http\Controllers\DailyReportController;
 use Modules\SimGateway\Http\Controllers\Admin\AdminSimController;
 use Modules\SimGateway\Http\Controllers\SmsController;
 
@@ -156,11 +156,13 @@ Route::middleware(['auth'])->group(function () {
     // Workspace activity log (audit trail) — gated to workspace admins in the controller.
     Route::get('/workspaces/{workspace}/activity-logs', [ActivityLogController::class, 'index'])->name('workspace.activity-logs.index');
 
+    // Daily Report — a standalone page (SalesMarketing module), no longer a tab
+    // of the S&M dashboard. Shares the dashboard's module toggle.
+    Route::get('/workspaces/{workspace}/sales-marketing/daily-report/data', [DailyReportController::class, 'data'])->name('workspaces.sales-marketing.daily-report.data');
+    Route::get('/workspaces/{workspace}/sales-marketing/daily-report', [DailyReportController::class, 'index'])->name('workspaces.sales-marketing.daily-report');
+
     // Role-specific dashboards (scaffold — gated by granular permissions)
-    // The S&M dashboard is tabbed; each tab is its own URL segment. The JSON
-    // `data` route is registered before the `{tab?}` route so it isn't captured
-    // as a tab. Daily Report is the default (bare dashboard path).
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/data', [SalesMarketingDashboardController::class, 'data'])->name('workspaces.sales-marketing.dashboard.data');
+    // The S&M dashboard is tabbed; each tab is its own URL segment.
     // Page ROAS Tracker and Ad Spend Goals are dashboard tabs — their own URLs,
     // registered before the {tab?} catch-all so they aren't swallowed by it.
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('workspaces.sales-marketing.dashboard.page-roas-tracker');
@@ -171,7 +173,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'show'])->name('workspaces.sales-marketing.dashboard.sales-targets.show');
     Route::put('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'update'])->name('workspaces.sales-marketing.dashboard.sales-targets.update');
     Route::delete('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'destroy'])->name('workspaces.sales-marketing.dashboard.sales-targets.destroy');
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
+    // The bare dashboard path used to serve Daily Report, which is now its own
+    // page — keep old bookmarks working by sending them there.
+    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.daily-report', $workspace))->name('workspaces.sales-marketing.dashboard');
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
     // Workspace CRUD routes

@@ -1,7 +1,3 @@
-import {
-    DashboardTab,
-    DashboardTabNav,
-} from '@/components/sales-marketing/dashboard-tabs';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -76,13 +72,9 @@ interface Props {
     workspace: Workspace;
     view: View;
     filters: Filters;
-    // Base path for the page's data endpoint / URL sync. Defaults to the gencys
-    // route; the S&M dashboard passes its own so this page can serve both.
+    // Base path for the page's data endpoint / URL sync. The controller always
+    // sends it; the fallback keeps this component self-contained.
     baseUrl?: string;
-    // Route-based tabs (S&M dashboard). Each tab is its own URL. Absent on the
-    // gencys route, which then renders without a tab bar.
-    tabs?: DashboardTab[];
-    activeTab?: string;
 }
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -359,28 +351,24 @@ function AdRtsSubtotalRow({ st }: { st: AdRtsSubtotal }) {
     );
 }
 
-export default function InternDashboard({
+export default function DailyReport({
     workspace,
     view: initialView,
     filters,
     baseUrl: baseUrlProp,
-    tabs,
-    activeTab,
 }: Props) {
     const [date, setDate] = useState<string>(filters.date ?? '');
     const [view, setView] = useState<View>(initialView);
     const [loading, setLoading] = useState(false);
 
     const baseUrl =
-        baseUrlProp ?? `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
-
-    const hasTabs = !!tabs && tabs.length > 0;
+        baseUrlProp ??
+        `/workspaces/${workspace.slug}/sales-marketing/daily-report`;
 
     // Persist the selected date in the URL so a refresh restores it — the
     // controller reads filter.date on load. replaceState (not an Inertia visit)
     // keeps this axios-driven; we preserve the existing history state so
-    // Inertia's page record isn't clobbered. The active tab lives in the route
-    // path, so it's carried by the pathname automatically.
+    // Inertia's page record isn't clobbered.
     const syncUrl = (dateVal: string | null) => {
         const params = new URLSearchParams();
         if (dateVal) params.set('filter[date]', dateVal);
@@ -412,7 +400,7 @@ export default function InternDashboard({
 
     const datePicker = (
         <DatePicker
-            id="intern-dashboard-date"
+            id="daily-report-date"
             key={date}
             mode="single"
             placeholder="Report date"
@@ -428,14 +416,12 @@ export default function InternDashboard({
 
     return (
         <AppLayout>
-            <Head title={`${workspace.name} - Intern Dashboard`} />
+            <Head title={`${workspace.name} - Daily Report`} />
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
-
                 <div>
                     {/* Page title on the left, report-date control on the right. */}
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                         <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-800 dark:text-gray-100">
                             Daily Report
                         </h1>

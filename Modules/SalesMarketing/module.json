@@ -1,0 +1,14 @@
+{
+    "name": "SalesMarketing",
+    "alias": "salesmarketing",
+    "description": "Sales & marketing planning, targets, and reporting.",
+    "keywords": [
+        "sales",
+        "marketing"
+    ],
+    "priority": 0,
+    "providers": [
+        "Modules\\SalesMarketing\\Providers\\SalesMarketingServiceProvider"
+    ],
+    "files": []
+}
