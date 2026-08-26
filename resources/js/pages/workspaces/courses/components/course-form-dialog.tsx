@@ -6,18 +6,20 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
+import { Check, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import {
+    BTN_PRIMARY,
+    BTN_SECONDARY,
+    FIELD,
+    FIELD_ERROR,
+    INPUT,
+    LABEL,
+    SECTION_BORDER,
+    TEXTAREA,
+} from '../lib/ui';
 import { type Course, type CourseStatus } from '../types';
 import CoverImageField from './cover-image-field';
-
-const inputClass =
-    'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
-const textareaClass =
-    'w-full resize-none rounded-[10px] border border-black/8 bg-stone-50 px-3 py-2.5 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
-const labelClass =
-    'block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500';
-const fieldClass = 'space-y-1.5';
-const errorClass = 'font-mono text-[11px] text-red-500';
 
 interface Props {
     open: boolean;
@@ -111,7 +113,7 @@ export default function CourseFormDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
-                <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
+                <div className={`border-b ${SECTION_BORDER} px-5 pt-5 pb-4`}>
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
                             {editing ? 'Edit Course' : 'New Course'}
@@ -126,15 +128,15 @@ export default function CourseFormDialog({
 
                 <form onSubmit={handleSubmit}>
                     <div className="space-y-5 px-5 py-4">
-                        <div className={fieldClass}>
-                            <label className={labelClass}>
+                        <div className={FIELD}>
+                            <label className={`block ${LABEL}`}>
                                 Course Name{' '}
                                 <span className="text-red-400">*</span>
                             </label>
                             <input
                                 type="text"
                                 autoFocus
-                                className={inputClass}
+                                className={INPUT}
                                 placeholder="e.g. Onboarding 101"
                                 value={data.name}
                                 onChange={(e) =>
@@ -142,15 +144,17 @@ export default function CourseFormDialog({
                                 }
                             />
                             {errors.name && (
-                                <p className={errorClass}>{errors.name}</p>
+                                <p className={FIELD_ERROR}>{errors.name}</p>
                             )}
                         </div>
 
-                        <div className={fieldClass}>
-                            <label className={labelClass}>Description</label>
+                        <div className={FIELD}>
+                            <label className={`block ${LABEL}`}>
+                                Description
+                            </label>
                             <textarea
                                 rows={4}
-                                className={textareaClass}
+                                className={TEXTAREA}
                                 placeholder="What this course covers (optional)"
                                 value={data.description}
                                 onChange={(e) =>
@@ -158,17 +162,17 @@ export default function CourseFormDialog({
                                 }
                             />
                             {errors.description && (
-                                <p className={errorClass}>
+                                <p className={FIELD_ERROR}>
                                     {errors.description}
                                 </p>
                             )}
                         </div>
 
-                        <div className={fieldClass}>
-                            <label className={labelClass}>Category</label>
+                        <div className={FIELD}>
+                            <label className={`block ${LABEL}`}>Category</label>
                             <input
                                 type="text"
-                                className={inputClass}
+                                className={INPUT}
                                 placeholder="e.g. Sales (optional)"
                                 value={data.category}
                                 onChange={(e) =>
@@ -176,7 +180,7 @@ export default function CourseFormDialog({
                                 }
                             />
                             {errors.category && (
-                                <p className={errorClass}>{errors.category}</p>
+                                <p className={FIELD_ERROR}>{errors.category}</p>
                             )}
                         </div>
 
@@ -199,12 +203,12 @@ export default function CourseFormDialog({
                             error={errors.cover_image ?? errors.cover_image_key}
                         />
 
-                        <div className={fieldClass}>
-                            <label className={labelClass}>
+                        <div className={FIELD}>
+                            <label className={`block ${LABEL}`}>
                                 Status <span className="text-red-400">*</span>
                             </label>
                             <select
-                                className={inputClass}
+                                className={INPUT}
                                 value={data.status}
                                 onChange={(e) =>
                                     patch({
@@ -216,24 +220,28 @@ export default function CourseFormDialog({
                                 <option value="published">Published</option>
                             </select>
                             {errors.status && (
-                                <p className={errorClass}>{errors.status}</p>
+                                <p className={FIELD_ERROR}>{errors.status}</p>
                             )}
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 border-t border-black/6 px-5 py-3 dark:border-white/6">
+                    <div
+                        className={`flex items-center justify-end gap-2 border-t ${SECTION_BORDER} px-5 py-3`}
+                    >
                         <button
                             type="button"
                             onClick={() => onOpenChange(false)}
-                            className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-200 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
+                            className={BTN_SECONDARY}
                         >
+                            <X className="h-4 w-4" />
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={processing || uploadingCover}
-                            className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
+                            className={BTN_PRIMARY}
                         >
+                            <Check className="h-4 w-4" />
                             {uploadingCover
                                 ? 'Uploading…'
                                 : processing

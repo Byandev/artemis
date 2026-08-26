@@ -50,6 +50,7 @@ use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
 use Modules\Courses\Http\Controllers\CourseLessonController;
 use Modules\Courses\Http\Controllers\CourseModuleController;
+use Modules\Courses\Http\Controllers\CourseProgressController;
 use Modules\Courses\Http\Controllers\CoursesController;
 use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
@@ -685,6 +686,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/{course}/modules/{module}/lessons', [CourseLessonController::class, 'store'])->name('lessons.store');
         Route::put('/{course}/modules/{module}/lessons/{lesson}', [CourseLessonController::class, 'update'])->name('lessons.update');
         Route::delete('/{course}/modules/{module}/lessons/{lesson}', [CourseLessonController::class, 'destroy'])->name('lessons.destroy');
+
+        // A learner's own run through the course.
+        Route::post('/{course}/start', [CourseProgressController::class, 'start'])->name('start');
+        Route::post('/{course}/modules/{module}/lessons/{lesson}/complete', [CourseProgressController::class, 'complete'])->name('lessons.complete');
+        Route::delete('/{course}/modules/{module}/lessons/{lesson}/complete', [CourseProgressController::class, 'uncomplete'])->name('lessons.uncomplete');
 
         // A lesson's video. Playback redirects to a signed URL so the browser
         // streams from S3 rather than through PHP.

@@ -1,138 +1,56 @@
 import PageHeader from '@/components/common/PageHeader';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, PaginatedData } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    GraduationCap,
-    MoreHorizontal,
-    Pencil,
-    Play,
-    Plus,
-    Trash2,
-} from 'lucide-react';
+import { GraduationCap, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import CourseFormDialog from './components/course-form-dialog';
+import { duration, plural } from './lib/format';
+import {
+    BAR,
+    BTN_PRIMARY,
+    CARD,
+    CARD_HOVER,
+    EMPTY,
+    ICON_BTN,
+    LABEL,
+    MUTED,
+    PAGE,
+    PILL_ACCENT,
+    PILL_OUTLINE,
+    TRACK,
+    TRACK_THIN,
+} from './lib/ui';
 import {
     type Course,
+    type CourseStats,
     type CourseWorkspace,
-    STATUS_LABELS,
-    STATUS_STYLES,
+    type LeaderboardRow,
 } from './types';
 
 interface Props {
     workspace: CourseWorkspace;
     courses: PaginatedData<Course>;
+    stats: CourseStats;
+    leaderboard: LeaderboardRow[];
     /** Set by ?new=1 so the player's "New course" button lands ready to type. */
     openCreateOnMount?: boolean;
 }
 
-function shortDate(value: string | null) {
-    if (!value) return '—';
-    return new Date(value).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-    });
-}
-
-export default function CoursesIndex({
-    workspace,
-    courses,
-    openCreateOnMount = false,
-}: Props) {
-    const baseUrl = `/workspaces/${workspace.slug}/courses`;
-
-    // `null` in the dialog means create; a course means edit.
-    const [dialogOpen, setDialogOpen] = useState(openCreateOnMount);
-    const [editing, setEditing] = useState<Course | null>(null);
-
-    const canCreate = usePermission(PERMISSIONS.CreateCourses);
-    const canEdit = usePermission(PERMISSIONS.EditCourses);
-    const canDelete = usePermission(PERMISSIONS.DeleteCourses);
-
-    const breadcrumbs: BreadcrumbItem[] = [{ title: 'Courses', href: baseUrl }];
-
-    function openCreate() {
-        setEditing(null);
-        setDialogOpen(true);
-    }
-
-    function openEdit(course: Course) {
-        setEditing(course);
-        setDialogOpen(true);
-    }
-
-    function handleDelete(course: Course) {
-        if (
-            !confirm(`Delete "${course.name}"? Its cover image is removed too.`)
-        ) {
-            return;
-        }
-        router.delete(`${baseUrl}/${course.id}`, { preserveScroll: true });
-    }
-
-    return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Courses" />
-
-            <div className="p-4 md:p-7">
-                <PageHeader
-                    title="Courses"
-                    description="Courses for this workspace"
-                >
-                    {canCreate && (
-                        <button
-                            onClick={openCreate}
-                            className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                        >
-                            <Plus className="h-4 w-4" />
-                            New Course
-                        </button>
-                    )}
-                </PageHeader>
-
-                {courses.data.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-black/12 bg-stone-50 py-16 text-center dark:border-white/12 dark:bg-zinc-900">
-                        <GraduationCap className="h-6 w-6 text-gray-300 dark:text-gray-600" />
-                        <p className="mt-2 font-mono text-[12px] text-gray-500 dark:text-gray-400">
-                            No courses yet
-                        </p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-                        {courses.data.map((course) => (
-                            <CourseCard
-                                key={course.id}
-                                course={course}
-                                baseUrl={baseUrl}
-                                canEdit={canEdit}
-                                canDelete={canDelete}
-                                onEdit={() => openEdit(course)}
-                                onDelete={() => handleDelete(course)}
-                            />
-                        ))}
-                    </div>
-                )}
-
-                <CourseFormDialog
-                    open={dialogOpen}
-                    onOpenChange={setDialogOpen}
-                    baseUrl={baseUrl}
-                    course={editing}
-                />
-            </div>
-        </AppLayout>
-    );
-}
+/**
+ * Banner colour when a course has no cover. Keyed off the id so a given course
+ * keeps the same one rather than shuffling between renders.
+ */
+const BANNERS = [
+    'from-slate-700 to-slate-900',
+    'from-purple-800 to-purple-950',
+    'from-emerald-800 to-emerald-950',
+    'from-amber-700 to-amber-900',
+    'from-sky-800 to-sky-950',
+    'from-rose-800 to-rose-950',
+];
 
 function CourseCard({
     course,
@@ -149,92 +67,271 @@ function CourseCard({
     onEdit: () => void;
     onDelete: () => void;
 }) {
-    // The bucket is private, so the cover is reached through the app, which
-    // signs a short-lived URL.
     const coverUrl = course.cover_image
         ? `${baseUrl}/${course.id}/media/${course.cover_image.id}`
         : null;
 
-    return (
-        <div className="group relative overflow-hidden rounded-xl border border-black/6 bg-white transition-all hover:border-black/12 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/12">
-            <Link href={`${baseUrl}/${course.id}`} className="block">
-                <div
-                    className="relative flex aspect-video items-center justify-center bg-stone-100 bg-cover bg-center dark:bg-zinc-800"
-                    style={
-                        coverUrl
-                            ? { backgroundImage: `url(${coverUrl})` }
-                            : undefined
-                    }
-                >
-                    {!coverUrl && (
-                        <GraduationCap className="h-7 w-7 text-gray-300 dark:text-gray-600" />
-                    )}
+    const banner = BANNERS[course.id % BANNERS.length];
+    const live = course.status === 'published';
 
-                    <span
-                        className={`absolute top-2.5 left-2.5 inline-flex items-center rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium ${STATUS_STYLES[course.status]}`}
-                    >
-                        {STATUS_LABELS[course.status]}
+    return (
+        <div className={`overflow-hidden ${CARD_HOVER}`}>
+            <div
+                className={`relative flex h-32 items-start justify-between bg-gradient-to-br p-3 ${coverUrl ? '' : banner}`}
+                style={
+                    coverUrl
+                        ? {
+                              // The bucket is private, so the cover is reached
+                              // through the app, which signs a short-lived URL.
+                              backgroundImage: `url(${coverUrl})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                          }
+                        : undefined
+                }
+            >
+                {course.category && (
+                    <span className="rounded-md bg-black/30 px-2 py-1 font-mono text-[10px] font-medium tracking-wider text-white/90 uppercase backdrop-blur-sm">
+                        {course.category}
                     </span>
+                )}
+
+                <div className="ml-auto flex items-center gap-2">
+                    <span
+                        className={`rounded-md px-2 py-1 font-mono text-[10px] font-medium tracking-wider uppercase ${
+                            live
+                                ? 'bg-emerald-500/90 text-white'
+                                : 'bg-black/30 text-white/80 backdrop-blur-sm'
+                        }`}
+                    >
+                        {live ? 'Live' : 'Draft'}
+                    </span>
+                    {(course.duration_seconds ?? 0) > 0 && (
+                        <span className="font-mono text-[11px] text-white/80 tabular-nums">
+                            {duration(course.duration_seconds ?? 0)}
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            <div className="space-y-3 p-4">
+                <div>
+                    <Link
+                        href={`${baseUrl}/${course.id}`}
+                        className="block truncate text-[15px] font-semibold text-gray-800 transition-colors hover:text-emerald-600 dark:text-gray-100 dark:hover:text-emerald-400"
+                    >
+                        {course.name}
+                    </Link>
+                    <p className={`mt-0.5 ${MUTED}`}>
+                        {course.modules_count ?? 0} modules ·{' '}
+                        {course.lessons_count ?? 0} lessons
+                    </p>
                 </div>
 
-                <div className="space-y-1.5 p-4">
-                    <p className="truncate text-[13px] font-medium text-gray-800 dark:text-gray-100">
-                        {course.name}
-                    </p>
-                    <div className="flex items-center gap-2">
-                        {course.category && (
-                            <span className="truncate rounded-md bg-stone-100 px-2 py-0.5 font-mono text-[10px] tracking-wider text-gray-500 uppercase dark:bg-zinc-800 dark:text-gray-400">
-                                {course.category}
-                            </span>
+                <div className={TRACK}>
+                    <div
+                        className={BAR}
+                        style={{ width: `${course.team_percent ?? 0}%` }}
+                    />
+                </div>
+
+                <div className="flex items-center justify-between">
+                    <span className="text-[13px] text-gray-500 tabular-nums dark:text-gray-400">
+                        Team {course.team_percent ?? 0}%
+                    </span>
+
+                    <div className="flex items-center gap-1.5">
+                        {canDelete && (
+                            <button
+                                onClick={onDelete}
+                                aria-label="Delete course"
+                                className={`${ICON_BTN} hover:text-red-600`}
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                         )}
-                        <span className="font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
-                            {course.modules_count ?? 0}{' '}
-                            {course.modules_count === 1 ? 'module' : 'modules'}
-                        </span>
-                        <span className="font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
-                            {shortDate(course.created_at)}
-                        </span>
+                        {canEdit && (
+                            <button onClick={onEdit} className={PILL_OUTLINE}>
+                                <Pencil className="h-3 w-3" />
+                                Edit
+                            </button>
+                        )}
+                        <Link
+                            href={`${baseUrl}/${course.id}/preview`}
+                            className={PILL_ACCENT}
+                        >
+                            <Play className="h-3 w-3" />
+                            Open
+                        </Link>
                     </div>
                 </div>
-            </Link>
-
-            <div className="absolute top-2 right-2">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button
-                            aria-label="Course actions"
-                            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/85 text-gray-600 opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100 hover:bg-white focus:opacity-100 dark:bg-zinc-900/85 dark:text-gray-300 dark:hover:bg-zinc-900"
-                        >
-                            <MoreHorizontal className="h-4 w-4" />
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                            <Link href={`${baseUrl}/${course.id}/preview`}>
-                                <Play className="mr-2 h-4 w-4" />
-                                Preview
-                            </Link>
-                        </DropdownMenuItem>
-                        {canEdit && <DropdownMenuSeparator />}
-                        {canEdit && (
-                            <DropdownMenuItem onSelect={onEdit}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
-                            </DropdownMenuItem>
-                        )}
-                        {canEdit && canDelete && <DropdownMenuSeparator />}
-                        {canDelete && (
-                            <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={onDelete}
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                            </DropdownMenuItem>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
             </div>
         </div>
+    );
+}
+
+export default function CoursesIndex({
+    workspace,
+    courses,
+    stats,
+    leaderboard,
+    openCreateOnMount = false,
+}: Props) {
+    const baseUrl = `/workspaces/${workspace.slug}/courses`;
+
+    const [dialogOpen, setDialogOpen] = useState(openCreateOnMount);
+    const [editing, setEditing] = useState<Course | null>(null);
+
+    const canCreate = usePermission(PERMISSIONS.CreateCourses);
+    const canEdit = usePermission(PERMISSIONS.EditCourses);
+    const canDelete = usePermission(PERMISSIONS.DeleteCourses);
+
+    const breadcrumbs: BreadcrumbItem[] = [{ title: 'Courses', href: baseUrl }];
+
+    function openCreate() {
+        setEditing(null);
+        setDialogOpen(true);
+    }
+
+    function handleDelete(course: Course) {
+        if (
+            !confirm(`Delete "${course.name}"? Its cover image is removed too.`)
+        ) {
+            return;
+        }
+        router.delete(`${baseUrl}/${course.id}`, { preserveScroll: true });
+    }
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Courses" />
+
+            <div className={PAGE}>
+                <PageHeader
+                    title="Courses"
+                    description={`${plural(stats.total_courses, 'course')}${
+                        stats.draft_courses > 0
+                            ? ` · ${stats.draft_courses} in draft`
+                            : ''
+                    }`}
+                >
+                    {canCreate && (
+                        <button onClick={openCreate} className={BTN_PRIMARY}>
+                            <Plus className="h-4 w-4" />
+                            New course
+                        </button>
+                    )}
+                </PageHeader>
+
+                {/* Stat tiles */}
+                <div className="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                    <div className={`${CARD} p-5`}>
+                        <p className={LABEL}>Active Courses</p>
+                        <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-gray-800 tabular-nums dark:text-gray-100">
+                            {stats.active_courses}
+                        </p>
+                        <p className={`mt-0.5 ${MUTED}`}>
+                            {stats.total_lessons} lessons across{' '}
+                            {stats.total_courses}{' '}
+                            {stats.total_courses === 1 ? 'course' : 'courses'}
+                        </p>
+                    </div>
+
+                    <div className={`${CARD} p-5`}>
+                        <p className={LABEL}>Avg Completion</p>
+                        <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-amber-600 tabular-nums dark:text-amber-500">
+                            {stats.avg_completion}%
+                        </p>
+                        <p className={`mt-0.5 ${MUTED}`}>
+                            team average across all courses
+                        </p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    {/* Course grid */}
+                    <div className="lg:col-span-2">
+                        {courses.data.length === 0 ? (
+                            <div className={EMPTY}>
+                                <GraduationCap className="h-6 w-6 text-gray-300 dark:text-gray-600" />
+                                <p className="mt-2 font-mono text-[12px] text-gray-500 dark:text-gray-400">
+                                    No courses yet
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+                                {courses.data.map((course) => (
+                                    <CourseCard
+                                        key={course.id}
+                                        course={course}
+                                        baseUrl={baseUrl}
+                                        canEdit={canEdit}
+                                        canDelete={canDelete}
+                                        onEdit={() => {
+                                            setEditing(course);
+                                            setDialogOpen(true);
+                                        }}
+                                        onDelete={() => handleDelete(course)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Leaderboard */}
+                    <aside className="lg:col-span-1">
+                        <div className={`${CARD} p-5`}>
+                            <p className={LABEL}>Completion Leaderboard</p>
+
+                            {leaderboard.length === 0 ? (
+                                <p className="mt-3 font-mono text-[11px] text-gray-400 dark:text-gray-500">
+                                    Nobody has completed a lesson yet
+                                </p>
+                            ) : (
+                                <ol className="mt-3 space-y-3">
+                                    {leaderboard.map((row, i) => (
+                                        <li
+                                            key={row.id}
+                                            className="flex items-start gap-3"
+                                        >
+                                            <span className="mt-0.5 w-4 shrink-0 font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                                                {i + 1}
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-baseline justify-between gap-2">
+                                                    <span className="truncate text-[13px] text-gray-700 dark:text-gray-200">
+                                                        {row.name}
+                                                    </span>
+                                                    <span className="shrink-0 font-mono text-[11px] font-medium text-gray-600 tabular-nums dark:text-gray-300">
+                                                        {row.percent}%
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    className={`mt-1 ${TRACK_THIN}`}
+                                                >
+                                                    <div
+                                                        className={BAR}
+                                                        style={{
+                                                            width: `${row.percent}%`,
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ol>
+                            )}
+                        </div>
+                    </aside>
+                </div>
+
+                <CourseFormDialog
+                    open={dialogOpen}
+                    onOpenChange={setDialogOpen}
+                    baseUrl={baseUrl}
+                    course={editing}
+                />
+            </div>
+        </AppLayout>
     );
 }

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -53,6 +54,24 @@ class Course extends Model implements HasMedia
     public function modules(): HasMany
     {
         return $this->hasMany(CourseModule::class)->orderBy('position');
+    }
+
+    public function enrollments(): HasMany
+    {
+        return $this->hasMany(CourseEnrollment::class);
+    }
+
+    /**
+     * Every lesson in the course, flattened across its modules.
+     */
+    public function lessons(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            CourseLesson::class,
+            CourseModule::class,
+            'course_id',
+            'course_module_id',
+        );
     }
 
     public function workspace(): BelongsTo
