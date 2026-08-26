@@ -12,6 +12,55 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.32.0',
+        date: '2026-08-25',
+        sections: [
+            {
+                title: 'Gencys ERP — Sync Batches (New)',
+                items: [
+                    'Every pull from Gencys is now a batch you can watch: a Sync Batches screen shows which one is holding the ERP right now, what is queued behind it, how far through its items it has got and how many came back short — so a sync that quietly did nothing is something you see the same morning rather than something you work out days later from a figure that looks wrong',
+                    'Open a batch to see each item or date inside it, whether it came back, how many rows it brought, how long it took and what went wrong where something did — the detail that used to exist only in the logs, on the screen next to the thing it explains',
+                    'You can raise a batch by hand for a date range and whichever syncs you tick, and cancel one mid-flight when you would rather it stopped, instead of waiting for the next scheduled pass to come round',
+                    'The old Sync Health screen under Inventory is gone — what it showed now lives on these batch pages under Gencys ERP, covering the daily sales tracker as well as transactions and purchase orders rather than only the latter two',
+                    'Sync Batches has its own permission, so nobody but a workspace owner sees it until a role has been granted it — check your roles after this release if your team watches ERP syncs',
+                ],
+            },
+            {
+                title: 'Gencys ERP — How Syncing Runs Now',
+                items: [
+                    'Syncing no longer fires everything at the ERP on a timer and hopes for the best: one batch works at a time and only asks for the next group of items once the previous group has answered, which is what stops the ERP rate-limiting the very sync trying to read it',
+                    'An item whose answer never arrives is retried on its own rather than dragging its whole group back with it, twice before it is written off, and the batch carries on past it instead of stalling behind one bad SKU',
+                    'A pass that starts while the one before it is still working now waits its turn instead of being dropped, and a pass asking for exactly what is already queued joins that batch rather than stacking a duplicate on top of it',
+                    'A day of the sales tracker too large to come back in one piece is no longer treated as finished when its first instalment lands — it stays open until the last one arrives, so a busy day is recorded whole instead of truncated at whatever turned up first',
+                    'The separate scheduled jobs for transactions, purchase orders and the daily sales tracker are now one, so a single run of it is a single batch you can follow from end to end',
+                ],
+            },
+            {
+                title: 'Gencys ERP — Checking a Sync Against n8n (New)',
+                items: [
+                    'Any item on a batch can be checked against n8n from the row itself — it reports whether that run succeeded, failed or is still going, shows the error n8n recorded, and links straight to it, so working out why a sync came back empty no longer means hunting through n8n by timestamp (this needs your n8n API details on file; without them the check simply is not offered)',
+                    'A failed item can be sent again from the same row, which re-reads your ERP credentials and the current state rather than replaying the old request — offered only while nothing else is syncing, since one batch holds the ERP at a time',
+                    'Where n8n has not kept a run — successful ones are commonly discarded, depending on how it is set up — the check says exactly that, rather than reading as though something had broken',
+                ],
+            },
+            {
+                title: 'Inventory — Saved Figures',
+                items: [
+                    'The day’s figures are no longer frozen while an ERP sync is still waiting its turn: a sync raised but not yet sent holds the save back just as one already in progress does, so a day cannot be recorded from half its stock movements and then read afterwards as though it were complete',
+                    'A sync still working after midnight holds the next morning’s save back too, rather than being passed over because it happened to start the day before',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'SMS delivery reports no longer read the whole message table on every push — both the delivery-report lookup and the duplicate check on incoming messages are indexed now, which at delivery-report volume was on its own enough to keep the database busy and slow everything else down with it',
+                    'Parcel journey notifications are indexed by the SMS they belong to, so a delivery report updates one row instead of scanning one of the largest tables in the system from end to end',
+                    'The For Delivery and RMO Management lists no longer work out a risk score for every row that nothing ever displayed — it was being computed on each load and each export and then thrown away, so both come back quicker',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.31.0',
         date: '2026-08-20',
         sections: [
