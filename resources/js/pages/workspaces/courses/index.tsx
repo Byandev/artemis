@@ -15,6 +15,7 @@ import {
     GraduationCap,
     MoreHorizontal,
     Pencil,
+    Play,
     Plus,
     Trash2,
 } from 'lucide-react';
@@ -30,6 +31,8 @@ import {
 interface Props {
     workspace: CourseWorkspace;
     courses: PaginatedData<Course>;
+    /** Set by ?new=1 so the player's "New course" button lands ready to type. */
+    openCreateOnMount?: boolean;
 }
 
 function shortDate(value: string | null) {
@@ -41,11 +44,15 @@ function shortDate(value: string | null) {
     });
 }
 
-export default function CoursesIndex({ workspace, courses }: Props) {
+export default function CoursesIndex({
+    workspace,
+    courses,
+    openCreateOnMount = false,
+}: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/courses`;
 
     // `null` in the dialog means create; a course means edit.
-    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogOpen, setDialogOpen] = useState(openCreateOnMount);
     const [editing, setEditing] = useState<Course | null>(null);
 
     const canCreate = usePermission(PERMISSIONS.CreateCourses);
@@ -181,44 +188,53 @@ function CourseCard({
                             </span>
                         )}
                         <span className="font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                            {course.modules_count ?? 0}{' '}
+                            {course.modules_count === 1 ? 'module' : 'modules'}
+                        </span>
+                        <span className="font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
                             {shortDate(course.created_at)}
                         </span>
                     </div>
                 </div>
             </Link>
 
-            {(canEdit || canDelete) && (
-                <div className="absolute top-2 right-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button
-                                aria-label="Course actions"
-                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/85 text-gray-600 opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100 hover:bg-white focus:opacity-100 dark:bg-zinc-900/85 dark:text-gray-300 dark:hover:bg-zinc-900"
+            <div className="absolute top-2 right-2">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button
+                            aria-label="Course actions"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/85 text-gray-600 opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100 hover:bg-white focus:opacity-100 dark:bg-zinc-900/85 dark:text-gray-300 dark:hover:bg-zinc-900"
+                        >
+                            <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                            <Link href={`${baseUrl}/${course.id}/preview`}>
+                                <Play className="mr-2 h-4 w-4" />
+                                Preview
+                            </Link>
+                        </DropdownMenuItem>
+                        {canEdit && <DropdownMenuSeparator />}
+                        {canEdit && (
+                            <DropdownMenuItem onSelect={onEdit}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                            </DropdownMenuItem>
+                        )}
+                        {canEdit && canDelete && <DropdownMenuSeparator />}
+                        {canDelete && (
+                            <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={onDelete}
                             >
-                                <MoreHorizontal className="h-4 w-4" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            {canEdit && (
-                                <DropdownMenuItem onSelect={onEdit}>
-                                    <Pencil className="mr-2 h-4 w-4" />
-                                    Edit
-                                </DropdownMenuItem>
-                            )}
-                            {canEdit && canDelete && <DropdownMenuSeparator />}
-                            {canDelete && (
-                                <DropdownMenuItem
-                                    variant="destructive"
-                                    onSelect={onDelete}
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                </DropdownMenuItem>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            )}
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                            </DropdownMenuItem>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
     );
 }

@@ -3,6 +3,7 @@
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Modules\Courses\Models\Course;
 
 function makeCourse($workspace, array $attributes = []): Course
@@ -190,6 +191,115 @@ it('leaves an existing cover alone when the flag is absent', function () {
     expect($course->fresh()->coverImage()?->file_name)->toBe('keep.jpg');
 });
 
+it('signs a cover upload scoped to the workspace', function () {
+    Storage::fake('s3');
+    config(['filesystems.course_media_disk' => 's3']);
+
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+
+    // Workspace-scoped, not course-scoped: the create form needs a key before
+    // the course exists.
+    $response = $this->postJson("/workspaces/{$workspace->slug}/courses/cover/presign", [
+        'file_name' => 'cover.jpg',
+        'content_type' => 'image/jpeg',
+    ])->assertOk();
+
+    expect($response->json('key'))
+        ->toStartWith("pending/course-covers/{$workspace->id}/")
+        ->toEndWith('.jpg');
+});
+
+it('refuses to sign a cover upload that is not an image', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+
+    $this->postJson("/workspaces/{$workspace->slug}/courses/cover/presign", [
+        'file_name' => 'clip.mp4',
+        'content_type' => 'video/mp4',
+    ])->assertStatus(422);
+});
+
+it('creates a course from a cover already uploaded to the bucket', function () {
+    Storage::fake('s3');
+    config(['filesystems.course_media_disk' => 's3']);
+
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+
+    $key = "pending/course-covers/{$workspace->id}/".Str::uuid().'.jpg';
+    Storage::disk('s3')->put($key, 'fake-bytes');
+
+    // No file in the request at all — just the key.
+    $this->post("/workspaces/{$workspace->slug}/courses", [
+        'name' => 'Presigned Cover',
+        'status' => 'draft',
+        'cover_image_key' => $key,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $cover = Course::where('workspace_id', $workspace->id)->sole()->coverImage();
+
+    expect($cover)->not->toBeNull()
+        ->and($cover->disk)->toBe('s3')
+        ->and(Storage::disk('s3')->exists($cover->getPathRelativeToRoot()))->toBeTrue()
+        // Moved out of the pending prefix, not left behind.
+        ->and(Storage::disk('s3')->exists($key))->toBeFalse();
+});
+
+it('refuses a cover key from another workspace', function () {
+    Storage::fake('s3');
+    config(['filesystems.course_media_disk' => 's3']);
+
+    ['workspace' => $mine] = actingAsWorkspaceOwner();
+    $mine->update(['courses_module_enabled' => true]);
+
+    $foreign = 'pending/course-covers/'.($mine->id + 999).'/'.Str::uuid().'.jpg';
+    Storage::disk('s3')->put($foreign, 'fake-bytes');
+
+    $this->post("/workspaces/{$mine->slug}/courses", [
+        'name' => 'Stolen Cover',
+        'status' => 'draft',
+        'cover_image_key' => $foreign,
+    ])->assertForbidden();
+});
+
+it('replaces the cover when a new key is sent on update', function () {
+    Storage::fake('s3');
+    config(['filesystems.course_media_disk' => 's3']);
+
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+    $course = makeCourse($workspace);
+    $course->addMedia(UploadedFile::fake()->image('old.jpg'))
+        ->toMediaCollection(Course::COVER_IMAGE_COLLECTION);
+
+    $key = "pending/course-covers/{$workspace->id}/".Str::uuid().'.jpg';
+    Storage::disk('s3')->put($key, 'fake-bytes');
+
+    $this->put("/workspaces/{$workspace->slug}/courses/{$course->id}", [
+        'name' => $course->name,
+        'status' => 'draft',
+        'cover_image_key' => $key,
+    ])->assertRedirect();
+
+    expect($course->fresh()->getMedia(Course::COVER_IMAGE_COLLECTION))->toHaveCount(1)
+        ->and($course->fresh()->coverImage()->file_name)->not->toBe('old.jpg');
+});
+
+it('rejects a cover key whose object is not in the bucket', function () {
+    Storage::fake('s3');
+    config(['filesystems.course_media_disk' => 's3']);
+
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+
+    $this->post("/workspaces/{$workspace->slug}/courses", [
+        'name' => 'Missing Cover',
+        'status' => 'draft',
+        'cover_image_key' => "pending/course-covers/{$workspace->id}/".Str::uuid().'.jpg',
+    ])->assertStatus(422);
+});
+
 it('rejects a cover image that is not an accepted image type', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     $workspace->update(['courses_module_enabled' => true]);
@@ -240,6 +350,83 @@ it('has no standalone create or edit pages', function () {
     // Both forms are modals on the index/detail pages.
     $this->get("/workspaces/{$workspace->slug}/courses/{$course->id}/edit")
         ->assertNotFound();
+});
+
+it('renders the preview player for a member', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+    $course = makeCourse($workspace);
+    $module = $course->modules()->create(['name' => 'Intro', 'position' => 1]);
+    $module->lessons()->create(['name' => 'Lesson One', 'position' => 1]);
+
+    $this->get("/workspaces/{$workspace->slug}/courses/{$course->id}/preview")
+        ->assertOk();
+});
+
+it('404s the preview when the courses module is off', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+    $course = makeCourse($workspace);
+    $workspace->update(['courses_module_enabled' => false]);
+
+    $this->get("/workspaces/{$workspace->slug}/courses/{$course->id}/preview")
+        ->assertNotFound();
+});
+
+it('404s a preview of a course in another workspace', function () {
+    ['workspace' => $mine] = actingAsWorkspaceOwner();
+    $mine->update(['courses_module_enabled' => true]);
+
+    ['workspace' => $theirs] = makeWorkspaceWithOwner();
+    $other = makeCourse($theirs);
+
+    $this->get("/workspaces/{$mine->slug}/courses/{$other->id}/preview")
+        ->assertNotFound();
+});
+
+it('does not let /preview be swallowed by the show route', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+    $course = makeCourse($workspace);
+
+    // Literal segments have to be registered before {course}; if they aren't,
+    // this resolves to show() with a course id of "preview" and 404s.
+    $this->get("/workspaces/{$workspace->slug}/courses/{$course->id}/preview")
+        ->assertOk();
+
+    expect(route('workspaces.courses.preview', [$workspace, $course]))
+        ->toContain("/courses/{$course->id}/preview");
+});
+
+it('opens the preview on the lesson named in the query string', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+    $course = makeCourse($workspace);
+    $module = $course->modules()->create(['name' => 'Intro', 'position' => 1]);
+    $first = $module->lessons()->create(['name' => 'One', 'position' => 1]);
+    $second = $module->lessons()->create(['name' => 'Two', 'position' => 2]);
+
+    $this->get("/workspaces/{$workspace->slug}/courses/{$course->id}/preview?lesson={$second->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('initialLessonId', $second->id));
+
+    expect($first->id)->not->toBe($second->id);
+});
+
+it('ignores a lesson id from another course rather than erroring', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $workspace->update(['courses_module_enabled' => true]);
+
+    $course = makeCourse($workspace, ['name' => 'Mine']);
+    $other = makeCourse($workspace, ['name' => 'Theirs']);
+    $foreign = $other->modules()
+        ->create(['name' => 'M', 'position' => 1])
+        ->lessons()->create(['name' => 'L', 'position' => 1]);
+
+    // The page falls back to its own first playable lesson.
+    $this->get("/workspaces/{$workspace->slug}/courses/{$course->id}/preview?lesson={$foreign->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('initialLessonId', null));
 });
 
 it('deletes a course', function () {

@@ -7,6 +7,28 @@ export interface CourseMedia {
     size: number;
 }
 
+export interface LessonVideo {
+    id: number;
+    file_name: string;
+    size: number;
+}
+
+export interface CourseLesson {
+    id: number;
+    name: string;
+    position: number;
+    /** Null until a video with readable metadata has been uploaded. */
+    duration_seconds: number | null;
+    video: LessonVideo | null;
+}
+
+export interface CourseModule {
+    id: number;
+    name: string;
+    position: number;
+    lessons: CourseLesson[];
+}
+
 export interface Course {
     id: number;
     name: string;
@@ -16,6 +38,9 @@ export interface Course {
     created_at: string | null;
     updated_at: string | null;
     cover_image: CourseMedia | null;
+    modules_count?: number;
+    /** Only loaded on the detail page. */
+    modules?: CourseModule[];
 }
 
 export interface CourseWorkspace {

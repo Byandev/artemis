@@ -6,6 +6,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -47,6 +48,11 @@ class Course extends Model implements HasMedia
     public function coverImage(): ?Media
     {
         return $this->getFirstMedia(static::COVER_IMAGE_COLLECTION);
+    }
+
+    public function modules(): HasMany
+    {
+        return $this->hasMany(CourseModule::class)->orderBy('position');
     }
 
     public function workspace(): BelongsTo

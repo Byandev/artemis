@@ -6,7 +6,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { type Course, type CourseStatus } from '../types';
 import CoverImageField from './cover-image-field';
 
@@ -31,6 +31,9 @@ interface FormValues {
     name: string;
     description: string;
     category: string;
+    /** Bucket key from the presigned upload — the usual path. */
+    cover_image_key: string | null;
+    /** Only sent when the disk could not sign an upload. */
     cover_image: File | null;
     remove_cover_image: boolean;
     status: CourseStatus;
@@ -40,6 +43,7 @@ const EMPTY: FormValues = {
     name: '',
     description: '',
     category: '',
+    cover_image_key: null,
     cover_image: null,
     remove_cover_image: false,
     status: 'draft',
@@ -53,16 +57,12 @@ export default function CourseFormDialog({
 }: Props) {
     const editing = course !== null;
 
-    const {
-        data,
-        setData,
-        post,
-        processing,
-        progress,
-        errors,
-        reset,
-        clearErrors,
-    } = useForm<FormValues>({ ...EMPTY });
+    const { data, setData, post, processing, errors, reset, clearErrors } =
+        useForm<FormValues>({ ...EMPTY });
+
+    // The cover goes to the bucket as soon as it is picked, so submitting has
+    // to wait for it or the key would still be null.
+    const [uploadingCover, setUploadingCover] = useState(false);
 
     // Reopening the dialog for a different course (or for a fresh create) has
     // to reload the fields — useForm keeps its state across open/close.
@@ -95,8 +95,10 @@ export default function CourseFormDialog({
         // on a POST.
         const url = editing ? `${baseUrl}/${course.id}` : baseUrl;
 
+        // Only a fallback upload still needs multipart; the usual path sends a
+        // key and can go as plain JSON.
         post(url, {
-            forceFormData: true,
+            forceFormData: data.cover_image !== null,
             ...(editing ? { data: { ...data, _method: 'put' } } : {}),
             preserveScroll: true,
             onSuccess: () => {
@@ -179,8 +181,10 @@ export default function CourseFormDialog({
                         </div>
 
                         <CoverImageField
+                            presignUrl={`${baseUrl}/cover/presign`}
                             file={data.cover_image}
                             onFileChange={(f) => patch({ cover_image: f })}
+                            onKeyChange={(k) => patch({ cover_image_key: k })}
                             removed={data.remove_cover_image}
                             onRemovedChange={(r) =>
                                 patch({ remove_cover_image: r })
@@ -191,10 +195,8 @@ export default function CourseFormDialog({
                                     ? `${baseUrl}/${course.id}/media/${course.cover_image.id}`
                                     : undefined
                             }
-                            progress={
-                                progress ? (progress.percentage ?? 0) : null
-                            }
-                            error={errors.cover_image}
+                            onUploadingChange={setUploadingCover}
+                            error={errors.cover_image ?? errors.cover_image_key}
                         />
 
                         <div className={fieldClass}>
@@ -229,16 +231,18 @@ export default function CourseFormDialog({
                         </button>
                         <button
                             type="submit"
-                            disabled={processing}
+                            disabled={processing || uploadingCover}
                             className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {processing
-                                ? editing
-                                    ? 'Saving…'
-                                    : 'Creating…'
-                                : editing
-                                  ? 'Save Changes'
-                                  : 'Create Course'}
+                            {uploadingCover
+                                ? 'Uploading…'
+                                : processing
+                                  ? editing
+                                      ? 'Saving…'
+                                      : 'Creating…'
+                                  : editing
+                                    ? 'Save Changes'
+                                    : 'Create Course'}
                         </button>
                     </div>
                 </form>
