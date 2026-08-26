@@ -8,11 +8,14 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Modules\Courses\Models\Course;
+use Modules\Courses\Models\CourseEnrollment;
+use Modules\Courses\Models\CourseLessonCompletion;
 use RuntimeException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\MediaLibrary\Support\PathGenerator\PathGeneratorFactory;
@@ -26,6 +29,13 @@ class CoursesController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewCourses->value, $workspace);
 
+        // Aggregated once for the whole page rather than per card, so the grid
+        // costs a fixed handful of queries however many courses there are.
+        $lessonTotals = $this->lessonTotalsByCourse($workspace);
+        $lengths = $this->lengthsByCourse($workspace);
+        $completions = $this->completionsByCourse($workspace);
+        $memberCount = max(1, $workspace->users()->count());
+
         $courses = Course::ofWorkspace($workspace)
             // `media` is eager loaded so the cover column doesn't fire a query
             // per row on a full page of courses.
@@ -34,13 +44,139 @@ class CoursesController extends Controller
             ->latest()
             ->paginate(15)
             ->withQueryString()
-            ->through(fn (Course $course) => $this->present($course));
+            ->through(function (Course $course) use ($lessonTotals, $lengths, $completions, $memberCount) {
+                $lessons = $lessonTotals[$course->id] ?? 0;
+
+                return [
+                    ...$this->present($course),
+                    'lessons_count' => $lessons,
+                    'duration_seconds' => $lengths[$course->id] ?? 0,
+                    // Averaging each member's own percentage is the same as
+                    // dividing total completions by (members x lessons).
+                    'team_percent' => $lessons > 0
+                        ? (int) round(($completions[$course->id] ?? 0) / ($memberCount * $lessons) * 100)
+                        : 0,
+                ];
+            });
 
         return Inertia::render('workspaces/courses/index', [
             'workspace' => $workspace->only(['id', 'name', 'slug']),
             'courses' => $courses,
+            'stats' => $this->workspaceStats($workspace, $lessonTotals, $completions, $memberCount),
+            'leaderboard' => $this->completionLeaderboard($workspace, array_sum($lessonTotals)),
             'openCreateOnMount' => $request->boolean('new'),
         ]);
+    }
+
+    /**
+     * Lesson count per course id.
+     *
+     * @return array<int, int>
+     */
+    private function lessonTotalsByCourse(Workspace $workspace): array
+    {
+        return DB::table('course_lessons')
+            ->join('course_modules', 'course_lessons.course_module_id', '=', 'course_modules.id')
+            ->join('courses', 'course_modules.course_id', '=', 'courses.id')
+            ->where('courses.workspace_id', $workspace->id)
+            ->groupBy('course_modules.course_id')
+            // Aliased rather than plucked by raw expression: pluck() resolves a
+            // real column name and cannot read an unnamed aggregate.
+            ->selectRaw('course_modules.course_id as course_id, count(*) as aggregate')
+            ->pluck('aggregate', 'course_id')
+            ->map(fn ($n) => (int) $n)
+            ->all();
+    }
+
+    /**
+     * Total video length per course id, in seconds.
+     *
+     * @return array<int, int>
+     */
+    private function lengthsByCourse(Workspace $workspace): array
+    {
+        return DB::table('course_lessons')
+            ->join('course_modules', 'course_lessons.course_module_id', '=', 'course_modules.id')
+            ->join('courses', 'course_modules.course_id', '=', 'courses.id')
+            ->where('courses.workspace_id', $workspace->id)
+            ->groupBy('course_modules.course_id')
+            ->selectRaw('course_modules.course_id as course_id, coalesce(sum(course_lessons.duration_seconds), 0) as aggregate')
+            ->pluck('aggregate', 'course_id')
+            ->map(fn ($n) => (int) $n)
+            ->all();
+    }
+
+    /**
+     * How many lesson completions each course has, across every member.
+     *
+     * @return array<int, int>
+     */
+    private function completionsByCourse(Workspace $workspace): array
+    {
+        return DB::table('course_lesson_completions')
+            ->join('course_lessons', 'course_lesson_completions.course_lesson_id', '=', 'course_lessons.id')
+            ->join('course_modules', 'course_lessons.course_module_id', '=', 'course_modules.id')
+            ->join('courses', 'course_modules.course_id', '=', 'courses.id')
+            ->where('courses.workspace_id', $workspace->id)
+            ->groupBy('course_modules.course_id')
+            ->selectRaw('course_modules.course_id as course_id, count(*) as aggregate')
+            ->pluck('aggregate', 'course_id')
+            ->map(fn ($n) => (int) $n)
+            ->all();
+    }
+
+    /**
+     * @param  array<int, int>  $lessonTotals
+     * @param  array<int, int>  $completions
+     * @return array<string, mixed>
+     */
+    private function workspaceStats(Workspace $workspace, array $lessonTotals, array $completions, int $memberCount): array
+    {
+        $total = Course::ofWorkspace($workspace)->count();
+        $published = Course::ofWorkspace($workspace)->where('status', 'published')->count();
+        $lessons = array_sum($lessonTotals);
+
+        return [
+            'total_courses' => $total,
+            'draft_courses' => $total - $published,
+            'active_courses' => $published,
+            'total_lessons' => $lessons,
+            'avg_completion' => $lessons > 0
+                ? (int) round(array_sum($completions) / ($memberCount * $lessons) * 100)
+                : 0,
+        ];
+    }
+
+    /**
+     * Members ranked by how much of the workspace's course material they have
+     * finished. Members who have completed nothing are left off rather than
+     * padding the board with zeroes.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function completionLeaderboard(Workspace $workspace, int $totalLessons): array
+    {
+        if ($totalLessons === 0) {
+            return [];
+        }
+
+        return DB::table('course_lesson_completions')
+            ->join('course_lessons', 'course_lesson_completions.course_lesson_id', '=', 'course_lessons.id')
+            ->join('course_modules', 'course_lessons.course_module_id', '=', 'course_modules.id')
+            ->join('courses', 'course_modules.course_id', '=', 'courses.id')
+            ->join('users', 'course_lesson_completions.user_id', '=', 'users.id')
+            ->where('courses.workspace_id', $workspace->id)
+            ->groupBy('users.id', 'users.name')
+            ->orderByDesc(DB::raw('count(*)'))
+            ->orderBy('users.name')
+            ->limit(10)
+            ->get(['users.id', 'users.name', DB::raw('count(*) as done')])
+            ->map(fn ($row) => [
+                'id' => $row->id,
+                'name' => $row->name,
+                'percent' => (int) round($row->done / $totalLessons * 100),
+            ])
+            ->all();
     }
 
     /**
@@ -110,6 +246,8 @@ class CoursesController extends Controller
 
         return Inertia::render('workspaces/courses/show', [
             'workspace' => $workspace->only(['id', 'name', 'slug']),
+            'progress' => $this->presentProgress($request, $course),
+            'team' => $this->presentTeam($workspace, $course),
             'course' => [
                 ...$this->present($course),
                 'modules' => $this->presentModules($course),
@@ -130,7 +268,10 @@ class CoursesController extends Controller
 
         // Which lesson to open on. A stale or foreign id is ignored rather than
         // erroring — the page falls back to the first playable lesson.
-        $requested = $request->integer('lesson') ?: null;
+        $requested = $request->integer('lesson')
+            ?: CourseEnrollment::where('course_id', $course->id)
+                ->where('user_id', $request->user()->getKey())
+                ->value('last_lesson_id');
 
         $known = $course->modules
             ->flatMap->lessons
@@ -140,6 +281,7 @@ class CoursesController extends Controller
         return Inertia::render('workspaces/courses/preview', [
             'workspace' => $workspace->only(['id', 'name', 'slug']),
             'initialLessonId' => $known ? $requested : null,
+            'progress' => $this->presentProgress($request, $course),
             'course' => [
                 ...$this->present($course),
                 'modules' => $this->presentModules($course),
@@ -342,6 +484,81 @@ class CoursesController extends Controller
                 'size' => $cover->size,
             ] : null,
         ];
+    }
+
+    /**
+     * The current user's own run through a course: whether they started it,
+     * which lessons they have finished, and where to drop them back in.
+     *
+     * @return array<string, mixed>
+     */
+    private function presentProgress(Request $request, Course $course): array
+    {
+        $userId = $request->user()->getKey();
+
+        $lessonIds = $course->modules->flatMap->lessons->pluck('id');
+
+        $completed = CourseLessonCompletion::where('user_id', $userId)
+            ->whereIn('course_lesson_id', $lessonIds)
+            ->pluck('course_lesson_id')
+            ->all();
+
+        $enrollment = CourseEnrollment::where('course_id', $course->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        $total = $lessonIds->count();
+
+        return [
+            'started' => $enrollment !== null,
+            'started_at' => $enrollment?->started_at?->toIso8601String(),
+            'completed_at' => $enrollment?->completed_at?->toIso8601String(),
+            'resume_lesson_id' => $enrollment?->last_lesson_id,
+            'completed_lesson_ids' => $completed,
+            'completed_count' => count($completed),
+            'total_lessons' => $total,
+            'percent' => $total > 0 ? (int) round(count($completed) / $total * 100) : 0,
+        ];
+    }
+
+    /**
+     * How far each learner has got through this one course.
+     *
+     * Only people who have actually started it are listed. Members who never
+     * opened the course would otherwise fill the panel with 0% rows that say
+     * nothing about how the people taking it are doing.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function presentTeam(Workspace $workspace, Course $course): array
+    {
+        $lessonIds = $course->modules->flatMap->lessons->pluck('id');
+        $total = $lessonIds->count();
+
+        if ($total === 0) {
+            return [];
+        }
+
+        $done = DB::table('course_lesson_completions')
+            ->whereIn('course_lesson_id', $lessonIds)
+            ->groupBy('user_id')
+            ->selectRaw('user_id, count(*) as aggregate')
+            ->pluck('aggregate', 'user_id');
+
+        // Enrollment is the record of having started, so someone who pressed
+        // Start but finished nothing still belongs here at 0%.
+        return DB::table('course_enrollments')
+            ->join('users', 'course_enrollments.user_id', '=', 'users.id')
+            ->where('course_enrollments.course_id', $course->id)
+            ->get(['users.id', 'users.name'])
+            ->map(fn ($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'percent' => (int) round((($done[$user->id] ?? 0) / $total) * 100),
+            ])
+            ->sortByDesc('percent')
+            ->values()
+            ->all();
     }
 
     /**

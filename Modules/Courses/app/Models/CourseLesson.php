@@ -4,6 +4,7 @@ namespace Modules\Courses\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -49,6 +50,11 @@ class CourseLesson extends Model implements HasMedia
     public function video(): ?Media
     {
         return $this->getFirstMedia(static::VIDEO_COLLECTION);
+    }
+
+    public function completions(): HasMany
+    {
+        return $this->hasMany(CourseLessonCompletion::class);
     }
 
     public function module(): BelongsTo

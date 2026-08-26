@@ -1,10 +1,19 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Play, Plus } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    ArrowLeft,
+    Check,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    Play,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
     type CourseLesson,
+    type CourseProgress,
     type Course as CourseType,
     type CourseWorkspace,
 } from './types';
@@ -14,6 +23,7 @@ interface Props {
     course: CourseType;
     /** Lesson to open on, from ?lesson= — null when absent or unrecognised. */
     initialLessonId: number | null;
+    progress: CourseProgress;
 }
 
 /** A lesson flattened with its module, so the outline reads as one sequence. */
@@ -21,6 +31,8 @@ interface FlatLesson {
     lesson: CourseLesson;
     moduleName: string;
     videoUrl: string;
+    /** Endpoint for marking this lesson done or undone. */
+    completeUrl: string;
     index: number;
 }
 
@@ -49,6 +61,7 @@ export default function CoursePreview({
     workspace,
     course,
     initialLessonId,
+    progress,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/courses`;
     const courseUrl = `${baseUrl}/${course.id}`;
@@ -62,6 +75,7 @@ export default function CoursePreview({
                 lesson,
                 moduleName: module.name,
                 videoUrl: `${courseUrl}/modules/${module.id}/lessons/${lesson.id}/video`,
+                completeUrl: `${courseUrl}/modules/${module.id}/lessons/${lesson.id}/complete`,
                 index: index++,
             })),
         );
@@ -78,6 +92,21 @@ export default function CoursePreview({
     const active = flat.find((f) => f.lesson.id === activeId) ?? null;
     const prev = active ? flat[active.index - 1] : undefined;
     const next = active ? flat[active.index + 1] : undefined;
+
+    const done = new Set(progress.completed_lesson_ids);
+    const activeDone = active ? done.has(active.lesson.id) : false;
+
+    function setComplete(entry: FlatLesson, complete: boolean) {
+        // Called on the router rather than pulled off it: these are methods on
+        // a class instance, so detaching one loses its `this`. Note also that
+        // delete() takes (url, options) while post() takes (url, data,
+        // options) — passing post's shape to delete drops the options.
+        if (complete) {
+            router.post(entry.completeUrl, {}, { preserveScroll: true });
+        } else {
+            router.delete(entry.completeUrl, { preserveScroll: true });
+        }
+    }
 
     const totalSeconds = flat.reduce(
         (sum, f) => sum + (f.lesson.duration_seconds ?? 0),
@@ -125,21 +154,31 @@ export default function CoursePreview({
                         </p>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
-                        <Link
-                            href={`${baseUrl}?new=1`}
-                            className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
-                        >
-                            <Plus className="h-4 w-4" />
-                            New course
-                        </Link>
+                    <div className="flex shrink-0 items-center gap-3">
+                        {progress.total_lessons > 0 && (
+                            <div className="hidden w-40 sm:block">
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-800">
+                                    <div
+                                        className="h-full rounded-full bg-emerald-600 transition-all"
+                                        style={{
+                                            width: `${progress.percent}%`,
+                                        }}
+                                    />
+                                </div>
+                                <p className="mt-1 text-right font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-500">
+                                    {progress.completed_count}/
+                                    {progress.total_lessons} ·{' '}
+                                    {progress.percent}%
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                     {/* Player + lesson detail */}
                     <div className="space-y-5 lg:col-span-2">
-                        <div className="overflow-hidden rounded-xl bg-zinc-900">
+                        <div className="overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-black/6 dark:ring-white/6">
                             {active?.lesson.video ? (
                                 <video
                                     // Keyed so switching lessons loads the new
@@ -148,6 +187,14 @@ export default function CoursePreview({
                                     src={active.videoUrl}
                                     controls
                                     autoPlay
+                                    // Watching a lesson to the end is the
+                                    // clearest signal it's finished, so it
+                                    // counts without the learner doing anything.
+                                    onEnded={() => {
+                                        if (!activeDone) {
+                                            setComplete(active, true);
+                                        }
+                                    }}
                                     className="aspect-video w-full"
                                 />
                             ) : (
@@ -163,62 +210,120 @@ export default function CoursePreview({
                         </div>
 
                         {active && (
-                            <div className="rounded-xl border border-black/6 bg-white p-5 dark:border-white/6 dark:bg-zinc-900">
-                                <p className={metaClass}>{active.moduleName}</p>
+                            <div className="rounded-xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                                <div className="p-5">
+                                    <div className="flex items-center gap-2">
+                                        <span className="rounded-md bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:bg-zinc-800 dark:text-gray-400">
+                                            {active.moduleName}
+                                        </span>
+                                        {activeDone && (
+                                            <span className="flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-medium tracking-wider text-emerald-700 uppercase dark:bg-emerald-950/40 dark:text-emerald-400">
+                                                <Check className="h-3 w-3" />
+                                                Completed
+                                            </span>
+                                        )}
+                                    </div>
 
-                                <h2 className="mt-1.5 text-[17px] font-semibold text-gray-800 dark:text-gray-100">
-                                    {active.lesson.name}
-                                </h2>
+                                    <h2 className="mt-2 text-[17px] font-semibold text-gray-800 dark:text-gray-100">
+                                        {active.lesson.name}
+                                    </h2>
 
-                                <p className="mt-1 font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
-                                    {active.lesson.duration_seconds
-                                        ? `${clock(active.lesson.duration_seconds)}  `
-                                        : ''}
-                                    Lesson {active.index + 1} of {flat.length}
-                                </p>
-
-                                <div className="mt-4 rounded-lg border border-black/8 px-3 py-2 font-mono text-[11px] text-gray-400 dark:border-white/8 dark:text-gray-500">
-                                    No file or link attached
+                                    <div className="mt-1.5 flex items-center gap-3 font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                                        {active.lesson.duration_seconds && (
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="h-3 w-3" />
+                                                {clock(
+                                                    active.lesson
+                                                        .duration_seconds,
+                                                )}
+                                            </span>
+                                        )}
+                                        <span>
+                                            Lesson {active.index + 1} of{' '}
+                                            {flat.length}
+                                        </span>
+                                    </div>
                                 </div>
 
-                                <div className="mt-4 flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 border-t border-black/6 px-5 py-3 dark:border-white/6">
                                     <button
                                         onClick={() =>
-                                            prev && setActiveId(prev.lesson.id)
+                                            setComplete(active, !activeDone)
                                         }
-                                        disabled={!prev}
-                                        className="flex h-9 items-center rounded-lg border border-black/8 px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-30 dark:border-white/8 dark:text-gray-300 dark:hover:bg-zinc-800"
+                                        className={`flex h-9 items-center gap-1.5 rounded-lg px-4 font-mono! text-[12px]! font-medium transition-all ${
+                                            activeDone
+                                                ? 'border border-emerald-600/20 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-400/20 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                        }`}
                                     >
-                                        Previous
+                                        <Check className="h-4 w-4" />
+                                        {activeDone
+                                            ? 'Completed'
+                                            : 'Mark complete'}
                                     </button>
-                                    <button
-                                        onClick={() =>
-                                            next && setActiveId(next.lesson.id)
-                                        }
-                                        disabled={!next}
-                                        className="flex h-9 items-center rounded-lg border border-black/8 bg-stone-100 px-4 font-mono! text-[12px]! font-medium text-gray-800 transition-all hover:bg-stone-200 disabled:pointer-events-none disabled:opacity-30 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:hover:bg-zinc-700"
-                                    >
-                                        Next lesson
-                                    </button>
-                                    <Link
-                                        href={courseUrl}
-                                        className="ml-2 font-mono text-[12px] text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400"
-                                    >
-                                        Back to outline
-                                    </Link>
+
+                                    <div className="ml-auto flex items-center gap-2">
+                                        <button
+                                            onClick={() =>
+                                                prev &&
+                                                setActiveId(prev.lesson.id)
+                                            }
+                                            disabled={!prev}
+                                            className="flex h-9 items-center gap-1 rounded-lg border border-black/8 px-3 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-30 dark:border-white/8 dark:text-gray-300 dark:hover:bg-zinc-800"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                            Previous
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                next &&
+                                                setActiveId(next.lesson.id)
+                                            }
+                                            disabled={!next}
+                                            className="flex h-9 items-center gap-1 rounded-lg border border-black/8 bg-stone-100 px-3 font-mono! text-[12px]! font-medium text-gray-800 transition-all hover:bg-stone-200 disabled:pointer-events-none disabled:opacity-30 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:hover:bg-zinc-700"
+                                        >
+                                            Next
+                                            <ChevronRight className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 </div>
+
+                                {next && (
+                                    <button
+                                        onClick={() =>
+                                            setActiveId(next.lesson.id)
+                                        }
+                                        className="flex w-full items-center gap-2 border-t border-black/6 px-5 py-2.5 text-left transition-all hover:bg-stone-50 dark:border-white/6 dark:hover:bg-zinc-800/50"
+                                    >
+                                        <span className={metaClass}>
+                                            Up next
+                                        </span>
+                                        <span className="min-w-0 flex-1 truncate text-[13px] text-gray-600 dark:text-gray-300">
+                                            {next.lesson.name}
+                                        </span>
+                                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-300 dark:text-gray-600" />
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
 
                     {/* Outline */}
                     <aside className="lg:col-span-1">
-                        <div className="overflow-hidden rounded-xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-                            <div className="px-4 pt-4 pb-2">
+                        {/* Sticky so the outline stays reachable while the
+                            lesson notes scroll. */}
+                        <div className="overflow-hidden rounded-xl border border-black/6 bg-white lg:sticky lg:top-4 dark:border-white/6 dark:bg-zinc-900">
+                            <div className="border-b border-black/6 px-4 py-3 dark:border-white/6">
                                 <p className={metaClass}>
                                     {course.name} · {flat.length}{' '}
                                     {flat.length === 1 ? 'lesson' : 'lessons'}
                                 </p>
+                                {flat.length > 0 && (
+                                    <p className="mt-0.5 font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                                        {progress.completed_count} of{' '}
+                                        {flat.length} completed
+                                    </p>
+                                )}
                             </div>
 
                             <div className="max-h-[70vh] overflow-y-auto pb-2">
@@ -232,24 +337,32 @@ export default function CoursePreview({
                                             onClick={() =>
                                                 setActiveId(entry.lesson.id)
                                             }
-                                            className={`flex w-full items-center gap-2.5 px-4 py-2 text-left transition-all ${
+                                            className={`flex w-full items-center gap-2.5 border-l-2 py-2 pr-4 pl-3.5 text-left transition-all ${
                                                 isActive
-                                                    ? 'bg-emerald-50 dark:bg-emerald-950/30'
-                                                    : 'hover:bg-stone-50 dark:hover:bg-zinc-800/50'
+                                                    ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30'
+                                                    : 'border-transparent hover:bg-stone-50 dark:hover:bg-zinc-800/50'
                                             }`}
                                         >
-                                            <span
-                                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                                                    isActive
-                                                        ? 'bg-emerald-500'
-                                                        : 'bg-gray-300 dark:bg-gray-600'
-                                                }`}
-                                            />
+                                            {done.has(entry.lesson.id) ? (
+                                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                            ) : (
+                                                <span
+                                                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                                                        isActive
+                                                            ? 'bg-emerald-500'
+                                                            : 'bg-gray-300 dark:bg-gray-600'
+                                                    }`}
+                                                />
+                                            )}
                                             <span
                                                 className={`min-w-0 flex-1 truncate text-[13px] ${
                                                     isActive
-                                                        ? 'text-emerald-700 dark:text-emerald-400'
-                                                        : 'text-gray-600 dark:text-gray-300'
+                                                        ? 'font-medium text-emerald-700 dark:text-emerald-400'
+                                                        : done.has(
+                                                                entry.lesson.id,
+                                                            )
+                                                          ? 'text-gray-400 dark:text-gray-500'
+                                                          : 'text-gray-600 dark:text-gray-300'
                                                 }`}
                                             >
                                                 {entry.lesson.name}
