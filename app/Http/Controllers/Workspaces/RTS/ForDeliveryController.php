@@ -16,7 +16,6 @@ use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
 use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
-use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\User as SystemUser;
@@ -41,6 +40,15 @@ class ForDeliveryController extends Controller
      * Upper bound on comma-separated terms accepted by the RMO search box.
      */
     private const MAX_SEARCH_TERMS = 50;
+
+    /**
+     * How long a call has to last before it counts as connected.
+     *
+     * Anything under this is the dial tone and a hang-up — the network logs it,
+     * but nobody spoke. The hit-rate card is only meaningful if those are kept
+     * out of the numerator.
+     */
+    private const CONNECTED_CALL_MIN_SECONDS = 5;
 
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
@@ -428,6 +436,26 @@ class ForDeliveryController extends Controller
         // Total uses its own base (optionally filtered via whereHas on confirmed_by)
         $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
+        // The call cards report the workspace's call logs for the delivery date,
+        // flat: every call that day, whether or not the number it reached
+        // belongs to an order on this page and whoever placed it. Deliberately
+        // not tied to the order set or to a Pancake user yet — those are
+        // separate questions, and answering them here would make the figures
+        // move for reasons the cards don't explain.
+        //
+        // One query per card. Each is independently readable and independently
+        // debuggable — run any one of them on its own and it answers exactly
+        // the question its card asks.
+        $totalCallLogs = $this->callLogStat($workspace, $deliveryDate, 'COUNT(*)');
+
+        $totalCallDuration = $this->callLogStat($workspace, $deliveryDate, 'COALESCE(SUM(duration), 0)');
+
+        $connectedCallLogs = $this->callLogStat(
+            $workspace,
+            $deliveryDate,
+            'COUNT(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)'
+        );
+
         // The other 4 stats share $statsBase — roll them into a single aggregate query
         $statusBreakdown = $statsBase
             ->selectRaw("
@@ -465,6 +493,9 @@ class ForDeliveryController extends Controller
             'delivered_count' => $totalDelivered,
             'returning_count' => $totalReturning,
             'problematic_count' => $totalProblematic,
+            'total_call_logs_count' => $totalCallLogs,
+            'total_call_duration' => $totalCallDuration,
+            'connected_call_logs_count' => $connectedCallLogs,
             'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
             'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
             'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
@@ -681,6 +712,29 @@ class ForDeliveryController extends Controller
             ->get(['id', 'user_id', 'assignee_user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
 
         return response()->json($this->namedCallers($logs));
+    }
+
+    /**
+     * One call-log figure for the RMO stat cards.
+     *
+     * Straight off call_logs for the workspace and delivery date — no join to
+     * the orders on the page, no filter on who placed the call. A day's calls
+     * are reported as a day's calls, so a workspace with no orders loaded yet
+     * still gets real numbers.
+     *
+     * $aggregate is what to measure: COUNT(*), SUM(duration), or either of
+     * those narrowed to connected calls. One card, one call, one query — the
+     * cards don't share an aggregate, so a change to any one of them can't
+     * move the others.
+     */
+    private function callLogStat(Workspace $workspace, string $deliveryDate, string $aggregate): int
+    {
+        $value = CallLog::where('workspace_id', $workspace->id)
+            ->whereDate('call_date', $deliveryDate)
+            ->selectRaw($aggregate.' as value')
+            ->value('value');
+
+        return (int) ($value ?? 0);
     }
 
     /**

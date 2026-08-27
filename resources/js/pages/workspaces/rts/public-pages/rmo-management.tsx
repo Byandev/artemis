@@ -112,6 +112,12 @@ interface Props {
     delivered_count: number;
     returning_count: number;
     problematic_count: number;
+    /** Call attempts — every customer and rider call on the listed orders. */
+    total_call_logs_count: number;
+    /** Combined talk time of those calls, in seconds. */
+    total_call_duration: number;
+    /** How many of those calls lasted at least 5 seconds. */
+    connected_call_logs_count: number;
     /**
      * Workspace-wide switch stored on rmo_settings. When on, every past
      * delivery date is assignable / re-statusable.
@@ -359,6 +365,9 @@ function RmoManagement({
     delivered_count,
     returning_count,
     problematic_count,
+    total_call_logs_count,
+    total_call_duration,
+    connected_call_logs_count,
     enable_edit_previous_day = false,
     enable_bulk_status_update = false,
     enable_auto_tag_status = false,
@@ -1668,6 +1677,11 @@ function RmoManagement({
                             delivered_count={delivered_count}
                             returning_count={returning_count}
                             problematic_count={problematic_count}
+                            total_call_logs_count={total_call_logs_count}
+                            total_call_duration={total_call_duration}
+                            connected_call_logs_count={
+                                connected_call_logs_count
+                            }
                         />
                     </div>
                 )}
