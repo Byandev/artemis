@@ -87,6 +87,16 @@ export const orderStatusConfig: Record<string, OrderStatusEntry> = {
         text: 'text-indigo-700 dark:text-indigo-400',
         pill: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400',
     },
+    'CX CALL ENDED': {
+        dot: 'bg-teal-500',
+        text: 'text-teal-700 dark:text-teal-400',
+        pill: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400',
+    },
+    'RIDER CALL ENDED': {
+        dot: 'bg-teal-500',
+        text: 'text-teal-700 dark:text-teal-400',
+        pill: 'bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400',
+    },
 };
 
 /**
