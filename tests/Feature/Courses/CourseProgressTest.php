@@ -1,39 +1,9 @@
 <?php
 
-use App\Models\Permission;
-use App\Models\Role;
 use App\Models\User;
-use App\Models\Workspace;
-use Illuminate\Support\Facades\DB;
 use Modules\Courses\Models\Course;
 use Modules\Courses\Models\CourseEnrollment;
 use Modules\Courses\Models\CourseLessonCompletion;
-
-/**
- * A workspace member holding the given permissions. Members attached without a
- * role hold nothing, so anything gated on a permission has to be granted one.
- */
-function memberWithPermissions(Workspace $workspace, array $names): User
-{
-    $user = User::factory()->create();
-
-    $role = Role::create([
-        'workspace_id' => $workspace->id,
-        'name' => 'Role '.uniqid(),
-    ]);
-
-    foreach ($names as $name) {
-        $permission = Permission::firstOrCreate(['name' => $name], ['category' => 'Courses']);
-        DB::table('role_permissions')->insert([
-            'role_id' => $role->id,
-            'permission_id' => $permission->id,
-        ]);
-    }
-
-    $workspace->users()->attach($user->id, ['role_id' => $role->id]);
-
-    return $user;
-}
 
 /** A course with two lessons across one module, plus its URLs. */
 function progressCourse(): array
@@ -164,7 +134,7 @@ it('keeps one learner\'s progress out of another\'s', function () {
 
     $this->post($oneUrl);
 
-    $other = memberWithPermissions($workspace, ['View Courses']);
+    $other = makeMemberWithPermissions($workspace, ['View Courses']);
 
     $this->actingAs($other)->get($base)->assertOk()->assertInertia(
         fn ($page) => $page
@@ -261,7 +231,7 @@ it('lists only learners who have started the course', function () {
     ['user' => $owner, 'workspace' => $workspace, 'base' => $base, 'oneUrl' => $oneUrl] = progressCourse();
 
     // Attached to the workspace but has never opened this course.
-    memberWithPermissions($workspace, ['View Courses']);
+    makeMemberWithPermissions($workspace, ['View Courses']);
 
     $this->post($oneUrl);
 
@@ -276,7 +246,7 @@ it('lists only learners who have started the course', function () {
 it('lists someone who started but has completed nothing, at 0%', function () {
     ['workspace' => $workspace, 'base' => $base] = progressCourse();
 
-    $starter = memberWithPermissions($workspace, ['View Courses']);
+    $starter = makeMemberWithPermissions($workspace, ['View Courses']);
 
     // Pressing Start is what counts as having begun.
     $this->actingAs($starter)->post("{$base}/start")->assertRedirect();

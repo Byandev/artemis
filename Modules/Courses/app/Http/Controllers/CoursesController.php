@@ -29,6 +29,11 @@ class CoursesController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewCourses->value, $workspace);
 
+        // Someone who can edit courses is administering them and sees the whole
+        // catalogue, drafts included; everyone else sees the published courses
+        // only — all of them, so they can still find something to start.
+        $canManage = $request->user()->hasPermission(Permission::EditCourses->value, $workspace);
+
         // Aggregated once for the whole page rather than per card, so the grid
         // costs a fixed handful of queries however many courses there are.
         $lessonTotals = $this->lessonTotalsByCourse($workspace);
@@ -36,7 +41,18 @@ class CoursesController extends Controller
         $completions = $this->completionsByCourse($workspace);
         $memberCount = max(1, $workspace->users()->count());
 
+        $startedIds = $this->startedCourseIds($request, $workspace);
+
+        $search = trim((string) $request->string('search'));
+        $categories = array_filter((array) $request->input('categories', []));
+
         $courses = Course::ofWorkspace($workspace)
+            ->unless($canManage, fn ($q) => $q->where('status', 'published'))
+            ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('category', 'like', "%{$search}%")))
+            ->when($categories !== [], fn ($q) => $q->whereIn('category', $categories))
             // `media` is eager loaded so the cover column doesn't fire a query
             // per row on a full page of courses.
             ->with('media')
@@ -62,9 +78,17 @@ class CoursesController extends Controller
         return Inertia::render('workspaces/courses/index', [
             'workspace' => $workspace->only(['id', 'name', 'slug']),
             'courses' => $courses,
-            'stats' => $this->workspaceStats($workspace, $lessonTotals, $completions, $memberCount),
+            'stats' => $canManage
+                ? $this->workspaceStats($workspace, $lessonTotals, $completions, $memberCount)
+                : $this->learnerStats($request, $workspace, $startedIds, $lessonTotals),
             'leaderboard' => $this->completionLeaderboard($workspace, array_sum($lessonTotals)),
             'openCreateOnMount' => $request->boolean('new'),
+            // Echoed back so the toolbar can render what is currently applied.
+            'filters' => [
+                'search' => $search,
+                'categories' => array_values($categories),
+            ],
+            'categoryOptions' => $this->categoryOptions($workspace, $canManage),
         ]);
     }
 
@@ -126,6 +150,80 @@ class CoursesController extends Controller
     }
 
     /**
+     * Categories actually in use, so the filter never offers an option that
+     * would return nothing. Scoped to what the viewer can see.
+     *
+     * @return array<int, string>
+     */
+    private function categoryOptions(Workspace $workspace, bool $canManage): array
+    {
+        return Course::ofWorkspace($workspace)
+            ->unless($canManage, fn ($q) => $q->where('status', 'published'))
+            ->whereNotNull('category')
+            ->where('category', '!=', '')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category')
+            ->all();
+    }
+
+    /**
+     * Ids of the courses in this workspace the current user has started.
+     *
+     * @return array<int, int>
+     */
+    private function startedCourseIds(Request $request, Workspace $workspace): array
+    {
+        return DB::table('course_enrollments')
+            ->join('courses', 'course_enrollments.course_id', '=', 'courses.id')
+            ->where('courses.workspace_id', $workspace->id)
+            ->where('course_enrollments.user_id', $request->user()->getKey())
+            ->pluck('course_enrollments.course_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    /**
+     * What a learner sees instead of the team-wide figures: the catalogue open
+     * to them, how much of it they have picked up, and how far through those
+     * they are. A team average would say nothing about their own standing.
+     *
+     * @param  array<int, int>  $startedIds
+     * @param  array<int, int>  $lessonTotals
+     * @return array<string, mixed>
+     */
+    private function learnerStats(Request $request, Workspace $workspace, array $startedIds, array $lessonTotals): array
+    {
+        // Only lessons inside the courses they started count, so finishing
+        // everything they picked up reads as 100% rather than a fraction of
+        // the whole catalogue.
+        $lessons = array_sum(array_intersect_key($lessonTotals, array_flip($startedIds)));
+
+        $done = $startedIds === [] ? 0 : DB::table('course_lesson_completions')
+            ->join('course_lessons', 'course_lesson_completions.course_lesson_id', '=', 'course_lessons.id')
+            ->join('course_modules', 'course_lessons.course_module_id', '=', 'course_modules.id')
+            ->whereIn('course_modules.course_id', $startedIds)
+            ->where('course_lesson_completions.user_id', $request->user()->getKey())
+            ->count();
+
+        $published = Course::ofWorkspace($workspace)->where('status', 'published')->count();
+
+        return [
+            'can_manage' => false,
+            // Every published course, which is what their list shows.
+            'total_courses' => $published,
+            'draft_courses' => 0,
+            'active_courses' => $published,
+            // The ones they have actually picked up.
+            'my_courses' => count($startedIds),
+            'total_lessons' => $lessons,
+            'completed_lessons' => $done,
+            'avg_completion' => 0,
+            'my_completion' => $lessons > 0 ? (int) round($done / $lessons * 100) : 0,
+        ];
+    }
+
+    /**
      * @param  array<int, int>  $lessonTotals
      * @param  array<int, int>  $completions
      * @return array<string, mixed>
@@ -137,10 +235,14 @@ class CoursesController extends Controller
         $lessons = array_sum($lessonTotals);
 
         return [
+            'can_manage' => true,
             'total_courses' => $total,
             'draft_courses' => $total - $published,
             'active_courses' => $published,
             'total_lessons' => $lessons,
+            'my_courses' => 0,
+            'completed_lessons' => 0,
+            'my_completion' => 0,
             'avg_completion' => $lessons > 0
                 ? (int) round(array_sum($completions) / ($memberCount * $lessons) * 100)
                 : 0,
