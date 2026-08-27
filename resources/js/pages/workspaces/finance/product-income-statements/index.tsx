@@ -55,7 +55,7 @@ interface ProductRow {
  * orders that carry no line items at all.
  */
 interface UnresolvedRow {
-    sku: string | null;
+    label: string | null;
     delivered_orders: number;
     delivered_units: number;
     delivered_amount: number;
@@ -277,7 +277,7 @@ export default function ProductIncomeStatements({
     const finance = `/workspaces/${workspace.slug}/finance`;
     const [cogsView, setCogsView] = useState<CogsView>('delivered');
     const [unresolvedOpen, setUnresolvedOpen] = useState(false);
-    const unmappedSkus = unresolvedRows.filter((u) => u.sku !== null).length;
+    const unmappedSkus = unresolvedRows.filter((u) => u.label !== null).length;
     const COLUMNS = buildColumns(rates, cogsView, gencysPartner);
     const named = products.filter((p) => p.product_id !== null);
 
@@ -568,15 +568,15 @@ export default function ProductIncomeStatements({
                                                                         (u) => (
                                                                             <tr
                                                                                 key={
-                                                                                    u.sku ??
+                                                                                    u.label ??
                                                                                     'no-items'
                                                                                 }
                                                                             >
                                                                                 <td className="py-1 pr-6">
-                                                                                    {u.sku ? (
+                                                                                    {u.label ? (
                                                                                         <span className="text-gray-800 dark:text-gray-100">
                                                                                             {
-                                                                                                u.sku
+                                                                                                u.label
                                                                                             }
                                                                                         </span>
                                                                                     ) : (

@@ -26,6 +26,9 @@ function uis_order(int $id, $workspace, string $cell, array $attrs = []): Gencys
 
 function uis_statement($workspace): IncomeStatement
 {
+    // These fixtures seed gencys orders, and the flag selects the source.
+    $workspace->update(['is_gencys_partner' => true]);
+
     return IncomeStatement::create([
         'workspace_id' => $workspace->id,
         'period_month' => '2026-05-01',
@@ -140,15 +143,15 @@ test('orders whose intern name matches nobody land in Unassigned', function () {
     // The breakdown says which names are behind it, biggest first.
     $rows = collect($service->unassignedBreakdown($statement));
 
-    expect($rows->pluck('cell'))->not->toContain('Juan Dela Cruz');
+    expect($rows->pluck('label'))->not->toContain('Juan Dela Cruz');
 
-    $ghost = $rows->firstWhere('cell', 'Ghost Intern');
+    $ghost = $rows->firstWhere('label', 'Ghost Intern');
     expect((int) $ghost['delivered_orders'])->toBe(2)
         ->and((float) $ghost['delivered_amount'])->toBe(500.0)
         ->and((float) $ghost['shipping_fee'])->toBe(50.0)
-        ->and($rows->first()['cell'])->toBe('Ghost Intern')
+        ->and($rows->first()['label'])->toBe('Ghost Intern')
         // The nameless order comes back under a null cell.
-        ->and($rows->firstWhere('cell', null)['delivered_amount'])->toBe(70.0);
+        ->and($rows->firstWhere('label', null)['delivered_amount'])->toBe(70.0);
 
     // And the breakdown adds up to the row it explains.
     expect(round($rows->sum('delivered_amount'), 2))->toBe((float) $unassigned->delivered_amount)
@@ -189,7 +192,7 @@ test('the user statement page reads the saved rows', function () {
             ->where('total.cod_fee', fn ($v) => (float) $v === 20.0)
             ->where('rates.cod', fn ($v) => (float) $v === 0.02)
             // The Unassigned row can be opened up to show what's behind it.
-            ->where('unassigned', fn ($rows) => collect($rows)->pluck('cell')->contains('Ghost Intern'))
+            ->where('unassigned', fn ($rows) => collect($rows)->pluck('label')->contains('Ghost Intern'))
         );
 
     // The page built the snapshot on first view.

@@ -1,0 +1,222 @@
+<?php
+
+namespace Modules\Finance\Statements\Sources;
+
+use App\Models\Workspace;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Modules\Finance\Statements\Contracts\StatementOrderSource;
+use Modules\Finance\Statements\OrderTotals;
+
+/**
+ * Orders as pancake records them, for workspaces that aren't gencys partners.
+ *
+ * Delivery and shipping are dated by `delivered_at` and `shipped_at`, and
+ * revenue is `final_amount` — net of discount, matching what the gencys side
+ * calls `price_final`. Pancake records no cost of goods against an order, so
+ * the delivered-COGS figure is absent rather than zero-because-nothing-shipped.
+ *
+ * Attribution is per order, not per line item: an order belongs to one shop and
+ * one page, so its product and its user follow directly and nothing is split.
+ */
+final class PancakeOrderSource implements StatementOrderSource
+{
+    public function label(): string
+    {
+        return 'pancake orders';
+    }
+
+    public function workspaceTotals(Workspace $workspace, Carbon $from, Carbon $to): OrderTotals
+    {
+        $delivered = $this->delivered($workspace, $from, $to)
+            ->selectRaw('COUNT(*) as orders, COALESCE(SUM(final_amount), 0) as revenue')
+            ->first();
+
+        $shipped = $this->shipped($workspace, $from, $to)
+            ->selectRaw('COUNT(*) as orders, COALESCE(SUM(shipping_fee), 0) as shipping')
+            ->first();
+
+        return new OrderTotals(
+            deliveredOrders: (int) $delivered->orders,
+            deliveredUnits: $this->units($workspace, $from, $to),
+            deliveredAmount: round((float) $delivered->revenue, 2),
+            deliveredCogs: 0.0,
+            shippedOrders: (int) $shipped->orders,
+            shippingFee: round((float) $shipped->shipping, 2),
+        );
+    }
+
+    public function totalsByProduct(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        // An order's product is its shop's, so the grouping is a plain join.
+        return $this->groupedTotals(
+            $workspace, $from, $to,
+            fn ($q) => $q->leftJoin('shops as sh', 'sh.id', '=', 'pancake_orders.shop_id')
+                ->selectRaw('sh.product_id as grouping_key'),
+        );
+    }
+
+    public function unresolvedProductDetail(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        return $this->unattributedDetail(
+            $workspace, $from, $to,
+            fn ($q) => $q->leftJoin('shops as sh', 'sh.id', '=', 'pancake_orders.shop_id')
+                ->selectRaw('sh.product_id as grouping_key, sh.name as label'),
+        );
+    }
+
+    public function totalsByUser(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        // An order is credited to whoever owns the page it came in on.
+        return $this->groupedTotals(
+            $workspace, $from, $to,
+            fn ($q) => $q->leftJoin('pages as pg', 'pg.id', '=', 'pancake_orders.page_id')
+                ->selectRaw('pg.owner_id as grouping_key'),
+        );
+    }
+
+    public function unassignedUserDetail(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        return $this->unattributedDetail(
+            $workspace, $from, $to,
+            fn ($q) => $q->leftJoin('pages as pg', 'pg.id', '=', 'pancake_orders.page_id')
+                ->selectRaw('pg.owner_id as grouping_key, pg.name as label'),
+        );
+    }
+
+    /**
+     * Delivered and shipped figures per grouping key, folded together. The two
+     * are separate queries because they cover different orders.
+     *
+     * @return array<string, OrderTotals>
+     */
+    private function groupedTotals(Workspace $workspace, Carbon $from, Carbon $to, callable $group): array
+    {
+        $totals = [];
+
+        $delivered = $group($this->delivered($workspace, $from, $to))
+            ->selectRaw('COUNT(*) as orders, COALESCE(SUM(pancake_orders.final_amount), 0) as revenue')
+            ->groupBy('grouping_key')
+            ->get();
+
+        foreach ($delivered as $row) {
+            $key = $this->key($row->grouping_key);
+            $totals[$key] = ($totals[$key] ?? OrderTotals::empty())->plus(new OrderTotals(
+                deliveredOrders: (int) $row->orders,
+                deliveredAmount: round((float) $row->revenue, 2),
+            ));
+        }
+
+        foreach ($this->unitsByKey($workspace, $from, $to, $group) as $key => $units) {
+            $totals[$key] = ($totals[$key] ?? OrderTotals::empty())
+                ->plus(new OrderTotals(deliveredUnits: $units));
+        }
+
+        $shipped = $group($this->shipped($workspace, $from, $to))
+            ->selectRaw('COUNT(*) as orders, COALESCE(SUM(pancake_orders.shipping_fee), 0) as shipping')
+            ->groupBy('grouping_key')
+            ->get();
+
+        foreach ($shipped as $row) {
+            $key = $this->key($row->grouping_key);
+            $totals[$key] = ($totals[$key] ?? OrderTotals::empty())->plus(new OrderTotals(
+                shippedOrders: (int) $row->orders,
+                shippingFee: round((float) $row->shipping, 2),
+            ));
+        }
+
+        return $totals;
+    }
+
+    /**
+     * The rows behind an unattributed bucket, labelled by whatever the source
+     * failed to match on, biggest first.
+     *
+     * @return list<array{label:?string, delivered_orders:int, delivered_amount:float, shipped_orders:int, shipping_fee:float}>
+     */
+    private function unattributedDetail(Workspace $workspace, Carbon $from, Carbon $to, callable $group): array
+    {
+        $rows = [];
+
+        $delivered = $group($this->delivered($workspace, $from, $to))
+            ->selectRaw('COUNT(*) as orders, COALESCE(SUM(pancake_orders.final_amount), 0) as revenue')
+            ->groupBy('grouping_key', 'label')
+            ->get();
+
+        foreach ($delivered as $row) {
+            if ($this->key($row->grouping_key) !== '') {
+                continue;
+            }
+            $rows[(string) $row->label] = [
+                'label' => $row->label ?: null,
+                'delivered_orders' => (int) $row->orders,
+                'delivered_amount' => round((float) $row->revenue, 2),
+                'shipped_orders' => 0,
+                'shipping_fee' => 0.0,
+            ];
+        }
+
+        $shipped = $group($this->shipped($workspace, $from, $to))
+            ->selectRaw('COUNT(*) as orders, COALESCE(SUM(pancake_orders.shipping_fee), 0) as shipping')
+            ->groupBy('grouping_key', 'label')
+            ->get();
+
+        foreach ($shipped as $row) {
+            if ($this->key($row->grouping_key) !== '') {
+                continue;
+            }
+            $rows[(string) $row->label] ??= [
+                'label' => $row->label ?: null,
+                'delivered_orders' => 0,
+                'delivered_amount' => 0.0,
+                'shipped_orders' => 0,
+                'shipping_fee' => 0.0,
+            ];
+            $rows[(string) $row->label]['shipped_orders'] = (int) $row->orders;
+            $rows[(string) $row->label]['shipping_fee'] = round((float) $row->shipping, 2);
+        }
+
+        usort($rows, fn ($a, $b) => [$b['delivered_amount'], $b['shipping_fee']] <=> [$a['delivered_amount'], $a['shipping_fee']]);
+
+        return $rows;
+    }
+
+    /** @return array<string, int> */
+    private function unitsByKey(Workspace $workspace, Carbon $from, Carbon $to, callable $group): array
+    {
+        return $group($this->delivered($workspace, $from, $to))
+            ->join('pancake_order_items as poi', 'poi.order_id', '=', 'pancake_orders.id')
+            ->selectRaw('COALESCE(SUM(GREATEST(COALESCE(poi.quantity, 1), 1)), 0) as units')
+            ->groupBy('grouping_key')
+            ->get()
+            ->mapWithKeys(fn ($r) => [$this->key($r->grouping_key) => (int) $r->units])
+            ->all();
+    }
+
+    private function units(Workspace $workspace, Carbon $from, Carbon $to): int
+    {
+        return (int) $this->delivered($workspace, $from, $to)
+            ->join('pancake_order_items as poi', 'poi.order_id', '=', 'pancake_orders.id')
+            ->sum(DB::raw('GREATEST(COALESCE(poi.quantity, 1), 1)'));
+    }
+
+    private function delivered(Workspace $workspace, Carbon $from, Carbon $to)
+    {
+        return DB::table('pancake_orders')
+            ->where('pancake_orders.workspace_id', $workspace->id)
+            ->whereBetween('pancake_orders.delivered_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()]);
+    }
+
+    private function shipped(Workspace $workspace, Carbon $from, Carbon $to)
+    {
+        return DB::table('pancake_orders')
+            ->where('pancake_orders.workspace_id', $workspace->id)
+            ->whereBetween('pancake_orders.shipped_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()]);
+    }
+
+    /** '' for anything that didn't resolve, matching the contract. */
+    private function key(mixed $value): string
+    {
+        return $value === null ? '' : (string) (int) $value;
+    }
+}

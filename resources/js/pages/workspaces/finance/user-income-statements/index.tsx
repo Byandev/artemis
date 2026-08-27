@@ -55,7 +55,7 @@ interface UserRow {
  * delivered, or the other way round; a null cell is orders with no name at all.
  */
 interface UnassignedRow {
-    cell: string | null;
+    label: string | null;
     delivered_orders: number;
     delivered_amount: number;
     shipped_orders: number;
@@ -275,7 +275,7 @@ export default function UserIncomeStatements({
     const finance = `/workspaces/${workspace.slug}/finance`;
     const [cogsView, setCogsView] = useState<CogsView>('delivered');
     const [unassignedOpen, setUnassignedOpen] = useState(false);
-    const unlinkedCells = unassignedRows.filter((u) => u.cell !== null).length;
+    const unlinkedCells = unassignedRows.filter((u) => u.label !== null).length;
     const COLUMNS = buildColumns(rates, cogsView, gencysPartner);
     const named = users.filter((u) => u.user_id !== null);
 
@@ -563,15 +563,15 @@ export default function UserIncomeStatements({
                                                                         (u) => (
                                                                             <tr
                                                                                 key={
-                                                                                    u.cell ??
+                                                                                    u.label ??
                                                                                     'blank'
                                                                                 }
                                                                             >
                                                                                 <td className="py-1 pr-6">
-                                                                                    {u.cell ? (
+                                                                                    {u.label ? (
                                                                                         <span className="text-gray-800 dark:text-gray-100">
                                                                                             {
-                                                                                                u.cell
+                                                                                                u.label
                                                                                             }
                                                                                         </span>
                                                                                     ) : (
