@@ -8,6 +8,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
 import { AlertTriangle, ArrowLeft, HelpCircle } from 'lucide-react';
+import { useState } from 'react';
 
 interface StatementContext {
     id: number;
@@ -64,6 +65,11 @@ const CARD =
 const BTN =
     'flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 px-3 font-mono text-[12px] text-gray-600 transition-all hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700';
 const COL = 'px-4 py-3 text-right text-[12px] whitespace-nowrap tabular-nums';
+
+// The frozen first column. The shadow stands in for a right border, which
+// border-collapse drops once a cell is sticky.
+const FROZEN =
+    'sticky left-0 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.06)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.06)]';
 const HEAD =
     'px-4 py-3 text-right text-[10px] font-semibold tracking-wider text-gray-400 uppercase whitespace-nowrap';
 
@@ -74,10 +80,25 @@ const HEAD =
  */
 const pct = (fraction: number) => `${Number((fraction * 100).toFixed(4))}%`;
 
-const buildColumns = (rates: {
-    cod: number;
-    vat: number;
-}): {
+/**
+ * Which side of cost-of-goods the table is showing. They answer different
+ * questions — what was sold this month, or what was purchased into stock — and
+ * putting both up at once made the row hard to read, so it's one or the other.
+ */
+type CogsView = 'delivered' | 'bought';
+
+const COGS_VIEWS: { value: CogsView; label: string }[] = [
+    { value: 'delivered', label: 'Delivered COGS' },
+    { value: 'bought', label: 'Bought COGS' },
+];
+
+const buildColumns = (
+    rates: {
+        cod: number;
+        vat: number;
+    },
+    cogsView: CogsView,
+): {
     label: string;
     help: string;
     render: (r: ProductRow) => string;
@@ -124,22 +145,29 @@ const buildColumns = (rates: {
         help: `VAT on the COD fee — ${pct(rates.vat)} of the fee itself, not of the delivered amount.`,
         render: (r) => fmt(r.cod_fee_vat),
     },
-    {
-        label: 'Bought COGS',
-        help: 'Cost of Goods purchases tagged to this product this month — stock bought, which is not the same as stock sold.',
-        render: (r) => fmt(r.total_bought_cogs),
-    },
-    {
-        label: 'Bought COGS Delivery Fee',
-        help: 'Freight paid on those purchases, from “Delivery of COG” transactions tagged to this product.',
-        render: (r) => fmt(r.total_bought_cogs_delivery_fee),
-    },
-    {
-        label: 'Delivered COGS',
-        help: 'Cost of the goods that actually shipped, taken from the orders’ own cost figures and divided across a multi-product parcel the same way revenue is.',
-        render: (r) => fmt(r.total_delivered_cogs),
-        emphasis: true,
-    },
+    ...(cogsView === 'bought'
+        ? [
+              {
+                  label: 'Bought COGS',
+                  help: 'Cost of Goods purchases tagged to this product this month — stock bought, which is not the same as stock sold.',
+                  render: (r: ProductRow) => fmt(r.total_bought_cogs),
+                  emphasis: true,
+              },
+              {
+                  label: 'Bought COGS Delivery Fee',
+                  help: 'Freight paid on those purchases, from “Delivery of COG” transactions tagged to this product.',
+                  render: (r: ProductRow) =>
+                      fmt(r.total_bought_cogs_delivery_fee),
+              },
+          ]
+        : [
+              {
+                  label: 'Delivered COGS',
+                  help: 'Cost of the goods that actually shipped, taken from the orders’ own cost figures and divided across a multi-product parcel the same way revenue is.',
+                  render: (r: ProductRow) => fmt(r.total_delivered_cogs),
+                  emphasis: true,
+              },
+          ]),
 ];
 
 export default function ProductIncomeStatements({
@@ -151,7 +179,8 @@ export default function ProductIncomeStatements({
     missingUnitCodes,
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
-    const COLUMNS = buildColumns(rates);
+    const [cogsView, setCogsView] = useState<CogsView>('delivered');
+    const COLUMNS = buildColumns(rates, cogsView);
     const named = products.filter((p) => p.product_id !== null);
 
     // The cost of what shipped against what was bought — the gap is inventory
@@ -209,16 +238,44 @@ export default function ProductIncomeStatements({
                                 {named.length === 1 ? 'product' : 'products'}
                             </div>
                         </div>
-                        <span className="rounded-full border border-black/6 px-2.5 py-0.5 text-[10px] tracking-wider text-gray-400 uppercase dark:border-white/6">
-                            Saved
-                        </span>
+                        <div className="flex items-center gap-3">
+                            <div
+                                role="group"
+                                aria-label="Cost of goods view"
+                                className="flex items-center gap-0.5 rounded-lg border border-black/6 bg-stone-50 p-0.5 dark:border-white/6 dark:bg-zinc-800"
+                            >
+                                {COGS_VIEWS.map((v) => {
+                                    const active = cogsView === v.value;
+                                    return (
+                                        <button
+                                            key={v.value}
+                                            type="button"
+                                            aria-pressed={active}
+                                            onClick={() => setCogsView(v.value)}
+                                            className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${
+                                                active
+                                                    ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-900 dark:text-gray-100'
+                                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                            }`}
+                                        >
+                                            {v.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            <span className="rounded-full border border-black/6 px-2.5 py-0.5 text-[10px] tracking-wider text-gray-400 uppercase dark:border-white/6">
+                                Saved
+                            </span>
+                        </div>
                     </div>
 
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-black/6 dark:border-white/6">
-                                    <th className="px-5 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
+                                    <th
+                                        className={`${FROZEN} z-20 bg-white px-5 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase dark:bg-zinc-900`}
+                                    >
                                         Product
                                     </th>
                                     {COLUMNS.map((c, i) => (
@@ -267,11 +324,17 @@ export default function ProductIncomeStatements({
                                             key={r.product_id ?? 'unresolved'}
                                             className={
                                                 unresolved
-                                                    ? 'bg-amber-50/70 dark:bg-amber-500/10'
-                                                    : 'transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/40'
+                                                    ? 'group bg-amber-50/70 dark:bg-amber-500/10'
+                                                    : 'group transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/40'
                                             }
                                         >
-                                            <td className="py-3 pr-4 pl-5">
+                                            <td
+                                                className={`${FROZEN} py-3 pr-4 pl-5 ${
+                                                    unresolved
+                                                        ? 'bg-amber-50 dark:bg-amber-950'
+                                                        : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
+                                                }`}
+                                            >
                                                 <div className="flex items-center gap-2">
                                                     {unresolved && (
                                                         <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
@@ -314,7 +377,9 @@ export default function ProductIncomeStatements({
                             </tbody>
                             <tfoot>
                                 <tr className="border-t border-black/6 bg-stone-100 dark:border-white/6 dark:bg-zinc-800/60">
-                                    <td className="py-3.5 pr-4 pl-5 text-[12px] font-semibold tracking-wide text-gray-700 uppercase dark:text-gray-200">
+                                    <td
+                                        className={`${FROZEN} bg-stone-100 py-3.5 pr-4 pl-5 text-[12px] font-semibold tracking-wide text-gray-700 uppercase dark:bg-zinc-800 dark:text-gray-200`}
+                                    >
                                         Total
                                     </td>
                                     {COLUMNS.map((c, i) => (
