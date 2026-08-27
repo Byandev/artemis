@@ -30,7 +30,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ColumnDef, RowSelectionState } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
@@ -174,6 +174,13 @@ export default function TransactionsIndex({
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/transactions`;
+    // The list URL as it stands (filters, sort, page) so a save on the edit
+    // screen lands back on the same view instead of an unfiltered first page.
+    const currentUrl = usePage().url;
+    const returnTo = useMemo(
+        () => encodeURIComponent(currentUrl),
+        [currentUrl],
+    );
     const canCreateTransactions = usePermission(
         PERMISSIONS.CreateFinanceTransactions,
     );
@@ -677,7 +684,7 @@ export default function TransactionsIndex({
                                       {canEditTransactions && (
                                           <DropdownMenuItem asChild>
                                               <Link
-                                                  href={`${baseUrl}/${row.original.id}/edit`}
+                                                  href={`${baseUrl}/${row.original.id}/edit?return_to=${returnTo}`}
                                               >
                                                   <Pencil className="mr-2 h-3.5 w-3.5" />{' '}
                                                   Edit
