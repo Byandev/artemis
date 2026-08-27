@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A saved per-product slice of an {@see IncomeStatement} — one row per product
  * for the month, workspace-wide across every intern (plus one row with a null
- * product_id for delivered orders that resolve to no product). Rebuilt whenever
+ * product_id for delivered items that resolve to no product). Rebuilt whenever
  * the parent statement is saved or regenerated.
  *
  * Bought vs delivered are deliberately separate: `total_bought_cogs` (and the
@@ -24,16 +24,28 @@ class ProductIncomeStatement extends Model
         'income_statement_id',
         'product_id',
         'product_name',
-        'delivered_count',
+        'delivered_orders',
+        'delivered_units',
         'delivered_amount',
+        'ad_spent',
+        'shipped_orders',
+        'total_shipping_fee',
+        'cod_fee',
+        'cod_fee_vat',
         'total_bought_cogs',
         'total_bought_cogs_delivery_fee',
         'total_delivered_cogs',
     ];
 
     protected $casts = [
-        'delivered_count' => 'integer',
+        'delivered_orders' => 'integer',
+        'delivered_units' => 'integer',
         'delivered_amount' => 'decimal:2',
+        'ad_spent' => 'decimal:2',
+        'shipped_orders' => 'integer',
+        'total_shipping_fee' => 'decimal:2',
+        'cod_fee' => 'decimal:2',
+        'cod_fee_vat' => 'decimal:2',
         'total_bought_cogs' => 'decimal:2',
         'total_bought_cogs_delivery_fee' => 'decimal:2',
         'total_delivered_cogs' => 'decimal:2',

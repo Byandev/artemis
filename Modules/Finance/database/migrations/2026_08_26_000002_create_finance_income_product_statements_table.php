@@ -28,7 +28,7 @@ return new class extends Migration
                 ->constrained('finance_income_statements', indexName: 'fips_statement')
                 ->cascadeOnDelete();
 
-            // Null = delivered orders whose unit codes resolve to no product.
+            // Null = delivered items whose unit codes resolve to no product.
             $table->foreignId('product_id')->nullable()
                 ->constrained('products', indexName: 'fips_product')
                 ->nullOnDelete();
