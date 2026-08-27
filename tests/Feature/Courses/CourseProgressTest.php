@@ -214,8 +214,11 @@ it('leaves the leaderboard empty until someone completes something', function ()
     );
 });
 
-it('reports per-course team completion on each card', function () {
+it('rates a course against the learners enrolled in it', function () {
     ['workspace' => $workspace, 'course' => $course, 'oneUrl' => $oneUrl] = progressCourse();
+
+    // A second member who never enrolled must not drag the rate down.
+    makeMemberWithPermissions($workspace, ['View Courses']);
 
     $this->post($oneUrl);
 
@@ -223,7 +226,36 @@ it('reports per-course team completion on each card', function () {
         fn ($page) => $page
             ->where('courses.data.0.id', $course->id)
             ->where('courses.data.0.lessons_count', 2)
-            ->where('courses.data.0.team_percent', 50),
+            ->where('courses.data.0.enrolled_count', 1)
+            // One enrolled learner, 1 of their 2 lessons done.
+            ->where('courses.data.0.completion_percent', 50),
+    );
+});
+
+it('rates nothing for a course nobody enrolled in', function () {
+    ['workspace' => $workspace] = progressCourse();
+
+    $this->get("/workspaces/{$workspace->slug}/courses")->assertOk()->assertInertia(
+        fn ($page) => $page
+            ->where('courses.data.0.enrolled_count', 0)
+            ->where('courses.data.0.completion_percent', 0)
+            ->where('stats.avg_completion', 0),
+    );
+});
+
+it('averages the completion rate over enrollments, not members', function () {
+    ['workspace' => $workspace, 'oneUrl' => $oneUrl] = progressCourse();
+
+    // Three members, one enrolled. The rate describes the one taking it.
+    makeMemberWithPermissions($workspace, ['View Courses']);
+    makeMemberWithPermissions($workspace, ['View Courses']);
+
+    $this->post($oneUrl);
+
+    $this->get("/workspaces/{$workspace->slug}/courses")->assertOk()->assertInertia(
+        fn ($page) => $page
+            ->where('stats.enrolled_count', 1)
+            ->where('stats.avg_completion', 50),
     );
 });
 
