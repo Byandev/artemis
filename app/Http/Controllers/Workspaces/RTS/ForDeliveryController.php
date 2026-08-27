@@ -456,12 +456,6 @@ class ForDeliveryController extends Controller
             'COUNT(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)'
         );
 
-        $connectedCallDuration = $this->callLogStat(
-            $workspace,
-            $deliveryDate,
-            'COALESCE(SUM(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN duration END), 0)'
-        );
-
         // The other 4 stats share $statsBase — roll them into a single aggregate query
         $statusBreakdown = $statsBase
             ->selectRaw("
@@ -502,7 +496,6 @@ class ForDeliveryController extends Controller
             'total_call_logs_count' => $totalCallLogs,
             'total_call_duration' => $totalCallDuration,
             'connected_call_logs_count' => $connectedCallLogs,
-            'connected_call_duration' => $connectedCallDuration,
             'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
             'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
             'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),

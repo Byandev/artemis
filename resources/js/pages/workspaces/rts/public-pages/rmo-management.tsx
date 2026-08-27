@@ -118,8 +118,6 @@ interface Props {
     total_call_duration: number;
     /** How many of those calls lasted at least 5 seconds. */
     connected_call_logs_count: number;
-    /** Talk time of those answered calls alone, in seconds. */
-    connected_call_duration: number;
     /**
      * Workspace-wide switch stored on rmo_settings. When on, every past
      * delivery date is assignable / re-statusable.
@@ -370,7 +368,6 @@ function RmoManagement({
     total_call_logs_count,
     total_call_duration,
     connected_call_logs_count,
-    connected_call_duration,
     enable_edit_previous_day = false,
     enable_bulk_status_update = false,
     enable_auto_tag_status = false,
@@ -1685,7 +1682,6 @@ function RmoManagement({
                             connected_call_logs_count={
                                 connected_call_logs_count
                             }
-                            connected_call_duration={connected_call_duration}
                         />
                     </div>
                 )}

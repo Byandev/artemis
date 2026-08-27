@@ -72,8 +72,6 @@ interface RmoStatCardsProps {
     total_call_duration?: number;
     /** How many of them lasted long enough to count as answered. */
     connected_call_logs_count?: number;
-    /** Talk time of those answered calls alone, in seconds. */
-    connected_call_duration?: number;
 }
 
 export function RmoStatCards({
@@ -85,7 +83,6 @@ export function RmoStatCards({
     total_call_logs_count,
     total_call_duration,
     connected_call_logs_count,
-    connected_call_duration,
 }: RmoStatCardsProps) {
     const showCallLogs = total_call_logs_count !== undefined;
 
@@ -94,14 +91,11 @@ export function RmoStatCards({
     // No calls means no rate to report — 0% would read as "everyone hung up".
     const hitRate = totalCalls > 0 ? (connectedCalls / totalCalls) * 100 : null;
 
-    // Answered talk time over answered calls — how long a call that actually
-    // connected ran for. Dividing the *total* duration here instead would drag
-    // the unanswered attempts into the numerator, and with a single answered
-    // call it just reprints the Total Call Duration card.
+    // All talk time spread over the calls that were answered — time spent per
+    // conversation actually reached, unanswered attempts included in the
+    // numerator on purpose. Not the mean length of a connected call.
     const avgCallDuration =
-        connectedCalls > 0
-            ? (connected_call_duration ?? 0) / connectedCalls
-            : null;
+        connectedCalls > 0 ? (total_call_duration ?? 0) / connectedCalls : null;
 
     return (
         <div
