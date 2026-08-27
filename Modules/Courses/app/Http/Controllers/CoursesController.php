@@ -39,7 +39,7 @@ class CoursesController extends Controller
         $lessonTotals = $this->lessonTotalsByCourse($workspace);
         $lengths = $this->lengthsByCourse($workspace);
         $completions = $this->completionsByCourse($workspace);
-        $memberCount = max(1, $workspace->users()->count());
+        $enrollments = $this->enrollmentsByCourse($workspace);
 
         $startedIds = $this->startedCourseIds($request, $workspace);
 
@@ -60,17 +60,20 @@ class CoursesController extends Controller
             ->latest()
             ->paginate(15)
             ->withQueryString()
-            ->through(function (Course $course) use ($lessonTotals, $lengths, $completions, $memberCount) {
+            ->through(function (Course $course) use ($lessonTotals, $lengths, $completions, $enrollments) {
                 $lessons = $lessonTotals[$course->id] ?? 0;
+                $enrolled = $enrollments[$course->id] ?? 0;
 
                 return [
                     ...$this->present($course),
                     'lessons_count' => $lessons,
                     'duration_seconds' => $lengths[$course->id] ?? 0,
-                    // Averaging each member's own percentage is the same as
-                    // dividing total completions by (members x lessons).
-                    'team_percent' => $lessons > 0
-                        ? (int) round(($completions[$course->id] ?? 0) / ($memberCount * $lessons) * 100)
+                    'enrolled_count' => $enrolled,
+                    // Averaging each enrolled learner's own percentage is the
+                    // same as dividing their total completions by
+                    // (enrolled x lessons).
+                    'completion_percent' => $lessons > 0 && $enrolled > 0
+                        ? (int) round(($completions[$course->id] ?? 0) / ($enrolled * $lessons) * 100)
                         : 0,
                 ];
             });
@@ -79,7 +82,7 @@ class CoursesController extends Controller
             'workspace' => $workspace->only(['id', 'name', 'slug']),
             'courses' => $courses,
             'stats' => $canManage
-                ? $this->workspaceStats($workspace, $lessonTotals, $completions, $memberCount)
+                ? $this->workspaceStats($workspace, $lessonTotals, $completions, $enrollments)
                 : $this->learnerStats($request, $workspace, $startedIds, $lessonTotals),
             'leaderboard' => $this->completionLeaderboard($workspace, array_sum($lessonTotals)),
             'openCreateOnMount' => $request->boolean('new'),
@@ -125,6 +128,25 @@ class CoursesController extends Controller
             ->where('courses.workspace_id', $workspace->id)
             ->groupBy('course_modules.course_id')
             ->selectRaw('course_modules.course_id as course_id, coalesce(sum(course_lessons.duration_seconds), 0) as aggregate')
+            ->pluck('aggregate', 'course_id')
+            ->map(fn ($n) => (int) $n)
+            ->all();
+    }
+
+    /**
+     * How many people have enrolled in each course. This is the denominator
+     * for a completion rate: a course's rate should describe the people taking
+     * it, not be diluted by everyone who never opened it.
+     *
+     * @return array<int, int>
+     */
+    private function enrollmentsByCourse(Workspace $workspace): array
+    {
+        return DB::table('course_enrollments')
+            ->join('courses', 'course_enrollments.course_id', '=', 'courses.id')
+            ->where('courses.workspace_id', $workspace->id)
+            ->groupBy('course_enrollments.course_id')
+            ->selectRaw('course_enrollments.course_id as course_id, count(*) as aggregate')
             ->pluck('aggregate', 'course_id')
             ->map(fn ($n) => (int) $n)
             ->all();
@@ -210,6 +232,7 @@ class CoursesController extends Controller
 
         return [
             'can_manage' => false,
+            'enrolled_count' => 0,
             // Every published course, which is what their list shows.
             'total_courses' => $published,
             'draft_courses' => 0,
@@ -226,13 +249,26 @@ class CoursesController extends Controller
     /**
      * @param  array<int, int>  $lessonTotals
      * @param  array<int, int>  $completions
+     * @param  array<int, int>  $enrollments
      * @return array<string, mixed>
      */
-    private function workspaceStats(Workspace $workspace, array $lessonTotals, array $completions, int $memberCount): array
+    private function workspaceStats(Workspace $workspace, array $lessonTotals, array $completions, array $enrollments): array
     {
         $total = Course::ofWorkspace($workspace)->count();
         $published = Course::ofWorkspace($workspace)->where('status', 'published')->count();
         $lessons = array_sum($lessonTotals);
+
+        // One enrollment's worth of work is that course's lesson count, so the
+        // denominator is the lessons every enrolled learner took on. Courses
+        // nobody enrolled in contribute nothing either way, rather than
+        // dragging the rate toward zero.
+        $expected = 0;
+
+        foreach ($enrollments as $courseId => $enrolled) {
+            $expected += $enrolled * ($lessonTotals[$courseId] ?? 0);
+        }
+
+        $done = array_sum($completions);
 
         return [
             'can_manage' => true,
@@ -240,12 +276,11 @@ class CoursesController extends Controller
             'draft_courses' => $total - $published,
             'active_courses' => $published,
             'total_lessons' => $lessons,
+            'enrolled_count' => array_sum($enrollments),
             'my_courses' => 0,
             'completed_lessons' => 0,
             'my_completion' => 0,
-            'avg_completion' => $lessons > 0
-                ? (int) round(array_sum($completions) / ($memberCount * $lessons) * 100)
-                : 0,
+            'avg_completion' => $expected > 0 ? (int) round($done / $expected * 100) : 0,
         ];
     }
 

@@ -41,8 +41,10 @@ export interface Course {
     modules_count?: number;
     lessons_count?: number;
     duration_seconds?: number;
-    /** Average completion across every workspace member. */
-    team_percent?: number;
+    /** Learners enrolled in this course. */
+    enrolled_count?: number;
+    /** Average completion across the learners who enrolled. */
+    completion_percent?: number;
     /** Only loaded on the detail page. */
     modules?: CourseModule[];
 }
@@ -70,7 +72,9 @@ export interface CourseStats {
     my_courses: number;
     /** Lessons the learner has finished across the courses they started. */
     completed_lessons: number;
-    /** Team-wide average — managers only. */
+    /** Enrollments across the workspace — the rate's population. */
+    enrolled_count: number;
+    /** Average completion across everyone enrolled — managers only. */
     avg_completion: number;
     /** The learner's own progress across the courses they started. */
     my_completion: number;

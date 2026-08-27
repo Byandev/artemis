@@ -146,13 +146,16 @@ function CourseCard({
                 <div className={TRACK}>
                     <div
                         className={BAR}
-                        style={{ width: `${course.team_percent ?? 0}%` }}
+                        style={{ width: `${course.completion_percent ?? 0}%` }}
                     />
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-[13px] text-gray-500 tabular-nums dark:text-gray-400">
-                        Team {course.team_percent ?? 0}%
+                    <span
+                        className="text-[13px] text-gray-500 tabular-nums dark:text-gray-400"
+                        title={`${plural(course.enrolled_count ?? 0, 'learner')} enrolled`}
+                    >
+                        {course.completion_percent ?? 0}% complete
                     </span>
 
                     <div className="flex items-center gap-1.5">
@@ -323,12 +326,14 @@ export default function CoursesIndex({
 
                     {stats.can_manage ? (
                         <div className={`${CARD} p-5`}>
-                            <p className={LABEL}>Avg Completion</p>
+                            <p className={LABEL}>Avg Completion Rate</p>
                             <p className="mt-1 font-mono text-[22px] font-semibold tracking-tight text-amber-600 tabular-nums dark:text-amber-500">
                                 {stats.avg_completion}%
                             </p>
                             <p className={`mt-0.5 ${MUTED}`}>
-                                team average across all courses
+                                {stats.enrolled_count === 0
+                                    ? 'nobody enrolled yet'
+                                    : `across ${plural(stats.enrolled_count, 'enrollment')}`}
                             </p>
                         </div>
                     ) : (
