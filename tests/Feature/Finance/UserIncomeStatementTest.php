@@ -1,44 +1,67 @@
 <?php
 
+use App\Models\User;
 use Modules\Finance\Models\Account;
+use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
-use Modules\Finance\Models\UserIncomeStatement;
+use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\Intern;
 
-function uisUrl($workspace, string $path = ''): string
+/** A delivered order credited to the given intern cell. */
+function uis_order(int $id, $workspace, string $cell, array $attrs = []): GencysDailySalesOrder
 {
-    return "/workspaces/{$workspace->slug}/finance/user-income-statements{$path}";
-}
-
-function uisOrder($workspace, array $attrs = []): GencysDailySalesOrder
-{
-    static $id = 700000;
-
     return GencysDailySalesOrder::create(array_merge([
-        'id' => $id++,
+        'id' => $id,
         'workspace_id' => $workspace->id,
+        'intern_brands_name' => $cell,
         'parcel_status' => 'DELIVERED',
-        'price_final' => 0,
-        'shipping_fee' => 0,
-        'total_cog' => 0,
+        'page' => 'FB Page',
+        'platform' => 'Website',
+        'parcel_updated_date' => '2026-05-12 09:00:00',
+        'shipped_out_date' => '2026-05-06',
     ], $attrs));
 }
 
-/**
- * May 2026, intern Juan (linked to $user). Two WIDGET orders (rev 8,000, cogs
- * 1,600, ship 300) + one GADGET (rev 4,000, cogs 800, ship 150). Transactions
- * charged to Juan: Ad Spent 800 tagged WIDGET, 300 tagged GADGET, Salary 500
- * untagged. A Maria order that must be excluded. COD 2%, VAT 12%, advisory 30%.
- */
-function seedJuan($workspace, $user): Intern
+function uis_statement($workspace): IncomeStatement
 {
-    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
-    $adSpent = TransactionType::create(['workspace_id' => $workspace->id, 'name' => 'Ad Spent']);
-    $salary = TransactionType::create(['workspace_id' => $workspace->id, 'name' => 'Salary']);
+    return IncomeStatement::create([
+        'workspace_id' => $workspace->id,
+        'period_month' => '2026-05-01',
+        'cod_fee_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+        'status' => 'final',
+    ]);
+}
 
-    $juan = Intern::create([
+/** An outflow of the given type, charged to a user. */
+function uis_charge($workspace, Account $account, string $typeName, User $user, float $amount): void
+{
+    $type = TransactionType::create([
+        'workspace_id' => $workspace->id,
+        'name' => $typeName,
+        'income_statement_section' => 'cost_of_sales',
+    ]);
+
+    $txn = Transaction::create([
+        'workspace_id' => $workspace->id,
+        'account_id' => $account->id,
+        'date' => '2026-05-15',
+        'description' => $typeName,
+        'type' => 'out',
+        'transaction_type_id' => $type->id,
+        'amount' => $amount,
+    ]);
+
+    $txn->chargeToUsers()->sync([$user->id => ['amount' => $amount]]);
+}
+
+test('the statement snapshots a row per user through to gross profit', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    Intern::create([
         'workspace_id' => $workspace->id,
         'intern_id' => 1,
         'full_name' => 'Juan Dela Cruz',
@@ -46,132 +69,129 @@ function seedJuan($workspace, $user): Intern
         'user_id' => $user->id,
     ]);
 
-    // Juan's delivered orders (intern_brands_name resolves to Juan via full_name).
-    uisOrder($workspace, ['intern_brands_name' => 'Juan Dela Cruz - Acme', 'order_details' => '1X WIDGET', 'price_final' => 5000, 'total_cog' => 1000, 'shipping_fee' => 200, 'parcel_updated_date' => '2026-05-10 09:00:00', 'shipped_out_date' => '2026-05-05']);
-    uisOrder($workspace, ['intern_brands_name' => 'Juan Dela Cruz - Acme', 'order_details' => '2X WIDGET', 'price_final' => 3000, 'total_cog' => 600, 'shipping_fee' => 100, 'parcel_updated_date' => '2026-05-20 09:00:00', 'shipped_out_date' => '2026-05-08']);
-    uisOrder($workspace, ['intern_brands_name' => 'Juan Dela Cruz - Acme', 'order_details' => '1X GADGET', 'price_final' => 4000, 'total_cog' => 800, 'shipping_fee' => 150, 'parcel_updated_date' => '2026-05-15 09:00:00', 'shipped_out_date' => '2026-05-09']);
-    // Different intern — must be excluded from Juan's statement.
-    uisOrder($workspace, ['intern_brands_name' => 'Maria Santos - Beta', 'order_details' => '1X WIDGET', 'price_final' => 9999, 'total_cog' => 999, 'shipping_fee' => 999, 'parcel_updated_date' => '2026-05-12 09:00:00', 'shipped_out_date' => '2026-05-07']);
+    // Two delivered parcels: 1,000 of revenue, 240 of goods, 100 of shipping.
+    uis_order(920001, $workspace, 'Juan Dela Cruz', ['price_final' => 500, 'total_cog' => 120, 'shipping_fee' => 50]);
+    uis_order(920002, $workspace, 'Juan Dela Cruz', ['price_final' => 500, 'total_cog' => 120, 'shipping_fee' => 50]);
 
-    // Transactions charged to Juan's user, who bears the whole of each. A
-    // `product` tag becomes a single product share for the whole amount.
-    $chargeToJuan = function (array $attrs) use ($workspace, $account, $user) {
-        $product = $attrs['product'] ?? null;
-        unset($attrs['product']);
+    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+    uis_charge($workspace, $account, 'Ad Spent', $user, 300);
+    uis_charge($workspace, $account, 'Cost of Goods', $user, 600);
+    uis_charge($workspace, $account, 'Delivery of COG', $user, 40);
 
-        $txn = Transaction::create(array_merge([
-            'workspace_id' => $workspace->id,
-            'account_id' => $account->id,
-            'type' => 'out',
-        ], $attrs));
+    $statement = uis_statement($workspace);
+    app(UserIncomeStatementService::class)->snapshot($statement);
 
-        $txn->chargeToUsers()->sync([$user->id => ['amount' => $attrs['amount']]]);
+    $row = $statement->userStatements()->where('user_id', $user->id)->first();
 
-        if ($product !== null) {
-            $txn->productShares()->create(['product' => $product, 'amount' => $attrs['amount']]);
-        }
-    };
+    expect($row)->not->toBeNull()
+        ->and($row->user_name)->toBe($user->name)
+        ->and((int) $row->delivered_orders)->toBe(2)
+        ->and((float) $row->delivered_amount)->toBe(1000.0)
+        ->and((int) $row->shipped_orders)->toBe(2)
+        ->and((float) $row->total_shipping_fee)->toBe(100.0)
+        // Charged costs land on the person they were charged to.
+        ->and((float) $row->ad_spent)->toBe(300.0)
+        ->and((float) $row->total_bought_cogs)->toBe(600.0)
+        ->and((float) $row->total_bought_cogs_delivery_fee)->toBe(40.0)
+        // 2% of 1,000, then 12% of that.
+        ->and((float) $row->cod_fee)->toBe(20.0)
+        ->and((float) $row->cod_fee_vat)->toBe(2.4)
+        ->and((float) $row->total_delivered_cogs)->toBe(240.0)
+        // Common costs are 300 + 100 + 20 + 2.40 = 422.40.
+        // Delivered basis: 1000 − 422.40 − 240 = 337.60
+        ->and((float) $row->gross_profit_delivered_cogs)->toBe(337.60)
+        // Bought basis: 1000 − 422.40 − 600 − 40 = −62.40
+        ->and((float) $row->gross_profit_bought_cogs)->toBe(-62.40);
 
-    $chargeToJuan(['date' => '2026-05-14', 'description' => 'Ads', 'transaction_type_id' => $adSpent->id, 'product' => 'WIDGET', 'amount' => 800]);
-    $chargeToJuan(['date' => '2026-05-16', 'description' => 'Ads', 'transaction_type_id' => $adSpent->id, 'product' => 'GADGET', 'amount' => 300]);
-    $chargeToJuan(['date' => '2026-05-15', 'description' => 'Pay', 'transaction_type_id' => $salary->id, 'product' => null, 'amount' => 500]);
+    // Rebuilding replaces the rows rather than stacking them up.
+    app(UserIncomeStatementService::class)->snapshot($statement);
+    expect($statement->userStatements()->where('user_id', $user->id)->count())->toBe(1);
+});
 
-    return $juan;
-}
-
-test('preview computes per-product gross with tagged txns folded in and untagged as OPEX', function () {
+test('orders whose intern name matches nobody land in Unassigned', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $workspace->update(['is_gencys_partner' => true]);
-    $juan = seedJuan($workspace, $user);
+
+    Intern::create([
+        'workspace_id' => $workspace->id,
+        'intern_id' => 1,
+        'full_name' => 'Juan Dela Cruz',
+        'active' => true,
+        'user_id' => $user->id,
+    ]);
+
+    uis_order(930001, $workspace, 'Juan Dela Cruz', ['price_final' => 900, 'shipping_fee' => 40]);
+    // A name nobody is linked to...
+    uis_order(930002, $workspace, 'Ghost Intern', ['price_final' => 300, 'shipping_fee' => 30]);
+    uis_order(930003, $workspace, 'Ghost Intern', ['price_final' => 200, 'shipping_fee' => 20]);
+    // ...and an order with no name written on it at all.
+    uis_order(930004, $workspace, '', ['price_final' => 70, 'shipping_fee' => 5]);
+
+    $statement = uis_statement($workspace);
+    $service = app(UserIncomeStatementService::class);
+    $service->snapshot($statement);
+
+    $unassigned = $statement->userStatements()->whereNull('user_id')->first();
+
+    expect($unassigned)->not->toBeNull()
+        ->and($unassigned->user_name)->toBe('Unassigned')
+        ->and((int) $unassigned->delivered_orders)->toBe(3)
+        ->and((float) $unassigned->delivered_amount)->toBe(570.0);
+
+    // The breakdown says which names are behind it, biggest first.
+    $rows = collect($service->unassignedBreakdown($statement));
+
+    expect($rows->pluck('cell'))->not->toContain('Juan Dela Cruz');
+
+    $ghost = $rows->firstWhere('cell', 'Ghost Intern');
+    expect((int) $ghost['delivered_orders'])->toBe(2)
+        ->and((float) $ghost['delivered_amount'])->toBe(500.0)
+        ->and((float) $ghost['shipping_fee'])->toBe(50.0)
+        ->and($rows->first()['cell'])->toBe('Ghost Intern')
+        // The nameless order comes back under a null cell.
+        ->and($rows->firstWhere('cell', null)['delivered_amount'])->toBe(70.0);
+
+    // And the breakdown adds up to the row it explains.
+    expect(round($rows->sum('delivered_amount'), 2))->toBe((float) $unassigned->delivered_amount)
+        ->and(round($rows->sum('shipping_fee'), 2))->toBe((float) $unassigned->total_shipping_fee);
+});
+
+test('the user statement page reads the saved rows', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    Intern::create([
+        'workspace_id' => $workspace->id,
+        'intern_id' => 1,
+        'full_name' => 'Juan Dela Cruz',
+        'active' => true,
+        'user_id' => $user->id,
+    ]);
+
+    uis_order(940001, $workspace, 'Juan Dela Cruz', ['price_final' => 1000]);
+    uis_order(940002, $workspace, 'Ghost Intern', ['price_final' => 50]);
+
+    $statement = uis_statement($workspace);
 
     $this->actingAs($user)
-        ->get(uisUrl($workspace, "/preview?intern_id={$juan->id}&month=2026-05"))
+        ->get("/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/users")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('workspaces/finance/user-income-statements/show')
-            ->where('statement.intern_name', 'Juan Dela Cruz')
-            ->where('statement.delivered', fn ($v) => (float) $v === 12000.0)
-            ->where('statement.orders', 3)
-            // WIDGET gross = 8000 − (1600 + 300 + 160 + 19.20 + 800) = 5120.80
-            ->where('statement.products', fn ($rows) => collect($rows)->contains(
-                fn ($r) => $r['product'] === 'WIDGET' && (float) $r['gross_profit'] === 5120.80
-            ))
-            // GADGET gross = 4000 − (800 + 150 + 80 + 9.60 + 300) = 2660.40
-            ->where('statement.products', fn ($rows) => collect($rows)->contains(
-                fn ($r) => $r['product'] === 'GADGET' && (float) $r['gross_profit'] === 2660.40
-            ))
-            ->where('statement.gross_profit', fn ($v) => (float) $v === 7781.20)
-            // Only the untagged Salary is OPEX.
-            ->where('statement.total_opex', fn ($v) => (float) $v === 500.0)
-            ->where('statement.opex', fn ($rows) => collect($rows)->contains(
-                fn ($r) => $r['type_name'] === 'Salary' && (float) $r['amount'] === 500.0
-            ))
-            // Advisory = 30% × 7781.20 = 2334.36 ; Net = 7781.20 − 500 − 2334.36
-            ->where('statement.advisory_share', fn ($v) => (float) $v === 2334.36)
-            ->where('statement.net_profit', fn ($v) => (float) $v === 4946.84)
+            ->component('workspaces/finance/user-income-statements/index')
+            ->where('users', function ($users) use ($user) {
+                $rows = collect($users);
+
+                return $rows->first()['user'] === $user->name
+                    // The unassigned row sits last, outside the named users.
+                    && $rows->last()['user_id'] === null;
+            })
+            // The Total covers the named users only — 1,000, not the 50.
+            ->where('total.delivered_amount', fn ($v) => (float) $v === 1000.0)
+            ->where('total.delivered_orders', 1)
+            ->where('total.cod_fee', fn ($v) => (float) $v === 20.0)
+            ->where('rates.cod', fn ($v) => (float) $v === 0.02)
+            // The Unassigned row can be opened up to show what's behind it.
+            ->where('unassigned', fn ($rows) => collect($rows)->pluck('cell')->contains('Ghost Intern'))
         );
-});
 
-test('store snapshots the header, product rows and opex buckets', function () {
-    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $workspace->update(['is_gencys_partner' => true]);
-    $juan = seedJuan($workspace, $user);
-
-    $this->actingAs($user)
-        ->post(uisUrl($workspace), ['intern_id' => $juan->id, 'month' => '2026-05'])
-        ->assertRedirect();
-
-    $this->assertDatabaseHas('finance_user_income_statements', [
-        'workspace_id' => $workspace->id,
-        'gencys_intern_id' => $juan->id,
-        'intern_name' => 'Juan Dela Cruz',
-        'total_delivered' => 12000,
-        'gross_profit' => 7781.20,
-        'total_opex' => 500,
-        'advisory_share' => 2334.36,
-        'net_profit' => 4946.84,
-    ]);
-
-    $statement = UserIncomeStatement::first();
-    $this->assertDatabaseHas('finance_user_income_statement_products', [
-        'user_income_statement_id' => $statement->id,
-        'product' => 'WIDGET',
-        'tagged_expense' => 800,
-        'gross_profit' => 5120.80,
-    ]);
-    $this->assertDatabaseHas('finance_user_income_statement_expenses', [
-        'user_income_statement_id' => $statement->id,
-        'type_name' => 'Salary',
-        'amount' => 500,
-    ]);
-    // The tagged Ad Spent lines are NOT in OPEX (they went into product rows).
-    $this->assertDatabaseMissing('finance_user_income_statement_expenses', [
-        'user_income_statement_id' => $statement->id,
-        'type_name' => 'Ad Spent',
-    ]);
-});
-
-test('non-partner workspaces get no advisory share', function () {
-    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    $juan = seedJuan($workspace, $user); // is_gencys_partner defaults false
-
-    $this->actingAs($user)
-        ->post(uisUrl($workspace), ['intern_id' => $juan->id, 'month' => '2026-05'])
-        ->assertRedirect();
-
-    $this->assertDatabaseHas('finance_user_income_statements', [
-        'gencys_intern_id' => $juan->id,
-        'advisory_share' => 0,
-        // Net = gross 7781.20 − opex 500 − advisory 0
-        'net_profit' => 7281.20,
-    ]);
-});
-
-test('a member without finance permission is forbidden', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    $member = makeWorkspaceMember($workspace, 'member');
-
-    $this->actingAs($member)
-        ->get(uisUrl($workspace))
-        ->assertForbidden();
+    // The page built the snapshot on first view.
+    expect($statement->userStatements()->count())->toBe(2);
 });
