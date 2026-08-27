@@ -22,6 +22,7 @@ interface Statement {
     cod_fee_rate: number; // fraction (0.02)
     vat_rate: number; // fraction (0.12)
     advisory_rate: number; // fraction (0.30)
+    advisory_delivered_rate: number; // fraction (0.09)
     gencys_partner: boolean;
     generated_at?: string | null;
 }
@@ -155,6 +156,7 @@ export default function IncomeStatementShow({
                         cod: statement.cod_fee_rate,
                         vat: statement.vat_rate,
                         advisory: statement.advisory_rate,
+                        advisoryDelivered: statement.advisory_delivered_rate,
                     }}
                     monthLabel={monthLabel}
                     gencysPartner={statement.gencys_partner}

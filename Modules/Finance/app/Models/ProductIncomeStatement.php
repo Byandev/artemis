@@ -39,6 +39,8 @@ class ProductIncomeStatement extends Model
         'gross_profit_bought_cogs',
         'gross_profit_delivered_cogs_advisory_share',
         'gross_profit_bought_cogs_advisory_share',
+        'gross_profit_delivered_cogs_after_advisory_share',
+        'gross_profit_bought_cogs_after_advisory_share',
     ];
 
     protected $casts = [
@@ -57,6 +59,8 @@ class ProductIncomeStatement extends Model
         'gross_profit_bought_cogs' => 'decimal:2',
         'gross_profit_delivered_cogs_advisory_share' => 'decimal:2',
         'gross_profit_bought_cogs_advisory_share' => 'decimal:2',
+        'gross_profit_delivered_cogs_after_advisory_share' => 'decimal:2',
+        'gross_profit_bought_cogs_after_advisory_share' => 'decimal:2',
     ];
 
     public function incomeStatement(): BelongsTo

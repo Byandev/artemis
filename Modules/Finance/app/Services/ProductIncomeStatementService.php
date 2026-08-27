@@ -117,8 +117,10 @@ class ProductIncomeStatementService
                 'total_delivered_cogs' => $deliveredCogs,
                 'gross_profit_delivered_cogs' => $grossDelivered,
                 'gross_profit_delivered_cogs_advisory_share' => $advisory($grossDelivered),
+                'gross_profit_delivered_cogs_after_advisory_share' => round($grossDelivered - $advisory($grossDelivered), 2),
                 'gross_profit_bought_cogs' => $grossBought,
                 'gross_profit_bought_cogs_advisory_share' => $advisory($grossBought),
+                'gross_profit_bought_cogs_after_advisory_share' => round($grossBought - $advisory($grossBought), 2),
             ];
         })->values();
 
@@ -157,8 +159,10 @@ class ProductIncomeStatementService
             'total_delivered_cogs' => (float) $r->total_delivered_cogs,
             'gross_profit_delivered_cogs' => (float) $r->gross_profit_delivered_cogs,
             'gross_profit_delivered_cogs_advisory_share' => (float) $r->gross_profit_delivered_cogs_advisory_share,
+            'gross_profit_delivered_cogs_after_advisory_share' => (float) $r->gross_profit_delivered_cogs_after_advisory_share,
             'gross_profit_bought_cogs' => (float) $r->gross_profit_bought_cogs,
             'gross_profit_bought_cogs_advisory_share' => (float) $r->gross_profit_bought_cogs_advisory_share,
+            'gross_profit_bought_cogs_after_advisory_share' => (float) $r->gross_profit_bought_cogs_after_advisory_share,
         ]);
 
         $named = $rows->filter(fn ($r) => $r['product_id'] !== null)
@@ -185,8 +189,10 @@ class ProductIncomeStatementService
             'total_delivered_cogs' => $sum('total_delivered_cogs'),
             'gross_profit_delivered_cogs' => $sum('gross_profit_delivered_cogs'),
             'gross_profit_delivered_cogs_advisory_share' => $sum('gross_profit_delivered_cogs_advisory_share'),
+            'gross_profit_delivered_cogs_after_advisory_share' => $sum('gross_profit_delivered_cogs_after_advisory_share'),
             'gross_profit_bought_cogs' => $sum('gross_profit_bought_cogs'),
             'gross_profit_bought_cogs_advisory_share' => $sum('gross_profit_bought_cogs_advisory_share'),
+            'gross_profit_bought_cogs_after_advisory_share' => $sum('gross_profit_bought_cogs_after_advisory_share'),
         ];
 
         $unresolved = $rows->first(fn ($r) => $r['product_id'] === null);

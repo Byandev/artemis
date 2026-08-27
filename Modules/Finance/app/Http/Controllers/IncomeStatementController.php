@@ -83,14 +83,15 @@ class IncomeStatementController extends Controller
             ->whereDate('period_month', $periodMonth)
             ->first();
 
-        [$defaultCod, $defaultVat, $defaultAdvisory] = $this->workspaceRates($workspace);
+        [$defaultCod, $defaultVat, $defaultAdvisory, $defaultAdvisoryDelivered] = $this->workspaceRates($workspace);
         $codRate = (float) ($request->input('cod_rate') ?? $existing?->cod_fee_rate ?? $defaultCod);
         $vatRate = (float) ($request->input('vat_rate') ?? $existing?->vat_rate ?? $defaultVat);
         $advisoryRate = (float) ($request->input('advisory_rate') ?? $existing?->advisory_rate ?? $defaultAdvisory);
+        $advisoryDeliveredRate = (float) ($request->input('advisory_delivered_rate') ?? $existing?->advisory_delivered_rate ?? $defaultAdvisoryDelivered);
 
         $revenue = $this->deliveredRevenue($workspace, $from, $to);
         $lines = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate);
-        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate);
+        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate);
 
         // Preview always defaults every line checked, so lines that appear after a
         // statement was last saved (e.g. a newly-flagged type, or new transactions)
@@ -110,6 +111,7 @@ class IncomeStatementController extends Controller
                 'cod_fee_rate' => $codRate,
                 'vat_rate' => $vatRate,
                 'advisory_rate' => $advisoryRate,
+                'advisory_delivered_rate' => $advisoryDeliveredRate,
                 'gencys_partner' => (bool) $workspace->is_gencys_partner,
             ],
         ]);
@@ -130,14 +132,16 @@ class IncomeStatementController extends Controller
             'cod_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'vat_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'advisory_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'advisory_delivered_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
         ]);
 
         [$periodMonth, $from, $to] = $this->resolveMonth($validated['month']);
 
-        [$defaultCod, $defaultVat, $defaultAdvisory] = $this->workspaceRates($workspace);
+        [$defaultCod, $defaultVat, $defaultAdvisory, $defaultAdvisoryDelivered] = $this->workspaceRates($workspace);
         $codRate = (float) ($validated['cod_rate'] ?? $defaultCod);
         $vatRate = (float) ($validated['vat_rate'] ?? $defaultVat);
         $advisoryRate = (float) ($validated['advisory_rate'] ?? $defaultAdvisory);
+        $advisoryDeliveredRate = (float) ($validated['advisory_delivered_rate'] ?? $defaultAdvisoryDelivered);
 
         $includedKeys = array_key_exists('included_keys', $validated)
             ? collect($validated['included_keys'])
@@ -153,11 +157,17 @@ class IncomeStatementController extends Controller
             $codRate,
             $vatRate,
             $advisoryRate,
+            $advisoryDeliveredRate,
         );
 
         IncomeStatementSetting::updateOrCreate(
             ['workspace_id' => $workspace->id],
-            ['cod_fee_rate' => $codRate, 'vat_rate' => $vatRate, 'advisory_rate' => $advisoryRate],
+            [
+                'cod_fee_rate' => $codRate,
+                'vat_rate' => $vatRate,
+                'advisory_rate' => $advisoryRate,
+                'advisory_delivered_rate' => $advisoryDeliveredRate,
+            ],
         );
 
         $userStatements->snapshot($statement);
@@ -192,8 +202,11 @@ class IncomeStatementController extends Controller
                 'total_delivered_cogs' => (float) $incomeStatement->total_delivered_cogs,
                 'gross_profit_delivered_cogs' => (float) $incomeStatement->gross_profit_delivered_cogs,
                 'gross_profit_delivered_cogs_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_advisory_share,
+                'gross_profit_delivered_cogs_after_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_after_advisory_share,
                 'gross_profit_bought_cogs' => (float) $incomeStatement->gross_profit_bought_cogs,
                 'gross_profit_bought_cogs_advisory_share' => (float) $incomeStatement->gross_profit_bought_cogs_advisory_share,
+                'gross_profit_bought_cogs_after_advisory_share' => (float) $incomeStatement->gross_profit_bought_cogs_after_advisory_share,
+                'advisory_share_on_delivered' => (float) $incomeStatement->advisory_share_on_delivered,
             ],
             'statement' => [
                 'id' => $incomeStatement->id,
@@ -201,6 +214,7 @@ class IncomeStatementController extends Controller
                 'cod_fee_rate' => (float) $incomeStatement->cod_fee_rate,
                 'vat_rate' => (float) $incomeStatement->vat_rate,
                 'advisory_rate' => (float) $incomeStatement->advisory_rate,
+                'advisory_delivered_rate' => (float) $incomeStatement->advisory_delivered_rate,
                 'gencys_partner' => (bool) $workspace->is_gencys_partner,
                 'generated_at' => $incomeStatement->generated_at?->toIso8601String(),
             ],
@@ -244,6 +258,7 @@ class IncomeStatementController extends Controller
             $codRate,
             $vatRate,
             (float) $incomeStatement->advisory_rate,
+            (float) $incomeStatement->advisory_delivered_rate,
         );
 
         $userStatements->snapshot($statement);
@@ -308,7 +323,7 @@ class IncomeStatementController extends Controller
      * Recompute the month's revenue, cost of sales, gross profit, advisory, OPEX
      * and net profit for the included lines, and (over)write the snapshot.
      */
-    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, float $codRate, float $vatRate, float $advisoryRate): IncomeStatement
+    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, float $codRate, float $vatRate, float $advisoryRate, float $advisoryDeliveredRate): IncomeStatement
     {
         $revenue = $this->deliveredRevenue($workspace, $from, $to);
 
@@ -328,9 +343,9 @@ class IncomeStatementController extends Controller
 
         $netProfit = $grossProfit - $opex - $advisoryShare;
 
-        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate);
+        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate);
 
-        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $codRate, $vatRate, $advisoryRate, $advisoryShare, $figures) {
+        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate, $advisoryShare, $figures) {
             $statement = IncomeStatement::updateOrCreate(
                 ['workspace_id' => $workspace->id, 'period_month' => $periodMonth],
                 [
@@ -342,6 +357,7 @@ class IncomeStatementController extends Controller
                     'cod_fee_rate' => $codRate,
                     'vat_rate' => $vatRate,
                     'advisory_rate' => $advisoryRate,
+                    'advisory_delivered_rate' => $advisoryDeliveredRate,
                     'advisory_share' => $advisoryShare,
                     'status' => 'final',
                     'generated_at' => now(),
@@ -463,7 +479,7 @@ class IncomeStatementController extends Controller
      *
      * @return array<string, float|int>
      */
-    private function figures(Workspace $workspace, Carbon $from, Carbon $to, float $codRate, float $vatRate, float $advisoryRate): array
+    private function figures(Workspace $workspace, Carbon $from, Carbon $to, float $codRate, float $vatRate, float $advisoryRate, float $advisoryDeliveredRate): array
     {
         $delivered = $this->statementOrders($workspace)
             ->where('parcel_status', self::DELIVERED_STATUS)
@@ -501,9 +517,21 @@ class IncomeStatementController extends Controller
         // A share of gross profit for gencys partners, taken on whichever
         // basis it sits beside. Only a positive gross owes anything — a
         // loss doesn't earn a rebate.
-        $advisory = fn (float $gross) => ($workspace->is_gencys_partner && $gross > 0)
-            ? round($gross * $advisoryRate, 2)
+        // The share can be struck two ways — off the margin, or off delivered
+        // revenue — and the agreement takes whichever comes out lower. Which one
+        // that is flips with the month, so both are worked out and the cheaper
+        // is the one actually charged.
+        $advisoryOnDelivered = ($workspace->is_gencys_partner && $revenue > 0)
+            ? round($revenue * $advisoryDeliveredRate, 2)
             : 0.0;
+
+        $advisory = function (float $gross) use ($workspace, $advisoryRate, $advisoryOnDelivered) {
+            if (! $workspace->is_gencys_partner || $gross <= 0) {
+                return 0.0;
+            }
+
+            return min(round($gross * $advisoryRate, 2), $advisoryOnDelivered);
+        };
 
         return [
             'delivered_orders' => $orders,
@@ -518,8 +546,11 @@ class IncomeStatementController extends Controller
             'total_delivered_cogs' => $deliveredCogs,
             'gross_profit_delivered_cogs' => $grossDelivered,
             'gross_profit_delivered_cogs_advisory_share' => $advisory($grossDelivered),
+            'gross_profit_delivered_cogs_after_advisory_share' => round($grossDelivered - $advisory($grossDelivered), 2),
             'gross_profit_bought_cogs' => $grossBought,
             'gross_profit_bought_cogs_advisory_share' => $advisory($grossBought),
+            'gross_profit_bought_cogs_after_advisory_share' => round($grossBought - $advisory($grossBought), 2),
+            'advisory_share_on_delivered' => $advisoryOnDelivered,
         ];
     }
 
@@ -600,7 +631,7 @@ class IncomeStatementController extends Controller
         };
     }
 
-    /** Workspace default rates [cod, vat, advisory] as fractions, falling back to constants. */
+    /** Workspace default rates [cod, vat, advisory, advisoryDelivered] as fractions, falling back to constants. */
     private function workspaceRates(Workspace $workspace): array
     {
         $settings = IncomeStatementSetting::where('workspace_id', $workspace->id)->first();
@@ -609,6 +640,7 @@ class IncomeStatementController extends Controller
             (float) ($settings?->cod_fee_rate ?? IncomeStatementSetting::DEFAULT_COD_FEE_RATE),
             (float) ($settings?->vat_rate ?? IncomeStatementSetting::DEFAULT_VAT_RATE),
             (float) ($settings?->advisory_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_RATE),
+            (float) ($settings?->advisory_delivered_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_DELIVERED_RATE),
         ];
     }
 

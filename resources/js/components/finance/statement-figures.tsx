@@ -26,8 +26,12 @@ export interface StatementFigureSet {
     total_delivered_cogs: number;
     gross_profit_delivered_cogs: number;
     gross_profit_delivered_cogs_advisory_share: number;
+    gross_profit_delivered_cogs_after_advisory_share: number;
     gross_profit_bought_cogs: number;
     gross_profit_bought_cogs_advisory_share: number;
+    gross_profit_bought_cogs_after_advisory_share: number;
+    /** The other basis: a share of delivered revenue rather than of margin. */
+    advisory_share_on_delivered: number;
 }
 
 type CogsView = 'delivered' | 'bought';
@@ -59,12 +63,50 @@ export default function StatementFigures({
     gencysPartner = false,
 }: {
     figures: StatementFigureSet;
-    rates: { cod: number; vat: number; advisory: number };
+    rates: {
+        cod: number;
+        vat: number;
+        advisory: number;
+        advisoryDelivered: number;
+    };
     monthLabel: string;
     /** The advisory share is only taken on partner workspaces. */
     gencysPartner?: boolean;
 }) {
     const [cogsView, setCogsView] = useState<CogsView>('delivered');
+
+    // The share can be struck off the margin or off delivered revenue, and the
+    // agreement takes the lower — so what is stored is already the cheaper of
+    // the two. Comparing it back against the delivered-basis figure says which
+    // one that was, which is what the label needs.
+    const advisoryCharged =
+        cogsView === 'bought'
+            ? figures.gross_profit_bought_cogs_advisory_share
+            : figures.gross_profit_delivered_cogs_advisory_share;
+    const afterAdvisory =
+        cogsView === 'bought'
+            ? figures.gross_profit_bought_cogs_after_advisory_share
+            : figures.gross_profit_delivered_cogs_after_advisory_share;
+    const onDeliveredBasis =
+        advisoryCharged > 0 &&
+        advisoryCharged === figures.advisory_share_on_delivered;
+
+    const advisoryRows = [
+        {
+            label: onDeliveredBasis
+                ? `Advisory Share — ${pct(rates.advisoryDelivered)} of Delivered`
+                : `Advisory Share — ${pct(rates.advisory)} of Gross Profit`,
+            help: `Struck two ways — ${pct(rates.advisory)} of a positive Gross Profit, or ${pct(rates.advisoryDelivered)} of Delivered Amount — and the lower of the two is charged. This month that is the ${onDeliveredBasis ? 'delivered' : 'gross profit'} basis. A loss owes nothing.`,
+            value: fmt(advisoryCharged),
+        },
+        {
+            label: 'Gross Profit after Advisory',
+            help: 'Gross Profit less the advisory share above.',
+            value: fmt(afterAdvisory),
+            emphasis: true,
+            signed: afterAdvisory,
+        },
+    ];
 
     const rows: {
         label: string;
@@ -129,17 +171,7 @@ export default function StatementFigures({
                       emphasis: true,
                       signed: figures.gross_profit_bought_cogs,
                   },
-                  ...(gencysPartner
-                      ? [
-                            {
-                                label: 'Advisory Share',
-                                help: `A share of gross profit taken by the partner — ${pct(rates.advisory)} of a positive Gross Profit, at the rate saved on this statement. A loss owes nothing.`,
-                                value: fmt(
-                                    figures.gross_profit_bought_cogs_advisory_share,
-                                ),
-                            },
-                        ]
-                      : []),
+                  ...(gencysPartner ? advisoryRows : []),
               ]
             : [
                   {
@@ -155,17 +187,7 @@ export default function StatementFigures({
                       emphasis: true,
                       signed: figures.gross_profit_delivered_cogs,
                   },
-                  ...(gencysPartner
-                      ? [
-                            {
-                                label: 'Advisory Share',
-                                help: `A share of gross profit taken by the partner — ${pct(rates.advisory)} of a positive Gross Profit, at the rate saved on this statement. A loss owes nothing.`,
-                                value: fmt(
-                                    figures.gross_profit_delivered_cogs_advisory_share,
-                                ),
-                            },
-                        ]
-                      : []),
+                  ...(gencysPartner ? advisoryRows : []),
               ]),
     ];
 

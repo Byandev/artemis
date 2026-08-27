@@ -43,8 +43,10 @@ interface ProductRow {
     total_delivered_cogs: number;
     gross_profit_delivered_cogs: number;
     gross_profit_delivered_cogs_advisory_share: number;
+    gross_profit_delivered_cogs_after_advisory_share: number;
     gross_profit_bought_cogs: number;
     gross_profit_bought_cogs_advisory_share: number;
+    gross_profit_bought_cogs_after_advisory_share: number;
 }
 
 /**
@@ -209,6 +211,17 @@ const buildColumns = (
                             render: (r: ProductRow) =>
                                 fmt(r.gross_profit_bought_cogs_advisory_share),
                         },
+                        {
+                            label: 'Gross Profit after Advisory',
+                            help: 'Gross Profit less the advisory share.',
+                            render: (r: ProductRow) =>
+                                fmt(
+                                    r.gross_profit_bought_cogs_after_advisory_share,
+                                ),
+                            emphasis: true,
+                            signed: (r: ProductRow) =>
+                                r.gross_profit_bought_cogs_after_advisory_share,
+                        },
                     ]
                   : []),
           ]
@@ -235,6 +248,17 @@ const buildColumns = (
                                 fmt(
                                     r.gross_profit_delivered_cogs_advisory_share,
                                 ),
+                        },
+                        {
+                            label: 'Gross Profit after Advisory',
+                            help: 'Gross Profit less the advisory share.',
+                            render: (r: ProductRow) =>
+                                fmt(
+                                    r.gross_profit_delivered_cogs_after_advisory_share,
+                                ),
+                            emphasis: true,
+                            signed: (r: ProductRow) =>
+                                r.gross_profit_delivered_cogs_after_advisory_share,
                         },
                     ]
                   : []),

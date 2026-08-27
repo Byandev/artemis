@@ -390,17 +390,24 @@ test('the advisory share is a cut of positive gross profit, partners only', func
 
     // Delivered 10,000 less ad spend 3,000, shipping 700, COD 200 and VAT 24,
     // then the goods: nothing shipped with a cost on it, so gross is 6,076.
+    // 30% of that is 1,822.80, but 9% of the 10,000 delivered is only 900 —
+    // and the lower of the two is what gets charged.
     expect((float) $statement->gross_profit_delivered_cogs)->toBe(6076.0)
-        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(1822.80)
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(900.0)
+        ->and((float) $statement->gross_profit_delivered_cogs_after_advisory_share)->toBe(5176.0)
         // Nothing was bought this month, so that basis is the same here.
         ->and((float) $statement->gross_profit_bought_cogs)->toBe(6076.0)
-        ->and((float) $statement->gross_profit_bought_cogs_advisory_share)->toBe(1822.80);
+        ->and((float) $statement->gross_profit_bought_cogs_advisory_share)->toBe(900.0)
+        ->and((float) $statement->gross_profit_bought_cogs_after_advisory_share)->toBe(5176.0);
 
     // A workspace that isn't a partner owes nothing on the same numbers.
     $workspace->update(['is_gencys_partner' => false]);
     $save();
 
-    expect((float) $statement->fresh()->gross_profit_delivered_cogs_advisory_share)->toBe(0.0);
+    expect((float) $statement->fresh()->gross_profit_delivered_cogs_advisory_share)->toBe(0.0)
+        // With nothing taken, the after figure is just the gross.
+        ->and((float) $statement->fresh()->gross_profit_delivered_cogs_after_advisory_share)
+        ->toBe((float) $statement->fresh()->gross_profit_delivered_cogs);
 });
 
 test('a loss owes no advisory share', function () {
@@ -424,4 +431,80 @@ test('a loss owes no advisory share', function () {
         // A negative gross earns no rebate — it is simply nothing.
         ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0)
         ->and((float) $statement->gross_profit_bought_cogs_advisory_share)->toBe(0.0);
+});
+
+test('the advisory share is worked out on both bases so the lower one shows', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+    seedMay($workspace);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05',
+        'cod_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+        'advisory_delivered_rate' => 0.09,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // Two ways to strike it: 30% of the 6,076 gross is 1,822.80, while 9% of
+    // the 10,000 delivered is 900. The cheaper one is what is charged, and the
+    // other is kept alongside so the statement can say which basis won.
+    expect((float) $statement->advisory_share_on_delivered)->toBe(900.0)
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(900.0)
+        // Both rates are snapshotted, so the comparison holds on a reread.
+        ->and((float) $statement->advisory_rate)->toBe(0.30)
+        ->and((float) $statement->advisory_delivered_rate)->toBe(0.09);
+
+    $this->actingAs($user)
+        ->get(isUrl($workspace, "/{$statement->id}"))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('figures.advisory_share_on_delivered', fn ($v) => (float) $v === 900.0)
+            ->has('figures.gross_profit_delivered_cogs_after_advisory_share')
+            ->has('statement.advisory_delivered_rate')
+        );
+});
+
+test('the gross profit basis wins when the margin is thin', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+    ['account' => $account, 'adSpent' => $adSpent] = seedMay($workspace);
+
+    // Push costs up so the margin is slim: 30% of a small gross now comes in
+    // under 9% of the unchanged delivered revenue.
+    makeTxn($workspace, $account, $adSpent, 'out', 5000, '2026-05-18');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05',
+        'cod_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+        'advisory_delivered_rate' => 0.09,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // Gross is 1,076, so 30% of it is 322.80 against 900 on the delivered basis.
+    expect((float) $statement->gross_profit_delivered_cogs)->toBe(1076.0)
+        ->and((float) $statement->advisory_share_on_delivered)->toBe(900.0)
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(322.80)
+        ->and((float) $statement->gross_profit_delivered_cogs_after_advisory_share)->toBe(753.20);
+});
+
+test('neither advisory basis applies to a workspace that is not a partner', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace); // is_gencys_partner defaults false
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05',
+        'cod_rate' => 0.02,
+        'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    expect((float) $statement->advisory_share_on_delivered)->toBe(0.0)
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0);
 });
