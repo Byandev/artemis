@@ -90,9 +90,7 @@ class CallLogController extends Controller
             ->whereDate('call_date', $date)
             ->whereExists(function ($query) use ($workspace, $date) {
                 $query->from('pancake_order_for_delivery')
-                    ->where('pancake_order_for_delivery.workspace_id', $workspace->id)
-                    ->whereDate('pancake_order_for_delivery.delivery_date', $date)
-                    ->whereRaw('(pancake_order_for_delivery.customer_phone = call_logs.phone_number OR pancake_order_for_delivery.rider_phone = call_logs.phone_number)');
+                    ->where('pancake_order_for_delivery.workspace_id', $workspace->id);
             })
             ->sum('duration');
 

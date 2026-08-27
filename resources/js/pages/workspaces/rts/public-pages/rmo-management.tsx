@@ -105,6 +105,8 @@ interface Props {
         page?: number;
         perPage?: number;
         delivery_date?: string;
+        /** Whoever the page is signed in as — scopes the call-log cards. */
+        stats_user_id?: string | null;
     };
     users: User[];
     total_for_delivery_today: number;
@@ -112,6 +114,14 @@ interface Props {
     delivered_count: number;
     returning_count: number;
     problematic_count: number;
+    /** Call attempts — every customer and rider call on the listed orders. */
+    total_call_logs_count: number;
+    /** Combined talk time of those calls, in seconds. */
+    total_call_duration: number;
+    /** How many of those calls lasted at least 5 seconds. */
+    connected_call_logs_count: number;
+    /** Talk time of those answered calls alone, in seconds. */
+    connected_call_duration: number;
     /**
      * Workspace-wide switch stored on rmo_settings. When on, every past
      * delivery date is assignable / re-statusable.
@@ -359,6 +369,10 @@ function RmoManagement({
     delivered_count,
     returning_count,
     problematic_count,
+    total_call_logs_count,
+    total_call_duration,
+    connected_call_logs_count,
+    connected_call_duration,
     enable_edit_previous_day = false,
     enable_bulk_status_update = false,
     enable_auto_tag_status = false,
@@ -541,6 +555,11 @@ function RmoManagement({
                 ...(showMyConfirmeeOnly && localStorage.getItem('user_id')
                     ? { confirmee_id: localStorage.getItem('user_id') }
                     : {}),
+                // Sent whatever the toggles say: it scopes the call cards to
+                // the signed-in CSR without narrowing the table.
+                ...(localStorage.getItem('user_id')
+                    ? { stats_user_id: localStorage.getItem('user_id') }
+                    : {}),
             };
         },
         [
@@ -617,6 +636,26 @@ function RmoManagement({
         const name = localStorage.getItem('user_name');
         if (name) setUserName(name);
     }, []);
+
+    // Who the page is signed in as lives in localStorage, so a cold load
+    // reaches the server without it and the call cards come back counting
+    // everyone. Re-ask for just those props once the identity is known — also
+    // covers picking a different name from the "Who are you?" modal.
+    useEffect(() => {
+        const userId = localStorage.getItem('user_id');
+        if (!userId || String(query?.stats_user_id ?? '') === userId) return;
+
+        router.reload({
+            data: { stats_user_id: userId },
+            only: [
+                'query',
+                'total_call_logs_count',
+                'total_call_duration',
+                'connected_call_logs_count',
+                'connected_call_duration',
+            ],
+        });
+    }, [query?.stats_user_id, userName]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -1668,6 +1707,12 @@ function RmoManagement({
                             delivered_count={delivered_count}
                             returning_count={returning_count}
                             problematic_count={problematic_count}
+                            total_call_logs_count={total_call_logs_count}
+                            total_call_duration={total_call_duration}
+                            connected_call_logs_count={
+                                connected_call_logs_count
+                            }
+                            connected_call_duration={connected_call_duration}
                         />
                     </div>
                 )}

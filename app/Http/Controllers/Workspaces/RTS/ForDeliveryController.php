@@ -16,7 +16,6 @@ use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
 use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
-use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\User as SystemUser;
@@ -41,6 +40,15 @@ class ForDeliveryController extends Controller
      * Upper bound on comma-separated terms accepted by the RMO search box.
      */
     private const MAX_SEARCH_TERMS = 50;
+
+    /**
+     * How long a call has to last before it counts as connected.
+     *
+     * Anything under this is the dial tone and a hang-up — the network logs it,
+     * but nobody spoke. The hit-rate card is only meaningful if those are kept
+     * out of the numerator.
+     */
+    private const CONNECTED_CALL_MIN_SECONDS = 5;
 
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
@@ -428,6 +436,31 @@ class ForDeliveryController extends Controller
         // Total uses its own base (optionally filtered via whereHas on confirmed_by)
         $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
+        // The call cards are a personal scorecard: they count the calls placed
+        // by whoever the page is signed in as, not every call to the numbers on
+        // these orders. The id arrives as stats_user_id — its own param because
+        // signing in doesn't filter the table, unlike assignee_id, which does.
+        $callerId = $request->input('stats_user_id') ?: $request->input('assignee_id');
+
+        // One query per card. Each is independently readable and independently
+        // debuggable — run any one of them on its own and it answers exactly
+        // the question its card asks.
+        $totalCallLogs = $this->callLogStat(clone $statsBase, 'COUNT(*)', $callerId);
+
+        $totalCallDuration = $this->callLogStat(clone $statsBase, 'COALESCE(SUM(duration), 0)', $callerId);
+
+        $connectedCallLogs = $this->callLogStat(
+            clone $statsBase,
+            'COUNT(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)',
+            $callerId
+        );
+
+        $connectedCallDuration = $this->callLogStat(
+            clone $statsBase,
+            'COALESCE(SUM(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN duration END), 0)',
+            $callerId
+        );
+
         // The other 4 stats share $statsBase — roll them into a single aggregate query
         $statusBreakdown = $statsBase
             ->selectRaw("
@@ -458,6 +491,7 @@ class ForDeliveryController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
                 'delivery_date' => $deliveryDate,
+                'stats_user_id' => $request->input('stats_user_id'),
             ],
             'users' => $users,
             'total_for_delivery_today' => $totalOrdersForDeliveryToday,
@@ -465,6 +499,10 @@ class ForDeliveryController extends Controller
             'delivered_count' => $totalDelivered,
             'returning_count' => $totalReturning,
             'problematic_count' => $totalProblematic,
+            'total_call_logs_count' => $totalCallLogs,
+            'total_call_duration' => $totalCallDuration,
+            'connected_call_logs_count' => $connectedCallLogs,
+            'connected_call_duration' => $connectedCallDuration,
             'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
             'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
             'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
@@ -681,6 +719,58 @@ class ForDeliveryController extends Controller
             ->get(['id', 'user_id', 'assignee_user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
 
         return response()->json($this->namedCallers($logs));
+    }
+
+    /**
+     * One call-log figure for the RMO stat cards, over whatever set of orders
+     * the page is currently showing.
+     *
+     * $aggregate is applied to that order's call logs — COUNT(*), SUM(duration),
+     * or either of those narrowed to connected calls. One card, one call, one
+     * query: the cards no longer share an aggregate, so a change to any one of
+     * them can't move the others.
+     *
+     * Counted per order the way the row badges count — every call on the
+     * delivery date to that order's customer or rider number — so the cards and
+     * the badges can't disagree. A number shared by two orders on the same day
+     * is counted under each, the rule allCustomerCallLogs already follows.
+     *
+     * $callerId narrows that to one CSR's own calls. The badges list every
+     * caller because the modal behind them does, but the cards are read as a
+     * personal scorecard — leaving a colleague's calls to the same customer in
+     * someone else's hit rate is what makes the number wrong.
+     *
+     * The id is a Pancake user UUID: call_logs.user_id is a char(36), so it is
+     * bound as a string. Casting it to an int silently matches nothing.
+     *
+     * @param  Builder<OrderForDelivery>  $orders
+     */
+    private function callLogStat(Builder $orders, string $aggregate, ?string $callerId = null): int
+    {
+        $callerId = $callerId !== '' ? $callerId : null;
+        $byCaller = $callerId !== null ? ' AND call_logs.user_id = ?' : '';
+
+        // One leg of the pair: the aggregate over a single order's calls to
+        // either its customer or its rider.
+        $leg = fn (string $phoneColumn) => "(
+            SELECT {$aggregate} FROM call_logs
+            WHERE call_logs.workspace_id = pancake_order_for_delivery.workspace_id
+              AND call_logs.call_date = pancake_order_for_delivery.delivery_date
+              AND call_logs.phone_number = pancake_order_for_delivery.{$phoneColumn}
+              {$byCaller}
+        )";
+
+        // Both legs, rolled up over every order in the set. One placeholder per
+        // leg, so the caller id is bound twice, in the order they appear.
+        $value = $orders
+            ->selectRaw(
+                'COALESCE(SUM('.$leg('customer_phone').'), 0)'
+                .' + COALESCE(SUM('.$leg('rider_phone').'), 0) as value',
+                $callerId !== null ? [$callerId, $callerId] : []
+            )
+            ->value('value');
+
+        return (int) ($value ?? 0);
     }
 
     /**
