@@ -27,7 +27,7 @@ import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
@@ -122,6 +122,10 @@ interface PurchasedOrder {
  */
 const LINE_CLASS = 'flex h-6 items-center';
 
+/** Peso amount, cents only when the figure has any — ₱24,000 / ₱24,000.50. */
+const peso = (value: number | string) =>
+    `₱${Number(value).toLocaleString('en-PH', { maximumFractionDigits: 2 })}`;
+
 /**
  * Every delivery on the PO, flattened across line items, oldest first. The
  * owning line item travels with each delivery because editing one still has to
@@ -191,6 +195,13 @@ export default function PurchasedOrderIndex({
     );
 
     const baseUrl = `/workspaces/${workspace.slug}/inventory/purchased-orders`;
+    // The list URL as it stands (filters, sort, page) so a save on the edit
+    // screen lands back on the same view instead of an unfiltered first page.
+    const currentUrl = usePage().url;
+    const returnTo = useMemo(
+        () => encodeURIComponent(currentUrl),
+        [currentUrl],
+    );
 
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [statusValue, setStatusValue] = useState(
@@ -370,13 +381,20 @@ export default function PurchasedOrderIndex({
                                 key={item.id}
                                 className={`group/item gap-2 ${LINE_CLASS}`}
                             >
-                                <span
-                                    className="truncate font-mono text-[11px] text-gray-800 dark:text-gray-200"
-                                    title={item.inventory_item?.sku}
-                                >
-                                    {item.inventory_item?.product?.name ??
-                                        item.inventory_item?.sku ??
-                                        '—'}
+                                <span className="flex min-w-0 items-center gap-1">
+                                    <span
+                                        className="truncate font-mono text-[11px] text-gray-800 dark:text-gray-200"
+                                        title={item.inventory_item?.sku}
+                                    >
+                                        {item.inventory_item?.product?.name ??
+                                            item.inventory_item?.sku ??
+                                            '—'}
+                                    </span>
+                                    {/* What this line cost, so the PO's total
+                                        can be read off its own items. */}
+                                    <span className="shrink-0 font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                                        ({peso(item.total_amount)})
+                                    </span>
                                 </span>
                                 {canEditPurchasedOrders && (
                                     <button
@@ -639,7 +657,7 @@ export default function PurchasedOrderIndex({
                                         <DropdownMenuItem
                                             onClick={() =>
                                                 router.get(
-                                                    `${baseUrl}/${order.id}/edit`,
+                                                    `${baseUrl}/${order.id}/edit?return_to=${returnTo}`,
                                                 )
                                             }
                                         >
@@ -674,6 +692,7 @@ export default function PurchasedOrderIndex({
         );
     }, [
         baseUrl,
+        returnTo,
         canDeletePurchasedOrders,
         canEditPurchasedOrders,
         canManagePurchasedOrders,
