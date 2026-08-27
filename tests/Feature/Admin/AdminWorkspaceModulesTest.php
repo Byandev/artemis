@@ -29,6 +29,7 @@ function moduleTogglePayload(Workspace $workspace, array $overrides = []): array
         'sim_gateway_module_enabled',
         'ad_spend_goals_module_enabled',
         'billing_module_enabled',
+        'courses_module_enabled',
     ];
 
     $payload = [];

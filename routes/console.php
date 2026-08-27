@@ -92,6 +92,11 @@ Schedule::command('metaads:report-user-budgets')->dailyAt('08:00');
 // Post each team's own ad budgets to its team Discord webhook every morning.
 Schedule::command('metaads:report-team-budgets')->dailyAt('08:00');
 
+// Lesson videos are uploaded straight to S3 and only attached afterwards; an
+// upload that is never attached leaves an orphan in the bucket that nothing
+// else cleans up. 24h is well clear of any upload still in flight.
+Schedule::command('courses:prune-pending-uploads')->dailyAt('04:00')->withoutOverlapping();
+
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();
 // Schedule::command('analytics:rollup --date="2 days ago"')->dailyAt('02:00')->withoutOverlapping();
