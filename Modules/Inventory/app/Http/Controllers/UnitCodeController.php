@@ -269,6 +269,11 @@ class UnitCodeController extends Controller
             });
         }
 
+        // "No product": keep only unit codes with no linked product.
+        if ($request->boolean('filter.unassigned')) {
+            $query->whereNull('product_id');
+        }
+
         return $query;
     }
 
