@@ -105,8 +105,6 @@ interface Props {
         page?: number;
         perPage?: number;
         delivery_date?: string;
-        /** Whoever the page is signed in as — scopes the call-log cards. */
-        stats_user_id?: string | null;
     };
     users: User[];
     total_for_delivery_today: number;
@@ -555,11 +553,6 @@ function RmoManagement({
                 ...(showMyConfirmeeOnly && localStorage.getItem('user_id')
                     ? { confirmee_id: localStorage.getItem('user_id') }
                     : {}),
-                // Sent whatever the toggles say: it scopes the call cards to
-                // the signed-in CSR without narrowing the table.
-                ...(localStorage.getItem('user_id')
-                    ? { stats_user_id: localStorage.getItem('user_id') }
-                    : {}),
             };
         },
         [
@@ -636,26 +629,6 @@ function RmoManagement({
         const name = localStorage.getItem('user_name');
         if (name) setUserName(name);
     }, []);
-
-    // Who the page is signed in as lives in localStorage, so a cold load
-    // reaches the server without it and the call cards come back counting
-    // everyone. Re-ask for just those props once the identity is known — also
-    // covers picking a different name from the "Who are you?" modal.
-    useEffect(() => {
-        const userId = localStorage.getItem('user_id');
-        if (!userId || String(query?.stats_user_id ?? '') === userId) return;
-
-        router.reload({
-            data: { stats_user_id: userId },
-            only: [
-                'query',
-                'total_call_logs_count',
-                'total_call_duration',
-                'connected_call_logs_count',
-                'connected_call_duration',
-            ],
-        });
-    }, [query?.stats_user_id, userName]);
 
     useEffect(() => {
         const timer = setTimeout(() => {

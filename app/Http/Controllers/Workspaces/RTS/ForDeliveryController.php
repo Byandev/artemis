@@ -436,29 +436,30 @@ class ForDeliveryController extends Controller
         // Total uses its own base (optionally filtered via whereHas on confirmed_by)
         $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
-        // The call cards are a personal scorecard: they count the calls placed
-        // by whoever the page is signed in as, not every call to the numbers on
-        // these orders. The id arrives as stats_user_id — its own param because
-        // signing in doesn't filter the table, unlike assignee_id, which does.
-        $callerId = $request->input('stats_user_id') ?: $request->input('assignee_id');
-
+        // The call cards report the workspace's call logs for the delivery date,
+        // flat: every call that day, whether or not the number it reached
+        // belongs to an order on this page and whoever placed it. Deliberately
+        // not tied to the order set or to a Pancake user yet — those are
+        // separate questions, and answering them here would make the figures
+        // move for reasons the cards don't explain.
+        //
         // One query per card. Each is independently readable and independently
         // debuggable — run any one of them on its own and it answers exactly
         // the question its card asks.
-        $totalCallLogs = $this->callLogStat(clone $statsBase, 'COUNT(*)', $callerId);
+        $totalCallLogs = $this->callLogStat($workspace, $deliveryDate, 'COUNT(*)');
 
-        $totalCallDuration = $this->callLogStat(clone $statsBase, 'COALESCE(SUM(duration), 0)', $callerId);
+        $totalCallDuration = $this->callLogStat($workspace, $deliveryDate, 'COALESCE(SUM(duration), 0)');
 
         $connectedCallLogs = $this->callLogStat(
-            clone $statsBase,
-            'COUNT(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)',
-            $callerId
+            $workspace,
+            $deliveryDate,
+            'COUNT(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)'
         );
 
         $connectedCallDuration = $this->callLogStat(
-            clone $statsBase,
-            'COALESCE(SUM(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN duration END), 0)',
-            $callerId
+            $workspace,
+            $deliveryDate,
+            'COALESCE(SUM(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN duration END), 0)'
         );
 
         // The other 4 stats share $statsBase — roll them into a single aggregate query
@@ -491,7 +492,6 @@ class ForDeliveryController extends Controller
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
                 'delivery_date' => $deliveryDate,
-                'stats_user_id' => $request->input('stats_user_id'),
             ],
             'users' => $users,
             'total_for_delivery_today' => $totalOrdersForDeliveryToday,
@@ -722,52 +722,23 @@ class ForDeliveryController extends Controller
     }
 
     /**
-     * One call-log figure for the RMO stat cards, over whatever set of orders
-     * the page is currently showing.
+     * One call-log figure for the RMO stat cards.
      *
-     * $aggregate is applied to that order's call logs — COUNT(*), SUM(duration),
-     * or either of those narrowed to connected calls. One card, one call, one
-     * query: the cards no longer share an aggregate, so a change to any one of
-     * them can't move the others.
+     * Straight off call_logs for the workspace and delivery date — no join to
+     * the orders on the page, no filter on who placed the call. A day's calls
+     * are reported as a day's calls, so a workspace with no orders loaded yet
+     * still gets real numbers.
      *
-     * Counted per order the way the row badges count — every call on the
-     * delivery date to that order's customer or rider number — so the cards and
-     * the badges can't disagree. A number shared by two orders on the same day
-     * is counted under each, the rule allCustomerCallLogs already follows.
-     *
-     * $callerId narrows that to one CSR's own calls. The badges list every
-     * caller because the modal behind them does, but the cards are read as a
-     * personal scorecard — leaving a colleague's calls to the same customer in
-     * someone else's hit rate is what makes the number wrong.
-     *
-     * The id is a Pancake user UUID: call_logs.user_id is a char(36), so it is
-     * bound as a string. Casting it to an int silently matches nothing.
-     *
-     * @param  Builder<OrderForDelivery>  $orders
+     * $aggregate is what to measure: COUNT(*), SUM(duration), or either of
+     * those narrowed to connected calls. One card, one call, one query — the
+     * cards don't share an aggregate, so a change to any one of them can't
+     * move the others.
      */
-    private function callLogStat(Builder $orders, string $aggregate, ?string $callerId = null): int
+    private function callLogStat(Workspace $workspace, string $deliveryDate, string $aggregate): int
     {
-        $callerId = $callerId !== '' ? $callerId : null;
-        $byCaller = $callerId !== null ? ' AND call_logs.user_id = ?' : '';
-
-        // One leg of the pair: the aggregate over a single order's calls to
-        // either its customer or its rider.
-        $leg = fn (string $phoneColumn) => "(
-            SELECT {$aggregate} FROM call_logs
-            WHERE call_logs.workspace_id = pancake_order_for_delivery.workspace_id
-              AND call_logs.call_date = pancake_order_for_delivery.delivery_date
-              AND call_logs.phone_number = pancake_order_for_delivery.{$phoneColumn}
-              {$byCaller}
-        )";
-
-        // Both legs, rolled up over every order in the set. One placeholder per
-        // leg, so the caller id is bound twice, in the order they appear.
-        $value = $orders
-            ->selectRaw(
-                'COALESCE(SUM('.$leg('customer_phone').'), 0)'
-                .' + COALESCE(SUM('.$leg('rider_phone').'), 0) as value',
-                $callerId !== null ? [$callerId, $callerId] : []
-            )
+        $value = CallLog::where('workspace_id', $workspace->id)
+            ->whereDate('call_date', $deliveryDate)
+            ->selectRaw($aggregate.' as value')
             ->value('value');
 
         return (int) ($value ?? 0);
