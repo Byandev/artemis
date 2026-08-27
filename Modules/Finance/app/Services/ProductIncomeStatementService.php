@@ -121,7 +121,7 @@ class ProductIncomeStatementService
      * The saved per-product rows — biggest delivered first, with the unresolved
      * row last — plus a Total across the named products. Built on first access.
      *
-     * @return array{products: list<array<string, mixed>>, total: array<string, mixed>, rates: array{cod:float, vat:float}}
+     * @return array{products: list<array<string, mixed>>, total: array<string, mixed>, unresolved: list<array<string, mixed>>, rates: array{cod:float, vat:float}}
      */
     public function payload(IncomeStatement $statement): array
     {
@@ -176,12 +176,103 @@ class ProductIncomeStatementService
         return [
             'products' => ($unresolved ? $named->push($unresolved) : $named)->values()->all(),
             'total' => $total,
+            // What the Unresolved row is made of, so it can be opened up.
+            'unresolved' => $this->unresolvedBreakdown($statement),
             // The rates these rows were struck at, for the column labels.
             'rates' => [
                 'cod' => (float) $statement->cod_fee_rate,
                 'vat' => (float) $statement->vat_rate,
             ],
         ];
+    }
+
+    /**
+     * What is actually sitting in the Unresolved row, per sku.
+     *
+     * The row is fed by two different order sets — the delivered figures and the
+     * shipping ones — so both are broken out here; a sku can appear with
+     * shipping against it and nothing delivered, or the other way round. Orders
+     * carrying no line items at all come back under a null sku.
+     *
+     * Computed live rather than snapshotted. It is a to-do list for whoever maps
+     * unit codes, not a figure the statement is closed on, and it should shrink
+     * as they work through it.
+     *
+     * @return list<array{sku:?string, delivered_orders:int, delivered_units:int, delivered_amount:float, shipped_orders:int, shipping_fee:float}>
+     */
+    public function unresolvedBreakdown(IncomeStatement $statement): array
+    {
+        $workspace = $statement->workspace;
+        [$from, $to] = $this->range($statement);
+
+        $delivered = $this->unresolvedBySku(
+            $this->deliveredItems($workspace, $from, $to),
+            'COALESCE(SUM(revenue * share), 0)'
+        );
+
+        $shipped = $this->unresolvedBySku(
+            $this->shippedItems($workspace, $from, $to),
+            'COALESCE(SUM(shipping_fee * share), 0)'
+        );
+
+        $rows = [];
+
+        foreach ($delivered as $sku => $row) {
+            $rows[$sku] = [
+                'sku' => $row['sku'],
+                'delivered_orders' => $row['orders'],
+                'delivered_units' => $row['units'],
+                'delivered_amount' => $row['amount'],
+                'shipped_orders' => 0,
+                'shipping_fee' => 0.0,
+            ];
+        }
+
+        foreach ($shipped as $sku => $row) {
+            $rows[$sku] ??= [
+                'sku' => $row['sku'],
+                'delivered_orders' => 0,
+                'delivered_units' => 0,
+                'delivered_amount' => 0.0,
+                'shipped_orders' => 0,
+                'shipping_fee' => 0.0,
+            ];
+            $rows[$sku]['shipped_orders'] = $row['orders'];
+            $rows[$sku]['shipping_fee'] = $row['amount'];
+        }
+
+        usort($rows, fn ($a, $b) => [$b['delivered_amount'], $b['shipping_fee']] <=> [$a['delivered_amount'], $a['shipping_fee']]);
+
+        return $rows;
+    }
+
+    /**
+     * Items on the given query that resolve to no product, grouped by sku. The
+     * money column differs by order set, so it comes in as an expression.
+     *
+     * @return array<string, array{sku:?string, orders:int, units:int, amount:float}>
+     */
+    private function unresolvedBySku($items, string $amountExpression): array
+    {
+        return DB::query()->fromSub($items, 't')
+            ->whereNull('product_id')
+            ->selectRaw('sku')
+            ->selectRaw('COUNT(DISTINCT order_id) as orders')
+            ->selectRaw('COALESCE(SUM(units), 0) as units')
+            ->selectRaw($amountExpression.' as amount')
+            ->groupBy('sku')
+            ->get()
+            ->mapWithKeys(function ($r) {
+                $sku = $r->sku !== null && $r->sku !== '' ? (string) $r->sku : null;
+
+                return [(string) $sku => [
+                    'sku' => $sku,
+                    'orders' => (int) $r->orders,
+                    'units' => (int) $r->units,
+                    'amount' => round((float) $r->amount, 2),
+                ]];
+            })
+            ->all();
     }
 
     private function ensureSnapshot(IncomeStatement $statement): void
@@ -313,6 +404,7 @@ class ProductIncomeStatementService
             ->leftJoinSub($orderQuantities, 'q', 'q.order_id', '=', 'gencys_orders.id')
             ->selectRaw('gencys_orders.id as order_id')
             ->selectRaw('uc.product_id as product_id')
+            ->selectRaw('goi.sku as sku')
             ->selectRaw('COALESCE(gencys_orders.price_final, 0) as revenue')
             ->selectRaw('COALESCE(gencys_orders.total_cog, 0) as cog')
             ->selectRaw('COALESCE(gencys_orders.shipping_fee, 0) as shipping_fee')

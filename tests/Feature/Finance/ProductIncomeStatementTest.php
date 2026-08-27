@@ -160,7 +160,8 @@ test('the product statement page reads the saved rows', function () {
             // The rates the columns are labelled with.
             ->where('rates.cod', fn ($v) => (float) $v === 0.02)
             ->where('rates.vat', fn ($v) => (float) $v === 0.12)
-            ->where('missingUnitCodes', fn ($codes) => collect($codes)->pluck('unit_code')->contains('NOPE'))
+            // The Unresolved row can be opened up to show what's behind it.
+            ->where('unresolved', fn ($rows) => collect($rows)->pluck('sku')->contains('NOPE'))
         );
 
     // The page built the snapshot on first view.
@@ -269,4 +270,60 @@ test('shipping is counted by ship-out date, not by delivery', function () {
         // Shipped: the two that went out this month, returns included (80 + 70).
         ->and((int) $row->shipped_orders)->toBe(2)
         ->and((float) $row->total_shipping_fee)->toBe(150.0);
+});
+
+test('the unresolved breakdown explains the row it sits under', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $widget = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'WIDGET']);
+    InventoryUnitCode::create(['workspace_id' => $workspace->id, 'unit_code' => 'UC1', 'product_id' => $widget->id]);
+
+    // A mapped parcel, for contrast — it must not appear in the breakdown.
+    pis_order(910001, $workspace, 'Anyone', ['price_final' => 900, 'shipping_fee' => 40], 'UC1');
+
+    // Two parcels on one unmapped code, one on another.
+    pis_order(910002, $workspace, 'Anyone', ['price_final' => 300, 'shipping_fee' => 30], 'NOPE');
+    pis_order(910003, $workspace, 'Anyone', ['price_final' => 200, 'shipping_fee' => 20], 'NOPE');
+    pis_order(910004, $workspace, 'Anyone', ['price_final' => 100, 'shipping_fee' => 10], 'ALSO-NOPE');
+
+    // Shipped this month but not delivered — it shows shipping and no revenue.
+    pis_order(910005, $workspace, 'Anyone', [
+        'parcel_status' => 'RETURNED',
+        'price_final' => 500, 'shipping_fee' => 15,
+        'shipped_out_date' => '2026-05-07', 'parcel_updated_date' => '2026-05-19 09:00:00',
+    ], 'SHIPPED-ONLY');
+
+    // An order with no line items at all still has to be accounted for.
+    pis_order(910006, $workspace, 'Anyone', ['price_final' => 70, 'shipping_fee' => 5], null);
+
+    $statement = pis_statement($workspace);
+    $rows = collect(app(ProductIncomeStatementService::class)->unresolvedBreakdown($statement));
+
+    // The mapped product is not part of this.
+    expect($rows->pluck('sku'))->not->toContain('UC1');
+
+    $nope = $rows->firstWhere('sku', 'NOPE');
+    expect((int) $nope['delivered_orders'])->toBe(2)
+        ->and((float) $nope['delivered_amount'])->toBe(500.0)
+        ->and((float) $nope['shipping_fee'])->toBe(50.0)
+        // Biggest delivered amount leads.
+        ->and($rows->first()['sku'])->toBe('NOPE');
+
+    // Shipped but never delivered: fee, no revenue.
+    $shippedOnly = $rows->firstWhere('sku', 'SHIPPED-ONLY');
+    expect((int) $shippedOnly['delivered_orders'])->toBe(0)
+        ->and((float) $shippedOnly['delivered_amount'])->toBe(0.0)
+        ->and((float) $shippedOnly['shipping_fee'])->toBe(15.0);
+
+    // The itemless order comes back under a null sku.
+    $noItems = $rows->firstWhere('sku', null);
+    expect((float) $noItems['delivered_amount'])->toBe(70.0)
+        ->and((int) $noItems['delivered_orders'])->toBe(1);
+
+    // And the breakdown adds up to the Unresolved row it explains.
+    app(ProductIncomeStatementService::class)->snapshot($statement);
+    $unresolvedRow = $statement->productStatements()->whereNull('product_id')->first();
+
+    expect(round($rows->sum('delivered_amount'), 2))->toBe((float) $unresolvedRow->delivered_amount)
+        ->and(round($rows->sum('shipping_fee'), 2))->toBe((float) $unresolvedRow->total_shipping_fee);
 });

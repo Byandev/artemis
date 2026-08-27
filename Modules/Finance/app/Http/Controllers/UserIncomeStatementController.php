@@ -55,7 +55,6 @@ class UserIncomeStatementController extends Controller
             'workspace' => $workspace,
             'incomeStatement' => $this->statementContext($incomeStatement),
             ...$this->productService->payload($incomeStatement),
-            'missingUnitCodes' => $this->service->missingUnitCodes($incomeStatement),
         ]);
     }
 

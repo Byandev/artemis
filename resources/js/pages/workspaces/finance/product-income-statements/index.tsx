@@ -7,8 +7,14 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, HelpCircle } from 'lucide-react';
-import { useState } from 'react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    ChevronDown,
+    ChevronRight,
+    HelpCircle,
+} from 'lucide-react';
+import { Fragment, useState } from 'react';
 
 interface StatementContext {
     id: number;
@@ -39,9 +45,18 @@ interface ProductRow {
     gross_profit_bought_cogs: number;
 }
 
-interface MissingUnitCode {
-    unit_code: string;
-    orders: number;
+/**
+ * One line of what the Unresolved row is made of. A sku can show shipping
+ * against it and nothing delivered, or the other way round; a null sku is the
+ * orders that carry no line items at all.
+ */
+interface UnresolvedRow {
+    sku: string | null;
+    delivered_orders: number;
+    delivered_units: number;
+    delivered_amount: number;
+    shipped_orders: number;
+    shipping_fee: number;
 }
 
 interface Props {
@@ -51,7 +66,7 @@ interface Props {
     total: ProductRow;
     /** The rates these rows were struck at, as fractions. */
     rates: { cod: number; vat: number };
-    missingUnitCodes: MissingUnitCode[];
+    unresolved: UnresolvedRow[];
 }
 
 const fmt = (v: number) =>
@@ -202,10 +217,12 @@ export default function ProductIncomeStatements({
     products,
     total,
     rates,
-    missingUnitCodes,
+    unresolved: unresolvedRows,
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
     const [cogsView, setCogsView] = useState<CogsView>('delivered');
+    const [unresolvedOpen, setUnresolvedOpen] = useState(false);
+    const unmappedSkus = unresolvedRows.filter((u) => u.sku !== null).length;
     const COLUMNS = buildColumns(rates, cogsView);
     const named = products.filter((p) => p.product_id !== null);
 
@@ -235,13 +252,13 @@ export default function ProductIncomeStatements({
 
                 {/* Unit codes with no product behind them — the items using
                     them can't be attributed, so they land in Unresolved. */}
-                {missingUnitCodes.length > 0 && (
+                {unmappedSkus > 0 && (
                     <div className="mb-6 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/40">
                         <div className="flex items-center gap-2 text-[12px] text-amber-800 dark:text-amber-200">
                             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                            {int(missingUnitCodes.length)} unit code
-                            {missingUnitCodes.length === 1 ? '' : 's'} on this
-                            month&rsquo;s delivered orders map to no product.{' '}
+                            {int(unmappedSkus)} unit code
+                            {unmappedSkus === 1 ? '' : 's'} on this
+                            month&rsquo;s orders map to no product.{' '}
                             <Link
                                 href={`/workspaces/${workspace.slug}/gencys/unit-codes`}
                                 className="underline underline-offset-2"
@@ -346,65 +363,227 @@ export default function ProductIncomeStatements({
                                         ? 'text-amber-700 dark:text-amber-400'
                                         : 'text-gray-800 dark:text-gray-100';
                                     return (
-                                        <tr
+                                        <Fragment
                                             key={r.product_id ?? 'unresolved'}
-                                            className={
-                                                unresolved
-                                                    ? 'group bg-amber-50/70 dark:bg-amber-500/10'
-                                                    : 'group transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/40'
-                                            }
                                         >
-                                            <td
-                                                className={`${FROZEN} py-3 pr-4 pl-5 ${
+                                            <tr
+                                                className={
                                                     unresolved
-                                                        ? 'bg-amber-50 dark:bg-amber-950'
-                                                        : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
-                                                }`}
+                                                        ? 'group bg-amber-50/70 dark:bg-amber-500/10'
+                                                        : 'group transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/40'
+                                                }
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    {unresolved && (
-                                                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                                                    )}
-                                                    <span className="min-w-0">
-                                                        <span
-                                                            className={`block truncate text-[13px] font-medium ${tone}`}
-                                                        >
-                                                            {r.product}
-                                                        </span>
-                                                        {unresolved && (
-                                                            <span className="text-[10px] text-gray-400">
-                                                                items that
-                                                                resolve to no
-                                                                product
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            {COLUMNS.map((c, i) => (
                                                 <td
-                                                    key={c.label}
-                                                    className={`${COL} ${
-                                                        i === COLUMNS.length - 1
-                                                            ? 'pr-5'
-                                                            : ''
-                                                    }${
-                                                        c.signed
-                                                            ? `font-semibold ${
-                                                                  c.signed(r) <
-                                                                  0
-                                                                      ? 'text-rose-600 dark:text-rose-400'
-                                                                      : 'text-emerald-600 dark:text-emerald-400'
-                                                              }`
-                                                            : c.emphasis
-                                                              ? `font-medium ${tone}`
-                                                              : 'text-gray-500 dark:text-gray-400'
+                                                    className={`${FROZEN} py-3 pr-4 pl-5 ${
+                                                        unresolved
+                                                            ? 'bg-amber-50 dark:bg-amber-950'
+                                                            : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
                                                     }`}
                                                 >
-                                                    {c.render(r)}
+                                                    <div className="flex items-center gap-2">
+                                                        {unresolved && (
+                                                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                                                        )}
+                                                        <span className="min-w-0">
+                                                            <span
+                                                                className={`block truncate text-[13px] font-medium ${tone}`}
+                                                            >
+                                                                {r.product}
+                                                            </span>
+                                                            {unresolved &&
+                                                                (unresolvedRows.length >
+                                                                0 ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            setUnresolvedOpen(
+                                                                                (
+                                                                                    o,
+                                                                                ) =>
+                                                                                    !o,
+                                                                            )
+                                                                        }
+                                                                        aria-expanded={
+                                                                            unresolvedOpen
+                                                                        }
+                                                                        className="mt-0.5 flex items-center gap-1 text-[10px] text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+                                                                    >
+                                                                        {unresolvedOpen ? (
+                                                                            <ChevronDown className="h-3 w-3" />
+                                                                        ) : (
+                                                                            <ChevronRight className="h-3 w-3" />
+                                                                        )}
+                                                                        {unresolvedOpen
+                                                                            ? 'hide'
+                                                                            : 'show'}{' '}
+                                                                        {int(
+                                                                            unresolvedRows.length,
+                                                                        )}{' '}
+                                                                        unmapped{' '}
+                                                                        {unresolvedRows.length ===
+                                                                        1
+                                                                            ? 'code'
+                                                                            : 'codes'}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-gray-400">
+                                                                        items
+                                                                        that
+                                                                        resolve
+                                                                        to no
+                                                                        product
+                                                                    </span>
+                                                                ))}
+                                                        </span>
+                                                    </div>
                                                 </td>
-                                            ))}
-                                        </tr>
+                                                {COLUMNS.map((c, i) => (
+                                                    <td
+                                                        key={c.label}
+                                                        className={`${COL} ${
+                                                            i ===
+                                                            COLUMNS.length - 1
+                                                                ? 'pr-5'
+                                                                : ''
+                                                        }${
+                                                            c.signed
+                                                                ? `font-semibold ${
+                                                                      c.signed(
+                                                                          r,
+                                                                      ) < 0
+                                                                          ? 'text-rose-600 dark:text-rose-400'
+                                                                          : 'text-emerald-600 dark:text-emerald-400'
+                                                                  }`
+                                                                : c.emphasis
+                                                                  ? `font-medium ${tone}`
+                                                                  : 'text-gray-500 dark:text-gray-400'
+                                                        }`}
+                                                    >
+                                                        {c.render(r)}
+                                                    </td>
+                                                ))}
+                                            </tr>
+
+                                            {unresolved && unresolvedOpen && (
+                                                <tr className="bg-amber-50/40 dark:bg-amber-500/5">
+                                                    <td
+                                                        colSpan={
+                                                            COLUMNS.length + 1
+                                                        }
+                                                        className="p-0"
+                                                    >
+                                                        {/* Pinned left so it stays
+                                                        readable however far the
+                                                        figures are scrolled. */}
+                                                        <div className="sticky left-0 w-max min-w-full px-5 py-4">
+                                                            <div className="mb-2 text-[10px] font-semibold tracking-wider text-amber-700 uppercase dark:text-amber-400">
+                                                                What&rsquo;s in
+                                                                Unresolved
+                                                            </div>
+                                                            <table className="text-[11px]">
+                                                                <thead>
+                                                                    <tr className="text-gray-400">
+                                                                        <th className="pr-6 pb-1 text-left font-medium">
+                                                                            Unit
+                                                                            code
+                                                                            on
+                                                                            the
+                                                                            order
+                                                                        </th>
+                                                                        <th className="px-3 pb-1 text-right font-medium">
+                                                                            Delivered
+                                                                        </th>
+                                                                        <th className="px-3 pb-1 text-right font-medium">
+                                                                            Units
+                                                                        </th>
+                                                                        <th className="px-3 pb-1 text-right font-medium">
+                                                                            Amount
+                                                                        </th>
+                                                                        <th className="px-3 pb-1 text-right font-medium">
+                                                                            Shipped
+                                                                        </th>
+                                                                        <th className="pb-1 pl-3 text-right font-medium">
+                                                                            Shipping
+                                                                            Fee
+                                                                        </th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {unresolvedRows.map(
+                                                                        (u) => (
+                                                                            <tr
+                                                                                key={
+                                                                                    u.sku ??
+                                                                                    'no-items'
+                                                                                }
+                                                                            >
+                                                                                <td className="py-1 pr-6">
+                                                                                    {u.sku ? (
+                                                                                        <span className="text-gray-800 dark:text-gray-100">
+                                                                                            {
+                                                                                                u.sku
+                                                                                            }
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span className="text-gray-500 italic dark:text-gray-400">
+                                                                                            orders
+                                                                                            with
+                                                                                            no
+                                                                                            items
+                                                                                            recorded
+                                                                                        </span>
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-3 py-1 text-right tabular-nums">
+                                                                                    {int(
+                                                                                        u.delivered_orders,
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-3 py-1 text-right tabular-nums">
+                                                                                    {int(
+                                                                                        u.delivered_units,
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-3 py-1 text-right tabular-nums">
+                                                                                    {fmt(
+                                                                                        u.delivered_amount,
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="px-3 py-1 text-right tabular-nums">
+                                                                                    {int(
+                                                                                        u.shipped_orders,
+                                                                                    )}
+                                                                                </td>
+                                                                                <td className="py-1 pl-3 text-right tabular-nums">
+                                                                                    {fmt(
+                                                                                        u.shipping_fee,
+                                                                                    )}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ),
+                                                                    )}
+                                                                </tbody>
+                                                            </table>
+                                                            <div className="mt-2.5 text-[10px] text-gray-400">
+                                                                Map a code on
+                                                                the{' '}
+                                                                <Link
+                                                                    href={`/workspaces/${workspace.slug}/gencys/unit-codes`}
+                                                                    className="underline underline-offset-2"
+                                                                >
+                                                                    unit codes
+                                                                </Link>{' '}
+                                                                page and its
+                                                                figures move
+                                                                onto the product
+                                                                at the next
+                                                                regenerate.
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
                                     );
                                 })}
                             </tbody>
