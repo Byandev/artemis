@@ -21,6 +21,7 @@ use App\Models\Page;
 use App\Models\User as SystemUser;
 use App\Models\Workspace;
 use App\Support\PublicWorkspaceGate;
+use App\Support\RmoDailyStats;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -40,15 +41,6 @@ class ForDeliveryController extends Controller
      * Upper bound on comma-separated terms accepted by the RMO search box.
      */
     private const MAX_SEARCH_TERMS = 50;
-
-    /**
-     * How long a call has to last before it counts as connected.
-     *
-     * Anything under this is the dial tone and a hang-up — the network logs it,
-     * but nobody spoke. The hit-rate card is only meaningful if those are kept
-     * out of the numerator.
-     */
-    private const CONNECTED_CALL_MIN_SECONDS = 5;
 
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
@@ -446,14 +438,14 @@ class ForDeliveryController extends Controller
         // One query per card. Each is independently readable and independently
         // debuggable — run any one of them on its own and it answers exactly
         // the question its card asks.
-        $totalCallLogs = $this->callLogStat($workspace, $deliveryDate, 'COUNT(*)');
+        $totalCallLogs = RmoDailyStats::callLogStat($workspace, $deliveryDate, 'COUNT(*)');
 
-        $totalCallDuration = $this->callLogStat($workspace, $deliveryDate, 'COALESCE(SUM(duration), 0)');
+        $totalCallDuration = RmoDailyStats::callLogStat($workspace, $deliveryDate, 'COALESCE(SUM(duration), 0)');
 
-        $connectedCallLogs = $this->callLogStat(
+        $connectedCallLogs = RmoDailyStats::callLogStat(
             $workspace,
             $deliveryDate,
-            'COUNT(CASE WHEN duration >= '.self::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)'
+            'COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)'
         );
 
         // The other 4 stats share $statsBase — roll them into a single aggregate query
@@ -712,29 +704,6 @@ class ForDeliveryController extends Controller
             ->get(['id', 'user_id', 'assignee_user_id', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
 
         return response()->json($this->namedCallers($logs));
-    }
-
-    /**
-     * One call-log figure for the RMO stat cards.
-     *
-     * Straight off call_logs for the workspace and delivery date — no join to
-     * the orders on the page, no filter on who placed the call. A day's calls
-     * are reported as a day's calls, so a workspace with no orders loaded yet
-     * still gets real numbers.
-     *
-     * $aggregate is what to measure: COUNT(*), SUM(duration), or either of
-     * those narrowed to connected calls. One card, one call, one query — the
-     * cards don't share an aggregate, so a change to any one of them can't
-     * move the others.
-     */
-    private function callLogStat(Workspace $workspace, string $deliveryDate, string $aggregate): int
-    {
-        $value = CallLog::where('workspace_id', $workspace->id)
-            ->whereDate('call_date', $deliveryDate)
-            ->selectRaw($aggregate.' as value')
-            ->value('value');
-
-        return (int) ($value ?? 0);
     }
 
     /**

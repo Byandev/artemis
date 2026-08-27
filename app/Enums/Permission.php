@@ -61,6 +61,7 @@ enum Permission: string
     case ViewRtsAiChat = 'View RTS AI Chat';
     case ViewRmoManagement = 'View RMO Management';
     case ManageRmoSettings = 'Manage RMO Settings';
+    case ManageRmoNotifications = 'Manage RMO Notifications';
     case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
@@ -233,6 +234,7 @@ enum Permission: string
             self::ViewRtsAiChat,
             self::ViewRmoManagement,
             self::ManageRmoSettings,
+            self::ManageRmoNotifications,
             self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
