@@ -66,10 +66,18 @@ const BTN =
     'flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 px-3 font-mono text-[12px] text-gray-600 transition-all hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700';
 const COL = 'px-4 py-3 text-right text-[12px] whitespace-nowrap tabular-nums';
 
-// The frozen first column. The shadow stands in for a right border, which
-// border-collapse drops once a cell is sticky.
+// The frozen first column and the frozen header row. Both use a box-shadow in
+// place of a border: border-collapse drops borders on a sticky cell.
+//
+// Stacking, highest first: the corner cell sits above the header row, which
+// sits above the frozen column, which sits above the scrolling figures.
 const FROZEN =
     'sticky left-0 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.06)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.06)]';
+const HEAD_BG = 'bg-white dark:bg-zinc-900';
+const STICKY_HEAD =
+    'sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.06)]';
+const STICKY_CORNER =
+    'sticky top-0 left-0 z-30 shadow-[1px_0_0_0_rgba(0,0,0,0.06),0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.06),0_1px_0_0_rgba(255,255,255,0.06)]';
 const HEAD =
     'px-4 py-3 text-right text-[10px] font-semibold tracking-wider text-gray-400 uppercase whitespace-nowrap';
 
@@ -269,19 +277,19 @@ export default function ProductIncomeStatements({
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className="max-h-[70vh] overflow-auto">
                         <table className="w-full">
                             <thead>
-                                <tr className="border-b border-black/6 dark:border-white/6">
+                                <tr>
                                     <th
-                                        className={`${FROZEN} z-20 bg-white px-5 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase dark:bg-zinc-900`}
+                                        className={`${STICKY_CORNER} ${HEAD_BG} px-5 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase`}
                                     >
                                         Product
                                     </th>
                                     {COLUMNS.map((c, i) => (
                                         <th
                                             key={c.label}
-                                            className={`${HEAD} ${i === COLUMNS.length - 1 ? 'pr-5' : ''}`}
+                                            className={`${HEAD} ${STICKY_HEAD} ${HEAD_BG} ${i === COLUMNS.length - 1 ? 'pr-5' : ''}`}
                                         >
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
