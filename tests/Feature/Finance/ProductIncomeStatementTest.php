@@ -109,7 +109,13 @@ test('the statement snapshots a product row per product, workspace-wide', functi
         ->and((int) $row->shipped_orders)->toBe(3)
         ->and((float) $row->total_shipping_fee)->toBe(0.0)
         // The cost of what actually shipped (120 + 120 + 80).
-        ->and((float) $row->total_delivered_cogs)->toBe(320.0);
+        ->and((float) $row->total_delivered_cogs)->toBe(320.0)
+        // Both margins start from 1,300 less ad spend 1,800, shipping 0,
+        // COD 26 and VAT 3.12 — then differ only in the cost of goods.
+        // Delivered basis: 1300 − 1829.12 − 320 = −849.12
+        ->and((float) $row->gross_profit_delivered_cogs)->toBe(-849.12)
+        // Bought basis: 1300 − 1829.12 − 5000 − 250 = −5,779.12
+        ->and((float) $row->gross_profit_bought_cogs)->toBe(-5779.12);
 
     // Rebuilding replaces the rows rather than stacking them up.
     app(ProductIncomeStatementService::class)->snapshot($statement);

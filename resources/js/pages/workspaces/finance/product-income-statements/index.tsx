@@ -35,6 +35,8 @@ interface ProductRow {
     total_bought_cogs: number;
     total_bought_cogs_delivery_fee: number;
     total_delivered_cogs: number;
+    gross_profit_delivered_cogs: number;
+    gross_profit_bought_cogs: number;
 }
 
 interface MissingUnitCode {
@@ -111,6 +113,8 @@ const buildColumns = (
     help: string;
     render: (r: ProductRow) => string;
     emphasis?: boolean;
+    /** When set, the cell is coloured by the sign of this value. */
+    signed?: (r: ProductRow) => number;
 }[] => [
     {
         label: 'Delivered Orders',
@@ -167,6 +171,13 @@ const buildColumns = (
                   render: (r: ProductRow) =>
                       fmt(r.total_bought_cogs_delivery_fee),
               },
+              {
+                  label: 'Gross Profit',
+                  help: 'Delivered Amount less ad spend, shipping, the COD fee and its VAT, then less what was bought into stock this month and the freight on it. What the month cost in cash, not the margin on what sold.',
+                  render: (r: ProductRow) => fmt(r.gross_profit_bought_cogs),
+                  emphasis: true,
+                  signed: (r: ProductRow) => r.gross_profit_bought_cogs,
+              },
           ]
         : [
               {
@@ -174,6 +185,13 @@ const buildColumns = (
                   help: 'Cost of the goods that actually shipped, taken from the orders’ own cost figures and divided across a multi-product parcel the same way revenue is.',
                   render: (r: ProductRow) => fmt(r.total_delivered_cogs),
                   emphasis: true,
+              },
+              {
+                  label: 'Gross Profit',
+                  help: 'Delivered Amount less ad spend, shipping, the COD fee and its VAT, then less the cost of the goods that actually shipped. The margin on what was sold this month.',
+                  render: (r: ProductRow) => fmt(r.gross_profit_delivered_cogs),
+                  emphasis: true,
+                  signed: (r: ProductRow) => r.gross_profit_delivered_cogs,
               },
           ]),
 ];
@@ -371,9 +389,16 @@ export default function ProductIncomeStatements({
                                                             ? 'pr-5'
                                                             : ''
                                                     }${
-                                                        c.emphasis
-                                                            ? `font-medium ${tone}`
-                                                            : 'text-gray-500 dark:text-gray-400'
+                                                        c.signed
+                                                            ? `font-semibold ${
+                                                                  c.signed(r) <
+                                                                  0
+                                                                      ? 'text-rose-600 dark:text-rose-400'
+                                                                      : 'text-emerald-600 dark:text-emerald-400'
+                                                              }`
+                                                            : c.emphasis
+                                                              ? `font-medium ${tone}`
+                                                              : 'text-gray-500 dark:text-gray-400'
                                                     }`}
                                                 >
                                                     {c.render(r)}
@@ -398,9 +423,13 @@ export default function ProductIncomeStatements({
                                                     ? 'pr-5'
                                                     : ''
                                             }font-semibold ${
-                                                c.emphasis
-                                                    ? 'text-gray-800 dark:text-gray-100'
-                                                    : 'text-gray-600 dark:text-gray-300'
+                                                c.signed
+                                                    ? c.signed(total) < 0
+                                                        ? 'text-rose-600 dark:text-rose-400'
+                                                        : 'text-emerald-600 dark:text-emerald-400'
+                                                    : c.emphasis
+                                                      ? 'text-gray-800 dark:text-gray-100'
+                                                      : 'text-gray-600 dark:text-gray-300'
                                             }`}
                                         >
                                             {c.render(total)}

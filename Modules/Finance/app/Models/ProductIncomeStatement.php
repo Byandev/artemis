@@ -35,6 +35,8 @@ class ProductIncomeStatement extends Model
         'total_bought_cogs',
         'total_bought_cogs_delivery_fee',
         'total_delivered_cogs',
+        'gross_profit_delivered_cogs',
+        'gross_profit_bought_cogs',
     ];
 
     protected $casts = [
@@ -49,6 +51,8 @@ class ProductIncomeStatement extends Model
         'total_bought_cogs' => 'decimal:2',
         'total_bought_cogs_delivery_fee' => 'decimal:2',
         'total_delivered_cogs' => 'decimal:2',
+        'gross_profit_delivered_cogs' => 'decimal:2',
+        'gross_profit_bought_cogs' => 'decimal:2',
     ];
 
     public function incomeStatement(): BelongsTo

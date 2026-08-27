@@ -75,6 +75,17 @@ class ProductIncomeStatementService
             $sentOut = $shipped[$key] ?? ['orders' => 0, 'shipping' => 0.0];
             $revenue = round((float) $sold['revenue'], 2);
             $codFee = round($revenue * $codRate, 2);
+            $codVat = round($codFee * $vatRate, 2);
+
+            $adSpend = round((float) ($adSpent[$key] ?? 0), 2);
+            $shippingFee = round((float) $sentOut['shipping'], 2);
+            $deliveredCogs = round((float) $sold['cog'], 2);
+            $productCogs = round((float) ($boughtCogs[$key] ?? 0), 2);
+            $boughtFreightFee = round((float) ($boughtFreight[$key] ?? 0), 2);
+
+            // Both margins take the same costs off delivered revenue and differ
+            // only in which cost of goods they charge.
+            $commonCosts = $adSpend + $shippingFee + $codFee + $codVat;
 
             return [
                 'product_id' => $productId,
@@ -82,15 +93,18 @@ class ProductIncomeStatementService
                 'delivered_orders' => (int) $sold['orders'],
                 'delivered_units' => (int) $sold['units'],
                 'delivered_amount' => $revenue,
-                'ad_spent' => round((float) ($adSpent[$key] ?? 0), 2),
+                'ad_spent' => $adSpend,
                 'shipped_orders' => (int) $sentOut['orders'],
-                'total_shipping_fee' => round((float) $sentOut['shipping'], 2),
+                'total_shipping_fee' => $shippingFee,
                 'cod_fee' => $codFee,
                 // VAT is charged on the fee, not on the revenue.
-                'cod_fee_vat' => round($codFee * $vatRate, 2),
-                'total_bought_cogs' => round((float) ($boughtCogs[$key] ?? 0), 2),
-                'total_bought_cogs_delivery_fee' => round((float) ($boughtFreight[$key] ?? 0), 2),
-                'total_delivered_cogs' => round((float) $sold['cog'], 2),
+                'cod_fee_vat' => $codVat,
+                'total_bought_cogs' => $productCogs,
+                'total_bought_cogs_delivery_fee' => $boughtFreightFee,
+                'total_delivered_cogs' => $deliveredCogs,
+                'gross_profit_delivered_cogs' => round($revenue - $commonCosts - $deliveredCogs, 2),
+                // Freight on a purchase is part of what the stock cost.
+                'gross_profit_bought_cogs' => round($revenue - $commonCosts - $productCogs - $boughtFreightFee, 2),
             ];
         })->values();
 
@@ -127,6 +141,8 @@ class ProductIncomeStatementService
             'total_bought_cogs' => (float) $r->total_bought_cogs,
             'total_bought_cogs_delivery_fee' => (float) $r->total_bought_cogs_delivery_fee,
             'total_delivered_cogs' => (float) $r->total_delivered_cogs,
+            'gross_profit_delivered_cogs' => (float) $r->gross_profit_delivered_cogs,
+            'gross_profit_bought_cogs' => (float) $r->gross_profit_bought_cogs,
         ]);
 
         $named = $rows->filter(fn ($r) => $r['product_id'] !== null)
@@ -151,6 +167,8 @@ class ProductIncomeStatementService
             'total_bought_cogs' => $sum('total_bought_cogs'),
             'total_bought_cogs_delivery_fee' => $sum('total_bought_cogs_delivery_fee'),
             'total_delivered_cogs' => $sum('total_delivered_cogs'),
+            'gross_profit_delivered_cogs' => $sum('gross_profit_delivered_cogs'),
+            'gross_profit_bought_cogs' => $sum('gross_profit_bought_cogs'),
         ];
 
         $unresolved = $rows->first(fn ($r) => $r['product_id'] === null);
