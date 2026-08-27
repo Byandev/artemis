@@ -72,29 +72,27 @@ function seedMay($workspace): array
     return compact('account', 'adSpent', 'expenses', 'transfer');
 }
 
-test('preview splits cost of sales (auto + flagged types) from OPEX (unflagged)', function () {
+test('saving splits cost of sales (auto + flagged types) from OPEX (unflagged)', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     seedMay($workspace);
 
+    // Omitting included_keys takes every line.
     $this->actingAs($user)
-        ->get(isUrl($workspace, '/preview?month=2026-05'))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('workspaces/finance/income-statements/show')
-            ->where('statement.delivered', fn ($v) => (float) $v === 10000.0)
-            // auto cost-of-sales first: shipping, cod, vat
-            ->where('statement.expenses.0.source', 'shipping_fee')
-            ->where('statement.expenses.0.section', 'cost_of_sales')
-            ->where('statement.expenses.1.source', 'cod_fee')
-            ->where('statement.expenses.2.source', 'vat')
-            // then the flagged transaction type (Ad Spent) in cost of sales
-            ->where('statement.expenses.3.type_name', 'Ad Spent')
-            ->where('statement.expenses.3.section', 'cost_of_sales')
-            ->where('statement.expenses.3.amount', fn ($v) => (float) $v === 3000.0)
-            // then OPEX (unflagged) buckets
-            ->where('statement.expenses.4.section', 'opex')
-            ->has('statement.expenses', 6)
-        );
+        ->post(isUrl($workspace), ['month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12])
+        ->assertRedirect();
+
+    $rows = IncomeStatement::first()->breakdown;
+
+    // The auto lines: shipping, COD and the VAT on it.
+    expect($rows->where('source', 'shipping_fee')->first()->section)->toBe('cost_of_sales')
+        ->and($rows->where('source', 'cod_fee')->first()->section)->toBe('cost_of_sales')
+        ->and($rows->where('source', 'vat')->first()->section)->toBe('cost_of_sales')
+        // A type tagged cost of sales sits with them...
+        ->and($rows->firstWhere('type_name', 'Ad Spent')->section)->toBe('cost_of_sales')
+        ->and((float) $rows->firstWhere('type_name', 'Ad Spent')->amount)->toBe(3000.0)
+        // ...and an untagged one falls to OPEX.
+        ->and($rows->firstWhere('type_name', 'expenses')->section)->toBe('opex')
+        ->and($rows)->toHaveCount(6);
 });
 
 test('store computes gross profit from cost of sales and net profit from OPEX', function () {
@@ -128,27 +126,24 @@ test('store computes gross profit from cost of sales and net profit from OPEX', 
     $this->assertDatabaseMissing('finance_income_statement_expenses', ['type_name' => 'transfer']);
 });
 
-test('a type flagged as gross profit deduction moves from OPEX to cost of sales', function () {
+test('a type tagged as cost of sales moves off OPEX', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     ['expenses' => $expenses] = seedMay($workspace);
 
-    // Initially "expenses" is OPEX.
-    $this->actingAs($user)
-        ->get(isUrl($workspace, '/preview?month=2026-05'))
-        ->assertInertia(fn ($page) => $page->where(
-            'statement.expenses',
-            fn ($rows) => collect($rows)->firstWhere('type_name', 'expenses')['section'] === 'opex',
-        ));
+    $save = fn () => $this->actingAs($user)
+        ->post(isUrl($workspace), ['month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12])
+        ->assertRedirect();
+
+    $sectionOfExpenses = fn () => IncomeStatement::first()->breakdown()
+        ->where('type_name', 'expenses')->first()->section;
+
+    $save();
+    expect($sectionOfExpenses())->toBe('opex');
 
     $expenses->update(['income_statement_section' => 'cost_of_sales']);
 
-    // Now it's a cost-of-sales line.
-    $this->actingAs($user)
-        ->get(isUrl($workspace, '/preview?month=2026-05'))
-        ->assertInertia(fn ($page) => $page->where(
-            'statement.expenses',
-            fn ($rows) => collect($rows)->firstWhere('type_name', 'expenses')['section'] === 'cost_of_sales',
-        ));
+    $save();
+    expect($sectionOfExpenses())->toBe('cost_of_sales');
 });
 
 test('advisory share deducts a % of gross profit for gencys partners', function () {
@@ -212,8 +207,13 @@ test('regenerate re-pulls with the snapshotted rate and included lines', functio
 
     $statement->refresh();
     expect((float) $statement->total_delivered)->toBe(15000.0);
-    expect((float) $statement->gross_profit)->toBe(14700.0);
-    $this->assertDatabaseCount('finance_income_statement_expenses', 1);
+
+    // Regenerate keeps the saved OPEX choices but always re-includes every
+    // cost-of-sales line, so a type newly tagged as cost of sales flows into
+    // gross profit instead of being dropped for not being in the original set.
+    // Shipping 700 + Ad Spent 3,000 + COD 300 + VAT 36 = 4,036.
+    expect((float) $statement->gross_profit)->toBe(10964.0);
+    $this->assertDatabaseCount('finance_income_statement_expenses', 4);
 });
 
 test('transaction type stores the nature and income statement section', function () {
@@ -313,5 +313,56 @@ test('the transaction types page offers the allocation bases', function () {
             ->where('allocationBases', fn ($bases) => collect($bases)->pluck('value')->all() === [
                 'delivered_parcels', 'total_orders', 'delivered_revenue',
             ])
+        );
+});
+
+test('the statement carries the same figures as its per-product and per-user slices', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    // An order with no platform or page recorded still belongs on the statement.
+    makeGencysOrder($workspace, [
+        'parcel_status' => 'DELIVERED',
+        'parcel_updated_date' => '2026-05-14 09:00:00',
+        'price_final' => 1000,
+        'total_cog' => 250,
+        'shipped_out_date' => '2026-05-11',
+        'shipping_fee' => 90,
+    ]);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05',
+        'cod_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'included_keys' => [-2],
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // 10,000 from the seed plus the 1,000 order with no platform or page.
+    expect((float) $statement->total_delivered)->toBe(11000.0)
+        ->and((int) $statement->delivered_orders)->toBe(3)
+        // Shipping counts the same order set the revenue does: 150 + 250 + 90.
+        ->and((int) $statement->shipped_orders)->toBe(4)
+        ->and((float) $statement->total_shipping_fee)->toBe(790.0)
+        // The whole month's Ad Spent, tagged or not.
+        ->and((float) $statement->ad_spent)->toBe(3000.0)
+        // 2% of 11,000, then 12% of that.
+        ->and((float) $statement->cod_fee)->toBe(220.0)
+        ->and((float) $statement->cod_fee_vat)->toBe(26.4)
+        ->and((float) $statement->total_delivered_cogs)->toBe(250.0);
+
+    // Common costs = 3,000 + 790 + 220 + 26.40 = 4,036.40.
+    // Delivered basis: 11,000 − 4,036.40 − 250 = 6,713.60
+    expect((float) $statement->gross_profit_delivered_cogs)->toBe(6713.60)
+        // Nothing was bought this month, so the bought basis charges no goods.
+        ->and((float) $statement->gross_profit_bought_cogs)->toBe(6963.60);
+
+    $this->actingAs($user)
+        ->get(isUrl($workspace, "/{$statement->id}"))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('figures.delivered_amount', fn ($v) => (float) $v === 11000.0)
+            ->where('figures.gross_profit_delivered_cogs', fn ($v) => (float) $v === 6713.60)
         );
 });
