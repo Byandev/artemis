@@ -136,11 +136,10 @@ const buildColumns = (
         help: 'Parcels delivered this month that contained this product. A parcel holding two products counts once for each, so this column can add up to more than the month’s parcels.',
         render: (r) => int(r.delivered_orders),
     },
-    {
-        label: 'Delivered Units',
-        help: 'Pieces of this product delivered this month, from the line-item quantities. Three of one product in a single parcel is one order but three units — this is the figure stock is drawn down by.',
-        render: (r) => int(r.delivered_units),
-    },
+    // Delivered Units is hidden for now. It is still computed and stored on
+    // `finance_income_product_statements.delivered_units`, and still shown in
+    // the Unresolved breakdown — put this entry back to bring the column back:
+    // { label: 'Delivered Units', help: '…', render: (r) => int(r.delivered_units) },
     {
         label: 'Delivered Amount',
         help: 'Revenue from those parcels. A parcel carrying several products has its value divided between them by item quantity, so nothing is counted twice.',
