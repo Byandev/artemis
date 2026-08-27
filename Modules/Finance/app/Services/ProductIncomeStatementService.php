@@ -48,6 +48,8 @@ class ProductIncomeStatementService
         // Struck at the rates saved on the parent statement, not today's.
         $codRate = (float) $statement->cod_fee_rate;
         $vatRate = (float) $statement->vat_rate;
+        $advisoryRate = (float) $statement->advisory_rate;
+        $gencysPartner = (bool) $workspace->is_gencys_partner;
 
         $delivered = $this->deliveredByProduct($workspace, $from, $to);
         $shipped = $this->shippedByProduct($workspace, $from, $to);
@@ -68,7 +70,7 @@ class ProductIncomeStatementService
             ->whereIn('id', $keys->filter(fn ($k) => $k !== '')->map(fn ($k) => (int) $k)->all())
             ->pluck('name', 'id');
 
-        $rows = $keys->map(function ($key) use ($delivered, $shipped, $boughtCogs, $boughtFreight, $adSpent, $names, $codRate, $vatRate) {
+        $rows = $keys->map(function ($key) use ($delivered, $shipped, $boughtCogs, $boughtFreight, $adSpent, $names, $codRate, $vatRate, $advisoryRate, $gencysPartner) {
             $productId = $key === '' ? null : (int) $key;
             $sold = $delivered[$key] ?? ['orders' => 0, 'units' => 0, 'revenue' => 0.0, 'cog' => 0.0];
 
@@ -87,6 +89,17 @@ class ProductIncomeStatementService
             // only in which cost of goods they charge.
             $commonCosts = $adSpend + $shippingFee + $codFee + $codVat;
 
+            $grossDelivered = round($revenue - $commonCosts - $deliveredCogs, 2);
+            // Freight on a purchase is part of what the stock cost.
+            $grossBought = round($revenue - $commonCosts - $productCogs - $boughtFreightFee, 2);
+
+            // A share of gross profit for gencys partners, taken on whichever
+            // basis it sits beside. Only a positive gross owes anything — a
+            // loss doesn't earn a rebate.
+            $advisory = fn (float $gross) => ($gencysPartner && $gross > 0)
+                ? round($gross * $advisoryRate, 2)
+                : 0.0;
+
             return [
                 'product_id' => $productId,
                 'product_name' => $productId !== null ? ($names[$productId] ?? 'Unknown') : 'Unresolved',
@@ -102,9 +115,10 @@ class ProductIncomeStatementService
                 'total_bought_cogs' => $productCogs,
                 'total_bought_cogs_delivery_fee' => $boughtFreightFee,
                 'total_delivered_cogs' => $deliveredCogs,
-                'gross_profit_delivered_cogs' => round($revenue - $commonCosts - $deliveredCogs, 2),
-                // Freight on a purchase is part of what the stock cost.
-                'gross_profit_bought_cogs' => round($revenue - $commonCosts - $productCogs - $boughtFreightFee, 2),
+                'gross_profit_delivered_cogs' => $grossDelivered,
+                'gross_profit_delivered_cogs_advisory_share' => $advisory($grossDelivered),
+                'gross_profit_bought_cogs' => $grossBought,
+                'gross_profit_bought_cogs_advisory_share' => $advisory($grossBought),
             ];
         })->values();
 
@@ -142,7 +156,9 @@ class ProductIncomeStatementService
             'total_bought_cogs_delivery_fee' => (float) $r->total_bought_cogs_delivery_fee,
             'total_delivered_cogs' => (float) $r->total_delivered_cogs,
             'gross_profit_delivered_cogs' => (float) $r->gross_profit_delivered_cogs,
+            'gross_profit_delivered_cogs_advisory_share' => (float) $r->gross_profit_delivered_cogs_advisory_share,
             'gross_profit_bought_cogs' => (float) $r->gross_profit_bought_cogs,
+            'gross_profit_bought_cogs_advisory_share' => (float) $r->gross_profit_bought_cogs_advisory_share,
         ]);
 
         $named = $rows->filter(fn ($r) => $r['product_id'] !== null)
@@ -168,7 +184,9 @@ class ProductIncomeStatementService
             'total_bought_cogs_delivery_fee' => $sum('total_bought_cogs_delivery_fee'),
             'total_delivered_cogs' => $sum('total_delivered_cogs'),
             'gross_profit_delivered_cogs' => $sum('gross_profit_delivered_cogs'),
+            'gross_profit_delivered_cogs_advisory_share' => $sum('gross_profit_delivered_cogs_advisory_share'),
             'gross_profit_bought_cogs' => $sum('gross_profit_bought_cogs'),
+            'gross_profit_bought_cogs_advisory_share' => $sum('gross_profit_bought_cogs_advisory_share'),
         ];
 
         $unresolved = $rows->first(fn ($r) => $r['product_id'] === null);
@@ -182,7 +200,9 @@ class ProductIncomeStatementService
             'rates' => [
                 'cod' => (float) $statement->cod_fee_rate,
                 'vat' => (float) $statement->vat_rate,
+                'advisory' => (float) $statement->advisory_rate,
             ],
+            'gencysPartner' => (bool) $statement->workspace->is_gencys_partner,
         ];
     }
 

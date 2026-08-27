@@ -21,6 +21,7 @@ interface Statement {
     period_month: string; // YYYY-MM-DD
     cod_fee_rate: number; // fraction (0.02)
     vat_rate: number; // fraction (0.12)
+    advisory_rate: number; // fraction (0.30)
     gencys_partner: boolean;
     generated_at?: string | null;
 }
@@ -153,8 +154,10 @@ export default function IncomeStatementShow({
                     rates={{
                         cod: statement.cod_fee_rate,
                         vat: statement.vat_rate,
+                        advisory: statement.advisory_rate,
                     }}
                     monthLabel={monthLabel}
+                    gencysPartner={statement.gencys_partner}
                 />
 
                 <p className="mt-3 text-[11px] text-gray-400">

@@ -50,6 +50,8 @@ class UserIncomeStatementService
         // Struck at the rates saved on the parent statement, not today's.
         $codRate = (float) $statement->cod_fee_rate;
         $vatRate = (float) $statement->vat_rate;
+        $advisoryRate = (float) $statement->advisory_rate;
+        $gencysPartner = (bool) $workspace->is_gencys_partner;
 
         $resolve = $this->cellUserResolver($workspace);
 
@@ -101,7 +103,7 @@ class UserIncomeStatementService
         $names = User::whereIn('id', array_values(array_filter(array_keys($totals), fn ($k) => $k !== '')))
             ->pluck('name', 'id');
 
-        $rows = collect($totals)->map(function ($t, $key) use ($names, $codRate, $vatRate) {
+        $rows = collect($totals)->map(function ($t, $key) use ($names, $codRate, $vatRate, $advisoryRate, $gencysPartner) {
             $userId = $key === '' ? null : (int) $key;
 
             $revenue = round((float) $t['delivered_amount'], 2);
@@ -118,6 +120,17 @@ class UserIncomeStatementService
             // only in which cost of goods they charge.
             $commonCosts = $adSpent + $shippingFee + $codFee + $codVat;
 
+            $grossDelivered = round($revenue - $commonCosts - $deliveredCogs, 2);
+            // Freight on a purchase is part of what the stock cost.
+            $grossBought = round($revenue - $commonCosts - $boughtCogs - $boughtFreight, 2);
+
+            // A share of gross profit for gencys partners, taken on whichever
+            // basis it sits beside. Only a positive gross owes anything — a
+            // loss doesn't earn a rebate.
+            $advisory = fn (float $gross) => ($gencysPartner && $gross > 0)
+                ? round($gross * $advisoryRate, 2)
+                : 0.0;
+
             return [
                 'user_id' => $userId,
                 'user_name' => $userId !== null ? ($names[$userId] ?? 'Unknown') : 'Unassigned',
@@ -132,9 +145,10 @@ class UserIncomeStatementService
                 'total_bought_cogs' => $boughtCogs,
                 'total_bought_cogs_delivery_fee' => $boughtFreight,
                 'total_delivered_cogs' => $deliveredCogs,
-                'gross_profit_delivered_cogs' => round($revenue - $commonCosts - $deliveredCogs, 2),
-                // Freight on a purchase is part of what the stock cost.
-                'gross_profit_bought_cogs' => round($revenue - $commonCosts - $boughtCogs - $boughtFreight, 2),
+                'gross_profit_delivered_cogs' => $grossDelivered,
+                'gross_profit_delivered_cogs_advisory_share' => $advisory($grossDelivered),
+                'gross_profit_bought_cogs' => $grossBought,
+                'gross_profit_bought_cogs_advisory_share' => $advisory($grossBought),
             ];
         })->values();
 
@@ -172,7 +186,9 @@ class UserIncomeStatementService
             'total_bought_cogs_delivery_fee' => (float) $r->total_bought_cogs_delivery_fee,
             'total_delivered_cogs' => (float) $r->total_delivered_cogs,
             'gross_profit_delivered_cogs' => (float) $r->gross_profit_delivered_cogs,
+            'gross_profit_delivered_cogs_advisory_share' => (float) $r->gross_profit_delivered_cogs_advisory_share,
             'gross_profit_bought_cogs' => (float) $r->gross_profit_bought_cogs,
+            'gross_profit_bought_cogs_advisory_share' => (float) $r->gross_profit_bought_cogs_advisory_share,
         ]);
 
         $named = $rows->filter(fn ($r) => $r['user_id'] !== null)
@@ -198,7 +214,9 @@ class UserIncomeStatementService
             'total_bought_cogs_delivery_fee' => $sum('total_bought_cogs_delivery_fee'),
             'total_delivered_cogs' => $sum('total_delivered_cogs'),
             'gross_profit_delivered_cogs' => $sum('gross_profit_delivered_cogs'),
+            'gross_profit_delivered_cogs_advisory_share' => $sum('gross_profit_delivered_cogs_advisory_share'),
             'gross_profit_bought_cogs' => $sum('gross_profit_bought_cogs'),
+            'gross_profit_bought_cogs_advisory_share' => $sum('gross_profit_bought_cogs_advisory_share'),
         ];
 
         $unassigned = $rows->first(fn ($r) => $r['user_id'] === null);
@@ -211,7 +229,9 @@ class UserIncomeStatementService
             'rates' => [
                 'cod' => (float) $statement->cod_fee_rate,
                 'vat' => (float) $statement->vat_rate,
+                'advisory' => (float) $statement->advisory_rate,
             ],
+            'gencysPartner' => (bool) $statement->workspace->is_gencys_partner,
         ];
     }
 

@@ -358,11 +358,70 @@ test('the statement carries the same figures as its per-product and per-user sli
         // Nothing was bought this month, so the bought basis charges no goods.
         ->and((float) $statement->gross_profit_bought_cogs)->toBe(6963.60);
 
+    // Every figure the card renders has to be in the payload — a missing one
+    // reaches the page as undefined and renders as NaN.
     $this->actingAs($user)
         ->get(isUrl($workspace, "/{$statement->id}"))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->where('figures.delivered_amount', fn ($v) => (float) $v === 11000.0)
             ->where('figures.gross_profit_delivered_cogs', fn ($v) => (float) $v === 6713.60)
+            ->has('figures.gross_profit_delivered_cogs_advisory_share')
+            ->has('figures.gross_profit_bought_cogs_advisory_share')
+            ->has('statement.advisory_rate')
+            ->has('statement.gencys_partner')
         );
+});
+
+test('the advisory share is a cut of positive gross profit, partners only', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+    seedMay($workspace);
+
+    $save = fn () => $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05',
+        'cod_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+    ])->assertRedirect();
+
+    $save();
+    $statement = IncomeStatement::first();
+
+    // Delivered 10,000 less ad spend 3,000, shipping 700, COD 200 and VAT 24,
+    // then the goods: nothing shipped with a cost on it, so gross is 6,076.
+    expect((float) $statement->gross_profit_delivered_cogs)->toBe(6076.0)
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(1822.80)
+        // Nothing was bought this month, so that basis is the same here.
+        ->and((float) $statement->gross_profit_bought_cogs)->toBe(6076.0)
+        ->and((float) $statement->gross_profit_bought_cogs_advisory_share)->toBe(1822.80);
+
+    // A workspace that isn't a partner owes nothing on the same numbers.
+    $workspace->update(['is_gencys_partner' => false]);
+    $save();
+
+    expect((float) $statement->fresh()->gross_profit_delivered_cogs_advisory_share)->toBe(0.0);
+});
+
+test('a loss owes no advisory share', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+    ['account' => $account, 'adSpent' => $adSpent] = seedMay($workspace);
+
+    // Enough extra ad spend to push the month into a loss.
+    makeTxn($workspace, $account, $adSpent, 'out', 20000, '2026-05-18');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05',
+        'cod_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    expect((float) $statement->gross_profit_delivered_cogs)->toBeLessThan(0)
+        // A negative gross earns no rebate — it is simply nothing.
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0)
+        ->and((float) $statement->gross_profit_bought_cogs_advisory_share)->toBe(0.0);
 });

@@ -90,7 +90,7 @@ class IncomeStatementController extends Controller
 
         $revenue = $this->deliveredRevenue($workspace, $from, $to);
         $lines = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate);
-        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate);
+        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate);
 
         // Preview always defaults every line checked, so lines that appear after a
         // statement was last saved (e.g. a newly-flagged type, or new transactions)
@@ -109,6 +109,8 @@ class IncomeStatementController extends Controller
                 'period_month' => $periodMonth,
                 'cod_fee_rate' => $codRate,
                 'vat_rate' => $vatRate,
+                'advisory_rate' => $advisoryRate,
+                'gencys_partner' => (bool) $workspace->is_gencys_partner,
             ],
         ]);
     }
@@ -189,13 +191,17 @@ class IncomeStatementController extends Controller
                 'total_bought_cogs_delivery_fee' => (float) $incomeStatement->total_bought_cogs_delivery_fee,
                 'total_delivered_cogs' => (float) $incomeStatement->total_delivered_cogs,
                 'gross_profit_delivered_cogs' => (float) $incomeStatement->gross_profit_delivered_cogs,
+                'gross_profit_delivered_cogs_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_advisory_share,
                 'gross_profit_bought_cogs' => (float) $incomeStatement->gross_profit_bought_cogs,
+                'gross_profit_bought_cogs_advisory_share' => (float) $incomeStatement->gross_profit_bought_cogs_advisory_share,
             ],
             'statement' => [
                 'id' => $incomeStatement->id,
                 'period_month' => $incomeStatement->period_month->toDateString(),
                 'cod_fee_rate' => (float) $incomeStatement->cod_fee_rate,
                 'vat_rate' => (float) $incomeStatement->vat_rate,
+                'advisory_rate' => (float) $incomeStatement->advisory_rate,
+                'gencys_partner' => (bool) $workspace->is_gencys_partner,
                 'generated_at' => $incomeStatement->generated_at?->toIso8601String(),
             ],
         ]);
@@ -322,7 +328,7 @@ class IncomeStatementController extends Controller
 
         $netProfit = $grossProfit - $opex - $advisoryShare;
 
-        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate);
+        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate);
 
         return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $codRate, $vatRate, $advisoryRate, $advisoryShare, $figures) {
             $statement = IncomeStatement::updateOrCreate(
@@ -457,7 +463,7 @@ class IncomeStatementController extends Controller
      *
      * @return array<string, float|int>
      */
-    private function figures(Workspace $workspace, Carbon $from, Carbon $to, float $codRate, float $vatRate): array
+    private function figures(Workspace $workspace, Carbon $from, Carbon $to, float $codRate, float $vatRate, float $advisoryRate): array
     {
         $delivered = $this->statementOrders($workspace)
             ->where('parcel_status', self::DELIVERED_STATUS)
@@ -488,6 +494,17 @@ class IncomeStatementController extends Controller
         // in which cost of goods they charge.
         $commonCosts = $adSpent + $shippingFee + $codFee + $codVat;
 
+        $grossDelivered = round($revenue - $commonCosts - $deliveredCogs, 2);
+        // Freight on a purchase is part of what the stock cost.
+        $grossBought = round($revenue - $commonCosts - $boughtCogs - $boughtFreight, 2);
+
+        // A share of gross profit for gencys partners, taken on whichever
+        // basis it sits beside. Only a positive gross owes anything — a
+        // loss doesn't earn a rebate.
+        $advisory = fn (float $gross) => ($workspace->is_gencys_partner && $gross > 0)
+            ? round($gross * $advisoryRate, 2)
+            : 0.0;
+
         return [
             'delivered_orders' => $orders,
             'delivered_units' => $units,
@@ -499,9 +516,10 @@ class IncomeStatementController extends Controller
             'total_bought_cogs' => $boughtCogs,
             'total_bought_cogs_delivery_fee' => $boughtFreight,
             'total_delivered_cogs' => $deliveredCogs,
-            'gross_profit_delivered_cogs' => round($revenue - $commonCosts - $deliveredCogs, 2),
-            // Freight on a purchase is part of what the stock cost.
-            'gross_profit_bought_cogs' => round($revenue - $commonCosts - $boughtCogs - $boughtFreight, 2),
+            'gross_profit_delivered_cogs' => $grossDelivered,
+            'gross_profit_delivered_cogs_advisory_share' => $advisory($grossDelivered),
+            'gross_profit_bought_cogs' => $grossBought,
+            'gross_profit_bought_cogs_advisory_share' => $advisory($grossBought),
         ];
     }
 

@@ -42,7 +42,9 @@ interface UserRow {
     total_bought_cogs_delivery_fee: number;
     total_delivered_cogs: number;
     gross_profit_delivered_cogs: number;
+    gross_profit_delivered_cogs_advisory_share: number;
     gross_profit_bought_cogs: number;
+    gross_profit_bought_cogs_advisory_share: number;
 }
 
 /**
@@ -64,17 +66,22 @@ interface Props {
     users: UserRow[];
     total: UserRow;
     /** The rates these rows were struck at, as fractions. */
-    rates: { cod: number; vat: number };
+    rates: { cod: number; vat: number; advisory: number };
+    /** The advisory share is only taken on partner workspaces. */
+    gencysPartner: boolean;
     unassigned: UnassignedRow[];
 }
 
 const fmt = (v: number) =>
-    Number(v).toLocaleString('en-PH', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
+    Number.isFinite(Number(v))
+        ? Number(v).toLocaleString('en-PH', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+          })
+        : '—';
 
-const int = (v: number) => Number(v).toLocaleString('en-PH');
+const int = (v: number) =>
+    Number.isFinite(Number(v)) ? Number(v).toLocaleString('en-PH') : '—';
 
 const CARD =
     'rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900';
@@ -120,8 +127,10 @@ const buildColumns = (
     rates: {
         cod: number;
         vat: number;
+        advisory: number;
     },
     cogsView: CogsView,
+    gencysPartner: boolean,
 ): {
     label: string;
     help: string;
@@ -190,6 +199,16 @@ const buildColumns = (
                   emphasis: true,
                   signed: (r: UserRow) => r.gross_profit_bought_cogs,
               },
+              ...(gencysPartner
+                  ? [
+                        {
+                            label: 'Advisory Share',
+                            help: `A share of gross profit taken by the partner — ${pct(rates.advisory)} of a positive Gross Profit, at the rate saved on this statement. A loss owes nothing.`,
+                            render: (r: UserRow) =>
+                                fmt(r.gross_profit_bought_cogs_advisory_share),
+                        },
+                    ]
+                  : []),
           ]
         : [
               {
@@ -205,6 +224,18 @@ const buildColumns = (
                   emphasis: true,
                   signed: (r: UserRow) => r.gross_profit_delivered_cogs,
               },
+              ...(gencysPartner
+                  ? [
+                        {
+                            label: 'Advisory Share',
+                            help: `A share of gross profit taken by the partner — ${pct(rates.advisory)} of a positive Gross Profit, at the rate saved on this statement. A loss owes nothing.`,
+                            render: (r: UserRow) =>
+                                fmt(
+                                    r.gross_profit_delivered_cogs_advisory_share,
+                                ),
+                        },
+                    ]
+                  : []),
           ]),
 ];
 
@@ -214,13 +245,14 @@ export default function UserIncomeStatements({
     users,
     total,
     rates,
+    gencysPartner,
     unassigned: unassignedRows,
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
     const [cogsView, setCogsView] = useState<CogsView>('delivered');
     const [unassignedOpen, setUnassignedOpen] = useState(false);
     const unlinkedCells = unassignedRows.filter((u) => u.cell !== null).length;
-    const COLUMNS = buildColumns(rates, cogsView);
+    const COLUMNS = buildColumns(rates, cogsView, gencysPartner);
     const named = users.filter((u) => u.user_id !== null);
 
     // The cost of what shipped against what was bought — the gap is inventory

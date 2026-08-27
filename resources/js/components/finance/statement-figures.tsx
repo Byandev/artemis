@@ -25,7 +25,9 @@ export interface StatementFigureSet {
     total_bought_cogs_delivery_fee: number;
     total_delivered_cogs: number;
     gross_profit_delivered_cogs: number;
+    gross_profit_delivered_cogs_advisory_share: number;
     gross_profit_bought_cogs: number;
+    gross_profit_bought_cogs_advisory_share: number;
 }
 
 type CogsView = 'delivered' | 'bought';
@@ -36,12 +38,15 @@ const COGS_VIEWS: { value: CogsView; label: string }[] = [
 ];
 
 const fmt = (v: number) =>
-    Number(v).toLocaleString('en-PH', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    });
+    Number.isFinite(Number(v))
+        ? Number(v).toLocaleString('en-PH', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+          })
+        : '—';
 
-const int = (v: number) => Number(v).toLocaleString('en-PH');
+const int = (v: number) =>
+    Number.isFinite(Number(v)) ? Number(v).toLocaleString('en-PH') : '—';
 const pct = (fraction: number) => `${Number((fraction * 100).toFixed(4))}%`;
 
 const CARD =
@@ -51,10 +56,13 @@ export default function StatementFigures({
     figures,
     rates,
     monthLabel,
+    gencysPartner = false,
 }: {
     figures: StatementFigureSet;
-    rates: { cod: number; vat: number };
+    rates: { cod: number; vat: number; advisory: number };
     monthLabel: string;
+    /** The advisory share is only taken on partner workspaces. */
+    gencysPartner?: boolean;
 }) {
     const [cogsView, setCogsView] = useState<CogsView>('delivered');
 
@@ -121,6 +129,17 @@ export default function StatementFigures({
                       emphasis: true,
                       signed: figures.gross_profit_bought_cogs,
                   },
+                  ...(gencysPartner
+                      ? [
+                            {
+                                label: 'Advisory Share',
+                                help: `A share of gross profit taken by the partner — ${pct(rates.advisory)} of a positive Gross Profit, at the rate saved on this statement. A loss owes nothing.`,
+                                value: fmt(
+                                    figures.gross_profit_bought_cogs_advisory_share,
+                                ),
+                            },
+                        ]
+                      : []),
               ]
             : [
                   {
@@ -136,6 +155,17 @@ export default function StatementFigures({
                       emphasis: true,
                       signed: figures.gross_profit_delivered_cogs,
                   },
+                  ...(gencysPartner
+                      ? [
+                            {
+                                label: 'Advisory Share',
+                                help: `A share of gross profit taken by the partner — ${pct(rates.advisory)} of a positive Gross Profit, at the rate saved on this statement. A loss owes nothing.`,
+                                value: fmt(
+                                    figures.gross_profit_delivered_cogs_advisory_share,
+                                ),
+                            },
+                        ]
+                      : []),
               ]),
     ];
 
