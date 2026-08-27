@@ -18,6 +18,7 @@ use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
+use Modules\Finance\Statements\TransactionTotals;
 
 /**
  * Monthly workspace-wide income statement for gencys-partner workspaces.
@@ -36,7 +37,10 @@ class IncomeStatementController extends Controller
 {
     use AuthorizesRequests;
 
-    public function __construct(private readonly StatementOrderSourceFactory $sources) {}
+    public function __construct(
+        private readonly StatementOrderSourceFactory $sources,
+        private readonly TransactionTotals $transactions,
+    ) {}
 
     /** Sentinel type_keys for the auto-computed cost-of-sales lines. */
     private const SHIPPING_FEE_KEY = -1;
@@ -452,7 +456,8 @@ class IncomeStatementController extends Controller
      */
     private function figures(Workspace $workspace, Carbon $from, Carbon $to, float $codRate, float $vatRate, float $advisoryRate, float $advisoryDeliveredRate): array
     {
-        $totals = $this->sources->for($workspace)->workspaceTotals($workspace, $from, $to);
+        $source = $this->sources->for($workspace);
+        $totals = $source->workspaceTotals($workspace, $from, $to);
 
         $revenue = $totals->deliveredAmount;
         $orders = $totals->deliveredOrders;
@@ -461,9 +466,11 @@ class IncomeStatementController extends Controller
         $shippedOrders = $totals->shippedOrders;
         $shippingFee = $totals->shippingFee;
 
-        $adSpent = $this->typeTotal($workspace, $from, $to, ['%adspent%', '%ad spent%', '%ad spend%']);
-        $boughtCogs = $this->typeTotal($workspace, $from, $to, ['%cost of goods%']);
-        $boughtFreight = $this->typeTotal($workspace, $from, $to, ['%delivery of cog%', '%delivery of goods%', '%cog delivery%']);
+        // Ad spend follows the workspace's source; goods and their freight are
+        // booked through the ledger either way.
+        $adSpent = $source->workspaceAdSpend($workspace, $from, $to);
+        $boughtCogs = $this->transactions->forWorkspace($workspace, $from, $to, TransactionTotals::COST_OF_GOODS);
+        $boughtFreight = $this->transactions->forWorkspace($workspace, $from, $to, TransactionTotals::COG_DELIVERY);
 
         $codFee = round($revenue * $codRate, 2);
         $codVat = round($codFee * $vatRate, 2);
@@ -514,33 +521,6 @@ class IncomeStatementController extends Controller
             'gross_profit_bought_cogs_after_advisory_share' => round($grossBought - $advisory($grossBought), 2),
             'advisory_share_on_delivered' => $advisoryOnDelivered,
         ];
-    }
-
-    /**
-     * The month's whole outflow for the transaction types matching any of the
-     * given (lowercased) LIKE patterns.
-     *
-     * @param  list<string>  $patterns
-     */
-    private function typeTotal(Workspace $workspace, Carbon $from, Carbon $to, array $patterns): float
-    {
-        $typeIds = TransactionType::where('workspace_id', $workspace->id)
-            ->where(function ($q) use ($patterns) {
-                foreach ($patterns as $pattern) {
-                    $q->orWhereRaw('LOWER(name) LIKE ?', [$pattern]);
-                }
-            })
-            ->pluck('id');
-
-        if ($typeIds->isEmpty()) {
-            return 0.0;
-        }
-
-        return round((float) Transaction::where('workspace_id', $workspace->id)
-            ->where('type', 'out')
-            ->whereIn('transaction_type_id', $typeIds)
-            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
-            ->sum('amount'), 2);
     }
 
     /**
@@ -599,7 +579,8 @@ class IncomeStatementController extends Controller
         $settings = IncomeStatementSetting::where('workspace_id', $workspace->id)->first();
 
         return [
-            (float) ($settings?->cod_fee_rate ?? IncomeStatementSetting::DEFAULT_COD_FEE_RATE),
+            // A saved rate is an explicit choice; otherwise the courier's own.
+            (float) ($settings?->cod_fee_rate ?? $this->sources->for($workspace)->defaultCodFeeRate()),
             (float) ($settings?->vat_rate ?? IncomeStatementSetting::DEFAULT_VAT_RATE),
             (float) ($settings?->advisory_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_RATE),
             (float) ($settings?->advisory_delivered_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_DELIVERED_RATE),

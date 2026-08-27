@@ -2,6 +2,7 @@
 
 namespace Modules\Finance\Statements\Sources;
 
+use App\Models\Page;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -21,9 +22,65 @@ use Modules\Finance\Statements\OrderTotals;
  */
 final class PancakeOrderSource implements StatementOrderSource
 {
+    /** The courier on this side charges more than the gencys one. */
+    public const COD_FEE_RATE = 0.0275;
+
     public function label(): string
     {
         return 'pancake orders';
+    }
+
+    public function defaultCodFeeRate(): float
+    {
+        return self::COD_FEE_RATE;
+    }
+
+    /**
+     * A pancake workspace has its spend counted per page per day by the ads
+     * sync, so it is read from there rather than from the finance ledger.
+     *
+     * Every row counts, whatever wrote it. The table is unique on workspace,
+     * page and date — `source` is not part of that key — so a page cannot hold
+     * two rows for one day, and filtering by source would only risk dropping
+     * spend that happened to be written by the other importer.
+     *
+     * A page belongs to a shop and a shop to a product, which is how spend
+     * reaches a product; a page has an owner, which is how it reaches a person.
+     */
+    public function workspaceAdSpend(Workspace $workspace, Carbon $from, Carbon $to): float
+    {
+        return round((float) $this->adSpend($workspace, $from, $to)->sum('r.ad_spent'), 2);
+    }
+
+    public function adSpendByProduct(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        return $this->adSpendKeyedBy($workspace, $from, $to, 'sh.product_id', fn ($q) => $q
+            ->leftJoin('shops as sh', 'sh.id', '=', 'pg.shop_id'));
+    }
+
+    public function adSpendByUser(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        return $this->adSpendKeyedBy($workspace, $from, $to, 'pg.owner_id', fn ($q) => $q);
+    }
+
+    /** @return array<string, float> */
+    private function adSpendKeyedBy(Workspace $workspace, Carbon $from, Carbon $to, string $column, callable $join): array
+    {
+        return $join($this->adSpend($workspace, $from, $to))
+            ->selectRaw($column.' as grouping_key, COALESCE(SUM(r.ad_spent), 0) as amount')
+            ->groupBy(DB::raw($column))
+            ->get()
+            ->mapWithKeys(fn ($r) => [$this->key($r->grouping_key) => round((float) $r->amount, 2)])
+            ->all();
+    }
+
+    private function adSpend(Workspace $workspace, Carbon $from, Carbon $to)
+    {
+        return DB::table('page_daily_records as r')
+            ->join('pages as pg', 'pg.id', '=', 'r.page_id')
+            ->where('r.workspace_id', $workspace->id)
+            ->where('r.page_type', (new Page)->getMorphClass())
+            ->whereBetween('r.date', [$from->toDateString(), $to->toDateString()]);
     }
 
     public function workspaceTotals(Workspace $workspace, Carbon $from, Carbon $to): OrderTotals

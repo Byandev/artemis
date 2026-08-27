@@ -6,8 +6,10 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Statements\Contracts\StatementOrderSource;
 use Modules\Finance\Statements\OrderTotals;
+use Modules\Finance\Statements\TransactionTotals;
 use Modules\GencysERP\Models\Intern;
 use Modules\GencysERP\Support\InternResolver;
 
@@ -30,9 +32,37 @@ final class GencysOrderSource implements StatementOrderSource
 
     private const EXCLUDED_PAGE_LIKE = '%pikutin%';
 
+    public function __construct(private readonly TransactionTotals $transactions) {}
+
     public function label(): string
     {
         return 'gencys orders';
+    }
+
+    public function defaultCodFeeRate(): float
+    {
+        return IncomeStatementSetting::DEFAULT_COD_FEE_RATE;
+    }
+
+    /**
+     * A gencys workspace books its advertising through the finance ledger, so
+     * the figures come from the Ad Spent transactions: the whole month for the
+     * workspace, the product tags per product, and the charge-to shares per
+     * person.
+     */
+    public function workspaceAdSpend(Workspace $workspace, Carbon $from, Carbon $to): float
+    {
+        return $this->transactions->forWorkspace($workspace, $from, $to, TransactionTotals::AD_SPENT);
+    }
+
+    public function adSpendByProduct(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        return $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::AD_SPENT);
+    }
+
+    public function adSpendByUser(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        return $this->transactions->byChargedUser($workspace, $from, $to, TransactionTotals::AD_SPENT);
     }
 
     public function workspaceTotals(Workspace $workspace, Carbon $from, Carbon $to): OrderTotals

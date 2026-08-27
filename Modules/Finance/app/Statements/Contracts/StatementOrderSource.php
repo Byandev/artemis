@@ -14,4 +14,12 @@ interface StatementOrderSource extends ProvidesProductTotals, ProvidesUserTotals
 {
     /** For messages and empty states: "gencys orders", "pancake orders". */
     public function label(): string;
+
+    /**
+     * The COD fee the courier on this side charges, as a fraction.
+     *
+     * Used only when the workspace hasn't saved a rate of its own — a saved
+     * rate is an explicit choice and always wins.
+     */
+    public function defaultCodFeeRate(): float;
 }

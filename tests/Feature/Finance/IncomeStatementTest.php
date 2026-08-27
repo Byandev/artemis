@@ -1,10 +1,13 @@
 <?php
 
 use App\Models\Page;
+use App\Models\PageDailyRecord;
 use App\Models\Shop;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
@@ -576,4 +579,115 @@ test('neither advisory basis applies to a workspace that is not a partner', func
 
     expect((float) $statement->advisory_share_on_delivered)->toBe(0.0)
         ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0);
+});
+
+test('a non-partner takes its ad spend from the page daily records', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace); // is_gencys_partner defaults false
+
+    $page = Page::where('workspace_id', $workspace->id)->first();
+
+    $record = fn (array $attrs) => DB::table('page_daily_records')->insert(array_merge([
+        'workspace_id' => $workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => (new Page)->getMorphClass(),
+        'page_id' => $page->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $attrs));
+
+    $record(['date' => '2026-05-04', 'ad_spent' => 1200]);
+    $record(['date' => '2026-05-19', 'ad_spent' => 800]);
+    // Outside the month.
+    $record(['date' => '2026-04-28', 'ad_spent' => 5000]);
+    // The table is unique on workspace, page and date whatever wrote the row,
+    // so a row from the other importer is just another day's spend, not a
+    // duplicate to be filtered out.
+    $record(['date' => '2026-05-21', 'ad_spent' => 500, 'source' => PageDailyRecord::SOURCE_GENCYS]);
+
+    // An Ad Spent transaction must not reach a pancake workspace's statement.
+    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+    $type = TransactionType::create([
+        'workspace_id' => $workspace->id,
+        'name' => 'Ad Spent',
+        'income_statement_section' => 'cost_of_sales',
+    ]);
+    Transaction::create([
+        'workspace_id' => $workspace->id,
+        'account_id' => $account->id,
+        'date' => '2026-05-15',
+        'description' => 'Ledger ad spend',
+        'type' => 'out',
+        'transaction_type_id' => $type->id,
+        'amount' => 7777,
+    ]);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // 1,200 + 800 + 500 from the page records; not April's 5,000, and not the
+    // 7,777 sitting in the ledger.
+    expect((float) $statement->ad_spent)->toBe(2500.0)
+        // 10,000 − ad 2,500 − shipping 700 − COD 200 − VAT 24 = 6,576.
+        ->and((float) $statement->gross_profit_delivered_cogs)->toBe(6576.0);
+});
+
+test('a gencys partner still takes its ad spend from the ledger', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace); // marks the workspace as a gencys partner
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    // The 3,000 Ad Spent transaction seedMay creates, untouched by the change.
+    expect((float) IncomeStatement::first()->ad_spent)->toBe(3000.0);
+});
+
+test('the COD fee rate follows the courier the workspace ships with', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace); // is_gencys_partner defaults false
+
+    // No saved rate, so the source's own is used.
+    $this->actingAs($user)->post(isUrl($workspace), ['month' => '2026-05'])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    expect((float) $statement->cod_fee_rate)->toBe(0.0275)
+        // 2.75% of the 10,000 delivered, then 12% of that fee.
+        ->and((float) $statement->cod_fee)->toBe(275.0)
+        ->and((float) $statement->cod_fee_vat)->toBe(33.0);
+
+    // Saving writes the rate back as the workspace default.
+    expect((float) IncomeStatementSetting::where('workspace_id', $workspace->id)->value('cod_fee_rate'))
+        ->toBe(0.0275);
+});
+
+test('a gencys partner keeps the 2% COD rate', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace); // marks the workspace as a gencys partner
+
+    $this->actingAs($user)->post(isUrl($workspace), ['month' => '2026-05'])->assertRedirect();
+
+    expect((float) IncomeStatement::first()->cod_fee_rate)->toBe(0.02);
+});
+
+test('a rate the workspace saved for itself wins over the courier default', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace);
+
+    // Someone negotiated their own rate.
+    IncomeStatementSetting::create([
+        'workspace_id' => $workspace->id,
+        'cod_fee_rate' => 0.015,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+    ]);
+
+    $this->actingAs($user)->post(isUrl($workspace), ['month' => '2026-05'])->assertRedirect();
+
+    expect((float) IncomeStatement::first()->cod_fee_rate)->toBe(0.015);
 });

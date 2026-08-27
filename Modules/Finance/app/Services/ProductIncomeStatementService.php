@@ -6,9 +6,9 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\IncomeStatement;
-use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Statements\OrderTotals;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
+use Modules\Finance\Statements\TransactionTotals;
 
 /**
  * Builds, saves and reads the per-product slices of an income statement.
@@ -29,7 +29,10 @@ use Modules\Finance\Statements\StatementOrderSourceFactory;
  */
 class ProductIncomeStatementService
 {
-    public function __construct(private readonly StatementOrderSourceFactory $sources) {}
+    public function __construct(
+        private readonly StatementOrderSourceFactory $sources,
+        private readonly TransactionTotals $transactions,
+    ) {}
 
     /** (Re)compute and store every per-product row for the statement's month. */
     public function snapshot(IncomeStatement $statement): void
@@ -43,10 +46,12 @@ class ProductIncomeStatementService
         $advisoryRate = (float) $statement->advisory_rate;
         $gencysPartner = (bool) $workspace->is_gencys_partner;
 
-        $orders = $this->sources->for($workspace)->totalsByProduct($workspace, $from, $to);
-        $boughtCogs = $this->taggedTotalsForTypes($workspace, $from, $to, $this->costOfGoodsTypeIds($workspace));
-        $boughtFreight = $this->taggedTotalsForTypes($workspace, $from, $to, $this->cogDeliveryTypeIds($workspace));
-        $adSpent = $this->taggedTotalsForTypes($workspace, $from, $to, $this->adSpentTypeIds($workspace));
+        $source = $this->sources->for($workspace);
+
+        $orders = $source->totalsByProduct($workspace, $from, $to);
+        $adSpent = $source->adSpendByProduct($workspace, $from, $to);
+        $boughtCogs = $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS);
+        $boughtFreight = $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY);
 
         // A product earns a row if anything happened to it this month — an
         // order, a purchase, or only an ad buy.
@@ -206,83 +211,6 @@ class ProductIncomeStatementService
         if (! $statement->productStatements()->exists()) {
             $this->snapshot($statement);
         }
-    }
-
-    /**
-     * Product-tagged outflow totals for the given transaction types, keyed by
-     * product id as a string ('' = a tag matching no product).
-     *
-     * @param  list<int>  $typeIds
-     * @return array<string, float>
-     */
-    private function taggedTotalsForTypes(Workspace $workspace, Carbon $from, Carbon $to, array $typeIds): array
-    {
-        if (empty($typeIds)) {
-            return [];
-        }
-
-        $rows = DB::table('finance_transaction_products as tp')
-            ->join('finance_transactions as t', 't.id', '=', 'tp.transaction_id')
-            ->where('t.workspace_id', $workspace->id)
-            ->where('t.type', 'out')
-            ->whereIn('t.transaction_type_id', $typeIds)
-            ->whereBetween('t.date', [$from->toDateString(), $to->toDateString()])
-            ->groupBy('tp.product')
-            ->selectRaw('tp.product as name, SUM(tp.amount) as amount')
-            ->get();
-
-        if ($rows->isEmpty()) {
-            return [];
-        }
-
-        $idByName = DB::table('products')
-            ->where('workspace_id', $workspace->id)
-            ->whereIn('name', $rows->pluck('name')->unique()->all())
-            ->pluck('id', 'name');
-
-        $totals = [];
-
-        foreach ($rows as $r) {
-            $key = isset($idByName[$r->name]) ? (string) $idByName[$r->name] : '';
-            $totals[$key] = ($totals[$key] ?? 0) + (float) $r->amount;
-        }
-
-        return $totals;
-    }
-
-    /** @return list<int> */
-    private function adSpentTypeIds(Workspace $workspace): array
-    {
-        return $this->typeIdsMatching($workspace, ['%adspent%', '%ad spent%', '%ad spend%']);
-    }
-
-    /** @return list<int> */
-    private function costOfGoodsTypeIds(Workspace $workspace): array
-    {
-        return $this->typeIdsMatching($workspace, ['%cost of goods%']);
-    }
-
-    /** @return list<int> */
-    private function cogDeliveryTypeIds(Workspace $workspace): array
-    {
-        return $this->typeIdsMatching($workspace, ['%delivery of cog%', '%delivery of goods%', '%cog delivery%']);
-    }
-
-    /**
-     * @param  list<string>  $patterns
-     * @return list<int>
-     */
-    private function typeIdsMatching(Workspace $workspace, array $patterns): array
-    {
-        return TransactionType::where('workspace_id', $workspace->id)
-            ->where(function ($q) use ($patterns) {
-                foreach ($patterns as $pattern) {
-                    $q->orWhereRaw('LOWER(name) LIKE ?', [$pattern]);
-                }
-            })
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
     }
 
     /** @return array{0:Carbon, 1:Carbon} [from, to] for the statement's month. */
