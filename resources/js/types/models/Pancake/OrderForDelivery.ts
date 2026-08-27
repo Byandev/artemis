@@ -18,6 +18,8 @@ export const ORDER_STATUSES = [
     'INCORRECT NUMBER',
     'AUTO DROP CX',
     'AUTO DROP RIDER',
+    'CX CALL ENDED',
+    'RIDER CALL ENDED',
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -100,6 +102,16 @@ export const STATUS_COLORS: Record<
         bg: 'bg-indigo-100',
         text: 'text-indigo-800',
         border: 'border-indigo-200',
+    },
+    'CX CALL ENDED': {
+        bg: 'bg-teal-100',
+        text: 'text-teal-800',
+        border: 'border-teal-200',
+    },
+    'RIDER CALL ENDED': {
+        bg: 'bg-teal-100',
+        text: 'text-teal-800',
+        border: 'border-teal-200',
     },
 };
 
