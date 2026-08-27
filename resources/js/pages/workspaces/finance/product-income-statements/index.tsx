@@ -147,11 +147,6 @@ const buildColumns = (
         emphasis: true,
     },
     {
-        label: 'Ad Spent',
-        help: 'Ad Spent transactions tagged to this product this month. Only tagged shares count — ad spend nobody attributed to a product is left out rather than spread across them on a guess.',
-        render: (r) => fmt(r.ad_spent),
-    },
-    {
         label: 'Shipped Orders',
         help: 'Parcels of this product shipped out this month, by shipped-out date and whatever became of them afterwards. A different set from Delivered Orders — the two are not expected to agree.',
         render: (r) => int(r.shipped_orders),
@@ -160,6 +155,11 @@ const buildColumns = (
         label: 'Total Shipping Fee',
         help: 'The courier fee on those parcels. Charged when a parcel ships, so a return is paid for too — this is not limited to what was delivered.',
         render: (r) => fmt(r.total_shipping_fee),
+    },
+    {
+        label: 'Ad Spent',
+        help: 'Ad Spent transactions tagged to this product this month. Only tagged shares count — ad spend nobody attributed to a product is left out rather than spread across them on a guess.',
+        render: (r) => fmt(r.ad_spent),
     },
     {
         label: 'COD Fee',
