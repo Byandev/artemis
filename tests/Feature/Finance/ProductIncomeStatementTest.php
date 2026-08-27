@@ -34,6 +34,9 @@ function pis_order(int $id, $workspace, string $cell, array $attrs, ?string $uni
 
 function pis_statement($workspace): IncomeStatement
 {
+    // These fixtures seed gencys orders, and the flag selects the source.
+    $workspace->update(['is_gencys_partner' => true]);
+
     return IncomeStatement::create([
         'workspace_id' => $workspace->id,
         'period_month' => '2026-05-01',
@@ -161,7 +164,7 @@ test('the product statement page reads the saved rows', function () {
             ->where('rates.cod', fn ($v) => (float) $v === 0.02)
             ->where('rates.vat', fn ($v) => (float) $v === 0.12)
             // The Unresolved row can be opened up to show what's behind it.
-            ->where('unresolved', fn ($rows) => collect($rows)->pluck('sku')->contains('NOPE'))
+            ->where('unresolved', fn ($rows) => collect($rows)->pluck('label')->contains('NOPE'))
         );
 
     // The page built the snapshot on first view.
@@ -300,23 +303,23 @@ test('the unresolved breakdown explains the row it sits under', function () {
     $rows = collect(app(ProductIncomeStatementService::class)->unresolvedBreakdown($statement));
 
     // The mapped product is not part of this.
-    expect($rows->pluck('sku'))->not->toContain('UC1');
+    expect($rows->pluck('label'))->not->toContain('UC1');
 
-    $nope = $rows->firstWhere('sku', 'NOPE');
+    $nope = $rows->firstWhere('label', 'NOPE');
     expect((int) $nope['delivered_orders'])->toBe(2)
         ->and((float) $nope['delivered_amount'])->toBe(500.0)
         ->and((float) $nope['shipping_fee'])->toBe(50.0)
         // Biggest delivered amount leads.
-        ->and($rows->first()['sku'])->toBe('NOPE');
+        ->and($rows->first()['label'])->toBe('NOPE');
 
     // Shipped but never delivered: fee, no revenue.
-    $shippedOnly = $rows->firstWhere('sku', 'SHIPPED-ONLY');
+    $shippedOnly = $rows->firstWhere('label', 'SHIPPED-ONLY');
     expect((int) $shippedOnly['delivered_orders'])->toBe(0)
         ->and((float) $shippedOnly['delivered_amount'])->toBe(0.0)
         ->and((float) $shippedOnly['shipping_fee'])->toBe(15.0);
 
     // The itemless order comes back under a null sku.
-    $noItems = $rows->firstWhere('sku', null);
+    $noItems = $rows->firstWhere('label', null);
     expect((float) $noItems['delivered_amount'])->toBe(70.0)
         ->and((int) $noItems['delivered_orders'])->toBe(1);
 

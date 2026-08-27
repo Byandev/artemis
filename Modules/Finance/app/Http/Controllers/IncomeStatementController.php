@@ -17,7 +17,7 @@ use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
-use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\Finance\Statements\StatementOrderSourceFactory;
 
 /**
  * Monthly workspace-wide income statement for gencys-partner workspaces.
@@ -36,8 +36,7 @@ class IncomeStatementController extends Controller
 {
     use AuthorizesRequests;
 
-    /** gencys_orders.parcel_status value that counts as delivered revenue. */
-    private const DELIVERED_STATUS = 'DELIVERED';
+    public function __construct(private readonly StatementOrderSourceFactory $sources) {}
 
     /** Sentinel type_keys for the auto-computed cost-of-sales lines. */
     private const SHIPPING_FEE_KEY = -1;
@@ -427,46 +426,18 @@ class IncomeStatementController extends Controller
         return ['type_key' => $key, 'type_name' => $name, 'amount' => $amount, 'source' => $source, 'section' => $section];
     }
 
-    /**
-     * Orders that belong on the statement at all, before any date scoping.
-     *
-     * The exclusions are written null-safely on purpose. `platform NOT IN (…)`
-     * and `page NOT LIKE …` are both NULL — not true — when the column is null,
-     * so an order missing either one would be dropped from the statement
-     * entirely rather than kept.
-     */
-    private function statementOrders(Workspace $workspace)
-    {
-        return GencysDailySalesOrder::where('workspace_id', $workspace->id)
-            ->where(fn ($q) => $q->whereNull('platform')->orWhereNotIn('platform', ['Shopee', 'TikTok']))
-            ->where(fn ($q) => $q->whereNull('page')->orWhereNotLike('page', '%pikutin%'));
-    }
-
-    /** Delivered gencys revenue + order count for the month (by parcel_updated_date). */
+    /** Delivered revenue + order count for the month, from whichever source. */
     private function deliveredRevenue(Workspace $workspace, Carbon $from, Carbon $to): array
     {
-        $row = $this->statementOrders($workspace)
-            ->where('parcel_status', self::DELIVERED_STATUS)
-            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->selectRaw('COALESCE(SUM(price_final), 0) as delivered, COUNT(*) as orders')
-            ->first();
+        $totals = $this->sources->for($workspace)->workspaceTotals($workspace, $from, $to);
 
-        return [
-            'delivered' => (float) $row->delivered,
-            'orders' => (int) $row->orders,
-        ];
+        return ['delivered' => $totals->deliveredAmount, 'orders' => $totals->deliveredOrders];
     }
 
-    /**
-     * Total shipping fee of gencys orders shipped out in the month, with the
-     * same exclusions the revenue side applies — otherwise the statement counts
-     * the freight on orders whose revenue it left out.
-     */
+    /** Courier fee on the month's shipped-out parcels, from whichever source. */
     private function shippingFee(Workspace $workspace, Carbon $from, Carbon $to): float
     {
-        return (float) $this->statementOrders($workspace)
-            ->whereBetween('shipped_out_date', [$from->toDateString(), $to->toDateString()])
-            ->sum('shipping_fee');
+        return $this->sources->for($workspace)->workspaceTotals($workspace, $from, $to)->shippingFee;
     }
 
     /**
@@ -481,23 +452,14 @@ class IncomeStatementController extends Controller
      */
     private function figures(Workspace $workspace, Carbon $from, Carbon $to, float $codRate, float $vatRate, float $advisoryRate, float $advisoryDeliveredRate): array
     {
-        $delivered = $this->statementOrders($workspace)
-            ->where('parcel_status', self::DELIVERED_STATUS)
-            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()]);
+        $totals = $this->sources->for($workspace)->workspaceTotals($workspace, $from, $to);
 
-        $revenue = round((float) (clone $delivered)->sum('price_final'), 2);
-        $orders = (int) (clone $delivered)->count();
-        $deliveredCogs = round((float) (clone $delivered)->sum('total_cog'), 2);
-
-        $units = (int) (clone $delivered)
-            ->join('gencys_order_items as goi', 'goi.order_id', '=', 'gencys_orders.id')
-            ->sum(DB::raw('GREATEST(COALESCE(goi.quantity, 1), 1)'));
-
-        $shipped = $this->statementOrders($workspace)
-            ->whereBetween('shipped_out_date', [$from->toDateString(), $to->toDateString()]);
-
-        $shippedOrders = (int) (clone $shipped)->count();
-        $shippingFee = round((float) (clone $shipped)->sum('shipping_fee'), 2);
+        $revenue = $totals->deliveredAmount;
+        $orders = $totals->deliveredOrders;
+        $units = $totals->deliveredUnits;
+        $deliveredCogs = $totals->deliveredCogs;
+        $shippedOrders = $totals->shippedOrders;
+        $shippingFee = $totals->shippingFee;
 
         $adSpent = $this->typeTotal($workspace, $from, $to, ['%adspent%', '%ad spent%', '%ad spend%']);
         $boughtCogs = $this->typeTotal($workspace, $from, $to, ['%cost of goods%']);
