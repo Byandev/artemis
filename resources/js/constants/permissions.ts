@@ -87,6 +87,7 @@ export const PERMISSIONS = {
     ViewGencysInterns: 'View Gencys Interns',
     ViewGencysInternDailyRecords: 'View Gencys Intern Daily Records',
     ViewGencysPages: 'View Gencys Pages',
+    ViewGencysSync: 'View Gencys Sync',
     ViewUnitCode: 'View Unit Code',
     CreateUnitCode: 'Create Unit Code',
     EditUnitCode: 'Edit Unit Code',
@@ -168,6 +169,12 @@ export const PERMISSIONS = {
     ViewBillingSettings: 'View Billing Settings',
     ManageBillingSettings: 'Manage Billing Settings',
     ViewInvoices: 'View Invoices',
+
+    // Courses
+    ViewCourses: 'View Courses',
+    CreateCourses: 'Create Courses',
+    EditCourses: 'Edit Courses',
+    DeleteCourses: 'Delete Courses',
 } as const;
 
 export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

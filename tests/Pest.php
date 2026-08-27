@@ -1,9 +1,12 @@
 <?php
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /*
@@ -70,6 +73,33 @@ function makeWorkspaceMember(Workspace $workspace, string $role = 'member'): Use
 {
     $user = User::factory()->create();
     $workspace->users()->attach($user->id, ['role' => $role]);
+
+    return $user;
+}
+
+/**
+ * Create a member attached to the workspace through a role holding exactly the
+ * given permissions. Members attached without a role hold nothing, so anything
+ * gated on a permission has to be granted one.
+ */
+function makeMemberWithPermissions(Workspace $workspace, array $permissions, string $category = 'Courses'): User
+{
+    $user = User::factory()->create();
+
+    $role = Role::create([
+        'workspace_id' => $workspace->id,
+        'name' => 'Role '.uniqid(),
+    ]);
+
+    foreach ($permissions as $name) {
+        $permission = Permission::firstOrCreate(['name' => $name], ['category' => $category]);
+        DB::table('role_permissions')->insert([
+            'role_id' => $role->id,
+            'permission_id' => $permission->id,
+        ]);
+    }
+
+    $workspace->users()->attach($user->id, ['role_id' => $role->id]);
 
     return $user;
 }

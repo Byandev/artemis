@@ -1,11 +1,12 @@
 import PageHeader from '@/components/common/PageHeader';
 import { DeleteUnitCodeDialog } from '@/components/gencys/delete-unit-code-dialog';
-import { ProductCombobox } from '@/components/inventory/product-combobox';
 import {
     UnitCode,
     UnitCodeFormDialog,
 } from '@/components/gencys/unit-code-form-dialog';
+import { ProductCombobox } from '@/components/inventory/product-combobox';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
+import { Switch } from '@/components/ui/switch';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -53,7 +54,7 @@ interface Props {
     query: {
         sort: string;
         perPage: number | null;
-        filter: { search?: string };
+        filter: { search?: string; unassigned?: string | number | boolean };
     };
 }
 
@@ -112,6 +113,10 @@ export default function UnitCodesIndex({
     const canDelete = usePermission(PERMISSIONS.DeleteUnitCode);
 
     const [searchValue, setSearchValue] = useState(query.filter?.search ?? '');
+    // "No product": show just the unit codes that have no linked product yet.
+    const [unassignedOnly, setUnassignedOnly] = useState(
+        !!query.filter?.unassigned && query.filter.unassigned !== '0',
+    );
     // Row selection for the bulk product update (ids, current page only).
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [formOpen, setFormOpen] = useState(false);
@@ -189,7 +194,10 @@ export default function UnitCodesIndex({
         router.get(
             baseUrl,
             {
-                filter: { search: searchValue || undefined },
+                filter: {
+                    search: searchValue || undefined,
+                    unassigned: unassignedOnly ? 1 : undefined,
+                },
                 sort: query.sort,
                 per_page: query.perPage ?? unitCodes.per_page ?? undefined,
                 ...overrides,
@@ -201,7 +209,7 @@ export default function UnitCodesIndex({
     const debouncedFetch = useMemo(
         () => debounce(() => fetchData({ page: 1 }), 400),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [searchValue],
+        [searchValue, unassignedOnly],
     );
 
     useEffect(() => {
@@ -209,6 +217,17 @@ export default function UnitCodesIndex({
         return () => debouncedFetch.cancel();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchValue]);
+
+    const handleUnassignedChange = (checked: boolean) => {
+        setUnassignedOnly(checked);
+        fetchData({
+            filter: {
+                search: searchValue || undefined,
+                unassigned: checked ? 1 : undefined,
+            },
+            page: 1,
+        });
+    };
 
     const handleSync = () => {
         router.post(
@@ -293,7 +312,9 @@ export default function UnitCodesIndex({
                         <ProductCombobox
                             products={products}
                             value={row.original.product_id ?? null}
-                            onChange={(id) => setRowProduct(row.original.id, id)}
+                            onChange={(id) =>
+                                setRowProduct(row.original.id, id)
+                            }
                             placeholder="— No product —"
                             triggerClassName="flex h-7 max-w-[200px] items-center gap-1.5 rounded-md border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none transition-colors hover:border-black/14 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:hover:border-white/14"
                         />
@@ -480,6 +501,16 @@ export default function UnitCodesIndex({
                             aria-label="Search unit codes"
                         />
                     </div>
+
+                    <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
+                        <Switch
+                            checked={unassignedOnly}
+                            onCheckedChange={handleUnassignedChange}
+                        />
+                        <span className="font-mono text-[12px] font-medium text-gray-600 dark:text-gray-300">
+                            No product
+                        </span>
+                    </label>
                 </div>
 
                 {canEdit && selectedIds.size > 0 && (
@@ -520,6 +551,9 @@ export default function UnitCodesIndex({
                                     sort: params?.sort,
                                     filter: {
                                         search: searchValue || undefined,
+                                        unassigned: unassignedOnly
+                                            ? 1
+                                            : undefined,
                                     },
                                     page: params?.page ?? 1,
                                     per_page:

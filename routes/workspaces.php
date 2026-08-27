@@ -48,6 +48,10 @@ use Modules\Billing\Http\Controllers\InvoiceController as BillingInvoiceControll
 use Modules\Botcake\Http\Controllers\Web\FlowController;
 use Modules\Botcake\Http\Controllers\Web\SequenceController;
 use Modules\Botcake\Http\Controllers\Web\SequenceMessageController;
+use Modules\Courses\Http\Controllers\CourseLessonController;
+use Modules\Courses\Http\Controllers\CourseModuleController;
+use Modules\Courses\Http\Controllers\CourseProgressController;
+use Modules\Courses\Http\Controllers\CoursesController;
 use Modules\Creatives\Http\Controllers\CreativesController;
 use Modules\Finance\Http\Controllers\AccountController as FinanceAccountController;
 use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardController;
@@ -61,7 +65,8 @@ use Modules\Finance\Http\Controllers\UserIncomeStatementController as FinanceUse
 use Modules\GencysERP\Http\Controllers\Web\DailySalesTrackerController as GencysDailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Web\InternController as GencysInternController;
 use Modules\GencysERP\Http\Controllers\Web\PageController as GencysPageController;
-use Modules\GencysERP\Http\Controllers\Web\SyncHealthController as GencysSyncHealthController;
+use Modules\GencysERP\Http\Controllers\Web\SyncBatchController as GencysSyncBatchController;
+use Modules\GencysERP\Http\Controllers\Web\SyncRunController as GencysSyncRunController;
 use Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use Modules\Inventory\Http\Controllers\InventoryItemController;
 use Modules\Inventory\Http\Controllers\InventoryTransactionController;
@@ -495,11 +500,6 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{item}', [InventoryItemController::class, 'destroy'])->name('destroy');
     });
 
-    // Gencys ERP sync health for inventory items (per-item transaction + PO sync status).
-    Route::get('/workspaces/{workspace}/inventory/sync-health', [GencysSyncHealthController::class, 'index'])
-        ->middleware('can:View Inventory Items,workspace')
-        ->name('workspaces.inventory.sync-health');
-
     Route::prefix('/workspaces/{workspace}/pancake/courier-shipments')->name('workspaces.pancake.courier-shipments.')->group(function () {
         Route::get('/', [CourierShipmentController::class, 'index'])->name('index');
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
@@ -539,6 +539,23 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/daily-sales-tracker', [GencysDailySalesTrackerController::class, 'store'])->name('daily-sales-tracker.store');
             Route::delete('/daily-sales-tracker/{order}', [GencysDailySalesTrackerController::class, 'destroy'])->name('daily-sales-tracker.destroy');
         }
+
+        // ERP syncing lives together under Gencys: the runs for this workspace
+        // and the batch queue that sends them, both gated on "View Gencys Sync".
+        // Per-run actions offered beside a batch's runs. No listing route: runs
+        // are read on the batch pages, these are just the things you can do to one.
+        Route::prefix('/sync-runs')->name('sync-runs.')->middleware('can:View Gencys Sync,workspace')->group(function () {
+            // Asked from the page per row, so JSON rather than an Inertia reload.
+            Route::get('/{run}/execution', [GencysSyncRunController::class, 'execution'])->name('execution');
+            Route::post('/{run}/retry', [GencysSyncRunController::class, 'retry'])->name('retry');
+        });
+
+        Route::prefix('/sync-batches')->name('sync-batches.')->middleware('can:View Gencys Sync,workspace')->group(function () {
+            Route::get('/', [GencysSyncBatchController::class, 'index'])->name('index');
+            Route::get('/{batch}', [GencysSyncBatchController::class, 'show'])->name('show');
+            Route::post('/', [GencysSyncBatchController::class, 'store'])->name('store');
+            Route::post('/{batch}/cancel', [GencysSyncBatchController::class, 'cancel'])->name('cancel');
+        });
 
         Route::get('/interns', [GencysInternController::class, 'index'])->name('interns.index');
         Route::post('/interns/sync', [GencysInternController::class, 'sync'])->name('interns.sync');
@@ -594,8 +611,6 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/income-statements/{incomeStatement}/products', [FinanceUserIncomeStatementController::class, 'productIndex'])->name('income-statements.products.index');
         Route::get('/income-statements/{incomeStatement}/users', [FinanceUserIncomeStatementController::class, 'index'])->name('income-statements.users.index');
-        Route::get('/income-statements/{incomeStatement}/users/{user}', [FinanceUserIncomeStatementController::class, 'show'])->name('income-statements.users.show');
-        Route::put('/income-statements/{incomeStatement}/users/{user}/commission-rate', [FinanceUserIncomeStatementController::class, 'setCommissionRate'])->name('income-statements.users.commission-rate');
 
         Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
         Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');
@@ -644,6 +659,47 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/invoices', [BillingInvoiceController::class, 'index'])->name('invoices.index');
         Route::get('/invoices/{invoice}/download', [BillingInvoiceController::class, 'download'])
             ->name('invoices.download');
+    });
+
+    Route::prefix('/workspaces/{workspace:slug}/courses')->name('workspaces.courses.')->group(function () {
+        Route::get('/', [CoursesController::class, 'index'])->name('index');
+        Route::post('/', [CoursesController::class, 'store'])->name('store');
+        // Literal path, registered before /{course} so it isn't swallowed.
+        Route::post('/cover/presign', [CoursesController::class, 'presignCover'])->name('cover.presign');
+        // Literal segment before the parameterised one, or /preview would be
+        // swallowed by {course}.
+        Route::get('/{course}/preview', [CoursesController::class, 'preview'])->name('preview');
+        Route::get('/{course}', [CoursesController::class, 'show'])->name('show');
+        Route::put('/{course}', [CoursesController::class, 'update'])->name('update');
+        Route::delete('/{course}', [CoursesController::class, 'destroy'])->name('destroy');
+        // The bucket is private, so course media is reached through the app.
+        Route::get('/{course}/media/{media}', [CoursesController::class, 'showMedia'])->name('media.show');
+
+        // A course's structure: modules, and the lessons inside them. Both are
+        // edited from the course detail page and gated by "Edit Courses".
+        Route::post('/{course}/modules', [CourseModuleController::class, 'store'])->name('modules.store');
+        Route::put('/{course}/modules/{module}', [CourseModuleController::class, 'update'])->name('modules.update');
+        Route::delete('/{course}/modules/{module}', [CourseModuleController::class, 'destroy'])->name('modules.destroy');
+
+        Route::post('/{course}/modules/{module}/lessons', [CourseLessonController::class, 'store'])->name('lessons.store');
+        Route::put('/{course}/modules/{module}/lessons/{lesson}', [CourseLessonController::class, 'update'])->name('lessons.update');
+        Route::delete('/{course}/modules/{module}/lessons/{lesson}', [CourseLessonController::class, 'destroy'])->name('lessons.destroy');
+
+        // A learner's own run through the course.
+        Route::post('/{course}/start', [CourseProgressController::class, 'start'])->name('start');
+        Route::post('/{course}/modules/{module}/lessons/{lesson}/complete', [CourseProgressController::class, 'complete'])->name('lessons.complete');
+        Route::delete('/{course}/modules/{module}/lessons/{lesson}/complete', [CourseProgressController::class, 'uncomplete'])->name('lessons.uncomplete');
+
+        // A lesson's video. Playback redirects to a signed URL so the browser
+        // streams from S3 rather than through PHP.
+        // Presigned direct-to-S3: the browser PUTs the file to the bucket and
+        // only tells us the key, so nginx and PHP never see the bytes.
+        Route::post('/{course}/modules/{module}/lessons/{lesson}/video/presign', [CourseLessonController::class, 'presignVideo'])->name('lessons.video.presign');
+        Route::post('/{course}/modules/{module}/lessons/{lesson}/video/attach', [CourseLessonController::class, 'attachVideo'])->name('lessons.video.attach');
+        // Fallback for disks that cannot sign an upload.
+        Route::post('/{course}/modules/{module}/lessons/{lesson}/video', [CourseLessonController::class, 'storeVideo'])->name('lessons.video.store');
+        Route::get('/{course}/modules/{module}/lessons/{lesson}/video', [CourseLessonController::class, 'showVideo'])->name('lessons.video.show');
+        Route::delete('/{course}/modules/{module}/lessons/{lesson}/video', [CourseLessonController::class, 'destroyVideo'])->name('lessons.video.destroy');
     });
 
     Route::get('/workspaces/{workspace:slug}/support', [SupportTicketController::class, 'index'])->name('support.index');

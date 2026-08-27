@@ -89,6 +89,7 @@ enum Permission: string
     case ViewGencysInterns = 'View Gencys Interns';
     case ViewGencysInternDailyRecords = 'View Gencys Intern Daily Records';
     case ViewGencysPages = 'View Gencys Pages';
+    case ViewGencysSync = 'View Gencys Sync';
     case ViewUnitCode = 'View Unit Code';
     case CreateUnitCode = 'Create Unit Code';
     case EditUnitCode = 'Edit Unit Code';
@@ -171,6 +172,12 @@ enum Permission: string
     case ViewBillingSettings = 'View Billing Settings';
     case ManageBillingSettings = 'Manage Billing Settings';
     case ViewInvoices = 'View Invoices';
+
+    // Courses
+    case ViewCourses = 'View Courses';
+    case CreateCourses = 'Create Courses';
+    case EditCourses = 'Edit Courses';
+    case DeleteCourses = 'Delete Courses';
 
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
@@ -257,6 +264,7 @@ enum Permission: string
             self::ViewGencysInterns,
             self::ViewGencysInternDailyRecords,
             self::ViewGencysPages,
+            self::ViewGencysSync,
             self::ViewUnitCode,
             self::CreateUnitCode,
             self::EditUnitCode,
@@ -322,6 +330,11 @@ enum Permission: string
             self::ViewBillingSettings,
             self::ManageBillingSettings,
             self::ViewInvoices => 'Billing',
+
+            self::ViewCourses,
+            self::CreateCourses,
+            self::EditCourses,
+            self::DeleteCourses => 'Courses',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,

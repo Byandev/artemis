@@ -32,6 +32,7 @@ import {
     ExternalLink,
     Facebook,
     FileText,
+    GraduationCap,
     History,
     Landmark,
     Layers,
@@ -83,6 +84,16 @@ export function AppSidebar() {
             icon: LayoutDashboard,
             permission: PERMISSIONS.ViewMainDashboard,
         },
+        ...(currentWorkspace.courses_module_enabled
+            ? [
+                  {
+                      title: 'Courses',
+                      href: `/workspaces/${slug}/courses`,
+                      icon: GraduationCap,
+                      permission: PERMISSIONS.ViewCourses,
+                  },
+              ]
+            : []),
         ...(currentWorkspace.sales_marketing_dashboard_module_enabled
             ? [
                   {
@@ -411,12 +422,6 @@ export function AppSidebar() {
                               icon: Activity,
                               permission: PERMISSIONS.ViewUnitCode,
                           },
-                          {
-                              title: 'Sync Health',
-                              href: `/workspaces/${slug}/inventory/sync-health`,
-                              icon: Activity,
-                              permission: PERMISSIONS.ViewInventoryItems,
-                          },
                       ],
                   },
               ]
@@ -431,6 +436,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewGencysInterns,
                           PERMISSIONS.ViewGencysInternDailyRecords,
                           PERMISSIONS.ViewGencysPages,
+                          PERMISSIONS.ViewGencysSync,
                       ],
                       items: [
                           {
@@ -450,6 +456,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/gencys/pages`,
                               icon: FileText,
                               permission: PERMISSIONS.ViewGencysPages,
+                          },
+                          {
+                              title: 'Sync Batches',
+                              href: `/workspaces/${slug}/gencys/sync-batches`,
+                              icon: Layers,
+                              permission: PERMISSIONS.ViewGencysSync,
                           },
                       ],
                   },

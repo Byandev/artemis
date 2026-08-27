@@ -17,6 +17,7 @@ use Modules\GencysERP\Http\Controllers\Api\DailySalesTrackerController;
 use Modules\GencysERP\Http\Controllers\Api\InternController as GencysInternApiController;
 use Modules\GencysERP\Http\Controllers\Api\InternDailyRecordController as GencysInternDailyRecordApiController;
 use Modules\GencysERP\Http\Controllers\Api\PageController as GencysPageApiController;
+use Modules\GencysERP\Http\Controllers\Api\SyncRunController as GencysSyncRunApiController;
 use Modules\GencysERP\Http\Controllers\Api\UnitCodeInventoryController as GencysUnitCodeInventoryApiController;
 use Modules\Inventory\Http\Controllers\Api\UnitCodeController as InventoryUnitCodeApiController;
 
@@ -55,6 +56,14 @@ Route::group(['prefix' => 'v1/public', 'as' => 'api.v1.public.', 'middleware' =>
 // sits outside the api.key middleware group.
 Route::post('v1/public/gencys/daily-sales-tracker', [DailySalesTrackerController::class, 'store'])
     ->name('api.v1.public.gencys.daily-sales-tracker.store');
+
+// GencysERP "that run is done" callback. Flows whose data is too big for one
+// post — the daily sales tracker sends a thousand rows at a time — send their
+// chunks to the normal callback and then call this once at the end. Without it
+// the run would close on the first chunk and the batch would release the ERP
+// while n8n was still posting. Authenticates with the api_key in the body.
+Route::post('v1/public/gencys/sync-runs/finish', [GencysSyncRunApiController::class, 'finish'])
+    ->name('api.v1.public.gencys.sync-runs.finish');
 
 // GencysERP unit code inventories callback. n8n posts the scraped inventory
 // items for a unit code here and authenticates with the api_key embedded in the

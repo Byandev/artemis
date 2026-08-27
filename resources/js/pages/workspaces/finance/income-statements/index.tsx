@@ -11,8 +11,8 @@ interface StatementRow {
     id: number;
     period_month: string;
     total_delivered: number;
-    total_expenses: number;
-    net_profit: number;
+    delivered_orders: number;
+    gross_profit_delivered_cogs: number;
     status: string;
     generated_at: string | null;
 }
@@ -81,10 +81,10 @@ export default function IncomeStatementsIndex({
                                     Delivered
                                 </th>
                                 <th className="px-4 py-3 text-right font-medium">
-                                    Expenses
+                                    Orders
                                 </th>
                                 <th className="px-4 py-3 text-right font-medium">
-                                    Net Profit
+                                    Gross Profit
                                 </th>
                                 <th className="px-4 py-3 font-medium">
                                     Generated
@@ -125,16 +125,20 @@ export default function IncomeStatementsIndex({
                                         {fmt(s.total_delivered)}
                                     </td>
                                     <td className="px-4 py-3 text-right tabular-nums">
-                                        {fmt(s.total_expenses)}
+                                        {Number(
+                                            s.delivered_orders,
+                                        ).toLocaleString('en-PH')}
                                     </td>
+                                    {/* On the delivered-COGS basis, the one the
+                                        statement leads with. */}
                                     <td
                                         className={`px-4 py-3 text-right font-medium tabular-nums ${
-                                            s.net_profit < 0
+                                            s.gross_profit_delivered_cogs < 0
                                                 ? 'text-red-600'
                                                 : 'text-emerald-600'
                                         }`}
                                     >
-                                        {fmt(s.net_profit)}
+                                        {fmt(s.gross_profit_delivered_cogs)}
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">
                                         {s.generated_at

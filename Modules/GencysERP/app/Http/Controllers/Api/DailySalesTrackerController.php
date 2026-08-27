@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\GencysSyncRun;
+use Modules\GencysERP\Support\SyncCallbackFields;
 
 /**
  * Receives the daily sales tracker rows that the n8n flow scrapes from Gencys
@@ -23,7 +24,14 @@ use Modules\GencysERP\Models\GencysSyncRun;
  * Each entry is authenticated by its own `api_key` (n8n puts it in the body),
  * and the orders are upserted keyed on Gencys' own order `id`, which is stored
  * as the row's primary key. `sync_run_id` is the run the trigger command opened
- * for this workspace/date, echoed back so we can close it out.
+ * for this workspace/date, echoed back so we can attribute the rows to it.
+ *
+ * A date's rows are too big for one post, so n8n sends them a thousand at a time
+ * and this endpoint does NOT close the run — it accumulates the counts and pushes
+ * the run's callback deadline out. n8n closes the run with a single call to
+ * /api/v1/public/gencys/sync-runs/finish once it has sent the last chunk. Without
+ * that call the run times out (and retries) roughly one timeout after the last
+ * chunk landed.
  */
 class DailySalesTrackerController extends Controller
 {
@@ -130,13 +138,32 @@ class DailySalesTrackerController extends Controller
                 }
             }
 
-            // Close out the run this entry echoed back. Succeeding it also
-            // resolves earlier pending/failed runs for the same workspace/date.
-            GencysSyncRun::succeedById(
+            // Feed the run rather than close it. This date's rows arrive a
+            // thousand at a time, so closing here would finish the run on the
+            // first chunk and let the batch release the ERP while n8n was still
+            // posting the rest. The counts accumulate, the callback deadline is
+            // pushed out, and the run stays pending until n8n posts to
+            // /api/v1/public/gencys/sync-runs/finish.
+            $runId = SyncCallbackFields::runId($entry, $request);
+
+            // Rows that arrive without a run id are still saved, but nothing is
+            // credited for them: the run they belong to stays pending until it
+            // times out and gets retried, re-fetching data that is already in.
+            // Silent when it happens, expensive afterwards — so say so.
+            if (! $runId) {
+                Log::warning('Gencys daily sales tracker rows arrived with no sync_run_id', [
+                    'workspace_id' => $workspace->id,
+                    'rows' => count($rows),
+                    'hint' => 'The n8n flow must echo sync_run_id back on each chunk, and POST /api/v1/public/gencys/sync-runs/finish when it is done.',
+                ]);
+            }
+
+            GencysSyncRun::heartbeatById(
                 $workspace->id,
-                $this->syncRunId($entry),
+                $runId,
                 count($rows),
                 $entrySaved,
+                SyncCallbackFields::executionId($entry, $request),
             );
         }
 
@@ -146,14 +173,6 @@ class DailySalesTrackerController extends Controller
             'skipped' => $skipped,
             'errors' => $errors,
         ], empty($errors) ? 200 : 207);
-    }
-
-    /** Pull the sync run id n8n echoed back, tolerating a couple of key spellings. */
-    private function syncRunId(array $entry): ?int
-    {
-        $id = $entry['sync_run_id'] ?? $entry['syncRunId'] ?? null;
-
-        return ($id === null || $id === '') ? null : (int) $id;
     }
 
     /**
