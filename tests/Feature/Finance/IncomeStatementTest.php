@@ -1,10 +1,14 @@
 <?php
 
+use App\Models\Page;
+use App\Models\Shop;
+use Illuminate\Support\Str;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\Pancake\Models\Order as PancakeOrder;
 
 function isUrl($workspace, string $path = ''): string
 {
@@ -53,6 +57,9 @@ function makeGencysOrder($workspace, array $attrs = []): GencysDailySalesOrder
  */
 function seedMay($workspace): array
 {
+    // The flag selects the order source, so gencys fixtures need it set.
+    $workspace->update(['is_gencys_partner' => true]);
+
     $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
     $adSpent = makeType($workspace, 'Ad Spent', section: 'cost_of_sales');
     $expenses = makeType($workspace, 'expenses');
@@ -70,6 +77,38 @@ function seedMay($workspace): array
     makeTxn($workspace, $account, $expenses, 'in', 999, '2026-05-17');    // inflow
 
     return compact('account', 'adSpent', 'expenses', 'transfer');
+}
+
+/**
+ * May 2026 on the pancake side: delivered 10,000 across two orders, 700 of
+ * shipping on three shipped parcels. No cost of goods — pancake records none.
+ */
+function seedMayPancake($workspace, ?int $ownerId = null): void
+{
+    $shop = Shop::create(['workspace_id' => $workspace->id, 'name' => 'Shop']);
+    $page = Page::create([
+        'workspace_id' => $workspace->id,
+        'shop_id' => $shop->id,
+        'name' => 'Page',
+        // Who the orders on this page are credited to.
+        'owner_id' => $ownerId ?? $workspace->users()->value('users.id'),
+    ]);
+
+    $order = fn (array $attrs) => PancakeOrder::create(array_merge([
+        'workspace_id' => $workspace->id,
+        'order_number' => fake()->unique()->numerify('PC-#####'),
+        'status' => 3,
+        'status_name' => 'delivered',
+        'shop_id' => $shop->id,
+        'page_id' => $page->id,
+        'customer_id' => (string) Str::uuid(),
+        'inserted_at' => '2026-05-01 09:00:00',
+    ], $attrs));
+
+    $order(['final_amount' => 6000, 'delivered_at' => '2026-05-10 09:00:00', 'shipped_at' => '2026-05-05 09:00:00', 'shipping_fee' => 300]);
+    $order(['final_amount' => 4000, 'delivered_at' => '2026-05-20 09:00:00', 'shipped_at' => '2026-05-08 09:00:00', 'shipping_fee' => 250]);
+    // Shipped inside the month but not delivered — shipping counts, revenue doesn't.
+    $order(['final_amount' => 7000, 'shipped_at' => '2026-05-12 09:00:00', 'shipping_fee' => 150]);
 }
 
 test('saving splits cost of sales (auto + flagged types) from OPEX (unflagged)', function () {
@@ -111,12 +150,15 @@ test('store computes gross profit from cost of sales and net profit from OPEX', 
 
     // Cost of sales = 700 + 200 + 24 + 3000 = 3924 → Gross = 10,000 − 3924 = 6076
     // OPEX = 1000 → Net = 6076 − 1000 = 5076
+    // Gross 6,076 and OPEX 1,000 would leave 5,076, but seedMay is a gencys
+    // workspace so the advisory share comes off as well: 30% of 6,076 is
+    // 1,822.80, leaving 3,253.20.
     $this->assertDatabaseHas('finance_income_statements', [
         'workspace_id' => $workspace->id,
         'total_delivered' => 10000,
         'gross_profit' => 6076,
         'total_expenses' => 4924,
-        'net_profit' => 5076,
+        'net_profit' => 3253.20,
     ]);
 
     $this->assertDatabaseCount('finance_income_statement_expenses', 5);
@@ -170,19 +212,46 @@ test('advisory share deducts a % of gross profit for gencys partners', function 
     ]);
 });
 
-test('advisory share is not applied to non-gencys-partner workspaces', function () {
+test('a non-partner workspace reads pancake orders instead of gencys', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['adSpent' => $adSpent] = seedMay($workspace); // is_gencys_partner defaults false
+    seedMayPancake($workspace); // is_gencys_partner defaults false
 
     $this->actingAs($user)->post(isUrl($workspace), [
-        'month' => '2026-05',
-        'included_keys' => [-1, -2, -3, $adSpent->id],
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
     ])->assertRedirect();
 
-    $this->assertDatabaseHas('finance_income_statements', [
-        'workspace_id' => $workspace->id,
-        'advisory_share' => 0,
-    ]);
+    $statement = IncomeStatement::first();
+
+    // Delivered by delivered_at, revenue from final_amount.
+    expect((int) $statement->delivered_orders)->toBe(2)
+        ->and((float) $statement->total_delivered)->toBe(10000.0)
+        // Shipped by shipped_at, counting the undelivered parcel too.
+        ->and((int) $statement->shipped_orders)->toBe(3)
+        ->and((float) $statement->total_shipping_fee)->toBe(700.0)
+        // Pancake records no cost of goods against an order.
+        ->and((float) $statement->total_delivered_cogs)->toBe(0.0)
+        // 10,000 − shipping 700 − COD 200 − VAT 24 = 9,076.
+        ->and((float) $statement->gross_profit_delivered_cogs)->toBe(9076.0)
+        // Not a partner, so no advisory on either basis.
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0)
+        ->and((float) $statement->advisory_share_on_delivered)->toBe(0.0)
+        ->and((float) $statement->gross_profit_delivered_cogs_after_advisory_share)->toBe(9076.0);
+});
+
+test('advisory share is not applied to non-gencys-partner workspaces', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace); // is_gencys_partner defaults false
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // A real positive margin, and still nothing owed on either basis.
+    expect((float) $statement->gross_profit_delivered_cogs)->toBeGreaterThan(0)
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0)
+        ->and((float) $statement->advisory_share_on_delivered)->toBe(0.0);
 });
 
 test('regenerate re-pulls with the snapshotted rate and included lines', function () {
@@ -495,7 +564,7 @@ test('the gross profit basis wins when the margin is thin', function () {
 
 test('neither advisory basis applies to a workspace that is not a partner', function () {
     ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    seedMay($workspace); // is_gencys_partner defaults false
+    seedMayPancake($workspace); // is_gencys_partner defaults false
 
     $this->actingAs($user)->post(isUrl($workspace), [
         'month' => '2026-05',

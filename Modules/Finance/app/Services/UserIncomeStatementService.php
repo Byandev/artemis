@@ -8,9 +8,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\TransactionType;
-use Modules\GencysERP\Models\GencysDailySalesOrder;
-use Modules\GencysERP\Models\Intern;
-use Modules\GencysERP\Support\InternResolver;
+use Modules\Finance\Statements\OrderTotals;
+use Modules\Finance\Statements\StatementOrderSourceFactory;
 
 /**
  * Builds, saves and reads the per-user slices of an income statement — the same
@@ -32,14 +31,7 @@ use Modules\GencysERP\Support\InternResolver;
  */
 class UserIncomeStatementService
 {
-    /** gencys_orders.parcel_status value that counts as delivered revenue. */
-    private const DELIVERED_STATUS = 'DELIVERED';
-
-    /** Platforms whose orders never belong on the statement. */
-    private const EXCLUDED_PLATFORMS = ['Shopee', 'TikTok'];
-
-    /** Pages whose orders never belong on the statement. */
-    private const EXCLUDED_PAGE_LIKE = '%pikutin%';
+    public function __construct(private readonly StatementOrderSourceFactory $sources) {}
 
     /** (Re)compute and store every per-user row for the statement's month. */
     public function snapshot(IncomeStatement $statement): void
@@ -53,38 +45,7 @@ class UserIncomeStatementService
         $advisoryRate = (float) $statement->advisory_rate;
         $gencysPartner = (bool) $workspace->is_gencys_partner;
 
-        $resolve = $this->cellUserResolver($workspace);
-
-        $totals = [];
-        $blank = [
-            'delivered_orders' => 0, 'delivered_units' => 0, 'delivered_amount' => 0.0,
-            'shipped_orders' => 0, 'total_shipping_fee' => 0.0,
-            'ad_spent' => 0.0, 'total_bought_cogs' => 0.0,
-            'total_bought_cogs_delivery_fee' => 0.0, 'total_delivered_cogs' => 0.0,
-        ];
-
-        // Cells are folded into users here rather than in SQL — the mapping runs
-        // through the intern resolver, which is PHP.
-        foreach ($this->deliveredByCell($workspace, $from, $to) as $cell => $row) {
-            $key = (string) ($resolve($cell) ?? '');
-            $totals[$key] ??= $blank;
-            $totals[$key]['delivered_orders'] += $row['orders'];
-            $totals[$key]['delivered_amount'] += $row['revenue'];
-            $totals[$key]['total_delivered_cogs'] += $row['cog'];
-        }
-
-        foreach ($this->deliveredUnitsByCell($workspace, $from, $to) as $cell => $units) {
-            $key = (string) ($resolve($cell) ?? '');
-            $totals[$key] ??= $blank;
-            $totals[$key]['delivered_units'] += $units;
-        }
-
-        foreach ($this->shippedByCell($workspace, $from, $to) as $cell => $row) {
-            $key = (string) ($resolve($cell) ?? '');
-            $totals[$key] ??= $blank;
-            $totals[$key]['shipped_orders'] += $row['orders'];
-            $totals[$key]['total_shipping_fee'] += $row['shipping'];
-        }
+        $totals = $this->sources->for($workspace)->totalsByUser($workspace, $from, $to);
 
         // Charged costs are already per user, so they key in directly.
         $charged = [
@@ -93,28 +54,28 @@ class UserIncomeStatementService
             'total_bought_cogs_delivery_fee' => $this->chargedTotalsForTypes($workspace, $from, $to, $this->cogDeliveryTypeIds($workspace)),
         ];
 
-        foreach ($charged as $field => $amounts) {
-            foreach ($amounts as $key => $amount) {
-                $totals[(string) $key] ??= $blank;
-                $totals[(string) $key][$field] += $amount;
+        // A user earns a row for a charged cost even with no orders behind it.
+        foreach ($charged as $amounts) {
+            foreach (array_keys($amounts) as $key) {
+                $totals[(string) $key] ??= OrderTotals::empty();
             }
         }
 
         $names = User::whereIn('id', array_values(array_filter(array_keys($totals), fn ($k) => $k !== '')))
             ->pluck('name', 'id');
 
-        $rows = collect($totals)->map(function ($t, $key) use ($names, $codRate, $vatRate, $advisoryRate, $gencysPartner) {
+        $rows = collect($totals)->map(function (OrderTotals $t, $key) use ($names, $charged, $codRate, $vatRate, $advisoryRate, $gencysPartner) {
             $userId = $key === '' ? null : (int) $key;
 
-            $revenue = round((float) $t['delivered_amount'], 2);
+            $revenue = round($t->deliveredAmount, 2);
             $codFee = round($revenue * $codRate, 2);
             $codVat = round($codFee * $vatRate, 2);
 
-            $adSpent = round((float) $t['ad_spent'], 2);
-            $shippingFee = round((float) $t['total_shipping_fee'], 2);
-            $deliveredCogs = round((float) $t['total_delivered_cogs'], 2);
-            $boughtCogs = round((float) $t['total_bought_cogs'], 2);
-            $boughtFreight = round((float) $t['total_bought_cogs_delivery_fee'], 2);
+            $adSpent = round((float) ($charged['ad_spent'][(int) $key] ?? 0), 2);
+            $shippingFee = round($t->shippingFee, 2);
+            $deliveredCogs = round($t->deliveredCogs, 2);
+            $boughtCogs = round((float) ($charged['total_bought_cogs'][(int) $key] ?? 0), 2);
+            $boughtFreight = round((float) ($charged['total_bought_cogs_delivery_fee'][(int) $key] ?? 0), 2);
 
             // Both margins take the same costs off delivered revenue and differ
             // only in which cost of goods they charge.
@@ -134,10 +95,10 @@ class UserIncomeStatementService
             return [
                 'user_id' => $userId,
                 'user_name' => $userId !== null ? ($names[$userId] ?? 'Unknown') : 'Unassigned',
-                'delivered_orders' => (int) $t['delivered_orders'],
-                'delivered_units' => (int) $t['delivered_units'],
+                'delivered_orders' => $t->deliveredOrders,
+                'delivered_units' => $t->deliveredUnits,
                 'delivered_amount' => $revenue,
-                'shipped_orders' => (int) $t['shipped_orders'],
+                'shipped_orders' => $t->shippedOrders,
                 'total_shipping_fee' => $shippingFee,
                 'ad_spent' => $adSpent,
                 'cod_fee' => $codFee,
@@ -254,41 +215,8 @@ class UserIncomeStatementService
     {
         $workspace = $statement->workspace;
         [$from, $to] = $this->range($statement);
-        $resolve = $this->cellUserResolver($workspace);
 
-        $rows = [];
-
-        foreach ($this->deliveredByCell($workspace, $from, $to) as $cell => $row) {
-            if ($resolve($cell) !== null) {
-                continue;
-            }
-            $rows[$cell] = [
-                'cell' => $cell === '' ? null : $cell,
-                'delivered_orders' => $row['orders'],
-                'delivered_amount' => $row['revenue'],
-                'shipped_orders' => 0,
-                'shipping_fee' => 0.0,
-            ];
-        }
-
-        foreach ($this->shippedByCell($workspace, $from, $to) as $cell => $row) {
-            if ($resolve($cell) !== null) {
-                continue;
-            }
-            $rows[$cell] ??= [
-                'cell' => $cell === '' ? null : $cell,
-                'delivered_orders' => 0,
-                'delivered_amount' => 0.0,
-                'shipped_orders' => 0,
-                'shipping_fee' => 0.0,
-            ];
-            $rows[$cell]['shipped_orders'] = $row['orders'];
-            $rows[$cell]['shipping_fee'] = $row['shipping'];
-        }
-
-        usort($rows, fn ($a, $b) => [$b['delivered_amount'], $b['shipping_fee']] <=> [$a['delivered_amount'], $a['shipping_fee']]);
-
-        return $rows;
+        return $this->sources->for($workspace)->unassignedUserDetail($workspace, $from, $to);
     }
 
     private function ensureSnapshot(IncomeStatement $statement): void
@@ -296,80 +224,6 @@ class UserIncomeStatementService
         if (! $statement->userStatements()->exists()) {
             $this->snapshot($statement);
         }
-    }
-
-    /** Orders that belong on the statement at all, before any date scoping. */
-    private function orders(Workspace $workspace)
-    {
-        return GencysDailySalesOrder::where('gencys_orders.workspace_id', $workspace->id)
-            ->whereNotIn('gencys_orders.platform', self::EXCLUDED_PLATFORMS)
-            ->whereNotLike('gencys_orders.page', self::EXCLUDED_PAGE_LIKE);
-    }
-
-    /**
-     * Delivered parcels, revenue and cost of goods per intern cell. An order
-     * belongs to one cell, so nothing is split.
-     *
-     * @return array<string, array{orders:int, revenue:float, cog:float}>
-     */
-    private function deliveredByCell(Workspace $workspace, Carbon $from, Carbon $to): array
-    {
-        return $this->orders($workspace)
-            ->where('gencys_orders.parcel_status', self::DELIVERED_STATUS)
-            ->whereBetween('gencys_orders.parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->selectRaw('gencys_orders.intern_brands_name as cell')
-            ->selectRaw('COUNT(*) as orders')
-            ->selectRaw('COALESCE(SUM(gencys_orders.price_final), 0) as revenue')
-            ->selectRaw('COALESCE(SUM(gencys_orders.total_cog), 0) as cog')
-            ->groupBy('cell')
-            ->get()
-            ->mapWithKeys(fn ($r) => [(string) $r->cell => [
-                'orders' => (int) $r->orders,
-                'revenue' => round((float) $r->revenue, 2),
-                'cog' => round((float) $r->cog, 2),
-            ]])
-            ->all();
-    }
-
-    /**
-     * Pieces delivered per intern cell, from the line-item quantities.
-     *
-     * @return array<string, int>
-     */
-    private function deliveredUnitsByCell(Workspace $workspace, Carbon $from, Carbon $to): array
-    {
-        return $this->orders($workspace)
-            ->where('gencys_orders.parcel_status', self::DELIVERED_STATUS)
-            ->whereBetween('gencys_orders.parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->join('gencys_order_items as goi', 'goi.order_id', '=', 'gencys_orders.id')
-            ->selectRaw('gencys_orders.intern_brands_name as cell')
-            ->selectRaw('COALESCE(SUM(GREATEST(COALESCE(goi.quantity, 1), 1)), 0) as units')
-            ->groupBy('cell')
-            ->get()
-            ->mapWithKeys(fn ($r) => [(string) $r->cell => (int) $r->units])
-            ->all();
-    }
-
-    /**
-     * Parcels shipped out and the courier fee on them, per intern cell —
-     * whatever became of them, since the courier is paid for a return too.
-     *
-     * @return array<string, array{orders:int, shipping:float}>
-     */
-    private function shippedByCell(Workspace $workspace, Carbon $from, Carbon $to): array
-    {
-        return $this->orders($workspace)
-            ->whereBetween('gencys_orders.shipped_out_date', [$from->toDateString(), $to->toDateString()])
-            ->selectRaw('gencys_orders.intern_brands_name as cell')
-            ->selectRaw('COUNT(*) as orders')
-            ->selectRaw('COALESCE(SUM(gencys_orders.shipping_fee), 0) as shipping')
-            ->groupBy('cell')
-            ->get()
-            ->mapWithKeys(fn ($r) => [(string) $r->cell => [
-                'orders' => (int) $r->orders,
-                'shipping' => round((float) $r->shipping, 2),
-            ]])
-            ->all();
     }
 
     /**
@@ -397,28 +251,6 @@ class UserIncomeStatementService
             ->get()
             ->mapWithKeys(fn ($r) => [(int) $r->user_id => round((float) $r->amount, 2)])
             ->all();
-    }
-
-    /**
-     * A memoized intern-cell → user_id resolver for the workspace (null =
-     * the cell matches no intern, or that intern has no linked user).
-     */
-    private function cellUserResolver(Workspace $workspace): callable
-    {
-        $resolver = new InternResolver($workspace->id);
-        $interns = Intern::where('workspace_id', $workspace->id)->get(['id', 'user_id'])->keyBy('id');
-        $cache = [];
-
-        return function (?string $cell) use ($resolver, $interns, &$cache): ?int {
-            $key = (string) $cell;
-
-            if (! array_key_exists($key, $cache)) {
-                $internId = $resolver->resolve($cell);
-                $cache[$key] = $internId ? ($interns[$internId]->user_id ?? null) : null;
-            }
-
-            return $cache[$key];
-        };
     }
 
     /** @return list<int> */
