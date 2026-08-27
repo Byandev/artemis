@@ -15,12 +15,14 @@ class IncomeStatementSetting extends Model
         'cod_fee_rate',
         'vat_rate',
         'advisory_rate',
+        'advisory_delivered_rate',
     ];
 
     protected $casts = [
         'cod_fee_rate' => 'decimal:4',
         'vat_rate' => 'decimal:4',
         'advisory_rate' => 'decimal:4',
+        'advisory_delivered_rate' => 'decimal:4',
     ];
 
     /** Default rates when a workspace has no saved settings yet. */
@@ -30,6 +32,9 @@ class IncomeStatementSetting extends Model
 
     /** Advisory share of Gross Profit (gencys-partner workspaces only). */
     public const DEFAULT_ADVISORY_RATE = 0.30;
+
+    /** The alternative basis: a share of Delivered rather than of Gross Profit. */
+    public const DEFAULT_ADVISORY_DELIVERED_RATE = 0.09;
 
     public function workspace(): BelongsTo
     {

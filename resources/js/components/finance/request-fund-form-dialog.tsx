@@ -104,23 +104,15 @@ export function RequestFundFormDialog({
     const typeOptions = buildTransactionTypeOptions(transactionTypes);
     const defaultTypeId = typeOptions[0]?.value ?? '';
 
-    const {
-        data,
-        setData,
-        post,
-        put,
-        processing,
-        errors,
-        reset,
-        clearErrors,
-    } = useForm({
-        transaction_type_id: defaultTypeId,
-        department_id: '' as number | '',
-        charge_to: [] as ChargeToShare[],
-        products: [] as ProductShare[],
-        amount_requested: '',
-        remarks: '',
-    });
+    const { data, setData, post, put, processing, errors, reset, clearErrors } =
+        useForm({
+            transaction_type_id: defaultTypeId,
+            department_id: '' as number | '',
+            charge_to: [] as ChargeToShare[],
+            products: [] as ProductShare[],
+            amount_requested: '',
+            remarks: '',
+        });
 
     // The charge-to and product shares must add up to the amount requested.
     const total = parseFloat(data.amount_requested) || 0;
