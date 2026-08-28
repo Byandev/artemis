@@ -8,10 +8,11 @@ use App\Models\Workspace;
 use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Maatwebsite\Excel\Facades\Excel;
-use Modules\Pancake\Imports\OrderShippingFeesImport;
+use Modules\Pancake\Jobs\ImportOrderShippingFees;
 use Modules\Pancake\Models\Order;
+use Modules\Pancake\Support\ShippingFeeImportStatus;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -105,6 +106,7 @@ class OrderController extends Controller
             'orders' => $orders,
             'statusCounts' => $statusCounts,
             'totalCount' => (int) $statusCounts->sum(),
+            'shippingFeeImport' => ShippingFeeImportStatus::get($workspace->id),
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
@@ -113,8 +115,8 @@ class OrderController extends Controller
     }
 
     /**
-     * Import a courier billing export: its shipping cost is written onto the
-     * orders whose tracking code matches the sheet's waybill number.
+     * Queue a courier billing export for import: its shipping cost is written
+     * onto the orders whose tracking code matches the sheet's waybill number.
      */
     public function importShippingFees(Request $request, Workspace $workspace)
     {
@@ -125,29 +127,33 @@ class OrderController extends Controller
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:51200'],
         ]);
 
-        // The read is the slow part: ~12s for a 14k-row sheet, against PHP's
-        // 30s default. Give the import room so a bigger export still lands.
-        set_time_limit(300);
-
-        try {
-            $import = OrderShippingFeesImport::for($workspace, $request->file('file'));
-
-            Excel::import($import, $request->file('file'));
-        } catch (\Throwable $e) {
-            report($e);
-
-            return redirect()->back()->with('error', 'Import failed: '.$e->getMessage());
+        // One at a time per workspace: two sheets writing the same column would
+        // race, and the page only reports on one import.
+        if (ShippingFeeImportStatus::running($workspace->id)) {
+            throw ValidationException::withMessages([
+                'file' => 'A shipping fee import is already running for this workspace. Wait for it to finish.',
+            ]);
         }
 
-        $sample = array_slice($import->unmatchedSample, 0, 3);
+        $file = $request->file('file');
+        $name = $file->getClientOriginalName();
+        $path = $file->store('imports/shipping-fees', 'local');
 
-        return redirect()->back()->with('success', sprintf(
-            'Import complete: %d of %d matched orders updated, %d waybills matched no order%s%s.',
-            $import->updated,
-            $import->matchedOrders,
-            $import->unmatched,
-            $sample ? ' (e.g. '.implode(', ', $sample).')' : '',
-            $import->skipped ? sprintf(', %d rows had no shipping cost', $import->skipped) : '',
-        ));
+        ShippingFeeImportStatus::begin($workspace->id, $name);
+
+        ImportOrderShippingFees::dispatch($workspace->id, $path, $name);
+
+        return redirect()->back()->with('success', "Queued {$name} — shipping fees will land on the orders shortly.");
+    }
+
+    /** Progress of the queued import, polled by the orders page. */
+    public function shippingFeeImportStatus(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewOrders->value, $workspace);
+
+        return response()->json([
+            'import' => ShippingFeeImportStatus::get($workspace->id),
+        ]);
     }
 }

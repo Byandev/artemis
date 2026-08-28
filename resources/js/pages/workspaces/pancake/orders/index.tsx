@@ -16,7 +16,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
-import { Search, Upload, X } from 'lucide-react';
+import { Loader2, Search, Upload, X } from 'lucide-react';
 import moment from 'moment';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -54,11 +54,24 @@ interface Order {
     tags: OrderTag[];
 }
 
+interface ShippingFeeImport {
+    status: 'queued' | 'processing' | 'finished' | 'failed';
+    file?: string;
+    rows_read?: number;
+    skipped?: number;
+    matched_orders?: number;
+    updated?: number;
+    unmatched?: number;
+    unmatched_sample?: string[];
+    message?: string;
+}
+
 interface Props {
     workspace: Workspace;
     orders: PaginatedData<Order>;
     statusCounts: Record<string, number>;
     totalCount: number;
+    shippingFeeImport?: ShippingFeeImport | null;
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -143,6 +156,7 @@ export default function PancakeOrdersIndex({
     orders,
     statusCounts,
     totalCount,
+    shippingFeeImport,
     query,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/pancake/orders`;
@@ -168,11 +182,62 @@ export default function PancakeOrdersIndex({
     const [importOpen, setImportOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const importForm = useForm<{ file: File | null }>({ file: null });
+    const [importState, setImportState] = useState<ShippingFeeImport | null>(
+        shippingFeeImport ?? null,
+    );
 
     useEffect(() => {
         if (flash?.success) toast.success(flash.success);
         if (flash?.error) toast.error(flash.error);
     }, [flash?.success, flash?.error]);
+
+    useEffect(() => {
+        setImportState(shippingFeeImport ?? null);
+    }, [shippingFeeImport]);
+
+    const importRunning =
+        importState?.status === 'queued' ||
+        importState?.status === 'processing';
+
+    // Poll while the job runs; the fees land on orders already on screen, so
+    // refresh the rows once it finishes.
+    useEffect(() => {
+        if (!importRunning) return;
+
+        // Give up after ~10 minutes so a stalled queue does not poll forever.
+        let attempts = 0;
+
+        const poll = setInterval(async () => {
+            if (++attempts > 200) {
+                clearInterval(poll);
+                return;
+            }
+
+            const res = await fetch(`${baseUrl}/shipping-fees/import/status`, {
+                headers: { Accept: 'application/json' },
+            });
+            if (!res.ok) return;
+
+            const next: ShippingFeeImport | null =
+                (await res.json()).import ?? null;
+            setImportState(next);
+
+            if (next?.status === 'finished') {
+                toast.success(
+                    `${next.updated ?? 0} order shipping fees updated${
+                        next.unmatched
+                            ? `, ${next.unmatched} waybills matched no order`
+                            : ''
+                    }.`,
+                );
+                router.reload({ only: ['orders'] });
+            } else if (next?.status === 'failed') {
+                toast.error(next.message ?? 'The shipping fee import failed.');
+            }
+        }, 3000);
+
+        return () => clearInterval(poll);
+    }, [importRunning, baseUrl]);
 
     const submitImport = (e: React.FormEvent) => {
         e.preventDefault();
@@ -479,11 +544,13 @@ export default function PancakeOrdersIndex({
                         <button
                             type="submit"
                             disabled={
-                                !importForm.data.file || importForm.processing
+                                !importForm.data.file ||
+                                importForm.processing ||
+                                importRunning
                             }
                             className="h-9 rounded-[10px] bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white disabled:opacity-50"
                         >
-                            {importForm.processing ? 'Importing…' : 'Upload'}
+                            {importForm.processing ? 'Uploading…' : 'Upload'}
                         </button>
                         <button
                             type="button"
@@ -498,6 +565,48 @@ export default function PancakeOrdersIndex({
                             Cancel
                         </button>
                     </form>
+                )}
+
+                {importState && (
+                    <div className="mb-3 flex items-center gap-2 rounded-[14px] border border-black/6 bg-stone-50 px-3 py-2 font-mono text-[11px] text-gray-600 dark:border-white/6 dark:bg-zinc-900 dark:text-gray-400">
+                        {importRunning && (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
+                        )}
+                        <span className="truncate">
+                            {importState.file}
+                            {importState.status === 'queued' &&
+                                ' — queued, waiting for a worker…'}
+                            {importState.status === 'processing' &&
+                                ' — reading the sheet and updating orders…'}
+                            {importState.status === 'finished' &&
+                                ` — ${importState.updated ?? 0} of ${
+                                    importState.matched_orders ?? 0
+                                } matched orders updated, ${
+                                    importState.unmatched ?? 0
+                                } waybills matched no order${
+                                    importState.skipped
+                                        ? `, ${importState.skipped} rows had no shipping cost`
+                                        : ''
+                                }.`}
+                            {importState.status === 'failed' &&
+                                ` — failed: ${importState.message ?? 'unknown error'}`}
+                        </span>
+                        {!!importState.unmatched_sample?.length && (
+                            <span
+                                className="truncate text-gray-400"
+                                title={importState.unmatched_sample.join(', ')}
+                            >
+                                e.g. {importState.unmatched_sample[0]}
+                            </span>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setImportState(null)}
+                            className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
                 )}
 
                 {/* Status tabs */}
