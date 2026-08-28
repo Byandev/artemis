@@ -3,8 +3,8 @@ import { MetricSettingDialog } from '@/components/metrics/metricsetting-dialog-f
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AdminSidebarLayout from '@/layouts/admin/admin-sidebar-layout';
-import { PaginatedData } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { PaginatedData, SharedData } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { omit } from 'lodash';
@@ -23,7 +23,7 @@ import {
     Smartphone,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface SubscriptionPlan {
     id: number;
@@ -328,6 +328,9 @@ function PagesCoverageCell({
 }
 
 export default function Index({ workspaces, plans, filters }: Props) {
+    // Only the primary admin account may jump straight into a client workspace.
+    const canOpenWorkspace =
+        usePage<SharedData>().props.auth.user?.email === 'admin@artemis.ph';
     const [selectedWorkspace, setSelectedWorkspace] =
         useState<Workspace | null>(null);
     const [search, setSearch] = useState(filters.search || '');
@@ -340,25 +343,6 @@ export default function Index({ workspaces, plans, filters }: Props) {
     const [editingMaxShops, setEditingMaxShops] = useState<Workspace | null>(
         null,
     );
-
-    // Auto-open subscription modal for workspaces with past_due or expired
-    // status — but only once, so the admin can still close it without it
-    // immediately reopening.
-    const hasAutoOpened = useRef(false);
-    useEffect(() => {
-        if (hasAutoOpened.current || editingWorkspace || !workspaces.data) {
-            return;
-        }
-        const pastDueOrExpiredWorkspace = workspaces.data.find(
-            (ws) =>
-                ws.subscription?.status === 'past_due' ||
-                ws.subscription?.status === 'expired',
-        );
-        if (pastDueOrExpiredWorkspace) {
-            hasAutoOpened.current = true;
-            setEditingWorkspace(pastDueOrExpiredWorkspace);
-        }
-    }, [workspaces.data, editingWorkspace]);
 
     const initialSorting = useMemo(() => {
         const sort =
@@ -569,13 +553,15 @@ export default function Index({ workspaces, plans, filters }: Props) {
                     >
                         <ChartColumnBig className="h-4 w-4" />
                     </Link>
-                    <Link
-                        href={`/workspaces/${row.original.slug}/dashboard`}
-                        className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
-                        title="Open workspace dashboard"
-                    >
-                        <ArrowUpRight className="h-4 w-4" />
-                    </Link>
+                    {canOpenWorkspace && (
+                        <Link
+                            href={`/workspaces/${row.original.slug}/dashboard`}
+                            className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
+                            title="Open workspace dashboard"
+                        >
+                            <ArrowUpRight className="h-4 w-4" />
+                        </Link>
+                    )}
                     <button
                         onClick={() => setEditingMaxShops(row.original)}
                         className="rounded-md p-1.5 text-zinc-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-500/10 dark:hover:text-brand-400"
