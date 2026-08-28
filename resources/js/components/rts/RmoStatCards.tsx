@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
     AlertTriangleIcon,
@@ -18,6 +19,12 @@ interface StatCardProps {
     suffix?: string;
     /** Rendered in place of the formatted number — for values that aren't counts. */
     valueLabel?: string;
+    /**
+     * Swaps the figure for a placeholder bar while a new one is on the way.
+     * The card keeps its height and its title, so changing a filter doesn't
+     * reflow the page — and a stale number can't be read as the fresh one.
+     */
+    loading?: boolean;
 }
 
 export function StatCard({
@@ -26,6 +33,7 @@ export function StatCard({
     icon: Icon,
     suffix,
     valueLabel,
+    loading = false,
 }: StatCardProps) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-[18px] dark:border-white/6 dark:bg-zinc-900">
@@ -35,10 +43,14 @@ export function StatCard({
                     {title}
                 </span>
             </div>
-            <span className="font-mono text-[22px] font-semibold tracking-tight text-gray-900 tabular-nums dark:text-gray-100">
-                {valueLabel ?? value.toLocaleString()}
-                {suffix}
-            </span>
+            {loading ? (
+                <Skeleton className="my-[5px] block h-[22px] w-16 rounded" />
+            ) : (
+                <span className="font-mono text-[22px] font-semibold tracking-tight text-gray-900 tabular-nums dark:text-gray-100">
+                    {valueLabel ?? value.toLocaleString()}
+                    {suffix}
+                </span>
+            )}
         </div>
     );
 }
@@ -72,6 +84,19 @@ interface RmoStatCardsProps {
     total_call_duration?: number;
     /** How many of them lasted long enough to count as answered. */
     connected_call_logs_count?: number;
+    /**
+     * Talk time per connected call, in seconds, and the share of attempts that
+     * connected. Both are computed server-side — see RmoDailyStats — so the page
+     * and the daily report can't disagree on what they mean, and both are null
+     * rather than zero when nobody has called yet.
+     *
+     * These travel with the three counts above: a caller that supplies those
+     * supplies these.
+     */
+    avg_call_duration?: number | null;
+    hit_rate?: number | null;
+    /** Show placeholder bars instead of the figures — a reload is in flight. */
+    loading?: boolean;
 }
 
 export function RmoStatCards({
@@ -83,19 +108,14 @@ export function RmoStatCards({
     total_call_logs_count,
     total_call_duration,
     connected_call_logs_count,
+    avg_call_duration = null,
+    hit_rate = null,
+    loading = false,
 }: RmoStatCardsProps) {
     const showCallLogs = total_call_logs_count !== undefined;
 
     const totalCalls = total_call_logs_count ?? 0;
     const connectedCalls = connected_call_logs_count ?? 0;
-    // No calls means no rate to report — 0% would read as "everyone hung up".
-    const hitRate = totalCalls > 0 ? (connectedCalls / totalCalls) * 100 : null;
-
-    // All talk time spread over the calls that were answered — time spent per
-    // conversation actually reached, unanswered attempts included in the
-    // numerator on purpose. Not the mean length of a connected call.
-    const avgCallDuration =
-        connectedCalls > 0 ? (total_call_duration ?? 0) / connectedCalls : null;
 
     return (
         <div
@@ -109,26 +129,31 @@ export function RmoStatCards({
             <StatCard
                 title="Total For Delivery Today"
                 value={total_for_delivery_today || 0}
+                loading={loading}
                 icon={TruckIcon}
             />
             <StatCard
                 title="Called"
                 value={called_count || 0}
+                loading={loading}
                 icon={PhoneIcon}
             />
             <StatCard
                 title="Delivered"
                 value={delivered_count || 0}
+                loading={loading}
                 icon={PackageCheckIcon}
             />
             <StatCard
                 title="Returning"
                 value={returning_count || 0}
+                loading={loading}
                 icon={RotateCcwIcon}
             />
             <StatCard
                 title="Problematic"
                 value={problematic_count || 0}
+                loading={loading}
                 icon={AlertTriangleIcon}
             />
             {showCallLogs && (
@@ -136,6 +161,7 @@ export function RmoStatCards({
                     <StatCard
                         title="Total Call Logs Synced"
                         value={totalCalls}
+                        loading={loading}
                         icon={PhoneCallIcon}
                     />
                     <StatCard
@@ -144,31 +170,35 @@ export function RmoStatCards({
                         valueLabel={formatCallDuration(
                             total_call_duration ?? 0,
                         )}
+                        loading={loading}
                         icon={TimerIcon}
                     />
                     <StatCard
                         title="Connected Calls (5s+)"
                         value={connectedCalls}
+                        loading={loading}
                         icon={PhoneCallIcon}
                     />
                     <StatCard
                         title="Avg Call Duration"
-                        value={avgCallDuration ?? 0}
+                        value={avg_call_duration ?? 0}
                         valueLabel={
-                            avgCallDuration === null
+                            avg_call_duration === null
                                 ? '—'
                                 : formatCallDuration(
-                                      Math.round(avgCallDuration),
+                                      Math.round(avg_call_duration),
                                   )
                         }
+                        loading={loading}
                         icon={ClockIcon}
                     />
                     <StatCard
                         title="Hit Rate"
-                        value={hitRate ?? 0}
+                        value={hit_rate ?? 0}
                         valueLabel={
-                            hitRate === null ? '—' : hitRate.toFixed(1) + '%'
+                            hit_rate === null ? '—' : hit_rate.toFixed(1) + '%'
                         }
+                        loading={loading}
                         icon={TargetIcon}
                     />
                 </>

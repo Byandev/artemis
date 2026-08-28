@@ -32,6 +32,7 @@ import {
     ExternalLink,
     Facebook,
     FileText,
+    GraduationCap,
     History,
     Landmark,
     Layers,
@@ -83,6 +84,16 @@ export function AppSidebar() {
             icon: LayoutDashboard,
             permission: PERMISSIONS.ViewMainDashboard,
         },
+        ...(currentWorkspace.courses_module_enabled
+            ? [
+                  {
+                      title: 'Courses',
+                      href: `/workspaces/${slug}/courses`,
+                      icon: GraduationCap,
+                      permission: PERMISSIONS.ViewCourses,
+                  },
+              ]
+            : []),
         ...(currentWorkspace.sales_marketing_dashboard_module_enabled
             ? [
                   {

@@ -43,11 +43,21 @@ interface TransactionType {
     name: string;
     nature: Nature;
     income_statement_section: IncomeStatementSection;
+    // Which company metric an OPEX pool is split across products by; null =
+    // the default. Only meaningful when the section is `opex`.
+    opex_allocation_basis: string | null;
+}
+
+interface AllocationBasis {
+    value: string;
+    label: string;
 }
 
 interface Props {
     workspace: Workspace;
     types: PaginatedData<TransactionType>;
+    allocationBases: AllocationBasis[];
+    defaultAllocationBasis: string;
     query?: {
         sort?: string | null;
         per_page?: number | string | null;
@@ -58,6 +68,8 @@ interface Props {
 export default function TransactionTypesIndex({
     workspace,
     types,
+    allocationBases,
+    defaultAllocationBasis,
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -165,6 +177,37 @@ export default function TransactionTypesIndex({
                 return (
                     <span className="inline-flex items-center rounded-full bg-transparent px-2.5 py-0.5 font-mono text-[11px] text-gray-300 uppercase ring-1 ring-black/6 ring-inset dark:text-gray-600 dark:ring-white/6">
                         Excluded
+                    </span>
+                );
+            },
+        },
+        {
+            accessorKey: 'opex_allocation_basis',
+            enableSorting: false,
+            header: () => (
+                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
+                    Split by
+                </div>
+            ),
+            cell: ({ row }) => {
+                // Only OPEX pools get split across products.
+                if (row.original.income_statement_section !== 'opex') {
+                    return (
+                        <span className="text-gray-300 dark:text-gray-600">
+                            —
+                        </span>
+                    );
+                }
+                const basis =
+                    row.original.opex_allocation_basis ??
+                    defaultAllocationBasis;
+                const label =
+                    allocationBases.find((b) => b.value === basis)?.label ??
+                    basis;
+
+                return (
+                    <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                        {label}
                     </span>
                 );
             },
@@ -290,6 +333,8 @@ export default function TransactionTypesIndex({
                         }}
                         type={editing}
                         baseUrl={baseUrl}
+                        allocationBases={allocationBases}
+                        defaultAllocationBasis={defaultAllocationBasis}
                     />
                 )}
                 {canDelete && (
@@ -312,11 +357,15 @@ function TypeFormDialog({
     onOpenChange,
     type,
     baseUrl,
+    allocationBases,
+    defaultAllocationBasis,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     type?: TransactionType | null;
     baseUrl: string;
+    allocationBases: AllocationBasis[];
+    defaultAllocationBasis: string;
 }) {
     const isEditing = !!type;
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
@@ -324,7 +373,13 @@ function TypeFormDialog({
             name: string;
             nature: Nature;
             income_statement_section: IncomeStatementSection;
-        }>({ name: '', nature: 'debit', income_statement_section: 'opex' });
+            opex_allocation_basis: string | null;
+        }>({
+            name: '',
+            nature: 'debit',
+            income_statement_section: 'opex',
+            opex_allocation_basis: null,
+        });
 
     useEffect(() => {
         if (open) {
@@ -335,6 +390,7 @@ function TypeFormDialog({
                     'income_statement_section',
                     type.income_statement_section,
                 );
+                setData('opex_allocation_basis', type.opex_allocation_basis);
             } else {
                 reset();
                 clearErrors();
@@ -488,6 +544,69 @@ function TypeFormDialog({
                                 })}
                             </div>
                         </Field>
+
+                        {/* A shared OPEX pool is split across products by its
+                            share of some company metric — and which metric fits
+                            depends on the cost. A CSR's salary tracks every
+                            order taken (returns included); warehouse and courier
+                            costs track parcels actually delivered. */}
+                        {data.income_statement_section === 'opex' && (
+                            <Field
+                                label="Split across products by"
+                                error={errors.opex_allocation_basis}
+                            >
+                                <div className="space-y-2">
+                                    {allocationBases.map((opt) => {
+                                        const active =
+                                            (data.opex_allocation_basis ??
+                                                defaultAllocationBasis) ===
+                                            opt.value;
+                                        return (
+                                            <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() =>
+                                                    setData(
+                                                        'opex_allocation_basis',
+                                                        opt.value,
+                                                    )
+                                                }
+                                                className={`flex w-full items-center gap-3 rounded-[10px] border p-3 text-left transition-all ${
+                                                    active
+                                                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30'
+                                                        : 'border-black/6 bg-stone-50 hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800/50 dark:hover:bg-zinc-800'
+                                                }`}
+                                            >
+                                                <span
+                                                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                                                        active
+                                                            ? 'border-emerald-500'
+                                                            : 'border-gray-300 dark:border-gray-600'
+                                                    }`}
+                                                >
+                                                    {active && (
+                                                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                                    )}
+                                                </span>
+                                                <span className="text-[12px] text-gray-800 dark:text-gray-100">
+                                                    {opt.label}
+                                                    {opt.value ===
+                                                        defaultAllocationBasis && (
+                                                        <span className="ml-2 text-[10px] text-gray-400">
+                                                            default
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <p className="mt-1.5 text-[11px] text-gray-400">
+                                    Each product carries the slice of this pool
+                                    matching its share of the chosen metric.
+                                </p>
+                            </Field>
+                        )}
                     </div>
 
                     <Footer

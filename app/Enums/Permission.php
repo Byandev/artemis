@@ -174,6 +174,12 @@ enum Permission: string
     case ManageBillingSettings = 'Manage Billing Settings';
     case ViewInvoices = 'View Invoices';
 
+    // Courses
+    case ViewCourses = 'View Courses';
+    case CreateCourses = 'Create Courses';
+    case EditCourses = 'Edit Courses';
+    case DeleteCourses = 'Delete Courses';
+
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
@@ -326,6 +332,11 @@ enum Permission: string
             self::ViewBillingSettings,
             self::ManageBillingSettings,
             self::ViewInvoices => 'Billing',
+
+            self::ViewCourses,
+            self::CreateCourses,
+            self::EditCourses,
+            self::DeleteCourses => 'Courses',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,

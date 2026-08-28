@@ -23,13 +23,15 @@ Schedule::command('gencys-erp:sweep-sync-batches')->everyMinute()->withoutOverla
 Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
 
 Schedule::command('gencys-erp:sync')->dailyAt('09:00')->withoutOverlapping();
-Schedule::command('gencys-erp:sync')->dailyAt('13:00')->withoutOverlapping();
-Schedule::command('gencys-erp:sync')->dailyAt('16:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('12:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('14:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('17:00')->withoutOverlapping();
 Schedule::command('gencys-erp:sync')->dailyAt('19:00')->withoutOverlapping();
 
 Schedule::command('inventory:snapshot-items')->dailyAt('10:30')->withoutOverlapping();
-Schedule::command('inventory:snapshot-items')->dailyAt('14:30')->withoutOverlapping();
-Schedule::command('inventory:snapshot-items')->dailyAt('17:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('13:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('13:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('18:30')->withoutOverlapping();
 Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapping();
 
 // Intern daily records still fan out on the old fixed-timer path.
@@ -97,6 +99,11 @@ Schedule::command('metaads:report-user-budgets')->dailyAt('08:00');
 
 // Post each team's own ad budgets to its team Discord webhook every morning.
 Schedule::command('metaads:report-team-budgets')->dailyAt('08:00');
+
+// Lesson videos are uploaded straight to S3 and only attached afterwards; an
+// upload that is never attached leaves an orphan in the bucket that nothing
+// else cleans up. 24h is well clear of any upload still in flight.
+Schedule::command('courses:prune-pending-uploads')->dailyAt('04:00')->withoutOverlapping();
 
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();
