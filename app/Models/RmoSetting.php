@@ -12,12 +12,21 @@ class RmoSetting extends Model
         'enable_edit_previous_day',
         'enable_bulk_status_update',
         'enable_auto_tag_status',
+        'discord_daily_stats_enabled',
+        'discord_webhook_url',
+        'discord_send_at',
     ];
 
     protected $casts = [
         'enable_edit_previous_day' => 'boolean',
         'enable_bulk_status_update' => 'boolean',
         'enable_auto_tag_status' => 'boolean',
+        'discord_daily_stats_enabled' => 'boolean',
+    ];
+
+    protected $attributes = [
+        'discord_daily_stats_enabled' => false,
+        'discord_send_at' => '18:00',
     ];
 
     public function workspace(): BelongsTo
