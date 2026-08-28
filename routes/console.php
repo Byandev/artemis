@@ -49,6 +49,12 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 // courier reported late in the evening.
 Schedule::command('rmo:apply-auto-tag')->dailyAt('00:00')->withoutOverlapping();
 
+// ── RMO (Discord) ───────────────────────────────────────────────────────
+// Checked hourly; posts only for workspaces whose configured send time matches
+// the current hour. Send times are whole hours only, so an hourly run always
+// lands on the match.
+Schedule::command('rmo:report-daily-stats')->hourly()->withoutOverlapping();
+
 // ── Inventory (Discord) ─────────────────────────────────────────────────
 // Checked hourly (top of each hour); each command posts only for workspaces
 // whose configured send time matches the current hour. Send times are
