@@ -59,8 +59,16 @@ export default function CourseFormDialog({
 }: Props) {
     const editing = course !== null;
 
-    const { data, setData, post, processing, errors, reset, clearErrors } =
-        useForm<FormValues>({ ...EMPTY });
+    const {
+        data,
+        setData,
+        post,
+        transform,
+        processing,
+        errors,
+        reset,
+        clearErrors,
+    } = useForm<FormValues>({ ...EMPTY });
 
     // The cover goes to the bucket as soon as it is picked, so submitting has
     // to wait for it or the key would still be null.
@@ -97,11 +105,23 @@ export default function CourseFormDialog({
         // on a POST.
         const url = editing ? `${baseUrl}/${course.id}` : baseUrl;
 
+        // transform() is what actually reaches the request. Passing `data` in
+        // the visit options does nothing — useForm hands its own data to
+        // router.post as the data argument, which lands after the spread
+        // options and overwrites them, so the spoofed method is dropped and a
+        // bare POST goes out to a PUT-only route.
+        //
+        // Set on every submit rather than only when editing: the dialog is
+        // reused for create, and a transform left over from a previous edit
+        // would spoof PUT on a store.
+        transform((values) =>
+            editing ? { ...values, _method: 'put' } : values,
+        );
+
         // Only a fallback upload still needs multipart; the usual path sends a
         // key and can go as plain JSON.
         post(url, {
             forceFormData: data.cover_image !== null,
-            ...(editing ? { data: { ...data, _method: 'put' } } : {}),
             preserveScroll: true,
             onSuccess: () => {
                 reset();
