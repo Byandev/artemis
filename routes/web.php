@@ -92,6 +92,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', function () {
         $user = auth()->user();
 
+        // Super admins belong in the admin panel, matching the post-login redirect.
+        if ($user->is_super_admin) {
+            return redirect()->route('admin.workspaces.index');
+        }
+
         // Use the last selected workspace from session, otherwise fall back to first owned workspace
         $sessionWorkspaceId = session('current_workspace_id');
 
