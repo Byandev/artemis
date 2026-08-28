@@ -61,6 +61,7 @@ enum Permission: string
     case ViewRtsAiChat = 'View RTS AI Chat';
     case ViewRmoManagement = 'View RMO Management';
     case ManageRmoSettings = 'Manage RMO Settings';
+    case ManageRmoNotifications = 'Manage RMO Notifications';
     case ViewParcelJourneyTemplates = 'View Parcel Journey Templates';
     case ManageParcelJourneyTemplates = 'Manage Parcel Journey Templates';
 
@@ -173,6 +174,12 @@ enum Permission: string
     case ManageBillingSettings = 'Manage Billing Settings';
     case ViewInvoices = 'View Invoices';
 
+    // Courses
+    case ViewCourses = 'View Courses';
+    case CreateCourses = 'Create Courses';
+    case EditCourses = 'Edit Courses';
+    case DeleteCourses = 'Delete Courses';
+
     // Meta Ads
     case ConnectFbAccount = 'Connect FB Account';
     case ViewAdAccounts = 'View Ad Accounts';
@@ -233,6 +240,7 @@ enum Permission: string
             self::ViewRtsAiChat,
             self::ViewRmoManagement,
             self::ManageRmoSettings,
+            self::ManageRmoNotifications,
             self::ViewParcelJourneyTemplates,
             self::ManageParcelJourneyTemplates => 'RTS',
 
@@ -324,6 +332,11 @@ enum Permission: string
             self::ViewBillingSettings,
             self::ManageBillingSettings,
             self::ViewInvoices => 'Billing',
+
+            self::ViewCourses,
+            self::CreateCourses,
+            self::EditCourses,
+            self::DeleteCourses => 'Courses',
 
             self::ViewMetaAds,
             self::ConnectFbAccount,

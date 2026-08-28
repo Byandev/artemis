@@ -49,6 +49,12 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 // courier reported late in the evening.
 Schedule::command('rmo:apply-auto-tag')->dailyAt('00:00')->withoutOverlapping();
 
+// ── RMO (Discord) ───────────────────────────────────────────────────────
+// Checked hourly; posts only for workspaces whose configured send time matches
+// the current hour. Send times are whole hours only, so an hourly run always
+// lands on the match.
+Schedule::command('rmo:report-daily-stats')->hourly()->withoutOverlapping();
+
 // ── Inventory (Discord) ─────────────────────────────────────────────────
 // Checked hourly (top of each hour); each command posts only for workspaces
 // whose configured send time matches the current hour. Send times are
@@ -93,6 +99,11 @@ Schedule::command('metaads:report-user-budgets')->dailyAt('08:00');
 
 // Post each team's own ad budgets to its team Discord webhook every morning.
 Schedule::command('metaads:report-team-budgets')->dailyAt('08:00');
+
+// Lesson videos are uploaded straight to S3 and only attached afterwards; an
+// upload that is never attached leaves an orphan in the bucket that nothing
+// else cleans up. 24h is well clear of any upload still in flight.
+Schedule::command('courses:prune-pending-uploads')->dailyAt('04:00')->withoutOverlapping();
 
 // Schedule::command('analytics:rollup --date=today')->hourly()->withoutOverlapping();
 // Schedule::command('analytics:rollup --date=yesterday')->dailyAt('01:00')->withoutOverlapping();

@@ -15,8 +15,9 @@ use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
+use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
-use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\Finance\Statements\StatementOrderSourceFactory;
 
 /**
  * Monthly workspace-wide income statement for gencys-partner workspaces.
@@ -35,8 +36,7 @@ class IncomeStatementController extends Controller
 {
     use AuthorizesRequests;
 
-    /** gencys_orders.parcel_status value that counts as delivered revenue. */
-    private const DELIVERED_STATUS = 'DELIVERED';
+    public function __construct(private readonly StatementOrderSourceFactory $sources) {}
 
     /** Sentinel type_keys for the auto-computed cost-of-sales lines. */
     private const SHIPPING_FEE_KEY = -1;
@@ -52,7 +52,11 @@ class IncomeStatementController extends Controller
 
         $statements = IncomeStatement::where('workspace_id', $workspace->id)
             ->orderByDesc('period_month')
-            ->get(['id', 'period_month', 'total_delivered', 'gross_profit', 'total_expenses', 'net_profit', 'status', 'generated_at']);
+            ->get([
+                'id', 'period_month', 'total_delivered', 'delivered_orders',
+                'gross_profit_delivered_cogs', 'gross_profit_bought_cogs',
+                'status', 'generated_at',
+            ]);
 
         return Inertia::render('workspaces/finance/income-statements/index', [
             'workspace' => $workspace,
@@ -78,13 +82,15 @@ class IncomeStatementController extends Controller
             ->whereDate('period_month', $periodMonth)
             ->first();
 
-        [$defaultCod, $defaultVat, $defaultAdvisory] = $this->workspaceRates($workspace);
+        [$defaultCod, $defaultVat, $defaultAdvisory, $defaultAdvisoryDelivered] = $this->workspaceRates($workspace);
         $codRate = (float) ($request->input('cod_rate') ?? $existing?->cod_fee_rate ?? $defaultCod);
         $vatRate = (float) ($request->input('vat_rate') ?? $existing?->vat_rate ?? $defaultVat);
         $advisoryRate = (float) ($request->input('advisory_rate') ?? $existing?->advisory_rate ?? $defaultAdvisory);
+        $advisoryDeliveredRate = (float) ($request->input('advisory_delivered_rate') ?? $existing?->advisory_delivered_rate ?? $defaultAdvisoryDelivered);
 
         $revenue = $this->deliveredRevenue($workspace, $from, $to);
         $lines = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate);
+        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate);
 
         // Preview always defaults every line checked, so lines that appear after a
         // statement was last saved (e.g. a newly-flagged type, or new transactions)
@@ -93,61 +99,78 @@ class IncomeStatementController extends Controller
         return Inertia::render('workspaces/finance/income-statements/show', [
             'workspace' => $workspace,
             'mode' => 'preview',
+            // Computed for the month, not read back — nothing is stored yet.
+            'figures' => [
+                ...$figures,
+                'delivered_amount' => $revenue['delivered'],
+            ],
             'statement' => [
                 'id' => $existing?->id,
                 'period_month' => $periodMonth,
-                'delivered' => $revenue['delivered'],
-                'orders' => $revenue['orders'],
                 'cod_fee_rate' => $codRate,
                 'vat_rate' => $vatRate,
                 'advisory_rate' => $advisoryRate,
+                'advisory_delivered_rate' => $advisoryDeliveredRate,
                 'gencys_partner' => (bool) $workspace->is_gencys_partner,
-                'expenses' => $lines->map(fn ($l) => [
-                    ...$l,
-                    'included' => true,
-                ])->values(),
             ],
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace, UserIncomeStatementService $userStatements)
+    public function store(Request $request, Workspace $workspace, UserIncomeStatementService $userStatements, ProductIncomeStatementService $productStatements)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
 
         $validated = $request->validate([
             'month' => ['required', 'date_format:Y-m'],
-            'included_keys' => ['array'],
+            // Omitted = every line. The figures don't depend on this, but the
+            // OPEX ledger underneath does, and an absent choice means "all"
+            // rather than "none".
+            'included_keys' => ['nullable', 'array'],
             'included_keys.*' => ['integer'],
             'cod_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'vat_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'advisory_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'advisory_delivered_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
         ]);
 
         [$periodMonth, $from, $to] = $this->resolveMonth($validated['month']);
 
-        [$defaultCod, $defaultVat, $defaultAdvisory] = $this->workspaceRates($workspace);
+        [$defaultCod, $defaultVat, $defaultAdvisory, $defaultAdvisoryDelivered] = $this->workspaceRates($workspace);
         $codRate = (float) ($validated['cod_rate'] ?? $defaultCod);
         $vatRate = (float) ($validated['vat_rate'] ?? $defaultVat);
         $advisoryRate = (float) ($validated['advisory_rate'] ?? $defaultAdvisory);
+        $advisoryDeliveredRate = (float) ($validated['advisory_delivered_rate'] ?? $defaultAdvisoryDelivered);
+
+        $includedKeys = array_key_exists('included_keys', $validated)
+            ? collect($validated['included_keys'])
+            : $this->expenseLines($workspace, $from, $to, $this->deliveredRevenue($workspace, $from, $to)['delivered'], $codRate, $vatRate)
+                ->map(fn ($l) => $l['type_key']);
 
         $statement = $this->persist(
             $workspace,
             $periodMonth,
             $from,
             $to,
-            collect($validated['included_keys'] ?? []),
+            $includedKeys,
             $codRate,
             $vatRate,
             $advisoryRate,
+            $advisoryDeliveredRate,
         );
 
         IncomeStatementSetting::updateOrCreate(
             ['workspace_id' => $workspace->id],
-            ['cod_fee_rate' => $codRate, 'vat_rate' => $vatRate, 'advisory_rate' => $advisoryRate],
+            [
+                'cod_fee_rate' => $codRate,
+                'vat_rate' => $vatRate,
+                'advisory_rate' => $advisoryRate,
+                'advisory_delivered_rate' => $advisoryDeliveredRate,
+            ],
         );
 
         $userStatements->snapshot($statement);
+        $productStatements->snapshot($statement);
 
         return redirect()
             ->route('workspaces.finance.income-statements.show', [$workspace->slug, $statement->id])
@@ -160,39 +183,45 @@ class IncomeStatementController extends Controller
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
         $this->ensureOwns($workspace, $incomeStatement);
 
-        $incomeStatement->load('breakdown');
-
         return Inertia::render('workspaces/finance/income-statements/show', [
             'workspace' => $workspace,
             'mode' => 'saved',
+            // The figures this statement shares with its per-product and
+            // per-user slices, read straight off the saved header.
+            'figures' => [
+                'delivered_orders' => (int) $incomeStatement->delivered_orders,
+                'delivered_amount' => (float) $incomeStatement->total_delivered,
+                'shipped_orders' => (int) $incomeStatement->shipped_orders,
+                'total_shipping_fee' => (float) $incomeStatement->total_shipping_fee,
+                'ad_spent' => (float) $incomeStatement->ad_spent,
+                'cod_fee' => (float) $incomeStatement->cod_fee,
+                'cod_fee_vat' => (float) $incomeStatement->cod_fee_vat,
+                'total_bought_cogs' => (float) $incomeStatement->total_bought_cogs,
+                'total_bought_cogs_delivery_fee' => (float) $incomeStatement->total_bought_cogs_delivery_fee,
+                'total_delivered_cogs' => (float) $incomeStatement->total_delivered_cogs,
+                'gross_profit_delivered_cogs' => (float) $incomeStatement->gross_profit_delivered_cogs,
+                'gross_profit_delivered_cogs_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_advisory_share,
+                'gross_profit_delivered_cogs_after_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_after_advisory_share,
+                'gross_profit_bought_cogs' => (float) $incomeStatement->gross_profit_bought_cogs,
+                'gross_profit_bought_cogs_advisory_share' => (float) $incomeStatement->gross_profit_bought_cogs_advisory_share,
+                'gross_profit_bought_cogs_after_advisory_share' => (float) $incomeStatement->gross_profit_bought_cogs_after_advisory_share,
+                'advisory_share_on_delivered' => (float) $incomeStatement->advisory_share_on_delivered,
+            ],
             'statement' => [
                 'id' => $incomeStatement->id,
                 'period_month' => $incomeStatement->period_month->toDateString(),
-                'delivered' => (float) $incomeStatement->total_delivered,
-                'orders' => (int) $incomeStatement->delivered_orders,
-                'gross_profit' => (float) $incomeStatement->gross_profit,
-                'total_expenses' => (float) $incomeStatement->total_expenses,
-                'net_profit' => (float) $incomeStatement->net_profit,
                 'cod_fee_rate' => (float) $incomeStatement->cod_fee_rate,
                 'vat_rate' => (float) $incomeStatement->vat_rate,
                 'advisory_rate' => (float) $incomeStatement->advisory_rate,
-                'advisory_share' => (float) $incomeStatement->advisory_share,
+                'advisory_delivered_rate' => (float) $incomeStatement->advisory_delivered_rate,
                 'gencys_partner' => (bool) $workspace->is_gencys_partner,
                 'generated_at' => $incomeStatement->generated_at?->toIso8601String(),
-                'expenses' => $incomeStatement->breakdown->map(fn ($b) => [
-                    'type_key' => $this->keyForRow($b),
-                    'type_name' => $b->type_name,
-                    'amount' => (float) $b->amount,
-                    'source' => $b->source,
-                    'section' => $b->section,
-                    'included' => true,
-                ])->values(),
             ],
         ]);
     }
 
     /** Re-pull the month's numbers with the snapshotted rates + included lines. */
-    public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement, UserIncomeStatementService $userStatements)
+    public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement, UserIncomeStatementService $userStatements, ProductIncomeStatementService $productStatements)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
@@ -228,9 +257,11 @@ class IncomeStatementController extends Controller
             $codRate,
             $vatRate,
             (float) $incomeStatement->advisory_rate,
+            (float) $incomeStatement->advisory_delivered_rate,
         );
 
         $userStatements->snapshot($statement);
+        $productStatements->snapshot($statement);
 
         return redirect()->back()->with('success', 'Income statement regenerated.');
     }
@@ -291,7 +322,7 @@ class IncomeStatementController extends Controller
      * Recompute the month's revenue, cost of sales, gross profit, advisory, OPEX
      * and net profit for the included lines, and (over)write the snapshot.
      */
-    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, float $codRate, float $vatRate, float $advisoryRate): IncomeStatement
+    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, float $codRate, float $vatRate, float $advisoryRate, float $advisoryDeliveredRate): IncomeStatement
     {
         $revenue = $this->deliveredRevenue($workspace, $from, $to);
 
@@ -311,18 +342,21 @@ class IncomeStatementController extends Controller
 
         $netProfit = $grossProfit - $opex - $advisoryShare;
 
-        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $codRate, $vatRate, $advisoryRate, $advisoryShare) {
+        $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate);
+
+        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate, $advisoryShare, $figures) {
             $statement = IncomeStatement::updateOrCreate(
                 ['workspace_id' => $workspace->id, 'period_month' => $periodMonth],
                 [
+                    ...$figures,
                     'total_delivered' => $revenue['delivered'],
-                    'delivered_orders' => $revenue['orders'],
                     'total_expenses' => $costOfSales + $opex,
                     'gross_profit' => $grossProfit,
                     'net_profit' => $netProfit,
                     'cod_fee_rate' => $codRate,
                     'vat_rate' => $vatRate,
                     'advisory_rate' => $advisoryRate,
+                    'advisory_delivered_rate' => $advisoryDeliveredRate,
                     'advisory_share' => $advisoryShare,
                     'status' => 'final',
                     'generated_at' => now(),
@@ -392,29 +426,121 @@ class IncomeStatementController extends Controller
         return ['type_key' => $key, 'type_name' => $name, 'amount' => $amount, 'source' => $source, 'section' => $section];
     }
 
-    /** Delivered gencys revenue + order count for the month (by parcel_updated_date). */
+    /** Delivered revenue + order count for the month, from whichever source. */
     private function deliveredRevenue(Workspace $workspace, Carbon $from, Carbon $to): array
     {
-        $row = GencysDailySalesOrder::where('workspace_id', $workspace->id)
-            ->where('parcel_status', self::DELIVERED_STATUS)
-            ->whereNotIn('platform', ['Shopee', 'TikTok'])
-            ->whereNotLike('page', '%pikutin%')
-            ->whereBetween('parcel_updated_date', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->selectRaw('COALESCE(SUM(price_final), 0) as delivered, COUNT(*) as orders')
-            ->first();
+        $totals = $this->sources->for($workspace)->workspaceTotals($workspace, $from, $to);
+
+        return ['delivered' => $totals->deliveredAmount, 'orders' => $totals->deliveredOrders];
+    }
+
+    /** Courier fee on the month's shipped-out parcels, from whichever source. */
+    private function shippingFee(Workspace $workspace, Carbon $from, Carbon $to): float
+    {
+        return $this->sources->for($workspace)->workspaceTotals($workspace, $from, $to)->shippingFee;
+    }
+
+    /**
+     * The figures the statement shares with its per-product and per-user slices,
+     * measured across the whole workspace.
+     *
+     * Ad spend and bought goods are the month's whole transaction totals here,
+     * not just the tagged or charged shares the slices can attribute — this is
+     * the company figure, so nothing is left out.
+     *
+     * @return array<string, float|int>
+     */
+    private function figures(Workspace $workspace, Carbon $from, Carbon $to, float $codRate, float $vatRate, float $advisoryRate, float $advisoryDeliveredRate): array
+    {
+        $totals = $this->sources->for($workspace)->workspaceTotals($workspace, $from, $to);
+
+        $revenue = $totals->deliveredAmount;
+        $orders = $totals->deliveredOrders;
+        $units = $totals->deliveredUnits;
+        $deliveredCogs = $totals->deliveredCogs;
+        $shippedOrders = $totals->shippedOrders;
+        $shippingFee = $totals->shippingFee;
+
+        $adSpent = $this->typeTotal($workspace, $from, $to, ['%adspent%', '%ad spent%', '%ad spend%']);
+        $boughtCogs = $this->typeTotal($workspace, $from, $to, ['%cost of goods%']);
+        $boughtFreight = $this->typeTotal($workspace, $from, $to, ['%delivery of cog%', '%delivery of goods%', '%cog delivery%']);
+
+        $codFee = round($revenue * $codRate, 2);
+        $codVat = round($codFee * $vatRate, 2);
+
+        // Both margins take the same costs off delivered revenue and differ only
+        // in which cost of goods they charge.
+        $commonCosts = $adSpent + $shippingFee + $codFee + $codVat;
+
+        $grossDelivered = round($revenue - $commonCosts - $deliveredCogs, 2);
+        // Freight on a purchase is part of what the stock cost.
+        $grossBought = round($revenue - $commonCosts - $boughtCogs - $boughtFreight, 2);
+
+        // A share of gross profit for gencys partners, taken on whichever
+        // basis it sits beside. Only a positive gross owes anything — a
+        // loss doesn't earn a rebate.
+        // The share can be struck two ways — off the margin, or off delivered
+        // revenue — and the agreement takes whichever comes out lower. Which one
+        // that is flips with the month, so both are worked out and the cheaper
+        // is the one actually charged.
+        $advisoryOnDelivered = ($workspace->is_gencys_partner && $revenue > 0)
+            ? round($revenue * $advisoryDeliveredRate, 2)
+            : 0.0;
+
+        $advisory = function (float $gross) use ($workspace, $advisoryRate, $advisoryOnDelivered) {
+            if (! $workspace->is_gencys_partner || $gross <= 0) {
+                return 0.0;
+            }
+
+            return min(round($gross * $advisoryRate, 2), $advisoryOnDelivered);
+        };
 
         return [
-            'delivered' => (float) $row->delivered,
-            'orders' => (int) $row->orders,
+            'delivered_orders' => $orders,
+            'delivered_units' => $units,
+            'shipped_orders' => $shippedOrders,
+            'total_shipping_fee' => $shippingFee,
+            'ad_spent' => $adSpent,
+            'cod_fee' => $codFee,
+            'cod_fee_vat' => $codVat,
+            'total_bought_cogs' => $boughtCogs,
+            'total_bought_cogs_delivery_fee' => $boughtFreight,
+            'total_delivered_cogs' => $deliveredCogs,
+            'gross_profit_delivered_cogs' => $grossDelivered,
+            'gross_profit_delivered_cogs_advisory_share' => $advisory($grossDelivered),
+            'gross_profit_delivered_cogs_after_advisory_share' => round($grossDelivered - $advisory($grossDelivered), 2),
+            'gross_profit_bought_cogs' => $grossBought,
+            'gross_profit_bought_cogs_advisory_share' => $advisory($grossBought),
+            'gross_profit_bought_cogs_after_advisory_share' => round($grossBought - $advisory($grossBought), 2),
+            'advisory_share_on_delivered' => $advisoryOnDelivered,
         ];
     }
 
-    /** Total shipping fee of gencys orders shipped out in the month. */
-    private function shippingFee(Workspace $workspace, Carbon $from, Carbon $to): float
+    /**
+     * The month's whole outflow for the transaction types matching any of the
+     * given (lowercased) LIKE patterns.
+     *
+     * @param  list<string>  $patterns
+     */
+    private function typeTotal(Workspace $workspace, Carbon $from, Carbon $to, array $patterns): float
     {
-        return (float) GencysDailySalesOrder::where('workspace_id', $workspace->id)
-            ->whereBetween('shipped_out_date', [$from->toDateString(), $to->toDateString()])
-            ->sum('shipping_fee');
+        $typeIds = TransactionType::where('workspace_id', $workspace->id)
+            ->where(function ($q) use ($patterns) {
+                foreach ($patterns as $pattern) {
+                    $q->orWhereRaw('LOWER(name) LIKE ?', [$pattern]);
+                }
+            })
+            ->pluck('id');
+
+        if ($typeIds->isEmpty()) {
+            return 0.0;
+        }
+
+        return round((float) Transaction::where('workspace_id', $workspace->id)
+            ->where('type', 'out')
+            ->whereIn('transaction_type_id', $typeIds)
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->sum('amount'), 2);
     }
 
     /**
@@ -467,7 +593,7 @@ class IncomeStatementController extends Controller
         };
     }
 
-    /** Workspace default rates [cod, vat, advisory] as fractions, falling back to constants. */
+    /** Workspace default rates [cod, vat, advisory, advisoryDelivered] as fractions, falling back to constants. */
     private function workspaceRates(Workspace $workspace): array
     {
         $settings = IncomeStatementSetting::where('workspace_id', $workspace->id)->first();
@@ -476,6 +602,7 @@ class IncomeStatementController extends Controller
             (float) ($settings?->cod_fee_rate ?? IncomeStatementSetting::DEFAULT_COD_FEE_RATE),
             (float) ($settings?->vat_rate ?? IncomeStatementSetting::DEFAULT_VAT_RATE),
             (float) ($settings?->advisory_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_RATE),
+            (float) ($settings?->advisory_delivered_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_DELIVERED_RATE),
         ];
     }
 
