@@ -5,6 +5,7 @@ use App\Models\Order;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\RmoDailyStats;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User as PancakeUser;
 
@@ -183,7 +184,7 @@ test('the endpoint needs the CSR analytics permission', function () {
     $outsider = User::factory()->create();
     $workspace->users()->attach($outsider->id);
 
-    foreach (['analytics-sales', 'analytics-rts', 'analytics-rmo-called', 'analytics-rmo-time'] as $stat) {
+    foreach (['analytics-sales', 'analytics-rts', 'analytics-rmo-called', 'analytics-rmo-time', 'analytics-calls-placed', 'analytics-real-conversations', 'analytics-reach-rate', 'analytics-longest-call'] as $stat) {
         $this->actingAs($outsider)
             ->getJson("/api/workspaces/{$workspace->slug}/csrs/stats/{$stat}?from=2026-08-01&to=2026-08-05")
             ->assertForbidden();
@@ -376,8 +377,13 @@ function csrRmoTimeStat($owner, Workspace $workspace, string $from, string $to)
     return csrStat($owner, $workspace, 'analytics-rmo-time', $from, $to);
 }
 
-/** A logged call of $seconds on $date. */
-function rmoCall(Workspace $workspace, string $date, int $seconds): void
+/**
+ * A logged call of $seconds on $date.
+ *
+ * Carries an order_id by default — that is what marks it as an RMO call. Pass
+ * $matched false for one that reached a number belonging to no delivery.
+ */
+function rmoCall(Workspace $workspace, string $date, int $seconds, bool $matched = true): void
 {
     CallLog::factory()->create([
         'workspace_id' => $workspace->id,
@@ -385,10 +391,13 @@ function rmoCall(Workspace $workspace, string $date, int $seconds): void
         'phone_number' => '09170000001',
         'call_date' => $date,
         'duration' => $seconds,
+        'order_id' => $matched
+            ? Order::factory()->forWorkspace($workspace)->create()->id
+            : null,
     ]);
 }
 
-test('RMO total time is the talk time across every call in the range', function () {
+test('RMO total time is the talk time across the range\'s RMO calls', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     rmoCall($workspace, '2026-08-02', 120);
@@ -448,4 +457,260 @@ test('another workspace\'s calls are not counted', function () {
     csrRmoTimeStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 0)
         ->assertJsonPath('calls', 0);
+});
+
+test('a call matched to no order is not RMO time', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 120);
+    // Reached a number on no delivery, so it is not time spent on RMO.
+    rmoCall($workspace, '2026-08-02', 600, matched: false);
+
+    csrRmoTimeStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 120)
+        ->assertJsonPath('calls', 1);
+});
+
+function csrCallsPlacedStat($owner, Workspace $workspace, string $from, string $to)
+{
+    return csrStat($owner, $workspace, 'analytics-calls-placed', $from, $to);
+}
+
+test('calls placed counts every call against an order, however short', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-02', 5);
+    // A one-second call still counts as placed — the CSR rang and was answered.
+    rmoCall($workspace, '2026-08-02', 1);
+    // Zero seconds never joined: it rang out or the line was busy.
+    rmoCall($workspace, '2026-08-03', 0);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 4)
+        ->assertJsonPath('connected', 3);
+});
+
+test('a call matched to no order is not a call placed', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-02', 60, matched: false);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('connected', 1);
+});
+
+test('the calls placed change is relative', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-07-28', 30);
+    rmoCall($workspace, '2026-07-29', 30);
+
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-03', 30);
+
+    // 2 to 3 calls is +50%.
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 3)
+        ->assertJsonPath('previous_value', 2)
+        ->assertJsonPath('change', 50);
+});
+
+test('a one-second call counts as both placed and connected', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 1);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('connected', 1)
+        ->assertJsonPath('change', null);
+});
+
+test('a call that never joined is placed but not connected', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 0);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('connected', 0);
+});
+
+test('connected here is looser than the RMO page\'s five-second rule', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // The RMO page counts a call as connected only at 5s+. This card counts any
+    // talk time at all, so the two figures differ on purpose — pinned here so
+    // the divergence stays deliberate rather than becoming a surprise.
+    rmoCall($workspace, '2026-08-02', 2);
+
+    expect(RmoDailyStats::CONNECTED_CALL_MIN_SECONDS)->toBe(5);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('connected', 1);
+});
+
+function csrRealConversationsStat($owner, Workspace $workspace, string $from, string $to)
+{
+    return csrStat($owner, $workspace, 'analytics-real-conversations', $from, $to);
+}
+
+test('real conversations counts only calls of five seconds or more', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-02', 5);
+    // A hello and a hang-up is not a conversation.
+    rmoCall($workspace, '2026-08-02', 4);
+    rmoCall($workspace, '2026-08-03', 1);
+    rmoCall($workspace, '2026-08-03', 0);
+
+    csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 2)
+        ->assertJsonPath('placed', 5)
+        ->assertJsonPath('share', 40);
+
+    // The same ratio is the Reach Rate card's headline.
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 40);
+});
+
+test('the three call figures narrow in turn', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-02', 2);
+    rmoCall($workspace, '2026-08-02', 0);
+
+    // Placed counts every attempt, connected any talk time, real 5s+.
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 3)
+        ->assertJsonPath('connected', 2);
+
+    csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1);
+});
+
+test('a call matched to no order is not a real conversation', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-02', 60, matched: false);
+
+    csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('placed', 1);
+});
+
+test('a range with no calls placed has no share', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('placed', 0)
+        ->assertJsonPath('share', null)
+        ->assertJsonPath('change', null);
+});
+
+function csrReachRateStat($owner, Workspace $workspace, string $from, string $to)
+{
+    return csrStat($owner, $workspace, 'analytics-reach-rate', $from, $to);
+}
+
+test('reach rate is real conversations over calls placed', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // 1 of 4 attempts lasted five seconds — 25%.
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-02', 4);
+    rmoCall($workspace, '2026-08-02', 1);
+    rmoCall($workspace, '2026-08-03', 0);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 25)
+        ->assertJsonPath('real', 1)
+        ->assertJsonPath('placed', 4);
+});
+
+test('the reach rate change is in percentage points', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Previous: 1 of 2 = 50%. Current: 2 of 2 = 100%. +50 pts.
+    rmoCall($workspace, '2026-07-28', 30);
+    rmoCall($workspace, '2026-07-28', 1);
+
+    rmoCall($workspace, '2026-08-02', 30);
+    rmoCall($workspace, '2026-08-03', 30);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 100)
+        ->assertJsonPath('previous_value', 50)
+        ->assertJsonPath('change', 50);
+});
+
+test('a range with no attempts has no reach rate rather than zero', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // 0% would read as "rang all day and reached nobody".
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', null)
+        ->assertJsonPath('change', null);
+});
+
+function csrLongestCallStat($owner, Workspace $workspace, string $from, string $to)
+{
+    return csrStat($owner, $workspace, 'analytics-longest-call', $from, $to);
+}
+
+test('longest call is the single longest in the range, with the day it landed', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 90);
+    rmoCall($workspace, '2026-08-03', 750);
+    rmoCall($workspace, '2026-08-04', 120);
+    // Outside the range, and longer — must not win.
+    rmoCall($workspace, '2026-08-09', 9999);
+
+    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 750)
+        ->assertJsonPath('call_date', '2026-08-03');
+});
+
+test('an unmatched call cannot be the longest', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 60);
+    rmoCall($workspace, '2026-08-02', 6000, matched: false);
+
+    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 60);
+});
+
+test('the longest call change is relative', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-07-28', 100);
+    rmoCall($workspace, '2026-08-02', 150);
+
+    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 150)
+        ->assertJsonPath('previous_value', 100)
+        ->assertJsonPath('change', 50);
+});
+
+test('a range with no calls has no longest and no day', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('call_date', null)
+        ->assertJsonPath('change', null);
 });

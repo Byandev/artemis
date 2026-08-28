@@ -46,6 +46,10 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-rts', [CSRController::class, 'analyticsRts']);
         Route::get('/csrs/stats/analytics-rmo-called', [CSRController::class, 'analyticsRmoCalled']);
         Route::get('/csrs/stats/analytics-rmo-time', [CSRController::class, 'analyticsRmoTime']);
+        Route::get('/csrs/stats/analytics-calls-placed', [CSRController::class, 'analyticsCallsPlaced']);
+        Route::get('/csrs/stats/analytics-real-conversations', [CSRController::class, 'analyticsRealConversations']);
+        Route::get('/csrs/stats/analytics-reach-rate', [CSRController::class, 'analyticsReachRate']);
+        Route::get('/csrs/stats/analytics-longest-call', [CSRController::class, 'analyticsLongestCall']);
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');

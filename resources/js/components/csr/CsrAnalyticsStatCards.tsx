@@ -2,8 +2,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
     ArrowDown,
     ArrowUp,
+    MessagesSquare,
     Minus,
+    Percent,
     PhoneCall,
+    PhoneForwarded,
+    PhoneOutgoing,
     RotateCcw,
     Timer,
     Wallet,
@@ -36,6 +40,29 @@ export interface RmoTimeStat extends StatPayload {
     value: number;
     calls: number;
     average_seconds: number | null;
+}
+
+export interface CallsPlacedStat extends StatPayload {
+    value: number;
+    connected: number;
+}
+
+export interface RealConversationsStat extends StatPayload {
+    value: number;
+    placed: number;
+    /** Share of the attempts that became a conversation, or null with none. */
+    share: number | null;
+}
+
+export interface ReachRateStat extends StatPayload {
+    real: number;
+    placed: number;
+}
+
+export interface LongestCallStat extends StatPayload {
+    value: number;
+    /** The day it happened, or null when no calls were placed. */
+    call_date: string | null;
 }
 
 /** Seconds as `502h 32m` / `12m 05s` / `45s`, dropping units that read as zero. */
@@ -292,6 +319,144 @@ export function RmoTimeStatCard({
                 !stat || stat.average_seconds === null
                     ? 'No calls in this period'
                     : `avg ${(stat.average_seconds / 60).toFixed(1)} min per call`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function CallsPlacedStatCard({
+    stat,
+    loading,
+}: {
+    stat: CallsPlacedStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="Calls Placed"
+            icon={PhoneOutgoing}
+            loading={loading || stat === null}
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The connected count is worth carrying: the gap between the two
+            // is the calls that rang and got nothing, which is the context the
+            // headline number is missing on its own.
+            footnote={
+                stat ? `${stat.connected.toLocaleString()} connected` : ''
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RealConversationsStatCard({
+    stat,
+    loading,
+}: {
+    stat: RealConversationsStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="Real Conversations"
+            icon={MessagesSquare}
+            loading={loading || stat === null}
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The share of attempts this represents is the Reach Rate card, so
+            // the footnote gives the denominator without restating the rate.
+            footnote={
+                !stat || stat.share === null
+                    ? 'No calls placed in this period'
+                    : `of ${stat.placed.toLocaleString()} placed`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function ReachRateStatCard({
+    stat,
+    loading,
+}: {
+    stat: ReachRateStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="Reach Rate"
+            icon={Percent}
+            loading={loading || stat === null}
+            // Null with no attempts at all — a dash, not 0%, which would read as
+            // "rang all day and reached nobody" rather than "nobody rang".
+            value={
+                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
+            }
+            footnote={
+                stat
+                    ? `${stat.real.toLocaleString()} of ${stat.placed.toLocaleString()} calls reached someone`
+                    : ''
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                    unit=" pts"
+                />
+            }
+        />
+    );
+}
+
+export function LongestCallStatCard({
+    stat,
+    loading,
+}: {
+    stat: LongestCallStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="Longest Call"
+            icon={PhoneForwarded}
+            loading={loading || stat === null}
+            value={stat ? duration(stat.value) : ''}
+            // Which day it landed on, since a single outlier is worth being able
+            // to go and look at rather than just wonder about.
+            footnote={
+                !stat || stat.call_date === null
+                    ? 'No calls in this period'
+                    : `on ${stat.call_date}`
             }
             trend={
                 <Trend

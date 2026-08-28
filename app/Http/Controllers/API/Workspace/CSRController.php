@@ -8,6 +8,7 @@ use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\PancakeUserRmoDailyReport;
 use App\Models\Workspace;
+use App\Support\RmoDailyStats;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -409,29 +410,176 @@ class CSRController extends Controller
         ]);
     }
 
+    public function analyticsCallsPlaced(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCallTotals($workspace, $from, $to);
+        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            // Every call placed against an order, however short. A two-second
+            // call is still a CSR picking up the phone, and this card counts
+            // the picking up.
+            'value' => $current['calls'],
+            // The subset that actually connected, carried alongside so the
+            // card can say how many of the attempts landed.
+            'connected' => $current['connected'],
+            'previous_value' => $previous['calls'],
+            // Relative, like the time card: a count is a magnitude, not a rate.
+            'change' => $previous['calls'] > 0
+                ? round(($current['calls'] - $previous['calls']) / $previous['calls'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsRealConversations(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCallTotals($workspace, $from, $to);
+        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['real'],
+            'placed' => $current['calls'],
+            // What share of the attempts turned into an actual conversation —
+            // the figure the count is meaningless without, since 40 out of 60
+            // and 40 out of 4,000 are not the same day's work.
+            'share' => $current['calls'] > 0
+                ? round($current['real'] / $current['calls'] * 100, 1)
+                : null,
+            'previous_value' => $previous['real'],
+            'change' => $previous['real'] > 0
+                ? round(($current['real'] - $previous['real']) / $previous['real'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsReachRate(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCallTotals($workspace, $from, $to);
+        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+
+        // How often picking up the phone reached somebody: the conversations
+        // that lasted, over every attempt made.
+        $rate = fn (array $t) => $t['calls'] > 0 ? $t['real'] / $t['calls'] * 100 : null;
+
+        $currentRate = $rate($current);
+        $previousRate = $rate($previous);
+
+        return response()->json([
+            // Null, not zero, with no attempts at all: 0% would read as "rang
+            // all day and reached nobody" rather than "nobody rang".
+            'value' => $currentRate === null ? null : round($currentRate, 1),
+            'real' => $current['real'],
+            'placed' => $current['calls'],
+            'previous_value' => $previousRate === null ? null : round($previousRate, 1),
+            // Percentage points, as on the other rate cards.
+            'change' => $currentRate !== null && $previousRate !== null
+                ? round($currentRate - $previousRate, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsLongestCall(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCallTotals($workspace, $from, $to);
+        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+
+        // The day it happened, for the footnote. A second, tiny query rather
+        // than a window function: MAX() gives the length, not the row it came
+        // from, and this is one indexed lookup on a range already scanned.
+        $longest = $current['longest'] > 0
+            ? DB::table('call_logs')
+                ->where('workspace_id', $workspace->id)
+                ->whereNotNull('order_id')
+                ->whereBetween('call_date', [$from, $to])
+                ->orderByDesc('duration')
+                ->first(['call_date', 'order_id'])
+            : null;
+
+        return response()->json([
+            'value' => $current['longest'],
+            'call_date' => $longest?->call_date,
+            'order_id' => $longest?->order_id,
+            'previous_value' => $previous['longest'],
+            // Relative: a duration is a magnitude, not a rate.
+            'change' => $previous['longest'] > 0
+                ? round(($current['longest'] - $previous['longest']) / $previous['longest'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
     /**
-     * Time spent on the phone across a range, and how many calls made it up.
+     * Time spent on RMO calls across a range, and how many calls made it up.
      *
-     * Every call the workspace logged on those dates, flat — the same rule the
-     * RMO management page's own call cards use, so the two agree. Deliberately
-     * not narrowed to calls that match a delivery: a CSR spends the day ringing
-     * numbers that are not on the orders assigned to them, and the `persona`
-     * column that marks a matched call is only stamped on rows synced since it
-     * was added, so leaning on it would read as zero for older ranges.
+     * Only calls carrying an order_id — the ones matched to a delivery when they
+     * synced. A CSR rings numbers all day that belong to no RMO order, and this
+     * card is about RMO time, so those are left out.
      *
-     * @return array{seconds: int, calls: int}
+     * The match is stamped at sync time by CallLogPersona and there is no
+     * backfill, so a call logged before order_id existed has none and is not
+     * counted. That makes the card cover calls synced from that point on rather
+     * than restate history from a match made long after the fact.
+     *
+     * `connected` is the subset that actually connected — any talk time at all.
+     * A zero-second row is a call that never joined: it rang out, or the line
+     * was busy, and nobody was reached.
+     *
+     * `real` is the stricter cut: five seconds or more, the same threshold the
+     * RMO page draws, kept on RmoDailyStats so the two cannot drift apart.
+     * Under that it is a hello and a hang-up, not a conversation.
+     *
+     * So the three narrow in turn — every attempt, the ones that joined, the
+     * ones where something was actually said.
+     *
+     * `longest` is the single longest call in the range — the one figure here
+     * that is not a total, and the reason the aggregate carries a MAX.
+     *
+     * @return array{seconds: int, calls: int, connected: int, real: int, longest: int}
      */
     private function rmoCallTotals(Workspace $workspace, string $from, string $to): array
     {
         $row = DB::table('call_logs')
             ->where('workspace_id', $workspace->id)
+            ->whereNotNull('order_id')
             ->whereBetween('call_date', [$from, $to])
-            ->selectRaw('COUNT(*) as calls, COALESCE(SUM(duration), 0) as seconds')
+            ->selectRaw('
+                COUNT(*) as calls,
+                COALESCE(SUM(duration), 0) as seconds,
+                COUNT(CASE WHEN duration > 0 THEN 1 END) as connected,
+                COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as real_conversations,
+                COALESCE(MAX(duration), 0) as longest
+            ')
             ->first();
 
         return [
             'seconds' => (int) ($row->seconds ?? 0),
             'calls' => (int) ($row->calls ?? 0),
+            'connected' => (int) ($row->connected ?? 0),
+            'real' => (int) ($row->real_conversations ?? 0),
+            'longest' => (int) ($row->longest ?? 0),
         ];
     }
 

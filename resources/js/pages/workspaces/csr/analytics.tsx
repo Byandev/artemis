@@ -1,9 +1,17 @@
 import PageHeader from '@/components/common/PageHeader';
 import {
+    CallsPlacedStatCard,
+    LongestCallStatCard,
+    ReachRateStatCard,
+    RealConversationsStatCard,
     RmoCalledStatCard,
     RmoTimeStatCard,
     RtsStatCard,
     SalesStatCard,
+    type CallsPlacedStat,
+    type LongestCallStat,
+    type ReachRateStat,
+    type RealConversationsStat,
     type RmoCalledStat,
     type RmoTimeStat,
     type RtsStat,
@@ -186,6 +194,33 @@ export default function Analytics({ workspace, records, query }: Props) {
         fromStr,
         toStr,
     );
+    const [callsPlacedStat, callsPlacedLoading] =
+        useAnalyticsStat<CallsPlacedStat>(
+            workspace.slug,
+            'analytics-calls-placed',
+            fromStr,
+            toStr,
+        );
+    const [realConversationsStat, realConversationsLoading] =
+        useAnalyticsStat<RealConversationsStat>(
+            workspace.slug,
+            'analytics-real-conversations',
+            fromStr,
+            toStr,
+        );
+    const [reachRateStat, reachRateLoading] = useAnalyticsStat<ReachRateStat>(
+        workspace.slug,
+        'analytics-reach-rate',
+        fromStr,
+        toStr,
+    );
+    const [longestCallStat, longestCallLoading] =
+        useAnalyticsStat<LongestCallStat>(
+            workspace.slug,
+            'analytics-longest-call',
+            fromStr,
+            toStr,
+        );
 
     // Debounced search — skip the initial mount so we don't refetch on load.
     const isFirstRender = useRef(true);
@@ -365,7 +400,7 @@ export default function Analytics({ workspace, records, query }: Props) {
                     />
                 </PageHeader>
 
-                <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <SalesStatCard stat={salesStat} loading={salesLoading} />
                     <RtsStatCard stat={rtsStat} loading={rtsLoading} />
                     <RmoCalledStatCard
@@ -375,6 +410,22 @@ export default function Analytics({ workspace, records, query }: Props) {
                     <RmoTimeStatCard
                         stat={rmoTimeStat}
                         loading={rmoTimeLoading}
+                    />
+                    <CallsPlacedStatCard
+                        stat={callsPlacedStat}
+                        loading={callsPlacedLoading}
+                    />
+                    <RealConversationsStatCard
+                        stat={realConversationsStat}
+                        loading={realConversationsLoading}
+                    />
+                    <ReachRateStatCard
+                        stat={reachRateStat}
+                        loading={reachRateLoading}
+                    />
+                    <LongestCallStatCard
+                        stat={longestCallStat}
+                        loading={longestCallLoading}
                     />
                 </div>
 
