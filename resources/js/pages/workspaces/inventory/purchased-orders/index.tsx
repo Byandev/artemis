@@ -383,6 +383,32 @@ export default function PurchasedOrderIndex({
                 },
             },
             {
+                accessorKey: 'delivery_fee',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Delivery Fee" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] whitespace-nowrap text-gray-600 tabular-nums dark:text-gray-400">
+                        {peso(row.original.delivery_fee)}
+                    </span>
+                ),
+            },
+            {
+                // The PO's own figure, delivery fee included — the item column's
+                // per-line amounts add up to this minus that fee.
+                accessorKey: 'total_amount',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Total Amount" />
+                ),
+                cell: ({ row }) => (
+                    <span className="font-mono text-[11px] font-medium whitespace-nowrap text-gray-800 tabular-nums dark:text-gray-200">
+                        {peso(row.original.total_amount)}
+                    </span>
+                ),
+            },
+            {
                 id: 'item_name',
                 enableSorting: false,
                 meta: { cellClassName: 'min-w-[240px]' },
@@ -875,6 +901,7 @@ export default function PurchasedOrderIndex({
 
                 <div className="rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
                     <DataTable
+                        stickyHeader
                         columns={columns}
                         enableInternalPagination={false}
                         data={orders.data || []}

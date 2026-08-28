@@ -69,6 +69,12 @@ interface DataTableProps<TData, TValue> {
     onColumnOrderChange?: (order: ColumnOrderState) => void
     /** When provided, rows become expandable and this renders the expanded panel. */
     renderSubRow?: (row: Row<TData>) => React.ReactNode
+    /**
+     * Pin the header row while the rows scroll under it. Opt-in because it
+     * bounds the table's height: the body gets its own scrollport instead of
+     * growing the page, which only pays off on wide/long lists.
+     */
+    stickyHeader?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -86,6 +92,7 @@ export function DataTable<TData, TValue>({
                                              columnOrder,
                                              onColumnOrderChange,
                                              renderSubRow,
+                                             stickyHeader = false,
                                          }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
     const [expanded, setExpanded] = useState<ExpandedState>({})
@@ -152,14 +159,29 @@ export function DataTable<TData, TValue>({
 
     return (
         <>
-            <div className="max-w-full overflow-x-auto custom-scrollbar">
+            <div
+                className={cn(
+                    "max-w-full custom-scrollbar",
+                    // A sticky header needs a scrollport to stick to, and the
+                    // page itself isn't one — the wrapper has to own the
+                    // vertical scroll for the row to stay put.
+                    stickyHeader ? "max-h-[70svh] overflow-auto" : "overflow-x-auto",
+                )}
+            >
                 <Table>
-                    <TableHeader>
+                    <TableHeader className={cn(stickyHeader && "sticky top-0 z-20 bg-white dark:bg-zinc-900")}>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     return (
-                                        <TableHead key={header.id} className={cn("px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6 [&:has([role=checkbox])]:pr-0", header.column.columnDef.meta?.headerClassName)}>
+                                        <TableHead key={header.id} className={cn(
+                                            "px-4 py-2.5 text-[10px] font-mono font-medium uppercase tracking-wider text-gray-300 dark:text-gray-600 border-b border-black/6 dark:border-white/6 [&:has([role=checkbox])]:pr-0",
+                                            // Collapsed table borders don't paint on a
+                                            // sticky cell, so the divider is drawn as an
+                                            // inset shadow instead.
+                                            stickyHeader && "shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]",
+                                            header.column.columnDef.meta?.headerClassName,
+                                        )}>
                                             {header.isPlaceholder
                                                 ? null
                                                 : flexRender(
