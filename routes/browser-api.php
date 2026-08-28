@@ -39,6 +39,13 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/total-returning', [CSRController::class, 'statTotalReturning']);
         Route::get('/csrs/stats/total-rts', [CSRController::class, 'statTotalRts']);
         Route::get('/csrs/stats/total-rmo-called', [CSRController::class, 'statTotalRmoCalled']);
+        // CSR Analytics cards. Same one-endpoint-per-card shape as the stats
+        // above; they read the workspace's orders (the dashboard's source)
+        // rather than the nightly per-CSR rollup.
+        Route::get('/csrs/stats/analytics-sales', [CSRController::class, 'analyticsSales']);
+        Route::get('/csrs/stats/analytics-rts', [CSRController::class, 'analyticsRts']);
+        Route::get('/csrs/stats/analytics-rmo-called', [CSRController::class, 'analyticsRmoCalled']);
+        Route::get('/csrs/stats/analytics-rmo-time', [CSRController::class, 'analyticsRmoTime']);
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');

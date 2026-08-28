@@ -1,4 +1,14 @@
 import PageHeader from '@/components/common/PageHeader';
+import {
+    RmoCalledStatCard,
+    RmoTimeStatCard,
+    RtsStatCard,
+    SalesStatCard,
+    type RmoCalledStat,
+    type RmoTimeStat,
+    type RtsStat,
+    type SalesStat,
+} from '@/components/csr/CsrAnalyticsStatCards';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
@@ -57,6 +67,56 @@ const formatCallTime = (seconds: number) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 };
+/**
+ * One CSR analytics stat card's figures.
+ *
+ * Each card has its own endpoint, so each gets its own request and its own
+ * loading flag. The AbortController is what keeps a fast sequence of date
+ * changes from landing out of order — the last range picked is the one shown.
+ */
+function useAnalyticsStat<T>(
+    workspaceSlug: string,
+    stat: string,
+    from: string,
+    to: string,
+): [T | null, boolean] {
+    const [data, setData] = useState<T | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+
+        const params = new URLSearchParams({ from, to });
+
+        fetch(
+            `/api/workspaces/${workspaceSlug}/csrs/stats/${stat}?${params.toString()}`,
+            {
+                signal: controller.signal,
+                headers: { Accept: 'application/json' },
+            },
+        )
+            .then((response) => {
+                if (!response.ok) throw new Error(String(response.status));
+                return response.json();
+            })
+            .then((payload: T) => {
+                setData(payload);
+                setLoading(false);
+            })
+            .catch((error: Error) => {
+                // An abort is this effect superseding itself — the newer request
+                // owns the loading flag now.
+                if (error.name === 'AbortError') return;
+                setLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [workspaceSlug, stat, from, to]);
+
+    return [data, loading];
+}
+
 export default function Analytics({ workspace, records, query }: Props) {
     const today = new Date();
     const currentType = query?.type === 'erp' ? 'erp' : 'pos';
@@ -93,6 +153,39 @@ export default function Analytics({ workspace, records, query }: Props) {
                 replace: true,
             },
         );
+
+    // One endpoint per card, the same shape the other CSR stat endpoints use.
+    // Each fetches on its own, so a slow metric shows a skeleton without holding
+    // up the card beside it, and the table's sorting, paging and search never
+    // touch either.
+    //
+    // Not keyed on the POS/ERP switch: these read the workspace's orders, the
+    // source the main dashboard's total sales comes from, and an order has no
+    // POS/ERP side. That switch only picks the rollup the table is built from.
+    const [salesStat, salesLoading] = useAnalyticsStat<SalesStat>(
+        workspace.slug,
+        'analytics-sales',
+        fromStr,
+        toStr,
+    );
+    const [rtsStat, rtsLoading] = useAnalyticsStat<RtsStat>(
+        workspace.slug,
+        'analytics-rts',
+        fromStr,
+        toStr,
+    );
+    const [rmoCalledStat, rmoCalledLoading] = useAnalyticsStat<RmoCalledStat>(
+        workspace.slug,
+        'analytics-rmo-called',
+        fromStr,
+        toStr,
+    );
+    const [rmoTimeStat, rmoTimeLoading] = useAnalyticsStat<RmoTimeStat>(
+        workspace.slug,
+        'analytics-rmo-time',
+        fromStr,
+        toStr,
+    );
 
     // Debounced search — skip the initial mount so we don't refetch on load.
     const isFirstRender = useRef(true);
@@ -222,6 +315,7 @@ export default function Analytics({ workspace, records, query }: Props) {
                     title="CSR Analytics"
                     description="Aggregated CSR performance from daily records"
                     stackActionsOnMobile
+                    divider={false}
                 >
                     <div className="flex items-center rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
                         {['erp', 'pos'].map((value) => {
@@ -271,40 +365,18 @@ export default function Analytics({ workspace, records, query }: Props) {
                     />
                 </PageHeader>
 
-                {/*<div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">*/}
-                {/*    <StatCard*/}
-                {/*        title="Total Sales"*/}
-                {/*        value={salesStat.value}*/}
-                {/*        loading={salesStat.loading}*/}
-                {/*        format={peso}*/}
-                {/*    />*/}
-                {/*    <StatCard*/}
-                {/*        title="Total Orders"*/}
-                {/*        value={ordersStat.value}*/}
-                {/*        loading={ordersStat.loading}*/}
-                {/*    />*/}
-                {/*    <StatCard*/}
-                {/*        title="Total Delivered"*/}
-                {/*        value={deliveredStat.value}*/}
-                {/*        loading={deliveredStat.loading}*/}
-                {/*    />*/}
-                {/*    <StatCard*/}
-                {/*        title="Total Returning"*/}
-                {/*        value={returningStat.value}*/}
-                {/*        loading={returningStat.loading}*/}
-                {/*    />*/}
-                {/*    <StatCard*/}
-                {/*        title="RTS Rate"*/}
-                {/*        value={rtsStat.value}*/}
-                {/*        loading={rtsStat.loading}*/}
-                {/*        format={(n) => `${n.toFixed(2)}%`}*/}
-                {/*    />*/}
-                {/*    <StatCard*/}
-                {/*        title="RMO Called"*/}
-                {/*        value={rmoCalledStat.value}*/}
-                {/*        loading={rmoCalledStat.loading}*/}
-                {/*    />*/}
-                {/*</div>*/}
+                <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <SalesStatCard stat={salesStat} loading={salesLoading} />
+                    <RtsStatCard stat={rtsStat} loading={rtsLoading} />
+                    <RmoCalledStatCard
+                        stat={rmoCalledStat}
+                        loading={rmoCalledLoading}
+                    />
+                    <RmoTimeStatCard
+                        stat={rmoTimeStat}
+                        loading={rmoTimeLoading}
+                    />
+                </div>
 
                 <input
                     type="text"
