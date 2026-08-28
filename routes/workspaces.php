@@ -116,6 +116,7 @@ Route::get('/public/workspaces/{workspace}/sales-targets/{salesTarget}', [Public
     ->name('public-page.sales-targets.show');
 
 Route::get('/public/workspaces/{workspace}/rts/rmo-management', [ForDeliveryController::class, 'public'])->name('public-page.rmo-management');
+Route::get('/public/workspaces/{workspace}/rts/rmo-management/stats', [ForDeliveryController::class, 'publicStats'])->name('public-page.rmo-management.stats');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/export', [ForDeliveryController::class, 'publicExport'])->name('public-page.rmo-management.export');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/verify-password', [ForDeliveryController::class, 'verifyPublicPassword'])->name('public-page.rmo-management.verify-password');
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/bulk-assign', [ForDeliveryController::class, 'publicBulkAssign'])->name('public-page.rmo-management.bulkAssign');
