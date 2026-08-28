@@ -12,6 +12,36 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.33.1',
+        date: '2026-08-28',
+        sections: [
+            {
+                title: 'RTS — RMO Call Cards',
+                items: [
+                    'The five call cards now report the calls one person actually placed rather than the whole workspace’s day — they follow the assignee you have picked, or failing that whoever the Logged in as picker says you are, so “my call logs” means the calls you made; left on All Assignees with no identity set they still cover the workspace’s whole day, as before',
+                    'They follow the page and shop filters too, so the cards describe the rows on screen; previously they reported every call logged that day whatever you had narrowed the list to, which is what made them look stuck',
+                    'The cut is by whoever dialled, not by whose orders the numbers belonged to — a CSR rings plenty of numbers that are not on the orders assigned to them, and counting against their order list was the wrong question and the reason the figures read as though the filters were being ignored',
+                ],
+            },
+            {
+                title: 'RTS — RMO Management',
+                items: [
+                    'The stat cards load on their own now instead of holding the page up: sorting, turning a page and typing in the search box no longer pay for six day-wide aggregates each time, and the cards only re-ask the server when something they actually depend on changes',
+                    'The filter bar has an All Assignees picker, so you can read someone else’s day by name rather than only your own through My Assignee Only — the toggle still wins while it is on, and the picker greys out with a note saying so instead of being quietly ignored',
+                    'While a figure is on its way the card shows a placeholder bar at its usual height rather than the previous number, so nothing reflows underneath you and a stale figure can’t be misread as the fresh one — and nothing is fetched at all while the cards are collapsed, which is how they start',
+                    'Changing who you are logged in as now re-runs the table and the cards, instead of leaving both sitting on the previous person’s orders until you happened to touch a filter',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Editing a course now saves — previously the form submitted as though it were creating a new one, so the update was rejected and the change never landed',
+                    'Avg Call Duration and Hit Rate are worked out in one place shared with the daily RMO Discord report, so the card and the report cannot drift apart on what a hit rate means',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.33.0',
         date: '2026-08-28',
         sections: [
