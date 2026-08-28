@@ -254,6 +254,8 @@ class IncomeStatementController extends Controller
                 'total_bought_cogs_delivery_fee' => (float) $incomeStatement->total_bought_cogs_delivery_fee,
                 'total_delivered_cogs' => (float) $incomeStatement->total_delivered_cogs,
                 'opex' => (float) $incomeStatement->opex,
+                'net_profit_delivered_cogs' => (float) $incomeStatement->net_profit_delivered_cogs,
+                'net_profit_bought_cogs' => (float) $incomeStatement->net_profit_bought_cogs,
                 'gross_profit_delivered_cogs' => (float) $incomeStatement->gross_profit_delivered_cogs,
                 'gross_profit_delivered_cogs_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_advisory_share,
                 'gross_profit_delivered_cogs_after_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_after_advisory_share,
@@ -543,6 +545,10 @@ class IncomeStatementController extends Controller
             'gross_profit_bought_cogs_advisory_share' => $advisory($grossBought),
             'gross_profit_bought_cogs_after_advisory_share' => round($grossBought - $advisory($grossBought), 2),
             'advisory_share_on_delivered' => $advisoryOnDelivered,
+            // What is left once the running costs come off. Taken from gross
+            // after the advisory, so the statement reads as one subtraction.
+            'net_profit_delivered_cogs' => round($grossDelivered - $advisory($grossDelivered) - $opexTotal, 2),
+            'net_profit_bought_cogs' => round($grossBought - $advisory($grossBought) - $opexTotal, 2),
         ];
     }
 

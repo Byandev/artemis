@@ -34,6 +34,8 @@ export interface StatementFigureSet {
     advisory_share_on_delivered: number;
     /** Outflow on transaction types marked OPEX. */
     opex: number;
+    net_profit_delivered_cogs: number;
+    net_profit_bought_cogs: number;
 }
 
 type CogsView = 'delivered' | 'bought';
@@ -89,29 +91,48 @@ export default function StatementFigures({
         cogsView === 'bought'
             ? figures.gross_profit_bought_cogs_after_advisory_share
             : figures.gross_profit_delivered_cogs_after_advisory_share;
+    const netProfit =
+        cogsView === 'bought'
+            ? figures.net_profit_bought_cogs
+            : figures.net_profit_delivered_cogs;
     const onDeliveredBasis =
         advisoryCharged > 0 &&
         advisoryCharged === figures.advisory_share_on_delivered;
 
-    const advisoryRows = [
+    // Only partners are charged an advisory share.
+    const advisoryRows = gencysPartner
+        ? [
+              {
+                  label: onDeliveredBasis
+                      ? `Advisory Share — ${pct(rates.advisoryDelivered)} of Delivered`
+                      : `Advisory Share — ${pct(rates.advisory)} of Gross Profit`,
+                  help: `Struck two ways — ${pct(rates.advisory)} of a positive Gross Profit, or ${pct(rates.advisoryDelivered)} of Delivered Amount — and the lower of the two is charged. This month that is the ${onDeliveredBasis ? 'delivered' : 'gross profit'} basis. A loss owes nothing.`,
+                  value: fmt(advisoryCharged),
+              },
+              {
+                  label: 'Gross Profit after Advisory',
+                  help: 'Gross Profit less the advisory share above.',
+                  value: fmt(afterAdvisory),
+                  emphasis: true,
+                  signed: afterAdvisory,
+              },
+          ]
+        : [];
+
+    // Operating expenses and what they leave behind. Nothing to do with the
+    // advisory — these close out every statement, partner or not.
+    const closingRows = [
         {
-            label: onDeliveredBasis
-                ? `Advisory Share — ${pct(rates.advisoryDelivered)} of Delivered`
-                : `Advisory Share — ${pct(rates.advisory)} of Gross Profit`,
-            help: `Struck two ways — ${pct(rates.advisory)} of a positive Gross Profit, or ${pct(rates.advisoryDelivered)} of Delivered Amount — and the lower of the two is charged. This month that is the ${onDeliveredBasis ? 'delivered' : 'gross profit'} basis. A loss owes nothing.`,
-            value: fmt(advisoryCharged),
-        },
-        {
-            label: 'Gross Profit after Advisory',
-            help: 'Gross Profit less the advisory share above.',
-            value: fmt(afterAdvisory),
-            emphasis: true,
-            signed: afterAdvisory,
-        },
-        {
-            label: 'OPEX',
+            label: 'Less — OPEX',
             help: 'The month’s operating expenses — outflow on transaction types marked OPEX on the income statement. Untyped outflow is left out: it isn’t marked as anything, and guessing it in would overstate expenses.',
             value: fmt(figures.opex),
+        },
+        {
+            label: '= Net Profit',
+            help: 'Gross Profit less the advisory share and the month’s OPEX. On a workspace with no advisory this is simply Gross Profit less OPEX.',
+            value: fmt(netProfit),
+            emphasis: true,
+            signed: netProfit,
         },
     ];
 
@@ -178,7 +199,8 @@ export default function StatementFigures({
                       emphasis: true,
                       signed: figures.gross_profit_bought_cogs,
                   },
-                  ...(gencysPartner ? advisoryRows : []),
+                  ...advisoryRows,
+                  ...closingRows,
               ]
             : [
                   {
@@ -194,7 +216,8 @@ export default function StatementFigures({
                       emphasis: true,
                       signed: figures.gross_profit_delivered_cogs,
                   },
-                  ...(gencysPartner ? advisoryRows : []),
+                  ...advisoryRows,
+                  ...closingRows,
               ]),
     ];
 

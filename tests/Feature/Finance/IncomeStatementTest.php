@@ -868,3 +868,56 @@ test('an untyped outflow is not counted as an expense', function () {
 
     expect((float) IncomeStatement::first()->opex)->toBe(1500.0);
 });
+
+test('net profit is what gross profit leaves after the advisory and OPEX', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+    seedMay($workspace);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+        'advisory_rate' => 0.30, 'advisory_delivered_rate' => 0.09,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // Gross 6,076; the advisory is the lower of 30% of that (1,822.80) and 9%
+    // of the 10,000 delivered (900), so 900. OPEX is seedMay's 1,000 + 500.
+    expect((float) $statement->gross_profit_delivered_cogs)->toBe(6076.0)
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(900.0)
+        ->and((float) $statement->opex)->toBe(1500.0)
+        // 6,076 − 900 − 1,500 = 3,676.
+        ->and((float) $statement->net_profit_delivered_cogs)->toBe(3676.0)
+        // The subtraction the page shows has to hold.
+        ->and((float) $statement->net_profit_delivered_cogs)
+        ->toBe(round((float) $statement->gross_profit_delivered_cogs_after_advisory_share - (float) $statement->opex, 2));
+});
+
+test('with no advisory, net profit is simply gross profit less OPEX', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace); // not a partner, so nothing is charged
+
+    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+    $rent = makeType($workspace, 'Rent', section: 'opex');
+    makeTxn($workspace, $account, $rent, 'out', 1000, '2026-05-09');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    expect((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0)
+        ->and((float) $statement->opex)->toBe(1000.0)
+        ->and((float) $statement->net_profit_delivered_cogs)
+        ->toBe(round((float) $statement->gross_profit_delivered_cogs - 1000.0, 2));
+
+    $this->actingAs($user)
+        ->get(isUrl($workspace, "/{$statement->id}"))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('figures.opex')
+            ->has('figures.net_profit_delivered_cogs')
+            ->has('figures.net_profit_bought_cogs')
+        );
+});
