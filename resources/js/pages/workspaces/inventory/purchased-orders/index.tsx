@@ -126,6 +126,15 @@ const LINE_CLASS = 'flex h-6 items-center';
 const peso = (value: number | string) =>
     `₱${Number(value).toLocaleString('en-PH', { maximumFractionDigits: 2 })}`;
 
+/** A line item's share of the PO — whole percents, one decimal under 10%. */
+const percent = (value: number, total: number) => {
+    const share = (value / total) * 100;
+
+    return `${share.toLocaleString('en-PH', {
+        maximumFractionDigits: share < 10 ? 1 : 0,
+    })}%`;
+};
+
 /**
  * Every delivery on the PO, flattened across line items, oldest first. The
  * owning line item travels with each delivery because editing one still has to
@@ -145,6 +154,14 @@ const orderDeliveries = (order: PurchasedOrder) =>
 /** Total quantity still owed across the whole PO. */
 const orderBalance = (order: PurchasedOrder) =>
     order.items.reduce((sum, item) => sum + item.balance, 0);
+
+/**
+ * What the line items add up to. Deliberately not the PO's own total_amount —
+ * that includes the delivery fee, so the per-item shares below would never
+ * reach 100%.
+ */
+const itemsTotal = (order: PurchasedOrder) =>
+    order.items.reduce((sum, item) => sum + Number(item.total_amount), 0);
 
 interface Totals {
     delivery_fee: number;
@@ -374,48 +391,61 @@ export default function PurchasedOrderIndex({
                         Item Name
                     </span>
                 ),
-                cell: ({ row }) => (
-                    <div className="flex flex-col">
-                        {row.original.items.map((item) => (
-                            <div
-                                key={item.id}
-                                className={`group/item gap-2 ${LINE_CLASS}`}
-                            >
-                                <span className="flex min-w-0 items-center gap-1">
-                                    <span
-                                        className="truncate font-mono text-[11px] text-gray-800 dark:text-gray-200"
-                                        title={item.inventory_item?.sku}
-                                    >
-                                        {item.inventory_item?.product?.name ??
-                                            item.inventory_item?.sku ??
-                                            '—'}
+                cell: ({ row }) => {
+                    /* Share of the PO is only meaningful when there is
+                       something to share it with — a single-item PO is
+                       always 100%. */
+                    const showShare = row.original.items.length > 1;
+                    const base = showShare ? itemsTotal(row.original) : 0;
+
+                    return (
+                        <div className="flex flex-col">
+                            {row.original.items.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className={`group/item gap-2 ${LINE_CLASS}`}
+                                >
+                                    <span className="flex min-w-0 items-center gap-1">
+                                        <span
+                                            className="truncate font-mono text-[11px] text-gray-800 dark:text-gray-200"
+                                            title={item.inventory_item?.sku}
+                                        >
+                                            {item.inventory_item?.product
+                                                ?.name ??
+                                                item.inventory_item?.sku ??
+                                                '—'}
+                                        </span>
+                                        {/* What this line cost, so the PO's total
+                                            can be read off its own items. */}
+                                        <span className="shrink-0 font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                                            ({peso(item.total_amount)}
+                                            {showShare && base > 0
+                                                ? ` · ${percent(Number(item.total_amount), base)}`
+                                                : ''}
+                                            )
+                                        </span>
                                     </span>
-                                    {/* What this line cost, so the PO's total
-                                        can be read off its own items. */}
-                                    <span className="shrink-0 font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                                        ({peso(item.total_amount)})
-                                    </span>
-                                </span>
-                                {canEditPurchasedOrders && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setDeliveryFor({
-                                                itemId: item.id,
-                                                balance: item.balance,
-                                                delivery: null,
-                                            })
-                                        }
-                                        aria-label="Record delivery"
-                                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-emerald-600 opacity-0 transition-all group-hover/item:opacity-100 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
-                                    >
-                                        <Plus className="h-3 w-3" />
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                ),
+                                    {canEditPurchasedOrders && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setDeliveryFor({
+                                                    itemId: item.id,
+                                                    balance: item.balance,
+                                                    delivery: null,
+                                                })
+                                            }
+                                            aria-label="Record delivery"
+                                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-emerald-600 opacity-0 transition-all group-hover/item:opacity-100 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950"
+                                        >
+                                            <Plus className="h-3 w-3" />
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                },
             },
             {
                 id: 'deliveries',
