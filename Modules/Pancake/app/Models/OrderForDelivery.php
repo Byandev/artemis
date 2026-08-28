@@ -17,6 +17,13 @@ class OrderForDelivery extends Model
 
     protected $table = 'pancake_order_for_delivery';
 
+    protected $casts = [
+        // Raw-selected in the RMO queries as a MySQL decimal, which arrives as a
+        // string. Cast so the JSON matches the `number | null` the frontend type
+        // declares.
+        'shop_rts_rate' => 'float',
+    ];
+
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);

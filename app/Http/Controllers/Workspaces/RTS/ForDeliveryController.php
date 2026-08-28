@@ -16,6 +16,7 @@ use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
 use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
+use App\Http\Sorts\Order\ForDelivery\ShopRtsSort;
 use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\User as SystemUser;
@@ -306,6 +307,9 @@ class ForDeliveryController extends Controller
             ->addSelect([
                 'pancake_order_for_delivery.*',
                 \DB::raw('(SELECT rts_rate FROM rider_delivery_summary WHERE rider_name = pancake_order_for_delivery.rider_name AND rider_phone = pancake_order_for_delivery.rider_phone LIMIT 1) as rider_rts_rate'),
+                // Pre-computed by `sync:shop-rts-snapshot` (previous 14 days) —
+                // read straight off the shop rather than aggregated per request.
+                \DB::raw('(SELECT rts_snapshot FROM shops WHERE shops.id = pancake_order_for_delivery.shop_id LIMIT 1) as shop_rts_rate'),
             ])
             // Every caller, not just the assignee — the badge opens the modal,
             // and the modal has never filtered by CSR. Keeping the assignee
@@ -389,6 +393,7 @@ class ForDeliveryController extends Controller
                 AllowedSort::custom('order_shipping_address_full_name', new CustomerNameSort),
                 AllowedSort::custom('order_shipping_address_city_order_summary_rts_rate', new LocationRtsRateSort),
                 AllowedSort::custom('rider_rts_rate', new RiderRtsSort),
+                AllowedSort::custom('shop_rts_rate', new ShopRtsSort),
                 AllowedSort::custom('cx_rts_rate', new CxRtsRateSort),
             ])
             ->whereDate('delivery_date', $deliveryDate)

@@ -42,6 +42,15 @@ Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapp
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
 Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 
+// Roll each shop's previous-14-days RTS rate onto shops.rts_snapshot so the RMO
+// table can show and sort by it without aggregating pancake_orders per request.
+// The 04:30 run follows the CSR rollups, once the previous day's orders have
+// settled; the 13:00 one picks up statuses the courier reported during the
+// morning. Both cover the same window of completed days, so the second run only
+// ever corrects the first — it never shifts the window mid-day.
+Schedule::command('sync:shop-rts-snapshot')->dailyAt('04:30')->withoutOverlapping();
+Schedule::command('sync:shop-rts-snapshot')->dailyAt('13:00')->withoutOverlapping();
+
 // Pull RMO statuses in line with the courier's parcel status for workspaces
 // that opted in. Runs once at midnight, which lands on the default two-day
 // window (today + yesterday) just as the day rolls over — so the day that has
