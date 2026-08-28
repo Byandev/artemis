@@ -17,6 +17,9 @@ return new class extends Migration
 
             // Who was on the other end: 'customer' or 'rider'. Null means the
             // call was not part of an RMO delivery — an order-verification call.
+            // Rows already in the table stay null: there is no backfill, so the
+            // breakdown covers calls synced from here on rather than restating
+            // history from a match made long after the fact.
             $table->string('persona', 16)->nullable()->after('order_id');
 
             // The breakdown groups a workspace's day by persona; this is the
