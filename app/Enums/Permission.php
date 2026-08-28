@@ -134,6 +134,7 @@ enum Permission: string
 
     // Pancake
     case ViewOrders = 'View Orders';
+    case ImportOrderShippingFees = 'Import Order Shipping Fees';
     case ViewCourierShipments = 'View Courier Shipments';
     case ImportCourierShipments = 'Import Courier Shipments';
 
@@ -297,6 +298,7 @@ enum Permission: string
             self::ApproveFinanceRequestFunds => 'Finance',
 
             self::ViewOrders,
+            self::ImportOrderShippingFees,
             self::ViewCourierShipments,
             self::ImportCourierShipments => 'Pancake',
 

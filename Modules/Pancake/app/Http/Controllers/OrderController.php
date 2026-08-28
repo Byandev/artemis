@@ -9,6 +9,8 @@ use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
+use Modules\Pancake\Imports\OrderShippingFeesImport;
 use Modules\Pancake\Models\Order;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -108,5 +110,44 @@ class OrderController extends Controller
                 'filter' => $request->input('filter', []),
             ],
         ]);
+    }
+
+    /**
+     * Import a courier billing export: its shipping cost is written onto the
+     * orders whose tracking code matches the sheet's waybill number.
+     */
+    public function importShippingFees(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ImportOrderShippingFees->value, $workspace);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:51200'],
+        ]);
+
+        // The read is the slow part: ~12s for a 14k-row sheet, against PHP's
+        // 30s default. Give the import room so a bigger export still lands.
+        set_time_limit(300);
+
+        try {
+            $import = OrderShippingFeesImport::for($workspace, $request->file('file'));
+
+            Excel::import($import, $request->file('file'));
+        } catch (\Throwable $e) {
+            report($e);
+
+            return redirect()->back()->with('error', 'Import failed: '.$e->getMessage());
+        }
+
+        $sample = array_slice($import->unmatchedSample, 0, 3);
+
+        return redirect()->back()->with('success', sprintf(
+            'Import complete: %d of %d matched orders updated, %d waybills matched no order%s%s.',
+            $import->updated,
+            $import->matchedOrders,
+            $import->unmatched,
+            $sample ? ' (e.g. '.implode(', ', $sample).')' : '',
+            $import->skipped ? sprintf(', %d rows had no shipping cost', $import->skipped) : '',
+        ));
     }
 }

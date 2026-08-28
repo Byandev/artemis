@@ -6,17 +6,20 @@ import {
 } from '@/components/ui/columns-dropdown';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
+import { PERMISSIONS } from '@/constants/permissions';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import flatpickr from 'flatpickr';
 import { debounce, omit } from 'lodash';
-import { Search, X } from 'lucide-react';
+import { Search, Upload, X } from 'lucide-react';
 import moment from 'moment';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import DateOption = flatpickr.Options.DateOption;
 
 interface OrderItem {
@@ -43,6 +46,7 @@ interface Order {
     status_name: string | null;
     tracking_code: string | null;
     total_amount: string | number | null;
+    shipping_fee: string | number | null;
     inserted_at: string | null;
     updated_at: string | null;
     shipping_address: ShippingAddress | null;
@@ -154,6 +158,39 @@ export default function PancakeOrdersIndex({
         query?.filter?.date_from ?? '',
     );
     const [dateTo, setDateTo] = useState<string>(query?.filter?.date_to ?? '');
+
+    const canImportFees = usePermission(PERMISSIONS.ImportOrderShippingFees);
+    const { flash } = usePage().props as {
+        flash?: { success?: string; error?: string };
+    };
+
+    // --- Shipping fee import ---
+    const [importOpen, setImportOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const importForm = useForm<{ file: File | null }>({ file: null });
+
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.success, flash?.error]);
+
+    const submitImport = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!importForm.data.file) return;
+        importForm.post(`${baseUrl}/shipping-fees/import`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setImportOpen(false);
+                importForm.reset();
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            },
+            onError: (errors) => {
+                if (errors.file) toast.error(errors.file);
+            },
+        });
+    };
+
     const defaultDate = useMemo(
         () =>
             dateFrom && dateTo
@@ -309,6 +346,23 @@ export default function PancakeOrdersIndex({
             ),
         },
         {
+            accessorKey: 'shipping_fee',
+            id: 'shipping_fee',
+            enableSorting: false,
+            header: () => (
+                <span className="font-mono text-[10px] tracking-wider text-gray-400 uppercase">
+                    Shipping fee
+                </span>
+            ),
+            cell: ({ row }) => (
+                <span className="font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                    {row.original.shipping_fee === null
+                        ? '—'
+                        : peso(row.original.shipping_fee)}
+                </span>
+            ),
+        },
+        {
             accessorKey: 'products',
             id: 'products',
             enableSorting: false,
@@ -389,7 +443,62 @@ export default function PancakeOrdersIndex({
                 <PageHeader
                     title="Orders"
                     description="All Pancake orders synced for this workspace."
-                />
+                >
+                    {canImportFees && (
+                        <button
+                            onClick={() => setImportOpen((v) => !v)}
+                            className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700"
+                        >
+                            <Upload className="h-3.5 w-3.5" />
+                            Import shipping fees
+                        </button>
+                    )}
+                </PageHeader>
+
+                {importOpen && canImportFees && (
+                    <form
+                        onSubmit={submitImport}
+                        className="mb-3 flex flex-col gap-2 rounded-[14px] border border-emerald-200 bg-emerald-50/40 p-3 md:flex-row md:items-center dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                    >
+                        <span className="font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                            xlsx with a <strong>Waybill Number</strong> and a{' '}
+                            <strong>Total Shipping Cost</strong> column
+                        </span>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={(e) =>
+                                importForm.setData(
+                                    'file',
+                                    e.target.files?.[0] ?? null,
+                                )
+                            }
+                            className="h-9 flex-1 rounded-[10px] border border-black/10 bg-white px-2 font-mono! text-[12px]! text-gray-800 file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-1 file:font-mono file:text-[11px] file:text-gray-700 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-100 dark:file:bg-zinc-800 dark:file:text-gray-300"
+                        />
+                        <button
+                            type="submit"
+                            disabled={
+                                !importForm.data.file || importForm.processing
+                            }
+                            className="h-9 rounded-[10px] bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white disabled:opacity-50"
+                        >
+                            {importForm.processing ? 'Importing…' : 'Upload'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setImportOpen(false);
+                                importForm.reset();
+                                if (fileInputRef.current)
+                                    fileInputRef.current.value = '';
+                            }}
+                            className="h-9 rounded-[10px] border border-black/10 bg-white px-3 font-mono! text-[12px]! text-gray-700 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300"
+                        >
+                            Cancel
+                        </button>
+                    </form>
+                )}
 
                 {/* Status tabs */}
                 <div className="mb-3 flex flex-wrap items-center gap-1.5">

@@ -506,8 +506,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
     });
 
-    Route::get('/workspaces/{workspace}/pancake/orders', [OrderController::class, 'index'])
-        ->name('workspaces.pancake.orders.index');
+    Route::prefix('/workspaces/{workspace}/pancake/orders')->name('workspaces.pancake.orders.')->group(function () {
+        Route::get('/', [OrderController::class, 'index'])->name('index');
+        Route::post('/shipping-fees/import', [OrderController::class, 'importShippingFees'])->name('shipping-fees.import');
+    });
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
