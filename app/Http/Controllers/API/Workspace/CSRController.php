@@ -597,6 +597,98 @@ class CSRController extends Controller
     }
 
     /**
+     * Where each day's calls ended up — the table under the effort chart.
+     *
+     * The chart draws two of these figures; this is the whole split, and it is
+     * its own endpoint rather than more columns on the chart's: the two answer
+     * different questions, and a table that grows a column later should not
+     * make the chart refetch.
+     *
+     * A day's attempts fall into three buckets, narrowing in turn:
+     *
+     *   no_answer      the phone never joined — it rang out, or the line was busy
+     *   answered       somebody picked up, however briefly
+     *   conversations  the answered calls past the shared five-second threshold
+     *
+     * So calls = no_answer + answered, and conversations is a cut of answered —
+     * the gap between them is the pick-up-and-hang-up, effort that got through
+     * without becoming anything.
+     *
+     * `hit_rate` is conversations over every attempt, the same reach rate the
+     * stat card at the top of the page reports, per day. Null on a day with no
+     * calls at all: 0% would read as "rang all day and reached nobody".
+     *
+     * Same source and rules as the call cards — RMO calls only, meaning a call
+     * carrying an order_id — so a row here and a card above it always agree.
+     */
+    public function analyticsDailyCallOutcomes(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+
+        $rows = DB::table('call_logs')
+            ->where('workspace_id', $workspace->id)
+            ->whereNotNull('order_id')
+            ->whereBetween('call_date', [$from, $to])
+            ->groupBy('call_date')
+            ->selectRaw('
+                call_date,
+                COUNT(*) as calls,
+                COUNT(CASE WHEN duration > 0 THEN 1 END) as answered,
+                COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as real_conversations
+            ')
+            ->get()
+            // call_date is a DATE column, but drivers hand it back with or
+            // without a time part depending on the connection — key on the
+            // first ten characters so both shapes land on the same day.
+            ->keyBy(fn ($row) => substr((string) $row->call_date, 0, 10));
+
+        $days = [];
+        $cursor = CarbonImmutable::parse($from);
+        $end = CarbonImmutable::parse($to);
+
+        while ($cursor->lessThanOrEqualTo($end)) {
+            $date = $cursor->toDateString();
+            $row = $rows->get($date);
+
+            $calls = (int) ($row->calls ?? 0);
+            $answered = (int) ($row->answered ?? 0);
+            $real = (int) ($row->real_conversations ?? 0);
+
+            // Every day in the range gets a row, quiet ones included — the
+            // table is a record of the period, not only of the busy days.
+            $days[] = [
+                'date' => $date,
+                'calls' => $calls,
+                'no_answer' => $calls - $answered,
+                'answered' => $answered,
+                'conversations' => $real,
+                'hit_rate' => $calls > 0 ? round($real / $calls * 100, 1) : null,
+            ];
+
+            $cursor = $cursor->addDay();
+        }
+
+        $calls = array_sum(array_column($days, 'calls'));
+        $conversations = array_sum(array_column($days, 'conversations'));
+
+        return response()->json([
+            'range' => ['from' => $from, 'to' => $to],
+            'days' => $days,
+            'totals' => [
+                'calls' => $calls,
+                'no_answer' => array_sum(array_column($days, 'no_answer')),
+                'answered' => array_sum(array_column($days, 'answered')),
+                'conversations' => $conversations,
+                // The period's own rate, not the mean of the daily ones — a
+                // twenty-call day and a two-call day do not weigh the same.
+                'hit_rate' => $calls > 0 ? round($conversations / $calls * 100, 1) : null,
+            ],
+        ]);
+    }
+
+    /**
      * Time spent on RMO calls across a range, and how many calls made it up.
      *
      * Only calls carrying an order_id — the ones matched to a delivery when they
