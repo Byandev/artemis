@@ -57,6 +57,32 @@ final class TransactionTotals
         return round((float) $this->outflow($workspace, $from, $to, $typeIds->all())->sum('amount'), 2);
     }
 
+    /**
+     * The same OPEX, split by transaction type — the rows sum to
+     * {@see opexForWorkspace()}. Keyed by transaction type id, biggest first,
+     * with types that had no outflow left out.
+     *
+     * @return array<int, float>
+     */
+    public function opexByTypeForWorkspace(Workspace $workspace, Carbon $from, Carbon $to): array
+    {
+        $typeIds = TransactionType::where('workspace_id', $workspace->id)
+            ->where('income_statement_section', 'opex')
+            ->pluck('id');
+
+        if ($typeIds->isEmpty()) {
+            return [];
+        }
+
+        return $this->outflow($workspace, $from, $to, $typeIds->all())
+            ->groupBy('transaction_type_id')
+            ->selectRaw('transaction_type_id, SUM(amount) as amount')
+            ->orderByDesc('amount')
+            ->get()
+            ->mapWithKeys(fn ($r) => [(int) $r->transaction_type_id => round((float) $r->amount, 2)])
+            ->all();
+    }
+
     /** The month's whole outflow for the matching types. */
     public function forWorkspace(Workspace $workspace, Carbon $from, Carbon $to, array $patterns): float
     {

@@ -97,6 +97,12 @@ class IncomeStatement extends Model
         return $this->hasMany(UserIncomeStatement::class, 'income_statement_id');
     }
 
+    /** The statement's OPEX split by transaction type (rebuilt on save/regenerate). */
+    public function opexBreakdown(): HasMany
+    {
+        return $this->hasMany(IncomeStatementOpexBreakdown::class, 'income_statement_id');
+    }
+
     /**
      * Saved per-product slices of this statement — workspace-wide, across every
      * intern (rebuilt on save/regenerate).

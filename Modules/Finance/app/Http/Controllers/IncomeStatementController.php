@@ -264,6 +264,15 @@ class IncomeStatementController extends Controller
                 'gross_profit_bought_cogs_after_advisory_share' => (float) $incomeStatement->gross_profit_bought_cogs_after_advisory_share,
                 'advisory_share_on_delivered' => (float) $incomeStatement->advisory_share_on_delivered,
             ],
+            'opexBreakdown' => $incomeStatement->opexBreakdown()
+                ->with('transactionType:id,name')
+                ->orderByDesc('amount')
+                ->get()
+                ->map(fn ($r) => [
+                    'transaction_type_id' => $r->transaction_type_id,
+                    'name' => $r->transactionType?->name ?? 'Unknown',
+                    'amount' => (float) $r->amount,
+                ]),
             'statement' => [
                 'id' => $incomeStatement->id,
                 'period_month' => $incomeStatement->period_month->toDateString(),
@@ -374,7 +383,7 @@ class IncomeStatementController extends Controller
 
         $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate);
 
-        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $rates, $advisoryShare, $figures) {
+        return DB::transaction(function () use ($workspace, $periodMonth, $from, $to, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $rates, $advisoryShare, $figures) {
             $statement = IncomeStatement::updateOrCreate(
                 ['workspace_id' => $workspace->id, 'period_month' => $periodMonth],
                 [
@@ -391,6 +400,16 @@ class IncomeStatementController extends Controller
             );
 
             $statement->breakdown()->delete();
+
+            // The OPEX split, rebuilt with the header it belongs to.
+            $statement->opexBreakdown()->delete();
+
+            foreach ($this->transactions->opexByTypeForWorkspace($workspace, $from, $to) as $typeId => $amount) {
+                $statement->opexBreakdown()->create([
+                    'transaction_type_id' => $typeId,
+                    'amount' => $amount,
+                ]);
+            }
 
             foreach ($included as $l) {
                 $statement->breakdown()->create([

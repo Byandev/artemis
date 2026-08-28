@@ -921,3 +921,55 @@ test('with no advisory, net profit is simply gross profit less OPEX', function (
             ->has('figures.net_profit_bought_cogs')
         );
 });
+
+test('the OPEX breakdown splits the total by transaction type', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+    $rent = makeType($workspace, 'Rent and Utilities', section: 'opex');
+    $salaries = makeType($workspace, 'Salaries and Wages', section: 'opex');
+
+    makeTxn($workspace, $account, $rent, 'out', 2500, '2026-05-09');
+    makeTxn($workspace, $account, $rent, 'out', 500, '2026-05-19');
+    makeTxn($workspace, $account, $salaries, 'out', 4000, '2026-05-15');
+    // Cost of sales, so it belongs above gross profit and not in this split.
+    makeTxn($workspace, $account, makeType($workspace, 'Freight', section: 'cost_of_sales'), 'out', 900, '2026-05-15');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+    $rows = $statement->opexBreakdown()->get()->keyBy('transaction_type_id');
+
+    // Rent's two transactions land on one row.
+    expect((float) $rows[$rent->id]->amount)->toBe(3000.0)
+        ->and((float) $rows[$salaries->id]->amount)->toBe(4000.0)
+        // seedMay's two types are in here too, and nothing from cost of sales.
+        ->and($rows)->toHaveCount(4)
+        // The split has to add up to the header it explains.
+        ->and(round($statement->opexBreakdown()->sum('amount'), 2))->toBe((float) $statement->opex);
+
+    // Regenerating rebuilds the rows rather than stacking a second set up.
+    $this->actingAs($user)->post(isUrl($workspace, "/{$statement->id}/regenerate"))->assertRedirect();
+
+    expect($statement->opexBreakdown()->count())->toBe(4)
+        ->and(round($statement->opexBreakdown()->sum('amount'), 2))->toBe((float) $statement->fresh()->opex);
+
+    // And the page can show it.
+    $this->actingAs($user)
+        ->get(isUrl($workspace, "/{$statement->id}"))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('opexBreakdown', function ($rows) {
+                $rows = collect($rows);
+
+                return $rows->firstWhere('name', 'Salaries and Wages')['amount'] == 4000.0
+                    // Dearest first: salaries 4,000, then rent 3,000.
+                    && $rows->first()['name'] === 'Salaries and Wages'
+                    && $rows->pluck('amount')->map(fn ($a) => (float) $a)->all()
+                        === $rows->pluck('amount')->map(fn ($a) => (float) $a)->sortDesc()->values()->all();
+            })
+        );
+});

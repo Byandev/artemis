@@ -3,8 +3,8 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { HelpCircle } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronDown, ChevronRight, HelpCircle } from 'lucide-react';
+import { Fragment, useState } from 'react';
 
 /**
  * The figures a statement shares with its per-product and per-user slices,
@@ -38,6 +38,13 @@ export interface StatementFigureSet {
     net_profit_bought_cogs: number;
 }
 
+/** One transaction type's share of the month's OPEX. */
+export interface OpexBreakdownRow {
+    transaction_type_id: number;
+    name: string;
+    amount: number;
+}
+
 type CogsView = 'delivered' | 'bought';
 
 const COGS_VIEWS: { value: CogsView; label: string }[] = [
@@ -65,8 +72,11 @@ export default function StatementFigures({
     rates,
     monthLabel,
     gencysPartner = false,
+    opexBreakdown = [],
 }: {
     figures: StatementFigureSet;
+    /** The OPEX split by transaction type; empty hides the expander. */
+    opexBreakdown?: OpexBreakdownRow[];
     rates: {
         cod: number;
         vat: number;
@@ -78,6 +88,10 @@ export default function StatementFigures({
     gencysPartner?: boolean;
 }) {
     const [cogsView, setCogsView] = useState<CogsView>('delivered');
+    const [opexOpen, setOpexOpen] = useState(false);
+
+    // Dearest first — the line worth questioning should be the one you read.
+    const opexRows = [...opexBreakdown].sort((a, b) => b.amount - a.amount);
 
     // The share can be struck off the margin or off delivered revenue, and the
     // agreement takes the lower — so what is stored is already the cheaper of
@@ -126,6 +140,7 @@ export default function StatementFigures({
             label: 'Less — OPEX',
             help: 'The month’s operating expenses — outflow on transaction types marked OPEX on the income statement. Untyped outflow is left out: it isn’t marked as anything, and guessing it in would overstate expenses.',
             value: fmt(figures.opex),
+            breakdown: opexRows,
         },
         {
             label: '= Net Profit',
@@ -142,6 +157,8 @@ export default function StatementFigures({
         value: string;
         emphasis?: boolean;
         signed?: number;
+        /** When set, the row opens to show what makes it up. */
+        breakdown?: OpexBreakdownRow[];
     }[] = [
         {
             label: 'Delivered Orders',
@@ -259,42 +276,87 @@ export default function StatementFigures({
             </div>
 
             <div className="divide-y divide-black/5 dark:divide-white/5">
-                {rows.map((r) => (
-                    <div
-                        key={r.label}
-                        className="flex items-center justify-between px-5 py-2.5"
-                    >
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button
-                                    type="button"
-                                    className="flex items-center gap-1.5 text-[12px] text-gray-600 transition-colors hover:text-gray-800 focus-visible:text-gray-800 focus-visible:outline-none dark:text-gray-300 dark:hover:text-gray-100"
+                {rows.map((r) => {
+                    const expandable = (r.breakdown?.length ?? 0) > 0;
+
+                    return (
+                        <Fragment key={r.label}>
+                            <div className="flex items-center justify-between px-5 py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <button
+                                                type="button"
+                                                className="flex items-center gap-1.5 text-[12px] text-gray-600 transition-colors hover:text-gray-800 focus-visible:text-gray-800 focus-visible:outline-none dark:text-gray-300 dark:hover:text-gray-100"
+                                            >
+                                                {r.label}
+                                                <HelpCircle className="h-3 w-3 shrink-0 opacity-50" />
+                                            </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-xs font-mono text-[11px] leading-relaxed">
+                                            {r.help}
+                                        </TooltipContent>
+                                    </Tooltip>
+
+                                    {expandable && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setOpexOpen((o) => !o)
+                                            }
+                                            aria-expanded={opexOpen}
+                                            className="flex items-center gap-0.5 text-[10px] text-gray-400 underline-offset-2 transition-colors hover:text-gray-600 hover:underline dark:hover:text-gray-300"
+                                        >
+                                            {opexOpen ? (
+                                                <ChevronDown className="h-3 w-3" />
+                                            ) : (
+                                                <ChevronRight className="h-3 w-3" />
+                                            )}
+                                            {int(r.breakdown!.length)}{' '}
+                                            {r.breakdown!.length === 1
+                                                ? 'type'
+                                                : 'types'}
+                                        </button>
+                                    )}
+                                </div>
+
+                                <span
+                                    className={`text-[13px] tabular-nums ${
+                                        r.signed !== undefined
+                                            ? `font-semibold ${
+                                                  r.signed < 0
+                                                      ? 'text-rose-600 dark:text-rose-400'
+                                                      : 'text-emerald-600 dark:text-emerald-400'
+                                              }`
+                                            : r.emphasis
+                                              ? 'font-medium text-gray-800 dark:text-gray-100'
+                                              : 'text-gray-500 dark:text-gray-400'
+                                    }`}
                                 >
-                                    {r.label}
-                                    <HelpCircle className="h-3 w-3 shrink-0 opacity-50" />
-                                </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs font-mono text-[11px] leading-relaxed">
-                                {r.help}
-                            </TooltipContent>
-                        </Tooltip>
-                        <span
-                            className={`text-[13px] tabular-nums ${
-                                r.signed !== undefined
-                                    ? `font-semibold ${
-                                          r.signed < 0
-                                              ? 'text-rose-600 dark:text-rose-400'
-                                              : 'text-emerald-600 dark:text-emerald-400'
-                                      }`
-                                    : r.emphasis
-                                      ? 'font-medium text-gray-800 dark:text-gray-100'
-                                      : 'text-gray-500 dark:text-gray-400'
-                            }`}
-                        >
-                            {r.value}
-                        </span>
-                    </div>
-                ))}
+                                    {r.value}
+                                </span>
+                            </div>
+
+                            {/* Dearest first, so the line worth questioning
+                                reads before the rounding errors. */}
+                            {expandable &&
+                                opexOpen &&
+                                r.breakdown!.map((b) => (
+                                    <div
+                                        key={b.transaction_type_id}
+                                        className="flex items-center justify-between bg-stone-50/60 py-1.5 pr-5 pl-10 dark:bg-zinc-800/30"
+                                    >
+                                        <span className="truncate text-[11px] text-gray-500 dark:text-gray-400">
+                                            {b.name}
+                                        </span>
+                                        <span className="text-[12px] text-gray-600 tabular-nums dark:text-gray-300">
+                                            {fmt(b.amount)}
+                                        </span>
+                                    </div>
+                                ))}
+                        </Fragment>
+                    );
+                })}
             </div>
         </div>
     );

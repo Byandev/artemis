@@ -1,5 +1,6 @@
 import PageHeader from '@/components/common/PageHeader';
 import StatementFigures, {
+    OpexBreakdownRow,
     StatementFigureSet,
 } from '@/components/finance/statement-figures';
 import AppLayout from '@/layouts/app-layout';
@@ -33,6 +34,8 @@ interface Props {
     mode: 'preview' | 'saved';
     statement: Statement;
     figures: StatementFigureSet;
+    /** The OPEX split by transaction type; saved statements only. */
+    opexBreakdown?: OpexBreakdownRow[];
 }
 
 const BTN =
@@ -43,6 +46,7 @@ export default function IncomeStatementShow({
     mode,
     statement,
     figures,
+    opexBreakdown,
 }: Props) {
     const base = `/workspaces/${workspace.slug}/finance/income-statements`;
     const isPreview = mode === 'preview';
@@ -160,6 +164,7 @@ export default function IncomeStatementShow({
                     }}
                     monthLabel={monthLabel}
                     gencysPartner={statement.gencys_partner}
+                    opexBreakdown={opexBreakdown}
                 />
 
                 <p className="mt-3 text-[11px] text-gray-400">
