@@ -482,9 +482,9 @@ class ForDeliveryController extends Controller
 
         // The call cards are about who was on the phone, so they are cut by the
         // caller — call_logs.user_id, the CSR who dialled — not by whose orders
-        // the numbers belonged to. The page sends whoever its identity picker
-        // says you are, or the assignee you picked instead; with no identity set
-        // the cards stay the whole workspace's day.
+        // the numbers belonged to. The page sends a caller only when it has been
+        // asked to narrow: a "mine only" toggle, or a name picked in the
+        // assignee filter. Absent that the cards report the whole day.
         //
         // Cutting these by the assignee's *orders* is the wrong question and was
         // why the figures looked unfiltered: a CSR rings numbers all day that
