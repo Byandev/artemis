@@ -386,6 +386,52 @@ class ForDeliveryController extends Controller
             ->whereDate('delivery_date', $deliveryDate)
             ->paginate($request->input('per_page', 100));
 
+        // Only list CSRs (Pancake users) tied to a shop in this workspace.
+        $users = User::whereHas('shops', function ($query) use ($workspace) {
+            $query->where('shops.workspace_id', $workspace->id);
+        })->get();
+
+        $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
+
+        return Inertia::render('workspaces/rts/public-pages/rmo-management', [
+            'locked' => false,
+            'orders' => $items,
+            'workspace' => $workspace,
+            'query' => [
+                ...$request->only(['sort', 'perPage', 'page']),
+                'filter' => $request->input('filter', []),
+                'delivery_date' => $deliveryDate,
+                // Echoed back so the assignee/confirmee pickers can render the
+                // selection they were loaded with — they live outside filter[].
+                'assignee_id' => $request->input('assignee_id'),
+                'confirmee_id' => $request->input('confirmee_id'),
+                'caller_id' => $request->input('caller_id'),
+            ],
+            'users' => $users,
+            // The ten stat cards are not here: they are six aggregates over the
+            // whole day's orders and call logs, and holding the page render
+            // hostage to them meant every sort, page turn and filter change paid
+            // for them again. The page fetches them from `stats` below and shows
+            // placeholder bars until they land.
+            'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
+            'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
+            'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
+        ]);
+    }
+
+    /**
+     * The ten stat-card figures for one delivery date.
+     *
+     * Served over XHR rather than folded into the page render: they are six
+     * aggregates across the whole day, they don't change when you sort or turn a
+     * page, and computing them inline made every table interaction wait on them.
+     * The page asks for them once per filter change and draws placeholders in
+     * the meantime.
+     *
+     * @return array<string, int|float|null>
+     */
+    private function rmoStats(Request $request, Workspace $workspace, string $deliveryDate): array
+    {
         // Build a base query for stats that respects page/shop/assignee filters
         $statsBase = OrderForDelivery::where('workspace_id', $workspace->id)
             ->whereDate('delivery_date', $deliveryDate);
@@ -425,27 +471,40 @@ class ForDeliveryController extends Controller
             $totalOrdersForDeliveryTodayQuery->where('conferrer_id', $request->input('confirmee_id'));
         }
 
+        // Whether the page/shop narrowing makes $statsBase smaller than "the
+        // whole workspace on this date". Assignee and confirmee are deliberately
+        // not in here — for the call cards they are answered by $callerId
+        // below, which is a different and better question.
+        $isFiltered = (bool) ($filterPageIds || $filterShopId || $filterUserId);
+
         // Total uses its own base (optionally filtered via whereHas on confirmed_by)
         $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
-        // The call cards report the workspace's call logs for the delivery date,
-        // flat: every call that day, whether or not the number it reached
-        // belongs to an order on this page and whoever placed it. Deliberately
-        // not tied to the order set or to a Pancake user yet — those are
-        // separate questions, and answering them here would make the figures
-        // move for reasons the cards don't explain.
+        // The call cards are about who was on the phone, so they are cut by the
+        // caller — call_logs.user_id, the CSR who dialled — not by whose orders
+        // the numbers belonged to. The page sends whoever its identity picker
+        // says you are, or the assignee you picked instead; with no identity set
+        // the cards stay the whole workspace's day.
         //
-        // One query per card. Each is independently readable and independently
-        // debuggable — run any one of them on its own and it answers exactly
-        // the question its card asks.
-        $totalCallLogs = RmoDailyStats::callLogStat($workspace, $deliveryDate, 'COUNT(*)');
+        // Cutting these by the assignee's *orders* is the wrong question and was
+        // why the figures looked unfiltered: a CSR rings numbers all day that
+        // are not on the orders assigned to them.
+        //
+        // The page and shop filters still apply through the order scope, since
+        // "which page" isn't something a call log records.
+        $callerId = $request->input('caller_id');
+        $callLogScope = $isFiltered ? (clone $statsBase) : null;
 
-        $totalCallDuration = RmoDailyStats::callLogStat($workspace, $deliveryDate, 'COALESCE(SUM(duration), 0)');
+        $totalCallLogs = RmoDailyStats::callLogStat($workspace, $deliveryDate, 'COUNT(*)', $callLogScope, $callerId);
+
+        $totalCallDuration = RmoDailyStats::callLogStat($workspace, $deliveryDate, 'COALESCE(SUM(duration), 0)', $callLogScope, $callerId);
 
         $connectedCallLogs = RmoDailyStats::callLogStat(
             $workspace,
             $deliveryDate,
-            'COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)'
+            'COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)',
+            $callLogScope,
+            $callerId
         );
 
         // The other 4 stats share $statsBase — roll them into a single aggregate query
@@ -463,23 +522,7 @@ class ForDeliveryController extends Controller
         $totalReturning = (int) ($statusBreakdown->returning_count ?? 0);
         $totalProblematic = (int) ($statusBreakdown->problematic ?? 0);
 
-        // Only list CSRs (Pancake users) tied to a shop in this workspace.
-        $users = User::whereHas('shops', function ($query) use ($workspace) {
-            $query->where('shops.workspace_id', $workspace->id);
-        })->get();
-
-        $workspace->load(['pages:id,name,workspace_id', 'shops:id,name,workspace_id', 'pageOwners:id,name']);
-
-        return Inertia::render('workspaces/rts/public-pages/rmo-management', [
-            'locked' => false,
-            'orders' => $items,
-            'workspace' => $workspace,
-            'query' => [
-                ...$request->only(['sort', 'perPage', 'page']),
-                'filter' => $request->input('filter', []),
-                'delivery_date' => $deliveryDate,
-            ],
-            'users' => $users,
+        return [
             'total_for_delivery_today' => $totalOrdersForDeliveryToday,
             'called_count' => $totalCalled,
             'delivered_count' => $totalDelivered,
@@ -488,10 +531,30 @@ class ForDeliveryController extends Controller
             'total_call_logs_count' => $totalCallLogs,
             'total_call_duration' => $totalCallDuration,
             'connected_call_logs_count' => $connectedCallLogs,
-            'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
-            'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
-            'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
-        ]);
+            // Derived server-side so the page and the daily report quote the
+            // same arithmetic. Null, not zero, when nobody has called yet.
+            ...RmoDailyStats::derivedCallStats($totalCallLogs, $totalCallDuration, $connectedCallLogs),
+        ];
+    }
+
+    /**
+     * The stat cards, as JSON, for the public RMO page.
+     *
+     * Behind the same password gate as the page itself — the figures describe
+     * the workspace's day, so a locked page must not leak them over XHR.
+     */
+    public function publicStats(Request $request, Workspace $workspace)
+    {
+        $user = $request->user();
+
+        if (! ($user && $user->isSuperAdmin())
+            && ! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewRmoManagement)) {
+            abort(403);
+        }
+
+        $deliveryDate = $request->input('delivery_date') ?: now()->toDateString();
+
+        return response()->json($this->rmoStats($request, $workspace, $deliveryDate));
     }
 
     /**
