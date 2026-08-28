@@ -18,6 +18,7 @@ use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
+use Modules\Finance\Statements\StatementRates;
 use Modules\Finance\Statements\TransactionTotals;
 
 /**
@@ -40,7 +41,59 @@ class IncomeStatementController extends Controller
     public function __construct(
         private readonly StatementOrderSourceFactory $sources,
         private readonly TransactionTotals $transactions,
+        private readonly UserIncomeStatementService $userStatements,
+        private readonly ProductIncomeStatementService $productStatements,
     ) {}
+
+    /**
+     * Build or rebuild a month's statement and re-snapshot its per-user and
+     * per-product slices.
+     *
+     * Creating and regenerating run this same path. They differ only in where
+     * the rates come from and which expense lines are carried, which is what
+     * the two arguments express — everything downstream is identical, so the
+     * two can't drift apart.
+     *
+     * @param  Collection|null  $requestedKeys  the form's line choices; null = every line
+     * @param  IncomeStatement|null  $regenerating  keep this statement's line choices
+     */
+    private function generate(
+        Workspace $workspace,
+        string $month,
+        StatementRates $rates,
+        ?Collection $requestedKeys = null,
+        ?IncomeStatement $regenerating = null,
+    ): IncomeStatement {
+        [$periodMonth, $from, $to] = $this->resolveMonth($month);
+
+        $lines = $this->expenseLines(
+            $workspace, $from, $to,
+            $this->deliveredRevenue($workspace, $from, $to)['delivered'],
+            $rates->codFee, $rates->vat,
+        );
+
+        $includedKeys = match (true) {
+            $requestedKeys !== null => $requestedKeys,
+            // Keep the saved line choices, but always re-include every
+            // cost-of-sales line. A type newly tagged as cost of sales, or a
+            // cost-of-sales transaction added since the last save, has to flow
+            // into gross profit rather than be dropped for not being in the
+            // original set. OPEX toggles are preserved.
+            $regenerating !== null => $regenerating->breakdown
+                ->map(fn ($b) => $this->keyForRow($b))
+                ->merge($lines->where('section', 'cost_of_sales')->map(fn ($l) => $l['type_key']))
+                ->unique()
+                ->values(),
+            default => $lines->map(fn ($l) => $l['type_key']),
+        };
+
+        $statement = $this->persist($workspace, $periodMonth, $from, $to, $includedKeys, $rates);
+
+        $this->userStatements->snapshot($statement);
+        $this->productStatements->snapshot($statement);
+
+        return $statement;
+    }
 
     /** Sentinel type_keys for the auto-computed cost-of-sales lines. */
     private const SHIPPING_FEE_KEY = -1;
@@ -86,11 +139,19 @@ class IncomeStatementController extends Controller
             ->whereDate('period_month', $periodMonth)
             ->first();
 
-        [$defaultCod, $defaultVat, $defaultAdvisory, $defaultAdvisoryDelivered] = $this->workspaceRates($workspace);
-        $codRate = (float) ($request->input('cod_rate') ?? $existing?->cod_fee_rate ?? $defaultCod);
-        $vatRate = (float) ($request->input('vat_rate') ?? $existing?->vat_rate ?? $defaultVat);
-        $advisoryRate = (float) ($request->input('advisory_rate') ?? $existing?->advisory_rate ?? $defaultAdvisory);
-        $advisoryDeliveredRate = (float) ($request->input('advisory_delivered_rate') ?? $existing?->advisory_delivered_rate ?? $defaultAdvisoryDelivered);
+        $rates = StatementRates::resolve(
+            $workspace,
+            IncomeStatementSetting::where('workspace_id', $workspace->id)->first(),
+            $this->sources->for($workspace),
+            [
+                'cod' => $request->input('cod_rate') ?? $existing?->cod_fee_rate,
+                'vat' => $request->input('vat_rate') ?? $existing?->vat_rate,
+                'advisory' => $request->input('advisory_rate') ?? $existing?->advisory_rate,
+                'advisory_delivered' => $request->input('advisory_delivered_rate') ?? $existing?->advisory_delivered_rate,
+            ],
+        );
+
+        ['codFee' => $codRate, 'vat' => $vatRate, 'advisory' => $advisoryRate, 'advisoryDelivered' => $advisoryDeliveredRate] = (array) $rates;
 
         $revenue = $this->deliveredRevenue($workspace, $from, $to);
         $lines = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate);
@@ -120,7 +181,7 @@ class IncomeStatementController extends Controller
         ]);
     }
 
-    public function store(Request $request, Workspace $workspace, UserIncomeStatementService $userStatements, ProductIncomeStatementService $productStatements)
+    public function store(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
@@ -138,43 +199,32 @@ class IncomeStatementController extends Controller
             'advisory_delivered_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
         ]);
 
-        [$periodMonth, $from, $to] = $this->resolveMonth($validated['month']);
-
-        [$defaultCod, $defaultVat, $defaultAdvisory, $defaultAdvisoryDelivered] = $this->workspaceRates($workspace);
-        $codRate = (float) ($validated['cod_rate'] ?? $defaultCod);
-        $vatRate = (float) ($validated['vat_rate'] ?? $defaultVat);
-        $advisoryRate = (float) ($validated['advisory_rate'] ?? $defaultAdvisory);
-        $advisoryDeliveredRate = (float) ($validated['advisory_delivered_rate'] ?? $defaultAdvisoryDelivered);
-
-        $includedKeys = array_key_exists('included_keys', $validated)
-            ? collect($validated['included_keys'])
-            : $this->expenseLines($workspace, $from, $to, $this->deliveredRevenue($workspace, $from, $to)['delivered'], $codRate, $vatRate)
-                ->map(fn ($l) => $l['type_key']);
-
-        $statement = $this->persist(
+        $rates = StatementRates::resolve(
             $workspace,
-            $periodMonth,
-            $from,
-            $to,
-            $includedKeys,
-            $codRate,
-            $vatRate,
-            $advisoryRate,
-            $advisoryDeliveredRate,
-        );
-
-        IncomeStatementSetting::updateOrCreate(
-            ['workspace_id' => $workspace->id],
+            IncomeStatementSetting::where('workspace_id', $workspace->id)->first(),
+            $this->sources->for($workspace),
             [
-                'cod_fee_rate' => $codRate,
-                'vat_rate' => $vatRate,
-                'advisory_rate' => $advisoryRate,
-                'advisory_delivered_rate' => $advisoryDeliveredRate,
+                'cod' => $validated['cod_rate'] ?? null,
+                'vat' => $validated['vat_rate'] ?? null,
+                'advisory' => $validated['advisory_rate'] ?? null,
+                'advisory_delivered' => $validated['advisory_delivered_rate'] ?? null,
             ],
         );
 
-        $userStatements->snapshot($statement);
-        $productStatements->snapshot($statement);
+        $statement = $this->generate(
+            $workspace,
+            $validated['month'],
+            $rates,
+            requestedKeys: array_key_exists('included_keys', $validated)
+                ? collect($validated['included_keys'])
+                : null,
+        );
+
+        // Whatever was used becomes the workspace's default for next time.
+        IncomeStatementSetting::updateOrCreate(
+            ['workspace_id' => $workspace->id],
+            $rates->toAttributes(),
+        );
 
         return redirect()
             ->route('workspaces.finance.income-statements.show', [$workspace->slug, $statement->id])
@@ -224,48 +274,19 @@ class IncomeStatementController extends Controller
         ]);
     }
 
-    /** Re-pull the month's numbers with the snapshotted rates + included lines. */
-    public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement, UserIncomeStatementService $userStatements, ProductIncomeStatementService $productStatements)
+    /** Re-pull the month's numbers with the rates and lines it was saved with. */
+    public function regenerate(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
     {
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
         $this->ensureOwns($workspace, $incomeStatement);
 
-        [$periodMonth, $from, $to] = $this->resolveMonth($incomeStatement->period_month->format('Y-m'));
-
-        $codRate = (float) $incomeStatement->cod_fee_rate;
-        $vatRate = (float) $incomeStatement->vat_rate;
-
-        // Keep the user's saved line choices, but always (re)include every
-        // cost-of-sales line. A transaction type newly tagged as cost of sales
-        // (e.g. Ad Spent), or a cost-of-sales transaction added after the last
-        // save, must flow into Gross Profit on regenerate rather than being
-        // dropped for not being in the original set. OPEX toggles are preserved.
-        $revenue = $this->deliveredRevenue($workspace, $from, $to);
-        $costOfSalesKeys = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate)
-            ->where('section', 'cost_of_sales')
-            ->map(fn ($l) => $l['type_key']);
-
-        $includedKeys = $incomeStatement->breakdown
-            ->map(fn ($b) => $this->keyForRow($b))
-            ->merge($costOfSalesKeys)
-            ->unique()
-            ->values();
-
-        $statement = $this->persist(
+        $this->generate(
             $workspace,
-            $periodMonth,
-            $from,
-            $to,
-            $includedKeys,
-            $codRate,
-            $vatRate,
-            (float) $incomeStatement->advisory_rate,
-            (float) $incomeStatement->advisory_delivered_rate,
+            $incomeStatement->period_month->format('Y-m'),
+            StatementRates::fromStatement($incomeStatement),
+            regenerating: $incomeStatement,
         );
-
-        $userStatements->snapshot($statement);
-        $productStatements->snapshot($statement);
 
         return redirect()->back()->with('success', 'Income statement regenerated.');
     }
@@ -326,8 +347,10 @@ class IncomeStatementController extends Controller
      * Recompute the month's revenue, cost of sales, gross profit, advisory, OPEX
      * and net profit for the included lines, and (over)write the snapshot.
      */
-    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, float $codRate, float $vatRate, float $advisoryRate, float $advisoryDeliveredRate): IncomeStatement
+    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, StatementRates $rates): IncomeStatement
     {
+        ['codFee' => $codRate, 'vat' => $vatRate, 'advisory' => $advisoryRate, 'advisoryDelivered' => $advisoryDeliveredRate] = (array) $rates;
+
         $revenue = $this->deliveredRevenue($workspace, $from, $to);
 
         $included = $this->expenseLines($workspace, $from, $to, $revenue['delivered'], $codRate, $vatRate)
@@ -348,7 +371,7 @@ class IncomeStatementController extends Controller
 
         $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate);
 
-        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate, $advisoryShare, $figures) {
+        return DB::transaction(function () use ($workspace, $periodMonth, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $rates, $advisoryShare, $figures) {
             $statement = IncomeStatement::updateOrCreate(
                 ['workspace_id' => $workspace->id, 'period_month' => $periodMonth],
                 [
@@ -357,10 +380,7 @@ class IncomeStatementController extends Controller
                     'total_expenses' => $costOfSales + $opex,
                     'gross_profit' => $grossProfit,
                     'net_profit' => $netProfit,
-                    'cod_fee_rate' => $codRate,
-                    'vat_rate' => $vatRate,
-                    'advisory_rate' => $advisoryRate,
-                    'advisory_delivered_rate' => $advisoryDeliveredRate,
+                    ...$rates->toAttributes(),
                     'advisory_share' => $advisoryShare,
                     'status' => 'final',
                     'generated_at' => now(),
@@ -573,27 +593,17 @@ class IncomeStatementController extends Controller
         };
     }
 
-    /** Workspace default rates [cod, vat, advisory, advisoryDelivered] as fractions, falling back to constants. */
-    private function workspaceRates(Workspace $workspace): array
-    {
-        $settings = IncomeStatementSetting::where('workspace_id', $workspace->id)->first();
-
-        return [
-            // A saved rate is an explicit choice; otherwise the courier's own.
-            (float) ($settings?->cod_fee_rate ?? $this->sources->for($workspace)->defaultCodFeeRate()),
-            (float) ($settings?->vat_rate ?? IncomeStatementSetting::DEFAULT_VAT_RATE),
-            (float) ($settings?->advisory_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_RATE),
-            (float) ($settings?->advisory_delivered_rate ?? IncomeStatementSetting::DEFAULT_ADVISORY_DELIVERED_RATE),
-        ];
-    }
-
     /**
      * @return array{0:string, 1:Carbon, 2:Carbon} [periodMonth (Y-m-d, 1st), from, to]
      */
     private function resolveMonth(?string $month): array
     {
+        // The `!` resets the unparsed fields. Without it Carbon fills the day
+        // from today, so asking for February on the 31st lands on March 3rd and
+        // startOfMonth() then reads March — a statement regenerated late in the
+        // month would rewrite the wrong one.
         $start = $month
-            ? Carbon::createFromFormat('Y-m', $month)->startOfMonth()
+            ? Carbon::createFromFormat('!Y-m', $month)->startOfMonth()
             : Carbon::now()->startOfMonth();
 
         return [$start->toDateString(), $start->copy()->startOfMonth(), $start->copy()->endOfMonth()];

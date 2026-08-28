@@ -20,9 +20,19 @@ final class TransactionTotals
 {
     public const AD_SPENT = ['%adspent%', '%ad spent%', '%ad spend%'];
 
-    public const COST_OF_GOODS = ['%cost of goods%'];
+    public const COST_OF_GOODS = ['%cost of goods%', '%cogs%'];
 
-    public const COG_DELIVERY = ['%delivery of cog%', '%delivery of goods%', '%cog delivery%'];
+    /**
+     * Freight on a goods purchase. The wording varies — "Delivery of COG",
+     * "Delivery Fee of COGS", "COG Delivery" — so the word order is matched
+     * loosely rather than as fixed phrases.
+     */
+    public const COG_DELIVERY = [
+        '%delivery%cog%',
+        '%cog%delivery%',
+        '%delivery%goods%',
+        '%goods%delivery%',
+    ];
 
     /** The month's whole outflow for the matching types. */
     public function forWorkspace(Workspace $workspace, Carbon $from, Carbon $to, array $patterns): float
@@ -116,10 +126,31 @@ final class TransactionTotals
     }
 
     /**
+     * The types a set of patterns resolves to.
+     *
+     * Freight is held out of every other lookup: a name like "Delivery Fee of
+     * COGS" reads as both the goods and the freight on them, and it is the
+     * freight — counting it on both lines would charge the purchase twice.
+     *
      * @param  list<string>  $patterns
      * @return list<int>
      */
     private function typeIds(Workspace $workspace, array $patterns): array
+    {
+        $ids = $this->matching($workspace, $patterns);
+
+        if ($patterns !== self::COG_DELIVERY) {
+            $ids = array_values(array_diff($ids, $this->matching($workspace, self::COG_DELIVERY)));
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param  list<string>  $patterns
+     * @return list<int>
+     */
+    private function matching(Workspace $workspace, array $patterns): array
     {
         return TransactionType::where('workspace_id', $workspace->id)
             ->where(function ($q) use ($patterns) {

@@ -2,6 +2,7 @@
 
 use App\Models\Page;
 use App\Models\PageDailyRecord;
+use App\Models\Product;
 use App\Models\Shop;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -9,6 +10,7 @@ use Modules\Finance\Models\Account;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Models\Transaction;
+use Modules\Finance\Models\TransactionProduct;
 use Modules\Finance\Models\TransactionType;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\Pancake\Models\Order as PancakeOrder;
@@ -690,4 +692,126 @@ test('a rate the workspace saved for itself wins over the courier default', func
     $this->actingAs($user)->post(isUrl($workspace), ['month' => '2026-05'])->assertRedirect();
 
     expect((float) IncomeStatement::first()->cod_fee_rate)->toBe(0.015);
+});
+
+test('freight on a goods purchase is picked up and not counted as goods', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+
+    // The wording varies in practice; each of these is freight, not goods.
+    foreach (['Delivery Fee of COGS', 'Delivery of COG', 'COG Delivery'] as $i => $name) {
+        $type = TransactionType::create([
+            'workspace_id' => $workspace->id,
+            'name' => $name,
+            'income_statement_section' => 'cost_of_sales',
+        ]);
+
+        makeTxn($workspace, $account, $type, 'out', 100 * ($i + 1), '2026-05-14');
+    }
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // 100 + 200 + 300, all three recognised as freight...
+    expect((float) $statement->total_bought_cogs_delivery_fee)->toBe(600.0)
+        // ...and none of them leaking into the goods line, which seedMay leaves
+        // empty since it books no Cost of Goods transaction.
+        ->and((float) $statement->total_bought_cogs)->toBe(0.0);
+});
+
+test('a goods purchase reaches the workspace, product and user statements alike', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+    $type = TransactionType::create([
+        'workspace_id' => $workspace->id,
+        'name' => 'Cost of Goods',
+        'income_statement_section' => 'cost_of_sales',
+    ]);
+
+    $txn = makeTxn($workspace, $account, $type, 'out', 5000, '2026-05-14');
+    // Tagged to a product and charged to a person, so all three grains see it.
+    $product = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'WIDGET']);
+    TransactionProduct::create([
+        'transaction_id' => $txn->id, 'product' => 'WIDGET', 'amount' => 5000,
+    ]);
+    $txn->chargeToUsers()->sync([$user->id => ['amount' => 5000]]);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    expect((float) $statement->total_bought_cogs)->toBe(5000.0)
+        ->and((float) $statement->productStatements()->where('product_id', $product->id)->value('total_bought_cogs'))->toBe(5000.0)
+        ->and((float) $statement->userStatements()->where('user_id', $user->id)->value('total_bought_cogs'))->toBe(5000.0);
+});
+
+test('regenerate rewrites the statement it was asked for, whatever the date today', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    // A February statement, saved back when the month was current.
+    $february = IncomeStatement::create([
+        'workspace_id' => $workspace->id,
+        'period_month' => '2026-02-01',
+        'cod_fee_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+        'advisory_delivered_rate' => 0.09,
+        'status' => 'final',
+    ]);
+
+    // Clicked on a day February doesn't have. Carbon fills the day from today
+    // when parsing 'Y-m', so this used to resolve to March and rewrite that
+    // statement instead.
+    $this->travelTo('2026-08-31');
+
+    $this->actingAs($user)
+        ->post(isUrl($workspace, "/{$february->id}/regenerate"))
+        ->assertRedirect();
+
+    expect($february->fresh()->period_month->toDateString())->toBe('2026-02-01')
+        // And no March statement was conjured up alongside it.
+        ->and(IncomeStatement::where('workspace_id', $workspace->id)->count())->toBe(1);
+});
+
+test('regenerating an unchanged month reproduces the statement exactly', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+    seedMay($workspace);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12, 'advisory_rate' => 0.30,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+    $tracked = collect($statement->getAttributes())
+        ->except(['id', 'created_at', 'updated_at', 'generated_at'])
+        ->all();
+
+    $usersBefore = $statement->userStatements()->count();
+    $productsBefore = $statement->productStatements()->count();
+
+    // Nothing about the month has changed, so nothing about it should.
+    $this->actingAs($user)
+        ->post(isUrl($workspace, "/{$statement->id}/regenerate"))
+        ->assertRedirect();
+
+    $after = collect($statement->fresh()->getAttributes())
+        ->except(['id', 'created_at', 'updated_at', 'generated_at'])
+        ->all();
+
+    expect($after)->toBe($tracked)
+        // And the slices were rebuilt, not duplicated or dropped.
+        ->and($statement->userStatements()->count())->toBe($usersBefore)
+        ->and($statement->productStatements()->count())->toBe($productsBefore)
+        ->and(IncomeStatement::count())->toBe(1);
 });
