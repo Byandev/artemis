@@ -75,6 +75,18 @@ const duration = (seconds: number) => {
     return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
 };
 
+/**
+ * A per-call average, in the unit that actually says something.
+ *
+ * Minutes to one decimal is the right read for a normal call, but useless below
+ * a minute: a 4.3-second average lands on "0.1 min", which rounds a real figure
+ * into noise. Under a minute it stays in seconds.
+ */
+export const perCall = (seconds: number) =>
+    seconds < 60
+        ? `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`
+        : `${(seconds / 60).toFixed(1)} min`;
+
 const peso = (n: number) =>
     new Intl.NumberFormat('en-PH', {
         style: 'currency',
@@ -318,7 +330,7 @@ export function RmoTimeStatCard({
             footnote={
                 !stat || stat.average_seconds === null
                     ? 'No calls in this period'
-                    : `avg ${(stat.average_seconds / 60).toFixed(1)} min per call`
+                    : `avg ${perCall(stat.average_seconds)} per call`
             }
             trend={
                 <Trend
