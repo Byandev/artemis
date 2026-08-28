@@ -107,6 +107,20 @@ class CSRController extends Controller
         return [$from, $to, $type];
     }
 
+    /**
+     * Which CSR comparison tab the page opens on.
+     *
+     * Kept in the URL rather than the browser so a reload, a shared link and
+     * the back button all land on the metric that was being read. Anything
+     * that isn't one of the endpoint's four keys falls back to sales.
+     */
+    private function comparisonTab(Request $request): string
+    {
+        $tab = (string) $request->input('comparison', 'sales');
+
+        return in_array($tab, ['sales', 'rts', 'rmo_called', 'call_time'], true) ? $tab : 'sales';
+    }
+
     public function analytics(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
@@ -216,6 +230,7 @@ class CSRController extends Controller
                 'page' => $request->integer('page', 1),
                 'per_page' => $request->integer('per_page', 10),
                 'search' => data_get($request->input('filter', []), 'search'),
+                'comparison' => $this->comparisonTab($request),
             ],
         ]);
     }
