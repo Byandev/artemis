@@ -331,7 +331,7 @@ export function AppSidebar() {
         ...(currentWorkspace.csr_module_enabled
             ? [
                   {
-                      title: 'CSR',
+                      title: 'Operations',
                       icon: User,
                       anyOf: [
                           PERMISSIONS.ViewCsrManagement,
@@ -339,13 +339,13 @@ export function AppSidebar() {
                       ],
                       items: [
                           {
-                              title: 'Management',
+                              title: 'CSR Management',
                               href: `/workspaces/${slug}/csr/management`,
                               icon: User,
                               permission: PERMISSIONS.ViewCsrManagement,
                           },
                           {
-                              title: 'Analytics',
+                              title: 'CSR Analytics',
                               href: `/workspaces/${slug}/csr/analytics`,
                               icon: BarChart2,
                               permission: PERMISSIONS.ViewCsrAnalytics,
