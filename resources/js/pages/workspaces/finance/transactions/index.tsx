@@ -1,11 +1,7 @@
 import PageHeader from '@/components/common/PageHeader';
 import { FinanceDeleteDialog } from '@/components/finance/delete-dialog';
 import { ImportTransactionsDialog } from '@/components/finance/import-transactions-dialog';
-import {
-    SUB_CATEGORIES,
-    SUB_CATEGORY_LABEL,
-    SubCategory,
-} from '@/components/finance/sub-category';
+import { SUB_CATEGORY_LABEL } from '@/components/finance/sub-category';
 import { FinanceTransaction } from '@/components/finance/transaction-form';
 import {
     buildTransactionTypeOptions,
@@ -168,9 +164,6 @@ export default function TransactionsIndex({
     };
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [bulkType, setBulkType] = useState<string>('');
-    const [bulkSubCategory, setBulkSubCategory] = useState<SubCategory | ''>(
-        '',
-    );
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
     const baseUrl = `/workspaces/${workspace.slug}/finance/transactions`;
@@ -236,27 +229,6 @@ export default function TransactionsIndex({
                 onSuccess: () => {
                     setRowSelection({});
                     setBulkType('');
-                },
-            },
-        );
-    };
-
-    const applyBulkSubCategory = () => {
-        if (!canEditTransactions || !selectedCount) return;
-        setBulkProcessing(true);
-        router.put(
-            `${baseUrl}/bulk-update-sub-category`,
-            {
-                ids: selectedIds.map(Number),
-                sub_category: bulkSubCategory === '' ? null : bulkSubCategory,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onFinish: () => setBulkProcessing(false),
-                onSuccess: () => {
-                    setRowSelection({});
-                    setBulkSubCategory('');
                 },
             },
         );
@@ -845,33 +817,6 @@ export default function TransactionsIndex({
                         </select>
                         <button
                             onClick={applyBulkType}
-                            disabled={bulkProcessing}
-                            className="flex h-8 items-center rounded-lg bg-emerald-600 px-3 font-mono! text-[11px]! font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                            {bulkProcessing ? 'Applying…' : 'Apply'}
-                        </button>
-                        <span className="h-4 w-px bg-emerald-200 dark:bg-emerald-500/30" />
-                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
-                            Sub category:
-                        </span>
-                        <select
-                            value={bulkSubCategory}
-                            onChange={(e) =>
-                                setBulkSubCategory(
-                                    e.target.value as SubCategory | '',
-                                )
-                            }
-                            className="h-8 rounded-lg border border-black/8 bg-white px-2 font-mono! text-[11px]! text-gray-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200"
-                        >
-                            <option value="">— clear —</option>
-                            {SUB_CATEGORIES.map((s) => (
-                                <option key={s.value} value={s.value}>
-                                    {s.label}
-                                </option>
-                            ))}
-                        </select>
-                        <button
-                            onClick={applyBulkSubCategory}
                             disabled={bulkProcessing}
                             className="flex h-8 items-center rounded-lg bg-emerald-600 px-3 font-mono! text-[11px]! font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                         >

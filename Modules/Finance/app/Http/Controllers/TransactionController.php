@@ -457,24 +457,6 @@ class TransactionController extends Controller
         return redirect()->back()->with('success', "{$updated} transactions updated.");
     }
 
-    public function bulkUpdateSubCategory(Request $request, Workspace $workspace)
-    {
-        $this->guard($request, $workspace);
-        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
-
-        $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer'],
-            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,delivery_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,capex_payment,others'],
-        ]);
-
-        $updated = Transaction::where('workspace_id', $workspace->id)
-            ->whereIn('id', $validated['ids'])
-            ->update(['sub_category' => $validated['sub_category'] ?? null]);
-
-        return redirect()->back()->with('success', "{$updated} transactions updated.");
-    }
-
     public function export(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
