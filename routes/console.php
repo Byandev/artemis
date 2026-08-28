@@ -23,13 +23,15 @@ Schedule::command('gencys-erp:sweep-sync-batches')->everyMinute()->withoutOverla
 Schedule::command('gencys-erp:expire-stale-sync-runs')->hourly();
 
 Schedule::command('gencys-erp:sync')->dailyAt('09:00')->withoutOverlapping();
-Schedule::command('gencys-erp:sync')->dailyAt('13:00')->withoutOverlapping();
-Schedule::command('gencys-erp:sync')->dailyAt('16:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('12:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('14:00')->withoutOverlapping();
+Schedule::command('gencys-erp:sync')->dailyAt('17:00')->withoutOverlapping();
 Schedule::command('gencys-erp:sync')->dailyAt('19:00')->withoutOverlapping();
 
 Schedule::command('inventory:snapshot-items')->dailyAt('10:30')->withoutOverlapping();
-Schedule::command('inventory:snapshot-items')->dailyAt('14:30')->withoutOverlapping();
-Schedule::command('inventory:snapshot-items')->dailyAt('17:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('13:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('13:30')->withoutOverlapping();
+Schedule::command('inventory:snapshot-items')->dailyAt('18:30')->withoutOverlapping();
 Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapping();
 
 // Intern daily records still fan out on the old fixed-timer path.
@@ -46,6 +48,12 @@ Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
 // only just ended gets closed out, including parcels whose final status the
 // courier reported late in the evening.
 Schedule::command('rmo:apply-auto-tag')->dailyAt('00:00')->withoutOverlapping();
+
+// ── RMO (Discord) ───────────────────────────────────────────────────────
+// Checked hourly; posts only for workspaces whose configured send time matches
+// the current hour. Send times are whole hours only, so an hourly run always
+// lands on the match.
+Schedule::command('rmo:report-daily-stats')->hourly()->withoutOverlapping();
 
 // ── Inventory (Discord) ─────────────────────────────────────────────────
 // Checked hourly (top of each hour); each command posts only for workspaces

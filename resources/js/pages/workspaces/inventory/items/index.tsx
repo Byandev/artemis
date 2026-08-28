@@ -382,10 +382,75 @@ const COLUMN_HELP: Record<string, React.ReactNode> = {
 const COLUMNS_STORAGE_KEY = 'inventory-items-cols';
 
 /**
- * Cover against lead time, which is what decides whether ordering now still
- * helps: five days of cover is comfortable on a three-day lead time and hopeless
- * on a thirty-day one. Mirrors InventoryItemReportExport::stockoutRisk().
+ * Pins the header row and the leading identity column(s) of the items table.
+ *
+ * Applied from the page rather than through DataTable: this is the only table
+ * carrying thirty-odd report columns, and the shared component is used by
+ * pages that would rather scroll normally.
+ *
+ * A header can only stick to a scroll container, and the one DataTable renders
+ * is already an overflow context on both axes — an `overflow-x` other than
+ * visible forces `overflow-y` to compute to auto. So the first rule caps that
+ * container's height and lets the table own its vertical scroll; without it
+ * there is nothing for `top-0` to stick to.
+ *
+ * Pinned cells need a solid background, since the row scrolling underneath
+ * would otherwise read straight through them. That rules out the row's
+ * translucent hover tint, so the hover rules below are flat stand-ins:
+ * emerald-500/3 resolved against each theme's row background.
+ *
+ * Cells are addressed by position because the column set is dynamic. Written
+ * out per variant rather than built from a width constant — Tailwind only sees
+ * class names that appear literally in the source, so an interpolated
+ * `left-[${n}px]` would compile to nothing at all.
  */
+const STICKY_TABLE = {
+    /** Scroll container gets a ceiling, header sticks to it. */
+    frame: [
+        '[&>div:first-child]:max-h-[70vh] [&>div:first-child]:overflow-y-auto',
+        '[&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-20',
+        '[&_thead_th]:bg-white dark:[&_thead_th]:bg-zinc-900',
+    ].join(' '),
+
+    /**
+     * Checkbox column, pinned flush left and held to a fixed width so the SKU
+     * column beside it has a left offset that doesn't move. The empty-state row
+     * is a single full-width cell, so it is excluded — pinning it would drag
+     * the message out of centre.
+     */
+    selectColumn: [
+        '[&_thead_th:nth-child(1)]:w-[44px] [&_thead_th:nth-child(1)]:min-w-[44px]',
+        '[&_tbody_td:nth-child(1):not([colspan])]:w-[44px]',
+        '[&_thead_th:nth-child(1)]:sticky [&_thead_th:nth-child(1)]:left-0 [&_thead_th:nth-child(1)]:z-30',
+        '[&_tbody_td:nth-child(1):not([colspan])]:sticky [&_tbody_td:nth-child(1):not([colspan])]:left-0 [&_tbody_td:nth-child(1):not([colspan])]:z-10',
+        '[&_tbody_td:nth-child(1):not([colspan])]:bg-white dark:[&_tbody_td:nth-child(1):not([colspan])]:bg-zinc-900',
+        '[&_tbody_tr:hover>td:nth-child(1):not([colspan])]:bg-[#f8fbfa]',
+        'dark:[&_tbody_tr:hover>td:nth-child(1):not([colspan])]:bg-[#181d1e]',
+    ].join(' '),
+
+    /** SKU / Product as the second column, offset past the checkbox. */
+    skuAfterSelect: [
+        '[&_thead_th:nth-child(2)]:sticky [&_thead_th:nth-child(2)]:left-[44px] [&_thead_th:nth-child(2)]:z-30',
+        '[&_tbody_td:nth-child(2):not([colspan])]:sticky [&_tbody_td:nth-child(2):not([colspan])]:left-[44px] [&_tbody_td:nth-child(2):not([colspan])]:z-10',
+        '[&_tbody_td:nth-child(2):not([colspan])]:bg-white dark:[&_tbody_td:nth-child(2):not([colspan])]:bg-zinc-900',
+        '[&_tbody_tr:hover>td:nth-child(2):not([colspan])]:bg-[#f8fbfa]',
+        'dark:[&_tbody_tr:hover>td:nth-child(2):not([colspan])]:bg-[#181d1e]',
+        '[&_thead_th:nth-child(2)]:border-r [&_thead_th:nth-child(2)]:border-black/6 dark:[&_thead_th:nth-child(2)]:border-white/6',
+        '[&_tbody_td:nth-child(2):not([colspan])]:border-r [&_tbody_td:nth-child(2):not([colspan])]:border-black/6 dark:[&_tbody_td:nth-child(2):not([colspan])]:border-white/6',
+    ].join(' '),
+
+    /** SKU / Product as the first column, when there is no checkbox. */
+    skuFirst: [
+        '[&_thead_th:nth-child(1)]:sticky [&_thead_th:nth-child(1)]:left-0 [&_thead_th:nth-child(1)]:z-30',
+        '[&_tbody_td:nth-child(1):not([colspan])]:sticky [&_tbody_td:nth-child(1):not([colspan])]:left-0 [&_tbody_td:nth-child(1):not([colspan])]:z-10',
+        '[&_tbody_td:nth-child(1):not([colspan])]:bg-white dark:[&_tbody_td:nth-child(1):not([colspan])]:bg-zinc-900',
+        '[&_tbody_tr:hover>td:nth-child(1):not([colspan])]:bg-[#f8fbfa]',
+        'dark:[&_tbody_tr:hover>td:nth-child(1):not([colspan])]:bg-[#181d1e]',
+        '[&_thead_th:nth-child(1)]:border-r [&_thead_th:nth-child(1)]:border-black/6 dark:[&_thead_th:nth-child(1)]:border-white/6',
+        '[&_tbody_td:nth-child(1):not([colspan])]:border-r [&_tbody_td:nth-child(1):not([colspan])]:border-black/6 dark:[&_tbody_td:nth-child(1):not([colspan])]:border-white/6',
+    ].join(' '),
+} as const;
+
 const stockoutRisk = (
     cover: number | null,
     leadTime: number,
@@ -2122,7 +2187,22 @@ export default function ItemIndex({
                         )}
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-[14px] border border-black/6 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900">
+                    <div
+                        className={cn(
+                            'overflow-hidden rounded-[14px] border border-black/6 bg-white shadow-sm dark:border-white/6 dark:bg-zinc-900',
+                            // The report columns run well past the fold: a
+                            // figure ten columns right is unreadable when you
+                            // can't see which item or which measure it belongs
+                            // to, so the header and the SKU both stay put.
+                            STICKY_TABLE.frame,
+                            canEditItems && !summarize
+                                ? cn(
+                                      STICKY_TABLE.selectColumn,
+                                      STICKY_TABLE.skuAfterSelect,
+                                  )
+                                : STICKY_TABLE.skuFirst,
+                        )}
+                    >
                         <DataTable
                             columns={columns}
                             enableInternalPagination={false}

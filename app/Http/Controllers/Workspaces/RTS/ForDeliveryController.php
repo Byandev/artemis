@@ -16,12 +16,12 @@ use App\Http\Sorts\Order\ForDelivery\OrderNumberSort;
 use App\Http\Sorts\Order\ForDelivery\OrderParcelStatusSort;
 use App\Http\Sorts\Order\ForDelivery\OrderTrackingCodeSort;
 use App\Http\Sorts\Order\ForDelivery\RiderRtsSort;
-use App\Http\Sorts\Order\ForDelivery\RiskScoreSort;
 use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\User as SystemUser;
 use App\Models\Workspace;
 use App\Support\PublicWorkspaceGate;
+use App\Support\RmoDailyStats;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -428,6 +428,26 @@ class ForDeliveryController extends Controller
         // Total uses its own base (optionally filtered via whereHas on confirmed_by)
         $totalOrdersForDeliveryToday = $totalOrdersForDeliveryTodayQuery->count();
 
+        // The call cards report the workspace's call logs for the delivery date,
+        // flat: every call that day, whether or not the number it reached
+        // belongs to an order on this page and whoever placed it. Deliberately
+        // not tied to the order set or to a Pancake user yet — those are
+        // separate questions, and answering them here would make the figures
+        // move for reasons the cards don't explain.
+        //
+        // One query per card. Each is independently readable and independently
+        // debuggable — run any one of them on its own and it answers exactly
+        // the question its card asks.
+        $totalCallLogs = RmoDailyStats::callLogStat($workspace, $deliveryDate, 'COUNT(*)');
+
+        $totalCallDuration = RmoDailyStats::callLogStat($workspace, $deliveryDate, 'COALESCE(SUM(duration), 0)');
+
+        $connectedCallLogs = RmoDailyStats::callLogStat(
+            $workspace,
+            $deliveryDate,
+            'COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END)'
+        );
+
         // The other 4 stats share $statsBase — roll them into a single aggregate query
         $statusBreakdown = $statsBase
             ->selectRaw("
@@ -465,6 +485,9 @@ class ForDeliveryController extends Controller
             'delivered_count' => $totalDelivered,
             'returning_count' => $totalReturning,
             'problematic_count' => $totalProblematic,
+            'total_call_logs_count' => $totalCallLogs,
+            'total_call_duration' => $totalCallDuration,
+            'connected_call_logs_count' => $connectedCallLogs,
             'enable_edit_previous_day' => $this->canEditPreviousDay($workspace),
             'enable_bulk_status_update' => $workspace->rmoBulkStatusUpdateEnabled(),
             'enable_auto_tag_status' => $workspace->rmoAutoTagStatusEnabled(),
