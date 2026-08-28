@@ -32,6 +32,8 @@ export interface StatementFigureSet {
     gross_profit_bought_cogs_after_advisory_share: number;
     /** The other basis: a share of delivered revenue rather than of margin. */
     advisory_share_on_delivered: number;
+    /** Outflow on transaction types marked OPEX. */
+    opex: number;
 }
 
 type CogsView = 'delivered' | 'bought';
@@ -105,6 +107,11 @@ export default function StatementFigures({
             value: fmt(afterAdvisory),
             emphasis: true,
             signed: afterAdvisory,
+        },
+        {
+            label: 'OPEX',
+            help: 'The month’s operating expenses — outflow on transaction types marked OPEX on the income statement. Untyped outflow is left out: it isn’t marked as anything, and guessing it in would overstate expenses.',
+            value: fmt(figures.opex),
         },
     ];
 

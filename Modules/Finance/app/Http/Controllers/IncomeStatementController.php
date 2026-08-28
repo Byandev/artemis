@@ -253,6 +253,7 @@ class IncomeStatementController extends Controller
                 'total_bought_cogs' => (float) $incomeStatement->total_bought_cogs,
                 'total_bought_cogs_delivery_fee' => (float) $incomeStatement->total_bought_cogs_delivery_fee,
                 'total_delivered_cogs' => (float) $incomeStatement->total_delivered_cogs,
+                'opex' => (float) $incomeStatement->opex,
                 'gross_profit_delivered_cogs' => (float) $incomeStatement->gross_profit_delivered_cogs,
                 'gross_profit_delivered_cogs_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_advisory_share,
                 'gross_profit_delivered_cogs_after_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_after_advisory_share,
@@ -377,9 +378,9 @@ class IncomeStatementController extends Controller
                 [
                     ...$figures,
                     'total_delivered' => $revenue['delivered'],
-                    'total_expenses' => $costOfSales + $opex,
                     'gross_profit' => $grossProfit,
                     'net_profit' => $netProfit,
+                    'total_expenses' => $costOfSales + $opex,
                     ...$rates->toAttributes(),
                     'advisory_share' => $advisoryShare,
                     'status' => 'final',
@@ -491,6 +492,7 @@ class IncomeStatementController extends Controller
         $adSpent = $source->workspaceAdSpend($workspace, $from, $to);
         $boughtCogs = $this->transactions->forWorkspace($workspace, $from, $to, TransactionTotals::COST_OF_GOODS);
         $boughtFreight = $this->transactions->forWorkspace($workspace, $from, $to, TransactionTotals::COG_DELIVERY);
+        $opexTotal = $this->transactions->opexForWorkspace($workspace, $from, $to);
 
         $codFee = round($revenue * $codRate, 2);
         $codVat = round($codFee * $vatRate, 2);
@@ -533,6 +535,7 @@ class IncomeStatementController extends Controller
             'total_bought_cogs' => $boughtCogs,
             'total_bought_cogs_delivery_fee' => $boughtFreight,
             'total_delivered_cogs' => $deliveredCogs,
+            'opex' => $opexTotal,
             'gross_profit_delivered_cogs' => $grossDelivered,
             'gross_profit_delivered_cogs_advisory_share' => $advisory($grossDelivered),
             'gross_profit_delivered_cogs_after_advisory_share' => round($grossDelivered - $advisory($grossDelivered), 2),

@@ -34,6 +34,29 @@ final class TransactionTotals
         '%goods%delivery%',
     ];
 
+    /**
+     * The month's operating expenses: every outflow whose transaction type is
+     * marked OPEX on the income statement.
+     *
+     * Unlike the lookups below this is driven by configuration rather than by
+     * matching a type's name, so renaming a type can't quietly empty it.
+     *
+     * Outflow with no type at all is left out — it isn't marked as anything, and
+     * guessing it into OPEX would overstate expenses.
+     */
+    public function opexForWorkspace(Workspace $workspace, Carbon $from, Carbon $to): float
+    {
+        $typeIds = TransactionType::where('workspace_id', $workspace->id)
+            ->where('income_statement_section', 'opex')
+            ->pluck('id');
+
+        if ($typeIds->isEmpty()) {
+            return 0.0;
+        }
+
+        return round((float) $this->outflow($workspace, $from, $to, $typeIds->all())->sum('amount'), 2);
+    }
+
     /** The month's whole outflow for the matching types. */
     public function forWorkspace(Workspace $workspace, Carbon $from, Carbon $to, array $patterns): float
     {

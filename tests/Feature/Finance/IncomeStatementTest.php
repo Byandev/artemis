@@ -163,6 +163,9 @@ test('store computes gross profit from cost of sales and net profit from OPEX', 
         'total_delivered' => 10000,
         'gross_profit' => 6076,
         'total_expenses' => 4924,
+        // opex is the month's OPEX-marked transactions on their own: the 1,000
+        // "expenses" and the 500 "transfer".
+        'opex' => 1500,
         'net_profit' => 3253.20,
     ]);
 
@@ -440,6 +443,7 @@ test('the statement carries the same figures as its per-product and per-user sli
         ->assertInertia(fn ($page) => $page
             ->where('figures.delivered_amount', fn ($v) => (float) $v === 11000.0)
             ->where('figures.gross_profit_delivered_cogs', fn ($v) => (float) $v === 6713.60)
+            ->has('figures.opex')
             ->has('figures.gross_profit_delivered_cogs_advisory_share')
             ->has('figures.gross_profit_bought_cogs_advisory_share')
             ->has('statement.advisory_rate')
@@ -814,4 +818,53 @@ test('regenerating an unchanged month reproduces the statement exactly', functio
         ->and($statement->userStatements()->count())->toBe($usersBefore)
         ->and($statement->productStatements()->count())->toBe($productsBefore)
         ->and(IncomeStatement::count())->toBe(1);
+});
+
+test('opex is the outflow on types marked OPEX', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+
+    // Marked OPEX — counts.
+    $rent = makeType($workspace, 'Rent and Utilities', section: 'opex');
+    makeTxn($workspace, $account, $rent, 'out', 2500, '2026-05-09');
+
+    // Marked cost of sales — belongs above gross profit, not here.
+    $freight = makeType($workspace, 'Freight', section: 'cost_of_sales');
+    makeTxn($workspace, $account, $freight, 'out', 400, '2026-05-09');
+
+    // Excluded from the statement entirely.
+    $excluded = makeType($workspace, 'Owner Drawings', section: null);
+    makeTxn($workspace, $account, $excluded, 'out', 900, '2026-05-09');
+
+    // An inflow on an OPEX type is money coming in, not an expense.
+    makeTxn($workspace, $account, $rent, 'in', 700, '2026-05-09');
+
+    // Outside the month.
+    makeTxn($workspace, $account, $rent, 'out', 5000, '2026-04-09');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    // seedMay's 1,000 + 500, plus the 2,500 rent. Nothing else.
+    expect((float) IncomeStatement::first()->opex)->toBe(4000.0);
+});
+
+test('an untyped outflow is not counted as an expense', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+
+    // No transaction type at all — it isn't marked as anything, so guessing it
+    // into OPEX would overstate expenses.
+    makeTxn($workspace, $account, null, 'out', 3000, '2026-05-09');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    expect((float) IncomeStatement::first()->opex)->toBe(1500.0);
 });
