@@ -20,6 +20,7 @@ use App\Models\CallLog;
 use App\Models\Page;
 use App\Models\User as SystemUser;
 use App\Models\Workspace;
+use App\Support\CallLogPersona;
 use App\Support\PublicWorkspaceGate;
 use App\Support\RmoDailyStats;
 use Carbon\Carbon;
@@ -41,6 +42,13 @@ class ForDeliveryController extends Controller
      * Upper bound on comma-separated terms accepted by the RMO search box.
      */
     private const MAX_SEARCH_TERMS = 50;
+
+    /**
+     * Rows listed per group in the call-log breakdown. The totals above each
+     * list are counted over the whole group, so a capped list still sits under
+     * an honest number.
+     */
+    private const BREAKDOWN_ROW_LIMIT = 200;
 
     public function publicUpdateStatus(Workspace $workspace, $id, Request $request)
     {
@@ -751,6 +759,79 @@ class ForDeliveryController extends Controller
         $filename = 'rmo-call-logs-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
         return Excel::download(new RmoCallLogsExport($query, $workspace->id, $deliveryDate), $filename);
+    }
+
+    /**
+     * The day's call logs, split by who was on the other end.
+     *
+     * "RMO customer" and "RMO rider" are the calls placed against a delivery
+     * loaded for that day, told apart by the persona stamped on the row when it
+     * synced.
+     *
+     * Order verification is reported as null, not as a count. A call that
+     * matched no delivery is only *probably* a verification call — it is
+     * equally a wrong number, a callback, or a delivery that synced late — and
+     * nothing in the data says which. Rather than put a number on a guess, the
+     * group is left empty until verification calls are marked as such at the
+     * source, and the modal says so.
+     *
+     * Each group carries its own totals so the modal can show the split without
+     * counting rows client-side, and the rows themselves are capped — the point
+     * is the breakdown, not a full call register, and a busy day runs to
+     * thousands.
+     */
+    public function callLogsBreakdown(Workspace $workspace, Request $request)
+    {
+        $request->validate(['date' => ['required', 'date']]);
+
+        $date = $request->input('date');
+
+        $groups = [
+            'rmo_customer' => CallLogPersona::CUSTOMER,
+            'rmo_rider' => CallLogPersona::RIDER,
+        ];
+
+        $payload = [];
+
+        foreach ($groups as $key => $persona) {
+            $base = fn () => CallLog::where('workspace_id', $workspace->id)
+                ->whereDate('call_date', $date)
+                ->where('persona', $persona);
+
+            $totals = $base()
+                ->selectRaw('
+                    COUNT(*) as calls,
+                    COALESCE(SUM(duration), 0) as duration,
+                    COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as connected
+                ')
+                ->first();
+
+            $logs = $base()
+                ->with('order:id,order_number')
+                ->orderBy('call_time', 'desc')
+                ->limit(self::BREAKDOWN_ROW_LIMIT)
+                ->get(['id', 'user_id', 'assignee_user_id', 'order_id', 'persona', 'phone_number', 'type', 'duration', 'call_date', 'call_time']);
+
+            $payload[$key] = [
+                'calls' => (int) ($totals->calls ?? 0),
+                'duration' => (int) ($totals->duration ?? 0),
+                'connected' => (int) ($totals->connected ?? 0),
+                'logs' => $this->namedCallers($logs)->map(fn (CallLog $log) => [
+                    ...$log->only([
+                        'id', 'phone_number', 'type', 'duration', 'call_time', 'persona', 'called_by',
+                    ]),
+                    'order_number' => $log->order?->order_number,
+                ])->values(),
+            ];
+        }
+
+        // Not yet tracked — see the note above.
+        $payload['order_verification'] = null;
+
+        return response()->json([
+            'date' => $date,
+            'groups' => $payload,
+        ]);
     }
 
     public function callLogs(Workspace $workspace, Request $request)

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\PublicApi;
 
 use App\Http\Controllers\Controller;
 use App\Models\CallLog;
+use App\Support\CallLogPersona;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
@@ -46,13 +47,18 @@ class CallLogV2Controller extends Controller
             ];
         }, $request->input('call_logs'));
 
+        // Match each number against that day's deliveries to work out whether
+        // it was the customer or the rider, and which order. The payload is
+        // unchanged — the app still posts only a number and a timestamp.
+        $rows = CallLogPersona::stamp($rows);
+
         $inserted = 0;
 
         foreach (array_chunk($rows, 500) as $chunk) {
             $inserted += CallLog::upsert(
                 $chunk,
                 ['workspace_id', 'user_id', 'phone_number', 'call_date', 'call_time'],
-                ['type', 'duration', 'assignee_user_id', 'updated_at']
+                ['type', 'duration', 'assignee_user_id', 'order_id', 'persona', 'updated_at']
             );
         }
 
