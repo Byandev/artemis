@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Tooltip,
     TooltipContent,
@@ -202,6 +203,281 @@ function EditablePhone({
             {value || '—'}
             <Pencil className="h-2.5 w-2.5 shrink-0 opacity-0 group-hover/phone:opacity-100" />
         </button>
+    );
+}
+
+/** The three things a CSR rings, in the order the modal lists them. */
+const BREAKDOWN_GROUPS = [
+    {
+        key: 'rmo_customer' as const,
+        label: 'RMO Customer',
+        hint: 'Calls to the customer on a delivery loaded for this day.',
+    },
+    {
+        key: 'rmo_rider' as const,
+        label: 'RMO Rider',
+        hint: "Calls to the rider carrying one of this day's deliveries.",
+    },
+    {
+        key: 'order_verification' as const,
+        label: 'Order Verification',
+        hint: 'Not tracked yet — verification calls are not marked as such at the source, and a call that matched no delivery is just as likely a wrong number or a late-syncing order.',
+    },
+];
+
+interface BreakdownLog {
+    id: number;
+    phone_number: string;
+    type: string;
+    duration: number;
+    call_time: string;
+    persona: string | null;
+    called_by: string | null;
+    order_number: string | null;
+}
+
+interface BreakdownGroup {
+    calls: number;
+    duration: number;
+    connected: number;
+    logs: BreakdownLog[];
+}
+
+type BreakdownResponse = {
+    date: string;
+    groups: Record<
+        'rmo_customer' | 'rmo_rider' | 'order_verification',
+        BreakdownGroup
+    >;
+};
+
+/**
+ * The day's calls split by who was on the other end.
+ *
+ * The stat cards say how many calls were made; this says what they were for,
+ * which is the question that actually follows. Each tab carries its own totals
+ * so the split is readable before opening any of them.
+ */
+function CallLogBreakdownModal({
+    open,
+    onOpenChange,
+    workspaceSlug,
+    date,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    workspaceSlug: string;
+    date: string;
+}) {
+    const [data, setData] = useState<BreakdownResponse | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [tab, setTab] = useState<string>(BREAKDOWN_GROUPS[0].key);
+
+    useEffect(() => {
+        if (!open) return;
+        setLoading(true);
+        fetch(
+            `/public/workspaces/${workspaceSlug}/rts/rmo-management/call-logs/breakdown?date=${date}`,
+        )
+            .then((r) => r.json())
+            .then(setData)
+            .finally(() => setLoading(false));
+    }, [open, workspaceSlug, date]);
+
+    const totalCalls = data
+        ? BREAKDOWN_GROUPS.reduce(
+              (sum, g) => sum + (data.groups[g.key]?.calls ?? 0),
+              0,
+          )
+        : 0;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle className="text-sm font-semibold">
+                        Call Logs Breakdown
+                    </DialogTitle>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                        {date} · {totalCalls} call{totalCalls !== 1 ? 's' : ''}{' '}
+                        across all users
+                    </p>
+                </DialogHeader>
+
+                {loading ? (
+                    <p className="py-10 text-center text-[12px] text-gray-400">
+                        Loading…
+                    </p>
+                ) : !data ? (
+                    <p className="py-10 text-center text-[12px] text-gray-400">
+                        Could not load the breakdown
+                    </p>
+                ) : (
+                    <Tabs value={tab} onValueChange={setTab}>
+                        <TabsList className="grid w-full grid-cols-3">
+                            {BREAKDOWN_GROUPS.map((g) => (
+                                <TabsTrigger
+                                    key={g.key}
+                                    value={g.key}
+                                    className="text-[11px]"
+                                >
+                                    {g.label}
+                                    <span className="ml-1.5 rounded-full bg-black/5 px-1.5 py-0.5 font-mono text-[10px] dark:bg-white/10">
+                                        {data.groups[g.key]?.calls ?? '—'}
+                                    </span>
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+
+                        {BREAKDOWN_GROUPS.map((g) => {
+                            const group = data.groups[g.key];
+
+                            // Null is "we don't measure this yet" — a zeroed-out
+                            // panel would read as a quiet day instead.
+                            if (!group) {
+                                return (
+                                    <TabsContent key={g.key} value={g.key}>
+                                        <div className="py-10 text-center">
+                                            <p className="text-[12px] font-medium text-gray-500 dark:text-gray-400">
+                                                Not tracked yet
+                                            </p>
+                                            <p className="mx-auto mt-1 max-w-sm text-[11px] text-gray-400 dark:text-gray-500">
+                                                {g.hint}
+                                            </p>
+                                        </div>
+                                    </TabsContent>
+                                );
+                            }
+
+                            return (
+                                <TabsContent key={g.key} value={g.key}>
+                                    <p className="mb-3 text-[11px] text-gray-400 dark:text-gray-500">
+                                        {g.hint}
+                                    </p>
+
+                                    <div className="mb-3 grid grid-cols-3 gap-2">
+                                        {[
+                                            {
+                                                label: 'Calls',
+                                                value: group.calls.toLocaleString(),
+                                            },
+                                            {
+                                                label: 'Duration',
+                                                value: formatDuration(
+                                                    group.duration,
+                                                ),
+                                            },
+                                            {
+                                                label: 'Connected (5s+)',
+                                                value: group.connected.toLocaleString(),
+                                            },
+                                        ].map((stat) => (
+                                            <div
+                                                key={stat.label}
+                                                className="rounded-[10px] border border-black/6 px-3 py-2 dark:border-white/6"
+                                            >
+                                                <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                                                    {stat.label}
+                                                </p>
+                                                <p className="font-mono text-[14px] font-semibold text-gray-900 tabular-nums dark:text-gray-100">
+                                                    {stat.value}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {group.logs.length === 0 ? (
+                                        <p className="py-8 text-center text-[12px] text-gray-400">
+                                            No calls in this group
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <div className="max-h-64 overflow-y-auto">
+                                                <table className="w-full text-[12px]">
+                                                    <thead>
+                                                        <tr className="border-b text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                                            <th className="pr-3 pb-2">
+                                                                Time
+                                                            </th>
+                                                            <th className="pr-3 pb-2">
+                                                                Number
+                                                            </th>
+                                                            <th className="pr-3 pb-2">
+                                                                Order
+                                                            </th>
+                                                            <th className="pr-3 pb-2">
+                                                                By
+                                                            </th>
+                                                            <th className="pr-3 pb-2 text-right">
+                                                                Duration
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {group.logs.map(
+                                                            (log) => (
+                                                                <tr
+                                                                    key={log.id}
+                                                                    className="border-b border-black/5 dark:border-white/5"
+                                                                >
+                                                                    <td className="py-2 pr-3 font-mono text-gray-600 dark:text-gray-300">
+                                                                        {
+                                                                            log.call_time
+                                                                        }
+                                                                    </td>
+                                                                    <td className="py-2 pr-3 font-mono text-[11px] text-gray-600 dark:text-gray-300">
+                                                                        {
+                                                                            log.phone_number
+                                                                        }
+                                                                    </td>
+                                                                    <td className="py-2 pr-3 font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                                                                        {log.order_number ??
+                                                                            '—'}
+                                                                    </td>
+                                                                    <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
+                                                                        {log.called_by ??
+                                                                            '—'}
+                                                                    </td>
+                                                                    <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                                                        {formatDuration(
+                                                                            log.duration,
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ),
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {group.logs.length <
+                                                group.calls && (
+                                                <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+                                                    Showing the{' '}
+                                                    {group.logs.length} most
+                                                    recent of {group.calls}{' '}
+                                                    calls. The totals above
+                                                    cover all of them.
+                                                </p>
+                                            )}
+                                        </>
+                                    )}
+                                </TabsContent>
+                            );
+                        })}
+                    </Tabs>
+                )}
+
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => onOpenChange(false)}
+                        className="rounded-lg border border-black/10 px-4 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 dark:border-white/10 dark:text-gray-400 dark:hover:bg-zinc-800"
+                    >
+                        Close
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -430,6 +706,7 @@ function RmoManagement({
     const [stats, setStats] = useState<RmoStats | null>(null);
     const [statsLoading, setStatsLoading] = useState(true);
     const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [breakdownOpen, setBreakdownOpen] = useState(false);
     const [exportColumns, setExportColumns] = useState<string[]>(() => {
         const saved = localStorage.getItem('rmo_export_columns');
         return saved ? JSON.parse(saved) : [...ALL_COLUMN_KEYS];
@@ -1575,6 +1852,13 @@ function RmoManagement({
                 onSubmit={handleUserSelected}
             />
 
+            <CallLogBreakdownModal
+                open={breakdownOpen}
+                onOpenChange={setBreakdownOpen}
+                workspaceSlug={workspace.slug}
+                date={deliveryDate}
+            />
+
             <CallLogModal
                 open={!!callLogModal}
                 onOpenChange={(open) => {
@@ -1825,6 +2109,15 @@ function RmoManagement({
 
                 {showStats && (
                     <div className="mb-6">
+                        <div className="mb-2 flex justify-end">
+                            <button
+                                onClick={() => setBreakdownOpen(true)}
+                                className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
+                            >
+                                <ListChecks className="h-3.5 w-3.5" />
+                                Call logs breakdown
+                            </button>
+                        </div>
                         <RmoStatCards
                             total_for_delivery_today={
                                 stats?.total_for_delivery_today ?? 0
