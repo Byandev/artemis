@@ -503,11 +503,14 @@ function RmoManagement({
     );
 
     // Whose calls the five call-log cards count. Those cards are about who was
-    // on the phone, so they follow the person, not the order set: the assignee
-    // picked in the filter bar if there is one, otherwise whoever the identity
-    // picker up top says you are. With "All Assignees" picked and no identity
-    // set they report the whole workspace's day.
-    const callerId = activeAssigneeId || currentUserId;
+    // on the phone, so they follow the person, not the order set.
+    //
+    // Only an explicit narrowing cuts them: either "mine only" toggle, or a name
+    // picked in the assignee filter. Having identified yourself in the picker up
+    // top does not — that is who you are, not a filter, and the page opens on
+    // the whole workspace's day until you ask for less.
+    const callerId =
+        activeAssigneeId || (showMyConfirmeeOnly ? currentUserId : '');
 
     const todayLocal = (() => {
         const d = new Date();
