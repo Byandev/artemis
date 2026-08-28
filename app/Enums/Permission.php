@@ -160,9 +160,22 @@ enum Permission: string
 
     // Dashboards
     case ViewMainDashboard = 'View Main Dashboard';
-    case ViewSalesMarketingDashboard = 'View Sales & Marketing Dashboard';
     case ViewVideoEditorDashboard = 'View Video Editor Dashboard';
     case ViewCsrDashboard = 'View CSR Dashboard';
+
+    // Sales & Marketing
+    //
+    // One per page. This was a single "View Sales & Marketing Dashboard" while
+    // the five were tabs of one screen; splitting the screen into five sibling
+    // pages splits the grant with it, so a role can be given the Daily Report
+    // without also being given everyone's sales targets.
+    //
+    // Only three are new. Ad Spend Goals and Ad Spent Summary already had their
+    // own permissions from when they were standalone pages — those keep their
+    // existing names and categories rather than being duplicated here.
+    case ViewSalesMarketingDailyReport = 'View S&M Daily Report';
+    case ViewPageRoasTracker = 'View Page ROAS Tracker';
+    case ViewSalesTargets = 'View Sales Targets';
 
     // Settings
     case EditWorkspaceSettings = 'Edit Workspace Settings';
@@ -321,9 +334,12 @@ enum Permission: string
             self::DeletePageDailyBudgetRecords => 'Page Daily Budget Records',
 
             self::ViewMainDashboard,
-            self::ViewSalesMarketingDashboard,
             self::ViewVideoEditorDashboard,
             self::ViewCsrDashboard => 'Dashboards',
+
+            self::ViewSalesMarketingDailyReport,
+            self::ViewPageRoasTracker,
+            self::ViewSalesTargets => 'Sales & Marketing',
 
             self::EditWorkspaceSettings,
             self::ManageApiKeys,

@@ -1,7 +1,3 @@
-import {
-    DashboardTab,
-    DashboardTabNav,
-} from '@/components/sales-marketing/dashboard-tabs';
 import { DeleteSalesTargetDialog } from '@/components/sales-targets/delete-sales-target-dialog';
 import {
     SalesTargetFormDialog,
@@ -31,8 +27,6 @@ interface Props {
     targets: PaginatedData<SalesTarget>;
     teams: TeamOption[];
     canManage: boolean;
-    tabs?: DashboardTab[];
-    activeTab?: string;
 }
 
 export default function SalesTargetsIndex({
@@ -40,11 +34,8 @@ export default function SalesTargetsIndex({
     targets,
     teams,
     canManage,
-    tabs,
-    activeTab,
 }: Props) {
-    const hasTabs = !!tabs?.length;
-    const base = `/workspaces/${workspace.slug}/sales-marketing/dashboard/sales-targets`;
+    const base = `/workspaces/${workspace.slug}/sales-marketing/sales-targets`;
 
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<SalesTarget | null>(null);
@@ -178,8 +169,6 @@ export default function SalesTargetsIndex({
         <AppLayout>
             <Head title={`${workspace.name} - Sales Targets`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
-
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-800 dark:text-gray-100">

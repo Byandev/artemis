@@ -1,12 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace App\Http\Controllers\Workspaces\SalesMarketing;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use App\Queries\AdvertiserDashboardQuery;
-use App\Support\SalesMarketingDashboard;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,35 +13,26 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The Sales & Marketing dashboard is the intern performance dashboard — it
- * renders the same page (and data) as the gencys intern dashboard, but under
- * the S&M module's own route, permission and gating.
- *
- * The dashboard is tabbed and each tab is its own URL (route path), e.g.
- * `.../dashboard` → Daily Report. New tabs slot into {@see self::tabs()}.
+ * Daily Report — advertiser performance, one of the five sibling pages under
+ * Sales & Marketing. It grew out of the gencys intern dashboard and still shares
+ * that query; the route, permission and module gate are S&M's own.
  */
-class SalesMarketingDashboardController extends Controller
+class DailyReportController extends Controller
 {
     use AuthorizesRequests;
 
-    /** Inertia page shell + first paint (default date) — the Daily Report tab. */
-    public function index(Request $request, Workspace $workspace, ?string $tab = null): Response
+    /** Inertia page shell + first paint, on the default date. */
+    public function index(Request $request, Workspace $workspace): Response
     {
         $this->authorizeAccess($workspace);
 
-        // Only the Daily Report tab is served here; other tabs (e.g. the Page
-        // ROAS Tracker) have their own routes. Reject unknown segments.
-        abort_unless(in_array($tab ?: 'daily-report', ['daily-report'], true), 404);
-
         [$data, $filters] = $this->build($request, $workspace);
 
-        return Inertia::render('workspaces/gencys/intern-dashboard/index', [
+        return Inertia::render('workspaces/sales-marketing/daily-report/index', [
             'workspace' => $workspace,
             'view' => $data,
             'filters' => $filters,
-            'baseUrl' => "/workspaces/{$workspace->slug}/sales-marketing/dashboard",
-            'tabs' => SalesMarketingDashboard::tabs($workspace),
-            'activeTab' => 'daily-report',
+            'baseUrl' => "/workspaces/{$workspace->slug}/sales-marketing/daily-report",
         ]);
     }
 
@@ -63,7 +53,7 @@ class SalesMarketingDashboardController extends Controller
     {
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
-        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+        $this->authorize(Permission::ViewSalesMarketingDailyReport->value, $workspace);
     }
 
     /**

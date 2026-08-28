@@ -1,7 +1,3 @@
-import {
-    DashboardTab,
-    DashboardTabNav,
-} from '@/components/sales-marketing/dashboard-tabs';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -79,10 +75,6 @@ interface Props {
     // Base path for the page's data endpoint / URL sync. Defaults to the gencys
     // route; the S&M dashboard passes its own so this page can serve both.
     baseUrl?: string;
-    // Route-based tabs (S&M dashboard). Each tab is its own URL. Absent on the
-    // gencys route, which then renders without a tab bar.
-    tabs?: DashboardTab[];
-    activeTab?: string;
 }
 
 // ─── Formatters ────────────────────────────────────────────────────────────────
@@ -364,8 +356,6 @@ export default function InternDashboard({
     view: initialView,
     filters,
     baseUrl: baseUrlProp,
-    tabs,
-    activeTab,
 }: Props) {
     const [date, setDate] = useState<string>(filters.date ?? '');
     const [view, setView] = useState<View>(initialView);
@@ -373,8 +363,6 @@ export default function InternDashboard({
 
     const baseUrl =
         baseUrlProp ?? `/workspaces/${workspace.slug}/gencys/intern-dashboard`;
-
-    const hasTabs = !!tabs && tabs.length > 0;
 
     // Persist the selected date in the URL so a refresh restores it — the
     // controller reads filter.date on load. replaceState (not an Inertia visit)
@@ -431,8 +419,6 @@ export default function InternDashboard({
             <Head title={`${workspace.name} - Intern Dashboard`} />
 
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
-
                 <div>
                     {/* Page title on the left, report-date control on the right. */}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

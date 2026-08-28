@@ -103,7 +103,7 @@ export function SalesTargetFormDialog({
     target,
 }: Props) {
     const isEditing = !!target;
-    const base = `/workspaces/${workspace.slug}/sales-marketing/dashboard/sales-targets`;
+    const base = `/workspaces/${workspace.slug}/sales-marketing/sales-targets`;
     const fieldId = useId();
 
     /**

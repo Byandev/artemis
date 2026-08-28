@@ -137,7 +137,16 @@ class Workspace extends Model
     public function hiddenPermissionNames(): array
     {
         return array_values(array_filter([
-            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDashboard->value,
+            // Sales & Marketing is five pages behind one module switch, so the
+            // switch hides all five grants. Ad Spend Goals has a second switch
+            // of its own and can be hidden while the rest of the group is on.
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDailyReport->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewPageRoasTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesTargets->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewAdSpentSummary->value,
+            $this->sales_marketing_dashboard_module_enabled && $this->ad_spend_goals_module_enabled
+                ? null
+                : PermissionEnum::ViewAdSpendGoals->value,
             $this->video_editor_dashboard_module_enabled ? null : PermissionEnum::ViewVideoEditorDashboard->value,
             $this->csr_dashboard_module_enabled ? null : PermissionEnum::ViewCsrDashboard->value,
             // RMO lives in the RTS category and the leaderboard in CSR, so each

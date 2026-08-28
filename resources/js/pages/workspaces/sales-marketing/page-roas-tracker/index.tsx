@@ -1,7 +1,3 @@
-import {
-    DashboardTab,
-    DashboardTabNav,
-} from '@/components/sales-marketing/dashboard-tabs';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
@@ -47,9 +43,6 @@ interface Props {
         shops: string[];
         users: string[];
     };
-    // S&M dashboard tabs — this page is the "Page ROAS Tracker" tab.
-    tabs?: DashboardTab[];
-    activeTab?: string;
 }
 
 const int = (n: number) => n.toLocaleString();
@@ -83,14 +76,10 @@ export default function PageRoasTrackerIndex({
     pages,
     filterOptions,
     query,
-    tabs,
-    activeTab,
 }: Props) {
     // The Page ROAS Tracker now lives as a tab under the S&M dashboard, so its
     // filter visits target that URL.
-    const baseUrl = `/workspaces/${workspace.slug}/sales-marketing/dashboard/page-roas-tracker`;
-    const hasTabs = !!tabs && tabs.length > 0;
-
+    const baseUrl = `/workspaces/${workspace.slug}/sales-marketing/page-roas-tracker`;
     const [filters, setFilters] = useState<PageRoasFilterValue>({
         pages: query.pages ?? [],
         shops: query.shops ?? [],
@@ -122,8 +111,6 @@ export default function PageRoasTrackerIndex({
         <AppLayout>
             <Head title={`${workspace.name} - Page ROAS Tracker`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
-
                 {/* Page title on the left, filters + date range on the right. */}
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-800 dark:text-gray-100">
