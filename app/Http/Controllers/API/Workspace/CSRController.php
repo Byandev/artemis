@@ -532,6 +532,71 @@ class CSRController extends Controller
     }
 
     /**
+     * Calls placed against real conversations, one point per day.
+     *
+     * The two call cards above give the period's totals; this is the same two
+     * figures laid out across the days that made them, so a week where the
+     * effort held up but the conversations fell away shows as the gap between
+     * the bars widening rather than as a single softened percentage.
+     *
+     * Same source and same rules as the cards — RMO calls only (an order_id on
+     * the row), `real` at the shared five-second threshold — so a day here and
+     * the card above it always agree.
+     *
+     * Every day in the range is returned, including the ones with no calls at
+     * all: a Sunday nobody worked is a gap in the run of bars, and dropping it
+     * would quietly close that gap up.
+     */
+    public function analyticsDailyEffort(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+
+        $rows = DB::table('call_logs')
+            ->where('workspace_id', $workspace->id)
+            ->whereNotNull('order_id')
+            ->whereBetween('call_date', [$from, $to])
+            ->groupBy('call_date')
+            ->selectRaw('
+                call_date,
+                COUNT(*) as calls,
+                COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as real_conversations
+            ')
+            ->get()
+            // call_date is a DATE column, but drivers hand it back as a string
+            // with or without a time part depending on the connection — key on
+            // the first ten characters so both shapes land on the same day.
+            ->keyBy(fn ($row) => substr((string) $row->call_date, 0, 10));
+
+        $days = [];
+        $cursor = CarbonImmutable::parse($from);
+        $end = CarbonImmutable::parse($to);
+
+        while ($cursor->lessThanOrEqualTo($end)) {
+            $date = $cursor->toDateString();
+            $row = $rows->get($date);
+
+            $days[] = [
+                'date' => $date,
+                'calls' => (int) ($row->calls ?? 0),
+                'real' => (int) ($row->real_conversations ?? 0),
+            ];
+
+            $cursor = $cursor->addDay();
+        }
+
+        return response()->json([
+            'range' => ['from' => $from, 'to' => $to],
+            'days' => $days,
+            'totals' => [
+                'calls' => array_sum(array_column($days, 'calls')),
+                'real' => array_sum(array_column($days, 'real')),
+            ],
+        ]);
+    }
+
+    /**
      * Time spent on RMO calls across a range, and how many calls made it up.
      *
      * Only calls carrying an order_id — the ones matched to a delivery when they

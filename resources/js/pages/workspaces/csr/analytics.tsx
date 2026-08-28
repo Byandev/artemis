@@ -31,6 +31,9 @@ import {
 import CsrComparisonPanel, {
     type ComparisonResponse,
 } from '@/components/csr/CsrComparisonPanel';
+import CsrDailyEffortChart, {
+    type DailyEffortResponse,
+} from '@/components/csr/CsrDailyEffortChart';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
@@ -292,6 +295,15 @@ export default function Analytics({ workspace, records, query }: Props) {
             toStr,
         );
 
+    // The two call cards' totals, spread across the days that made them.
+    const [dailyEffort, dailyEffortLoading] =
+        useAnalyticsStat<DailyEffortResponse>(
+            workspace.slug,
+            'analytics-daily-effort',
+            fromStr,
+            toStr,
+        );
+
     // Debounced search — skip the initial mount so we don't refetch on load.
     const isFirstRender = useRef(true);
     useEffect(() => {
@@ -527,6 +539,11 @@ export default function Analytics({ workspace, records, query }: Props) {
                     loading={comparisonLoading}
                     metricKey={comparisonTab}
                     onMetricChange={selectComparisonTab}
+                />
+
+                <CsrDailyEffortChart
+                    data={dailyEffort}
+                    loading={dailyEffortLoading}
                 />
 
                 <input

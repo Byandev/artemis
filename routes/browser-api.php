@@ -58,6 +58,9 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         // The field behind the leaders: every CSR on one axis, all four
         // metrics in a single response so switching tabs costs nothing.
         Route::get('/csrs/stats/analytics-comparison', [CSRController::class, 'analyticsComparison']);
+        // Effort against results, day by day: calls placed beside the ones that
+        // turned into a conversation.
+        Route::get('/csrs/stats/analytics-daily-effort', [CSRController::class, 'analyticsDailyEffort']);
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
