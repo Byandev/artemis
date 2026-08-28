@@ -4,6 +4,8 @@ namespace App\Support;
 
 use App\Models\CallLog;
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\OrderForDelivery;
 
 /**
@@ -60,14 +62,37 @@ class RmoDailyStats
             'total_call_logs' => $totalCallLogs,
             'total_call_duration' => $totalCallDuration,
             'connected_call_logs' => $connectedCallLogs,
-            // Both are undefined rather than zero when nothing has happened
-            // yet: a 0% hit rate reads as "everyone hung up", which is not the
-            // same as "nobody has called".
+            ...self::derivedCallStats($totalCallLogs, $totalCallDuration, $connectedCallLogs),
+        ];
+    }
+
+    /**
+     * The two figures that are arithmetic over the other three.
+     *
+     * Here rather than at each call site so the daily Discord report and the RMO
+     * page can't drift apart on what "hit rate" means — the same reason the rest
+     * of this class exists.
+     *
+     * Both are undefined rather than zero when nothing has happened yet: a 0%
+     * hit rate reads as "everyone hung up", which is not the same as "nobody has
+     * called". Average is all talk time spread over the calls that connected —
+     * time spent per conversation actually reached, so the unanswered attempts
+     * count against it.
+     *
+     * @return array{avg_call_duration: float|null, hit_rate: float|null}
+     */
+    public static function derivedCallStats(int $totalCallLogs, int $totalCallDuration, int $connectedCallLogs): array
+    {
+        // Cast because PHP's `/` hands back an int when the division comes out
+        // even, which would make the declared float|null a lie for exactly the
+        // tidy numbers. (JSON still renders a whole float without its decimal
+        // point — a client reading these back gets 76, not 76.0.)
+        return [
             'avg_call_duration' => $connectedCallLogs > 0
-                ? $totalCallDuration / $connectedCallLogs
+                ? (float) ($totalCallDuration / $connectedCallLogs)
                 : null,
             'hit_rate' => $totalCallLogs > 0
-                ? $connectedCallLogs / $totalCallLogs * 100
+                ? (float) ($connectedCallLogs / $totalCallLogs * 100)
                 : null,
         ];
     }
@@ -75,8 +100,7 @@ class RmoDailyStats
     /**
      * One call-log figure.
      *
-     * Straight off call_logs for the workspace and date — no join to the
-     * orders on the page, no filter on who placed the call. A day's calls are
+     * Straight off call_logs for the workspace and date. A day's calls are
      * reported as a day's calls, so a workspace with no orders loaded yet still
      * gets real numbers.
      *
@@ -84,13 +108,50 @@ class RmoDailyStats
      * those narrowed to connected calls. One figure, one query — the cards
      * don't share an aggregate, so a change to any one of them can't move the
      * others.
+     *
+     * $callerId narrows to the calls one CSR actually placed — call_logs.user_id
+     * is whoever dialled. This is the one the RMO page leans on: "my call logs"
+     * means the calls I made, not the calls that happened to reach a customer on
+     * an order assigned to me.
+     *
+     * $orderScope narrows the day to the calls placed to a customer or rider on
+     * some subset of the day's orders — what the page passes for its page and
+     * shop filters, so the cards report the rows on screen. Left null (the daily
+     * report, and the unfiltered page) each figure stays a single indexed count
+     * over call_logs with no join at all.
      */
-    public static function callLogStat(Workspace $workspace, string $date, string $aggregate): int
-    {
-        $value = CallLog::where('workspace_id', $workspace->id)
-            ->whereDate('call_date', $date)
-            ->selectRaw($aggregate.' as value')
-            ->value('value');
+    public static function callLogStat(
+        Workspace $workspace,
+        string $date,
+        string $aggregate,
+        ?Builder $orderScope = null,
+        ?string $callerId = null,
+    ): int {
+        $query = CallLog::where('workspace_id', $workspace->id)
+            ->whereDate('call_date', $date);
+
+        if ($callerId !== null && $callerId !== '') {
+            $query->where('call_logs.user_id', $callerId);
+        }
+
+        if ($orderScope !== null) {
+            $query->whereExists(
+                (clone $orderScope)
+                    ->select(DB::raw(1))
+                    // A call matches an order when it reached either of the two
+                    // numbers the order carries. The scope is already pinned to
+                    // this workspace and delivery date, which is the same day
+                    // the outer query is counting.
+                    ->where(function (Builder $match) {
+                        $match
+                            ->whereColumn('pancake_order_for_delivery.customer_phone', 'call_logs.phone_number')
+                            ->orWhereColumn('pancake_order_for_delivery.rider_phone', 'call_logs.phone_number');
+                    })
+                    ->getQuery()
+            );
+        }
+
+        $value = $query->selectRaw($aggregate.' as value')->value('value');
 
         return (int) ($value ?? 0);
     }

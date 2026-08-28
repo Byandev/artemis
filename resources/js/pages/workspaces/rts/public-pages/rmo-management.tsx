@@ -105,19 +105,13 @@ interface Props {
         page?: number;
         perPage?: number;
         delivery_date?: string;
+        /** Assignee / confirmee narrowing — top-level, not part of filter[]. */
+        assignee_id?: string | null;
+        confirmee_id?: string | null;
+        /** Whose calls the call-log cards report. */
+        caller_id?: string | null;
     };
     users: User[];
-    total_for_delivery_today: number;
-    called_count: number;
-    delivered_count: number;
-    returning_count: number;
-    problematic_count: number;
-    /** Call attempts — every customer and rider call on the listed orders. */
-    total_call_logs_count: number;
-    /** Combined talk time of those calls, in seconds. */
-    total_call_duration: number;
-    /** How many of those calls lasted at least 5 seconds. */
-    connected_call_logs_count: number;
     /**
      * Workspace-wide switch stored on rmo_settings. When on, every past
      * delivery date is assignable / re-statusable.
@@ -355,19 +349,32 @@ function CallLogBadge({
     );
 }
 
+/** The ten stat-card figures, as the `stats` endpoint returns them. */
+interface RmoStats {
+    total_for_delivery_today: number;
+    called_count: number;
+    delivered_count: number;
+    returning_count: number;
+    problematic_count: number;
+    /** Calls placed by the caller the page asked about. */
+    total_call_logs_count: number;
+    /** Combined talk time of those calls, in seconds. */
+    total_call_duration: number;
+    /** How many of those calls lasted at least 5 seconds. */
+    connected_call_logs_count: number;
+    /**
+     * Derived server-side rather than here, so these and the daily Discord
+     * report quote the same arithmetic. Null, not zero, when nobody has called.
+     */
+    avg_call_duration: number | null;
+    hit_rate: number | null;
+}
+
 function RmoManagement({
     orders,
     workspace,
     query,
     users,
-    total_for_delivery_today,
-    called_count,
-    delivered_count,
-    returning_count,
-    problematic_count,
-    total_call_logs_count,
-    total_call_duration,
-    connected_call_logs_count,
     enable_edit_previous_day = false,
     enable_bulk_status_update = false,
     enable_auto_tag_status = false,
@@ -392,6 +399,15 @@ function RmoManagement({
         }
     }, [flashMessages]);
 
+    // Who the page is acting as — picked in the "Logged in as" button up top and
+    // remembered in localStorage. Held in state rather than read out of
+    // localStorage at each call site: the "mine only" toggles, the exports and
+    // the stat cards all resolve against it, and changing it has to re-run every
+    // one of them. Read during render, like the toggles below, so the very first
+    // visit already carries the right id.
+    const [currentUserId, setCurrentUserId] = useState<string>(
+        () => localStorage.getItem('user_id') ?? '',
+    );
     const [userName, setUserName] = useState<string | false>(false);
     const [isOpen, setIsOpen] = useState(false);
     const [showStats, setShowStats] = useState(
@@ -411,6 +427,8 @@ function RmoManagement({
         phone: string;
         label: string;
     } | null>(null);
+    const [stats, setStats] = useState<RmoStats | null>(null);
+    const [statsLoading, setStatsLoading] = useState(true);
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [exportColumns, setExportColumns] = useState<string[]>(() => {
         const saved = localStorage.getItem('rmo_export_columns');
@@ -443,6 +461,13 @@ function RmoManagement({
             : [],
     );
 
+    // Whose orders to show, picked by name. "My Assignee Only" is the same
+    // narrowing pinned to the logged-in CSR, so the toggle wins while it's on
+    // and the picker is left disabled rather than silently ignored.
+    const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>(() =>
+        showMyAssigneeOnly ? '' : (query?.assignee_id ?? ''),
+    );
+
     // Use URL as source of truth for status (avoids stale closure issues with select)
     const currentStatus = useMemo(
         () =>
@@ -460,6 +485,30 @@ function RmoManagement({
         [query?.filter?.parcel_status],
     );
 
+    // CSRs by name, for the assignee picker — the list comes off the shops in
+    // this workspace, in whatever order the query returned it.
+    const assigneeOptions = useMemo(
+        () =>
+            [...users].sort((a, b) =>
+                (a.name ?? '').localeCompare(b.name ?? ''),
+            ),
+        [users],
+    );
+
+    // The assignee actually sent to the server: the toggle pins it to the
+    // logged-in CSR, otherwise it's whoever the picker has selected.
+    const activeAssigneeId = useMemo(
+        () => (showMyAssigneeOnly ? currentUserId : selectedAssigneeId),
+        [showMyAssigneeOnly, currentUserId, selectedAssigneeId],
+    );
+
+    // Whose calls the five call-log cards count. Those cards are about who was
+    // on the phone, so they follow the person, not the order set: the assignee
+    // picked in the filter bar if there is one, otherwise whoever the identity
+    // picker up top says you are. With "All Assignees" picked and no identity
+    // set they report the whole workspace's day.
+    const callerId = activeAssigneeId || currentUserId;
+
     const todayLocal = (() => {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -476,6 +525,34 @@ function RmoManagement({
     // workspace enabled the switch.
     const canEditPastDay =
         enable_edit_previous_day && deliveryDate < todayLocal;
+
+    // Exactly the inputs the stats endpoint reads — deliberately not the search
+    // box or the status selects, which don't move the figures. Keeping it narrow
+    // is what stops every keystroke in search from firing a stats request.
+    const statsQuery = useMemo(() => {
+        const params = new URLSearchParams();
+        params.set('delivery_date', deliveryDate);
+        if (selectedPageIds.length)
+            params.set('filter[page_id]', selectedPageIds.join(','));
+        if (selectedShopIds.length)
+            params.set('filter[shop_id]', selectedShopIds.join(','));
+        if (selectedUserIds.length)
+            params.set('filter[user_id]', selectedUserIds.join(','));
+        if (activeAssigneeId) params.set('assignee_id', activeAssigneeId);
+        if (showMyConfirmeeOnly && currentUserId)
+            params.set('confirmee_id', currentUserId);
+        if (callerId) params.set('caller_id', callerId);
+        return params.toString();
+    }, [
+        deliveryDate,
+        selectedPageIds,
+        selectedShopIds,
+        selectedUserIds,
+        activeAssigneeId,
+        showMyConfirmeeOnly,
+        currentUserId,
+        callerId,
+    ]);
 
     const initialSorting = useMemo(
         () => toFrontendSort(query?.sort ?? null),
@@ -509,11 +586,15 @@ function RmoManagement({
                 pageIds?: string[];
                 shopIds?: string[];
                 userIds?: string[];
+                assigneeId?: string;
             },
         ) => {
             const pageIds = ids?.pageIds ?? selectedPageIds;
             const shopIds = ids?.shopIds ?? selectedShopIds;
             const userIds = ids?.userIds ?? selectedUserIds;
+            const assigneeId = showMyAssigneeOnly
+                ? currentUserId
+                : (ids?.assigneeId ?? selectedAssigneeId);
 
             return {
                 sort: sort ?? undefined,
@@ -544,11 +625,12 @@ function RmoManagement({
                 page: page ?? 1,
                 per_page: perPage ?? orders.per_page,
                 delivery_date: deliveryDate,
-                ...(showMyAssigneeOnly && localStorage.getItem('user_id')
-                    ? { assignee_id: localStorage.getItem('user_id') }
+                ...(assigneeId ? { assignee_id: assigneeId } : {}),
+                ...(assigneeId || currentUserId
+                    ? { caller_id: assigneeId || currentUserId }
                     : {}),
-                ...(showMyConfirmeeOnly && localStorage.getItem('user_id')
-                    ? { confirmee_id: localStorage.getItem('user_id') }
+                ...(showMyConfirmeeOnly && currentUserId
+                    ? { confirmee_id: currentUserId }
                     : {}),
             };
         },
@@ -559,11 +641,32 @@ function RmoManagement({
             selectedPageIds,
             selectedShopIds,
             selectedUserIds,
+            selectedAssigneeId,
             showMyAssigneeOnly,
             showMyConfirmeeOnly,
+            currentUserId,
             orders.per_page,
             deliveryDate,
         ],
+    );
+
+    const handleAssigneeChange = useCallback(
+        (assigneeId: string) => {
+            setSelectedAssigneeId(assigneeId);
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                buildAllParams(
+                    query?.sort,
+                    1,
+                    undefined,
+                    undefined,
+                    undefined,
+                    { assigneeId },
+                ),
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [workspace, buildAllParams, query?.sort],
     );
 
     const handleFilterChange = useCallback(
@@ -627,6 +730,43 @@ function RmoManagement({
         if (name) setUserName(name);
     }, []);
 
+    // The cards come from their own endpoint, so they reload on their own —
+    // independently of the table, and only when something they actually depend
+    // on changes. Sorting, paging and searching leave them alone.
+    //
+    // Nothing is fetched while the cards are collapsed, which is the default.
+    useEffect(() => {
+        if (!showStats) return;
+
+        const controller = new AbortController();
+        setStatsLoading(true);
+
+        fetch(
+            `/public/workspaces/${workspace.slug}/rts/rmo-management/stats?${statsQuery}`,
+            {
+                signal: controller.signal,
+                headers: { Accept: 'application/json' },
+            },
+        )
+            .then((response) => {
+                if (!response.ok) throw new Error(String(response.status));
+                return response.json();
+            })
+            .then((data: RmoStats) => {
+                setStats(data);
+                setStatsLoading(false);
+            })
+            .catch((error: Error) => {
+                // An abort is this effect superseding itself — the newer request
+                // owns the loading flag now, so leave it be.
+                if (error.name === 'AbortError') return;
+                setStatsLoading(false);
+                toast.error('Could not load the stat cards.');
+            });
+
+        return () => controller.abort();
+    }, [workspace.slug, statsQuery, showStats]);
+
     useEffect(() => {
         const timer = setTimeout(() => {
             router.get(
@@ -639,6 +779,9 @@ function RmoManagement({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchValue]);
 
+    // The "mine only" toggles resolve against whoever the identity picker says
+    // you are, so switching identity has to re-ask the server — otherwise the
+    // table and the stat cards sit on the previous person's orders.
     useEffect(() => {
         router.get(
             publicPage.rmoManagement({ workspace }),
@@ -646,7 +789,7 @@ function RmoManagement({
             { preserveState: true, replace: true, preserveScroll: true },
         );
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showMyAssigneeOnly, showMyConfirmeeOnly]);
+    }, [showMyAssigneeOnly, showMyConfirmeeOnly, currentUserId]);
 
     // Clear selection whenever the page data changes
     useEffect(() => {
@@ -669,11 +812,14 @@ function RmoManagement({
         if (selectedUserIds.length)
             params.set('filter[user_id]', selectedUserIds.join(','));
         params.set('delivery_date', deliveryDate);
-        if (showMyAssigneeOnly && localStorage.getItem('user_id')) {
-            params.set('assignee_id', localStorage.getItem('user_id') ?? '');
+        if (activeAssigneeId) {
+            params.set('assignee_id', activeAssigneeId);
         }
-        if (showMyConfirmeeOnly && localStorage.getItem('user_id')) {
-            params.set('confirmee_id', localStorage.getItem('user_id') ?? '');
+        if (callerId) {
+            params.set('caller_id', callerId);
+        }
+        if (showMyConfirmeeOnly && currentUserId) {
+            params.set('confirmee_id', currentUserId);
         }
         return params;
     }, [
@@ -683,8 +829,10 @@ function RmoManagement({
         selectedPageIds,
         selectedShopIds,
         selectedUserIds,
-        showMyAssigneeOnly,
+        activeAssigneeId,
+        callerId,
         showMyConfirmeeOnly,
+        currentUserId,
         deliveryDate,
     ]);
 
@@ -731,11 +879,12 @@ function RmoManagement({
                     ...(selectedUserIds.length
                         ? { 'filter[user_id]': selectedUserIds.join(',') }
                         : {}),
-                    ...(showMyAssigneeOnly && localStorage.getItem('user_id')
-                        ? { assignee_id: localStorage.getItem('user_id') }
+                    ...(activeAssigneeId
+                        ? { assignee_id: activeAssigneeId }
                         : {}),
-                    ...(showMyConfirmeeOnly && localStorage.getItem('user_id')
-                        ? { confirmee_id: localStorage.getItem('user_id') }
+                    ...(callerId ? { caller_id: callerId } : {}),
+                    ...(showMyConfirmeeOnly && currentUserId
+                        ? { confirmee_id: currentUserId }
                         : {}),
                     delivery_date: date,
                     page: 1,
@@ -753,8 +902,10 @@ function RmoManagement({
             selectedPageIds,
             selectedShopIds,
             selectedUserIds,
-            showMyAssigneeOnly,
+            activeAssigneeId,
+            callerId,
             showMyConfirmeeOnly,
+            currentUserId,
             orders.per_page,
         ],
     );
@@ -794,15 +945,14 @@ function RmoManagement({
 
     const handleAssignToMe = useCallback(
         (id: number) => {
-            const userId = localStorage.getItem('user_id');
-            if (userId) {
-                handleAssignUser(id, userId);
+            if (currentUserId) {
+                handleAssignUser(id, currentUserId);
             } else {
                 setPendingAssign({ id, currentStatus: '' });
                 setIsOpen(true);
             }
         },
-        [handleAssignUser],
+        [handleAssignUser, currentUserId],
     );
 
     const handleUpdatePhone = useCallback(
@@ -822,6 +972,7 @@ function RmoManagement({
 
     const handleUserSelected = useCallback(
         (userId: string) => {
+            setCurrentUserId(userId);
             setUserName(localStorage.getItem('user_name') ?? '');
             if (pendingAssign) {
                 handleAssignUser(pendingAssign.id, userId);
@@ -890,7 +1041,7 @@ function RmoManagement({
     );
 
     const handleBulkAssignToMe = useCallback(() => {
-        const userId = localStorage.getItem('user_id');
+        const userId = currentUserId;
         if (!userId) {
             setIsOpen(true);
             return;
@@ -909,7 +1060,7 @@ function RmoManagement({
             return;
         }
         doBulkAssign(userId);
-    }, [selectedIds, orders.data, doBulkAssign]);
+    }, [selectedIds, orders.data, doBulkAssign, currentUserId]);
 
     const handleBulkUpdateStatus = useCallback(
         (status: OrderStatus) => {
@@ -1672,16 +1823,25 @@ function RmoManagement({
                 {showStats && (
                     <div className="mb-6">
                         <RmoStatCards
-                            total_for_delivery_today={total_for_delivery_today}
-                            called_count={called_count}
-                            delivered_count={delivered_count}
-                            returning_count={returning_count}
-                            problematic_count={problematic_count}
-                            total_call_logs_count={total_call_logs_count}
-                            total_call_duration={total_call_duration}
-                            connected_call_logs_count={
-                                connected_call_logs_count
+                            total_for_delivery_today={
+                                stats?.total_for_delivery_today ?? 0
                             }
+                            called_count={stats?.called_count ?? 0}
+                            delivered_count={stats?.delivered_count ?? 0}
+                            returning_count={stats?.returning_count ?? 0}
+                            problematic_count={stats?.problematic_count ?? 0}
+                            total_call_logs_count={
+                                stats?.total_call_logs_count ?? 0
+                            }
+                            total_call_duration={
+                                stats?.total_call_duration ?? 0
+                            }
+                            connected_call_logs_count={
+                                stats?.connected_call_logs_count ?? 0
+                            }
+                            avg_call_duration={stats?.avg_call_duration ?? null}
+                            hit_rate={stats?.hit_rate ?? null}
+                            loading={statsLoading || stats === null}
                         />
                     </div>
                 )}
@@ -1727,6 +1887,30 @@ function RmoManagement({
                                     </option>
                                 ),
                             )}
+                        </select>
+
+                        <select
+                            value={selectedAssigneeId}
+                            disabled={showMyAssigneeOnly}
+                            onChange={(e) =>
+                                handleAssigneeChange(e.target.value)
+                            }
+                            title={
+                                showMyAssigneeOnly
+                                    ? 'Turn off "My Assignee Only" to pick a different assignee'
+                                    : undefined
+                            }
+                            className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-800 dark:text-gray-300"
+                        >
+                            <option value="">All Assignees</option>
+                            {assigneeOptions.map((assignee) => (
+                                <option
+                                    key={assignee.id}
+                                    value={String(assignee.id)}
+                                >
+                                    {assignee.name}
+                                </option>
+                            ))}
                         </select>
 
                         <button
@@ -1973,11 +2157,7 @@ function RmoManagement({
                                     {bulkConflict.toAssign > 0 && (
                                         <button
                                             onClick={() =>
-                                                doBulkAssign(
-                                                    localStorage.getItem(
-                                                        'user_id',
-                                                    )!,
-                                                )
+                                                doBulkAssign(currentUserId)
                                             }
                                             className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1 text-[12px] font-medium text-white transition-colors hover:bg-amber-700"
                                         >
