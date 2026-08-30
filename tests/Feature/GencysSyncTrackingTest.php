@@ -361,6 +361,68 @@ test('the purchase-order callback saves the range the run carried, by item name'
         ->and($run->fresh()->rows_received)->toBe(2);
 });
 
+test('the run id may wrap the orders as an object rather than a list', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+    $patch = makeInventoryItem($workspace, 'Amazing Kidney Care Patch');
+
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_PURCHASE_ORDER, ['start_date' => '06/01/2026', 'end_date' => '08/30/2026']);
+
+    // The shape n8n posts: one object, the run id beside the orders.
+    $this->postJson('/api/v1/public/purchase-orders/bulk-sync', [
+        'sync_run_id' => $run->id,
+        'purchased_orders' => [
+            [
+                'issue_date' => '2026-08-29',
+                'delivery_no' => 'DN-TP1013',
+                'cust_po_no' => 'CPO-TP1013',
+                'control_no' => 'CN-TP1013',
+                'delivery_fee' => 1000,
+                'total_amount' => 29800,
+                'status' => 3,
+                'created_at' => '2026-08-29 15:57:42',
+                'supplier' => 'Kintara Manuf Ventures Inc',
+                'items' => [['count' => 1200, 'amount' => 24, 'total_amount' => 28800, 'item' => 'Amazing Kidney Care Patch']],
+                'statusLogs' => [
+                    ['status' => 'Approve', 'by' => 'GENCYS - Angelyn Macabasag', 'detail' => 'approved', 'timestamp' => '2026-08-29 16:20:46'],
+                    ['status' => 'To Pay', 'by' => 'GENCYS - Angelyn Macabasag', 'detail' => 'to pay', 'timestamp' => '2026-08-29 16:20:54'],
+                ],
+                'deliveries' => [],
+            ],
+            [
+                'issue_date' => '2026-08-08',
+                'control_no' => 'CN-TP971',
+                'delivery_fee' => 3000,
+                'total_amount' => 503000,
+                'status' => 6,
+                'supplier' => 'Kintara Manuf Ventures Inc',
+                'items' => [['count' => 12500, 'amount' => 40, 'total_amount' => 500000, 'item' => 'Lunggold Repirabalm (KINTARA)']],
+                // A Draft entry sits ahead of Approve and belongs to no stage.
+                'statusLogs' => [
+                    ['status' => 'Draft', 'by' => 'MARIO REDENTOR MOSLARES', 'detail' => 'APPROVED', 'timestamp' => '2026-08-10 08:19:08'],
+                    ['status' => 'Approve', 'by' => 'MARIO REDENTOR MOSLARES', 'detail' => 'APPROVED', 'timestamp' => '2026-08-10 08:22:26'],
+                ],
+                'deliveries' => [
+                    ['qty' => 161, 'created_at' => '2026-08-16 17:17:25'],
+                    ['qty' => 1235, 'created_at' => '2026-08-18 11:14:04'],
+                ],
+            ],
+        ],
+    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
+
+    $first = PurchasedOrder::where('control_no', 'CN-TP1013')->sole();
+    $second = PurchasedOrder::where('control_no', 'CN-TP971')->sole();
+
+    expect($first->items()->sole()->inventory_item_id)->toBe($patch->id)
+        ->and($first->approved_at->toDateTimeString())->toBe('2026-08-29 16:20:46')
+        ->and($first->paid_at)->toBeNull()
+        ->and($second->approved_at->toDateTimeString())->toBe('2026-08-10 08:22:26')
+        ->and((int) $second->items()->sole()->deliveries()->sum('qty'))->toBe(1396)
+        ->and($run->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and($run->fresh()->rows_received)->toBe(2)
+        ->and($run->fresh()->rows_saved)->toBe(2);
+});
+
 test('an order keeps only the lines the ERP still reports', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);

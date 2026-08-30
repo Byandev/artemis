@@ -26,10 +26,11 @@ class PurchaseOrderController extends Controller
      *
      * The body wraps the run id around the list n8n scraped:
      *
-     * [ { "sync_run_id": 3196, "purchased_orders": [ ...the orders... } ]
+     * { "sync_run_id": 3196, "purchased_orders": [ ...the orders... ] }
      *
-     * and the orders themselves may equally arrive on their own, bare or under
-     * a { data: [...] } / { items: [...] } key. An order looks like this:
+     * which may itself arrive inside an array, and the orders may equally
+     * arrive on their own, bare or under a { data: [...] } / { items: [...] }
+     * key. An order looks like this:
      *
      * [
      *   {
@@ -66,7 +67,7 @@ class PurchaseOrderController extends Controller
     {
         $workspace = $request->attributes->get('workspace');
 
-        $entries = BulkCallback::entries($request, ['data', 'items']);
+        $entries = BulkCallback::entries($request, ['purchased_orders', 'data', 'items']);
         $resolver = new InventoryItemResolver($workspace->id);
         $executionId = SyncCallbackFields::executionId($request);
 
