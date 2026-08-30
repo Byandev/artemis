@@ -12,6 +12,44 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.34.0',
+        date: '2026-08-30',
+        sections: [
+            {
+                title: 'Gencys ERP — How the Sync Runs',
+                items: [
+                    'Transaction history and purchase orders are now fetched a whole day — or a whole date range — at a time instead of one product at a time, so a pass that used to open an ERP session for every item on your list opens one and brings the entire report back',
+                    'Because the report is taken whole, a day’s movements are no longer limited to the products you had registered here: everything the ERP lists comes back, including items nobody has set up in Artemis yet',
+                    'Sync Batches reads differently as a result — a run is now a date, or a purchase order’s date range, rather than a product — so a pass that used to be hundreds of rows to scroll through is a handful you can actually follow, and there is only ever one of them out at the ERP at a time',
+                ],
+            },
+            {
+                title: 'Inventory — Items & Purchase Orders from the ERP',
+                items: [
+                    'An item the ERP names that we don’t recognise is now created here rather than dropped — it is matched first on its SKU, then on its transaction keywords, and created switched off if neither hits, so a day’s stock movements are never quietly short a product just because the two systems spell it differently; worth looking over the inactive items after a sync and merging or keywording anything that should have matched',
+                    'A purchase order’s lines are now written to exactly what the ERP reports rather than added to, so an order whose product resolves somewhere new carries one line instead of both — left to accumulate, the same goods would have been counted twice against the stock the order shows as owed',
+                    'Approved, To Pay, Paid, For Purchase and Purchased dates are filled in on every purchase order from its own status trail now that the ERP has stopped sending them as separate fields — so when an order reached each stage is still on record rather than going blank from here on',
+                ],
+            },
+            {
+                title: 'Admin — Workspaces',
+                items: [
+                    'A workspace whose subscription is past due or expired no longer throws its subscription dialog open the moment the list loads — it was interrupting whatever you came to the page to do, and the same dialog is still a click away on the row',
+                    'The arrow that drops you straight into a client workspace now shows only for the primary admin account; everyone else works from the admin panel, where the workspace’s figures are already on screen',
+                    'A super admin going to the dashboard now lands in the admin panel rather than being sent into a workspace, which is where signing in already put them — the two disagreed, so the link out of a workspace bounced you somewhere you had not asked for',
+                    'A Finance admin account is created on every environment, verified and ready to sign in, so the finance side no longer has to share the main admin login',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Saying who you are in the Logged in as picker no longer narrows the five RMO call cards — that is who you are, not a filter, so the page opens on the whole workspace’s day and only My Assignee Only or a name in the assignee picker cuts the cards down; last release had identifying yourself filtering them too, which left the cards describing one person while the list beside them described everyone',
+                    'A delivery the ERP logs with no quantity against it — a settlement note rather than a receipt — no longer lands on the purchase order as a delivery of nothing',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.33.1',
         date: '2026-08-28',
         sections: [
