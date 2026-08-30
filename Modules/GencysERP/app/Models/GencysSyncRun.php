@@ -183,6 +183,24 @@ class GencysSyncRun extends Model
     }
 
     /**
+     * The run a callback belongs to when n8n didn't echo an id back.
+     *
+     * Only safe for the sync types a batch sends one subject at a time — the
+     * transaction-history report covers a whole date, so a workspace never has
+     * two of them in flight, and the oldest one still waiting is the one this
+     * callback answers. Types that go out in groups must echo the id instead.
+     */
+    public static function oldestInFlight(int $workspaceId, string $syncType): ?self
+    {
+        return self::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('sync_type', $syncType)
+            ->pending()
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
      * Record one chunk of a run that arrives in pieces, without closing it.
      *
      * Some ERP pulls are too big for a single callback — the daily sales tracker

@@ -10,115 +10,169 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\BulkCallback;
 use Modules\GencysERP\Support\SyncCallbackFields;
-use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\PurchasedOrder;
 use Modules\Inventory\Models\PurchasedOrderItem;
 use Modules\Inventory\Models\PurchasedOrderItemDelivery;
 use Modules\Inventory\Models\PurchasedOrderStatusLog;
+use Modules\Inventory\Support\InventoryItemResolver;
 
 class PurchaseOrderController extends Controller
 {
     /**
-     * Receive ERP purchase orders synced back by n8n, grouped per inventory item.
-     * Each data[] entry echoes the item id and the sync_run_id we sent, and lists
-     * that item's purchase orders:
+     * Receive one date range's ERP purchase orders, as n8n scrapes them: every
+     * order on the list, one entry each.
      *
-     * {
-     *   "data": [
-     *     {
-     *       "id": 55,                     // inventory item id
-     *       "sync_run_id": 2,             // the run we opened on dispatch
-     *       "purchased_orders": [
-     *         {
-     *           "control_no": "CN-TP839", // unique key per workspace (upsert key)
-     *           "issue_date": "2026-06-25",
-     *           "delivery_no": "DN-TP839",
-     *           "cust_po_no": "CPO-TP839",
-     *           "delivery_fee": 0,
-     *           "total_amount": 42752,
-     *           "status": 7,              // PurchasedOrder::STATUSES code (1-8)
-     *           "supplier": "BFM",        // free-text name, no supplier table
-     *           "items": [ { "count": 800, "amount": 57.23, "total_amount": 45784 } ],
-     *           "deliveries": [ { "qty": 800, "created_at": "2026-06-29 11:07:02" } ],
-     *           "statusLogs": [           // the ERP's audit trail, any order
-     *             { "status": "Paid", "by": "RENZ LAICA MERCADO",
-     *               "detail": "PAID-50%", "timestamp": "2026-07-24 16:23:30" }
-     *           ],
-     *           // When the order reached each stage. Null until it gets there.
-     *           "approved_at": "2026-07-23 17:32:32",
-     *           "to_pay_at": "2026-07-23 17:33:52",
-     *           "paid_at": "2026-07-24 16:23:30",
-     *           "for_purchase_at": "2026-07-24 16:52:25",
-     *           "purchased_at": "2026-07-24 16:52:34"
-     *         }
-     *       ]
-     *     }
-     *   ]
-     * }
+     * The body wraps the run id around the list n8n scraped:
      *
-     * These ERP POs carry a single inventory item, so each PO's line is attached
-     * to the entry's item. Deliveries and status logs are replaced wholesale each
-     * sync. Items not owned by the authenticated workspace are skipped.
+     * [ { "sync_run_id": 3196, "purchased_orders": [ ...the orders... } ]
+     *
+     * and the orders themselves may equally arrive on their own, bare or under
+     * a { data: [...] } / { items: [...] } key. An order looks like this:
+     *
+     * [
+     *   {
+     *     "control_no": "CN-TP1010",   // unique key per workspace (upsert key)
+     *     "issue_date": "2026-08-28",
+     *     "delivery_no": "DN-TP1010",
+     *     "cust_po_no": "CPO-TP1010",
+     *     "delivery_fee": 750,
+     *     "total_amount": 32750,
+     *     "status": 6,                 // PurchasedOrder::STATUSES code (1-9)
+     *     "supplier": "Kintara Manuf Ventures Inc",
+     *     "items": [
+     *       { "count": 800, "amount": 40, "total_amount": 32000,
+     *         "item": "HIKARI PARAGIS THERAPY HEART CARE (Satellite)" }
+     *     ],
+     *     "statusLogs": [              // the ERP's audit trail, any order
+     *       { "status": "Paid", "by": "RENZ LAICA MERCADO",
+     *         "detail": "PAID-50%", "timestamp": "2026-08-28 17:28:18" }
+     *     ],
+     *     "deliveries": [ { "qty": 800, "created_at": "2026-08-29 11:07:02" } ]
+     *   }
+     * ]
+     *
+     * Line items arrive by name and are matched (or created) by
+     * InventoryItemResolver, exactly as transaction history does. The stage
+     * timestamps the ERP used to send alongside the trail are no longer in the
+     * payload, so they are read back off the trail instead.
+     *
+     * The whole callback belongs to a single sync run — the range's run, whose
+     * id n8n echoes back as `sync_run_id`, beside the list or at the top level.
+     * See BulkCallback.
      */
     public function bulkSync(Request $request, BatchRunner $runner): JsonResponse
     {
         $workspace = $request->attributes->get('workspace');
 
-        $entries = $request->input('data', []);
-
-        $itemsById = InventoryItem::where('workspace_id', $workspace->id)
-            ->whereIn('id', collect($entries)->pluck('id')->filter()->unique()->all())
-            ->get()
-            ->keyBy('id');
+        $entries = BulkCallback::entries($request, ['data', 'items']);
+        $resolver = new InventoryItemResolver($workspace->id);
+        $executionId = SyncCallbackFields::executionId($request);
 
         $results = [];
+        $received = 0;
+        $saved = 0;
 
-        DB::transaction(function () use ($entries, $workspace, $itemsById, $request, &$results) {
+        // Orders tallied against the run that carried them, plus the ones that
+        // named no run and fall back to the request.
+        $tallies = [];
+        $loose = ['received' => 0, 'saved' => 0];
+
+        DB::transaction(function () use ($entries, $workspace, $resolver, &$results, &$received, &$saved, &$tallies, &$loose) {
             foreach ($entries as $entry) {
-                $item = $itemsById->get($entry['id'] ?? null);
+                $wrapped = is_array($entry['purchased_orders'] ?? null);
 
-                $synced = 0;
-                foreach (($entry['purchased_orders'] ?? []) as $po) {
-                    if ($item && $this->saveOrder($workspace, $item, $po)) {
-                        $synced++;
+                // An entry is either a run's whole result or, when n8n posts
+                // the list flat, a single order.
+                $orders = $wrapped ? array_filter($entry['purchased_orders'], 'is_array') : [$entry];
+                $runId = $wrapped ? SyncCallbackFields::runId($entry) : null;
+
+                foreach ($orders as $po) {
+                    $order = $this->saveOrder($workspace, $po, fn (array $line) => $resolver->resolve($line['item'] ?? null));
+
+                    $results[] = $order
+                        ? [
+                            'control_no' => $order->control_no,
+                            'purchased_order_id' => $order->id,
+                            'lines' => $order->items()->count(),
+                            'status' => 'synced',
+                        ]
+                        : [
+                            'control_no' => $po['control_no'] ?? null,
+                            'status' => 'skipped',
+                            'reason' => 'no control_no to key the order on',
+                        ];
+
+                    $received++;
+                    $saved += $order ? 1 : 0;
+
+                    $tally = $runId ? ($tallies[$runId] ?? ['received' => 0, 'saved' => 0]) : $loose;
+                    $tally['received']++;
+                    $tally['saved'] += $order ? 1 : 0;
+
+                    if ($runId) {
+                        $tallies[$runId] = $tally;
+                    } else {
+                        $loose = $tally;
                     }
                 }
-
-                // The entry's sync_run_id is the run we opened for this item.
-                GencysSyncRun::succeedById(
-                    $workspace->id,
-                    SyncCallbackFields::runId($entry, $request),
-                    $synced,
-                    executionId: SyncCallbackFields::executionId($entry, $request),
-                );
-
-                $results[] = [
-                    'inventory_item_id' => $entry['id'] ?? null,
-                    'orders_synced' => $synced,
-                ];
             }
         });
+
+        // A run n8n named is credited with exactly what it carried; a callback
+        // that named none is credited to whichever run is in flight.
+        if (! $tallies && $loose['received'] > 0) {
+            $tallies[0] = $loose;
+        }
+
+        $credited = [];
+
+        foreach ($tallies as $runId => $tally) {
+            $run = BulkCallback::creditRun(
+                $request,
+                $workspace->id,
+                GencysSyncRun::TYPE_PURCHASE_ORDER,
+                $tally['received'],
+                $tally['saved'],
+                $executionId,
+                $runId ?: null,
+            );
+
+            if ($run) {
+                $credited[] = $run->id;
+            }
+        }
 
         // Every run this callback covered is now resolved, so whichever batch
         // they belonged to can send its next group.
         $runner->tick();
 
-        return response()->json(['data' => $results]);
+        return response()->json([
+            'data' => $results,
+            'sync_run_ids' => $credited,
+            'orders_received' => $received,
+            'orders_saved' => $saved,
+            'items_created' => count($resolver->createdItems()),
+        ]);
     }
 
     /**
-     * Upsert one purchase order (header, its single item line, deliveries and
-     * the ERP's status trail) for the given inventory item. Returns false when
-     * the PO has no control_no.
+     * Upsert one purchase order — header, lines, deliveries and the ERP's
+     * status trail. Returns null when the order has no control_no to key on.
+     *
+     * $resolveItem turns a payload line into the inventory item it belongs to,
+     * which is the only thing that differs between the two payload shapes.
      */
-    private function saveOrder(Workspace $workspace, InventoryItem $item, array $po): bool
+    private function saveOrder(Workspace $workspace, array $po, callable $resolveItem): ?PurchasedOrder
     {
         $controlNo = $po['control_no'] ?? null;
 
         if (! $controlNo) {
-            return false;
+            return null;
         }
+
+        $explicitStamps = $this->stageTimestamps($po);
 
         $order = PurchasedOrder::updateOrCreate(
             ['workspace_id' => $workspace->id, 'control_no' => $controlNo],
@@ -137,40 +191,94 @@ class PurchaseOrderController extends Controller
                 'delivery_fee' => $po['delivery_fee'] ?? 0,
                 'total_amount' => $po['total_amount'] ?? 0,
                 'status' => $this->normalizeStatus($po['status'] ?? null),
-                ...$this->stageTimestamps($po),
+                ...$explicitStamps,
             ]
         );
 
-        $this->saveStatusLogs($order, $po);
+        $this->saveStatusLogs($order, $po, $explicitStamps);
+        $this->saveLines($order, $po, $resolveItem);
 
-        $line = $po['items'][0] ?? [];
+        return $order;
+    }
 
-        $orderItem = PurchasedOrderItem::updateOrCreate(
-            ['inventory_purchased_order_id' => $order->id, 'inventory_item_id' => $item->id],
-            [
-                'count' => (int) ($line['count'] ?? 0),
-                'amount' => $line['amount'] ?? 0,
-                'total_amount' => $line['total_amount'] ?? 0,
-            ]
-        );
+    /**
+     * Write the order's lines to exactly what the payload lists.
+     *
+     * The ERP owns them the way it already owns deliveries and the status
+     * trail: a line it has stopped reporting is gone, and its deliveries go
+     * with it. Without that, resolving items by name would leave an order
+     * carrying both the line it had before and the line it has now — the same
+     * goods counted twice against the balance.
+     *
+     * Pruning only happens once at least one line resolved: a payload we
+     * couldn't make sense of is no reason to throw away what we already knew.
+     */
+    private function saveLines(PurchasedOrder $order, array $po, callable $resolveItem): void
+    {
+        $lines = array_values(array_filter($po['items'] ?? [], 'is_array'));
 
-        // Replace deliveries wholesale so delivered quantities track the ERP.
-        if (array_key_exists('deliveries', $po)) {
-            PurchasedOrderItemDelivery::where('inventory_purchased_order_item_id', $orderItem->id)->delete();
+        $kept = [];
+        $first = null;
 
-            foreach (($po['deliveries'] ?? []) as $delivery) {
-                PurchasedOrderItemDelivery::create([
-                    'inventory_purchased_order_item_id' => $orderItem->id,
-                    'delivery_date' => $this->toDate($delivery['delivery_date'] ?? $delivery['created_at'] ?? null)
-                        ?? $this->toDate($po['issue_date'] ?? null)
-                        ?? now()->toDateString(),
-                    'delivery_no' => $delivery['delivery_no'] ?? $po['delivery_no'] ?? null,
-                    'qty' => (int) ($delivery['qty'] ?? 0),
-                ]);
+        foreach ($lines as $line) {
+            $item = $resolveItem($line);
+
+            if (! $item) {
+                continue;
             }
+
+            $orderItem = PurchasedOrderItem::updateOrCreate(
+                ['inventory_purchased_order_id' => $order->id, 'inventory_item_id' => $item->id],
+                [
+                    'count' => (int) ($line['count'] ?? 0),
+                    'amount' => $line['amount'] ?? 0,
+                    'total_amount' => $line['total_amount'] ?? 0,
+                ]
+            );
+
+            $kept[] = $item->id;
+            $first ??= $orderItem;
         }
 
-        return true;
+        if ($kept) {
+            PurchasedOrderItem::where('inventory_purchased_order_id', $order->id)
+                ->whereNotIn('inventory_item_id', $kept)
+                ->delete();
+        }
+
+        $this->saveDeliveries($first, $po);
+    }
+
+    /**
+     * Replace the line's deliveries with what the ERP sent, so delivered
+     * quantities track it.
+     *
+     * These ERP orders carry a single line, and the payload reports deliveries
+     * for the order rather than per line, so they hang off the first one. A row
+     * with no qty is a settlement note rather than a receipt, and is skipped.
+     */
+    private function saveDeliveries(?PurchasedOrderItem $orderItem, array $po): void
+    {
+        if (! $orderItem || ! array_key_exists('deliveries', $po)) {
+            return;
+        }
+
+        PurchasedOrderItemDelivery::where('inventory_purchased_order_item_id', $orderItem->id)->delete();
+
+        foreach (($po['deliveries'] ?? []) as $delivery) {
+            if (! is_array($delivery) || ($delivery['qty'] ?? null) === null) {
+                continue;
+            }
+
+            PurchasedOrderItemDelivery::create([
+                'inventory_purchased_order_item_id' => $orderItem->id,
+                'delivery_date' => $this->toDate($delivery['delivery_date'] ?? $delivery['created_at'] ?? null)
+                    ?? $this->toDate($po['issue_date'] ?? null)
+                    ?? now()->toDateString(),
+                'delivery_no' => $delivery['delivery_no'] ?? $po['delivery_no'] ?? null,
+                'qty' => (int) $delivery['qty'],
+            ]);
+        }
     }
 
     /**
@@ -180,7 +288,8 @@ class PurchaseOrderController extends Controller
      * Only keys actually present are returned: a field the ERP has stopped
      * sending must leave the stored value alone, while one sent as null is the
      * ERP saying the order has not reached that stage (or has been moved back),
-     * and does clear it.
+     * and does clear it. The current payload sends none of them — see
+     * saveStatusLogs(), which reads them off the trail instead.
      *
      * @return array<string, Carbon|null>
      */
@@ -198,23 +307,24 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Replace the order's status trail with what the ERP sent, and — only when
-     * the ERP did not send `paid_at` itself — denormalise the payment date out
-     * of it onto the order.
+     * Replace the order's status trail with what the ERP sent, and derive from
+     * it every stage timestamp the ERP did not stamp itself.
      *
      * Wholesale replacement, like deliveries: the ERP owns this trail and can
      * revise it, and there is no local id to match entries on. A payload that
-     * omits `statusLogs` entirely leaves both the trail and paid_at untouched —
-     * absent means "not sent", not "cleared".
+     * omits `statusLogs` entirely leaves the trail and the derived stamps
+     * untouched — absent means "not sent", not "cleared".
+     *
+     * @param  array<string, mixed>  $explicitStamps
      */
-    private function saveStatusLogs(PurchasedOrder $order, array $po): void
+    private function saveStatusLogs(PurchasedOrder $order, array $po, array $explicitStamps): void
     {
         if (! array_key_exists('statusLogs', $po)) {
             return;
         }
 
         // Bypasses model events on purpose: a wholesale replace would otherwise
-        // re-derive paid_at once per row. The single recalculate below does the
+        // re-derive the stamps once per row. The single pass below does the
         // same work once.
         PurchasedOrderStatusLog::where('inventory_purchased_order_id', $order->id)->toBase()->delete();
 
@@ -243,16 +353,15 @@ class PurchaseOrderController extends Controller
             PurchasedOrderStatusLog::insert($rows);
         }
 
-        // The ERP's own paid_at is authoritative when it sends one — re-deriving
-        // would overwrite it with a reading of the same trail it came from, and
-        // disagree whenever the ERP knows something the log does not.
-        if (array_key_exists('paid_at', $po)) {
-            return;
-        }
-
-        // Runs even when the trail came back empty, so an order whose Paid entry
-        // the ERP has withdrawn stops reporting a payment date.
-        $order->recalculatePaidAt();
+        // A stamp the ERP sent is authoritative: re-deriving would overwrite it
+        // with a reading of the same trail it came from, and disagree whenever
+        // the ERP knows something the log does not. Runs even when the trail
+        // came back empty, so an order whose Paid entry the ERP has withdrawn
+        // stops reporting a payment date.
+        $order->recalculateStageTimestamps(array_values(array_diff(
+            array_keys(PurchasedOrder::STAGE_LOG_LABELS),
+            array_keys($explicitStamps),
+        )));
     }
 
     /** Trim a scalar to a non-empty string, or null. */
