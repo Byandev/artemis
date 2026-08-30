@@ -195,6 +195,9 @@ class SyncBatchController extends Controller
     /**
      * Each flow reads its dates differently: purchase orders take one range, the
      * others take an explicit list of days.
+     *
+     * Only purchase orders can be narrowed to particular items — every other
+     * flow asks the ERP for a date and takes back whatever is on the report.
      */
     private function windowFor(string $syncType, Carbon $start, Carbon $end, array $itemIds): array
     {
@@ -211,10 +214,7 @@ class SyncBatchController extends Controller
             $dates[] = $date->format('m/d/Y');
         }
 
-        return array_filter([
-            'dates' => $dates,
-            'item_ids' => $itemIds,
-        ]);
+        return ['dates' => $dates];
     }
 
     /** @return array<string, mixed> */

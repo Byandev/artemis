@@ -35,9 +35,8 @@ function makeN8nWorkspace(int $items = 2): array
 /** A finished transaction-history run, as a batch would have left it. */
 function finishedRun($workspace, string $status = GencysSyncRun::STATUS_FAILED): GencysSyncRun
 {
-    $item = InventoryItem::where('workspace_id', $workspace->id)->first();
-
-    $run = GencysSyncRun::start($workspace->id, $item?->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY, ['date' => '08/24/2026']);
+    // Transaction history syncs a whole date, so the run belongs to no one item.
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_TRANSACTION_HISTORY, ['date' => '08/24/2026']);
 
     $run->forceFill(['status' => $status, 'finished_at' => now(), 'n8n_execution_id' => '5150'])->save();
 
@@ -166,7 +165,7 @@ test('retrying a failed run queues a fresh batch for just that item and date', f
 
     $batch = GencysSyncBatch::sole();
 
-    // Scoped to the one subject, not all three items.
+    // Scoped to the one date the failed run was for, not the flow's usual window.
     expect($batch->sync_types)->toBe([GencysSyncRun::TYPE_TRANSACTION_HISTORY])
         ->and($batch->workspace_id)->toBe($workspace->id)
         ->and($batch->source)->toBe(GencysSyncBatch::SOURCE_MANUAL)
@@ -174,7 +173,6 @@ test('retrying a failed run queues a fresh batch for just that item and date', f
         ->and($batch->total_runs)->toBe(1)
         ->and($batch->parametersFor(GencysSyncRun::TYPE_TRANSACTION_HISTORY))->toBe([
             'dates' => ['08/24/2026'],
-            'item_ids' => [$run->inventory_item_id],
         ]);
 
     // The original run is left exactly as it was — history, not a workspace.
