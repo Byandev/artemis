@@ -32,57 +32,36 @@ function makeErpWorkspace(int $items = 0, string $skuPrefix = 'SKU'): array
     return ['workspace' => $workspace, 'raw' => $raw, 'items' => $created];
 }
 
-/** Queue a transaction-history-only batch for one date. One run covers the lot. */
-function queueTransactionBatch(array $parameters = []): GencysSyncBatch
+/**
+ * Queue a transaction-history batch. Every flow now syncs a whole window in one
+ * run, so a batch holds several runs by covering several dates — which is how
+ * the tests below get a queue worth stepping through.
+ */
+function queueTransactionBatch(array $dates = ['08/24/2026']): GencysSyncBatch
 {
     return app(BatchRunner::class)->queue(
         [GencysSyncRun::TYPE_TRANSACTION_HISTORY],
-        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => array_merge(['dates' => ['08/24/2026']], $parameters)],
+        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => ['dates' => $dates]],
     );
 }
 
-/**
- * Queue a purchase-order batch — the batch mechanics below need a flow that
- * still opens a run per item, so that a group holds more than one of them.
- */
-function queueItemBatch(array $parameters = []): GencysSyncBatch
+/** Report the run currently in flight back as a success, the way n8n would. */
+function reportInFlightRun(GencysSyncBatch $batch, string $raw, int $rows = 1): void
 {
-    return app(BatchRunner::class)->queue(
-        [GencysSyncRun::TYPE_PURCHASE_ORDER],
-        [GencysSyncRun::TYPE_PURCHASE_ORDER => array_merge(
-            ['start_date' => '08/01/2026', 'end_date' => '08/24/2026'],
-            $parameters,
-        )],
-    );
-}
+    $run = $batch->runs()->pending()->orderBy('id')->first();
 
-/** Report every currently in-flight run back as a success, the way n8n would. */
-function reportInFlightRuns(GencysSyncBatch $batch, string $raw, int $rows = 1): void
-{
-    $runs = $batch->runs()->pending()->get();
-
-    test()->postJson('/api/v1/public/purchase-orders/bulk-sync', [
-        'data' => $runs->map(fn (GencysSyncRun $run) => [
-            'id' => $run->inventory_item_id,
-            'sync_run_id' => $run->id,
-            'purchased_orders' => collect(range(1, $rows))->map(fn ($n) => [
-                'control_no' => "CN-{$run->id}-{$n}",
-                'issue_date' => '2026-08-24',
-                'total_amount' => 100,
-                'status' => 6,
-                'items' => [['count' => 1, 'amount' => 100, 'total_amount' => 100]],
-                'deliveries' => [],
-            ])->all(),
-        ])->values()->all(),
-    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
-}
-
-/** Post one date's transaction report back the way n8n now does: by item name. */
-function reportTransactionsForDate(GencysSyncRun $run, string $raw, array $items): void
-{
     test()->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', [
-        'sync_run_id' => $run->id,
-        'items' => $items,
+        'sync_run_id' => $run?->id,
+        'items' => [[
+            'item' => 'SKU-1',
+            'transactions' => collect(range(1, $rows))->map(fn ($n) => [
+                'number' => $n,
+                'ref_no' => "TX-{$run?->id}-{$n}",
+                'date' => '2026-08-24',
+                'po_qty_in' => 1,
+                'inventory_remaining_stock' => 1,
+            ])->all(),
+        ]],
     ], ['Authorization' => 'Bearer '.$raw])->assertOk();
 }
 
@@ -94,100 +73,90 @@ beforeEach(function () {
     $this->n8nHeaders = [];
 
     Http::fake(fn () => Http::response($this->n8nBody, $this->n8nStatus, $this->n8nHeaders));
-
-    config(['gencyserp.batch.group_size' => 2]);
 });
 
-test('a batch opens one queued run per item and sends only the first group', function () {
+test('a batch opens one queued run per date and sends only the first', function () {
     ['workspace' => $workspace] = makeErpWorkspace(items: 5);
 
     Queue::fake();
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch(['08/22/2026', '08/23/2026', '08/24/2026']);
 
-    expect($batch->total_runs)->toBe(5)
+    // The five items make no difference: a date is the subject, so three dates
+    // are three runs, and none of them belongs to an item.
+    expect($batch->total_runs)->toBe(3)
         ->and($batch->status)->toBe(GencysSyncBatch::STATUS_RUNNING)
-        ->and($batch->sync_types)->toBe([GencysSyncRun::TYPE_PURCHASE_ORDER]);
+        ->and($batch->sync_types)->toBe([GencysSyncRun::TYPE_TRANSACTION_HISTORY])
+        ->and($batch->runs()->whereNotNull('inventory_item_id')->count())->toBe(0);
 
-    // Exactly one group is in flight; everything else is still waiting its turn.
-    expect($batch->runs()->pending()->count())->toBe(2)
-        ->and($batch->runs()->queued()->count())->toBe(3);
+    // Exactly one run is in flight; the rest are still waiting their turn.
+    expect($batch->runs()->pending()->count())->toBe(1)
+        ->and($batch->runs()->queued()->count())->toBe(2);
 
     Queue::assertPushed(SendGencysSyncGroup::class, 1);
 });
 
-test('the next group is only sent once the previous group has reported back', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 4);
+test('the next run is only sent once the one in flight has reported back', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
-    $batch = queueItemBatch();
-    $firstGroup = $batch->runs()->pending()->pluck('id');
+    $batch = queueTransactionBatch(['08/23/2026', '08/24/2026']);
+    $first = $batch->runs()->pending()->sole();
 
-    expect($firstGroup)->toHaveCount(2);
+    // Ticking while a run is still out changes nothing — the ERP is busy.
+    app(BatchRunner::class)->tick();
 
-    // Only one of the two comes back — the group isn't done, so nothing new goes out.
-    $first = GencysSyncRun::find($firstGroup->first());
+    expect($batch->runs()->pending()->pluck('id')->all())->toBe([$first->id])
+        ->and($batch->runs()->queued()->count())->toBe(1);
+
+    // It lands, and the next date goes out.
     GencysSyncRun::succeedById($workspace->id, $first->id, 1, 1);
     app(BatchRunner::class)->tick();
 
     expect($batch->runs()->pending()->count())->toBe(1)
-        ->and($batch->runs()->queued()->count())->toBe(2);
-
-    // The second one lands and the next group goes out.
-    GencysSyncRun::succeedById($workspace->id, $firstGroup->last(), 1, 1);
-    app(BatchRunner::class)->tick();
-
-    expect($batch->runs()->pending()->count())->toBe(2)
-        ->and($batch->runs()->queued()->count())->toBe(0)
-        ->and($batch->runs()->pending()->pluck('id')->intersect($firstGroup))->toBeEmpty();
+        ->and($batch->runs()->pending()->sole()->id)->not->toBe($first->id)
+        ->and($batch->runs()->queued()->count())->toBe(0);
 });
 
 test('an n8n callback drives the batch forward on its own', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 4);
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch(['08/23/2026', '08/24/2026']);
 
-    reportInFlightRuns($batch, $raw);
+    reportInFlightRun($batch, $raw);
 
-    // The callback resolved the whole group, so the batch sent the next one
-    // without anything else prompting it.
-    expect($batch->runs()->pending()->count())->toBe(2)
-        ->and($batch->runs()->where('status', GencysSyncRun::STATUS_SUCCESS)->count())->toBe(2);
+    // The callback resolved the run, so the batch sent the next one without
+    // anything else prompting it.
+    expect($batch->runs()->pending()->count())->toBe(1)
+        ->and($batch->runs()->where('status', GencysSyncRun::STATUS_SUCCESS)->count())->toBe(1);
 
-    reportInFlightRuns($batch, $raw);
+    reportInFlightRun($batch, $raw);
 
     $batch->refresh();
 
     expect($batch->status)->toBe(GencysSyncBatch::STATUS_COMPLETED)
-        ->and($batch->succeeded_runs)->toBe(4)
+        ->and($batch->succeeded_runs)->toBe(2)
         ->and($batch->failed_runs)->toBe(0)
         ->and($batch->finished_at)->not->toBeNull();
 });
 
-test('a run whose callback never arrives is retried on its own, then failed, and the batch carries on', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 3);
+test('a run whose callback never arrives is retried, then failed, and the batch carries on', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
     config(['gencyserp.batch.max_retries' => 1]);
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch(['08/23/2026', '08/24/2026']);
     $runner = app(BatchRunner::class);
 
-    $stuck = $batch->runs()->pending()->orderBy('id')->first();
-    $partner = $batch->runs()->pending()->orderBy('id')->skip(1)->first();
+    $stuck = $batch->runs()->pending()->sole();
 
-    // Its group-mate answers; the stuck one doesn't.
-    GencysSyncRun::succeedById($workspace->id, $partner->id, 1, 1);
-    $runner->tick();
-
-    expect($stuck->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
-
-    // Its timeout expires.
+    // Its timeout expires with nothing having come back.
     $this->travel(11)->minutes();
     [$retried, $failed] = $runner->expireTimedOutRuns();
 
     expect($retried)->toBe(1)->and($failed)->toBe(0)
         ->and($stuck->fresh()->attempt)->toBe(1);
 
-    // The retry goes out alone, ahead of the run still queued behind it.
+    // The retry goes out ahead of the date still queued behind it.
     $runner->tick();
 
     $inFlight = $batch->runs()->pending()->get();
@@ -209,16 +178,18 @@ test('a run whose callback never arrives is retried on its own, then failed, and
 });
 
 test('a batch ends as completed_with_failures when a run never came back', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 2);
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
     config(['gencyserp.batch.max_retries' => 0]);
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch(['08/23/2026', '08/24/2026']);
     $runner = app(BatchRunner::class);
 
-    $good = $batch->runs()->pending()->orderBy('id')->first();
+    $good = $batch->runs()->pending()->sole();
     GencysSyncRun::succeedById($workspace->id, $good->id, 1, 1);
+    $runner->tick();
 
+    // The second date goes out and is never answered.
     $this->travel(11)->minutes();
     $runner->expireTimedOutRuns();
     $runner->tick();
@@ -231,51 +202,51 @@ test('a batch ends as completed_with_failures when a run never came back', funct
 });
 
 test('only one batch runs at a time and the next one starts when it finishes', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 2);
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
-    $first = queueItemBatch(['end_date' => '08/23/2026']);
-    $second = queueItemBatch(['end_date' => '08/24/2026']);
+    $first = queueTransactionBatch(['08/23/2026']);
+    $second = queueTransactionBatch(['08/24/2026']);
 
     expect($first->fresh()->status)->toBe(GencysSyncBatch::STATUS_RUNNING)
         ->and($second->fresh()->status)->toBe(GencysSyncBatch::STATUS_QUEUED)
         ->and($second->runs()->pending()->count())->toBe(0);
 
-    reportInFlightRuns($first, $raw);
+    reportInFlightRun($first, $raw);
 
     expect($first->fresh()->status)->toBe(GencysSyncBatch::STATUS_COMPLETED)
         ->and($second->fresh()->status)->toBe(GencysSyncBatch::STATUS_RUNNING)
-        ->and($second->runs()->pending()->count())->toBe(2);
+        ->and($second->runs()->pending()->count())->toBe(1);
 });
 
 test('an identical batch that has not started yet is reused instead of duplicated', function () {
-    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
+    ['workspace' => $workspace] = makeErpWorkspace(items: 1);
 
-    $running = queueItemBatch(['end_date' => '08/23/2026']);
-    $queued = queueItemBatch(['end_date' => '08/24/2026']);
-    $repeat = queueItemBatch(['end_date' => '08/24/2026']);
+    $running = queueTransactionBatch(['08/23/2026']);
+    $queued = queueTransactionBatch(['08/24/2026']);
+    $repeat = queueTransactionBatch(['08/24/2026']);
 
     expect($repeat->id)->toBe($queued->id)
         ->and($repeat->wasRecentlyCreated)->toBeFalse()
         ->and(GencysSyncBatch::count())->toBe(2)
-        ->and($queued->fresh()->total_runs)->toBe(2);
+        ->and($queued->fresh()->total_runs)->toBe(1);
 
     // A batch already running is never collapsed into — that work is in flight.
     expect($running->id)->not->toBe($queued->id);
 });
 
-test('a failed n8n handshake hands the runs back for a retry without re-sending immediately', function () {
-    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
+test('a failed n8n handshake hands the run back for a retry without re-sending immediately', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 1);
 
     $this->n8nStatus = 500;
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch();
 
-    // The POST failed, so the runs are queued again rather than left in flight.
+    // The POST failed, so the run is queued again rather than left in flight.
     expect($batch->runs()->pending()->count())->toBe(0)
-        ->and($batch->runs()->queued()->count())->toBe(2)
+        ->and($batch->runs()->queued()->count())->toBe(1)
         ->and($batch->runs()->queued()->first()->attempt)->toBe(1);
 
-    // The sweeper is what picks them back up, which gives n8n room to recover.
+    // The sweeper is what picks it back up, which gives n8n room to recover.
     $this->n8nStatus = 200;
     $this->artisan('gencys-erp:sweep-sync-batches')->assertSuccessful();
 
@@ -283,47 +254,71 @@ test('a failed n8n handshake hands the runs back for a retry without re-sending 
 });
 
 test('cancelling a batch releases the queue for the one behind it', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 4);
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
-    $first = queueItemBatch(['end_date' => '08/23/2026']);
-    $second = queueItemBatch(['end_date' => '08/24/2026']);
+    $first = queueTransactionBatch(['08/21/2026', '08/22/2026', '08/23/2026']);
+    $second = queueTransactionBatch(['08/24/2026']);
 
     app(BatchRunner::class)->cancel($first, 'Cancelled by test');
 
     $first->refresh();
 
     expect($first->status)->toBe(GencysSyncBatch::STATUS_CANCELLED)
-        ->and($first->cancelled_runs)->toBe(4)
+        ->and($first->cancelled_runs)->toBe(3)
         ->and($second->fresh()->status)->toBe(GencysSyncBatch::STATUS_RUNNING);
 });
 
-test('the purchase-order payload carries the item SKUs and each run id to echo back', function () {
-    ['workspace' => $workspace] = makeErpWorkspace(items: 2, skuPrefix: 'ABC');
+test('the transaction-history payload asks for a date rather than a list of items', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
 
-    queueItemBatch();
+    $run = queueTransactionBatch()->runs()->pending()->sole();
 
-    Http::assertSent(function ($request) use ($workspace) {
+    Http::assertSent(function ($request) use ($workspace, $run) {
         $body = $request->data();
 
         return $body['workspace_id'] === $workspace->id
-            && $body['end_date'] === '08/24/2026'
+            && $body['date'] === '08/24/2026'
             && $body['erp_username'] === 'erp-user'
-            && count($body['items']) === 2
-            && collect($body['items'])->pluck('keyword')->all() === ['ABC-1', 'ABC-2']
-            && collect($body['items'])->every(fn ($item) => ! empty($item['sync_run_id']))
+            && $body['sync_run_id'] === $run->id
+            && ! array_key_exists('items', $body)
+            && str_contains($body['webhook_url'], '/api/v1/public/inventory-items/transactions/bulk-sync');
+    });
+});
+
+test('the purchase-order payload asks for a range rather than a list of items', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
+
+    $batch = app(BatchRunner::class)->queue(
+        [GencysSyncRun::TYPE_PURCHASE_ORDER],
+        [GencysSyncRun::TYPE_PURCHASE_ORDER => ['start_date' => '08/01/2026', 'end_date' => '08/24/2026']],
+    );
+
+    // One workspace, one range, one run — the two items are irrelevant.
+    $run = $batch->runs()->pending()->sole();
+
+    expect($batch->total_runs)->toBe(1)
+        ->and($run->inventory_item_id)->toBeNull();
+
+    Http::assertSent(function ($request) use ($workspace, $run) {
+        $body = $request->data();
+
+        return $body['workspace_id'] === $workspace->id
+            && $body['start_date'] === '08/01/2026'
+            && $body['end_date'] === '08/24/2026'
+            && $body['sync_run_id'] === $run->id
+            && ! array_key_exists('items', $body)
+            // The delivered list is workspace-wide, so it survives the change.
+            && array_key_exists('delivered_purchase_orders_no', $body)
             && str_contains($body['webhook_url'], '/api/v1/public/purchase-orders/bulk-sync');
     });
 });
 
-test('parent and inactive items are never queued', function () {
-    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
+test('a workspace with no inventory items still syncs its window', function () {
+    // Nothing to enumerate any more — whatever is on the report comes back, and
+    // the callback creates the items it needs.
+    makeErpWorkspace(items: 0);
 
-    InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'PARENT', 'is_active' => true, 'is_parent' => true]);
-    InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'DORMANT', 'is_active' => false, 'is_parent' => false]);
-
-    $batch = queueItemBatch();
-
-    expect($batch->total_runs)->toBe(2);
+    expect(queueTransactionBatch()->total_runs)->toBe(1);
 });
 
 test('a handshake failure fails the run outright once its retries are spent', function () {
@@ -333,7 +328,7 @@ test('a handshake failure fails the run outright once its retries are spent', fu
 
     $this->n8nStatus = 500;
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch();
     $run = $batch->runs()->sole();
 
     expect($run->status)->toBe(GencysSyncRun::STATUS_FAILED)
@@ -360,10 +355,10 @@ test('the scheduled sync command queues a single batch covering every sync type'
         GencysSyncRun::TYPE_DAILY_SALES_TRACKER,
     ])->and($batch->status)->toBe(GencysSyncBatch::STATUS_RUNNING);
 
-    // 2 transaction dates + 2 items POs + 3 tracker dates.
-    expect($batch->total_runs)->toBe(7)
+    // 2 transaction dates + 1 PO range + 3 tracker dates.
+    expect($batch->total_runs)->toBe(6)
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_TRANSACTION_HISTORY)->count())->toBe(2)
-        ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_PURCHASE_ORDER)->count())->toBe(2)
+        ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_PURCHASE_ORDER)->count())->toBe(1)
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_DAILY_SALES_TRACKER)->count())->toBe(3);
 
     // Each type carries its own window under its own key.
@@ -372,7 +367,7 @@ test('the scheduled sync command queues a single batch covering every sync type'
         ->and($batch->parametersFor(GencysSyncRun::TYPE_DAILY_SALES_TRACKER))->toHaveKey('dates');
 });
 
-test('the batch works through its types in order, one group at a time', function () {
+test('the batch works through its types in order, one run at a time', function () {
     ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 2);
 
     $this->artisan('gencys-erp:sync', [
@@ -387,8 +382,8 @@ test('the batch works through its types in order, one group at a time', function
         GencysSyncRun::TYPE_TRANSACTION_HISTORY,
     ]);
 
-    // The tracker goes first, and n8n only takes one date per call, so exactly
-    // one run is in flight even though the batch holds plenty more.
+    // The tracker goes first, and every flow takes one window per call, so
+    // exactly one run is in flight even though the batch holds plenty more.
     $inFlight = $batch->runs()->pending()->get();
 
     expect($inFlight)->toHaveCount(1)
@@ -455,17 +450,18 @@ test('a pass with nothing to sync leaves no empty batch behind', function () {
         ->and(GencysSyncRun::count())->toBe(0);
 });
 
-test('the batch tallies keep up as its groups report back, not only at the end', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 4);
+test('the batch tallies keep up as its runs report back, not only at the end', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch(['08/21/2026', '08/22/2026', '08/23/2026', '08/24/2026']);
 
     expect($batch->succeeded_runs)->toBe(0)
         ->and($batch->progressPercent())->toBe(0);
 
-    // First group of two comes back — the batch is still running, but its
-    // counters (which are what the UI draws progress from) must already say so.
-    reportInFlightRuns($batch, $raw);
+    // The first two come back — the batch is still running, but its counters
+    // (which are what the UI draws progress from) must already say so.
+    reportInFlightRun($batch, $raw);
+    reportInFlightRun($batch, $raw);
 
     $batch->refresh();
 
@@ -474,7 +470,8 @@ test('the batch tallies keep up as its groups report back, not only at the end',
         ->and($batch->succeeded_runs)->toBe(2)
         ->and($batch->progressPercent())->toBe(50);
 
-    reportInFlightRuns($batch, $raw);
+    reportInFlightRun($batch, $raw);
+    reportInFlightRun($batch, $raw);
 
     $batch->refresh();
 
@@ -484,16 +481,16 @@ test('the batch tallies keep up as its groups report back, not only at the end',
 });
 
 test('a timed-out run shows up in the tallies while the batch is still going', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 4);
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
     config(['gencyserp.batch.max_retries' => 0]);
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch(['08/21/2026', '08/22/2026', '08/23/2026', '08/24/2026']);
     $runner = app(BatchRunner::class);
 
-    $good = $batch->runs()->pending()->orderBy('id')->first();
-    GencysSyncRun::succeedById($workspace->id, $good->id, 1, 1);
+    reportInFlightRun($batch, $raw);
 
+    // The next one is in flight and never answers.
     $this->travel(11)->minutes();
     $runner->expireTimedOutRuns();
     $runner->tick();
@@ -501,42 +498,36 @@ test('a timed-out run shows up in the tallies while the batch is still going', f
     $batch->refresh();
 
     // Two runs resolved (one ok, one failed) out of four, and the batch has
-    // moved on to its next group rather than sitting at zero.
+    // moved on to the next date rather than sitting at zero.
     expect($batch->status)->toBe(GencysSyncBatch::STATUS_RUNNING)
         ->and($batch->succeeded_runs)->toBe(1)
         ->and($batch->failed_runs)->toBe(1)
         ->and($batch->progressPercent())->toBe(50);
 });
 
-test('the execution id lands on inventory runs too, and clears on retry', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 2);
+test('the execution id lands on the run a callback answers, and clears on retry', function () {
+    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1);
 
     config(['gencyserp.batch.max_retries' => 1]);
 
-    $batch = queueItemBatch();
-    $runs = $batch->runs()->pending()->orderBy('id')->get();
+    $batch = queueTransactionBatch(['08/23/2026', '08/24/2026']);
+    $first = $batch->runs()->pending()->sole();
 
-    $this->postJson('/api/v1/public/purchase-orders/bulk-sync', [
-        // One execution handled the whole group, so it rides at the top level.
+    $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', [
+        // One execution handled the whole date, so it rides at the top level.
         'n8n_execution_id' => '77123',
-        'data' => [[
-            'id' => $runs->first()->inventory_item_id,
-            'sync_run_id' => $runs->first()->id,
-            'purchased_orders' => [[
-                'control_no' => 'CN-1',
-                'issue_date' => '2026-08-24',
-                'total_amount' => 100,
-                'status' => 6,
-                'items' => [['count' => 1, 'amount' => 100, 'total_amount' => 100]],
-            ]],
+        'sync_run_id' => $first->id,
+        'items' => [[
+            'item' => 'SKU-1',
+            'transactions' => [['number' => 1, 'ref_no' => 'TX-1', 'date' => '2026-08-23', 'po_qty_in' => 1, 'inventory_remaining_stock' => 1]],
         ]],
     ], ['Authorization' => 'Bearer '.$raw])->assertOk();
 
-    expect($runs->first()->fresh()->n8n_execution_id)->toBe('77123');
+    expect($first->fresh()->n8n_execution_id)->toBe('77123');
 
-    // The other run times out. Its next attempt will be a different execution,
-    // so the stale id must not follow it into the retry.
-    $stuck = $runs->last();
+    // The second date times out. Its next attempt will be a different
+    // execution, so the stale id must not follow it into the retry.
+    $stuck = $batch->runs()->pending()->sole();
     $stuck->forceFill(['n8n_execution_id' => '77123'])->save();
 
     $this->travel(11)->minutes();
@@ -549,15 +540,15 @@ test('the execution id lands on inventory runs too, and clears on retry', functi
         ->and($stuck->n8n_execution_id)->toBeNull();
 });
 
-test('the execution id n8n answers with is stamped on the group it took', function () {
-    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
+test('the execution id n8n answers with is stamped on the run it took', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 1);
 
     // n8n reports the execution it started in the response to our call.
     $this->n8nBody = ['executionId' => '88231'];
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch();
 
-    expect($batch->runs()->pluck('n8n_execution_id')->unique()->all())->toBe(['88231']);
+    expect($batch->runs()->sole()->n8n_execution_id)->toBe('88231');
 });
 
 test('the execution id is found inside a wrapped response', function () {
@@ -565,7 +556,7 @@ test('the execution id is found inside a wrapped response', function () {
 
     $this->n8nBody = ['data' => ['execution_id' => '4410']];
 
-    expect(queueItemBatch()->runs()->sole()->n8n_execution_id)->toBe('4410');
+    expect(queueTransactionBatch()->runs()->sole()->n8n_execution_id)->toBe('4410');
 });
 
 test('the execution id is found in a response header', function () {
@@ -575,87 +566,16 @@ test('the execution id is found in a response header', function () {
     $this->n8nBody = ['message' => 'Workflow was started'];
     $this->n8nHeaders = ['x-n8n-execution-id' => '4411'];
 
-    expect(queueItemBatch()->runs()->sole()->n8n_execution_id)->toBe('4411');
+    expect(queueTransactionBatch()->runs()->sole()->n8n_execution_id)->toBe('4411');
 });
 
-test('a response with no execution id leaves the runs unstamped rather than failing', function () {
-    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
+test('a response with no execution id leaves the run unstamped rather than failing', function () {
+    ['workspace' => $workspace] = makeErpWorkspace(items: 1);
 
     $this->n8nBody = ['message' => 'Workflow was started'];
 
-    $batch = queueItemBatch();
+    $batch = queueTransactionBatch();
 
-    expect($batch->runs()->pending()->count())->toBe(2)
+    expect($batch->runs()->pending()->count())->toBe(1)
         ->and($batch->runs()->whereNotNull('n8n_execution_id')->count())->toBe(0);
-});
-
-test('a transaction-history batch opens one run per date, whatever the item count', function () {
-    ['workspace' => $workspace] = makeErpWorkspace(items: 5);
-
-    $batch = app(BatchRunner::class)->queue(
-        [GencysSyncRun::TYPE_TRANSACTION_HISTORY],
-        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => ['dates' => ['08/23/2026', '08/24/2026']]],
-    );
-
-    // A date is the subject now, so the five items make no difference: two dates,
-    // two runs, and neither of them belongs to an item.
-    expect($batch->total_runs)->toBe(2)
-        ->and($batch->runs()->whereNotNull('inventory_item_id')->count())->toBe(0)
-        ->and($batch->runs()->pending()->count())->toBe(1)
-        ->and($batch->runs()->queued()->count())->toBe(1);
-});
-
-test('a workspace with no inventory items still syncs the date', function () {
-    // Nothing to enumerate any more — whatever is on the report comes back, and
-    // the callback creates the items it needs.
-    makeErpWorkspace(items: 0);
-
-    expect(queueTransactionBatch()->total_runs)->toBe(1);
-});
-
-test('the transaction-history payload asks for a date rather than a list of items', function () {
-    ['workspace' => $workspace] = makeErpWorkspace(items: 2);
-
-    $run = queueTransactionBatch()->runs()->pending()->sole();
-
-    Http::assertSent(function ($request) use ($workspace, $run) {
-        $body = $request->data();
-
-        return $body['workspace_id'] === $workspace->id
-            && $body['date'] === '08/24/2026'
-            && $body['erp_username'] === 'erp-user'
-            && $body['sync_run_id'] === $run->id
-            && ! array_key_exists('items', $body)
-            && str_contains($body['webhook_url'], '/api/v1/public/inventory-items/transactions/bulk-sync');
-    });
-});
-
-test('one bulk transaction callback closes the date and releases the next one', function () {
-    ['workspace' => $workspace, 'raw' => $raw] = makeErpWorkspace(items: 1, skuPrefix: 'Airzen');
-
-    $batch = app(BatchRunner::class)->queue(
-        [GencysSyncRun::TYPE_TRANSACTION_HISTORY],
-        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => ['dates' => ['08/23/2026', '08/24/2026']]],
-    );
-
-    $first = $batch->runs()->pending()->sole();
-
-    reportTransactionsForDate($first, $raw, [
-        ['item' => 'Airzen-1', 'transactions' => [
-            ['number' => 1, 'date' => '2026-08-23', 'ref_no' => 'Rigor Esperanzate', 'po_qty_out' => '7', 'inventory_remaining_stock' => '1,249'],
-        ]],
-        ['item' => 'Amazing Kidney Care Patch', 'transactions' => [
-            ['number' => 1, 'date' => '2026-08-23', 'ref_no' => 'Anna Marie Mallo', 'po_qty_in' => '2,400', 'inventory_remaining_stock' => '2,400'],
-        ]],
-    ]);
-
-    $first->refresh();
-
-    // The one run covers every item on the report, and finishing it lets the
-    // second date go out.
-    expect($first->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
-        ->and($first->rows_received)->toBe(2)
-        ->and($first->rows_saved)->toBe(2)
-        ->and($batch->runs()->pending()->count())->toBe(1)
-        ->and($batch->runs()->pending()->sole()->id)->not->toBe($first->id);
 });

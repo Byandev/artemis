@@ -4,6 +4,7 @@ use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\Inventory\Models\PurchasedOrder;
+use Modules\Inventory\Models\PurchasedOrderItem;
 
 /** Create an active inventory item in the given workspace. */
 function makeInventoryItem($workspace, string $sku = 'SKU-1'): InventoryItem
@@ -171,57 +172,6 @@ test('a report posted in pieces keeps the run open until the last one', function
         ->and($run->fresh()->rows_received)->toBe(2);
 });
 
-test('the older per-item callback shape still resolves its runs', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['raw' => $raw] = makeApiKey($workspace);
-    $item = makeInventoryItem($workspace);
-
-    // A batch queued before the sync changed grain is still in flight.
-    $run = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_TRANSACTION_HISTORY);
-
-    $this->postJson('/api/v1/public/inventory-items/transactions/bulk-sync', [
-        'items' => [[
-            'id' => $item->id,
-            'sync_run_id' => $run->id,
-            'transactions' => [
-                ['ref_no' => 'TX-1', 'date' => '2026-06-28', 'po_qty_in' => 5, 'inventory_remaining_stock' => 5],
-            ],
-        ]],
-    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
-
-    expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
-        ->and($run->fresh()->rows_received)->toBe(1);
-});
-
-test('purchase-order callback resolves the run by the echoed sync_run_id and saves the PO', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['raw' => $raw] = makeApiKey($workspace);
-    $item = makeInventoryItem($workspace);
-
-    $run = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_PURCHASE_ORDER);
-
-    $this->postJson('/api/v1/public/purchase-orders/bulk-sync', [
-        'data' => [[
-            'id' => $item->id,
-            'sync_run_id' => $run->id,
-            'purchased_orders' => [[
-                'control_no' => 'CN-1',
-                'issue_date' => '2026-06-20',
-                'total_amount' => 1000,
-                'status' => 6,
-                'items' => [['count' => 10, 'amount' => 100, 'total_amount' => 1000]],
-                'deliveries' => [['qty' => 10, 'created_at' => '2026-06-21 10:00:00']],
-            ]],
-        ]],
-    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
-
-    $run->refresh();
-
-    expect($run->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
-        ->and($run->rows_received)->toBe(1)
-        ->and(PurchasedOrder::where('control_no', 'CN-1')->where('workspace_id', $workspace->id)->exists())->toBeTrue();
-});
-
 test('the callback resolves the exact run id echoed back, and a replay is idempotent', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
@@ -311,29 +261,158 @@ test('the backfill command resolves runs a later success already covered', funct
         ->and($later->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
 });
 
-test('a purchase-order callback without sync_run_id leaves the run pending', function () {
+test('an un-labelled purchase-order callback is credited to its own type, not another', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $item = makeInventoryItem($workspace);
+    makeInventoryItem($workspace, 'Her Reset Ovarra');
 
-    // POs still go out many items to a call, so there is no single run an
-    // un-labelled callback could safely be credited to.
-    $run = GencysSyncRun::start($workspace->id, $item->id, GencysSyncRun::TYPE_PURCHASE_ORDER);
+    // A transaction-history run is also in flight; a PO callback must not close it.
+    $transactions = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_TRANSACTION_HISTORY, ['date' => '08/30/2026']);
+    $orders = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_PURCHASE_ORDER, ['start_date' => '06/01/2026', 'end_date' => '08/30/2026']);
 
     $this->postJson('/api/v1/public/purchase-orders/bulk-sync', [
-        'data' => [[
-            'id' => $item->id,
-            'purchased_orders' => [[
-                'control_no' => 'CN-9',
-                'issue_date' => '2026-06-20',
-                'total_amount' => 100,
-                'status' => 6,
-                'items' => [['count' => 1, 'amount' => 100, 'total_amount' => 100]],
-            ]],
-        ]],
+        [
+            'control_no' => 'CN-TP983',
+            'issue_date' => '2026-08-12',
+            'total_amount' => 18000,
+            'status' => 6,
+            'supplier' => 'BFM',
+            'items' => [['count' => 400, 'amount' => 45, 'total_amount' => 18000, 'item' => 'Her Reset Ovarra']],
+            'statusLogs' => [],
+            'deliveries' => [],
+        ],
     ], ['Authorization' => 'Bearer '.$raw])->assertOk();
 
-    expect($run->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
+    expect($orders->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and($transactions->fresh()->status)->toBe(GencysSyncRun::STATUS_PENDING);
+});
+
+test('the purchase-order callback saves the range the run carried, by item name', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+    $known = makeInventoryItem($workspace, 'Anti-Diabetes Herbal Foot Patch');
+
+    $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_PURCHASE_ORDER, ['start_date' => '06/01/2026', 'end_date' => '08/30/2026']);
+
+    $this->postJson('/api/v1/public/purchase-orders/bulk-sync', [[
+        'sync_run_id' => $run->id,
+        'purchased_orders' => [
+            [
+                'issue_date' => '2026-08-26',
+                'delivery_no' => 'DN-TP1004',
+                'cust_po_no' => 'CPO-TP1004',
+                'control_no' => 'CN-TP1004',
+                'delivery_fee' => 1500,
+                'total_amount' => 27900,
+                'status' => 6,
+                'created_at' => '2026-08-26 13:24:01',
+                'supplier' => 'Kintara Manuf Ventures Inc',
+                'items' => [['count' => 2400, 'amount' => 11, 'total_amount' => 26400, 'item' => 'Anti-Diabetes Herbal Foot Patch']],
+                'statusLogs' => [
+                    ['status' => 'Approve', 'by' => 'GENCYS - Angelyn Macabasag', 'detail' => 'approved', 'timestamp' => '2026-08-26 14:12:19'],
+                    ['status' => 'To Pay', 'by' => 'GENCYS - Angelyn Macabasag', 'detail' => 'to pay', 'timestamp' => '2026-08-26 14:12:29'],
+                    ['status' => 'Paid', 'by' => 'RENZ LAICA MERCADO', 'detail' => 'PAID-FULL', 'timestamp' => '2026-08-26 16:40:40'],
+                    ['status' => 'For Purchase', 'by' => 'GENCYS - Angelyn Macabasag', 'detail' => 'for purchased', 'timestamp' => '2026-08-27 10:11:39'],
+                    ['status' => 'Purchased', 'by' => 'GENCYS - Angelyn Macabasag', 'detail' => 'purchased', 'timestamp' => '2026-08-27 10:11:49'],
+                ],
+                'deliveries' => [['qty' => 2398, 'created_at' => '2026-08-29 18:48:11']],
+            ],
+            [
+                'issue_date' => '2026-08-15',
+                'control_no' => 'CN-TP984',
+                'delivery_fee' => 0,
+                'total_amount' => 600250,
+                'status' => 6,
+                'supplier' => 'ALL',
+                // An item we have never seen — created rather than dropped.
+                'items' => [['count' => 4900, 'amount' => 122.5, 'total_amount' => 600250, 'item' => 'Beyou Acai Berry Glow']],
+                'statusLogs' => [],
+                'deliveries' => [],
+            ],
+        ],
+    ]], ['Authorization' => 'Bearer '.$raw])->assertOk();
+
+    $order = PurchasedOrder::where('control_no', 'CN-TP1004')->sole();
+    $line = $order->items()->sole();
+
+    expect($order->cust_po_no)->toBe('CPO-TP1004')
+        ->and($order->supplier)->toBe('Kintara Manuf Ventures Inc')
+        ->and((int) $order->status)->toBe(6)
+        // Two weeks after issue, since the ERP sends no expected date.
+        ->and($order->expected_delivery_date->toDateString())->toBe('2026-09-09')
+        ->and($line->inventory_item_id)->toBe($known->id)
+        ->and((int) $line->count)->toBe(2400)
+        ->and((int) $line->deliveries()->sum('qty'))->toBe(2398)
+        ->and($order->statusLogs()->count())->toBe(5);
+
+    // The stage stamps are no longer sent, so they come off the trail.
+    expect($order->approved_at->toDateTimeString())->toBe('2026-08-26 14:12:19')
+        ->and($order->to_pay_at->toDateTimeString())->toBe('2026-08-26 14:12:29')
+        ->and($order->paid_at->toDateTimeString())->toBe('2026-08-26 16:40:40')
+        ->and($order->for_purchase_at->toDateTimeString())->toBe('2026-08-27 10:11:39')
+        ->and($order->purchased_at->toDateTimeString())->toBe('2026-08-27 10:11:49');
+
+    $created = InventoryItem::where('workspace_id', $workspace->id)->where('sku', 'Beyou Acai Berry Glow')->first();
+
+    expect($created)->not->toBeNull()
+        ->and($created->is_active)->toBeFalse()
+        ->and(PurchasedOrder::where('workspace_id', $workspace->id)->count())->toBe(2)
+        ->and($run->fresh()->status)->toBe(GencysSyncRun::STATUS_SUCCESS)
+        ->and($run->fresh()->rows_received)->toBe(2);
+});
+
+test('an order keeps only the lines the ERP still reports', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+    $before = makeInventoryItem($workspace, 'HIKARI PARAGIS THERAPY HEART CARE');
+    $after = makeInventoryItem($workspace, 'HIKARI PARAGIS THERAPY HEART CARE (Satellite)');
+
+    $post = fn (string $item) => $this->postJson('/api/v1/public/purchase-orders/bulk-sync', [
+        [
+            'control_no' => 'CN-TP1010',
+            'issue_date' => '2026-08-28',
+            'total_amount' => 32750,
+            'status' => 6,
+            'items' => [['count' => 800, 'amount' => 40, 'total_amount' => 32000, 'item' => $item]],
+            'deliveries' => [],
+        ],
+    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
+
+    $post('HIKARI PARAGIS THERAPY HEART CARE');
+    // The ERP's spelling changes and the line resolves elsewhere. Left to
+    // accumulate, the order would owe 800 twice over.
+    $post('HIKARI PARAGIS THERAPY HEART CARE (Satellite)');
+
+    $order = PurchasedOrder::where('control_no', 'CN-TP1010')->sole();
+
+    expect($order->items()->count())->toBe(1)
+        ->and($order->items()->sole()->inventory_item_id)->toBe($after->id)
+        ->and(PurchasedOrderItem::where('inventory_item_id', $before->id)->count())->toBe(0);
+});
+
+test('a delivery row with no quantity is a settlement note, not a receipt', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+    makeInventoryItem($workspace, 'Amazing Life Super Recovery Gel (KINTARA)');
+
+    $this->postJson('/api/v1/public/purchase-orders/bulk-sync', [
+        [
+            'control_no' => 'CN-TP902',
+            'issue_date' => '2026-07-22',
+            'total_amount' => 13450,
+            'status' => 7,
+            'items' => [['count' => 300, 'amount' => 44, 'total_amount' => 13200, 'item' => 'Amazing Life Super Recovery Gel (KINTARA)']],
+            'deliveries' => [
+                ['qty' => 300, 'created_at' => '2026-07-29 09:26:24'],
+                ['qty' => null, 'created_at' => '2026-08-06 19:46:05'],
+            ],
+        ],
+    ], ['Authorization' => 'Bearer '.$raw])->assertOk();
+
+    $line = PurchasedOrder::where('control_no', 'CN-TP902')->sole()->items()->sole();
+
+    expect($line->deliveries()->count())->toBe(1)
+        ->and((int) $line->deliveries()->sum('qty'))->toBe(300);
 });
 
 test('stale pending runs are failed by the sweeper, recent ones are left alone', function () {

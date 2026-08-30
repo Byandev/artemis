@@ -13,7 +13,7 @@ class TriggerFetchERPPurchaseOrders extends Command
     protected $signature = 'gencys-erp:trigger-fetch-erp-purchase-orders
         {--start-date= : Start of the PO date range in Y-m-d format}
         {--end-date= : End of the PO date range in Y-m-d format (defaults to today when --start-date is given)}
-        {--item=* : Limit to specific inventory item id(s); repeat (--item=1 --item=2) or comma-separate (--item=1,2). Omit for all active items}
+        {--item=* : Deprecated and ignored — one call now brings back every purchase order in the range}
         {--workspace= : Limit the batch to one workspace id. Omit to cover every ERP-connected workspace}
         {--delay= : Deprecated and ignored — the batch paces itself by waiting for each group to report back}
         {--webhook= : Override the n8n webhook URL (e.g. point at a test-mode webhook)}
@@ -33,6 +33,10 @@ class TriggerFetchERPPurchaseOrders extends Command
 
         if ($this->option('delay')) {
             $this->warn('--delay is ignored: the batch sends the next group only once the previous one reports back.');
+        }
+
+        if ($this->option('item')) {
+            $this->warn('--item is ignored: the ERP list is read a range at a time and comes back with every order in it.');
         }
 
         $flow = $flows->for(GencysSyncRun::TYPE_PURCHASE_ORDER);
@@ -74,7 +78,6 @@ class TriggerFetchERPPurchaseOrders extends Command
             parameters: [
                 GencysSyncRun::TYPE_PURCHASE_ORDER => array_filter([
                     ...$range,
-                    'item_ids' => $this->itemIds(),
                     'without_delivered' => (bool) $this->option('without-delivered') ?: null,
                     'webhook' => $this->option('webhook') ?: null,
                     'inline' => (bool) $this->option('sync') ?: null,
@@ -90,7 +93,7 @@ class TriggerFetchERPPurchaseOrders extends Command
         }
 
         if ($batch->total_runs === 0) {
-            $this->warn('No workspaces found with ERP credentials, an API key and syncable items.');
+            $this->warn('No workspaces found with ERP credentials and an API key.');
 
             return self::SUCCESS;
         }
@@ -99,22 +102,5 @@ class TriggerFetchERPPurchaseOrders extends Command
         $this->line("Status: {$batch->status}. Watch it with: php artisan gencys-erp:sync-batches");
 
         return self::SUCCESS;
-    }
-
-    /**
-     * Parse the --item option into a list of inventory item ids. Accepts repeated
-     * flags (--item=1 --item=2) and/or comma-separated values (--item=1,2).
-     *
-     * @return int[]
-     */
-    private function itemIds(): array
-    {
-        return collect((array) $this->option('item'))
-            ->flatMap(fn ($value) => explode(',', (string) $value))
-            ->map(fn ($value) => (int) trim($value))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
     }
 }

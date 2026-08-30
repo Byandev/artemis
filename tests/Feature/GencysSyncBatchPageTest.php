@@ -136,8 +136,8 @@ test('a batch raised from the UI is pinned to that workspace and attributed to t
         ->and($batch->workspace_id)->toBe($workspace->id)
         ->and($batch->source)->toBe(GencysSyncBatch::SOURCE_MANUAL)
         ->and($batch->created_by_user_id)->toBe($user->id)
-        // One run for the transaction-history date, plus one per item for the POs.
-        ->and($batch->total_runs)->toBe(3)
+        // One run for the transaction-history date, one for the PO range.
+        ->and($batch->total_runs)->toBe(2)
         ->and($batch->runs()->where('workspace_id', $other->id)->count())->toBe(0);
 });
 

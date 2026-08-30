@@ -144,19 +144,16 @@ class SyncBatchController extends Controller
             'sync_types.*' => ['string', 'distinct', 'in:'.implode(',', $this->flows->types())],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-            'item_ids' => ['sometimes', 'array'],
-            'item_ids.*' => ['integer'],
         ]);
 
         $start = Carbon::parse($validated['start_date'])->startOfDay();
         $end = Carbon::parse($validated['end_date'])->startOfDay();
-        $itemIds = $validated['item_ids'] ?? [];
 
         // One window, applied to whichever types were picked. Each still reads
         // its own dates the way its n8n flow expects.
         $parameters = collect($validated['sync_types'])
             ->mapWithKeys(fn (string $type) => [
-                $type => $this->windowFor($type, $start, $end, $itemIds),
+                $type => $this->windowFor($type, $start, $end),
             ])
             ->all();
 
@@ -173,7 +170,7 @@ class SyncBatchController extends Controller
         }
 
         if ($batch->total_runs === 0) {
-            return back()->with('error', 'Nothing to sync: this workspace has no ERP credentials, no API key, or no matching items.');
+            return back()->with('error', 'Nothing to sync: this workspace has no ERP credentials or no API key.');
         }
 
         return back()->with('success', "Queued batch #{$batch->id} with {$batch->total_runs} run(s).");
@@ -196,17 +193,16 @@ class SyncBatchController extends Controller
      * Each flow reads its dates differently: purchase orders take one range, the
      * others take an explicit list of days.
      *
-     * Only purchase orders can be narrowed to particular items — every other
-     * flow asks the ERP for a date and takes back whatever is on the report.
+     * No flow can be narrowed to particular items any more — each asks the ERP
+     * for a window and takes back whatever is on the report.
      */
-    private function windowFor(string $syncType, Carbon $start, Carbon $end, array $itemIds): array
+    private function windowFor(string $syncType, Carbon $start, Carbon $end): array
     {
         if ($syncType === GencysSyncRun::TYPE_PURCHASE_ORDER) {
-            return array_filter([
+            return [
                 'start_date' => $start->format('m/d/Y'),
                 'end_date' => $end->format('m/d/Y'),
-                'item_ids' => $itemIds,
-            ]);
+            ];
         }
 
         $dates = [];
@@ -249,9 +245,20 @@ class SyncBatchController extends Controller
         ];
     }
 
-    /** Label a run that has no inventory item — its subject lives in the meta. */
+    /**
+     * Label a run that has no inventory item — its subject lives in the meta.
+     *
+     * Which is now almost all of them: a run syncs a window, so the window is
+     * what identifies it. Purchase orders carry a range rather than a day.
+     */
     private function subjectFromMeta(GencysSyncRun $run): ?string
     {
+        if ($start = data_get($run->meta, 'start_date')) {
+            $end = data_get($run->meta, 'end_date');
+
+            return $end && $end !== $start ? "{$start} – {$end}" : $start;
+        }
+
         return data_get($run->meta, 'date')
             ?? data_get($run->meta, 'intern_id')
             ?? data_get($run->meta, 'page_id');

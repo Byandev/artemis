@@ -7,18 +7,20 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
-use Modules\Inventory\Models\InventoryItem;
 
 /**
- * Purchase orders, one run per item over a single date range.
+ * Purchase orders, one run per workspace over a single date range.
  *
- * Like transaction history, n8n loops an items[] array on one ERP session, so a
- * group carries many runs. The delivered-PO exclusion list is rebuilt at send
- * time rather than when the batch was raised, so a batch that waited its turn
- * doesn't re-fetch POs that closed while it was queued.
+ * Like transaction history, n8n reads the ERP's purchase-order list for the
+ * whole range in one pass and posts back every order on it, so there is nothing
+ * to fan out per item: the range is the subject and one run covers it.
+ *
+ * The delivered-PO exclusion list is still rebuilt at send time rather than when
+ * the batch was raised, so a batch that waited its turn doesn't re-fetch POs
+ * that closed while it was queued.
  *
  * Parameters (under the `purchase_order` key of the batch): start_date, end_date
- * (m/d/Y), item_ids[], without_delivered, webhook, inline.
+ * (m/d/Y), without_delivered, webhook, inline.
  */
 class PurchaseOrderFlow extends SyncFlow
 {
@@ -38,11 +40,6 @@ class PurchaseOrderFlow extends SyncFlow
             ?: config('services.n8n.purchase_order_webhook_url');
     }
 
-    public function defaultGroupSize(): int
-    {
-        return (int) config('gencyserp.batch.group_size', 20);
-    }
-
     /** The last three months — POs stay open long enough to need the run-up. */
     public function defaultParameters(): array
     {
@@ -57,7 +54,6 @@ class PurchaseOrderFlow extends SyncFlow
         return array_filter([
             'start_date' => data_get($run->meta, 'start_date'),
             'end_date' => data_get($run->meta, 'end_date'),
-            'item_ids' => array_filter([$run->inventory_item_id]),
         ]);
     }
 
@@ -65,26 +61,16 @@ class PurchaseOrderFlow extends SyncFlow
     {
         $parameters = $batch->parametersFor($this->type());
 
-        $itemIds = (array) data_get($parameters, 'item_ids', []);
-
         $meta = [
             'start_date' => data_get($parameters, 'start_date'),
             'end_date' => data_get($parameters, 'end_date'),
         ];
 
-        $workspaces = $this->eligibleWorkspaces($batch)
-            ->with(['inventoryItems' => fn ($query) => $this->syncableItems($query, $itemIds)])
-            ->get();
-
         $created = 0;
 
-        foreach ($workspaces as $workspace) {
-            $groupKey = $this->groupKey($workspace->id);
-
-            foreach ($workspace->inventoryItems as $item) {
-                $this->queueRun($batch, $workspace->id, $groupKey, $meta, $item->id);
-                $created++;
-            }
+        foreach ($this->eligibleWorkspaces($batch)->get() as $workspace) {
+            $this->queueRun($batch, $workspace->id, $this->groupKey($workspace->id), $meta);
+            $created++;
         }
 
         return $created;
@@ -92,10 +78,7 @@ class PurchaseOrderFlow extends SyncFlow
 
     public function buildPayload(GencysSyncBatch $batch, Workspace $workspace, Collection $runs): array
     {
-        $skus = InventoryItem::query()
-            ->whereIn('id', $runs->pluck('inventory_item_id')->filter())
-            ->pluck('sku', 'id');
-
+        $run = $runs->first();
         $parameters = $batch->parametersFor($this->type());
 
         $delivered = data_get($parameters, 'without_delivered')
@@ -110,22 +93,12 @@ class PurchaseOrderFlow extends SyncFlow
             'start_date' => data_get($parameters, 'start_date'),
             'end_date' => data_get($parameters, 'end_date'),
             'webhook_url' => $this->callbackUrl('api/v1/public/purchase-orders/bulk-sync'),
-            'items' => $runs->map(fn (GencysSyncRun $run) => [
-                'id' => $run->inventory_item_id,
-                'keyword' => $skus[$run->inventory_item_id] ?? null,
-                'sync_run_id' => $run->id,
-            ])->values()->all(),
+            // Only needed if the list is too big to post back in one call: the
+            // data callback then heartbeats instead of closing the run, and this
+            // is what ends it. See GencysSyncRun::finishById().
+            'finish_webhook_url' => $this->callbackUrl('api/v1/public/gencys/sync-runs/finish'),
+            'sync_run_id' => $run->id,
             'delivered_purchase_orders_no' => $delivered,
         ];
-    }
-
-    /** Same rule as transaction history — see TransactionHistoryFlow. */
-    protected function syncableItems($query, array $itemIds)
-    {
-        $query->where('is_parent', false);
-
-        return empty($itemIds)
-            ? $query->where('is_active', true)
-            : $query->whereIn('id', $itemIds);
     }
 }

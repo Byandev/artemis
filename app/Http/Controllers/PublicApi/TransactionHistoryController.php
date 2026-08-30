@@ -7,6 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\BulkCallback;
 use Modules\GencysERP\Support\SyncCallbackFields;
 use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryTransaction;
@@ -46,16 +47,12 @@ class TransactionHistoryController extends Controller
      * (or `final: false`) on every piece but the last, and each one extends the
      * run's deadline instead of closing it. n8n may also close it explicitly via
      * the finish endpoint.
-     *
-     * The older per-item shape — { items: [{ id, sync_run_id, transactions }] },
-     * one run per item — is still accepted, so a batch queued before this changed
-     * still resolves its runs.
      */
     public function bulkSync(Request $request, BatchRunner $runner): JsonResponse
     {
         $workspace = $request->attributes->get('workspace');
 
-        $entries = $this->entries($request);
+        $entries = BulkCallback::entries($request);
         $resolver = new InventoryItemResolver($workspace->id);
         $executionId = SyncCallbackFields::executionId($request);
 
@@ -63,26 +60,15 @@ class TransactionHistoryController extends Controller
         $received = 0;
         $saved = 0;
 
-        // Set only by the legacy per-item shape; its presence is what tells the
-        // two shapes apart below.
-        $entryRunIds = [];
-
         foreach ($entries as $entry) {
-            if (! is_array($entry)) {
-                continue;
-            }
-
             $rows = is_array($entry['transactions'] ?? null) ? $entry['transactions'] : [];
             $name = is_string($entry['item'] ?? null) ? $entry['item'] : null;
 
-            // An `id` means the old shape, where we chose the item ourselves.
-            $item = isset($entry['id'])
-                ? InventoryItem::where('workspace_id', $workspace->id)->find($entry['id'])
-                : $resolver->resolve($name);
+            $item = $resolver->resolve($name);
 
             if (! $item) {
                 $results[] = [
-                    'item' => $name ?? ($entry['id'] ?? null),
+                    'item' => $name,
                     'status' => 'skipped',
                     'reason' => 'no item to attach these transactions to',
                 ];
@@ -103,17 +89,16 @@ class TransactionHistoryController extends Controller
                 'transactions_saved' => $rowsSaved,
                 'status' => 'synced',
             ];
-
-            if ($runId = SyncCallbackFields::runId($entry)) {
-                $entryRunIds[] = $runId;
-
-                GencysSyncRun::succeedById($workspace->id, $runId, count($rows), $rowsSaved, $executionId);
-            }
         }
 
-        $run = empty($entryRunIds)
-            ? $this->resolveRun($request, $workspace->id, $received, $saved, $executionId)
-            : null;
+        $run = BulkCallback::creditRun(
+            $request,
+            $workspace->id,
+            GencysSyncRun::TYPE_TRANSACTION_HISTORY,
+            $received,
+            $saved,
+            $executionId,
+        );
 
         // Every run this callback covered is now resolved, so whichever batch
         // they belonged to can send its next group.
@@ -121,83 +106,11 @@ class TransactionHistoryController extends Controller
 
         return response()->json([
             'data' => $results,
-            'sync_run_id' => $run?->id ?? ($entryRunIds[0] ?? null),
+            'sync_run_id' => $run?->id,
             'transactions_received' => $received,
             'transactions_saved' => $saved,
             'items_created' => count($resolver->createdItems()),
         ]);
-    }
-
-    /**
-     * The entries this callback carries, whichever way they were wrapped.
-     *
-     * n8n workflows post a bare array as readily as a keyed object, and the key
-     * they choose is whatever the node was named, so all three shapes are read
-     * rather than made someone's problem to get right.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function entries(Request $request): array
-    {
-        foreach (['items', 'data'] as $key) {
-            if (is_array($value = $request->input($key))) {
-                return $value;
-            }
-        }
-
-        // A bare array body is the list itself. It has to be read off the JSON
-        // source rather than all(), which merges the query string in and so
-        // stops the body looking like a list at all.
-        $body = $request->isJson() ? $request->json()->all() : $request->all();
-
-        return array_is_list($body) ? $body : [];
-    }
-
-    /**
-     * Credit this callback to the run it belongs to and, unless more is coming,
-     * close it.
-     *
-     * The counts are always fed in as a heartbeat first so a chunked report adds
-     * up instead of the last piece overwriting the total; closing then takes the
-     * accumulated figures.
-     */
-    private function resolveRun(
-        Request $request,
-        int $workspaceId,
-        int $received,
-        int $saved,
-        ?string $executionId,
-    ): ?GencysSyncRun {
-        $runId = SyncCallbackFields::runId($request)
-            ?? GencysSyncRun::oldestInFlight($workspaceId, GencysSyncRun::TYPE_TRANSACTION_HISTORY)?->id;
-
-        if (! $runId) {
-            return null;
-        }
-
-        $run = GencysSyncRun::heartbeatById($workspaceId, $runId, $received, $saved, $executionId);
-
-        if ($this->expectsMore($request)) {
-            return $run;
-        }
-
-        return GencysSyncRun::finishById($workspaceId, $runId, executionId: $executionId) ?? $run;
-    }
-
-    /** Whether n8n says this is one piece of a report still being posted. */
-    private function expectsMore(Request $request): bool
-    {
-        if ($request->has('has_more')) {
-            return $request->boolean('has_more');
-        }
-
-        foreach (['final', 'is_final', 'last_chunk'] as $key) {
-            if ($request->has($key)) {
-                return ! $request->boolean($key);
-            }
-        }
-
-        return false;
     }
 
     /**
