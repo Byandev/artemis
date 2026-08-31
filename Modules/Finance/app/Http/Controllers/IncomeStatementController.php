@@ -17,6 +17,7 @@ use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
+use Modules\Finance\Services\UserProductIncomeStatementService;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
 use Modules\Finance\Statements\StatementRates;
 use Modules\Finance\Statements\TransactionTotals;
@@ -43,6 +44,7 @@ class IncomeStatementController extends Controller
         private readonly TransactionTotals $transactions,
         private readonly UserIncomeStatementService $userStatements,
         private readonly ProductIncomeStatementService $productStatements,
+        private readonly UserProductIncomeStatementService $userProductStatements,
     ) {}
 
     /**
@@ -91,6 +93,7 @@ class IncomeStatementController extends Controller
 
         $this->userStatements->snapshot($statement);
         $this->productStatements->snapshot($statement);
+        $this->userProductStatements->snapshot($statement);
 
         return $statement;
     }

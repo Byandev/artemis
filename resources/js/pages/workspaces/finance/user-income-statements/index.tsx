@@ -438,11 +438,15 @@ export default function UserIncomeStatements({
                                                             <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
                                                         )}
                                                         <span className="min-w-0">
-                                                            <span
-                                                                className={`block truncate text-[13px] font-medium ${tone}`}
+                                                            {/* Straight to
+                                                            their per-product
+                                                            breakdown. */}
+                                                            <Link
+                                                                href={`${finance}/income-statements/${incomeStatement.id}/users/${r.user_id ?? 'unassigned'}`}
+                                                                className={`block truncate text-[13px] font-medium underline-offset-2 hover:underline ${tone}`}
                                                             >
                                                                 {r.user}
-                                                            </span>
+                                                            </Link>
                                                             {unassigned &&
                                                                 (unassignedRows.length >
                                                                 0 ? (

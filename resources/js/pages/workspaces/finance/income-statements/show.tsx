@@ -9,6 +9,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     Download,
+    Grid2X2,
     RefreshCw,
     Save,
     ShoppingBag,
@@ -116,6 +117,13 @@ export default function IncomeStatementShow({
                                 >
                                     <ShoppingBag className="h-3.5 w-3.5" />
                                     Per-product
+                                </Link>
+                                <Link
+                                    href={`${base}/${statement.id}/user-products`}
+                                    className={BTN}
+                                >
+                                    <Grid2X2 className="h-3.5 w-3.5" />
+                                    Seller × Product
                                 </Link>
                             </>
                         )}

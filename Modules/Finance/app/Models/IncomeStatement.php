@@ -111,4 +111,13 @@ class IncomeStatement extends Model
     {
         return $this->hasMany(ProductIncomeStatement::class, 'income_statement_id');
     }
+
+    /**
+     * Saved per-user-per-product slices — the cross of the two above, for a
+     * product run by several people (rebuilt on save/regenerate).
+     */
+    public function userProductStatements(): HasMany
+    {
+        return $this->hasMany(UserProductIncomeStatement::class, 'income_statement_id');
+    }
 }
