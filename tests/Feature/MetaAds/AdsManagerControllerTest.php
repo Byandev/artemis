@@ -104,6 +104,8 @@ it('supports every group_by dimension', function (string $groupBy, int $expected
     'campaign' => ['campaign', 2],
     'ad_set' => ['ad_set', 2],
     'account' => ['account', 2],
+    // Neither seeded ad set promotes a page, so both land in one bucket.
+    'page' => ['page', 1],
 ]);
 
 it('restricts aggregation to the selected accounts', function () {
