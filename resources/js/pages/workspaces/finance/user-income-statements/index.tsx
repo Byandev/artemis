@@ -231,13 +231,13 @@ const buildColumns = (
         ? [
               {
                   label: 'Bought COGS',
-                  help: 'Cost of Goods purchases charged to this user this month — stock bought, which is not the same as stock sold.',
+                  help: 'This user’s share of the goods bought for the products they moved — each product’s purchases split between its sellers by their share of its delivered orders. Stock bought, which is not the same as stock sold.',
                   render: (r: UserRow) => fmt(r.total_bought_cogs),
                   emphasis: true,
               },
               {
                   label: 'Bought COGS Delivery Fee',
-                  help: 'Freight paid on those purchases, from “Delivery of COG” transactions charged to this user.',
+                  help: 'Freight paid on those purchases, shared out the same way.',
                   render: (r: UserRow) => fmt(r.total_bought_cogs_delivery_fee),
               },
               {

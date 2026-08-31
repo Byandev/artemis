@@ -6,8 +6,8 @@ use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Services\Concerns\ClosesOutSlices;
 use Modules\Finance\Statements\OrderTotals;
-use Modules\Finance\Statements\ProportionalSplit;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
 use Modules\Finance\Statements\TransactionTotals;
 
@@ -30,6 +30,8 @@ use Modules\Finance\Statements\TransactionTotals;
  */
 class ProductIncomeStatementService
 {
+    use ClosesOutSlices;
+
     public function __construct(
         private readonly StatementOrderSourceFactory $sources,
         private readonly TransactionTotals $transactions,
@@ -115,8 +117,9 @@ class ProductIncomeStatementService
             ];
         })->values();
 
-        // OPEX is shared out only once every row's gross profit is settled.
-        $rows = collect($this->closeOut($statement, $rows->all()));
+        // The advisory and OPEX are allocated from the parent statement once
+        // every row's gross profit is settled — see ClosesOutSlices.
+        $rows = collect($this->closeSlice($statement, $rows->all()));
 
         DB::transaction(function () use ($statement, $rows) {
             $statement->productStatements()->delete();
@@ -212,48 +215,6 @@ class ProductIncomeStatementService
         [$from, $to] = $this->range($statement);
 
         return $this->sources->for($workspace)->unresolvedProductDetail($workspace, $from, $to);
-    }
-
-    /**
-     * Share the month's OPEX across the rows and close each one out.
-     *
-     * OPEX is a company-wide pool — no part of it is booked against one product
-     * — so a row's share is allocated, not measured: its delivered orders over
-     * the delivered orders of every row here. Net profit then follows the
-     * workspace statement's own formula, gross after advisory less that OPEX.
-     *
-     * The pool taken is the one saved on the parent statement, so the slices
-     * always close out to the statement they belong to rather than to whatever
-     * the ledger says today.
-     *
-     * Rows with no delivered orders take nothing: they carry no share of a cost
-     * that follows parcels. When nothing delivered at all the pool stays
-     * unallocated rather than being spread evenly onto rows that did not earn it.
-     *
-     * @param  list<array<string, mixed>>  $rows
-     * @return list<array<string, mixed>>
-     */
-    private function closeOut(IncomeStatement $statement, array $rows): array
-    {
-        $weights = array_map(fn ($row) => (int) $row['delivered_orders'], $rows);
-        $delivered = array_sum($weights);
-
-        $shares = ProportionalSplit::of((float) $statement->opex, $weights);
-
-        foreach ($rows as $i => $row) {
-            $opex = round($shares[$i] ?? 0.0, 2);
-
-            $rows[$i]['opex'] = $opex;
-            // Saved beside the amount so the split stays checkable later, when
-            // the delivered counts behind it may have moved on.
-            $rows[$i]['opex_share_percentage'] = $delivered > 0
-                ? round($weights[$i] / $delivered * 100, 6)
-                : 0.0;
-            $rows[$i]['net_profit_delivered_cogs'] = round($row['gross_profit_delivered_cogs_after_advisory_share'] - $opex, 2);
-            $rows[$i]['net_profit_bought_cogs'] = round($row['gross_profit_bought_cogs_after_advisory_share'] - $opex, 2);
-        }
-
-        return $rows;
     }
 
     private function ensureSnapshot(IncomeStatement $statement): void

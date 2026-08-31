@@ -8,8 +8,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\UserProductIncomeStatement;
+use Modules\Finance\Services\Concerns\ClosesOutSlices;
 use Modules\Finance\Statements\OrderTotals;
-use Modules\Finance\Statements\ProportionalSplit;
+use Modules\Finance\Statements\ProductCostAllocator;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
 use Modules\Finance\Statements\TransactionTotals;
 use Modules\Finance\Statements\UserProductKey;
@@ -45,9 +46,12 @@ use Modules\Finance\Statements\UserProductKey;
  */
 class UserProductIncomeStatementService
 {
+    use ClosesOutSlices;
+
     public function __construct(
         private readonly StatementOrderSourceFactory $sources,
         private readonly TransactionTotals $transactions,
+        private readonly ProductCostAllocator $allocator,
     ) {}
 
     /** (Re)compute and store every user/product row for the statement's month. */
@@ -73,7 +77,7 @@ class UserProductIncomeStatementService
             'total_bought_cogs_delivery_fee' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY),
         ];
 
-        $costs = $this->allocateProductCosts($perProduct, $orders);
+        $costs = $this->allocator->allocate($perProduct, $orders);
 
         // A pair earns a row for a cost even with no orders behind it.
         foreach (array_keys($costs) as $key) {
@@ -135,8 +139,9 @@ class UserProductIncomeStatementService
             ];
         })->values();
 
-        // OPEX is shared out only once every row's gross profit is settled.
-        $rows = collect($this->closeOut($statement, $rows->all()));
+        // The advisory and OPEX are allocated from the parent statement once
+        // every row's gross profit is settled — see ClosesOutSlices.
+        $rows = collect($this->closeSlice($statement, $rows->all()));
 
         DB::transaction(function () use ($statement, $rows) {
             $statement->userProductStatements()->delete();
@@ -145,90 +150,6 @@ class UserProductIncomeStatementService
                 $statement->userProductStatements()->create($row);
             }
         });
-    }
-
-    /**
-     * Share each product's costs across the sellers who delivered it, weighted
-     * by delivered orders.
-     *
-     * A product with costs but no delivered orders at all keeps them whole on
-     * its no-user row: there is no seller to credit them to, and dropping them
-     * would leave this table short of the product statement.
-     *
-     * @param  array<string, array<string, float>>  $perProduct  cost name => [productKey => amount]
-     * @param  array<string, OrderTotals>  $orders
-     * @return array<string, array<string, float>> userProductKey => [cost name => amount]
-     */
-    private function allocateProductCosts(array $perProduct, array $orders): array
-    {
-        // Delivered orders per seller, per product — the weights themselves.
-        $weights = [];
-
-        foreach ($orders as $key => $totals) {
-            if ($totals->deliveredOrders > 0) {
-                $weights[UserProductKey::productOf($key)][$key] = (float) $totals->deliveredOrders;
-            }
-        }
-
-        $costs = [];
-
-        foreach ($perProduct as $name => $amounts) {
-            foreach ($amounts as $productKey => $amount) {
-                $productKey = (string) $productKey;
-                $shares = $weights[$productKey] ?? [];
-
-                if ($shares === []) {
-                    $costs[UserProductKey::of(null, $productKey)][$name] = round((float) $amount, 2);
-
-                    continue;
-                }
-
-                foreach ($this->split((float) $amount, $shares) as $key => $share) {
-                    $costs[$key][$name] = $share;
-                }
-            }
-        }
-
-        return $costs;
-    }
-
-    /**
-     * `$amount` divided between `$weights` in proportion, in cents so the shares
-     * add back up to it exactly — the centavos left over by the division go to
-     * the largest remainders rather than vanishing.
-     *
-     * @param  array<string, float>  $weights
-     * @return array<string, float>
-     */
-    private function split(float $amount, array $weights): array
-    {
-        $total = array_sum($weights);
-
-        if ($total <= 0) {
-            return [];
-        }
-
-        $cents = (int) round($amount * 100);
-        $exact = array_map(fn (float $w) => $cents * $w / $total, $weights);
-        $shares = array_map(fn (float $v) => (int) floor($v), $exact);
-
-        $remainders = [];
-        foreach ($exact as $key => $value) {
-            $remainders[$key] = $value - floor($value);
-        }
-        arsort($remainders);
-
-        $left = $cents - array_sum($shares);
-
-        foreach (array_keys($remainders) as $key) {
-            if ($left <= 0) {
-                break;
-            }
-            $shares[$key]++;
-            $left--;
-        }
-
-        return array_map(fn (int $c) => round($c / 100, 2), $shares);
     }
 
     /**
@@ -490,48 +411,6 @@ class UserProductIncomeStatementService
         }
 
         return $out;
-    }
-
-    /**
-     * Share the month's OPEX across the rows and close each one out.
-     *
-     * OPEX is a company-wide pool — no part of it is booked against one seller and product pair
-     * — so a row's share is allocated, not measured: its delivered orders over
-     * the delivered orders of every row here. Net profit then follows the
-     * workspace statement's own formula, gross after advisory less that OPEX.
-     *
-     * The pool taken is the one saved on the parent statement, so the slices
-     * always close out to the statement they belong to rather than to whatever
-     * the ledger says today.
-     *
-     * Rows with no delivered orders take nothing: they carry no share of a cost
-     * that follows parcels. When nothing delivered at all the pool stays
-     * unallocated rather than being spread evenly onto rows that did not earn it.
-     *
-     * @param  list<array<string, mixed>>  $rows
-     * @return list<array<string, mixed>>
-     */
-    private function closeOut(IncomeStatement $statement, array $rows): array
-    {
-        $weights = array_map(fn ($row) => (int) $row['delivered_orders'], $rows);
-        $delivered = array_sum($weights);
-
-        $shares = ProportionalSplit::of((float) $statement->opex, $weights);
-
-        foreach ($rows as $i => $row) {
-            $opex = round($shares[$i] ?? 0.0, 2);
-
-            $rows[$i]['opex'] = $opex;
-            // Saved beside the amount so the split stays checkable later, when
-            // the delivered counts behind it may have moved on.
-            $rows[$i]['opex_share_percentage'] = $delivered > 0
-                ? round($weights[$i] / $delivered * 100, 6)
-                : 0.0;
-            $rows[$i]['net_profit_delivered_cogs'] = round($row['gross_profit_delivered_cogs_after_advisory_share'] - $opex, 2);
-            $rows[$i]['net_profit_bought_cogs'] = round($row['gross_profit_bought_cogs_after_advisory_share'] - $opex, 2);
-        }
-
-        return $rows;
     }
 
     private function ensureSnapshot(IncomeStatement $statement): void

@@ -13,6 +13,9 @@ use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionProduct;
 use Modules\Finance\Models\TransactionType;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\GencysERP\Models\GencysDailySalesOrderItem;
+use Modules\GencysERP\Models\Intern;
+use Modules\Inventory\Models\InventoryUnitCode;
 use Modules\Pancake\Models\Order as PancakeOrder;
 
 function isUrl($workspace, string $path = ''): string
@@ -740,12 +743,32 @@ test('a goods purchase reaches the workspace, product and user statements alike'
     ]);
 
     $txn = makeTxn($workspace, $account, $type, 'out', 5000, '2026-05-14');
-    // Tagged to a product and charged to a person, so all three grains see it.
+    // Tagged to a product, which is the only tagging the goods lines read now:
+    // a user's figure is their share of the products they moved, so the person
+    // is reached by delivering it rather than by being charged for it.
     $product = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'WIDGET']);
     TransactionProduct::create([
         'transaction_id' => $txn->id, 'product' => 'WIDGET', 'amount' => 5000,
     ]);
-    $txn->chargeToUsers()->sync([$user->id => ['amount' => 5000]]);
+
+    // One seller, delivering that product: they carry the whole purchase.
+    InventoryUnitCode::create([
+        'workspace_id' => $workspace->id, 'unit_code' => 'UC-W', 'product_id' => $product->id,
+    ]);
+    Intern::create([
+        'workspace_id' => $workspace->id, 'intern_id' => 77,
+        'full_name' => 'Juan Dela Cruz', 'active' => true, 'user_id' => $user->id,
+    ]);
+    $delivered = makeGencysOrder($workspace, [
+        'intern_brands_name' => 'Juan Dela Cruz',
+        'parcel_status' => 'DELIVERED',
+        'parcel_updated_date' => '2026-05-11 09:00:00',
+        'shipped_out_date' => '2026-05-04',
+        'price_final' => 1200,
+    ]);
+    GencysDailySalesOrderItem::create([
+        'order_id' => $delivered->id, 'sku' => 'UC-W', 'quantity' => 1,
+    ]);
 
     $this->actingAs($user)->post(isUrl($workspace), [
         'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,

@@ -6,8 +6,9 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Services\Concerns\ClosesOutSlices;
 use Modules\Finance\Statements\OrderTotals;
-use Modules\Finance\Statements\ProportionalSplit;
+use Modules\Finance\Statements\ProductCostAllocator;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
 use Modules\Finance\Statements\TransactionTotals;
 
@@ -21,19 +22,24 @@ use Modules\Finance\Statements\TransactionTotals;
  * whole order's money goes there. Orders whose cell resolves to nobody roll into
  * a single "Unassigned" row.
  *
- * The costs that aren't carried on the order itself — ad spend, bought goods and
- * the freight on them — come from the charge-to shares on finance transactions,
- * which is the user-side counterpart of the product tags the product statement
- * reads.
+ * The costs that aren't carried on the order itself reach a user two ways. Ad
+ * spend is known per person directly — from the page it ran on, or from the
+ * charge-to shares. Bought goods and their freight are tagged to a product
+ * instead, so a user takes the share of each product matching their share of
+ * its delivered orders; those columns are therefore the sum of this user's rows
+ * on the user-and-product statement.
  *
  * The result is snapshotted into `finance_income_user_statements` when the parent
  * statement is saved or regenerated. A first view with no snapshot builds one.
  */
 class UserIncomeStatementService
 {
+    use ClosesOutSlices;
+
     public function __construct(
         private readonly StatementOrderSourceFactory $sources,
         private readonly TransactionTotals $transactions,
+        private readonly ProductCostAllocator $allocator,
     ) {}
 
     /** (Re)compute and store every per-user row for the statement's month. */
@@ -51,11 +57,26 @@ class UserIncomeStatementService
         $source = $this->sources->for($workspace);
         $totals = $source->totalsByUser($workspace, $from, $to);
 
-        // Charged costs are already per user, so they key in directly.
+        // Goods bought and their freight are tagged to a product, not to a
+        // person, so a user's figure is their share of every product they
+        // moved — the per-product-per-user allocation added up along the
+        // product axis. That makes this column the sum of the same user's rows
+        // on the user-and-product statement, by construction rather than by
+        // coincidence.
+        $allocated = $this->allocator->byUser($this->allocator->allocate(
+            [
+                'total_bought_cogs' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS),
+                'total_bought_cogs_delivery_fee' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY),
+            ],
+            $source->totalsByUserProduct($workspace, $from, $to),
+        ));
+
+        // Ad spend stays per person: it is known directly, from the page it ran
+        // on (whose owner is the seller) or from the charge-to shares.
         $charged = [
             'ad_spent' => $source->adSpendByUser($workspace, $from, $to),
-            'total_bought_cogs' => $this->transactions->byChargedUser($workspace, $from, $to, TransactionTotals::COST_OF_GOODS),
-            'total_bought_cogs_delivery_fee' => $this->transactions->byChargedUser($workspace, $from, $to, TransactionTotals::COG_DELIVERY),
+            'total_bought_cogs' => $allocated['total_bought_cogs'] ?? [],
+            'total_bought_cogs_delivery_fee' => $allocated['total_bought_cogs_delivery_fee'] ?? [],
         ];
 
         // A user earns a row for a charged cost even with no orders behind it.
@@ -78,8 +99,10 @@ class UserIncomeStatementService
             $adSpent = round((float) ($charged['ad_spent'][(int) $key] ?? 0), 2);
             $shippingFee = round($t->shippingFee, 2);
             $deliveredCogs = round($t->deliveredCogs, 2);
-            $boughtCogs = round((float) ($charged['total_bought_cogs'][(int) $key] ?? 0), 2);
-            $boughtFreight = round((float) ($charged['total_bought_cogs_delivery_fee'][(int) $key] ?? 0), 2);
+            // Keyed by $key rather than (int) $key: the allocation puts costs
+            // for a product nobody delivered under '', which would cast to 0.
+            $boughtCogs = round((float) ($charged['total_bought_cogs'][$key] ?? 0), 2);
+            $boughtFreight = round((float) ($charged['total_bought_cogs_delivery_fee'][$key] ?? 0), 2);
 
             // Both margins take the same costs off delivered revenue and differ
             // only in which cost of goods they charge.
@@ -119,8 +142,9 @@ class UserIncomeStatementService
             ];
         })->values();
 
-        // OPEX is shared out only once every row's gross profit is settled.
-        $rows = collect($this->closeOut($statement, $rows->all()));
+        // The advisory and OPEX are allocated from the parent statement once
+        // every row's gross profit is settled — see ClosesOutSlices.
+        $rows = collect($this->closeSlice($statement, $rows->all()));
 
         DB::transaction(function () use ($statement, $rows) {
             $statement->userStatements()->delete();
@@ -232,48 +256,6 @@ class UserIncomeStatementService
         [$from, $to] = $this->range($statement);
 
         return $this->sources->for($workspace)->unassignedUserDetail($workspace, $from, $to);
-    }
-
-    /**
-     * Share the month's OPEX across the rows and close each one out.
-     *
-     * OPEX is a company-wide pool — no part of it is booked against one user
-     * — so a row's share is allocated, not measured: its delivered orders over
-     * the delivered orders of every row here. Net profit then follows the
-     * workspace statement's own formula, gross after advisory less that OPEX.
-     *
-     * The pool taken is the one saved on the parent statement, so the slices
-     * always close out to the statement they belong to rather than to whatever
-     * the ledger says today.
-     *
-     * Rows with no delivered orders take nothing: they carry no share of a cost
-     * that follows parcels. When nothing delivered at all the pool stays
-     * unallocated rather than being spread evenly onto rows that did not earn it.
-     *
-     * @param  list<array<string, mixed>>  $rows
-     * @return list<array<string, mixed>>
-     */
-    private function closeOut(IncomeStatement $statement, array $rows): array
-    {
-        $weights = array_map(fn ($row) => (int) $row['delivered_orders'], $rows);
-        $delivered = array_sum($weights);
-
-        $shares = ProportionalSplit::of((float) $statement->opex, $weights);
-
-        foreach ($rows as $i => $row) {
-            $opex = round($shares[$i] ?? 0.0, 2);
-
-            $rows[$i]['opex'] = $opex;
-            // Saved beside the amount so the split stays checkable later, when
-            // the delivered counts behind it may have moved on.
-            $rows[$i]['opex_share_percentage'] = $delivered > 0
-                ? round($weights[$i] / $delivered * 100, 6)
-                : 0.0;
-            $rows[$i]['net_profit_delivered_cogs'] = round($row['gross_profit_delivered_cogs_after_advisory_share'] - $opex, 2);
-            $rows[$i]['net_profit_bought_cogs'] = round($row['gross_profit_bought_cogs_after_advisory_share'] - $opex, 2);
-        }
-
-        return $rows;
     }
 
     private function ensureSnapshot(IncomeStatement $statement): void
