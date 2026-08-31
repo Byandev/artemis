@@ -41,6 +41,10 @@ class ProductIncomeStatement extends Model
         'gross_profit_bought_cogs_advisory_share',
         'gross_profit_delivered_cogs_after_advisory_share',
         'gross_profit_bought_cogs_after_advisory_share',
+        'opex',
+        'opex_share_percentage',
+        'net_profit_delivered_cogs',
+        'net_profit_bought_cogs',
     ];
 
     protected $casts = [
@@ -61,6 +65,11 @@ class ProductIncomeStatement extends Model
         'gross_profit_bought_cogs_advisory_share' => 'decimal:2',
         'gross_profit_delivered_cogs_after_advisory_share' => 'decimal:2',
         'gross_profit_bought_cogs_after_advisory_share' => 'decimal:2',
+        'opex' => 'decimal:2',
+        // A percentage (0-100), not a fraction — see the migration.
+        'opex_share_percentage' => 'decimal:6',
+        'net_profit_delivered_cogs' => 'decimal:2',
+        'net_profit_bought_cogs' => 'decimal:2',
     ];
 
     public function incomeStatement(): BelongsTo

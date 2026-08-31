@@ -47,6 +47,12 @@ interface UserRow {
     gross_profit_bought_cogs: number;
     gross_profit_bought_cogs_advisory_share: number;
     gross_profit_bought_cogs_after_advisory_share: number;
+    /** This row's share of the month's OPEX, by its delivered orders. */
+    opex: number;
+    /** The share that produced it, as a percentage (0-100), not a fraction. */
+    opex_share_percentage: number;
+    net_profit_delivered_cogs: number;
+    net_profit_bought_cogs: number;
 }
 
 /**
@@ -114,6 +120,13 @@ const HEAD =
 const pct = (fraction: number) => `${Number((fraction * 100).toFixed(4))}%`;
 
 /**
+ * A stored OPEX share. Already a percentage — unlike `pct` above, which takes a
+ * fraction — so it is only trimmed, never multiplied.
+ */
+const sharePct = (percentage: number) =>
+    `${Number(Number(percentage).toFixed(4))}%`;
+
+/**
  * Which side of cost-of-goods the table is showing. They answer different
  * questions — what was sold this month, or what was purchased into stock — and
  * putting both up at once made the row hard to read, so it's one or the other.
@@ -123,6 +136,39 @@ type CogsView = 'delivered' | 'bought';
 const COGS_VIEWS: { value: CogsView; label: string }[] = [
     { value: 'delivered', label: 'Delivered COGS' },
     { value: 'bought', label: 'Bought COGS' },
+];
+
+/**
+ * The statement's closing lines. OPEX is a company-wide pool with nothing in it
+ * booked against one user, so each row takes the share matching its
+ * delivered orders; net profit then follows the workspace statement's formula.
+ */
+const closingColumns = (
+    net: (r: UserRow) => number,
+): {
+    label: string;
+    help: string;
+    render: (r: UserRow) => string;
+    emphasis?: boolean;
+    signed?: (r: UserRow) => number;
+}[] => [
+    {
+        label: 'OPEX Share',
+        help: 'This user\u2019s delivered orders as a percentage of every row\u2019s on this statement \u2014 the split the OPEX beside it was struck from. Saved with the statement, so it still reads back after a later sync moves the underlying counts.',
+        render: (r) => sharePct(r.opex_share_percentage),
+    },
+    {
+        label: 'Less — OPEX',
+        help: 'This user\u2019s share of the month\u2019s operating expenses, by its delivered orders over every row\u2019s. Nothing in the OPEX pool is booked against a single user, so the share is allocated rather than measured \u2014 a row that delivered nothing carries none of it.',
+        render: (r) => fmt(r.opex),
+    },
+    {
+        label: '= Net Profit',
+        help: 'Gross Profit less the advisory share and the OPEX above.',
+        render: (r) => fmt(net(r)),
+        emphasis: true,
+        signed: net,
+    },
 ];
 
 const buildColumns = (
@@ -222,6 +268,7 @@ const buildColumns = (
                         },
                     ]
                   : []),
+              ...closingColumns((r: UserRow) => r.net_profit_bought_cogs),
           ]
         : [
               {
@@ -260,6 +307,7 @@ const buildColumns = (
                         },
                     ]
                   : []),
+              ...closingColumns((r: UserRow) => r.net_profit_delivered_cogs),
           ]),
 ];
 

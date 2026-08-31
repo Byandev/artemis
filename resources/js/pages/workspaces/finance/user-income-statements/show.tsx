@@ -43,6 +43,12 @@ interface ProductRow {
     gross_profit_bought_cogs: number;
     gross_profit_bought_cogs_advisory_share: number;
     gross_profit_bought_cogs_after_advisory_share: number;
+    /** This pair's share of the month's OPEX, by its delivered orders. */
+    opex: number;
+    /** The share that produced it, as a percentage (0-100), not a fraction. */
+    opex_share_percentage: number;
+    net_profit_delivered_cogs: number;
+    net_profit_bought_cogs: number;
     /**
      * The product across every seller who ran it, and this person's `share` of
      * its delivered orders — the weight the allocated costs were cut by, so
@@ -85,6 +91,13 @@ const pct = (fraction: number) => `${Number((fraction * 100).toFixed(4))}%`;
 /** A seller's share of a product, to one decimal. Null = no ratio to take. */
 const share = (v: number | null) =>
     v === null ? '—' : `${(v * 100).toFixed(1)}%`;
+
+/**
+ * A stored OPEX share. Already a percentage — unlike `share` above, which takes
+ * a fraction — so it is only trimmed, never multiplied.
+ */
+const sharePct = (percentage: number) =>
+    `${Number(Number(percentage).toFixed(4))}%`;
 
 const CARD =
     'rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900';
@@ -137,8 +150,6 @@ interface FigureRow {
     emphasis?: boolean;
     /** When set, the cell is coloured by the sign of this value. */
     signed?: (r: ProductRow) => number;
-    /** Rows the per-product data doesn't carry — shown, but with no figure. */
-    unavailable?: boolean;
     /** A band splitting the table into sections; carries no figures. */
     heading?: boolean;
     /** Context about the whole product rather than this person's slice. */
@@ -147,9 +158,8 @@ interface FigureRow {
 
 /**
  * The rows, in the order and wording the main income statement uses, so the
- * same figure reads the same way on both. The last two are the statement's
- * closing lines: they are kept in place rather than dropped, but a product
- * carries no OPEX of its own, so their cells stay empty — see `unavailable`.
+ * same figure reads the same way on both — down to the closing OPEX and net
+ * profit lines.
  */
 const buildRows = (
     rates: { cod: number; vat: number; advisory: number },
@@ -187,21 +197,34 @@ const buildRows = (
           ]
         : [];
 
-    // The statement's closing lines. OPEX is a company-wide pool that has never
-    // been split across products — the basis for doing so is configurable per
-    // transaction type but nothing reads it yet — so these show for shape only.
+    // The statement's closing lines. Nothing in the OPEX pool is booked against
+    // one seller-and-product pair, so the share is allocated by delivered
+    // orders — the same weight the bought-goods costs above are cut by.
     const closingRows: FigureRow[] = [
         {
+            label: 'OPEX Share',
+            help: 'This column’s delivered orders as a percentage of every row’s on the statement — the split the OPEX beside it was struck from. A different share from the one above, which is of this product alone.',
+            render: (r) => sharePct(r.opex_share_percentage),
+        },
+        {
             label: 'Less — OPEX',
-            help: 'The month’s operating expenses. Held company-wide and not split across products, so there is no per-product figure to show here. Each transaction type already carries an allocation basis for this; nothing reads it yet.',
-            render: () => '—',
-            unavailable: true,
+            help: 'This person’s share of the month’s operating expenses on this product, by its delivered orders over every row’s on the statement. A column that delivered nothing carries none of it.',
+            render: (r) => fmt(r.opex),
         },
         {
             label: '= Net Profit',
-            help: 'Gross Profit less the advisory share and OPEX. Follows from the OPEX line above, so it is unavailable per product for the same reason.',
-            render: () => '—',
-            unavailable: true,
+            help: 'Gross Profit less the advisory share and the OPEX above.',
+            render: (r) =>
+                fmt(
+                    cogsView === 'bought'
+                        ? r.net_profit_bought_cogs
+                        : r.net_profit_delivered_cogs,
+                ),
+            emphasis: true,
+            signed: (r) =>
+                cogsView === 'bought'
+                    ? r.net_profit_bought_cogs
+                    : r.net_profit_delivered_cogs,
         },
     ];
 
@@ -353,7 +376,6 @@ export default function UserProductBreakdown({
 
     /** The tone a figure cell takes, shared by the Total and product columns. */
     const cellTone = (row: FigureRow, r: ProductRow, muted: boolean) => {
-        if (row.unavailable) return 'text-gray-300 dark:text-gray-600';
         // Whole-product context sits behind this person's own figures.
         if (row.muted) return 'text-gray-400 italic dark:text-gray-500';
         if (row.signed) {
@@ -530,13 +552,11 @@ export default function UserProductBreakdown({
                                                         <button
                                                             type="button"
                                                             className={`flex items-center gap-1.5 text-left text-[12px] transition-colors hover:text-gray-800 focus-visible:text-gray-800 focus-visible:outline-none dark:hover:text-gray-100 ${
-                                                                row.unavailable
-                                                                    ? 'text-gray-400 dark:text-gray-500'
-                                                                    : row.muted
-                                                                      ? 'pl-3 text-gray-500 italic dark:text-gray-400'
-                                                                      : row.emphasis
-                                                                        ? 'font-medium text-gray-700 dark:text-gray-200'
-                                                                        : 'text-gray-600 dark:text-gray-300'
+                                                                row.muted
+                                                                    ? 'pl-3 text-gray-500 italic dark:text-gray-400'
+                                                                    : row.emphasis
+                                                                      ? 'font-medium text-gray-700 dark:text-gray-200'
+                                                                      : 'text-gray-600 dark:text-gray-300'
                                                             }`}
                                                         >
                                                             {row.label}
