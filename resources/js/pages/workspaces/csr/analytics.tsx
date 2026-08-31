@@ -41,6 +41,7 @@ import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { toFrontendSort } from '@/lib/sort';
+import { cn } from '@/lib/utils';
 import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
@@ -146,6 +147,21 @@ function useAnalyticsStat<T>(
 
     return [data, loading];
 }
+
+// Pinning the header is done from this page rather than inside the shared
+// DataTable: the classes below are stamped onto this table's columns and its
+// scroll container, so no other table's layout moves. The surface is repainted
+// on the pinned cells (the body would otherwise show through) and the rule is
+// drawn as an inset shadow — a collapsed table drops the border of a sticky
+// cell once it starts to scroll.
+const STICKY_HEADER_CELL =
+    'sticky top-0 z-20 bg-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] dark:bg-zinc-900 dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]';
+
+// The body has to scroll for a header to stick to anything, so the container
+// DataTable renders is capped here. The page then stays put while a long table
+// is read, instead of the columns scrolling out of sight.
+const SCROLL_BODY =
+    '[&_.custom-scrollbar]:max-h-[32rem] [&_.custom-scrollbar]:overflow-y-auto';
 
 export default function Analytics({ workspace, records, query }: Props) {
     const today = new Date();
@@ -339,7 +355,7 @@ export default function Analytics({ workspace, records, query }: Props) {
         [currentSort],
     );
 
-    const columns = useMemo<ColumnDef<CsrRecord>[]>(
+    const baseColumns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
             {
                 accessorKey: 'name',
@@ -350,6 +366,18 @@ export default function Analytics({ workspace, records, query }: Props) {
                 // name (e.g. assignees not yet pulled into pancake_users).
                 cell: ({ row }) => row.original.name,
                 size: 220,
+                // Eleven columns of figures are wider than any screen, and a
+                // row of numbers with the name scrolled off is unreadable — so
+                // the name column is pinned and the figures scroll past it. It
+                // repaints the surface (the body would otherwise show through)
+                // and carries the edge as an inset shadow rather than a border,
+                // which a collapsed table drops on a sticky cell.
+                meta: {
+                    headerClassName:
+                        'sticky left-0 z-30 bg-white dark:bg-zinc-900 shadow-[inset_-1px_-1px_0_rgba(0,0,0,0.06)] dark:shadow-[inset_-1px_-1px_0_rgba(255,255,255,0.06)]',
+                    cellClassName:
+                        'sticky left-0 z-10 bg-white dark:bg-zinc-900 shadow-[inset_-1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]',
+                },
             },
             {
                 accessorKey: 'total_orders',
@@ -435,6 +463,23 @@ export default function Analytics({ workspace, records, query }: Props) {
             },
         ],
         [],
+    );
+
+    // cn lets a column keep its own pinned styling — the name column's corner
+    // shadow and higher stacking win over the shared header class.
+    const columns = useMemo<ColumnDef<CsrRecord>[]>(
+        () =>
+            baseColumns.map((column) => ({
+                ...column,
+                meta: {
+                    ...column.meta,
+                    headerClassName: cn(
+                        STICKY_HEADER_CELL,
+                        column.meta?.headerClassName,
+                    ),
+                },
+            })),
+        [baseColumns],
     );
 
     return (
@@ -564,15 +609,28 @@ export default function Analytics({ workspace, records, query }: Props) {
                     loading={callOutcomesLoading}
                 />
 
-                <input
-                    type="text"
-                    placeholder="Search CSR..."
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
-                />
+                {/* The same header row the sections above use: the section's
+                    name on the left, its one control on the right. */}
+                <div className="mt-6 mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="font-mono text-[10px] font-medium tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
+                        CSR breakdown
+                    </h2>
 
-                <div className="mt-2 rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
+                    <input
+                        type="text"
+                        placeholder="Search CSR..."
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none sm:w-64 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+                    />
+                </div>
+
+                <div
+                    className={cn(
+                        'rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900',
+                        SCROLL_BODY,
+                    )}
+                >
                     <DataTable
                         key={currentSort}
                         columns={columns}
