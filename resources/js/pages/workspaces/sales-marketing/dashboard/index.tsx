@@ -2,6 +2,7 @@ import PageHeader from '@/components/common/PageHeader';
 import KpiCard, {
     formatKpi,
 } from '@/components/sales-marketing/dashboard/kpi-card';
+import LeaderCard from '@/components/sales-marketing/dashboard/leader-card';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -83,19 +84,19 @@ export default function SalesMarketingDashboard({ workspace }: Props) {
                     <KpiCard
                         slug={workspace.slug}
                         label="Total Sales"
-                        endpoint="total-sales"
+                        endpoint="kpi/total-sales"
                         dateRange={dateRange}
                     />
                     <KpiCard
                         slug={workspace.slug}
                         label="Total Ad Spend"
-                        endpoint="total-ad-spend"
+                        endpoint="kpi/total-ad-spend"
                         dateRange={dateRange}
                     />
                     <KpiCard
                         slug={workspace.slug}
                         label="Blended ROAS"
-                        endpoint="blended-roas"
+                        endpoint="kpi/blended-roas"
                         dateRange={dateRange}
                         as="ratio"
                         emptyHint="no ad spend in this period"
@@ -115,7 +116,7 @@ export default function SalesMarketingDashboard({ workspace }: Props) {
                     <KpiCard
                         slug={workspace.slug}
                         label="RTS Rate"
-                        endpoint="rts-rate"
+                        endpoint="kpi/rts-rate"
                         dateRange={dateRange}
                         as="percent"
                         // A rising return rate is bad news, so the trend colours
@@ -127,6 +128,84 @@ export default function SalesMarketingDashboard({ workspace }: Props) {
                                 ? `${formatKpi(data.returning_amount, 'currencyExact')} returned to sender`
                                 : null
                         }
+                    />
+                </div>
+
+                {/* Who topped each figure over the same window. Its own
+                    endpoints, so the section loads after the KPI row rather
+                    than holding it up. */}
+                <h2 className="mt-10 mb-4 text-[11px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                    Leaders for the period
+                </h2>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:gap-4 xl:grid-cols-4">
+                    <LeaderCard
+                        slug={workspace.slug}
+                        label="Highest Ad Spend"
+                        endpoint="leaders/highest-ad-spend"
+                        dateRange={dateRange}
+                        emptyHint="no ad spend in this period"
+                        // What the spend bought: its own return, then the
+                        // sales figure that return is drawn from.
+                        caption={(d) => {
+                            const sales = Number(d.sales ?? 0);
+                            const roas = d.value > 0 ? sales / d.value : null;
+
+                            return [
+                                roas !== null &&
+                                    `ROAS ${formatKpi(roas, 'ratio')}`,
+                                `${formatKpi(sales, 'currencyExact')} sales`,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ');
+                        }}
+                    />
+                    <LeaderCard
+                        slug={workspace.slug}
+                        label="Lowest RTS"
+                        endpoint="leaders/lowest-rts"
+                        dateRange={dateRange}
+                        as="percent"
+                        // Lowest wins here, so the corner names the achievement
+                        // rather than a share of anything.
+                        aside="Best delivery rate"
+                        emptyHint="nothing delivered or returned yet"
+                        caption={(d) =>
+                            `${formatKpi(Number(d.returned_amount ?? 0), 'currencyExact')} returned to sender`
+                        }
+                    />
+                    <LeaderCard
+                        slug={workspace.slug}
+                        label="Highest ROAS"
+                        endpoint="leaders/highest-roas"
+                        dateRange={dateRange}
+                        as="ratio"
+                        // A ratio is not a slice of a total, so the corner says
+                        // what the number means instead of a share.
+                        aside="Best efficiency"
+                        emptyHint="no ad spend in this period"
+                        // Both sides of the ratio, so the figure can be judged
+                        // against the size of the bet behind it.
+                        caption={(d) =>
+                            `${formatKpi(Number(d.ad_spend ?? 0), 'currencyExact')} spend on ${formatKpi(Number(d.sales ?? 0), 'currencyExact')} sales`
+                        }
+                    />
+                    <LeaderCard
+                        slug={workspace.slug}
+                        label="Highest Sales"
+                        endpoint="leaders/highest-sales"
+                        dateRange={dateRange}
+                        emptyHint="no sales in this period"
+                        // What the sales are made of: how many orders, and how
+                        // big the average one was.
+                        caption={(d) => {
+                            const orders = Number(d.orders ?? 0);
+                            if (orders <= 0) return null;
+
+                            return [
+                                `${formatKpi(orders, 'number')} orders`,
+                                `AOV ${formatKpi(d.value / orders, 'currencyExact')}`,
+                            ].join(' · ');
+                        }}
                     />
                 </div>
             </div>
