@@ -4,6 +4,7 @@ import {
     ChecklistProgressItem,
     formatFileSize,
 } from '@/components/checklist/types';
+import { UncheckProofDialog } from '@/components/checklist/uncheck-proof-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
@@ -107,6 +108,8 @@ export function TargetChecklistDrawer({
         null,
     );
     const [uploadingProof, setUploadingProof] = useState(false);
+    const [uncheckItem, setUncheckItem] =
+        useState<ChecklistProgressItem | null>(null);
 
     const progressUrl = `/workspaces/${workspace.slug}/checklist/progress/${target}/${targetId}`;
 
@@ -120,16 +123,6 @@ export function TargetChecklistDrawer({
 
         return { completed, total, percent, requiredPending };
     }, [items]);
-
-    // Pending first: the drawer is opened to find what is still outstanding,
-    // and settled items only get in the way of that.
-    const groups = useMemo(
-        () => ({
-            pending: items.filter((item) => !item.is_completed),
-            completed: items.filter((item) => item.is_completed),
-        }),
-        [items],
-    );
 
     const fetchItems = useCallback(async () => {
         const res = await axios.get(
@@ -179,10 +172,7 @@ export function TargetChecklistDrawer({
         };
     }, [open, targetId, fetchItems]);
 
-    const handleToggle = async (
-        item: ChecklistProgressItem,
-        checked: boolean,
-    ) => {
+    const handleToggle = (item: ChecklistProgressItem, checked: boolean) => {
         if (!targetId || savingId !== null) {
             return;
         }
@@ -194,16 +184,20 @@ export function TargetChecklistDrawer({
             return;
         }
 
-        if (
-            !checked &&
-            item.proof &&
-            !window.confirm(
-                `Uncheck "${item.title}"? The attached proof (${item.proof.file_name}) is deleted from storage.`,
-            )
-        ) {
+        // Unchecking destroys the stored proof, so it goes through a
+        // confirmation dialog rather than happening on a stray click.
+        if (!checked && item.proof) {
+            setUncheckItem(item);
             return;
         }
 
+        applyToggle(item, checked);
+    };
+
+    const applyToggle = async (
+        item: ChecklistProgressItem,
+        checked: boolean,
+    ) => {
         const previousItems = items;
         const optimisticTime = new Date().toISOString();
 
@@ -413,18 +407,6 @@ export function TargetChecklistDrawer({
         );
     };
 
-    const renderGroupLabel = (label: string, count: number) => (
-        <div className="flex items-center gap-2 pt-1 pb-1.5 first:pt-0">
-            <p className="font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                {label}
-            </p>
-            <span className="rounded bg-stone-100 px-1.5 py-px font-mono text-[10px] text-gray-500 dark:bg-zinc-800 dark:text-gray-400">
-                {count}
-            </span>
-            <span className="h-px flex-1 bg-black/6 dark:bg-white/8" />
-        </div>
-    );
-
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
@@ -512,24 +494,7 @@ export function TargetChecklistDrawer({
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                {groups.pending.length > 0 && (
-                                    <>
-                                        {renderGroupLabel(
-                                            'Pending',
-                                            groups.pending.length,
-                                        )}
-                                        {groups.pending.map(renderItem)}
-                                    </>
-                                )}
-                                {groups.completed.length > 0 && (
-                                    <>
-                                        {renderGroupLabel(
-                                            'Completed',
-                                            groups.completed.length,
-                                        )}
-                                        {groups.completed.map(renderItem)}
-                                    </>
-                                )}
+                                {items.map(renderItem)}
                             </div>
                         )}
                     </div>
@@ -545,6 +510,22 @@ export function TargetChecklistDrawer({
                     )}
                 </DialogContent>
             </Dialog>
+
+            <UncheckProofDialog
+                open={uncheckItem !== null}
+                onOpenChange={(next) => {
+                    if (!next) {
+                        setUncheckItem(null);
+                    }
+                }}
+                item={uncheckItem}
+                onConfirm={() => {
+                    if (uncheckItem) {
+                        applyToggle(uncheckItem, false);
+                    }
+                    setUncheckItem(null);
+                }}
+            />
 
             <ChecklistProofDialog
                 open={proofItem !== null}
