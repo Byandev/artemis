@@ -337,18 +337,14 @@ class UserProductIncomeStatementService
      * One seller's products: the same saved rows narrowed to a single user, for
      * the drill-down off the per-user list.
      *
-     * Also carries what the per-user statement charged that person directly, so
-     * the page can put the two attributions side by side. The order-carried
-     * columns agree between them — same orders, grouped finer — but the bought
-     * goods, their freight and ad spend need not: the per-user statement reads
-     * them from the charge-to shares on transactions, while these rows are the
-     * seller's slice of the products they moved. Showing the gap is the point;
-     * hiding it would make one of the two pages look wrong.
+     * Each column also carries the whole product (`whole_*`) and this seller's
+     * `share` of its delivered orders, so the page can show what the allocated
+     * costs were a share of.
      *
      * Null when the statement has no rows for that user at all — there is
      * nothing to drill into.
      *
-     * @return array{user: array{id:?int, name:string}, products: list<array<string, mixed>>, total: array<string, mixed>, charged: array<string, float>|null, rates: array{cod:float, vat:float, advisory:float}, gencysPartner: bool}|null
+     * @return array{user: array{id:?int, name:string}, products: list<array<string, mixed>>, total: array<string, mixed>, rates: array{cod:float, vat:float, advisory:float}, gencysPartner: bool}|null
      */
     public function userPayload(IncomeStatement $statement, ?int $userId): ?array
     {
@@ -430,7 +426,6 @@ class UserProductIncomeStatementService
             ],
             'products' => ($unresolved ? $named->push($unresolved) : $named)->values()->all(),
             'total' => $total,
-            'charged' => $this->chargedToUser($statement, $userId),
             'rates' => [
                 'cod' => (float) $statement->cod_fee_rate,
                 'vat' => (float) $statement->vat_rate,
@@ -483,33 +478,6 @@ class UserProductIncomeStatementService
         }
 
         return $out;
-    }
-
-    /**
-     * What the per-user statement booked against this person directly, for the
-     * side-by-side above. Null when that statement has no row for them (it is
-     * built from the same save, so this is only reachable mid-rebuild).
-     *
-     * @return array<string, float>|null
-     */
-    private function chargedToUser(IncomeStatement $statement, ?int $userId): ?array
-    {
-        $row = $statement->userStatements()
-            ->when($userId === null,
-                fn ($q) => $q->whereNull('user_id'),
-                fn ($q) => $q->where('user_id', $userId),
-            )
-            ->first();
-
-        if (! $row) {
-            return null;
-        }
-
-        return [
-            'ad_spent' => (float) $row->ad_spent,
-            'total_bought_cogs' => (float) $row->total_bought_cogs,
-            'total_bought_cogs_delivery_fee' => (float) $row->total_bought_cogs_delivery_fee,
-        ];
     }
 
     private function ensureSnapshot(IncomeStatement $statement): void

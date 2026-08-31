@@ -57,20 +57,12 @@ interface ProductRow {
     whole_total_delivered_cogs: number;
 }
 
-/** What the per-user statement booked against this person directly. */
-interface Charged {
-    ad_spent: number;
-    total_bought_cogs: number;
-    total_bought_cogs_delivery_fee: number;
-}
-
 interface Props {
     workspace: Workspace;
     incomeStatement: StatementContext;
     user: { id: number | null; name: string };
     products: ProductRow[];
     total: ProductRow;
-    charged: Charged | null;
     /** The rates these rows were struck at, as fractions. */
     rates: { cod: number; vat: number; advisory: number };
     /** The advisory share is only taken on partner workspaces. */
@@ -345,20 +337,12 @@ const buildRows = (
     ];
 };
 
-/** The three costs whose two attributions can disagree, for the strip below. */
-const COMPARED: { key: keyof Charged; label: string }[] = [
-    { key: 'ad_spent', label: 'Ad Spent' },
-    { key: 'total_bought_cogs', label: 'Bought COGS' },
-    { key: 'total_bought_cogs_delivery_fee', label: 'Bought COGS Freight' },
-];
-
 export default function UserProductBreakdown({
     workspace,
     incomeStatement,
     user,
     products,
     total,
-    charged,
     rates,
     gencysPartner,
 }: Props) {
@@ -366,18 +350,6 @@ export default function UserProductBreakdown({
     const [cogsView, setCogsView] = useState<CogsView>('delivered');
     const ROWS = buildRows(rates, cogsView, gencysPartner, user.name);
     const named = products.filter((p) => p.product_id !== null);
-
-    // Where the two attributions of the same costs disagree: what was charged
-    // to this person against what the products they ran actually cost them.
-    // The gap is the part sitting with co-sellers of those products.
-    const differences = charged
-        ? COMPARED.map((c) => ({
-              ...c,
-              charged: charged[c.key],
-              allocated: total[c.key],
-              gap: Number((charged[c.key] - total[c.key]).toFixed(2)),
-          })).filter((d) => Math.abs(d.gap) >= 0.01)
-        : [];
 
     /** The tone a figure cell takes, shared by the Total and product columns. */
     const cellTone = (row: FigureRow, r: ProductRow, muted: boolean) => {
@@ -428,47 +400,6 @@ export default function UserProductBreakdown({
                         </Link>
                     </div>
                 </PageHeader>
-
-                {differences.length > 0 && (
-                    <div className="mb-6 rounded-lg border border-black/6 bg-stone-50 px-4 py-3 dark:border-white/6 dark:bg-zinc-800/60">
-                        <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase dark:text-gray-400">
-                            Charged to them vs. their share of these products
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-x-8 gap-y-3">
-                            {differences.map((d) => (
-                                <div key={d.key}>
-                                    <div className="text-[10px] text-gray-400">
-                                        {d.label}
-                                    </div>
-                                    <div className="text-[12px] text-gray-700 tabular-nums dark:text-gray-200">
-                                        {fmt(d.charged)}{' '}
-                                        <span className="text-gray-400">
-                                            charged
-                                        </span>{' '}
-                                        · {fmt(d.allocated)}{' '}
-                                        <span className="text-gray-400">
-                                            here
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <p className="mt-2.5 text-[10px] leading-relaxed text-gray-400">
-                            The{' '}
-                            <Link
-                                href={`${finance}/income-statements/${incomeStatement.id}/users`}
-                                className="underline underline-offset-2"
-                            >
-                                per-user statement
-                            </Link>{' '}
-                            books these costs from the charge-to shares on
-                            transactions; this page splits the product&rsquo;s
-                            own tagged cost between everyone who ran it. The
-                            difference is the part belonging to their co-sellers
-                            &mdash; not an error in either page.
-                        </p>
-                    </div>
-                )}
 
                 <div className={`${CARD} overflow-hidden`}>
                     <div className="flex items-center justify-between border-b border-black/6 px-5 py-4 dark:border-white/6">

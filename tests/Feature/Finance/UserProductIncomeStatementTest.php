@@ -11,7 +11,6 @@ use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionProduct;
 use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Services\ProductIncomeStatementService;
-use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Services\UserProductIncomeStatementService;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
 use Modules\GencysERP\Models\GencysDailySalesOrderItem;
@@ -539,50 +538,6 @@ test('a user the statement holds nothing for is a 404, as is a junk segment', fu
 
     $this->actingAs($owner)->get(ups_drillUrl($workspace, $statement, '999999'))->assertNotFound();
     $this->actingAs($owner)->get(ups_drillUrl($workspace, $statement, 'nonsense'))->assertNotFound();
-});
-
-test('the drill-down carries what was charged to them, for the side-by-side', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    ups_product($workspace, 'WIDGET', 'UC1');
-    $ana = ups_seller($workspace, 'Ana Reyes');
-    ups_seller($workspace, 'Ben Cruz');
-
-    ups_order(964001, $workspace, 'Ana Reyes', 'UC1');
-    ups_order(964002, $workspace, 'Ben Cruz', 'UC1');
-
-    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
-
-    // Tagged to the product (split 50/50 here) and charged wholly to Ana on the
-    // per-user statement — the two attributions the page puts side by side.
-    $type = TransactionType::firstOrCreate(
-        ['workspace_id' => $workspace->id, 'name' => 'Cost of Goods'],
-        ['income_statement_section' => 'cost_of_sales'],
-    );
-    $txn = Transaction::create([
-        'workspace_id' => $workspace->id,
-        'account_id' => $account->id,
-        'date' => '2026-05-15',
-        'description' => 'Cost of Goods',
-        'type' => 'out',
-        'transaction_type_id' => $type->id,
-        'amount' => 1000,
-    ]);
-    TransactionProduct::create(['transaction_id' => $txn->id, 'product' => 'WIDGET', 'amount' => 1000]);
-    $txn->chargeToUsers()->sync([$ana->id => ['amount' => 1000]]);
-
-    $statement = ups_statement($workspace);
-    ups_snapshot($statement);
-    app(UserIncomeStatementService::class)->snapshot($statement);
-
-    $this->actingAs($owner)
-        ->get(ups_drillUrl($workspace, $statement, (string) $ana->id))
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            // Charged the whole 1,000; her share of the product is half of it.
-            ->where('charged.total_bought_cogs', fn ($v) => (float) $v === 1000.0)
-            ->where('total.total_bought_cogs', fn ($v) => (float) $v === 500.0)
-        );
 });
 
 test('a non-member cannot drill into another workspace’s user', function () {
