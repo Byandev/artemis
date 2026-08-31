@@ -155,10 +155,16 @@ class TransactionController extends Controller
      */
     protected function formOptions(Request $request, Workspace $workspace, ?Transaction $editing = null): array
     {
+        $types = TransactionType::where('workspace_id', $workspace->id)
+            ->orderBy('name')->get(['id', 'name', 'nature']);
+
         return [
             'accounts' => $this->accountOptions($workspace, $editing),
-            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name', 'nature']),
+            'transactionTypes' => $types,
+            // The types whose entries are a purchase order's freight bill: the
+            // form offers a PO picker for these and splits the amount across
+            // that order's products. See TransactionType::isCogsDelivery().
+            'cogsDeliveryTypeIds' => $types->filter->isCogsDelivery()->pluck('id')->values(),
             'users' => $workspace->users()->get(['users.id', 'users.name']),
             // The product tags the picker offers (see productOptions).
             'products' => $this->productOptions($request, $workspace, $editing),

@@ -58,6 +58,7 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
 use Modules\Finance\Http\Controllers\IncomeStatementController as FinanceIncomeStatementController;
+use Modules\Finance\Http\Controllers\PurchasedOrderLookupController as FinancePurchasedOrderLookupController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
@@ -603,6 +604,9 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/transactions/bulk-update-type', [FinanceTransactionController::class, 'bulkUpdateType'])->name('transactions.bulk-update-type');
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
+
+        // XHR lookup behind the transaction form's delivery-fee PO picker.
+        Route::get('/purchased-orders', FinancePurchasedOrderLookupController::class)->name('purchased-orders.index');
 
         Route::get('/income-statements', [FinanceIncomeStatementController::class, 'index'])->name('income-statements.index');
         Route::get('/income-statements/preview', [FinanceIncomeStatementController::class, 'preview'])->name('income-statements.preview');
