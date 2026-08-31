@@ -167,6 +167,13 @@ const buildRows = (
     gencysPartner: boolean,
     userName: string,
 ): FigureRow[] => {
+    // Where spend is recorded per page — a page has both an owner and a
+    // product — this is exactly what ran on their own pages. The ledger side
+    // ties spend to a product or to a person but never to both, so there it
+    // falls back to their share of the product's.
+    const adSpentHelp = gencysPartner
+        ? 'This person’s share of the product’s ad spend for the month, by their share of its delivered orders. The ledger ties spend to a product or to a person, never to both at once, so this grain has to apportion it.'
+        : 'Ad spend on the pages this person owns for this product. Taken straight from the daily page records, not shared out — someone who delivered most of a product still carries only what ran on their own pages.';
     const advisoryRows: FigureRow[] = gencysPartner
         ? [
               {
@@ -306,7 +313,7 @@ const buildRows = (
         },
         {
             label: 'Ad Spent',
-            help: 'This person’s share of the product’s ad spend for the month, by their share of its delivered orders. On a product they run alone, all of it.',
+            help: adSpentHelp,
             render: (r) => fmt(r.ad_spent),
         },
         {

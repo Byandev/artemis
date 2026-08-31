@@ -99,9 +99,19 @@ final class TransactionTotals
      * Product-tagged shares, keyed by product id as a string ('' = a tag that
      * matches no product).
      *
+     * `$withUntagged` adds the rest of the month's outflow on these types —
+     * what no product share accounts for — to that same '' bucket. Costs that
+     * have to reconcile to the workspace figure want it on: a goods purchase
+     * nobody tagged is still a goods purchase, and dropping it would leave
+     * every slice quietly short of the statement they belong to. It stays
+     * unattributed rather than being spread over products on a guess.
+     *
+     * Off by default, and deliberately left off for ad spend, where only what
+     * someone attributed is counted (see the product statement's own note).
+     *
      * @return array<string, float>
      */
-    public function byProductTag(Workspace $workspace, Carbon $from, Carbon $to, array $patterns): array
+    public function byProductTag(Workspace $workspace, Carbon $from, Carbon $to, array $patterns, bool $withUntagged = false): array
     {
         $typeIds = $this->typeIds($workspace, $patterns);
 
@@ -119,20 +129,27 @@ final class TransactionTotals
             ->selectRaw('tp.product as name, SUM(tp.amount) as amount')
             ->get();
 
-        if ($rows->isEmpty()) {
-            return [];
-        }
-
-        $idByName = DB::table('products')
-            ->where('workspace_id', $workspace->id)
-            ->whereIn('name', $rows->pluck('name')->unique()->all())
-            ->pluck('id', 'name');
-
         $totals = [];
 
-        foreach ($rows as $r) {
-            $key = isset($idByName[$r->name]) ? (string) $idByName[$r->name] : '';
-            $totals[$key] = round(($totals[$key] ?? 0) + (float) $r->amount, 2);
+        if ($rows->isNotEmpty()) {
+            $idByName = DB::table('products')
+                ->where('workspace_id', $workspace->id)
+                ->whereIn('name', $rows->pluck('name')->unique()->all())
+                ->pluck('id', 'name');
+
+            foreach ($rows as $r) {
+                $key = isset($idByName[$r->name]) ? (string) $idByName[$r->name] : '';
+                $totals[$key] = round(($totals[$key] ?? 0) + (float) $r->amount, 2);
+            }
+        }
+
+        if ($withUntagged) {
+            $outflow = round((float) $this->outflow($workspace, $from, $to, $typeIds)->sum('amount'), 2);
+            $untagged = round($outflow - round(array_sum($totals), 2), 2);
+
+            if (abs($untagged) >= 0.01) {
+                $totals[''] = round(($totals[''] ?? 0) + $untagged, 2);
+            }
         }
 
         return $totals;

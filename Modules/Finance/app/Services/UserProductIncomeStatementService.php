@@ -27,13 +27,16 @@ use Modules\Finance\Statements\UserProductKey;
  * seller and a product, so it is read straight at that grain and nothing is
  * apportioned.
  *
- * The product-specific costs booked through the ledger — goods bought, the
- * freight on them, and ad spend — know only a product. A product run by several
- * people has one bought-COGS figure between them, so each seller takes the
- * share of it matching their share of that product's delivered orders. A
- * product whose costs no one delivered against this month keeps them on a row
- * with no user rather than having them silently dropped or spread over sellers
- * of other products.
+ * The goods bought for a product, and the freight on them, know only a product.
+ * A product run by several people has one such figure between them, so each
+ * seller takes the share matching their share of that product's delivered
+ * orders. A product whose costs no one delivered against this month keeps them
+ * on a row with no user rather than having them silently dropped or spread over
+ * sellers of other products.
+ *
+ * Ad spend is apportioned only where it has to be. Where the source ties spend
+ * to a page — which has both an owner and a product — the pair is already known
+ * and a seller carries the spend from their own pages exactly.
  *
  * That choice is what the rows reconcile to: summed over users, a product here
  * equals its row on the product statement. It deliberately does NOT reconcile to
@@ -70,14 +73,28 @@ class UserProductIncomeStatementService
 
         $orders = $source->totalsByUserProduct($workspace, $from, $to);
 
+        // Ad spend can be exact at this grain: where a page has both an owner
+        // and a product behind it, the spend already knows the pair, so a
+        // seller carries what ran on their own pages and nothing else. Only a
+        // source that cannot tie the two together falls back to apportioning
+        // the product's figure.
+        $exactAdSpend = $source->adSpendByUserProduct($workspace, $from, $to);
+
         // Costs that know a product but not a seller, shared out below.
         $perProduct = [
-            'ad_spent' => $source->adSpendByProduct($workspace, $from, $to),
-            'total_bought_cogs' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS),
-            'total_bought_cogs_delivery_fee' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY),
+            'total_bought_cogs' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS, withUntagged: true),
+            'total_bought_cogs_delivery_fee' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY, withUntagged: true),
         ];
 
+        if ($exactAdSpend === null) {
+            $perProduct['ad_spent'] = $source->adSpendByProduct($workspace, $from, $to);
+        }
+
         $costs = $this->allocator->allocate($perProduct, $orders);
+
+        foreach ($exactAdSpend ?? [] as $key => $amount) {
+            $costs[$key]['ad_spent'] = round((float) $amount, 2);
+        }
 
         // A pair earns a row for a cost even with no orders behind it.
         foreach (array_keys($costs) as $key) {

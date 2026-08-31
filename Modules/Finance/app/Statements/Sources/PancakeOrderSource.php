@@ -64,6 +64,26 @@ final class PancakeOrderSource implements StatementOrderSource
         return $this->adSpendKeyedBy($workspace, $from, $to, 'pg.owner_id', fn ($q) => $q);
     }
 
+    /**
+     * Exact on this side: a daily record belongs to a page, the page has an
+     * owner and a shop, and the shop has a product — so the spend already knows
+     * both without anything being apportioned.
+     */
+    public function adSpendByUserProduct(Workspace $workspace, Carbon $from, Carbon $to): ?array
+    {
+        $key = "CONCAT(COALESCE(pg.owner_id, ''), '|', COALESCE(sh.product_id, ''))";
+
+        return $this->adSpend($workspace, $from, $to)
+            ->leftJoin('shops as sh', 'sh.id', '=', 'pg.shop_id')
+            ->selectRaw($key.' as grouping_key, COALESCE(SUM(r.ad_spent), 0) as amount')
+            ->groupBy(DB::raw($key))
+            ->get()
+            ->mapWithKeys(fn ($r) => [
+                UserProductKey::of(...array_pad(explode('|', (string) $r->grouping_key, 2), 2, '')) => round((float) $r->amount, 2),
+            ])
+            ->all();
+    }
+
     /** @return array<string, float> */
     private function adSpendKeyedBy(Workspace $workspace, Carbon $from, Carbon $to, string $column, callable $join): array
     {

@@ -53,8 +53,8 @@ class ProductIncomeStatementService
 
         $orders = $source->totalsByProduct($workspace, $from, $to);
         $adSpent = $source->adSpendByProduct($workspace, $from, $to);
-        $boughtCogs = $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS);
-        $boughtFreight = $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY);
+        $boughtCogs = $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS, withUntagged: true);
+        $boughtFreight = $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY, withUntagged: true);
 
         // A product earns a row if anything happened to it this month — an
         // order, a purchase, or only an ad buy.

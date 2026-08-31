@@ -66,6 +66,17 @@ final class GencysOrderSource implements StatementOrderSource
         return $this->transactions->byChargedUser($workspace, $from, $to, TransactionTotals::AD_SPENT);
     }
 
+    /**
+     * Not available here. A transaction carries product tags and charge-to
+     * shares, but the two are independent taggings of the same amount and
+     * nothing ties a particular product's spend to a particular person, so the
+     * cross grain has to apportion the per-product figure instead.
+     */
+    public function adSpendByUserProduct(Workspace $workspace, Carbon $from, Carbon $to): ?array
+    {
+        return null;
+    }
+
     public function workspaceTotals(Workspace $workspace, Carbon $from, Carbon $to): OrderTotals
     {
         $delivered = $this->delivered($workspace, $from, $to)

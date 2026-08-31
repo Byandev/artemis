@@ -65,8 +65,8 @@ class UserIncomeStatementService
         // coincidence.
         $allocated = $this->allocator->byUser($this->allocator->allocate(
             [
-                'total_bought_cogs' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS),
-                'total_bought_cogs_delivery_fee' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY),
+                'total_bought_cogs' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COST_OF_GOODS, withUntagged: true),
+                'total_bought_cogs_delivery_fee' => $this->transactions->byProductTag($workspace, $from, $to, TransactionTotals::COG_DELIVERY, withUntagged: true),
             ],
             $source->totalsByUserProduct($workspace, $from, $to),
         ));

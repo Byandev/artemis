@@ -25,6 +25,13 @@ final class ProductCostAllocator
      * row with no user: there is no seller to credit them to, and dropping them
      * would leave the slice short of the product statement.
      *
+     * So does a cost whose tag matches no product. That bucket and the one
+     * holding orders from shops with no product behind them share a key, but
+     * not a cause — a mistyped or since-renamed tag has nothing to do with who
+     * happened to sell through an unlinked shop — and charging one to the other
+     * pins a data-entry slip on a person. It stays unattributed, where it reads
+     * as the loose end it is.
+     *
      * @param  array<string, array<string, float>>  $perProduct  cost name => [product key => amount]
      * @param  array<string, OrderTotals>  $orders  keyed by {@see UserProductKey}
      * @return array<string, array<string, float>> user-product key => [cost name => amount]
@@ -45,7 +52,7 @@ final class ProductCostAllocator
         foreach ($perProduct as $name => $amounts) {
             foreach ($amounts as $productKey => $amount) {
                 $productKey = (string) $productKey;
-                $shares = $weights[$productKey] ?? [];
+                $shares = $productKey === '' ? [] : ($weights[$productKey] ?? []);
 
                 if ($shares === []) {
                     $costs[UserProductKey::of(null, $productKey)][$name] = round((float) $amount, 2);
