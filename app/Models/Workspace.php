@@ -137,9 +137,10 @@ class Workspace extends Model
     public function hiddenPermissionNames(): array
     {
         return array_values(array_filter([
-            // Sales & Marketing is five pages behind one module switch, so the
-            // switch hides all five grants. Ad Spend Goals has a second switch
+            // Sales & Marketing is a group of pages behind one module switch,
+            // so the switch hides every grant in the group. Ad Spend Goals has a second switch
             // of its own and can be hidden while the rest of the group is on.
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDashboard->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDailyReport->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewPageRoasTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesTargets->value,

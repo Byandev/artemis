@@ -27,6 +27,7 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DailyReportController;
+use App\Http\Controllers\Workspaces\SalesMarketing\DashboardController as SalesMarketingDashboardController;
 use App\Http\Controllers\Workspaces\SalesMarketing\PageRoasTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\SalesTargetController;
 use App\Http\Controllers\Workspaces\SalesMarketing\TeamAdSpendGoalController;
@@ -159,12 +160,14 @@ Route::middleware(['auth'])->group(function () {
 
     // Role-specific dashboards (scaffold — gated by granular permissions)
     //
-    // Sales & Marketing is five sibling pages, each with its own URL and its own
+    // Sales & Marketing is a group of sibling pages, each with its own URL and its own
     // entry in the sidebar's "Sales & Marketing" group. It used to be a single
     // tabbed dashboard at .../dashboard/{tab}; the redirects at the end of this
     // group keep those URLs — and the three legacy entry points further down
     // this file — landing in the right place.
     Route::prefix('/workspaces/{workspace}/sales-marketing')->name('workspaces.sales-marketing.')->group(function () {
+        Route::get('/dashboard', [SalesMarketingDashboardController::class, 'index'])->name('dashboard');
+
         Route::get('/daily-report', [DailyReportController::class, 'index'])->name('daily-report');
         // JSON the Daily Report page fetches when the date changes.
         Route::get('/daily-report/data', [DailyReportController::class, 'data'])->name('daily-report.data');
@@ -179,17 +182,18 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/sales-targets/{salesTarget}', [SalesTargetController::class, 'update'])->name('sales-targets.update');
         Route::delete('/sales-targets/{salesTarget}', [SalesTargetController::class, 'destroy'])->name('sales-targets.destroy');
 
-        // The tabbed dashboard's old URLs. `{tab?}` is last or it swallows the
-        // more specific redirect above it.
+        // The tabbed dashboard's old tab URLs. `{tab}` is last or it swallows
+        // the more specific redirect above it. `/dashboard` itself is no longer
+        // a redirect — it is the group's own page, declared at the top.
         Route::permanentRedirect('/dashboard/data', '/workspaces/{workspace}/sales-marketing/daily-report/data');
-        Route::get('/dashboard/{tab?}', function (Workspace $workspace, ?string $tab = null) {
+        Route::get('/dashboard/{tab}', function (Workspace $workspace, string $tab) {
             $moved = ['page-roas-tracker', 'ad-spend-goals', 'ad-spent-summary', 'sales-targets'];
 
             return redirect()->route(
                 'workspaces.sales-marketing.'.(in_array($tab, $moved, true) ? $tab : 'daily-report'),
                 $workspace,
             );
-        })->name('dashboard');
+        })->name('dashboard.legacy-tab');
     });
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
