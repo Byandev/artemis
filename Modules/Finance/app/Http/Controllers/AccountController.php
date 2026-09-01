@@ -10,7 +10,6 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Modules\Finance\Http\Requests\AccountRequest;
 use Modules\Finance\Models\Account;
-use Modules\Finance\Models\Transaction;
 use Modules\Finance\Models\TransactionType;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -38,7 +37,11 @@ class AccountController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceAccounts->value, $workspace);
 
-        $accounts = QueryBuilder::for(Account::where('workspace_id', $workspace->id)->withCount(['transactions']))
+        // User wallets (created on the S&M Go Tyme Balance page) share this
+        // table but are not company accounts, so they stay out of this listing.
+        $accounts = QueryBuilder::for(
+            Account::where('workspace_id', $workspace->id)->excludingWallets()->withCount(['transactions'])
+        )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where('name', 'like', "%{$v}%")),
                 AllowedFilter::exact('is_active'),
@@ -49,17 +52,10 @@ class AccountController extends Controller
             ->withQueryString();
 
         // Get last transaction per account for running_balance
-        $accountIds = collect($accounts->items())->pluck('id');
-        $lastBalances = Transaction::where('workspace_id', $workspace->id)
-            ->whereIn('account_id', $accountIds)
-            ->whereIn('id', function ($q) use ($workspace, $accountIds) {
-                $q->selectRaw('(SELECT t2.id FROM finance_transactions t2 WHERE t2.account_id = finance_transactions.account_id AND t2.workspace_id = ? ORDER BY t2.date DESC, t2.position DESC LIMIT 1)', [$workspace->id])
-                    ->from('finance_transactions')
-                    ->where('workspace_id', $workspace->id)
-                    ->whereIn('account_id', $accountIds)
-                    ->groupBy('account_id');
-            })
-            ->pluck('running_balance', 'account_id');
+        $lastBalances = Account::currentBalances(
+            $workspace->id,
+            collect($accounts->items())->pluck('id'),
+        );
 
         // Append current_balance to each account
         $accounts->through(function ($account) use ($lastBalances) {

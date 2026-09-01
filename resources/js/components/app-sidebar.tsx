@@ -111,6 +111,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewAdSpendGoals,
                           PERMISSIONS.ViewAdSpentSummary,
                           PERMISSIONS.ViewSalesTargets,
+                          PERMISSIONS.ViewGoTymeBalance,
                       ],
                       items: [
                           {
@@ -150,6 +151,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/sales-marketing/sales-targets`,
                               icon: Target,
                               permission: PERMISSIONS.ViewSalesTargets,
+                          },
+                          {
+                              title: 'Go Tyme Balance',
+                              href: `/workspaces/${slug}/sales-marketing/go-tyme-balance`,
+                              icon: Wallet,
+                              permission: PERMISSIONS.ViewGoTymeBalance,
                           },
                       ],
                   },

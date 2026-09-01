@@ -22,6 +22,13 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     account?: FinanceAccount | null;
     workspaceSlug: string;
+    /**
+     * Where the form submits. Defaults to Finance → Accounts; the Go Tyme
+     * Balance page points it at its own endpoint, which stamps is_user_wallet.
+     */
+    endpoint?: string;
+    title?: string;
+    description?: string;
 }
 
 export function AccountFormDialog({
@@ -29,6 +36,9 @@ export function AccountFormDialog({
     onOpenChange,
     account,
     workspaceSlug,
+    endpoint,
+    title,
+    description,
 }: Props) {
     const isEditing = !!account;
 
@@ -67,7 +77,8 @@ export function AccountFormDialog({
                 onOpenChange(false);
             },
         };
-        const base = `/workspaces/${workspaceSlug}/finance/accounts`;
+        const base =
+            endpoint ?? `/workspaces/${workspaceSlug}/finance/accounts`;
         if (isEditing) {
             put(`${base}/${account!.id}`, options);
         } else {
@@ -81,12 +92,14 @@ export function AccountFormDialog({
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            {isEditing ? 'Edit Account' : 'Add Account'}
+                            {title ??
+                                (isEditing ? 'Edit Account' : 'Add Account')}
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-                            {isEditing
-                                ? 'Update this account’s details.'
-                                : 'Create a new finance account.'}
+                            {description ??
+                                (isEditing
+                                    ? 'Update this account’s details.'
+                                    : 'Create a new finance account.')}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
