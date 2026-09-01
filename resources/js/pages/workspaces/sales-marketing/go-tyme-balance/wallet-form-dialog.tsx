@@ -1,4 +1,9 @@
 import {
+    Field,
+    Footer,
+    inputCls,
+} from '@/components/finance/account-form-dialog';
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -7,34 +12,32 @@ import {
 } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect } from 'react';
-
-export interface FinanceAccount {
-    id: number;
-    name: string;
-    opening_balance: number | string;
-    currency: string;
-    notes: string | null;
-    is_active: boolean;
-}
+import { WALLET_TYPES, WalletType } from './types';
 
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    account?: FinanceAccount | null;
     workspaceSlug: string;
 }
 
-export function AccountFormDialog({
-    open,
-    onOpenChange,
-    account,
-    workspaceSlug,
-}: Props) {
-    const isEditing = !!account;
-
-    const { data, setData, post, put, processing, errors, reset, clearErrors } =
-        useForm({
+/**
+ * Create form for a Go Tyme wallet. The saved record is an ordinary Finance
+ * account — this posts to the S&M endpoint, which is what stamps
+ * `is_user_wallet` — plus the wallet-only Main/Backup slot, which has no
+ * meaning for the company accounts the Finance dialog creates.
+ */
+export function WalletFormDialog({ open, onOpenChange, workspaceSlug }: Props) {
+    const { data, setData, post, processing, errors, reset, clearErrors } =
+        useForm<{
+            name: string;
+            wallet_type: WalletType;
+            opening_balance: string;
+            currency: string;
+            notes: string;
+            is_active: boolean;
+        }>({
             name: '',
+            wallet_type: 'main',
             opening_balance: '0',
             currency: 'PHP',
             notes: '',
@@ -43,36 +46,21 @@ export function AccountFormDialog({
 
     useEffect(() => {
         if (open) {
-            if (account) {
-                setData({
-                    name: account.name ?? '',
-                    opening_balance: String(account.opening_balance ?? 0),
-                    currency: account.currency ?? 'PHP',
-                    notes: account.notes ?? '',
-                    is_active: !!account.is_active,
-                });
-            } else {
-                reset();
-                clearErrors();
-            }
+            reset();
+            clearErrors();
         }
-    }, [open, account]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const options = {
+        post(`/workspaces/${workspaceSlug}/sales-marketing/go-tyme-balance`, {
             preserveScroll: true,
             onSuccess: () => {
                 reset();
                 onOpenChange(false);
             },
-        };
-        const base = `/workspaces/${workspaceSlug}/finance/accounts`;
-        if (isEditing) {
-            put(`${base}/${account!.id}`, options);
-        } else {
-            post(base, options);
-        }
+        });
     };
 
     return (
@@ -81,12 +69,11 @@ export function AccountFormDialog({
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            {isEditing ? 'Edit Account' : 'Add Account'}
+                            Create Account
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-                            {isEditing
-                                ? 'Update this account’s details.'
-                                : 'Create a new finance account.'}
+                            Creates a Go Tyme wallet. It is kept out of Finance
+                            → Accounts.
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -102,6 +89,31 @@ export function AccountFormDialog({
                                 }
                                 className={inputCls}
                             />
+                        </Field>
+
+                        <Field
+                            label="Account Type"
+                            required
+                            error={errors.wallet_type}
+                        >
+                            <div className="flex gap-2">
+                                {WALLET_TYPES.map((type) => (
+                                    <button
+                                        key={type.value}
+                                        type="button"
+                                        onClick={() =>
+                                            setData('wallet_type', type.value)
+                                        }
+                                        className={`h-10 flex-1 rounded-[10px] border font-mono! text-[12px]! font-medium transition-all ${
+                                            data.wallet_type === type.value
+                                                ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                                : 'border-black/8 bg-stone-50 text-gray-500 hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-400 dark:hover:bg-zinc-700'
+                                        }`}
+                                    >
+                                        {type.label}
+                                    </button>
+                                ))}
+                            </div>
                         </Field>
 
                         <Field
@@ -163,7 +175,7 @@ export function AccountFormDialog({
 
                     <Footer
                         processing={processing}
-                        isEditing={isEditing}
+                        isEditing={false}
                         onCancel={() => onOpenChange(false)}
                     />
                 </form>
@@ -171,69 +183,3 @@ export function AccountFormDialog({
         </Dialog>
     );
 }
-
-const inputCls =
-    'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100';
-
-function Field({
-    label,
-    required,
-    error,
-    children,
-}: {
-    label: string;
-    required?: boolean;
-    error?: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="space-y-1.5">
-            <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                {label} {required && <span className="text-red-400">*</span>}
-            </label>
-            {children}
-            {error && (
-                <p className="mt-1 font-mono text-[11px] text-red-500">
-                    {error}
-                </p>
-            )}
-        </div>
-    );
-}
-
-function Footer({
-    processing,
-    isEditing,
-    onCancel,
-}: {
-    processing: boolean;
-    isEditing: boolean;
-    onCancel: () => void;
-}) {
-    return (
-        <div className="flex items-center justify-end gap-2 border-t border-black/6 bg-stone-50/50 px-5 py-3 dark:border-white/6 dark:bg-white/2">
-            <button
-                type="button"
-                onClick={onCancel}
-                className="flex h-9 items-center rounded-lg border border-black/8 bg-white px-4 font-mono! text-[12px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700"
-            >
-                Cancel
-            </button>
-            <button
-                type="submit"
-                disabled={processing}
-                className="flex h-9 items-center rounded-lg bg-emerald-600 px-4 font-mono! text-[12px]! font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-50"
-            >
-                {processing
-                    ? isEditing
-                        ? 'Saving…'
-                        : 'Creating…'
-                    : isEditing
-                      ? 'Save Changes'
-                      : 'Create'}
-            </button>
-        </div>
-    );
-}
-
-export { Field, Footer, inputCls };

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Modules\Finance\Enums\WalletType;
 
 class Account extends Model
 {
@@ -19,12 +20,14 @@ class Account extends Model
         'notes',
         'is_active',
         'is_user_wallet',
+        'wallet_type',
     ];
 
     protected $casts = [
         'opening_balance' => 'decimal:2',
         'is_active' => 'boolean',
         'is_user_wallet' => 'boolean',
+        'wallet_type' => WalletType::class,
     ];
 
     public function transactions(): HasMany

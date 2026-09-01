@@ -44,7 +44,9 @@ class TransactionController extends Controller
     protected function validateWorkspaceFor(Workspace $workspace, array $data): void
     {
         $accountOk = Account::where('id', $data['account_id'] ?? null)
-            ->where('workspace_id', $workspace->id)->exists();
+            ->where('workspace_id', $workspace->id)
+            ->excludingWallets()
+            ->exists();
         if (! $accountOk) {
             throw ValidationException::withMessages(['account_id' => 'Invalid account for this workspace.']);
         }
@@ -238,7 +240,10 @@ class TransactionController extends Controller
      */
     protected function accountOptions(Workspace $workspace, ?Transaction $editing = null): Collection
     {
+        // User wallets are not company accounts — they never appear in the
+        // picker, and validateWorkspaceFor() rejects one posted directly.
         $accounts = Account::where('workspace_id', $workspace->id)
+            ->excludingWallets()
             ->orderBy('name')->get(['id', 'name', 'currency', 'opening_balance']);
 
         // Newest per account, matching the ledger's date/position ordering.
@@ -403,6 +408,7 @@ class TransactionController extends Controller
 
         $accountIds = collect($validated['rows'])->pluck('account_id')->unique();
         $validAccountIds = Account::where('workspace_id', $workspace->id)
+            ->excludingWallets()
             ->whereIn('id', $accountIds)->pluck('id')->all();
 
         if (count($validAccountIds) !== $accountIds->count()) {

@@ -7,8 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\Finance\Enums\WalletType;
 use Modules\Finance\Models\Account;
 
 /**
@@ -30,14 +32,15 @@ class GoTymeBalanceController extends Controller
         $accounts = Account::where('workspace_id', $workspace->id)
             ->wallets()
             ->orderBy('name')
-            ->get(['id', 'name', 'opening_balance', 'currency', 'notes', 'is_active']);
+            ->get(['id', 'name', 'opening_balance', 'currency', 'notes', 'is_active', 'is_user_wallet', 'wallet_type']);
 
         $balances = Account::currentBalances($workspace->id, $accounts->pluck('id'));
 
         return Inertia::render('workspaces/sales-marketing/go-tyme-balance/index', [
             'workspace' => $workspace,
             'accounts' => $accounts->map(fn (Account $account) => [
-                ...$account->only(['id', 'name', 'currency', 'notes', 'is_active']),
+                ...$account->only(['id', 'name', 'currency', 'notes', 'is_active', 'is_user_wallet']),
+                'wallet_type' => $account->wallet_type?->value,
                 'opening_balance' => (float) $account->opening_balance,
                 'current_balance' => (float) $balances->get($account->id, $account->opening_balance),
             ]),
@@ -56,6 +59,7 @@ class GoTymeBalanceController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'wallet_type' => ['required', Rule::enum(WalletType::class)],
             'opening_balance' => ['required', 'numeric'],
             'currency' => ['required', 'string', 'size:3'],
             'notes' => ['nullable', 'string'],

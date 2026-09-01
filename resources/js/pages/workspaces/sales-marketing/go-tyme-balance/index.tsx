@@ -1,5 +1,4 @@
 import PageHeader from '@/components/common/PageHeader';
-import { AccountFormDialog } from '@/components/finance/account-form-dialog';
 import { DataTable } from '@/components/ui/data-table';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -7,16 +6,8 @@ import { Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-
-interface WalletAccount {
-    id: number;
-    name: string;
-    opening_balance: number;
-    current_balance: number;
-    currency: string;
-    notes: string | null;
-    is_active: boolean;
-}
+import { WALLET_TYPES, WalletAccount } from './types';
+import { WalletFormDialog } from './wallet-form-dialog';
 
 interface Props {
     workspace: Workspace;
@@ -29,6 +20,12 @@ const fmt = (v: number) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
+
+const headerCls =
+    'font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600';
+
+const walletTypeLabel = (value: WalletAccount['wallet_type']) =>
+    WALLET_TYPES.find((t) => t.value === value)?.label ?? null;
 
 /**
  * Go Tyme Balance — the per-user wallets. These are ordinary Finance accounts
@@ -45,11 +42,7 @@ export default function GoTymeBalanceIndex({
     const columns: ColumnDef<WalletAccount>[] = [
         {
             accessorKey: 'name',
-            header: () => (
-                <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Name
-                </div>
-            ),
+            header: () => <div className={headerCls}>Name</div>,
             cell: ({ row }) => (
                 <span className="text-[13px] font-medium text-gray-800 dark:text-gray-100">
                     {row.original.name}
@@ -57,11 +50,44 @@ export default function GoTymeBalanceIndex({
             ),
         },
         {
+            accessorKey: 'wallet_type',
+            header: () => (
+                <div className={`text-center ${headerCls}`}>Account Type</div>
+            ),
+            // Main/Backup is a wallet-only idea, so it renders only for rows
+            // flagged is_user_wallet.
+            cell: ({ row }) => {
+                const label = row.original.is_user_wallet
+                    ? walletTypeLabel(row.original.wallet_type)
+                    : null;
+
+                if (!label) {
+                    return (
+                        <div className="text-center font-mono text-[11px] text-gray-300 dark:text-gray-600">
+                            —
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="text-center">
+                        <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 font-mono text-[11px] font-medium ${
+                                row.original.wallet_type === 'main'
+                                    ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
+                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                            }`}
+                        >
+                            {label}
+                        </span>
+                    </div>
+                );
+            },
+        },
+        {
             accessorKey: 'currency',
             header: () => (
-                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Currency
-                </div>
+                <div className={`text-center ${headerCls}`}>Currency</div>
             ),
             cell: ({ row }) => (
                 <div className="text-center font-mono text-[11px] text-gray-500 uppercase">
@@ -72,9 +98,7 @@ export default function GoTymeBalanceIndex({
         {
             id: 'current_balance',
             header: () => (
-                <div className="text-right font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Current Balance
-                </div>
+                <div className={`text-right ${headerCls}`}>Current Balance</div>
             ),
             cell: ({ row }) => {
                 const bal = Number(row.original.current_balance ?? 0);
@@ -90,9 +114,7 @@ export default function GoTymeBalanceIndex({
         {
             accessorKey: 'is_active',
             header: () => (
-                <div className="text-center font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                    Status
-                </div>
+                <div className={`text-center ${headerCls}`}>Status</div>
             ),
             cell: ({ row }) => (
                 <div className="text-center">
@@ -128,13 +150,10 @@ export default function GoTymeBalanceIndex({
                 </div>
             </div>
 
-            <AccountFormDialog
+            <WalletFormDialog
                 open={createOpen}
                 onOpenChange={setCreateOpen}
                 workspaceSlug={workspace.slug}
-                endpoint={`/workspaces/${workspace.slug}/sales-marketing/go-tyme-balance`}
-                title="Create Account"
-                description="Creates a Go Tyme wallet. It is kept out of Finance → Accounts."
             />
         </AppLayout>
     );
