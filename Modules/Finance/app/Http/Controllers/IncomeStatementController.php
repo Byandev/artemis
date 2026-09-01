@@ -18,6 +18,7 @@ use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Services\UserProductIncomeStatementService;
+use Modules\Finance\Statements\LossCarryovers;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
 use Modules\Finance\Statements\StatementRates;
 use Modules\Finance\Statements\TransactionTotals;
@@ -45,6 +46,7 @@ class IncomeStatementController extends Controller
         private readonly UserIncomeStatementService $userStatements,
         private readonly ProductIncomeStatementService $productStatements,
         private readonly UserProductIncomeStatementService $userProductStatements,
+        private readonly LossCarryovers $carryovers,
     ) {}
 
     /**
@@ -65,7 +67,15 @@ class IncomeStatementController extends Controller
         StatementRates $rates,
         ?Collection $requestedKeys = null,
         ?IncomeStatement $regenerating = null,
+        ?float $manualLossBroughtForward = null,
     ): IncomeStatement {
+        // A figure someone typed survives a regenerate, the way the rates do:
+        // it is a statement about months this system never saw, and rebuilding
+        // this one tells us nothing new about them.
+        $manualLossBroughtForward ??= $regenerating?->manual_loss_brought_forward === null
+            ? null
+            : (float) $regenerating->manual_loss_brought_forward;
+
         [$periodMonth, $from, $to] = $this->resolveMonth($month);
 
         $lines = $this->expenseLines(
@@ -81,15 +91,21 @@ class IncomeStatementController extends Controller
             // cost-of-sales transaction added since the last save, has to flow
             // into gross profit rather than be dropped for not being in the
             // original set. OPEX toggles are preserved.
+            // toBase() because mapping an Eloquent collection to ints only
+            // downgrades it when the result is non-empty — map() checks whether
+            // it still holds models, and an empty one trivially does. A
+            // statement with no breakdown rows would otherwise keep an Eloquent
+            // collection here and merge() would ask an int for its key.
             $regenerating !== null => $regenerating->breakdown
                 ->map(fn ($b) => $this->keyForRow($b))
+                ->toBase()
                 ->merge($lines->where('section', 'cost_of_sales')->map(fn ($l) => $l['type_key']))
                 ->unique()
                 ->values(),
             default => $lines->map(fn ($l) => $l['type_key']),
         };
 
-        $statement = $this->persist($workspace, $periodMonth, $from, $to, $includedKeys, $rates);
+        $statement = $this->persist($workspace, $periodMonth, $from, $to, $includedKeys, $rates, $manualLossBroughtForward);
 
         $this->userStatements->snapshot($statement);
         $this->productStatements->snapshot($statement);
@@ -170,6 +186,7 @@ class IncomeStatementController extends Controller
             // Computed for the month, not read back — nothing is stored yet.
             'figures' => [
                 ...$figures,
+                ...$this->carriedForward($workspace, $periodMonth, $figures),
                 'delivered_amount' => $revenue['delivered'],
             ],
             'statement' => [
@@ -200,6 +217,9 @@ class IncomeStatementController extends Controller
             'vat_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'advisory_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'advisory_delivered_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            // What last month left owing, when it was never closed here. Given
+            // as a positive amount to deduct; 0 states the month broke even.
+            'loss_brought_forward' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $rates = StatementRates::resolve(
@@ -220,6 +240,9 @@ class IncomeStatementController extends Controller
             $rates,
             requestedKeys: array_key_exists('included_keys', $validated)
                 ? collect($validated['included_keys'])
+                : null,
+            manualLossBroughtForward: isset($validated['loss_brought_forward'])
+                ? (float) $validated['loss_brought_forward']
                 : null,
         );
 
@@ -259,6 +282,10 @@ class IncomeStatementController extends Controller
                 'opex' => (float) $incomeStatement->opex,
                 'net_profit_delivered_cogs' => (float) $incomeStatement->net_profit_delivered_cogs,
                 'net_profit_bought_cogs' => (float) $incomeStatement->net_profit_bought_cogs,
+                'loss_brought_forward_delivered_cogs' => (float) $incomeStatement->loss_brought_forward_delivered_cogs,
+                'loss_brought_forward_bought_cogs' => (float) $incomeStatement->loss_brought_forward_bought_cogs,
+                'cumulative_profit_delivered_cogs' => (float) $incomeStatement->cumulative_profit_delivered_cogs,
+                'cumulative_profit_bought_cogs' => (float) $incomeStatement->cumulative_profit_bought_cogs,
                 'gross_profit_delivered_cogs' => (float) $incomeStatement->gross_profit_delivered_cogs,
                 'gross_profit_delivered_cogs_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_advisory_share,
                 'gross_profit_delivered_cogs_after_advisory_share' => (float) $incomeStatement->gross_profit_delivered_cogs_after_advisory_share,
@@ -281,6 +308,9 @@ class IncomeStatementController extends Controller
                 'period_month' => $incomeStatement->period_month->toDateString(),
                 'cod_fee_rate' => (float) $incomeStatement->cod_fee_rate,
                 'vat_rate' => (float) $incomeStatement->vat_rate,
+                'manual_loss_brought_forward' => $incomeStatement->manual_loss_brought_forward === null
+                    ? null
+                    : (float) $incomeStatement->manual_loss_brought_forward,
                 'advisory_rate' => (float) $incomeStatement->advisory_rate,
                 'advisory_delivered_rate' => (float) $incomeStatement->advisory_delivered_rate,
                 'gencys_partner' => (bool) $workspace->is_gencys_partner,
@@ -362,7 +392,7 @@ class IncomeStatementController extends Controller
      * Recompute the month's revenue, cost of sales, gross profit, advisory, OPEX
      * and net profit for the included lines, and (over)write the snapshot.
      */
-    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, StatementRates $rates): IncomeStatement
+    private function persist(Workspace $workspace, string $periodMonth, Carbon $from, Carbon $to, Collection $includedKeys, StatementRates $rates, ?float $manualLossBroughtForward = null): IncomeStatement
     {
         ['codFee' => $codRate, 'vat' => $vatRate, 'advisory' => $advisoryRate, 'advisoryDelivered' => $advisoryDeliveredRate] = (array) $rates;
 
@@ -385,6 +415,11 @@ class IncomeStatementController extends Controller
         $netProfit = $grossProfit - $opex - $advisoryShare;
 
         $figures = $this->figures($workspace, $from, $to, $codRate, $vatRate, $advisoryRate, $advisoryDeliveredRate);
+
+        // What last month left owing, and what this month comes to once it is
+        // paid off. Worked out before the write so it lands with everything
+        // else rather than as a second save.
+        $figures = [...$figures, ...$this->carriedForward($workspace, $periodMonth, $figures, $manualLossBroughtForward)];
 
         return DB::transaction(function () use ($workspace, $periodMonth, $from, $to, $revenue, $included, $costOfSales, $opex, $grossProfit, $netProfit, $rates, $advisoryShare, $figures) {
             $statement = IncomeStatement::updateOrCreate(
@@ -572,6 +607,62 @@ class IncomeStatementController extends Controller
             'net_profit_delivered_cogs' => round($grossDelivered - $advisory($grossDelivered) - $opexTotal, 2),
             'net_profit_bought_cogs' => round($grossBought - $advisory($grossBought) - $opexTotal, 2),
         ];
+    }
+
+    /**
+     * What last month left owing, and what this month comes to once it is paid
+     * off.
+     *
+     * A month that ends in the red does not start the next one level: the
+     * deficit is brought forward and only what is left after filling it counts
+     * as profit. What carries is the previous month's *cumulative* figure, not
+     * its net profit, so a run of bad months accumulates rather than each one
+     * forgiving everything before it.
+     *
+     * Nought is carried from a month that ended in profit — a good month is not
+     * a credit against a bad one, it has already been taken.
+     *
+     * @return array<string, float>
+     */
+    private function carriedForward(Workspace $workspace, string $periodMonth, array $figures, ?float $manual = null): array
+    {
+        $month = Carbon::parse($periodMonth)->startOfMonth();
+
+        // Entries against a seller and a product are the finest statement of
+        // the deficit there is, so where they exist the month's figure is
+        // simply their sum — that is what makes the top of the statement agree
+        // with the bottom of the slices.
+        $entered = $this->carryovers->forWorkspace($workspace, $month);
+        $hasEntries = $entered > 0;
+
+        $previous = ($manual === null && ! $hasEntries)
+            ? IncomeStatement::where('workspace_id', $workspace->id)
+                ->whereDate('period_month', $month->copy()->subMonthNoOverflow())
+                ->first()
+            : null;
+
+        $carried = ['manual_loss_brought_forward' => $manual];
+
+        foreach (['delivered_cogs', 'bought_cogs'] as $basis) {
+            // Precedence, finest first: what was entered per seller and
+            // product, then a figure typed for the month as a whole, then last
+            // month's own closing position. The first two apply to both bases,
+            // coming from books that knew one bottom line.
+            $before = (float) ($previous?->{"cumulative_profit_{$basis}"} ?? 0.0);
+            $loss = match (true) {
+                $hasEntries => $entered,
+                $manual !== null => round(max($manual, 0.0), 2),
+                default => $before < 0 ? round(abs($before), 2) : 0.0,
+            };
+
+            $carried["loss_brought_forward_{$basis}"] = $loss;
+            $carried["cumulative_profit_{$basis}"] = round(
+                (float) ($figures["net_profit_{$basis}"] ?? 0.0) - $loss,
+                2,
+            );
+        }
+
+        return $carried;
     }
 
     /**

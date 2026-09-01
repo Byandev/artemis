@@ -27,6 +27,11 @@ interface Statement {
     advisory_delivered_rate: number; // fraction (0.09)
     gencys_partner: boolean;
     generated_at?: string | null;
+    /**
+     * A deficit typed in rather than read off last month's statement, for the
+     * months that were closed somewhere else. Null = use the month before.
+     */
+    manual_loss_brought_forward?: number | null;
 }
 
 interface Props {
@@ -56,6 +61,17 @@ export default function IncomeStatementShow({
 
     const [saving, setSaving] = useState(false);
 
+    // What last month left owing, when it was never closed here — the months
+    // before this system was in use were worked out on a spreadsheet, so the
+    // figure has to be given rather than found. Blank means "read it off the
+    // month before"; a typed 0 means "that month broke even", which is a
+    // different statement and is kept.
+    const [lossBroughtForward, setLossBroughtForward] = useState(
+        statement.manual_loss_brought_forward == null
+            ? ''
+            : String(statement.manual_loss_brought_forward),
+    );
+
     // The rates come along so the saved statement keeps the ones it was struck
     // at, rather than picking up a later change to the workspace defaults.
     const save = () => {
@@ -66,6 +82,9 @@ export default function IncomeStatementShow({
                 month,
                 cod_rate: statement.cod_fee_rate,
                 vat_rate: statement.vat_rate,
+                ...(lossBroughtForward.trim() === ''
+                    ? {}
+                    : { loss_brought_forward: lossBroughtForward }),
             },
             { onFinish: () => setSaving(false) },
         );
@@ -126,6 +145,28 @@ export default function IncomeStatementShow({
                                     Seller × Product
                                 </Link>
                             </>
+                        )}
+
+                        {isPreview && (
+                            <label className="flex h-8 items-center gap-2 rounded-lg border border-black/6 bg-stone-50 px-3 dark:border-white/6 dark:bg-zinc-800">
+                                <span
+                                    className="font-mono text-[11px] whitespace-nowrap text-gray-500 dark:text-gray-400"
+                                    title="What last month ended owing, if it was never closed here. Leave blank to read it off the previous statement."
+                                >
+                                    Loss b/f
+                                </span>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={lossBroughtForward}
+                                    onChange={(e) =>
+                                        setLossBroughtForward(e.target.value)
+                                    }
+                                    placeholder="auto"
+                                    className="h-6 w-28 rounded-md border border-black/8 bg-white px-2 text-right font-mono! text-[12px]! text-gray-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-100"
+                                />
+                            </label>
                         )}
 
                         {isPreview ? (

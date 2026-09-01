@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Services\Concerns\ClosesOutSlices;
+use Modules\Finance\Statements\LossCarryovers;
 use Modules\Finance\Statements\OrderTotals;
 use Modules\Finance\Statements\ProductCostAllocator;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
@@ -39,6 +40,7 @@ class UserIncomeStatementService
     public function __construct(
         private readonly StatementOrderSourceFactory $sources,
         private readonly TransactionTotals $transactions,
+        private readonly LossCarryovers $carryovers,
         private readonly ProductCostAllocator $allocator,
     ) {}
 
@@ -144,7 +146,15 @@ class UserIncomeStatementService
 
         // The advisory and OPEX are allocated from the parent statement once
         // every row's gross profit is settled — see ClosesOutSlices.
-        $rows = collect($this->closeSlice($statement, $rows->all()));
+        $rows = $this->closeSlice($statement, $rows->all());
+
+        // Then the deficit carried into the month, entered at the seller-and-
+        // product grain and added up to whatever grain this slice reports at.
+        $rows = collect($this->applyCarriedLoss(
+            $rows,
+            $this->carryovers->byUser($workspace, $from),
+            fn (array $row) => (string) ($row['user_id'] ?? ''),
+        ));
 
         DB::transaction(function () use ($statement, $rows) {
             $statement->userStatements()->delete();
@@ -192,6 +202,9 @@ class UserIncomeStatementService
             'opex' => (float) $r->opex,
             'opex_share_percentage' => (float) $r->opex_share_percentage,
             'opex_breakdown' => $this->opexByType($opexTypes, (float) $r->opex),
+            'loss_brought_forward' => (float) $r->loss_brought_forward,
+            'cumulative_profit_delivered_cogs' => (float) $r->cumulative_profit_delivered_cogs,
+            'cumulative_profit_bought_cogs' => (float) $r->cumulative_profit_bought_cogs,
             'net_profit_delivered_cogs' => (float) $r->net_profit_delivered_cogs,
             'net_profit_bought_cogs' => (float) $r->net_profit_bought_cogs,
         ]);
@@ -226,6 +239,9 @@ class UserIncomeStatementService
             'gross_profit_bought_cogs_after_advisory_share' => $sum('gross_profit_bought_cogs_after_advisory_share'),
             'opex' => $sum('opex'),
             'opex_breakdown' => $this->opexByType($opexTypes, $sum('opex')),
+            'loss_brought_forward' => $sum('loss_brought_forward'),
+            'cumulative_profit_delivered_cogs' => $sum('cumulative_profit_delivered_cogs'),
+            'cumulative_profit_bought_cogs' => $sum('cumulative_profit_bought_cogs'),
             'opex_share_percentage' => $sum('opex_share_percentage'),
             'net_profit_delivered_cogs' => $sum('net_profit_delivered_cogs'),
             'net_profit_bought_cogs' => $sum('net_profit_bought_cogs'),

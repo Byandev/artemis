@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -68,6 +68,10 @@ interface Row {
     opex_share_percentage: number;
     /** That share opened up by transaction type; sums back to `opex`. */
     opex_breakdown: OpexLine[];
+    /** The deficit carried into the month for this pair, entered by hand. */
+    loss_brought_forward: number;
+    cumulative_profit_delivered_cogs: number;
+    cumulative_profit_bought_cogs: number;
     net_profit_delivered_cogs: number;
     net_profit_bought_cogs: number;
 }
@@ -155,6 +159,12 @@ interface FigureRow {
     signed?: (r: Row) => number;
     /** The row opens to show what makes it up, one sub-row per entry. */
     breakdown?: (r: Row) => OpexLine[];
+    /**
+     * The row is typed into rather than only read. The value is entered per
+     * column and everything above it is those entries added up, so this is the
+     * one place the figure is stated.
+     */
+    editable?: (r: Row) => number;
 }
 
 /**
@@ -296,6 +306,27 @@ const buildRows = (
                     ? r.net_profit_bought_cogs
                     : r.net_profit_delivered_cogs,
         },
+        {
+            label: 'Less — Loss Brought Forward',
+            help: 'What this seller carried into the month on this product — a deficit from before, entered here because this is the finest grain the statements report at. Everything above adds up from these: the person’s own total, the product’s across its sellers, and the month’s across both. Type a figure and it saves when you leave the box; nought clears it.',
+            render: (r) => fmt(r.loss_brought_forward),
+            editable: (r) => r.loss_brought_forward,
+        },
+        {
+            label: '= Cumulative Profit',
+            help: 'Net Profit less the loss carried in — what this pair is actually up, counting where it started the month.',
+            render: (r) =>
+                fmt(
+                    cogsView === 'bought'
+                        ? r.cumulative_profit_bought_cogs
+                        : r.cumulative_profit_delivered_cogs,
+                ),
+            emphasis: true,
+            signed: (r) =>
+                cogsView === 'bought'
+                    ? r.cumulative_profit_bought_cogs
+                    : r.cumulative_profit_delivered_cogs,
+        },
     ];
 };
 
@@ -355,6 +386,22 @@ export default function UserProductIncomeStatements({
     );
     const divider = (i: number) =>
         startsGroup[i] ? 'border-l border-black/6 dark:border-white/6' : '';
+
+    // Saving a carried loss rebuilds the slices server-side, so the roll-ups
+    // above it are true again on the response. Sent on leaving the box rather
+    // than per keystroke — each save re-snapshots three tables.
+    const saveCarryover = (r: Row, raw: string) => {
+        const amount = raw.trim() === '' ? 0 : Number(raw);
+
+        if (!Number.isFinite(amount) || amount < 0) return;
+        if (amount === r.loss_brought_forward) return;
+
+        router.post(
+            `${finance}/income-statements/${incomeStatement.id}/loss-carryovers`,
+            { user_id: r.user_id, product_id: r.product_id, amount },
+            { preserveScroll: true },
+        );
+    };
 
     const toggleRow = (label: string) =>
         setOpenRows((current) => {
@@ -635,7 +682,35 @@ export default function UserProductIncomeStatements({
                                                                 : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
                                                         } ${cellTone(row, r, isMuted(r))}`}
                                                     >
-                                                        {row.render(r)}
+                                                        {row.editable ? (
+                                                            <input
+                                                                // Uncontrolled, so it has to remount to pick
+                                                                // up a value the server changed — keying on
+                                                                // the figure does that, and does nothing
+                                                                // while the prop is unchanged mid-typing.
+                                                                key={`${columnKey(r)}-${row.editable(r)}`}
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                defaultValue={
+                                                                    row.editable(
+                                                                        r,
+                                                                    ) || ''
+                                                                }
+                                                                placeholder="0.00"
+                                                                aria-label={`Loss brought forward for ${r.user} on ${r.product}`}
+                                                                onBlur={(e) =>
+                                                                    saveCarryover(
+                                                                        r,
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className="h-7 w-full rounded-md border border-black/8 bg-white px-2 text-right font-mono! text-[12px]! text-gray-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-100"
+                                                            />
+                                                        ) : (
+                                                            row.render(r)
+                                                        )}
                                                     </td>
                                                 ))}
                                                 {rows.length === 0 && (

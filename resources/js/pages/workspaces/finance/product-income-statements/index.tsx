@@ -62,6 +62,10 @@ interface ProductRow {
     opex_share_percentage: number;
     /** That share opened up by transaction type; sums back to `opex`. */
     opex_breakdown: OpexLine[];
+    /** The deficit carried in, added up from the seller-and-product entries. */
+    loss_brought_forward: number;
+    cumulative_profit_delivered_cogs: number;
+    cumulative_profit_bought_cogs: number;
     net_profit_delivered_cogs: number;
     net_profit_bought_cogs: number;
 }
@@ -293,6 +297,26 @@ const buildRows = (
                 cogsView === 'bought'
                     ? r.net_profit_bought_cogs
                     : r.net_profit_delivered_cogs,
+        },
+        {
+            label: 'Less — Loss Brought Forward',
+            help: 'What was carried into the month, added up from this product’s sellers — the figures are entered on the Seller × Product page, which is the finest grain they are stated at. Nought here means none was entered against this product.',
+            render: (r) => fmt(r.loss_brought_forward),
+        },
+        {
+            label: '= Cumulative Profit',
+            help: 'Net Profit less the loss carried in — what this product is actually up, counting where it started the month.',
+            render: (r) =>
+                fmt(
+                    cogsView === 'bought'
+                        ? r.cumulative_profit_bought_cogs
+                        : r.cumulative_profit_delivered_cogs,
+                ),
+            emphasis: true,
+            signed: (r) =>
+                cogsView === 'bought'
+                    ? r.cumulative_profit_bought_cogs
+                    : r.cumulative_profit_delivered_cogs,
         },
     ];
 };

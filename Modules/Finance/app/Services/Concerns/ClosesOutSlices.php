@@ -3,6 +3,7 @@
 namespace Modules\Finance\Services\Concerns;
 
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Statements\LossCarryovers;
 use Modules\Finance\Statements\ProportionalSplit;
 
 /**
@@ -28,6 +29,37 @@ trait ClosesOutSlices
 {
     /** The two cost-of-goods bases a statement carries side by side. */
     private const BASES = ['delivered_cogs', 'bought_cogs'];
+
+    /**
+     * Fill in each row's carried deficit and what it leaves.
+     *
+     * The figures are entered against a seller and a product and added up from
+     * there, so a slice only has to ask for its own grain — see
+     * {@see LossCarryovers}. A row with no entry
+     * carries nothing, which is the common case.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @param  array<string, float>  $carried  keyed the way this slice's rows are
+     * @param  callable(array<string, mixed>): string  $keyOf
+     * @return list<array<string, mixed>>
+     */
+    private function applyCarriedLoss(array $rows, array $carried, callable $keyOf): array
+    {
+        foreach ($rows as $i => $row) {
+            $loss = round((float) ($carried[$keyOf($row)] ?? 0), 2);
+
+            $rows[$i]['loss_brought_forward'] = $loss;
+
+            foreach (self::BASES as $basis) {
+                $rows[$i]["cumulative_profit_{$basis}"] = round(
+                    (float) $rows[$i]["net_profit_{$basis}"] - $loss,
+                    2,
+                );
+            }
+        }
+
+        return $rows;
+    }
 
     /**
      * A row's OPEX opened up by transaction type, for the pages that let the

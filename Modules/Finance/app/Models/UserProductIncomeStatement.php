@@ -48,6 +48,9 @@ class UserProductIncomeStatement extends Model
         'opex_share_percentage',
         'net_profit_delivered_cogs',
         'net_profit_bought_cogs',
+        'loss_brought_forward',
+        'cumulative_profit_delivered_cogs',
+        'cumulative_profit_bought_cogs',
     ];
 
     protected $casts = [
@@ -73,6 +76,9 @@ class UserProductIncomeStatement extends Model
         'opex_share_percentage' => 'decimal:6',
         'net_profit_delivered_cogs' => 'decimal:2',
         'net_profit_bought_cogs' => 'decimal:2',
+        'loss_brought_forward' => 'decimal:2',
+        'cumulative_profit_delivered_cogs' => 'decimal:2',
+        'cumulative_profit_bought_cogs' => 'decimal:2',
     ];
 
     public function incomeStatement(): BelongsTo

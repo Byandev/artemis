@@ -621,6 +621,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/income-statements/{incomeStatement}/products', [FinanceUserIncomeStatementController::class, 'productIndex'])->name('income-statements.products.index');
         Route::get('/income-statements/{incomeStatement}/users', [FinanceUserIncomeStatementController::class, 'index'])->name('income-statements.users.index');
         Route::get('/income-statements/{incomeStatement}/user-products', [FinanceUserIncomeStatementController::class, 'userProductIndex'])->name('income-statements.user-products.index');
+        Route::post('/income-statements/{incomeStatement}/loss-carryovers', [FinanceUserIncomeStatementController::class, 'storeLossCarryover'])->name('income-statements.loss-carryovers.store');
         Route::get('/income-statements/{incomeStatement}/users/{user}', [FinanceUserIncomeStatementController::class, 'userShow'])->name('income-statements.users.show');
 
         Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');

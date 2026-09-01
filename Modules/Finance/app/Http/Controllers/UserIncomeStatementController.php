@@ -7,8 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Models\LossCarryover;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Services\UserProductIncomeStatementService;
@@ -105,6 +107,58 @@ class UserIncomeStatementController extends Controller
             'incomeStatement' => $this->statementContext($incomeStatement),
             ...$this->userProductService->payload($incomeStatement),
         ]);
+    }
+
+    /**
+     * Record what one seller carried into the month on one product.
+     *
+     * Entered at the finest grain the statements report at, so it adds up on
+     * its own: the seller's own total, the product's across its sellers, and
+     * the month's across both. Saving one re-snapshots the slices so those
+     * roll-ups are true again straight away.
+     *
+     * An amount of nought removes the entry rather than storing a zero — the
+     * absence of a deficit and a deficit of nothing are the same thing here,
+     * and keeping rows of nought would make the month look edited when it is
+     * not.
+     */
+    public function storeLossCarryover(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
+        $this->ensureOwns($workspace, $incomeStatement);
+
+        $validated = $request->validate([
+            // Null on either side is the unattributed bucket that side reports.
+            'user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
+            'product_id' => [
+                'nullable', 'integer',
+                Rule::exists('products', 'id')->where('workspace_id', $workspace->id),
+            ],
+            // What is owed, held positive: a carryover is a hole to fill.
+            'amount' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $key = [
+            'workspace_id' => $workspace->id,
+            'period_month' => $incomeStatement->period_month->copy()->startOfMonth()->toDateString(),
+            'user_id' => $validated['user_id'] ?? null,
+            'product_id' => $validated['product_id'] ?? null,
+        ];
+
+        if ((float) $validated['amount'] <= 0) {
+            LossCarryover::where($key)->delete();
+        } else {
+            LossCarryover::updateOrCreate($key, ['amount' => $validated['amount']]);
+        }
+
+        // The slices carry the figure, so they have to be rebuilt for the
+        // roll-ups above it to agree again.
+        $this->userProductService->snapshot($incomeStatement);
+        $this->service->snapshot($incomeStatement);
+        $this->productService->snapshot($incomeStatement);
+
+        return redirect()->back()->with('success', 'Loss carried forward saved.');
     }
 
     /** @return array{id:int, period_month:string, month:string, label:string} */
