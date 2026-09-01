@@ -12,6 +12,100 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.33.1',
+        date: '2026-08-28',
+        sections: [
+            {
+                title: 'RTS — RMO Call Cards',
+                items: [
+                    'The five call cards now report the calls one person actually placed rather than the whole workspace’s day — they follow the assignee you have picked, or failing that whoever the Logged in as picker says you are, so “my call logs” means the calls you made; left on All Assignees with no identity set they still cover the workspace’s whole day, as before',
+                    'They follow the page and shop filters too, so the cards describe the rows on screen; previously they reported every call logged that day whatever you had narrowed the list to, which is what made them look stuck',
+                    'The cut is by whoever dialled, not by whose orders the numbers belonged to — a CSR rings plenty of numbers that are not on the orders assigned to them, and counting against their order list was the wrong question and the reason the figures read as though the filters were being ignored',
+                ],
+            },
+            {
+                title: 'RTS — RMO Management',
+                items: [
+                    'The stat cards load on their own now instead of holding the page up: sorting, turning a page and typing in the search box no longer pay for six day-wide aggregates each time, and the cards only re-ask the server when something they actually depend on changes',
+                    'The filter bar has an All Assignees picker, so you can read someone else’s day by name rather than only your own through My Assignee Only — the toggle still wins while it is on, and the picker greys out with a note saying so instead of being quietly ignored',
+                    'While a figure is on its way the card shows a placeholder bar at its usual height rather than the previous number, so nothing reflows underneath you and a stale figure can’t be misread as the fresh one — and nothing is fetched at all while the cards are collapsed, which is how they start',
+                    'Changing who you are logged in as now re-runs the table and the cards, instead of leaving both sitting on the previous person’s orders until you happened to touch a filter',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Editing a course now saves — previously the form submitted as though it were creating a new one, so the update was rejected and the change never landed',
+                    'Avg Call Duration and Hit Rate are worked out in one place shared with the daily RMO Discord report, so the card and the report cannot drift apart on what a hit rate means',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.33.0',
+        date: '2026-08-28',
+        sections: [
+            {
+                title: 'Courses (New)',
+                items: [
+                    'Courses is now its own admin-toggled module: a workspace switched onto it gets a Courses catalogue in the sidebar, where a course is built as modules with lessons inside them, each lesson carrying a video, and published only when you are ready — a draft is visible to the people who can edit courses and to nobody else, so half-built material never turns up in front of a learner',
+                    'A learner opens a course into a player — the lesson list down one side, the video beside it, Mark complete and Next underneath — and Start becomes Continue afterwards, dropping them back at the lesson they left off on rather than at the beginning',
+                    'Lesson videos upload straight from the browser to storage rather than through Artemis, so a large file no longer has to survive the trip through the app, and each lesson’s length is read off the file as it goes up — the outline shows a duration per lesson and the course header the total',
+                    'The catalogue shows each person what is theirs to see: someone who can edit courses gets the whole catalogue including drafts, how many people enrolled and the average completion across them, while everyone else gets the published courses and their own progress through the ones they picked up',
+                    'A completion leaderboard ranks the ten members who have finished most of the workspace’s material, and each course carries a How The Team Is Doing panel listing everyone who started it and how far through they are — a course’s completion rate counts only the people actually enrolled, so material nobody opened cannot drag the figure down',
+                    'Courses has its own permissions — view, create, edit and delete are each separate — so nobody but a workspace owner sees it until a role has been granted them; check your roles after this release if your team is meant to have it',
+                ],
+            },
+            {
+                title: 'Finance — Income Statements Rebuilt',
+                items: [
+                    'A statement now reads as one column of figures, from delivered orders and revenue down through shipping, ad spend, the COD fee and its VAT to gross profit and the advisory share — and the same figures, in the same words, carry across the workspace statement and its per-product and per-user tables, so a number can be followed through all three instead of each page having its own shape',
+                    'Cost of goods can be read two ways and you switch between them: Delivered COGS charges what actually shipped, which is the truer margin on the month’s sales, while Bought COGS charges what was purchased into stock plus the freight on it, which is what the month cost in cash — they answer different questions, so neither is picked for you',
+                    'The advisory share is now struck two ways — a percentage of gross profit, or a percentage of delivered revenue — and the lower of the two is what is charged, with the statement naming which basis applied that month; a loss-making month owes nothing rather than earning a rebate',
+                    'Income statements are no longer Gencys-only: a workspace that is not a Gencys partner now takes its delivered revenue, shipped parcels and courier fees from its Pancake orders and gets a statement in exactly the same shape',
+                    'Saving now includes every line rather than only the ones you ticked — the cost-of-sales and OPEX checklist has gone from the statement page, and the Expenses and Net Profit columns on the statements list have been replaced by Orders and Gross Profit',
+                ],
+            },
+            {
+                title: 'Finance — Per-Product & Per-User Statements',
+                items: [
+                    'Both tables have been rebuilt onto the figures above: every product, and every intern, with delivered orders and revenue, shipping, ad spend, the COD fee and its VAT, cost of goods on whichever basis you are reading, gross profit and the advisory share taken off it',
+                    'Net profit per intern, the per-intern drill-down page and the per-product commission rates it carried have gone with the rebuild — the per-user table now stops at gross profit after the advisory share, the same place the product table and the workspace statement stop',
+                    'The header row and the first column stay put as you scroll, so a figure ten columns to the right still says which product or which person it belongs to, and every column carries a question mark spelling out what it counts and how it was worked out',
+                    'Shipping counts parcels by the day they went out and counts them whatever became of them — you pay the courier for a return too — so a row’s shipped and delivered counts are not meant to agree, and the column note says as much rather than leaving it to look like an error',
+                    'Ad spend is counted only where it was actually tagged to a product; spend nobody attributed stays out of the per-product figures rather than being spread around on an assumption',
+                ],
+            },
+            {
+                title: 'RTS — RMO Call Statistics',
+                items: [
+                    'RMO Management carries five more cards alongside the delivery counts — Total Call Logs Synced, Total Call Duration, Connected Calls (5s+), Avg Call Duration and Hit Rate — so the day’s calling effort reads beside what it produced instead of only the orders it touched',
+                    'A call has to last five seconds before it counts as connected; anything shorter is the dial tone and a hang-up, and keeping those out of the numerator is what makes a hit rate worth reading',
+                    'The call cards report every call the workspace logged for that delivery date, whoever placed it and whatever number it reached, so they stay still when you narrow the list underneath rather than moving for reasons the cards don’t explain',
+                    'Total talk time on the call KPI now counts every call a person made that day; previously it counted only calls whose number matched an order due for delivery that day, so time spent on anything else quietly vanished from the figure',
+                    'CX CALL ENDED and RIDER CALL ENDED have been added as RMO statuses, each with its own badge',
+                ],
+            },
+            {
+                title: 'RTS — Daily RMO Discord Report (New)',
+                items: [
+                    'The day’s RMO numbers can now be posted to Discord once a day — for delivery, called, delivered, returning and problematic, plus the five call figures — covering the whole workspace across all users, and quoting the same figures the RMO page shows so the report and the page cannot disagree',
+                    'Set it up on the RMO management settings page: switch it on, paste your webhook and pick the hour it should send, whole hours only',
+                    'It sits behind its own Manage RMO Notifications permission on top of the one that opens the settings page, so nobody sees the webhook field until a role has been granted it, and it is off by default — an existing workspace will not start posting because it was upgraded',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'The Inventory Items table now pins its header row and the SKU column as you scroll — with thirty-odd report columns running well past the fold, a figure ten columns right was unreadable when you could no longer see which item or which measure it belonged to',
+                    'Unit Codes has a No product switch that narrows the list to codes with nothing linked yet, so the mapping still left to do is one toggle away rather than a page-by-page hunt',
+                    'An OPEX transaction type now records which company metric its shared cost should be split across products by — Delivered parcels, Total orders or Delivered revenue — shown as a Split by column on the Transaction Types list, because a CSR’s salary tracks every order taken while warehouse costs track only the parcels that actually went out',
+                    'The ERP sync now runs five times a day rather than four, and the inventory snapshot passes have been retimed alongside it, spreading both further across the working day',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.32.0',
         date: '2026-08-25',
         sections: [

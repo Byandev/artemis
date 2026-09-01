@@ -4,6 +4,7 @@ use App\Http\Controllers\API\Workspace\AnalyticsController;
 use App\Http\Controllers\API\Workspace\CSRController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
+use App\Http\Controllers\API\Workspace\ParcelJourneyStatsController;
 use App\Http\Controllers\API\Workspace\ProductController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
@@ -56,6 +57,20 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards'])->name('leaderboards.index');
+
+        // Parcel journey KPIs — one endpoint per stat card so each loads,
+        // skeletons and refreshes on its own. See ParcelJourneyStatsController.
+        Route::prefix('rts/parcel-journey/kpi')->name('rts.parcel-journey.kpi.')->group(function () {
+            Route::get('/tracked-orders', [ParcelJourneyStatsController::class, 'trackedOrders'])->name('tracked-orders');
+            Route::get('/sms-sent', [ParcelJourneyStatsController::class, 'smsSent'])->name('sms-sent');
+            Route::get('/chat-sent', [ParcelJourneyStatsController::class, 'chatSent'])->name('chat-sent');
+            Route::get('/total-sent', [ParcelJourneyStatsController::class, 'totalSent'])->name('total-sent');
+        });
+
+        // The per-shop breakdown under the cards — paginated and sorted over
+        // XHR, so the page no longer carries it.
+        Route::get('/rts/parcel-journey/shops', [ParcelJourneyStatsController::class, 'shops'])
+            ->name('rts.parcel-journey.shops');
 
         Route::prefix('video-editor')->name('video-editor.')->group(function () {
             Route::get('/kpi/total', [VideoEditorDashboardController::class, 'totalCreatives'])->name('kpi.total');
