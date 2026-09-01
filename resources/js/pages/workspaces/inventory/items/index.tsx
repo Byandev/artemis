@@ -428,14 +428,25 @@ function rememberBasis(basis: DemandBasis): void {
 }
 
 /**
- * The columns that change denomination with the toggle: demand, and only demand.
+ * The columns that change denomination with the toggle.
  *
- * Stock on hand, incoming stock and the reorder figures built on them stay in
- * units in both bases. Stock is counted on a shelf and bought in units, and a
- * plan that measured unit stock against an order rate would buy a bundled SKU
- * short by its bundle size.
+ * Demand, the supply it is measured against, and the reorder figures built from
+ * both — converted together, which is what keeps the plan honest: an order rate
+ * read against unit stock would buy a bundled SKU short by its bundle size.
+ *
+ * Two things stay in units in both bases. Stock on hand and incoming stock,
+ * because they are counted on a shelf and bought that way. And Days It Can
+ * Last, because it does not move — orders of stock over orders a day is the
+ * same quotient as units over units.
  */
-const ORDER_BASIS_COLUMNS = ['three_days_average', 'unfulfilled_count'];
+const ORDER_BASIS_COLUMNS = [
+    'three_days_average',
+    'unfulfilled_count',
+    'remaining_after_fulfillment',
+    'stocks_needed_for_lead_time',
+    'po_qty',
+    'po_needed',
+];
 
 /**
  * Pins the header row and the leading identity column(s) of the items table.
@@ -1596,7 +1607,7 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['po_qty']}
                     column={column}
-                    title="PO QTY"
+                    title={basisTitle('po_qty', 'PO QTY')}
                     className="justify-center"
                 />
             ),
@@ -1637,7 +1648,10 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['stocks_needed_for_lead_time']}
                     column={column}
-                    title="Stocks Needed (Lead Time)"
+                    title={basisTitle(
+                        'stocks_needed_for_lead_time',
+                        'Stocks Needed (Lead Time)',
+                    )}
                     className="justify-center"
                 />
             ),
@@ -1758,7 +1772,10 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['remaining_after_fulfillment']}
                     column={column}
-                    title="Remaining After Fulfillment"
+                    title={basisTitle(
+                        'remaining_after_fulfillment',
+                        'Remaining After Fulfillment',
+                    )}
                     className="justify-center"
                 />
             ),
@@ -1799,7 +1816,7 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['po_needed']}
                     column={column}
-                    title="PO Needed"
+                    title={basisTitle('po_needed', 'PO Needed')}
                     className="justify-center"
                 />
             ),

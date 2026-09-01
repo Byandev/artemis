@@ -135,36 +135,87 @@ test('unfulfilled reports orders or units, and the stock beside it does not move
         ->and($order['waiting_for_delivery_stocks'])->toEqual(6);
 });
 
-test('the reorder plan stays in units whichever basis is on', function () {
+test('the reorder plan is priced in whichever basis is on', function () {
     ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace();
 
     // lead 10 x 6 units/day = 60, buffer 10 x 6 = 60, less 30 units on hand.
     $unit = basisRow($owner, $workspace);
-    $order = basisRow($owner, $workspace, '?basis=order');
-
-    // Not one of these moves. Planning 2 orders a day against 30 units of stock
-    // would order this SKU at a third of what it actually consumes.
-    foreach ([
-        'stocks_needed_for_lead_time',
-        'po_qty',
-        'po_needed',
-        'days_it_can_last',
-        'remaining_after_fulfillment',
-    ] as $column) {
-        expect($order[$column])->toEqual($unit[$column]);
-    }
 
     expect($unit['stocks_needed_for_lead_time'])->toEqual(60)
         ->and($unit['po_qty'])->toEqual(60)
         ->and($unit['po_needed'])->toEqual(90)
         ->and($unit['remaining_after_fulfillment'])->toEqual(30);
+
+    // The same figures at 2 orders a day and 3 units an order: 20 + 20 less the
+    // 10 orders' worth of stock those 30 units represent.
+    $order = basisRow($owner, $workspace, '?basis=order');
+
+    expect($order['stocks_needed_for_lead_time'])->toEqual(20)
+        ->and($order['po_qty'])->toEqual(20)
+        ->and($order['po_needed'])->toEqual(30)
+        ->and($order['remaining_after_fulfillment'])->toEqual(10);
+
+    // The point of converting both sides: 30 orders at 3 units an order is the
+    // 90 units the unit basis asked for. Same purchase, priced differently.
+    expect($order['po_needed'] * 3)->toEqual($unit['po_needed']);
+});
+
+test('stock itself is not converted, only what is planned against it', function () {
+    // Bought and counted on a shelf, so these read the same either way — which
+    // is also what lets Stockout Risk keep dividing them by a unit rate.
+    ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace([
+        'waiting_for_delivery_stocks' => 6,
+    ]);
+
+    $unit = basisRow($owner, $workspace);
+    $order = basisRow($owner, $workspace, '?basis=order');
+
+    foreach (['current_stocks', 'waiting_for_delivery_stocks'] as $column) {
+        expect($order[$column])->toEqual($unit[$column]);
+    }
+
+    expect($order['current_stocks'])->toEqual(30)
+        ->and($order['waiting_for_delivery_stocks'])->toEqual(6)
+        // And the unit rate travels alongside for those cover cells.
+        ->and($order['unit_three_days_average'])->toEqual(6);
+});
+
+test('the plan multiplies out from the rate the row displays', function () {
+    // 17 units over three days is 5.667 a day, which the list shows as 6. The
+    // buffer and the lead-time demand have to be 60, not the 56.67 the exact
+    // rate would give — a reader multiplying what is on screen gets 60.
+    ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace(['units_3d' => 17]);
+
+    $row = basisRow($owner, $workspace);
+
+    expect($row['stocks_needed_for_lead_time'])->toEqual(60)
+        ->and($row['po_qty'])->toEqual(60)
+        // 60 + 60 less the 30 on hand.
+        ->and($row['po_needed'])->toEqual(90);
+
+    // Cover keeps the exact rate: it answers "how long will this last", which
+    // is a measurement rather than a quantity to buy, and rounding the divisor
+    // up would understate it.
+    expect(round((float) $row['days_it_can_last'], 4))->toEqual(round(30 / (17 / 3), 4));
+});
+
+test('the rounding follows the basis, not the units behind it', function () {
+    // 7 orders over three days is 2.333 a day, displayed as 3 — so the order
+    // plan works from 3, not from the unit rate's ceiling.
+    ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace(['orders_3d' => 7]);
+
+    $row = basisRow($owner, $workspace, '?basis=order');
+
+    expect($row['stocks_needed_for_lead_time'])->toEqual(30)
+        ->and($row['po_qty'])->toEqual(30);
 });
 
 test('days of cover is the same in both bases', function () {
     ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace();
 
-    // 30 units at 6 units a day. Cover is a unit figure over a unit rate, and
-    // the toggle reaches neither.
+    // 30 units at 6 a day, and the 10 orders those are at 2 a day: both five
+    // days. Cover is the one figure the conversion cancels out of, so a toggle
+    // that moved it would mean one side had not converted.
     expect(basisRow($owner, $workspace)['days_it_can_last'])->toEqual(5)
         ->and(basisRow($owner, $workspace, '?basis=order')['days_it_can_last'])->toEqual(5);
 });
@@ -181,12 +232,13 @@ test('a group that took no orders reports no order figures', function () {
     $row = basisRow($owner, $workspace, '?basis=order');
 
     expect($row['three_days_average'])->toBeNull()
-        ->and($row['unfulfilled_count'])->toBeNull();
+        ->and($row['unfulfilled_count'])->toBeNull()
+        // The plan is priced in orders now, so it has nothing to say either.
+        ->and($row['remaining_after_fulfillment'])->toBeNull()
+        ->and($row['stocks_needed_for_lead_time'])->toBeNull();
 
-    // The plan is untouched, because it never read the order count — it reads
-    // the units, which the day did record.
-    expect($row['po_needed'])->toEqual(90)
-        ->and($row['days_it_can_last'])->toEqual(5);
+    // Cover still answers: it is measured in units, which the day did record.
+    expect($row['days_it_can_last'])->toEqual(5);
 
     // And the unit basis still answers for the same day, because it was measured.
     expect(basisRow($owner, $workspace)['three_days_average'])->toEqual(6);

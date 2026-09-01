@@ -285,11 +285,14 @@ class InventoryItemController extends Controller
         $summedWaiting = 'COALESCE(SUM(sub.waiting_for_delivery_stocks), 0)';
         $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
 
+        // Both worked from the rate rounded up, matching the snapshot path and
+        // the figure the row displays — see buildSnapshotSummaryQuery.
+        $ceiledThreeDayAvg = "CEIL($summedThreeDayAvg)";
         // Stock needed to cover the lead time for the whole group: the group's
         // representative lead time × its summed daily average (same term po_needed uses).
-        $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
+        $groupStocksNeeded = "($groupLeadTime * $ceiledThreeDayAvg)";
         // Group safety buffer: the group's days-of-coverage × its summed daily average.
-        $groupCoverageBuffer = "($groupDaysOfCoverage * $summedThreeDayAvg)";
+        $groupCoverageBuffer = "($groupDaysOfCoverage * $ceiledThreeDayAvg)";
         $groupPoNeeded = "GREATEST(0, $groupCoverageBuffer + $groupStocksNeeded - $summedRemaining)";
         $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
 
@@ -527,8 +530,11 @@ class InventoryItemController extends Controller
         $cover = 'COALESCE(snap.days_of_coverage, inventory_items.days_of_coverage, 0)';
         $remaining = 'COALESCE(snap.remaining_after_fulfillment, 0)';
 
-        $needed = "($lead * $rate)";
-        $buffer = "($cover * $rate)";
+        // Rounded up, for the same reason the roll-up does it: the rate beside
+        // these is displayed as a whole unit, and the two have to multiply out.
+        $ceiled = "CEIL($rate)";
+        $needed = "($lead * $ceiled)";
+        $buffer = "($cover * $ceiled)";
 
         return implode(', ', [
             "$needed as stocks_needed_for_lead_time",
@@ -623,19 +629,18 @@ class InventoryItemController extends Controller
         $groupDaysOfCoverage = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.days_of_coverage END), MAX(sub.days_of_coverage))';
         $groupCreatedAt = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.created_at END), MIN(sub.created_at))';
 
-        // Two rates, and the difference between them is the whole design.
+        // Everything the reorder calculation touches is read in the basis on
+        // screen — the rate, the supply it is measured against, and the four
+        // figures built from them.
         //
-        // The DISPLAYED rate follows the basis: units a day, or the orders that
-        // carried them. Same for Unfulfilled. Those two are demand, and demand is
-        // what someone switching to orders wants to read.
-        //
-        // The PLANNING rate is always units, because everything it touches is:
-        // stock is counted in units, purchase orders are raised in units, and
-        // Remaining is a unit figure. Measuring unit stock against an order rate
-        // would buy a bundled SKU short by its bundle size — a group shipping 1.5
-        // units an order would plan for two thirds of what it actually consumes
-        // and quietly run out. So Stocks Needed, PO QTY, PO Needed and cover read
-        // the unit rate in both bases and do not move when the toggle does.
+        // Converting BOTH sides is what makes that safe. An order rate measured
+        // against unit stock would buy a bundled SKU short by its bundle size: a
+        // group shipping 1.5 units an order would plan for two thirds of what it
+        // actually consumes. So when demand becomes orders a day, the stock
+        // behind it becomes orders' worth of stock, and PO Needed comes out as
+        // the same purchase priced differently — 1,804 orders where the unit
+        // basis asks for 2,706 units, which at 1.5 units an order is the same
+        // goods.
         $orderBasis = $basis === self::BASIS_ORDER;
 
         // Both order figures come straight from the counts the day already
@@ -655,9 +660,11 @@ class InventoryItemController extends Controller
         // for, and would drift on any group whose bundle mix has moved.
         $groupOrders3d = 'MAX(sub.orders_3d)';
 
+        $groupUnits3d = 'SUM(sub.units_3d)';
+
         $displayedAverage = $orderBasis
             ? "($groupOrders3d / 3)"
-            : '(SUM(sub.units_3d) / 3)';
+            : "($groupUnits3d / 3)";
 
         // MAX for the order count, SUM for the units: one is the group's figure
         // stamped on every row, the other is each item's own.
@@ -665,23 +672,47 @@ class InventoryItemController extends Controller
             ? 'MAX(sub.unfulfilled_orders_count)'
             : 'SUM(sub.unfulfilled_count)';
 
-        // Units a day, always — the rate stock is bought against. Summed rather
-        // than read from the group, so it narrows with the rows a filter leaves.
-        $planAverage = '(SUM(sub.units_3d) / 3)';
-        $remainingOut = 'SUM(sub.remaining_after_fulfillment)';
+        // Units a day, always. Stockout Risk and Stocks Last divide unit stock —
+        // which stays in units in both bases — so they need a unit rate even
+        // when the displayed one has become a count of orders.
+        $unitAverage = "($groupUnits3d / 3)";
+
+        // Stock, in the basis on screen. Multiplied by the order count and
+        // divided by the unit count rather than by a units-per-order quotient:
+        // one multiply and one divide instead of two divides, so MySQL's
+        // division scale is applied once. Deriving through a rounded conversion
+        // factor is what once turned 19 into 19.0008 and, after the list's
+        // ceiling, into 20.
+        $remainingOut = $orderBasis
+            ? "(SUM(sub.remaining_after_fulfillment) * $groupOrders3d / NULLIF($groupUnits3d, 0))"
+            : 'SUM(sub.remaining_after_fulfillment)';
 
         // Coalesced to 0 for the arithmetic only. The displayed column keeps its
         // NULL, which means "the day recorded nothing", but a NULL here would
         // swallow the whole PO Needed expression and report nothing to buy for a
         // group that has stock and no demand.
         $summedRemaining = "COALESCE($remainingOut, 0)";
-        $groupStocksNeeded = "($groupLeadTime * $planAverage)";
-        $groupCoverageBuffer = "($groupDaysOfCoverage * $planAverage)";
+
+        // Both are built on the rate ROUNDED UP, because that is the rate the
+        // row shows: 3-Day Avg is rendered as a whole unit rounded up, and a
+        // buffer worked out from the exact 5.87 behind a displayed 6 gives 58.7
+        // where the reader multiplies to 60. The plan has to be arithmetic
+        // anyone can redo from what is on screen — and rounding up is the safe
+        // direction: half a unit a day still needs a unit on the shelf.
+        $ceiledAverage = "CEIL($displayedAverage)";
+        $groupStocksNeeded = "($groupLeadTime * $ceiledAverage)";
+        $groupCoverageBuffer = "($groupDaysOfCoverage * $ceiledAverage)";
         $groupPoNeeded = "GREATEST(0, $groupCoverageBuffer + $groupStocksNeeded - $summedRemaining)";
         // The NULL arm is what separates "the day recorded nothing for this group"
         // from "it sold nothing that day": without it a group with no snapshot
         // rows would report 0 days of cover, which reads as an emergency.
-        $groupDaysItCanLast = "(CASE WHEN $planAverage IS NULL THEN NULL WHEN $planAverage > 0 THEN $summedRemaining / $planAverage ELSE 0 END)";
+        // Cover is the one figure that does not move: orders of stock over
+        // orders a day is the same quotient as units over units. Computed from
+        // the unit figures in both bases so it is exact rather than the same
+        // number twice through different divisions — and so a toggle that did
+        // move it would be a real signal that one side had not converted.
+        $unitRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
+        $groupDaysItCanLast = "(CASE WHEN $unitAverage IS NULL THEN NULL WHEN $unitAverage > 0 THEN $unitRemaining / $unitAverage ELSE 0 END)";
 
         $outer = DB::query()
             ->fromSub($inner, 'sub')
@@ -715,7 +746,7 @@ class InventoryItemController extends Controller
             // Units a day regardless of the basis on screen. Stockout risk and
             // Stocks Last divide unit stock by a rate, so they need this one
             // even when the displayed average has become a count of orders.
-            ->selectRaw("$planAverage as unit_three_days_average")
+            ->selectRaw("$unitAverage as unit_three_days_average")
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
             ->selectRaw("$groupCreatedAt as created_at")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
