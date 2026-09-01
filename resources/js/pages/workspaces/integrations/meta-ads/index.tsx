@@ -71,7 +71,7 @@ import {
 
 import DateOption = flatpickr.Options.DateOption;
 
-type GroupBy = 'ad_name' | 'ad' | 'campaign' | 'ad_set' | 'account';
+type GroupBy = 'ad_name' | 'ad' | 'campaign' | 'ad_set' | 'account' | 'page';
 
 const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
     { value: 'ad_name', label: 'Ad Name' },
@@ -79,6 +79,7 @@ const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
     { value: 'campaign', label: 'Campaign' },
     { value: 'ad_set', label: 'Ad Set' },
     { value: 'account', label: 'Ad Account' },
+    { value: 'page', label: 'Page' },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -88,6 +89,7 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
     campaign: true,
     ad_set: true,
     account: false,
+    page: false,
 };
 
 interface Row extends InsightsMetrics {
