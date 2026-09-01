@@ -31,6 +31,12 @@ import {
 import CsrComparisonPanel, {
     type ComparisonResponse,
 } from '@/components/csr/CsrComparisonPanel';
+import CsrDailyCallOutcomesTable, {
+    type DailyCallOutcomesResponse,
+} from '@/components/csr/CsrDailyCallOutcomesTable';
+import CsrDailyEffortChart, {
+    type DailyEffortResponse,
+} from '@/components/csr/CsrDailyEffortChart';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
@@ -292,6 +298,25 @@ export default function Analytics({ workspace, records, query }: Props) {
             toStr,
         );
 
+    // The two call cards' totals, spread across the days that made them.
+    const [dailyEffort, dailyEffortLoading] =
+        useAnalyticsStat<DailyEffortResponse>(
+            workspace.slug,
+            'analytics-daily-effort',
+            fromStr,
+            toStr,
+        );
+
+    // The same days as numbers, under the chart. Its own request: the table
+    // answers a different question and carries columns the chart never draws.
+    const [callOutcomes, callOutcomesLoading] =
+        useAnalyticsStat<DailyCallOutcomesResponse>(
+            workspace.slug,
+            'analytics-daily-call-outcomes',
+            fromStr,
+            toStr,
+        );
+
     // Debounced search — skip the initial mount so we don't refetch on load.
     const isFirstRender = useRef(true);
     useEffect(() => {
@@ -527,6 +552,16 @@ export default function Analytics({ workspace, records, query }: Props) {
                     loading={comparisonLoading}
                     metricKey={comparisonTab}
                     onMetricChange={selectComparisonTab}
+                />
+
+                <CsrDailyEffortChart
+                    data={dailyEffort}
+                    loading={dailyEffortLoading}
+                />
+
+                <CsrDailyCallOutcomesTable
+                    data={callOutcomes}
+                    loading={callOutcomesLoading}
                 />
 
                 <input
