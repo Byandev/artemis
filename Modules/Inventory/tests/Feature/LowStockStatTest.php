@@ -52,7 +52,7 @@ function lowStockOrder($workspace, InventoryItem $item, string $issuedAt, int $c
 }
 
 test('po needed is the buffer plus lead-time demand less stock on hand', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -75,7 +75,7 @@ test('po needed is the buffer plus lead-time demand less stock on hand', functio
 });
 
 test('items are ranked by po needed, worst first', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     // Same buffer and lead time throughout, so the daily average sets the order.
     foreach ([['LOW', 1], ['HIGH', 9], ['MID', 5]] as [$sku, $average]) {
@@ -95,7 +95,7 @@ test('items are ranked by po needed, worst first', function () {
 });
 
 test('a group recomputes po needed from its parts instead of summing children', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -133,7 +133,7 @@ test('a group recomputes po needed from its parts instead of summing children', 
 });
 
 test('incoming purchase-order stock is counted once, not twice', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -166,7 +166,7 @@ test('incoming purchase-order stock is counted once, not twice', function () {
 });
 
 test('only the worst 20 groups are listed', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     foreach (range(1, 25) as $n) {
         InventoryItem::create([
@@ -189,7 +189,7 @@ test('only the worst 20 groups are listed', function () {
 });
 
 test('covered items and inactive items are left out', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     // Well stocked against its demand -> nothing to order.
     $covered = InventoryItem::create([
@@ -226,8 +226,8 @@ test('covered items and inactive items are left out', function () {
 });
 
 test('one workspace never sees another workspace items', function () {
-    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
-    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspaceA] = makeGencysWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeGencysWorkspaceWithOwner();
 
     InventoryItem::create([
         'workspace_id' => $workspaceB->id,
@@ -245,7 +245,7 @@ test('one workspace never sees another workspace items', function () {
 });
 
 test('last PO issued reports the most recent order across the whole group', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'PARENT', 'is_parent' => true,
@@ -273,7 +273,7 @@ test('last PO issued reports the most recent order across the whole group', func
 });
 
 test('a group that has never been ordered reports no date at all', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'NEVER-ORDERED', 'is_active' => true,

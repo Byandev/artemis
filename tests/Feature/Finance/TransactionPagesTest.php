@@ -123,3 +123,71 @@ test('store ignores a return_to that points outside the workspace', function () 
         ])
         ->assertRedirect(tpUrl($workspace));
 });
+
+test('the edit page carries the return_to it was opened with', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+    $txn = Transaction::create([
+        'workspace_id' => $workspace->id,
+        'account_id' => $account->id,
+        'date' => '2026-05-10',
+        'description' => 'Ad spend',
+        'type' => 'out',
+        'amount' => 1000,
+    ]);
+    $listUrl = tpUrl($workspace, '?filter[search]=ad&page=2');
+
+    $this->actingAs($user)
+        ->get(tpUrl($workspace, "/{$txn->id}/edit?return_to=".urlencode($listUrl)))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('returnTo', $listUrl));
+});
+
+test('update returns to the filtered list the edit page came from', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+    $txn = Transaction::create([
+        'workspace_id' => $workspace->id,
+        'account_id' => $account->id,
+        'date' => '2026-05-10',
+        'description' => 'Ad spend',
+        'type' => 'out',
+        'amount' => 1000,
+    ]);
+    $listUrl = tpUrl($workspace, '?filter[search]=ad&page=2');
+
+    $this->actingAs($user)
+        ->put(tpUrl($workspace, "/{$txn->id}"), [
+            'account_id' => $account->id,
+            'date' => '2026-05-10',
+            'description' => 'Ad spend (edited)',
+            'type' => 'out',
+            'amount' => 1200,
+            'return_to' => $listUrl,
+        ])
+        ->assertRedirect($listUrl);
+});
+
+test('update ignores a return_to that points outside the workspace', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+    $txn = Transaction::create([
+        'workspace_id' => $workspace->id,
+        'account_id' => $account->id,
+        'date' => '2026-05-10',
+        'description' => 'Ad spend',
+        'type' => 'out',
+        'amount' => 1000,
+    ]);
+
+    $this->actingAs($user)
+        ->put(tpUrl($workspace, "/{$txn->id}"), [
+            'account_id' => $account->id,
+            'date' => '2026-05-10',
+            'description' => 'Ad spend (edited)',
+            'type' => 'out',
+            'amount' => 1200,
+            'return_to' => 'https://evil.example.com/phish',
+        ])
+        ->assertRedirect(tpUrl($workspace));
+});

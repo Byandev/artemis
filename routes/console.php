@@ -67,6 +67,10 @@ Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapp
 // and status changes visible.
 // Schedule::command('metaads:sync-ad-accounts')->everyThirtyMinutes()->withoutOverlapping();
 
+// Who has access to each ad account (Business Manager People list). Access
+// changes are rare and the call is one request per account — daily is plenty.
+Schedule::command('metaads:sync-ad-account-people')->dailyAt('02:00')->withoutOverlapping();
+
 // Entity tree (campaigns → ad sets → ads → creatives) changes when advertisers
 // edit Ads Manager — refresh every 6 hours.
 Schedule::command('meta-ads:sync-campaigns')->everySixHours()->withoutOverlapping();

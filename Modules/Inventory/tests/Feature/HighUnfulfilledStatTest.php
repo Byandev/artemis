@@ -24,7 +24,7 @@ function highUnfulfilled($user, $workspace): array
 }
 
 test('items are ranked by unfulfilled units, worst first', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     foreach ([['LOW', 3], ['HIGH', 90], ['MID', 20]] as [$sku, $unfulfilled]) {
         InventoryItem::create([
@@ -43,7 +43,7 @@ test('items are ranked by unfulfilled units, worst first', function () {
 });
 
 test('children roll into their parent as a single group row', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -74,7 +74,7 @@ test('children roll into their parent as a single group row', function () {
 });
 
 test('a standalone item reports as a group of one', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -90,7 +90,7 @@ test('a standalone item reports as a group of one', function () {
 });
 
 test('only the worst 20 groups are listed', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     // 25 items, each owing more than the last.
     foreach (range(1, 25) as $n) {
@@ -112,7 +112,7 @@ test('only the worst 20 groups are listed', function () {
 });
 
 test('items owing nothing and inactive items are left out', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -139,8 +139,8 @@ test('items owing nothing and inactive items are left out', function () {
 });
 
 test('one workspace never sees another workspace items', function () {
-    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
-    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspaceA] = makeGencysWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeGencysWorkspaceWithOwner();
 
     InventoryItem::create([
         'workspace_id' => $workspaceB->id,

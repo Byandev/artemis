@@ -32,6 +32,14 @@ class IncomeStatement extends Model
         'gross_profit_bought_cogs_after_advisory_share',
         'ad_spent',
         'total_expenses',
+        'opex',
+        'net_profit_delivered_cogs',
+        'net_profit_bought_cogs',
+        'loss_brought_forward_delivered_cogs',
+        'cumulative_profit_delivered_cogs',
+        'loss_brought_forward_bought_cogs',
+        'cumulative_profit_bought_cogs',
+        'manual_loss_brought_forward',
         'gross_profit',
         'net_profit',
         'cod_fee_rate',
@@ -64,6 +72,14 @@ class IncomeStatement extends Model
         'gross_profit_bought_cogs_after_advisory_share' => 'decimal:2',
         'ad_spent' => 'decimal:2',
         'total_expenses' => 'decimal:2',
+        'opex' => 'decimal:2',
+        'net_profit_delivered_cogs' => 'decimal:2',
+        'net_profit_bought_cogs' => 'decimal:2',
+        'loss_brought_forward_delivered_cogs' => 'decimal:2',
+        'cumulative_profit_delivered_cogs' => 'decimal:2',
+        'loss_brought_forward_bought_cogs' => 'decimal:2',
+        'cumulative_profit_bought_cogs' => 'decimal:2',
+        'manual_loss_brought_forward' => 'decimal:2',
         'gross_profit' => 'decimal:2',
         'net_profit' => 'decimal:2',
         'cod_fee_rate' => 'decimal:4',
@@ -91,6 +107,12 @@ class IncomeStatement extends Model
         return $this->hasMany(UserIncomeStatement::class, 'income_statement_id');
     }
 
+    /** The statement's OPEX split by transaction type (rebuilt on save/regenerate). */
+    public function opexBreakdown(): HasMany
+    {
+        return $this->hasMany(IncomeStatementOpexBreakdown::class, 'income_statement_id');
+    }
+
     /**
      * Saved per-product slices of this statement — workspace-wide, across every
      * intern (rebuilt on save/regenerate).
@@ -98,5 +120,14 @@ class IncomeStatement extends Model
     public function productStatements(): HasMany
     {
         return $this->hasMany(ProductIncomeStatement::class, 'income_statement_id');
+    }
+
+    /**
+     * Saved per-user-per-product slices — the cross of the two above, for a
+     * product run by several people (rebuilt on save/regenerate).
+     */
+    public function userProductStatements(): HasMany
+    {
+        return $this->hasMany(UserProductIncomeStatement::class, 'income_statement_id');
     }
 }
