@@ -357,3 +357,47 @@ test('a statement with no OPEX types has nothing to expand', function () {
         expect($row['opex_breakdown'])->toBe([]);
     }
 });
+
+test('the per-product OPEX opens up by type too, and its parts sum', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $widget = opex_product($workspace, 'WIDGET', 'UC1');
+    $gadget = opex_product($workspace, 'GADGET', 'UC2');
+    opex_seller($workspace, 'Ana Reyes');
+
+    opex_order(982001, $workspace, 'Ana Reyes', 'UC1');
+    opex_order(982002, $workspace, 'Ana Reyes', 'UC1');
+    opex_order(982003, $workspace, 'Ana Reyes', 'UC1');
+    opex_order(982004, $workspace, 'Ana Reyes', 'UC2');
+
+    $statement = opex_statement($workspace, 1000);
+
+    foreach ([['Salaries', 800], ['Rent', 200]] as [$name, $amount]) {
+        $type = TransactionType::create([
+            'workspace_id' => $workspace->id,
+            'name' => $name,
+            'income_statement_section' => 'opex',
+        ]);
+        $statement->opexBreakdown()->create(['transaction_type_id' => $type->id, 'amount' => $amount]);
+    }
+
+    app(ProductIncomeStatementService::class)->snapshot($statement);
+    $payload = app(ProductIncomeStatementService::class)->payload($statement);
+
+    $row = collect($payload['products'])->firstWhere('product_id', $widget->id);
+
+    // WIDGET took 3 of 4 delivered orders — 750 — split 80/20 by type.
+    expect($row['opex'])->toBe(750.0)
+        ->and(collect($row['opex_breakdown'])->pluck('amount', 'name')->all())->toBe([
+            'Salaries' => 600.0,
+            'Rent' => 150.0,
+        ])
+        ->and(round(collect($row['opex_breakdown'])->sum('amount'), 2))->toBe($row['opex']);
+
+    $gadgetRow = collect($payload['products'])->firstWhere('product_id', $gadget->id);
+    expect(round(collect($gadgetRow['opex_breakdown'])->sum('amount'), 2))->toBe($gadgetRow['opex']);
+
+    // The Total column opens up the same way, and to the whole pool.
+    expect(round(collect($payload['total']['opex_breakdown'])->sum('amount'), 2))
+        ->toBe($payload['total']['opex']);
+});

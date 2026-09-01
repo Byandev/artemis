@@ -30,6 +30,56 @@ trait ClosesOutSlices
     private const BASES = ['delivered_cogs', 'bought_cogs'];
 
     /**
+     * A row's OPEX opened up by transaction type, for the pages that let the
+     * line be expanded.
+     *
+     * The row's own figure is divided along the company's split rather than
+     * each type being allocated over again, so the parts always add back to the
+     * whole they expand — a breakdown whose lines don't sum to the line above
+     * them is worse than no breakdown at all.
+     *
+     * @param  list<array{name:string, amount:float}>  $types  the statement's own split
+     * @return list<array{name:string, amount:float}>
+     */
+    private function opexByType(array $types, float $opex): array
+    {
+        if ($types === [] || $opex == 0.0) {
+            return [];
+        }
+
+        $shares = ProportionalSplit::of($opex, array_column($types, 'amount'));
+
+        return collect($types)
+            ->map(fn (array $type, int $i) => [
+                'name' => $type['name'],
+                'amount' => round($shares[$i] ?? 0.0, 2),
+            ])
+            ->filter(fn (array $row) => $row['amount'] != 0.0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The statement's OPEX split by transaction type, biggest first — the
+     * shape {@see opexByType()} divides a row along.
+     *
+     * @return list<array{name:string, amount:float}>
+     */
+    private function opexTypes(IncomeStatement $statement): array
+    {
+        return $statement->opexBreakdown()
+            ->with('transactionType:id,name')
+            ->orderByDesc('amount')
+            ->get()
+            ->map(fn ($r) => [
+                'name' => $r->transactionType?->name ?? 'Unknown',
+                'amount' => (float) $r->amount,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * Pull the per-row COD fee and its VAT onto the statement's own figures,
      * and re-settle gross profit from them.
      *
