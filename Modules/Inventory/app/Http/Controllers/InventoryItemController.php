@@ -1121,6 +1121,11 @@ class InventoryItemController extends Controller
             'three_days_average' => $request->three_days_average ?? 0,
         ]);
 
+        // Lead time, the active flag and the linked product all change what the
+        // frozen row says, and the list reads the frozen row first — so an edit
+        // that did not rewrite it would appear to do nothing.
+        $this->refreshTodaysSnapshot($workspace, $item);
+
         return redirect()->back()
             ->with('success', 'Inventory Items record updated.');
     }
@@ -1172,9 +1177,24 @@ class InventoryItemController extends Controller
      */
     private function refreshTodaysSnapshot(Workspace $workspace, InventoryItem $item): void
     {
+        $this->refreshTodaysSnapshotFor($workspace, [$item->id]);
+    }
+
+    /**
+     * The same, for an edit that touched several items at once.
+     *
+     * Every group the given items belong to is rewritten whole, not just the
+     * rows named: the roll-up derives a group's figures from all of its
+     * members, so refreshing half of one leaves a group part before the edit
+     * and part after.
+     *
+     * @param  list<int>  $itemIds
+     */
+    private function refreshTodaysSnapshotFor(Workspace $workspace, array $itemIds): void
+    {
         // A live workspace has no snapshot to keep in step, and any row it still
         // carries from before the partner rule is one nothing reads.
-        if (! $this->usesSnapshots($workspace)) {
+        if (! $this->usesSnapshots($workspace) || ! $itemIds) {
             return;
         }
 
@@ -1188,10 +1208,24 @@ class InventoryItemController extends Controller
             return;
         }
 
-        $groupId = (int) ($item->parent_id ?? $item->id);
+        // Resolved from the items as they stand now, so a regrouping is read
+        // against its new parent — and from their previous rows too, so the
+        // group they just left is rewritten without them.
+        $groupIds = InventoryItem::whereIn('id', $itemIds)
+            ->pluck('parent_id', 'id')
+            ->map(fn ($parentId, $id) => (int) ($parentId ?? $id))
+            ->merge(
+                InventoryItemSnapshot::where('snapshot_date', $today)
+                    ->whereIn('inventory_item_id', $itemIds)
+                    ->get(['inventory_item_id', 'parent_id'])
+                    ->map(fn ($row) => (int) ($row->parent_id ?? $row->inventory_item_id))
+            )
+            ->unique()
+            ->values()
+            ->all();
 
         $ids = InventoryItem::where('workspace_id', $workspace->id)
-            ->where(fn ($q) => $q->whereKey($groupId)->orWhere('parent_id', $groupId))
+            ->where(fn ($q) => $q->whereIn('id', $groupIds)->orWhereIn('parent_id', $groupIds))
             ->pluck('id')
             ->all();
 
@@ -1322,6 +1356,8 @@ class InventoryItemController extends Controller
             'discrepancy' => (int) $validated['counted_qty'] - $ledgerQty,
         ]);
 
+        $this->refreshTodaysSnapshot($workspace, $item);
+
         return redirect()->back()
             ->with('success', 'Stock count recorded.');
     }
@@ -1342,6 +1378,8 @@ class InventoryItemController extends Controller
         $updated = InventoryItem::where('workspace_id', $workspace->id)
             ->whereIn('id', $validated['ids'])
             ->update(['is_active' => $validated['is_active']]);
+
+        $this->refreshTodaysSnapshotFor($workspace, $validated['ids']);
 
         $status = $validated['is_active'] ? 'activated' : 'deactivated';
 
@@ -1371,6 +1409,8 @@ class InventoryItemController extends Controller
         $updated = InventoryItem::where('workspace_id', $workspace->id)
             ->whereIn('id', $validated['ids'])
             ->update(['product_id' => $productId]);
+
+        $this->refreshTodaysSnapshotFor($workspace, $validated['ids']);
 
         $message = $productId
             ? "Product set for {$updated} inventory item(s)."
@@ -1444,6 +1484,11 @@ class InventoryItemController extends Controller
             ->whereIn('id', $ids)
             ->where('is_parent', false)
             ->update(['parent_id' => $parentId]);
+
+        // Both sides of the move: the items carry their new parent now, and
+        // refreshTodaysSnapshotFor also reads the parent they had this morning,
+        // so the group they left is rewritten without them.
+        $this->refreshTodaysSnapshotFor($workspace, array_merge($ids, array_filter([$parentId])));
 
         $message = $parentId
             ? "{$updated} item(s) grouped under the parent item."

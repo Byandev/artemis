@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Modules\Inventory\Models\InventoryItem;
+use Modules\Inventory\Models\InventoryItemSnapshot;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -224,4 +225,95 @@ test('the flat list filters on the stage too', function () {
 
     expect($filtered)->toHaveKey('PO-SKU')
         ->and($filtered)->not->toHaveKey('WH-SKU');
+});
+
+/**
+ * Every edit that changes what the frozen row says has to rewrite it.
+ *
+ * The list reads the snapshot first — COALESCE(snap.lead_time, item.lead_time)
+ * — so an edit that only touched inventory_items appeared to do nothing at all.
+ * That is how the item dialog's lead time went unnoticed: the inline editor on
+ * the list refreshed and the dialog did not, and only one of them had a test.
+ */
+function editWorkspace(): array
+{
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+
+    $item = columnsItem($workspace, 'EDIT-SKU');
+    // A real feed, because a refresh recomputes demand from it — 10 a day over
+    // the window, so lead 10 gives 100 needed.
+    seedDemandFeed($item, 10);
+    columnsSnapshot($workspace, $item, ['units_3d' => 30]);
+
+    return ['owner' => $owner, 'workspace' => $workspace, 'item' => $item];
+}
+
+test('the item dialog rewrites the frozen row it just contradicted', function () {
+    ['owner' => $owner, 'workspace' => $workspace, 'item' => $item] = editWorkspace();
+
+    expect(demandRows($owner, $workspace)['EDIT-SKU']['stocks_needed_for_lead_time'])
+        ->toEqual(100);
+
+    test()->actingAs($owner)
+        ->put(route('workspaces.inventory.item.update', ['workspace' => $workspace, 'item' => $item->id]), [
+            'sku' => 'EDIT-SKU',
+            'is_active' => true,
+            'lead_time' => 20,
+        ])
+        ->assertRedirect();
+
+    expect((int) InventoryItemSnapshot::where('inventory_item_id', $item->id)
+        ->where('snapshot_date', now()->toDateString())->value('lead_time'))->toBe(20);
+
+    // And the list agrees at once: 20 days at 10 a day.
+    expect(demandRows($owner, $workspace)['EDIT-SKU']['stocks_needed_for_lead_time'])
+        ->toEqual(200);
+});
+
+test('the inline lead-time editor still rewrites it', function () {
+    ['owner' => $owner, 'workspace' => $workspace, 'item' => $item] = editWorkspace();
+
+    test()->actingAs($owner)
+        ->patch(route('workspaces.inventory.item.lead-time.update', ['workspace' => $workspace, 'item' => $item->id]), ['lead_time' => 20])
+        ->assertRedirect();
+
+    expect(demandRows($owner, $workspace)['EDIT-SKU']['stocks_needed_for_lead_time'])
+        ->toEqual(200);
+});
+
+test('deactivating in bulk rewrites the frozen rows', function () {
+    ['owner' => $owner, 'workspace' => $workspace, 'item' => $item] = editWorkspace();
+
+    test()->actingAs($owner)
+        ->post(route('workspaces.inventory.item.bulk-status', $workspace), [
+            'ids' => [$item->id], 'is_active' => false,
+        ])
+        ->assertRedirect();
+
+    expect((bool) InventoryItemSnapshot::where('inventory_item_id', $item->id)
+        ->where('snapshot_date', now()->toDateString())->value('is_active'))->toBeFalse();
+});
+
+test('regrouping rewrites the group left behind as well as the one joined', function () {
+    ['owner' => $owner, 'workspace' => $workspace, 'item' => $item] = editWorkspace();
+
+    $parent = columnsItem($workspace, 'NEW-PARENT');
+    $parent->update(['is_parent' => true]);
+    columnsSnapshot($workspace, $parent, ['is_parent' => true, 'units_3d' => 0]);
+
+    test()->actingAs($owner)
+        ->post(route('workspaces.inventory.item.bulk-group', $workspace), [
+            'ids' => [$item->id], 'parent_id' => $parent->id,
+        ])
+        ->assertRedirect();
+
+    // The frozen row carries the parent it now belongs to, so the roll-up puts
+    // it under that group rather than listing it on its own.
+    expect((int) InventoryItemSnapshot::where('inventory_item_id', $item->id)
+        ->where('snapshot_date', now()->toDateString())->value('parent_id'))->toBe($parent->id);
+
+    $rows = demandRows($owner, $workspace);
+
+    expect($rows)->toHaveKey('NEW-PARENT')
+        ->and($rows)->not->toHaveKey('EDIT-SKU');
 });
