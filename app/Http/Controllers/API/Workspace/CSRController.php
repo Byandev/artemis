@@ -614,6 +614,236 @@ class CSRController extends Controller
         ];
     }
 
+    /*
+     |--------------------------------------------------------------------------
+     | Leaders for the period
+     |--------------------------------------------------------------------------
+     |
+     | Who came top, rather than what the workspace did. Same source and same
+     | rules as the stat cards above, so a leader's share of the total is a share
+     | of the number the Sales card actually shows.
+     */
+
+    public function analyticsLeaderSales(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+
+        $perCsr = DB::table('pancake_orders as po')
+            ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
+            ->where('po.workspace_id', $workspace->id)
+            // Every status, cancellations included — the same rule
+            // SyncCsrDailyRecord uses, so a CSR's figure here is the one the
+            // table below the cards shows for them.
+            //
+            // Note this is NOT the Sales card's rule: that follows the dashboard
+            // and drops statuses 6 and 7. The two will differ by the value of
+            // the period's cancelled orders, deliberately — the leaderboard
+            // credits work done, the Sales card reports money kept.
+            ->whereBetween('po.confirmed_at', [$from.' 00:00:00', $to.' 23:59:59'])
+            ->groupBy('pu.id', 'pu.name')
+            ->selectRaw('
+                pu.id as pancake_user_id,
+                pu.name as name,
+                COALESCE(SUM(po.final_amount), 0) as sales,
+                COUNT(*) as orders
+            ')
+            ->orderByDesc('sales')
+            ->get();
+
+        $leader = $perCsr->first();
+
+        if ($leader === null) {
+            return response()->json(['leader' => null]);
+        }
+
+        // The total is the CSRs' own total, summed across this same breakdown —
+        // not the workspace's. An order whose confirmed_by resolves to nobody
+        // counts on the Sales card but belongs to no CSR, and dividing by a
+        // total that includes it would leave every share short of the truth.
+        // Measured this way the shares add up to 100%.
+        $total = (float) $perCsr->sum('sales');
+        $sales = (float) $leader->sales;
+        $orders = (int) $leader->orders;
+
+        return response()->json([
+            'leader' => [
+                'name' => $leader->name,
+                'value' => $sales,
+                'orders' => $orders,
+                // What one order was worth on average to this CSR.
+                'aov' => $orders > 0 ? round($sales / $orders, 2) : null,
+                // Their slice of everything the CSRs confirmed between them.
+                // Null rather than 100% when that total is somehow zero — a
+                // share of nothing is not a share.
+                'share' => $total > 0 ? round($sales / $total * 100, 1) : null,
+            ],
+        ]);
+    }
+
+    public function analyticsLeaderRts(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+
+        $start = $from.' 00:00:00';
+        $end = $to.' 23:59:59';
+
+        // The rollup's own definitions, so a CSR's rate here is the one the RTS
+        // Rate column shows for them: money that turned back over money that
+        // arrived, each counted on the day it happened rather than the day the
+        // order was confirmed.
+        $perCsr = DB::table('pancake_orders as po')
+            ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
+            ->where('po.workspace_id', $workspace->id)
+            ->groupBy('pu.id', 'pu.name')
+            ->selectRaw('
+                pu.name as name,
+                COALESCE(SUM(CASE WHEN po.status IN (4, 5) AND po.returning_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END), 0) as returned,
+                COALESCE(SUM(CASE WHEN po.status = 3 AND po.delivered_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END), 0) as delivered,
+                COUNT(CASE
+                    WHEN (po.status IN (4, 5) AND po.returning_at BETWEEN ? AND ?)
+                      OR (po.status = 3 AND po.delivered_at BETWEEN ? AND ?)
+                    THEN 1
+                END) as settled_orders
+            ', [$start, $end, $start, $end, $start, $end, $start, $end])
+            // Eligibility is one settled parcel, counted — not one peso. A
+            // delivery worth nothing is still a delivery, and summing amounts
+            // would have quietly dropped whoever handled it.
+            ->havingRaw('settled_orders >= 1')
+            // NULL sorts first in MySQL, so a CSR whose settled parcels are all
+            // worth zero — an undefined rate — would otherwise take the crown.
+            // Push those to the back and let a real rate win.
+            ->orderByRaw('(returned / NULLIF(returned + delivered, 0)) IS NULL')
+            ->orderByRaw('returned / NULLIF(returned + delivered, 0) ASC')
+            // Ties are common at a clean 0%. Break them on volume, so the
+            // winner is whoever managed it over more parcels — and so the same
+            // data always crowns the same person rather than whichever row the
+            // database happened to return first.
+            ->orderByDesc('settled_orders')
+            ->first();
+
+        if ($perCsr === null) {
+            return response()->json(['leader' => null]);
+        }
+
+        $returned = (float) $perCsr->returned;
+        $delivered = (float) $perCsr->delivered;
+        $settled = $returned + $delivered;
+
+        return response()->json([
+            'leader' => [
+                'name' => $perCsr->name,
+                // Zero when their settled parcels are all worth nothing: they
+                // are eligible on the count, and none of it came back.
+                'value' => $settled > 0 ? round($returned / $settled * 100, 1) : 0.0,
+                'returned' => $returned,
+                'delivered' => $delivered,
+                'orders' => (int) $perCsr->settled_orders,
+            ],
+        ]);
+    }
+
+    public function analyticsLeaderRmoCalled(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+
+        // Read off the same rollup the CSR table reads, using the table's own
+        // RMO % — total_called over total_confirmed — so the leader's figure is
+        // the number in that CSR's row rather than a second opinion on it.
+        //
+        // Note those two are different roles: total_called counts deliveries
+        // assigned to them that moved off PENDING, total_confirmed counts
+        // deliveries they confirmed. The table divides one by the other, and
+        // this follows it deliberately.
+        //
+        // Consequence worth knowing: because the rollup is written nightly, a
+        // range the sync has not covered has no leader here, where the stat
+        // cards above would still have figures.
+        $leader = DB::table('pancake_user_rmo_daily_reports as r')
+            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+            ->where('r.workspace_id', $workspace->id)
+            ->whereBetween('r.date', [$from, $to])
+            ->groupBy('pu.id', 'pu.name')
+            ->selectRaw('
+                pu.name as name,
+                COALESCE(SUM(r.total_called), 0) as called,
+                COALESCE(SUM(r.total_confirmed), 0) as confirmed
+            ')
+            // Nothing confirmed is no rate at all, not a zero one.
+            ->havingRaw('confirmed > 0')
+            ->orderByRaw('called / confirmed DESC')
+            // Ties break on volume, so the same data always crowns the same
+            // person rather than whichever row came back first.
+            ->orderByDesc('confirmed')
+            ->first();
+
+        if ($leader === null) {
+            return response()->json(['leader' => null]);
+        }
+
+        $called = (int) $leader->called;
+        $confirmed = (int) $leader->confirmed;
+
+        return response()->json([
+            'leader' => [
+                'name' => $leader->name,
+                'value' => round($called / $confirmed * 100, 1),
+                'called' => $called,
+                'confirmed' => $confirmed,
+            ],
+        ]);
+    }
+
+    public function analyticsLeaderRmoDuration(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+
+        // Off the same rollup the CSR table reads, so this is that CSR's "RMO
+        // Call Time" column summed over the range, and the average uses the
+        // call count sitting beside it in "RMO Called".
+        $leader = DB::table('pancake_user_rmo_daily_reports as r')
+            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+            ->where('r.workspace_id', $workspace->id)
+            ->whereBetween('r.date', [$from, $to])
+            ->groupBy('pu.id', 'pu.name')
+            ->selectRaw('
+                pu.name as name,
+                COALESCE(SUM(r.total_call_time), 0) as seconds,
+                COALESCE(SUM(r.total_rmo_call_attempts), 0) as calls
+            ')
+            // No time on the phone is not "most time on calls". Without this the
+            // card would crown somebody at 00:00 on a quiet week.
+            ->havingRaw('seconds > 0')
+            ->orderByDesc('seconds')
+            ->first();
+
+        if ($leader === null) {
+            return response()->json(['leader' => null]);
+        }
+
+        $seconds = (int) $leader->seconds;
+        $calls = (int) $leader->calls;
+
+        return response()->json([
+            'leader' => [
+                'name' => $leader->name,
+                'value' => $seconds,
+                'calls' => $calls,
+                // Null when the rollup recorded time but no calls to divide it
+                // between — the two columns are written independently, so that
+                // is possible and an average of nothing is not zero.
+                'average_seconds' => $calls > 0 ? round($seconds / $calls, 1) : null,
+            ],
+        ]);
+    }
+
     /**
      * The equally long stretch ending the day before $from.
      *

@@ -1,5 +1,16 @@
 import PageHeader from '@/components/common/PageHeader';
 import {
+    HighestRmoCalledLeaderCard,
+    HighestRmoDurationLeaderCard,
+    HighestSalesLeaderCard,
+    LowestRtsLeaderCard,
+    type LeaderResponse,
+    type RmoCalledLeader,
+    type RmoDurationLeader,
+    type RtsLeader,
+    type SalesLeader,
+} from '@/components/csr/CsrAnalyticsLeaderCards';
+import {
     CallsPlacedStatCard,
     LongestCallStatCard,
     ReachRateStatCard,
@@ -222,6 +233,19 @@ export default function Analytics({ workspace, records, query }: Props) {
             toStr,
         );
 
+    const [salesLeader, salesLeaderLoading] = useAnalyticsStat<
+        LeaderResponse<SalesLeader>
+    >(workspace.slug, 'analytics-leader-sales', fromStr, toStr);
+    const [rtsLeader, rtsLeaderLoading] = useAnalyticsStat<
+        LeaderResponse<RtsLeader>
+    >(workspace.slug, 'analytics-leader-rts', fromStr, toStr);
+    const [rmoCalledLeader, rmoCalledLeaderLoading] = useAnalyticsStat<
+        LeaderResponse<RmoCalledLeader>
+    >(workspace.slug, 'analytics-leader-rmo-called', fromStr, toStr);
+    const [rmoDurationLeader, rmoDurationLeaderLoading] = useAnalyticsStat<
+        LeaderResponse<RmoDurationLeader>
+    >(workspace.slug, 'analytics-leader-rmo-duration', fromStr, toStr);
+
     // Debounced search — skip the initial mount so we don't refetch on load.
     const isFirstRender = useRef(true);
     useEffect(() => {
@@ -426,6 +450,29 @@ export default function Analytics({ workspace, records, query }: Props) {
                     <LongestCallStatCard
                         stat={longestCallStat}
                         loading={longestCallLoading}
+                    />
+                </div>
+
+                <h2 className="mt-6 mb-3 font-mono text-[10px] font-medium tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
+                    Leaders for the period
+                </h2>
+
+                <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <HighestSalesLeaderCard
+                        data={salesLeader}
+                        loading={salesLeaderLoading}
+                    />
+                    <LowestRtsLeaderCard
+                        data={rtsLeader}
+                        loading={rtsLeaderLoading}
+                    />
+                    <HighestRmoCalledLeaderCard
+                        data={rmoCalledLeader}
+                        loading={rmoCalledLeaderLoading}
+                    />
+                    <HighestRmoDurationLeaderCard
+                        data={rmoDurationLeader}
+                        loading={rmoDurationLeaderLoading}
                     />
                 </div>
 
