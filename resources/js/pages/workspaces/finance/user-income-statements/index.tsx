@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -62,8 +62,14 @@ interface UserRow {
     opex_share_percentage: number;
     /** That share opened up by transaction type; sums back to `opex`. */
     opex_breakdown: OpexLine[];
-    /** The deficit carried in, added up from the seller-and-product entries. */
+    /**
+     * What this person carried into the month. Read off their own closing
+     * position last month, unless a figure was entered for a month whose
+     * predecessor was closed elsewhere.
+     */
     loss_brought_forward: number;
+    /** True when that figure was typed rather than worked out. */
+    loss_brought_forward_entered: boolean;
     cumulative_profit_delivered_cogs: number;
     cumulative_profit_bought_cogs: number;
     net_profit_delivered_cogs: number;
@@ -156,6 +162,11 @@ interface FigureRow {
     signed?: (r: UserRow) => number;
     /** The row opens to show what makes it up, one sub-row per entry. */
     breakdown?: (r: UserRow) => OpexLine[];
+    /**
+     * The row is typed into rather than only read. A deficit belongs to a
+     * person, so this is the one grain it can be stated at.
+     */
+    editable?: (r: UserRow) => number;
 }
 
 /**
@@ -299,12 +310,13 @@ const buildRows = (
         },
         {
             label: 'Less — Loss Brought Forward',
-            help: 'What was carried into the month, added up from this person’s products — the figures are entered on the Seller × Product page, which is the finest grain they are stated at. Nought here means none was entered against this person.',
+            help: 'What this person carried into the month — their own closing position last month, where that was negative. Someone who ended last month in profit carries nothing, however many of their products lost money: those losses were already taken out of the month they happened in. Type a figure only for a month whose predecessor was closed elsewhere; clearing the box hands it back to the worked-out one.',
             render: (r) => fmt(r.loss_brought_forward),
+            editable: (r) => r.loss_brought_forward,
         },
         {
             label: '= Cumulative Profit',
-            help: 'Net Profit less the loss carried in — what this person is actually up, counting where it started the month.',
+            help: 'Net Profit less the loss carried in — where this person actually stands, counting where they started the month. This is the figure next month carries.',
             render: (r) =>
                 fmt(
                     cogsView === 'bought'
@@ -337,6 +349,24 @@ export default function UserIncomeStatements({
     const ROWS = buildRows(rates, cogsView, gencysPartner);
     const named = users.filter((u) => u.user_id !== null);
     const unlinkedCells = unassignedRows.filter((u) => u.label !== null).length;
+
+    // Saving rebuilds the slices server-side, so everything above is true
+    // again on the response. Sent on leaving the box rather than per keystroke.
+    const saveCarryover = (r: UserRow, raw: string) => {
+        const amount = raw.trim() === '' ? 0 : Number(raw);
+
+        if (!Number.isFinite(amount) || amount < 0) return;
+        // Clearing a box that only ever held a worked-out figure would post a
+        // pointless zero; only a real change is worth a round trip.
+        if (amount === r.loss_brought_forward) return;
+        if (amount === 0 && !r.loss_brought_forward_entered) return;
+
+        router.post(
+            `${finance}/income-statements/${incomeStatement.id}/loss-carryovers`,
+            { user_id: r.user_id, amount },
+            { preserveScroll: true },
+        );
+    };
 
     const toggleRow = (label: string) =>
         setOpenRows((current) => {
@@ -581,7 +611,38 @@ export default function UserIncomeStatements({
                                                                 : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
                                                         } ${cellTone(row, u, u.user_id === null)}`}
                                                     >
-                                                        {row.render(u)}
+                                                        {row.editable ? (
+                                                            <input
+                                                                // Uncontrolled, so it remounts to pick up a
+                                                                // value the server worked out; keying on the
+                                                                // figure does nothing while it is unchanged.
+                                                                key={`${u.user_id ?? 'none'}-${row.editable(u)}`}
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                defaultValue={
+                                                                    row.editable(
+                                                                        u,
+                                                                    ) || ''
+                                                                }
+                                                                placeholder="0.00"
+                                                                aria-label={`Loss brought forward for ${u.user}`}
+                                                                onBlur={(e) =>
+                                                                    saveCarryover(
+                                                                        u,
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className={`h-7 w-full rounded-md border px-2 text-right font-mono! text-[12px]! text-gray-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:text-gray-100 ${
+                                                                    u.loss_brought_forward_entered
+                                                                        ? 'border-emerald-500/40 bg-emerald-50/40 dark:border-emerald-500/30 dark:bg-emerald-500/5'
+                                                                        : 'border-black/8 bg-white dark:border-white/8 dark:bg-zinc-900'
+                                                                }`}
+                                                            />
+                                                        ) : (
+                                                            row.render(u)
+                                                        )}
                                                     </td>
                                                 ))}
                                                 {users.length === 0 && (

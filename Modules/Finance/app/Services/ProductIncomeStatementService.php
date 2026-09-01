@@ -123,13 +123,10 @@ class ProductIncomeStatementService
         // every row's gross profit is settled — see ClosesOutSlices.
         $rows = $this->closeSlice($statement, $rows->all());
 
-        // Then the deficit carried into the month, entered at the seller-and-
-        // product grain and added up to whatever grain this slice reports at.
-        $rows = collect($this->applyCarriedLoss(
-            $rows,
-            $this->carryovers->byProduct($workspace, $from),
-            fn (array $row) => (string) ($row['product_id'] ?? ''),
-        ));
+        // No carried deficit here: it belongs to a person, and a product is
+        // run by several. Passing none still settles cumulative profit, which
+        // on this slice is simply net profit.
+        $rows = collect($this->applyCarriedLoss($rows, [], fn () => ''));
 
         DB::transaction(function () use ($statement, $rows) {
             $statement->productStatements()->delete();

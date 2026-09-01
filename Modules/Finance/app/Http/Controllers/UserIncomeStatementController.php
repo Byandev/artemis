@@ -110,17 +110,17 @@ class UserIncomeStatementController extends Controller
     }
 
     /**
-     * Record what one seller carried into the month on one product.
+     * Record what one person carried into the month.
      *
-     * Entered at the finest grain the statements report at, so it adds up on
-     * its own: the seller's own total, the product's across its sellers, and
-     * the month's across both. Saving one re-snapshots the slices so those
-     * roll-ups are true again straight away.
+     * Only needed for a month whose predecessor was closed somewhere else:
+     * where last month's statement exists, each person's carry is read off
+     * their own closing position instead. An entry wins for the month it is
+     * made against. Saving one re-snapshots the slices so the figures above it
+     * are true again straight away.
      *
-     * An amount of nought removes the entry rather than storing a zero — the
-     * absence of a deficit and a deficit of nothing are the same thing here,
-     * and keeping rows of nought would make the month look edited when it is
-     * not.
+     * An amount of nought removes the entry rather than storing a zero — that
+     * hands the month back to the derived figure, and keeps a month from
+     * looking edited when it is not.
      */
     public function storeLossCarryover(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
     {
@@ -129,21 +129,20 @@ class UserIncomeStatementController extends Controller
         $this->ensureOwns($workspace, $incomeStatement);
 
         $validated = $request->validate([
-            // Null on either side is the unattributed bucket that side reports.
+            // Null is the bucket for orders credited to nobody.
             'user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
-            'product_id' => [
-                'nullable', 'integer',
-                Rule::exists('products', 'id')->where('workspace_id', $workspace->id),
-            ],
             // What is owed, held positive: a carryover is a hole to fill.
             'amount' => ['required', 'numeric', 'min:0'],
+            // A deficit is a person's, never one of their products' — see the
+            // migration. Refused rather than ignored, so a caller still sending
+            // one is told instead of quietly getting something else.
+            'product_id' => ['prohibited'],
         ]);
 
         $key = [
             'workspace_id' => $workspace->id,
             'period_month' => $incomeStatement->period_month->copy()->startOfMonth()->toDateString(),
             'user_id' => $validated['user_id'] ?? null,
-            'product_id' => $validated['product_id'] ?? null,
         ];
 
         if ((float) $validated['amount'] <= 0) {

@@ -2,15 +2,12 @@
 
 use App\Models\Page;
 use App\Models\Product;
-use App\Models\Shop;
 use App\Models\User;
-use Illuminate\Support\Str;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\LossCarryover;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Services\UserProductIncomeStatementService;
-use Modules\Pancake\Models\Order;
 
 /**
  * A month that ends in the red is carried into the next one.
@@ -315,224 +312,205 @@ test('a negative figure is refused — it is an amount owing, not a profit', fun
         ->assertSessionHasErrors('loss_brought_forward');
 });
 
-// --- entered per seller and product, added up from there --------------------
+// --- carried per person, not per product ------------------------------------
 
-/** A month with two sellers on one product, and one on another. */
-function lbf_seed($workspace): array
+/**
+ * Last month, closed: each person's own closing position, which is what this
+ * month reads. Written directly — how a month reaches those figures is covered
+ * above and by the statement tests.
+ *
+ * @param  array<int, float>  $closingByUser  user id => cumulative profit
+ */
+function lbf_lastMonth($workspace, string $month, array $closingByUser): IncomeStatement
 {
-    $workspace->update(['is_gencys_partner' => false]);
+    $statement = lbf_statement($workspace, $month, 0);
+
+    foreach ($closingByUser as $userId => $closing) {
+        $statement->userStatements()->create([
+            'user_id' => $userId,
+            'user_name' => 'Seller '.$userId,
+            'net_profit_bought_cogs' => $closing,
+            'cumulative_profit_bought_cogs' => $closing,
+        ]);
+    }
+
+    return $statement;
+}
+
+function lbf_thisMonth($workspace, string $month = '2026-06'): IncomeStatement
+{
+    $statement = lbf_statement($workspace, $month, 0);
+    app(UserIncomeStatementService::class)->snapshot($statement);
+
+    return $statement;
+}
+
+function lbf_carryFor(IncomeStatement $statement, int $userId): float
+{
+    return (float) $statement->userStatements()->where('user_id', $userId)->value('loss_brought_forward');
+}
+
+test('a person carries their own closing position when it was negative', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $ana = User::factory()->create(['name' => 'Ana']);
+    $workspace->users()->attach($ana->id);
+
+    lbf_lastMonth($workspace, '2026-05', [$ana->id => -18000]);
+
+    expect(lbf_carryFor(lbf_thisMonth($workspace), $ana->id))->toBe(18000.0);
+});
+
+test('a person who ended the month up carries nothing, whatever their products did', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $ana = User::factory()->create(['name' => 'Ana']);
+    $workspace->users()->attach($ana->id);
+
+    // Ana ran a winner and a loser and still finished ahead: WIDGET +100,000
+    // against GADGET -60,000 leaves her +40,000.
+    $last = lbf_lastMonth($workspace, '2026-05', [$ana->id => 40000]);
 
     $widget = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'WIDGET']);
     $gadget = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'GADGET']);
-    $wShop = Shop::create(['workspace_id' => $workspace->id, 'name' => 'W', 'product_id' => $widget->id]);
-    $gShop = Shop::create(['workspace_id' => $workspace->id, 'name' => 'G', 'product_id' => $gadget->id]);
 
-    $seller = function (string $name) use ($workspace) {
-        $user = User::factory()->create(['name' => $name]);
-        $workspace->users()->attach($user->id);
-
-        return $user;
-    };
-    $ana = $seller('Ana');
-    $ben = $seller('Ben');
-
-    $page = fn ($owner, $shop, $name) => Page::create([
-        'workspace_id' => $workspace->id, 'shop_id' => $shop->id,
-        'name' => $name, 'owner_id' => $owner->id,
-    ]);
-
-    $deliver = function ($page, $shop) use ($workspace) {
-        Order::create([
-            'workspace_id' => $workspace->id,
-            'order_number' => fake()->unique()->numerify('PC-######'),
-            'status' => 3, 'status_name' => 'delivered',
-            'shop_id' => $shop->id, 'page_id' => $page->id,
-            'customer_id' => (string) Str::uuid(),
-            'inserted_at' => '2026-05-01 09:00:00',
-            'final_amount' => 1000, 'delivered_at' => '2026-05-10 09:00:00',
+    foreach ([[$widget->id, 100000], [$gadget->id, -60000]] as [$productId, $net]) {
+        $last->userProductStatements()->create([
+            'user_id' => $ana->id, 'user_name' => 'Ana',
+            'product_id' => $productId, 'product_name' => 'P',
+            'net_profit_bought_cogs' => $net,
+            'cumulative_profit_bought_cogs' => $net,
         ]);
-    };
+    }
 
-    $deliver($page($ana, $wShop, 'Ana W'), $wShop);
-    $deliver($page($ben, $wShop, 'Ben W'), $wShop);
-    $deliver($page($ana, $gShop, 'Ana G'), $gShop);
-
-    return ['ana' => $ana, 'ben' => $ben, 'widget' => $widget, 'gadget' => $gadget];
-}
-
-test('a loss entered per seller and product adds up to every level above it', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['ana' => $ana, 'ben' => $ben, 'widget' => $widget, 'gadget' => $gadget] = lbf_seed($workspace);
-
-    $statement = IncomeStatement::create([
-        'workspace_id' => $workspace->id,
-        'period_month' => '2026-05-01',
-        'cod_fee_rate' => 0.0275, 'vat_rate' => 0.12, 'advisory_rate' => 0.30,
-        'status' => 'final',
-    ]);
-
-    $url = "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/loss-carryovers";
-
-    // Three entries at the finest grain.
-    $this->actingAs($owner)->post($url, ['user_id' => $ana->id, 'product_id' => $widget->id, 'amount' => 100])->assertRedirect();
-    $this->actingAs($owner)->post($url, ['user_id' => $ben->id, 'product_id' => $widget->id, 'amount' => 250])->assertRedirect();
-    $this->actingAs($owner)->post($url, ['user_id' => $ana->id, 'product_id' => $gadget->id, 'amount' => 40])->assertRedirect();
-
-    $cross = $statement->userProductStatements()->get();
-    $pair = fn ($u, $p) => (float) $cross->first(fn ($r) => $r->user_id === $u && $r->product_id === $p)?->loss_brought_forward;
-
-    // The entries themselves.
-    expect($pair($ana->id, $widget->id))->toBe(100.0)
-        ->and($pair($ben->id, $widget->id))->toBe(250.0)
-        ->and($pair($ana->id, $gadget->id))->toBe(40.0);
-
-    // Added up across products for a person...
-    $users = $statement->userStatements()->get();
-    expect((float) $users->firstWhere('user_id', $ana->id)->loss_brought_forward)->toBe(140.0)
-        ->and((float) $users->firstWhere('user_id', $ben->id)->loss_brought_forward)->toBe(250.0);
-
-    // ...across people for a product...
-    $products = $statement->productStatements()->get();
-    expect((float) $products->firstWhere('product_id', $widget->id)->loss_brought_forward)->toBe(350.0)
-        ->and((float) $products->firstWhere('product_id', $gadget->id)->loss_brought_forward)->toBe(40.0);
-
-    // ...and every way round it comes to the same 390.
-    expect(round((float) $cross->sum('loss_brought_forward'), 2))->toBe(390.0)
-        ->and(round((float) $users->sum('loss_brought_forward'), 2))->toBe(390.0)
-        ->and(round((float) $products->sum('loss_brought_forward'), 2))->toBe(390.0);
+    // The whole point: GADGET's 60,000 already came out of what Ana earned in
+    // May — it pulled her commission base from 100,000 down to 40,000. Carrying
+    // it into June would charge her for it a second time.
+    expect(lbf_carryFor(lbf_thisMonth($workspace), $ana->id))->toBe(0.0);
 });
 
-test('cumulative profit on a row is its net profit less what it carried', function () {
+test('a product cannot be tagged with a deficit at all', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['ana' => $ana, 'widget' => $widget] = lbf_seed($workspace);
+    $ana = User::factory()->create(['name' => 'Ana']);
+    $workspace->users()->attach($ana->id);
+    $widget = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'WIDGET']);
 
-    $statement = IncomeStatement::create([
-        'workspace_id' => $workspace->id,
-        'period_month' => '2026-05-01',
-        'cod_fee_rate' => 0.0275, 'vat_rate' => 0.12, 'advisory_rate' => 0.30,
-        'status' => 'final',
-    ]);
+    $statement = lbf_statement($workspace, '2026-06', 0);
 
+    // Refused outright rather than quietly stored against the person: a caller
+    // still sending a product is working from the old idea and should hear so.
     $this->actingAs($owner)->post(
         "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/loss-carryovers",
         ['user_id' => $ana->id, 'product_id' => $widget->id, 'amount' => 500],
-    )->assertRedirect();
+    )->assertSessionHasErrors('product_id');
 
-    $row = $statement->userProductStatements()
-        ->where('user_id', $ana->id)->where('product_id', $widget->id)->first();
-
-    expect((float) $row->loss_brought_forward)->toBe(500.0)
-        ->and((float) $row->cumulative_profit_bought_cogs)
-        ->toBe(round((float) $row->net_profit_bought_cogs - 500, 2));
+    expect(LossCarryover::count())->toBe(0);
 });
 
-test('an entry of nought clears it rather than storing a zero', function () {
+test('a typed figure wins for the month it is entered against', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['ana' => $ana, 'widget' => $widget] = lbf_seed($workspace);
+    $ana = User::factory()->create(['name' => 'Ana']);
+    $workspace->users()->attach($ana->id);
 
-    $statement = IncomeStatement::create([
-        'workspace_id' => $workspace->id,
-        'period_month' => '2026-05-01',
-        'cod_fee_rate' => 0.0275, 'vat_rate' => 0.12, 'advisory_rate' => 0.30,
-        'status' => 'final',
-    ]);
-    $url = "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/loss-carryovers";
+    // Last month says -5,000, but the books before this system say otherwise.
+    lbf_lastMonth($workspace, '2026-05', [$ana->id => -5000]);
+    $june = lbf_statement($workspace, '2026-06', 0);
 
-    $this->actingAs($owner)->post($url, ['user_id' => $ana->id, 'product_id' => $widget->id, 'amount' => 300]);
-    expect(LossCarryover::count())->toBe(1);
+    $this->actingAs($owner)->post(
+        "/workspaces/{$workspace->slug}/finance/income-statements/{$june->id}/loss-carryovers",
+        ['user_id' => $ana->id, 'amount' => 12345.67],
+    )->assertRedirect();
 
-    $this->actingAs($owner)->post($url, ['user_id' => $ana->id, 'product_id' => $widget->id, 'amount' => 0]);
+    expect(lbf_carryFor($june, $ana->id))->toBe(12345.67);
+});
 
-    // Nothing carried and a carryover of nothing are the same thing, so the
-    // month doesn't read as edited when it isn't.
+test('clearing a typed figure hands the month back to the worked-out one', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $ana = User::factory()->create(['name' => 'Ana']);
+    $workspace->users()->attach($ana->id);
+
+    lbf_lastMonth($workspace, '2026-05', [$ana->id => -5000]);
+    $june = lbf_statement($workspace, '2026-06', 0);
+    $url = "/workspaces/{$workspace->slug}/finance/income-statements/{$june->id}/loss-carryovers";
+
+    $this->actingAs($owner)->post($url, ['user_id' => $ana->id, 'amount' => 999]);
+    expect(lbf_carryFor($june, $ana->id))->toBe(999.0);
+
+    $this->actingAs($owner)->post($url, ['user_id' => $ana->id, 'amount' => 0]);
+
+    // Not nought — the entry is gone, so last month speaks again.
     expect(LossCarryover::count())->toBe(0)
-        ->and((float) $statement->userProductStatements()
-            ->where('user_id', $ana->id)->value('loss_brought_forward'))->toBe(0.0);
+        ->and(lbf_carryFor($june, $ana->id))->toBe(5000.0);
 });
 
-test('entries survive a regenerate, unlike the rows that carry them', function () {
+test('a typed figure survives a regenerate, unlike the rows that carry it', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['ana' => $ana, 'widget' => $widget] = lbf_seed($workspace);
+    $workspace->update(['is_gencys_partner' => true]);
+    $ana = User::factory()->create(['name' => 'Ana']);
+    $workspace->users()->attach($ana->id);
 
-    $statement = IncomeStatement::create([
-        'workspace_id' => $workspace->id,
-        'period_month' => '2026-05-01',
-        'cod_fee_rate' => 0.0275, 'vat_rate' => 0.12, 'advisory_rate' => 0.30,
-        'status' => 'final',
-    ]);
+    $june = lbf_statement($workspace, '2026-06', 0);
 
     $this->actingAs($owner)->post(
-        "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/loss-carryovers",
-        ['user_id' => $ana->id, 'product_id' => $widget->id, 'amount' => 777.77],
+        "/workspaces/{$workspace->slug}/finance/income-statements/{$june->id}/loss-carryovers",
+        ['user_id' => $ana->id, 'amount' => 777.77],
     )->assertRedirect();
 
-    // A regenerate deletes and rebuilds every slice row, which is exactly why
-    // the entries are kept in their own table.
     $this->actingAs($owner)->post(
-        "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/regenerate",
+        "/workspaces/{$workspace->slug}/finance/income-statements/{$june->id}/regenerate",
     )->assertRedirect();
 
-    expect((float) $statement->userProductStatements()
-        ->where('user_id', $ana->id)->where('product_id', $widget->id)
-        ->value('loss_brought_forward'))->toBe(777.77)
-        // And the month's own figure is those entries added up.
-        ->and((float) $statement->fresh()->loss_brought_forward_bought_cogs)->toBe(777.77);
+    // A regenerate deletes and rebuilds every slice row, which is why the
+    // entries live in a table of their own.
+    expect(lbf_carryFor($june->fresh(), $ana->id))->toBe(777.77);
 });
 
-test('the entered figure comes back in the payloads the pages read', function () {
+test('the figure reaches the pages that show it, and none that should not', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['ana' => $ana, 'widget' => $widget] = lbf_seed($workspace);
+    $ana = User::factory()->create(['name' => 'Ana']);
+    $workspace->users()->attach($ana->id);
 
-    $statement = IncomeStatement::create([
-        'workspace_id' => $workspace->id,
-        'period_month' => '2026-05-01',
-        'cod_fee_rate' => 0.0275, 'vat_rate' => 0.12, 'advisory_rate' => 0.30,
-        'status' => 'final',
-    ]);
+    lbf_lastMonth($workspace, '2026-05', [$ana->id => -2500]);
+    $june = lbf_thisMonth($workspace);
+    app(ProductIncomeStatementService::class)->snapshot($june);
+    app(UserProductIncomeStatementService::class)->snapshot($june);
 
-    $this->actingAs($owner)->post(
-        "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/loss-carryovers",
-        ['user_id' => $ana->id, 'product_id' => $widget->id, 'amount' => 321.45],
-    )->assertRedirect();
+    // The per-user page states it, and says it was worked out rather than typed.
+    $users = app(UserIncomeStatementService::class)->payload($june);
+    $row = collect($users['users'])->firstWhere('user_id', $ana->id);
 
-    // Stored is not enough: the figure has to reach the page, or the box it was
-    // typed into reads empty again on the next load.
-    $cross = app(UserProductIncomeStatementService::class)->payload($statement);
-    $column = collect($cross['rows'])->first(
-        fn ($r) => $r['user_id'] === $ana->id && $r['product_id'] === $widget->id,
-    );
+    expect($row['loss_brought_forward'])->toBe(2500.0)
+        ->and($row['loss_brought_forward_entered'])->toBeFalse();
 
-    expect($column)->toHaveKey('loss_brought_forward')
-        ->and($column['loss_brought_forward'])->toBe(321.45)
-        ->and($column)->toHaveKey('cumulative_profit_bought_cogs');
+    // A product carries none of it — it is a person's, and a product is run by
+    // several people.
+    foreach ($june->productStatements as $product) {
+        expect((float) $product->loss_brought_forward)->toBe(0.0);
+    }
 
-    // And on the pages above, where it is read-only.
-    $users = app(UserIncomeStatementService::class)->payload($statement);
-    $products = app(ProductIncomeStatementService::class)->payload($statement);
-
-    expect(collect($users['users'])->firstWhere('user_id', $ana->id)['loss_brought_forward'])->toBe(321.45)
-        ->and(collect($products['products'])->firstWhere('product_id', $widget->id)['loss_brought_forward'])->toBe(321.45);
+    // Nor does any one of that person's products.
+    foreach ($june->userProductStatements as $pair) {
+        expect((float) $pair->loss_brought_forward)->toBe(0.0);
+    }
 });
 
-test('the drill-down payload carries it too', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['ana' => $ana, 'widget' => $widget] = lbf_seed($workspace);
+test('the drill-down shows the person’s deficit on its total, not against a product', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $ana = User::factory()->create(['name' => 'Ana']);
+    $workspace->users()->attach($ana->id);
 
-    $statement = IncomeStatement::create([
-        'workspace_id' => $workspace->id,
-        'period_month' => '2026-05-01',
-        'cod_fee_rate' => 0.0275, 'vat_rate' => 0.12, 'advisory_rate' => 0.30,
-        'status' => 'final',
+    lbf_lastMonth($workspace, '2026-05', [$ana->id => -3200]);
+
+    $june = lbf_statement($workspace, '2026-06', 0);
+    // A row for Ana so the drill-down has something to open.
+    $june->userProductStatements()->create([
+        'user_id' => $ana->id, 'user_name' => 'Ana',
+        'product_id' => null, 'product_name' => 'Unresolved',
+        'net_profit_bought_cogs' => 1000,
     ]);
-
-    $this->actingAs($owner)->post(
-        "/workspaces/{$workspace->slug}/finance/income-statements/{$statement->id}/loss-carryovers",
-        ['user_id' => $ana->id, 'product_id' => $widget->id, 'amount' => 55.5],
-    )->assertRedirect();
 
     $payload = app(UserProductIncomeStatementService::class)
-        ->userPayload($statement, $ana->id);
+        ->userPayload($june, $ana->id);
 
-    expect(collect($payload['products'])->firstWhere('product_id', $widget->id)['loss_brought_forward'])
-        ->toBe(55.5);
+    expect($payload['total']['loss_brought_forward'])->toBe(3200.0)
+        // Their products each carry none of it.
+        ->and(collect($payload['products'])->pluck('loss_brought_forward')->unique()->all())->toBe([0.0]);
 });

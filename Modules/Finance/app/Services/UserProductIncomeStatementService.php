@@ -162,13 +162,12 @@ class UserProductIncomeStatementService
         // every row's gross profit is settled — see ClosesOutSlices.
         $rows = $this->closeSlice($statement, $rows->all());
 
-        // Then the deficit carried into the month, entered at the seller-and-
-        // product grain and added up to whatever grain this slice reports at.
-        $rows = collect($this->applyCarriedLoss(
-            $rows,
-            $this->carryovers->byUserProduct($workspace, $from),
-            fn (array $row) => UserProductKey::of($row['user_id'], $row['product_id']),
-        ));
+        // A deficit is a person's, not a person-on-one-product's: their
+        // products were netted against each other in the month it happened, so
+        // it cannot be split back across them without charging it twice. The
+        // pair rows carry none; the drill-down shows the person's own figure on
+        // its Total.
+        $rows = collect($this->applyCarriedLoss($rows, [], fn () => ''));
 
         DB::transaction(function () use ($statement, $rows) {
             $statement->userProductStatements()->delete();
@@ -389,6 +388,22 @@ class UserProductIncomeStatementService
         $namedIds = $named->pluck('product_id')->map(fn ($id) => (string) $id)->all();
 
         $total['opex_breakdown'] = $this->opexByType($opexTypes, $total['opex'] ?? 0.0);
+
+        // The deficit this person carried in. It sits on the Total and nowhere
+        // else on this page: it is theirs, not any one product's, and dividing
+        // it across their products is exactly the double-count this grain
+        // invites — those products were already netted in the month it arose.
+        [$from] = $this->range($statement);
+        $carried = $this->carryovers->forUsers($statement->workspace, $from)[(string) ($userId ?? '')] ?? 0.0;
+
+        $total['loss_brought_forward'] = round($carried, 2);
+
+        foreach (['delivered_cogs', 'bought_cogs'] as $basis) {
+            $total["cumulative_profit_{$basis}"] = round(
+                (float) ($total["net_profit_{$basis}"] ?? 0.0) - $carried,
+                2,
+            );
+        }
 
         $total += $this->wholeAndShare(
             $this->foldFigures($all->filter(fn ($r) => in_array((string) $r->product_id, $namedIds, true))),

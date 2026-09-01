@@ -88,6 +88,16 @@ class UserIncomeStatementService
             }
         }
 
+        // And for a deficit carried in. Someone who owes from last month has to
+        // appear even having sold nothing this one, or what they owe quietly
+        // disappears the month they stop selling — and reappears if they start
+        // again, which is worse.
+        $carried = $this->carryovers->forUsers($workspace, $from);
+
+        foreach (array_keys($carried) as $key) {
+            $totals[(string) $key] ??= OrderTotals::empty();
+        }
+
         $names = User::whereIn('id', array_values(array_filter(array_keys($totals), fn ($k) => $k !== '')))
             ->pluck('name', 'id');
 
@@ -152,7 +162,7 @@ class UserIncomeStatementService
         // product grain and added up to whatever grain this slice reports at.
         $rows = collect($this->applyCarriedLoss(
             $rows,
-            $this->carryovers->byUser($workspace, $from),
+            $carried,
             fn (array $row) => (string) ($row['user_id'] ?? ''),
         ));
 
@@ -179,6 +189,12 @@ class UserIncomeStatementService
         // then divided along.
         $opexTypes = $this->opexTypes($statement);
 
+        // Which carried figures were typed rather than worked out — the page
+        // marks those boxes, and clearing one has to mean something different
+        // from clearing a box that only ever showed a derived figure.
+        [$from] = $this->range($statement);
+        $entered = $this->carryovers->entered($statement->workspace, $from);
+
         $rows = $statement->userStatements()->get()->map(fn ($r) => [
             'user_id' => $r->user_id,
             'user' => $r->user_name ?: 'Unassigned',
@@ -203,6 +219,7 @@ class UserIncomeStatementService
             'opex_share_percentage' => (float) $r->opex_share_percentage,
             'opex_breakdown' => $this->opexByType($opexTypes, (float) $r->opex),
             'loss_brought_forward' => (float) $r->loss_brought_forward,
+            'loss_brought_forward_entered' => array_key_exists((string) ($r->user_id ?? ''), $entered),
             'cumulative_profit_delivered_cogs' => (float) $r->cumulative_profit_delivered_cogs,
             'cumulative_profit_bought_cogs' => (float) $r->cumulative_profit_bought_cogs,
             'net_profit_delivered_cogs' => (float) $r->net_profit_delivered_cogs,
@@ -240,6 +257,7 @@ class UserIncomeStatementService
             'opex' => $sum('opex'),
             'opex_breakdown' => $this->opexByType($opexTypes, $sum('opex')),
             'loss_brought_forward' => $sum('loss_brought_forward'),
+            'loss_brought_forward_entered' => false,
             'cumulative_profit_delivered_cogs' => $sum('cumulative_profit_delivered_cogs'),
             'cumulative_profit_bought_cogs' => $sum('cumulative_profit_bought_cogs'),
             'opex_share_percentage' => $sum('opex_share_percentage'),
