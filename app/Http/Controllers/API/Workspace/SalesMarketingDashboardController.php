@@ -320,6 +320,26 @@ class SalesMarketingDashboardController extends Controller
     }
 
     /**
+     * The same per-product rows, for the breakdown table beneath the chart.
+     *
+     * Its own endpoint so the table loads, skeletons and refreshes on its own
+     * rather than waiting on the chart, but deliberately the same query — the
+     * same reasoning as `teamBreakdown`: the table states what the chart plots,
+     * and two implementations of one figure is how the two would eventually
+     * disagree.
+     */
+    public function productBreakdown(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
+        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+
+        return response()->json([
+            'rows' => $this->productRows($request, $workspace, $this->window($request)),
+        ]);
+    }
+
+    /**
      * One row of raw sums per product over the window.
      *
      * Read off page_daily_records — the per-page half of the same nightly build
