@@ -63,13 +63,13 @@ test('a bare array body is read the same as a wrapped one', function () {
         ->and($run->fresh()->rows_received)->toBe(1);
 });
 
-test('items arrive by name: matched on SKU, on a transaction keyword, or created', function () {
+test('items arrive by name: matched on SKU, or created', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
 
     $bySku = makeInventoryItem($workspace, 'Amazing Kidney Care Patch');
-    $byKeyword = makeInventoryItem($workspace, 'CARDIOMAX');
-    $byKeyword->update(['transaction_keywords' => 'CardioMax - Heart Wellness Powder Juice, CardioMax 2.0']);
+    // Matched on its SKU spelled differently — case and spacing are normalised.
+    $byName = makeInventoryItem($workspace, 'CardioMax - Heart Wellness Powder Juice');
 
     $run = GencysSyncRun::start($workspace->id, null, GencysSyncRun::TYPE_TRANSACTION_HISTORY, ['date' => '08/30/2026']);
 
@@ -94,7 +94,7 @@ test('items arrive by name: matched on SKU, on a transaction keyword, or created
     expect($created)->not->toBeNull()
         ->and($created->is_active)->toBeFalse()
         ->and(InventoryTransaction::where('inventory_item_id', $bySku->id)->count())->toBe(1)
-        ->and(InventoryTransaction::where('inventory_item_id', $byKeyword->id)->count())->toBe(1)
+        ->and(InventoryTransaction::where('inventory_item_id', $byName->id)->count())->toBe(1)
         ->and(InventoryTransaction::where('inventory_item_id', $created->id)->count())->toBe(1)
         ->and($run->fresh()->rows_received)->toBe(3);
 });

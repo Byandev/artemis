@@ -3,6 +3,7 @@
 use App\Enums\Permission as PermissionEnum;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -58,6 +59,9 @@ function gencysMemberWithPermissions($workspace, array $permissions): User
 
 beforeEach(function () {
     Http::fake(['*' => Http::response(['ok' => true], 200)]);
+    // The wildcard fake above would otherwise answer Inertia's own SSR request
+    // too, and @inertiaHead chokes on a body with no "head" key.
+    config(['inertia.ssr.enabled' => false]);
 });
 
 test('the index lists batches with their progress and what is holding the ERP', function () {
@@ -106,6 +110,24 @@ test('the detail page lists the batch runs visible to this workspace', function 
             ->where('queueBusy', true)
             ->has('runs.data.0.n8n_execution_id')
         );
+});
+
+test('picking a team in the switcher does not hide the batch runs', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeErpWorkspaceWithOwner();
+
+    $team = Team::create(['workspace_id' => $workspace->id, 'name' => 'Team Expo']);
+
+    $batch = app(BatchRunner::class)->queue(
+        [GencysSyncRun::TYPE_TRANSACTION_HISTORY],
+        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => ['dates' => ['08/23/2026', '08/24/2026']]],
+    );
+
+    // A run syncs a workspace-wide ERP window, so it belongs to no team and the
+    // "viewing as team" filter has nothing to narrow it by.
+    $this->actingAs($user)
+        ->get(syncBatchesUrl($workspace, "/{$batch->id}?team_id={$team->id}"))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('runs.data', 2));
 });
 
 test('a batch raised from the UI is pinned to that workspace and attributed to the user', function () {

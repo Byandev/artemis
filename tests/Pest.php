@@ -7,6 +7,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Modules\Inventory\Models\InventoryItem;
 use Tests\TestCase;
 
 /*
@@ -64,6 +65,46 @@ function makeGencysWorkspaceWithOwner(): array
     $made['workspace']->update(['is_gencys_partner' => true]);
 
     return $made;
+}
+
+/**
+ * Give an inventory item a Gencys order feed selling $perDay of it a day.
+ *
+ * The snapshot measures demand from the order feed rather than from a value
+ * typed onto the item, so a test that needs a sales rate has to supply orders.
+ * One unit code carrying $perDay of the item, ordered once on each of the
+ * three-day window's days — which freezes as units_3d = 3 x $perDay.
+ */
+function seedDemandFeed(InventoryItem $item, int|float $perDay): void
+{
+    static $nextOrder = 800000;
+
+    $code = 'UC-'.$item->id;
+
+    DB::table('inventory_unit_codes')->insertOrIgnore([
+        'workspace_id' => $item->workspace_id,
+        'unit_code' => $code, 'sku' => $code,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('inventory_unit_code_items')->insert([
+        'workspace_id' => $item->workspace_id,
+        'unit_code' => $code, 'item_code' => $item->sku, 'quantity' => $perDay,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    foreach ([0, 1, 2] as $daysBack) {
+        $id = $nextOrder++;
+
+        DB::table('gencys_orders')->insert([
+            'id' => $id, 'workspace_id' => $item->workspace_id, 'order_no' => 'GO-'.$id,
+            'order_date' => now()->subDays($daysBack)->toDateString(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('gencys_order_items')->insert([
+            'order_id' => $id, 'sku' => $code, 'quantity' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
 }
 
 /**

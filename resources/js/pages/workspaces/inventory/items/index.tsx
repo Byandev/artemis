@@ -70,8 +70,6 @@ interface Item {
     parent_sku?: string | null;
     is_group?: boolean | number;
     child_count?: number;
-    sales_keywords: string;
-    transaction_keywords: string;
     lead_time: number;
     unfulfilled_count: number;
     product?: { id: number; name: string; winning_date?: string | null };
@@ -83,6 +81,12 @@ interface Item {
     /** Everything still owed on open purchase orders, at any stage. */
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
+    /**
+     * Units a day whatever the basis on screen — the denominator for anything
+     * dividing unit stock. Absent on the live (non-snapshot) path, where
+     * three_days_average is already in units.
+     */
+    unit_three_days_average?: number | null;
     po_qty: number | null;
     remaining_after_fulfillment: number | null;
     stocks_needed_for_lead_time: number | null;
@@ -135,16 +139,34 @@ interface Props {
     requestedDate?: string | null;
     /** Days that actually have a snapshot, newest first. */
     snapshotDates?: string[];
+    /**
+     * Which denomination the figures on screen are in. Resolved server-side —
+     * the rows and the toolbar have to agree, and only the server knows whether
+     * the request it just answered could honour the basis that was asked for.
+     */
+    basis?: DemandBasis;
+    /**
+     * Whether the order basis can be offered at all: it needs frozen order
+     * counts, which exist only on a rolled-up snapshot.
+     */
+    basisAvailable?: boolean;
+    /**
+     * The stages the bottleneck filter can offer. Sent by the server so the
+     * page never carries its own copy of the classifier's labels.
+     */
+    bottleneckStages?: string[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
         summarize?: boolean;
+        basis?: DemandBasis;
         filter?: {
             search?: string;
             is_active?: string | number | boolean;
             unassigned?: string | number | boolean;
             product_status?: string;
+            bottleneck_stage?: string;
             date?: string;
         };
     };
@@ -189,39 +211,22 @@ const COLUMN_OPTIONS: ColumnOption[] = [
     { id: 'days_it_can_last', label: 'Days it can last', group: 'List' },
     { id: 'po_needed', label: 'PO needed', group: 'List' },
 
+    // One entry per window. Which denomination each shows follows the
+    // Unit/Order toggle, so the menu offers a window to switch on rather than
+    // two columns of which only one is ever the one you meant.
+    //
+    // Three days is absent because 3-Day Avg above already is it, in whichever
+    // denomination the toggle is set to. Two columns of the same number is what
+    // this whole block was untangled to stop.
     {
-        id: 'orders_3d',
-        label: 'Orders / day (3d)',
+        id: 'demand_7d',
+        label: 'Demand / day (7d)',
         defaultVisible: false,
         group: 'Demand',
     },
     {
-        id: 'units_3d',
-        label: 'Units / day (3d)',
-        defaultVisible: false,
-        group: 'Demand',
-    },
-    {
-        id: 'orders_7d',
-        label: 'Orders / day (7d)',
-        defaultVisible: false,
-        group: 'Demand',
-    },
-    {
-        id: 'units_7d',
-        label: 'Units / day (7d)',
-        defaultVisible: false,
-        group: 'Demand',
-    },
-    {
-        id: 'orders_14d',
-        label: 'Orders / day (14d)',
-        defaultVisible: false,
-        group: 'Demand',
-    },
-    {
-        id: 'units_14d',
-        label: 'Units / day (14d)',
+        id: 'demand_14d',
+        label: 'Demand / day (14d)',
         defaultVisible: false,
         group: 'Demand',
     },
@@ -380,6 +385,68 @@ const COLUMN_HELP: Record<string, React.ReactNode> = {
 };
 
 const COLUMNS_STORAGE_KEY = 'inventory-items-cols';
+
+/**
+ * Whether the planning figures are read in units of stock, or in the orders
+ * that stock ships against.
+ *
+ * The demand feed counts both: an order line names a bundle, which expands into
+ * its component items, so one order for a three-item bundle is one order and
+ * three units. Both denominations are frozen into the snapshot, and the toggle
+ * picks which pair of columns the roll-up reads.
+ *
+ * Remembered per browser beside the column choices — a buyer who works in
+ * orders should not have to reach for the toggle every morning.
+ */
+type DemandBasis = 'unit' | 'order';
+
+const BASIS_STORAGE_KEY = 'inventory-items-basis';
+
+/**
+ * The remembered basis, or units when nothing is remembered.
+ *
+ * Both accessors swallow their errors: storage throws outright in some
+ * contexts (private windows, blocked site data), and a preference is never
+ * worth taking the page down for.
+ */
+function readRememberedBasis(): DemandBasis {
+    try {
+        return window.localStorage.getItem(BASIS_STORAGE_KEY) === 'order'
+            ? 'order'
+            : 'unit';
+    } catch {
+        return 'unit';
+    }
+}
+
+function rememberBasis(basis: DemandBasis): void {
+    try {
+        window.localStorage.setItem(BASIS_STORAGE_KEY, basis);
+    } catch {
+        /* storage unavailable — the choice lasts this page only */
+    }
+}
+
+/**
+ * The columns that change denomination with the toggle.
+ *
+ * Demand, the supply it is measured against, and the reorder figures built from
+ * both — converted together, which is what keeps the plan honest: an order rate
+ * read against unit stock would buy a bundled SKU short by its bundle size.
+ *
+ * Two things stay in units in both bases. Stock on hand and incoming stock,
+ * because they are counted on a shelf and bought that way. And Days It Can
+ * Last, because it does not move — orders of stock over orders a day is the
+ * same quotient as units over units.
+ */
+const ORDER_BASIS_COLUMNS = [
+    'three_days_average',
+    'unfulfilled_count',
+    'remaining_after_fulfillment',
+    'stocks_needed_for_lead_time',
+    'po_qty',
+    'po_needed',
+];
 
 /**
  * Pins the header row and the leading identity column(s) of the items table.
@@ -694,6 +761,9 @@ export default function ItemIndex({
     snapshotUpdatedAt = null,
     requestedDate = null,
     snapshotDates = [],
+    basis = 'unit',
+    basisAvailable = false,
+    bottleneckStages = [],
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -717,6 +787,12 @@ export default function ItemIndex({
     const [unassignedOnly, setUnassignedOnly] = useState(
         !!query?.filter?.unassigned && query?.filter?.unassigned !== '0',
     );
+    // The frozen bottleneck stage; '' means every stage, including none at all.
+    const [bottleneckStage, setBottleneckStage] = useState(
+        query?.filter?.bottleneck_stage
+            ? String(query.filter.bottleneck_stage)
+            : '',
+    );
     // Lifecycle stage of the linked product; '' means every stage.
     const [productStatus, setProductStatus] = useState(
         query?.filter?.product_status
@@ -725,6 +801,9 @@ export default function ItemIndex({
     );
     // Summarize rolls SKU variants up under their parent item and sums the values.
     const [summarize, setSummarize] = useState(!!query?.summarize);
+    // Units or orders. The server is the authority on what is actually on
+    // screen, so this mirrors its answer rather than leading it.
+    const orderBasis = basis === 'order';
     // A date pins the list to that day's saved snapshot; '' is live data.
     const [dateValue, setDateValue] = useState(
         query?.filter?.date ? String(query.filter.date) : '',
@@ -801,11 +880,16 @@ export default function ItemIndex({
         'filter[is_active]': activeOnly ? 1 : 'all',
         'filter[unassigned]': unassignedOnly ? 1 : undefined,
         'filter[product_status]': productStatus || undefined,
+        'filter[bottleneck_stage]': bottleneckStage || undefined,
         'filter[date]': dateValue || undefined,
         // Always explicit: the server rolls up by default, so an omitted param
         // reads as "on" and the toggle would spring back the next time the URL
         // is read (a refresh, or any navigation that rebuilds these params).
         summarize: summarize ? 1 : 0,
+        // Explicit for the same reason summarize is: the server defaults to
+        // units, so an omitted param would quietly drop the order basis on the
+        // next sort or page change.
+        basis,
         page: 1,
         per_page: query?.perPage ?? items.per_page,
         ...overrides,
@@ -823,6 +907,12 @@ export default function ItemIndex({
             'snapshotUpdatedAt',
             'requestedDate',
             'snapshotDates',
+            // The basis decides what the headers claim the numbers are in, and
+            // whether the toggle is offered at all — both can change with the
+            // rows (turning summarize off withdraws the order basis), so they
+            // have to come back with them.
+            'basis',
+            'basisAvailable',
         ],
     };
 
@@ -843,6 +933,7 @@ export default function ItemIndex({
             activeOnly,
             unassignedOnly,
             productStatus,
+            bottleneckStage,
             summarize,
             dateValue,
         ],
@@ -870,6 +961,15 @@ export default function ItemIndex({
                 'filter[unassigned]': checked ? 1 : undefined,
                 ...(checked ? { 'filter[product_status]': undefined } : {}),
             }),
+            visitOptions,
+        );
+    };
+
+    const handleBottleneckStageChange = (value: string) => {
+        setBottleneckStage(value);
+        router.get(
+            baseUrl,
+            buildParams({ 'filter[bottleneck_stage]': value || undefined }),
             visitOptions,
         );
     };
@@ -906,6 +1006,49 @@ export default function ItemIndex({
             visitOptions,
         );
     };
+
+    const handleBasisChange = (next: DemandBasis) => {
+        if (next === basis) return;
+
+        rememberBasis(next);
+        router.get(baseUrl, buildParams({ basis: next }), visitOptions);
+    };
+
+    /**
+     * Reopen the list on the basis it was last left on.
+     *
+     * The server resolves the basis from the URL, so a remembered choice can
+     * only be applied by asking again — once, on mount, and only when there is
+     * something to correct. An explicit `basis` in the URL wins and is what gets
+     * remembered instead: a link someone was sent, or a bookmark, means that
+     * basis on purpose, and silently overriding it would make shared links show
+     * different numbers to different people.
+     */
+    const reconciledBasis = useRef(false);
+    useEffect(() => {
+        if (reconciledBasis.current) return;
+        reconciledBasis.current = true;
+
+        const inUrl = new URLSearchParams(window.location.search).get('basis');
+
+        if (inUrl === 'order' || inUrl === 'unit') {
+            rememberBasis(inUrl);
+            return;
+        }
+
+        const remembered = readRememberedBasis();
+
+        if (basisAvailable && remembered !== basis) {
+            router.get(
+                baseUrl,
+                buildParams({ basis: remembered }),
+                visitOptions,
+            );
+        }
+        // Mount only: this reconciles the first render against storage, and
+        // re-running it on every basis change would fight the toggle.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleBulkStatus = (isActive: boolean) => {
         router.post(
@@ -993,52 +1136,100 @@ export default function ItemIndex({
         return () => performQuery.cancel();
     }, [searchValue]);
 
-    // A rate per day, so the three windows are comparable: 30 units over 3 days
-    // and 70 over 14 are 10/day against 5/day, which the totals hide.
-    const rateColumn = (
-        key:
-            | 'orders_3d'
-            | 'units_3d'
-            | 'orders_7d'
-            | 'units_7d'
-            | 'orders_14d'
-            | 'units_14d',
-        title: string,
-        days: number,
-    ): ColumnDef<Item> => ({
-        id: key,
-        enableSorting: false,
-        header: () => <ReportHeader id={key} title={title} />,
-        cell: ({ row }) => {
-            const value = row.original[key];
-            return (
-                <div className="text-center">
-                    {/* Whole units, rounded up: half a unit a day still needs a
-                        unit on the shelf. The ceiling is applied to the figure
-                        being shown — never per SKU and then summed, which is
-                        what made this disagree with the 3-day average beside
-                        it. */}
-                    <MetricCell
-                        value={value == null ? null : Math.ceil(value / days)}
-                    />
-                </div>
-            );
-        },
-    });
+    /**
+     * Units a day, whatever the toggle is showing.
+     *
+     * The two cover cells below divide stock by a rate, and stock is always in
+     * units — so they cannot read `three_days_average` when the order basis has
+     * made it a count of orders. units_3d over three days is the same figure the
+     * unit basis sums, measured from the same window.
+     */
+    const unitsPerDay = (row: Item): number | null =>
+        row.unit_three_days_average ?? row.three_days_average;
+
+    /**
+     * A column title carrying its denomination when it is not the default.
+     *
+     * The banner above the table says which columns converted, but it scrolls
+     * away and the header does not — and a figure read as units when it is
+     * orders is off by the bundle size.
+     */
+    const basisTitle = (id: string, title: string) =>
+        orderBasis && ORDER_BASIS_COLUMNS.includes(id)
+            ? `${title} (ord)`
+            : title;
+
+    /**
+     * Demand per day over one window, in whichever denomination the toggle is
+     * set to — units of stock, or the orders that shipped them.
+     *
+     * One column per window rather than one per window per denomination: the
+     * two were never read together, and showing both put a group's order count
+     * beside a per-item unit rate with nothing to say which was which.
+     *
+     * A rate rather than the window's total, so the three are comparable: 30
+     * units over 3 days and 70 over 14 are 10/day against 5/day, which the
+     * totals hide.
+     *
+     * Every window here is recorded per GROUP: a distinct order touching two
+     * SKUs of a group is still one order to pick and cannot be split between
+     * them, and the wider unit windows sit beside those counts so they are kept
+     * at the same grain. On the flat per-SKU list they have nothing honest to
+     * say and show "—".
+     *
+     * Three days is not among them — 3-Day Avg already reports it, from the
+     * per-item demand the reorder maths divides by.
+     */
+    const rateColumn = (days: 7 | 14): ColumnDef<Item> => {
+        const key = `${orderBasis ? 'orders' : 'units'}_${days}d` as const;
+
+        return {
+            id: `demand_${days}d`,
+            enableSorting: false,
+            header: () => (
+                <ReportHeader
+                    id={key}
+                    title={`${orderBasis ? 'Orders' : 'Units'}/d ${days}d`}
+                />
+            ),
+            cell: ({ row }) => {
+                const value = summarize ? row.original[key] : null;
+
+                return (
+                    <div className="text-center">
+                        {/* Whole units, rounded up: half a unit a day still
+                            needs a unit on the shelf. The ceiling is applied to
+                            the figure being shown — never per SKU and then
+                            summed, which is what made this disagree with the
+                            3-day average beside it. */}
+                        <MetricCell
+                            value={
+                                value == null ? null : Math.ceil(value / days)
+                            }
+                        />
+                    </div>
+                );
+            },
+        };
+    };
 
     const reportColumns: ColumnDef<Item>[] = [
-        rateColumn('orders_3d', 'Orders/d 3d', 3),
-        rateColumn('units_3d', 'Units/d 3d', 3),
-        rateColumn('orders_7d', 'Orders/d 7d', 7),
-        rateColumn('units_7d', 'Units/d 7d', 7),
-        rateColumn('orders_14d', 'Orders/d 14d', 14),
-        rateColumn('units_14d', 'Units/d 14d', 14),
+        rateColumn(7),
+        rateColumn(14),
         {
             id: 'demand_trend',
             enableSorting: false,
             header: () => <ReportHeader id="demand_trend" title="Trend" />,
             cell: ({ row }) => {
-                const { units_3d: recent, units_14d: baseline } = row.original;
+                // Compares the same two windows the rate columns show, so it
+                // reads the same denomination. The 14-day figure is a group
+                // one, so there is nothing to say on a per-SKU row.
+                const recent = summarize
+                    ? row.original[orderBasis ? 'orders_3d' : 'units_3d']
+                    : null;
+                const baseline = summarize
+                    ? row.original[orderBasis ? 'orders_14d' : 'units_14d']
+                    : null;
                 if (recent == null || baseline == null || baseline <= 0) {
                     return (
                         <div className="text-center">
@@ -1071,7 +1262,7 @@ export default function ItemIndex({
                 <ReportHeader id="stockout_risk" title="Stockout risk" />
             ),
             cell: ({ row }) => {
-                const avg = row.original.three_days_average ?? 0;
+                const avg = unitsPerDay(row.original) ?? 0;
                 const stocks = row.original.current_stocks ?? 0;
                 const { label, className } = stockoutRisk(
                     avg > 0 ? stocks / avg : null,
@@ -1118,7 +1309,7 @@ export default function ItemIndex({
             // Current stock alone, unlike Days It Can Last which also counts
             // what suppliers still owe.
             cell: ({ row }) => {
-                const avg = row.original.three_days_average ?? 0;
+                const avg = unitsPerDay(row.original) ?? 0;
                 return (
                     <div className="text-center">
                         <MetricCell
@@ -1390,7 +1581,7 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['three_days_average']}
                     column={column}
-                    title="3-Day Avg"
+                    title={basisTitle('three_days_average', '3-Day Avg')}
                     className="justify-center"
                 />
             ),
@@ -1416,7 +1607,7 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['po_qty']}
                     column={column}
-                    title="PO QTY"
+                    title={basisTitle('po_qty', 'PO QTY')}
                     className="justify-center"
                 />
             ),
@@ -1437,7 +1628,7 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['unfulfilled_count']}
                     column={column}
-                    title="Unfulfilled"
+                    title={basisTitle('unfulfilled_count', 'Unfulfilled')}
                     className="justify-center"
                 />
             ),
@@ -1457,7 +1648,10 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['stocks_needed_for_lead_time']}
                     column={column}
-                    title="Stocks Needed (Lead Time)"
+                    title={basisTitle(
+                        'stocks_needed_for_lead_time',
+                        'Stocks Needed (Lead Time)',
+                    )}
                     className="justify-center"
                 />
             ),
@@ -1578,7 +1772,10 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['remaining_after_fulfillment']}
                     column={column}
-                    title="Remaining After Fulfillment"
+                    title={basisTitle(
+                        'remaining_after_fulfillment',
+                        'Remaining After Fulfillment',
+                    )}
                     className="justify-center"
                 />
             ),
@@ -1619,7 +1816,7 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['po_needed']}
                     column={column}
-                    title="PO Needed"
+                    title={basisTitle('po_needed', 'PO Needed')}
                     className="justify-center"
                 />
             ),
@@ -1860,6 +2057,25 @@ export default function ItemIndex({
                         ))}
                     </select>
 
+                    {/* Frozen with the day, so a live workspace has nothing to
+                        offer — the control is hidden rather than shown empty. */}
+                    {bottleneckStages.length > 0 && viewingSnapshot && (
+                        <select
+                            value={bottleneckStage}
+                            onChange={(e) =>
+                                handleBottleneckStageChange(e.target.value)
+                            }
+                            className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-3 font-mono! text-[12px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
+                        >
+                            <option value="">All bottlenecks</option>
+                            {bottleneckStages.map((stage) => (
+                                <option key={stage} value={stage}>
+                                    {stage}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
                     <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
                         <Switch
                             checked={activeOnly}
@@ -1889,6 +2105,38 @@ export default function ItemIndex({
                             Summarize by parent
                         </span>
                     </label>
+
+                    {/* Units or orders. Disabled rather than hidden when it
+                        cannot be offered, so the option does not appear and
+                        vanish as the summarize toggle moves — the title says
+                        why it is greyed. */}
+                    <div
+                        className={`flex h-9 items-center gap-1 rounded-[10px] border border-black/6 bg-stone-100 px-1 dark:border-white/6 dark:bg-zinc-800 ${
+                            basisAvailable ? '' : 'opacity-50'
+                        }`}
+                        title={
+                            basisAvailable
+                                ? 'Read the planning figures in units of stock, or in the orders that stock ships against.'
+                                : 'Needs the summarized view of a saved snapshot — order counts are recorded per group, not per SKU.'
+                        }
+                    >
+                        {(['unit', 'order'] as const).map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                disabled={!basisAvailable}
+                                onClick={() => handleBasisChange(option)}
+                                aria-pressed={basis === option}
+                                className={`rounded-[8px] px-2.5 py-1 font-mono text-[12px] font-medium transition-colors ${
+                                    basis === option
+                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-zinc-700 dark:text-white'
+                                        : 'text-gray-500 hover:text-gray-700 disabled:hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-200'
+                                } ${basisAvailable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                            >
+                                {option === 'unit' ? 'Unit' : 'Order'}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {canEditItems && selectedIds.length > 0 && (
