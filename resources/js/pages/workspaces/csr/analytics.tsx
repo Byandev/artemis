@@ -28,6 +28,9 @@ import {
     type RtsStat,
     type SalesStat,
 } from '@/components/csr/CsrAnalyticsStatCards';
+import CsrComparisonPanel, {
+    type ComparisonResponse,
+} from '@/components/csr/CsrComparisonPanel';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
@@ -69,6 +72,8 @@ interface Props {
         per_page?: number | string;
         type?: 'erp' | 'pos' | null;
         search?: string | null;
+        /** Which CSR comparison tab to open on — one of the metric keys. */
+        comparison?: string | null;
     };
 }
 
@@ -145,6 +150,9 @@ export default function Analytics({ workspace, records, query }: Props) {
         to: query?.to ? parseISO(query.to) : today,
     };
     const [searchInput, setSearchInput] = useState(query?.search ?? '');
+    const [comparisonTab, setComparisonTab] = useState(
+        query?.comparison ?? 'sales',
+    );
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
     const toStr = format(range.to, 'yyyy-MM-dd');
@@ -163,6 +171,7 @@ export default function Analytics({ workspace, records, query }: Props) {
                 'filter[search]': searchInput || undefined,
                 page: query?.page ?? 1,
                 per_page: query?.per_page ?? records.per_page,
+                comparison: comparisonTab,
                 ...overrides,
             },
             {
@@ -172,6 +181,33 @@ export default function Analytics({ workspace, records, query }: Props) {
                 replace: true,
             },
         );
+
+    // Picking a comparison tab is a read of data already in hand, so it writes
+    // the URL in place instead of making a visit — a reload or a shared link
+    // then opens on the same metric. Inertia's own history entry is stamped
+    // with the new URL too, so coming back through the browser's history
+    // restores the tab rather than the one the entry was created with.
+    const selectComparisonTab = (key: string) => {
+        setComparisonTab(key);
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('comparison', key);
+
+        const state = window.history.state;
+        window.history.replaceState(
+            state?.page
+                ? {
+                      ...state,
+                      page: {
+                          ...state.page,
+                          url: url.pathname + url.search,
+                      },
+                  }
+                : state,
+            '',
+            url,
+        );
+    };
 
     // One endpoint per card, the same shape the other CSR stat endpoints use.
     // Each fetches on its own, so a slow metric shows a skeleton without holding
@@ -245,6 +281,16 @@ export default function Analytics({ workspace, records, query }: Props) {
     const [rmoDurationLeader, rmoDurationLeaderLoading] = useAnalyticsStat<
         LeaderResponse<RmoDurationLeader>
     >(workspace.slug, 'analytics-leader-rmo-duration', fromStr, toStr);
+
+    // The field behind the leaders. One request for all four metrics — they
+    // come from the same two scans, so a call per tab would repeat the work.
+    const [comparison, comparisonLoading] =
+        useAnalyticsStat<ComparisonResponse>(
+            workspace.slug,
+            'analytics-comparison',
+            fromStr,
+            toStr,
+        );
 
     // Debounced search — skip the initial mount so we don't refetch on load.
     const isFirstRender = useRef(true);
@@ -475,6 +521,13 @@ export default function Analytics({ workspace, records, query }: Props) {
                         loading={rmoDurationLeaderLoading}
                     />
                 </div>
+
+                <CsrComparisonPanel
+                    data={comparison}
+                    loading={comparisonLoading}
+                    metricKey={comparisonTab}
+                    onMetricChange={selectComparisonTab}
+                />
 
                 <input
                     type="text"

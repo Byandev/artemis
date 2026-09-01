@@ -56,6 +56,9 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-leader-rts', [CSRController::class, 'analyticsLeaderRts']);
         Route::get('/csrs/stats/analytics-leader-rmo-called', [CSRController::class, 'analyticsLeaderRmoCalled']);
         Route::get('/csrs/stats/analytics-leader-rmo-duration', [CSRController::class, 'analyticsLeaderRmoDuration']);
+        // The field behind the leaders: every CSR on one axis, all four
+        // metrics in a single response so switching tabs costs nothing.
+        Route::get('/csrs/stats/analytics-comparison', [CSRController::class, 'analyticsComparison']);
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
