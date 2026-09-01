@@ -250,7 +250,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $candidates = [
             ['workspace.dashboard', Permission::ViewMainDashboard],
-            ['workspaces.sales-marketing.dashboard', Permission::ViewSalesMarketingDashboard],
+            ['workspaces.sales-marketing.daily-report', Permission::ViewSalesMarketingDailyReport],
             ['workspaces.video-editor.dashboard', Permission::ViewVideoEditorDashboard],
             ['workspaces.csr.dashboard', Permission::ViewCsrDashboard],
         ];

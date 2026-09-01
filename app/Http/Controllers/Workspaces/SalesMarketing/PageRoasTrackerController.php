@@ -1,13 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace App\Http\Controllers\Workspaces\SalesMarketing;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\Page;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Support\SalesMarketingDashboard;
 use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -33,7 +32,7 @@ class PageRoasTrackerController extends Controller
         // shares that dashboard's gating (module flag + permission).
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
-        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+        $this->authorize(Permission::ViewPageRoasTracker->value, $workspace);
 
         [$start, $end] = $this->resolveRange($request);
         $dates = $this->datesInRange($start, $end);
@@ -117,7 +116,7 @@ class PageRoasTrackerController extends Controller
             ->sortByDesc(fn ($page) => $page['total']['sales'])
             ->values();
 
-        return Inertia::render('workspaces/page-roas-tracker/index', [
+        return Inertia::render('workspaces/sales-marketing/page-roas-tracker/index', [
             'workspace' => $workspace,
             'dates' => $dates,
             'pages' => $pages,
@@ -130,8 +129,6 @@ class PageRoasTrackerController extends Controller
                 'shops' => array_map('strval', $selectedShops),
                 'users' => array_map('strval', $selectedUsers),
             ],
-            'tabs' => SalesMarketingDashboard::tabs($workspace),
-            'activeTab' => 'page-roas-tracker',
         ]);
     }
 

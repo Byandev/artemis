@@ -1,7 +1,3 @@
-import {
-    DashboardTab,
-    DashboardTabNav,
-} from '@/components/sales-marketing/dashboard-tabs';
 import { DeleteSalesTargetDialog } from '@/components/sales-targets/delete-sales-target-dialog';
 import {
     SalesTargetFormDialog,
@@ -27,8 +23,6 @@ interface Props {
     target: SalesTarget;
     teams: TeamOption[];
     canManage: boolean;
-    tabs?: DashboardTab[];
-    activeTab?: string;
 }
 
 export default function SalesTargetShow({
@@ -36,11 +30,8 @@ export default function SalesTargetShow({
     target,
     teams,
     canManage,
-    tabs,
-    activeTab,
 }: Props) {
-    const hasTabs = !!tabs?.length;
-    const base = `/workspaces/${workspace.slug}/sales-marketing/dashboard/sales-targets`;
+    const base = `/workspaces/${workspace.slug}/sales-marketing/sales-targets`;
 
     const [editing, setEditing] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -53,8 +44,6 @@ export default function SalesTargetShow({
         <AppLayout>
             <Head title={`${target.name} - Sales Target`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
-
                 <Link
                     href={base}
                     className="mt-4 inline-flex items-center gap-1.5 font-mono text-[11px] font-medium text-gray-400 transition-colors hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200"

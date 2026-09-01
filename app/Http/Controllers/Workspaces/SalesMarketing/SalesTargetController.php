@@ -1,12 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace App\Http\Controllers\Workspaces\SalesMarketing;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\SalesTarget;
 use App\Models\Workspace;
-use App\Support\SalesMarketingDashboard;
 use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -38,7 +37,7 @@ class SalesTargetController extends Controller
     {
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
-        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+        $this->authorize(Permission::ViewSalesTargets->value, $workspace);
 
         $targets = SalesTarget::ofWorkspace($workspace)
             ->with(['teamTargets.team:id,name'])
@@ -53,13 +52,11 @@ class SalesTargetController extends Controller
             ->map(fn ($team) => $team->only(['id', 'name']))
             ->values();
 
-        return Inertia::render('workspaces/sales-targets/index', [
+        return Inertia::render('workspaces/sales-marketing/sales-targets/index', [
             'workspace' => $workspace,
             'targets' => $targets,
             'teams' => $teams,
             'canManage' => $request->user()->hasPermission(Permission::EditTeams->value, $workspace),
-            'tabs' => SalesMarketingDashboard::tabs($workspace),
-            'activeTab' => 'sales-targets',
         ]);
     }
 
@@ -67,21 +64,19 @@ class SalesTargetController extends Controller
     {
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
-        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+        $this->authorize(Permission::ViewSalesTargets->value, $workspace);
 
         $this->guardOwnership($workspace, $salesTarget);
 
         $salesTarget->load('teamTargets.team:id,name');
 
-        return Inertia::render('workspaces/sales-targets/show', [
+        return Inertia::render('workspaces/sales-marketing/sales-targets/show', [
             'workspace' => $workspace,
             'target' => $salesTarget,
             'teams' => TeamVisibility::selectableTeams($request->user(), $workspace)
                 ->map(fn ($team) => $team->only(['id', 'name']))
                 ->values(),
             'canManage' => $request->user()->hasPermission(Permission::EditTeams->value, $workspace),
-            'tabs' => SalesMarketingDashboard::tabs($workspace),
-            'activeTab' => 'sales-targets',
         ]);
     }
 
@@ -144,7 +139,7 @@ class SalesTargetController extends Controller
 
         // Where the delete was fired from, while the record still resolves.
         $cameFromItsOwnPage = parse_url(url()->previous(), PHP_URL_PATH) === parse_url(
-            route('workspaces.sales-marketing.dashboard.sales-targets.show', [$workspace, $salesTarget]),
+            route('workspaces.sales-marketing.sales-targets.show', [$workspace, $salesTarget]),
             PHP_URL_PATH
         );
 
@@ -155,7 +150,7 @@ class SalesTargetController extends Controller
         // back is the record that was just deleted, so it would land on a 404.
         // From the list, `back()` is right: it keeps the page and query string.
         return ($cameFromItsOwnPage
-            ? redirect()->route('workspaces.sales-marketing.dashboard.sales-targets', $workspace)
+            ? redirect()->route('workspaces.sales-marketing.sales-targets', $workspace)
             : redirect()->back()
         )->with('success', 'Sales target deleted.');
     }

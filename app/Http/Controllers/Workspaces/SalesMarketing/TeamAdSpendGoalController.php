@@ -1,13 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\Workspaces;
+namespace App\Http\Controllers\Workspaces\SalesMarketing;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Models\TeamAdSpendGoal;
 use App\Models\Workspace;
 use App\Queries\TeamAdSpendGoalStatusQuery;
-use App\Support\SalesMarketingDashboard;
 use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -27,7 +26,7 @@ class TeamAdSpendGoalController extends Controller
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
         $this->guardModule($workspace);
 
-        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+        $this->authorize(Permission::ViewAdSpendGoals->value, $workspace);
 
         // Team visibility: scoped users see only their team(s)' goals; the
         // "viewing as team" switcher narrows everyone to the chosen team. A null
@@ -57,13 +56,11 @@ class TeamAdSpendGoalController extends Controller
         $teams = TeamVisibility::selectableTeams($request->user(), $workspace)
             ->load('members:id,name');
 
-        return Inertia::render('workspaces/ad-spend-goals/index', [
+        return Inertia::render('workspaces/sales-marketing/ad-spend-goals/index', [
             'workspace' => $workspace,
             'goals' => $goals,
             'teams' => $teams,
             'canManage' => $request->user()->hasPermission(Permission::ManageAdSpendGoals->value, $workspace),
-            'tabs' => SalesMarketingDashboard::tabs($workspace),
-            'activeTab' => 'ad-spend-goals',
         ]);
     }
 
@@ -85,7 +82,7 @@ class TeamAdSpendGoalController extends Controller
         $teams = TeamVisibility::selectableTeams($request->user(), $workspace)
             ->load('members:id,name');
 
-        return Inertia::render('workspaces/ad-spend-goals/show', [
+        return Inertia::render('workspaces/sales-marketing/ad-spend-goals/show', [
             'workspace' => $workspace,
             'goal' => $this->presentGoal($goal, $status),
             'teams' => $teams,
@@ -202,7 +199,7 @@ class TeamAdSpendGoalController extends Controller
         // whose URL no longer resolves, doesn't 404. The list now lives on the
         // S&M dashboard's Ad Spend Goals tab.
         return redirect()
-            ->route('workspaces.sales-marketing.dashboard.ad-spend-goals', $workspace)
+            ->route('workspaces.sales-marketing.ad-spend-goals', $workspace)
             ->with('success', 'Ad spend goal deleted successfully.');
     }
 

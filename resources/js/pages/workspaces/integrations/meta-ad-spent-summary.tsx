@@ -1,10 +1,6 @@
 import AdSpentRoasTable, {
     RoasRow,
 } from '@/components/metrics/AdSpentRoasTable';
-import {
-    DashboardTab,
-    DashboardTabNav,
-} from '@/components/sales-marketing/dashboard-tabs';
 import DatePicker from '@/components/ui/date-picker';
 import { MultiSelect, Option } from '@/components/ui/multi-select';
 import AppLayout from '@/layouts/app-layout';
@@ -19,9 +15,6 @@ interface Props {
     filters: { start_date: string; end_date: string; advertisers: string[] };
     advertiserOptions: Option[];
     rows: RoasRow[];
-    // S&M dashboard tabs — this page is the "Ad Spent Summary" tab.
-    tabs?: DashboardTab[];
-    activeTab?: string;
 }
 
 export default function AdSpentSummary({
@@ -29,12 +22,8 @@ export default function AdSpentSummary({
     filters,
     advertiserOptions,
     rows,
-    tabs,
-    activeTab,
 }: Props) {
-    const baseUrl = `/workspaces/${workspace.slug}/sales-marketing/dashboard/ad-spent-summary`;
-    const hasTabs = !!tabs && tabs.length > 0;
-
+    const baseUrl = `/workspaces/${workspace.slug}/sales-marketing/ad-spent-summary`;
     const [advertisers, setAdvertisers] = useState<string[]>(
         filters.advertisers ?? [],
     );
@@ -71,8 +60,6 @@ export default function AdSpentSummary({
         <AppLayout>
             <Head title={`${workspace.name} - Adspent ROAS Summary`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
-
                 {/* Page title on the left, filters on the right. */}
                 <div className="mt-4 mb-4 flex flex-wrap items-center justify-between gap-3">
                     <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-800 dark:text-gray-100">

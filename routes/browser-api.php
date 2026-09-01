@@ -6,6 +6,7 @@ use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ParcelJourneyStatsController;
 use App\Http\Controllers\API\Workspace\ProductController;
+use App\Http\Controllers\API\Workspace\SalesMarketingDashboardController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
@@ -84,6 +85,15 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         // XHR, so the page no longer carries it.
         Route::get('/rts/parcel-journey/shops', [ParcelJourneyStatsController::class, 'shops'])
             ->name('rts.parcel-journey.shops');
+
+        // Sales & Marketing dashboard — one endpoint per KPI so each loads,
+        // skeletons and retries independently. See SalesMarketingDashboardController.
+        Route::prefix('sales-marketing/dashboard/kpi')->name('sales-marketing.dashboard.kpi.')->group(function () {
+            Route::get('/total-sales', [SalesMarketingDashboardController::class, 'totalSales'])->name('total-sales');
+            Route::get('/total-ad-spend', [SalesMarketingDashboardController::class, 'totalAdSpend'])->name('total-ad-spend');
+            Route::get('/blended-roas', [SalesMarketingDashboardController::class, 'blendedRoas'])->name('blended-roas');
+            Route::get('/rts-rate', [SalesMarketingDashboardController::class, 'rtsRate'])->name('rts-rate');
+        });
 
         Route::prefix('video-editor')->name('video-editor.')->group(function () {
             Route::get('/kpi/total', [VideoEditorDashboardController::class, 'totalCreatives'])->name('kpi.total');

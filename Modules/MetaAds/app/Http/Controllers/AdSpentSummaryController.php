@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Models\AdvertiserPerformanceDailyRecord;
 use App\Models\Workspace;
 use App\Support\AdvertiserVisibility;
-use App\Support\SalesMarketingDashboard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -22,11 +21,11 @@ class AdSpentSummaryController extends Controller
      */
     public function index(Request $request, Workspace $workspace): Response
     {
-        // Rendered as the "Ad Spent Summary" tab of the S&M dashboard, so it
-        // shares that dashboard's gating (module flag + permission).
+        // One of the five Sales & Marketing pages: the S&M module flag still
+        // gates it, but the grant is now its own rather than the whole group's.
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
         abort_unless(
-            $request->user()->hasPermission(Permission::ViewSalesMarketingDashboard->value, $workspace),
+            $request->user()->hasPermission(Permission::ViewAdSpentSummary->value, $workspace),
             403,
         );
 
@@ -117,8 +116,6 @@ class AdSpentSummaryController extends Controller
             ],
             'advertiserOptions' => $advertiserOptions,
             'rows' => $rows,
-            'tabs' => SalesMarketingDashboard::tabs($workspace),
-            'activeTab' => 'ad-spent-summary',
         ]);
     }
 }

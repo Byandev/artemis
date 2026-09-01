@@ -12,10 +12,6 @@ import {
     bestOf,
     fmtDate,
 } from '@/components/ad-spend-goals/goal-graph';
-import {
-    DashboardTab,
-    DashboardTabNav,
-} from '@/components/sales-marketing/dashboard-tabs';
 import { DataTable } from '@/components/ui/data-table';
 import {
     DropdownMenu,
@@ -48,9 +44,6 @@ interface Props {
     goals: PaginatedData<Goal>;
     teams: TeamOption[];
     canManage: boolean;
-    // S&M dashboard tabs — this page is the "Ad Spend Goals" tab.
-    tabs?: DashboardTab[];
-    activeTab?: string;
 }
 
 /** Small colored dot keyed to a goal's status. */
@@ -97,13 +90,9 @@ export default function AdSpendGoalsIndex({
     goals,
     teams,
     canManage,
-    tabs,
-    activeTab,
 }: Props) {
     const canManageGoals =
         usePermission(PERMISSIONS.ManageAdSpendGoals) || canManage;
-    const hasTabs = !!tabs && tabs.length > 0;
-
     const [createOpen, setCreateOpen] = useState(false);
     const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
     const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
@@ -260,8 +249,6 @@ export default function AdSpendGoalsIndex({
         <AppLayout>
             <Head title={`${workspace.name} - Ad Spend Goals`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
-
                 {/* Page title on the left, actions on the right. */}
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <h1 className="my-0! text-[22px]! font-semibold tracking-tight text-gray-800 dark:text-gray-100">
@@ -299,7 +286,7 @@ export default function AdSpendGoalsIndex({
                             onRowClick={(goal) => router.visit(showUrl(goal))}
                             onFetch={(params) =>
                                 router.get(
-                                    `/workspaces/${workspace.slug}/sales-marketing/dashboard/ad-spend-goals`,
+                                    `/workspaces/${workspace.slug}/sales-marketing/ad-spend-goals`,
                                     {
                                         page: params?.page ?? 1,
                                         per_page: params?.per_page ?? undefined,

@@ -1,5 +1,5 @@
 import { TeamPerformance } from '@/components/sales-targets/gameboard-teams';
-import { formatPeso } from '@/pages/workspaces/sales-targets/shared';
+import { formatPeso } from '@/pages/workspaces/sales-marketing/sales-targets/shared';
 import { Square, SquareCheck, Trophy } from 'lucide-react';
 import { useId } from 'react';
 

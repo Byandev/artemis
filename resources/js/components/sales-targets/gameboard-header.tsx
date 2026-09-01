@@ -1,7 +1,7 @@
 import {
     formatLongDate,
     SalesTarget,
-} from '@/pages/workspaces/sales-targets/shared';
+} from '@/pages/workspaces/sales-marketing/sales-targets/shared';
 import { router } from '@inertiajs/react';
 import { Maximize2, Minimize2, MonitorPlay, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
