@@ -63,6 +63,11 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/sales-marketing/dashboard/team-breakdown', [SalesMarketingDashboardController::class, 'teamBreakdown'])
             ->name('sales-marketing.dashboard.team-breakdown');
 
+        // The same window cut by product instead of advertiser, on the same
+        // terms — one fetch, every metric derived from it client-side.
+        Route::get('/sales-marketing/dashboard/product-comparison', [SalesMarketingDashboardController::class, 'productComparison'])
+            ->name('sales-marketing.dashboard.product-comparison');
+
         // "Leaders for the period" — who topped each figure, on their own
         // endpoints so the section loads independently of the KPI row.
         Route::prefix('sales-marketing/dashboard/leaders')->name('sales-marketing.dashboard.leaders.')->group(function () {
