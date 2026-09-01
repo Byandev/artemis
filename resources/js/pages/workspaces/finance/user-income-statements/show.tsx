@@ -13,14 +13,26 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, HelpCircle } from 'lucide-react';
-import { useState } from 'react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    ChevronDown,
+    ChevronRight,
+    HelpCircle,
+} from 'lucide-react';
+import { Fragment, useState } from 'react';
 
 interface StatementContext {
     id: number;
     period_month: string; // YYYY-MM-DD
     month: string; // YYYY-MM
     label: string; // "July 2026"
+}
+
+/** One transaction type's share of a column's OPEX; these sum to that OPEX. */
+interface OpexLine {
+    name: string;
+    amount: number;
 }
 
 /**
@@ -53,6 +65,8 @@ interface ProductRow {
     opex: number;
     /** The share that produced it, as a percentage (0-100), not a fraction. */
     opex_share_percentage: number;
+    /** That share opened up by transaction type; sums back to `opex`. */
+    opex_breakdown: OpexLine[];
     net_profit_delivered_cogs: number;
     net_profit_bought_cogs: number;
     /**
@@ -148,6 +162,8 @@ interface FigureRow {
     heading?: boolean;
     /** Context about the whole product rather than this person's slice. */
     muted?: boolean;
+    /** The row opens to show what makes it up, one sub-row per entry. */
+    breakdown?: (r: ProductRow) => OpexLine[];
 }
 
 /**
@@ -209,8 +225,9 @@ const buildRows = (
         },
         {
             label: 'Less — OPEX',
-            help: 'This person’s share of the month’s operating expenses on this product, by its delivered orders over every row’s on the statement. A column that delivered nothing carries none of it.',
+            help: 'This person’s share of the month’s operating expenses on this product, by its delivered orders over every row’s on the statement. A column that delivered nothing carries none of it. Open the row to see it by transaction type.',
             render: (r) => fmt(r.opex),
+            breakdown: (r) => r.opex_breakdown,
         },
         {
             label: '= Net Profit',
@@ -372,8 +389,18 @@ export default function UserProductBreakdown({
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
     const [cogsView, setCogsView] = useState<CogsView>(DEFAULT_COGS_VIEW);
+    const [openRows, setOpenRows] = useState<Set<string>>(new Set());
     const ROWS = buildRows(rates, cogsView, gencysPartner, user.name);
     const named = products.filter((p) => p.product_id !== null);
+
+    const toggleRow = (label: string) =>
+        setOpenRows((current) => {
+            const next = new Set(current);
+
+            if (!next.delete(label)) next.add(label);
+
+            return next;
+        });
 
     /** The tone a figure cell takes, shared by the Total and product columns. */
     const cellTone = (row: FigureRow, r: ProductRow, muted: boolean) => {
@@ -544,66 +571,160 @@ export default function UserProductBreakdown({
                                             )}
                                         </tr>
                                     ) : (
-                                        <tr
-                                            key={row.label}
-                                            className="group border-t border-black/5 dark:border-white/5"
-                                        >
-                                            <th
-                                                scope="row"
-                                                className={`${LABEL_W} ${LABEL_LEFT} ${EDGE} ${Z_FROZEN} border-t border-black/5 bg-white px-5 py-2.5 text-left font-normal group-hover:bg-stone-50 dark:border-white/5 dark:bg-zinc-900 dark:group-hover:bg-zinc-800`}
-                                            >
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <button
-                                                            type="button"
-                                                            className={`flex items-center gap-1.5 text-left text-[12px] transition-colors hover:text-gray-800 focus-visible:text-gray-800 focus-visible:outline-none dark:hover:text-gray-100 ${
-                                                                row.muted
-                                                                    ? 'pl-3 text-gray-500 italic dark:text-gray-400'
-                                                                    : row.emphasis
-                                                                      ? 'font-medium text-gray-700 dark:text-gray-200'
-                                                                      : 'text-gray-600 dark:text-gray-300'
-                                                            }`}
+                                        <Fragment key={row.label}>
+                                            <tr className="group border-t border-black/5 dark:border-white/5">
+                                                <th
+                                                    scope="row"
+                                                    className={`${LABEL_W} ${LABEL_LEFT} ${EDGE} ${Z_FROZEN} border-t border-black/5 bg-white px-5 py-2.5 text-left font-normal group-hover:bg-stone-50 dark:border-white/5 dark:bg-zinc-900 dark:group-hover:bg-zinc-800`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Tooltip>
+                                                            <TooltipTrigger
+                                                                asChild
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    className={`flex items-center gap-1.5 text-left text-[12px] transition-colors hover:text-gray-800 focus-visible:text-gray-800 focus-visible:outline-none dark:hover:text-gray-100 ${
+                                                                        row.muted
+                                                                            ? 'pl-3 text-gray-500 italic dark:text-gray-400'
+                                                                            : row.emphasis
+                                                                              ? 'font-medium text-gray-700 dark:text-gray-200'
+                                                                              : 'text-gray-600 dark:text-gray-300'
+                                                                    }`}
+                                                                >
+                                                                    {row.label}
+                                                                    <HelpCircle className="h-3 w-3 shrink-0 opacity-50" />
+                                                                </button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="max-w-xs font-mono text-[11px] leading-relaxed">
+                                                                {row.help}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+
+                                                        {(row.breakdown?.(total)
+                                                            ?.length ?? 0) >
+                                                            0 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    toggleRow(
+                                                                        row.label,
+                                                                    )
+                                                                }
+                                                                aria-expanded={openRows.has(
+                                                                    row.label,
+                                                                )}
+                                                                className="flex items-center gap-0.5 text-[10px] text-gray-400 underline-offset-2 transition-colors hover:text-gray-600 hover:underline dark:hover:text-gray-300"
+                                                            >
+                                                                {openRows.has(
+                                                                    row.label,
+                                                                ) ? (
+                                                                    <ChevronDown className="h-3 w-3" />
+                                                                ) : (
+                                                                    <ChevronRight className="h-3 w-3" />
+                                                                )}
+                                                                {int(
+                                                                    row.breakdown!(
+                                                                        total,
+                                                                    ).length,
+                                                                )}{' '}
+                                                                {row.breakdown!(
+                                                                    total,
+                                                                ).length === 1
+                                                                    ? 'type'
+                                                                    : 'types'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </th>
+
+                                                <td
+                                                    className={`${VALUE_W} ${TOTAL_LEFT} ${CELL} ${EDGE} ${Z_FROZEN} border-t border-black/5 bg-stone-100 font-semibold dark:border-white/5 dark:bg-zinc-800 ${cellTone(row, total, false)}`}
+                                                >
+                                                    {row.render(total)}
+                                                </td>
+
+                                                {products.map((p) => (
+                                                    <td
+                                                        key={
+                                                            p.product_id ??
+                                                            'unresolved'
+                                                        }
+                                                        className={`${VALUE_W} ${CELL} border-t border-black/5 dark:border-white/5 ${
+                                                            p.product_id ===
+                                                            null
+                                                                ? 'bg-amber-50/60 dark:bg-amber-500/10'
+                                                                : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
+                                                        } ${cellTone(row, p, p.product_id === null)}`}
+                                                    >
+                                                        {row.render(p)}
+                                                    </td>
+                                                ))}
+
+                                                {products.length === 0 && (
+                                                    <td
+                                                        className={`${VALUE_W} ${CELL} border-t border-black/5 bg-white text-gray-400 dark:border-white/5 dark:bg-zinc-900`}
+                                                    >
+                                                        —
+                                                    </td>
+                                                )}
+                                            </tr>
+
+                                            {/* What the row is made of, one sub-row
+                                            per transaction type. The parts sum
+                                            to the row above. */}
+                                            {openRows.has(row.label) &&
+                                                (
+                                                    row.breakdown?.(total) ?? []
+                                                ).map((line, i) => (
+                                                    <tr
+                                                        key={line.name}
+                                                        className="bg-stone-50/60 dark:bg-zinc-800/30"
+                                                    >
+                                                        <th
+                                                            scope="row"
+                                                            className={`${LABEL_W} ${LABEL_LEFT} ${EDGE} ${Z_FROZEN} bg-stone-50 py-1.5 pr-4 pl-11 text-left text-[11px] font-normal text-gray-500 dark:bg-zinc-800 dark:text-gray-400`}
                                                         >
-                                                            {row.label}
-                                                            <HelpCircle className="h-3 w-3 shrink-0 opacity-50" />
-                                                        </button>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent className="max-w-xs font-mono text-[11px] leading-relaxed">
-                                                        {row.help}
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </th>
-
-                                            <td
-                                                className={`${VALUE_W} ${TOTAL_LEFT} ${CELL} ${EDGE} ${Z_FROZEN} border-t border-black/5 bg-stone-100 font-semibold dark:border-white/5 dark:bg-zinc-800 ${cellTone(row, total, false)}`}
-                                            >
-                                                {row.render(total)}
-                                            </td>
-
-                                            {products.map((p) => (
-                                                <td
-                                                    key={
-                                                        p.product_id ??
-                                                        'unresolved'
-                                                    }
-                                                    className={`${VALUE_W} ${CELL} border-t border-black/5 dark:border-white/5 ${
-                                                        p.product_id === null
-                                                            ? 'bg-amber-50/60 dark:bg-amber-500/10'
-                                                            : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
-                                                    } ${cellTone(row, p, p.product_id === null)}`}
-                                                >
-                                                    {row.render(p)}
-                                                </td>
-                                            ))}
-
-                                            {products.length === 0 && (
-                                                <td
-                                                    className={`${VALUE_W} ${CELL} border-t border-black/5 bg-white text-gray-400 dark:border-white/5 dark:bg-zinc-900`}
-                                                >
-                                                    —
-                                                </td>
-                                            )}
-                                        </tr>
+                                                            {line.name}
+                                                        </th>
+                                                        <td
+                                                            className={`${VALUE_W} ${TOTAL_LEFT} ${CELL} ${EDGE} ${Z_FROZEN} bg-stone-100 py-1.5 text-[11px] text-gray-500 dark:bg-zinc-800 dark:text-gray-400`}
+                                                        >
+                                                            {fmt(line.amount)}
+                                                        </td>
+                                                        {products.map((p) => (
+                                                            <td
+                                                                key={
+                                                                    p.product_id ??
+                                                                    'unresolved'
+                                                                }
+                                                                className={`${VALUE_W} ${CELL} py-1.5 text-[11px] text-gray-500 dark:text-gray-400 ${
+                                                                    p.product_id ===
+                                                                    null
+                                                                        ? 'bg-amber-50/40 dark:bg-amber-500/5'
+                                                                        : 'bg-stone-50/60 dark:bg-zinc-800/30'
+                                                                }`}
+                                                            >
+                                                                {fmt(
+                                                                    p
+                                                                        .opex_breakdown[
+                                                                        i
+                                                                    ]?.amount ??
+                                                                        0,
+                                                                )}
+                                                            </td>
+                                                        ))}
+                                                        {products.length ===
+                                                            0 && (
+                                                            <td
+                                                                className={`${VALUE_W} ${CELL} py-1.5 text-[11px] text-gray-400`}
+                                                            >
+                                                                —
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                ))}
+                                        </Fragment>
                                     ),
                                 )}
                             </tbody>

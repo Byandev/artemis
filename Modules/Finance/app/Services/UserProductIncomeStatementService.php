@@ -209,6 +209,8 @@ class UserProductIncomeStatementService
     {
         $this->ensureSnapshot($statement);
 
+        $opexTypes = $this->opexTypes($statement);
+
         $rows = $statement->userProductStatements()->get()->map(fn ($r) => [
             'user_id' => $r->user_id,
             'user' => $r->user_name ?: 'Unassigned',
@@ -233,6 +235,7 @@ class UserProductIncomeStatementService
             'gross_profit_bought_cogs_after_advisory_share' => (float) $r->gross_profit_bought_cogs_after_advisory_share,
             'opex' => (float) $r->opex,
             'opex_share_percentage' => (float) $r->opex_share_percentage,
+            'opex_breakdown' => $this->opexByType($opexTypes, (float) $r->opex),
             'net_profit_delivered_cogs' => (float) $r->net_profit_delivered_cogs,
             'net_profit_bought_cogs' => (float) $r->net_profit_bought_cogs,
         ]);
@@ -259,13 +262,15 @@ class UserProductIncomeStatementService
         $total = ['user_id' => null, 'user' => 'Total', 'product_id' => null, 'product' => ''];
 
         foreach (array_keys($rows->first() ?? []) as $key) {
-            if (in_array($key, ['user_id', 'user', 'product_id', 'product'], true)) {
+            if (in_array($key, ['user_id', 'user', 'product_id', 'product', 'opex_breakdown'], true)) {
                 continue;
             }
             $total[$key] = str_contains($key, '_orders') || str_contains($key, '_units')
                 ? (int) $attributed->sum($key)
                 : round($attributed->sum($key), 2);
         }
+
+        $total['opex_breakdown'] = $this->opexByType($opexTypes, $total['opex'] ?? 0.0);
 
         return [
             'rows' => $ordered->all(),
@@ -313,6 +318,8 @@ class UserProductIncomeStatementService
         $wholeProduct = $all->groupBy(fn ($r) => (string) $r->product_id)
             ->map(fn ($group) => $this->foldFigures($group));
 
+        $opexTypes = $this->opexTypes($statement);
+
         $products = $rows->map(fn ($r) => [
             ...$this->wholeAndShare($wholeProduct[(string) $r->product_id] ?? null, (int) $r->delivered_orders),
             'product_id' => $r->product_id,
@@ -336,6 +343,7 @@ class UserProductIncomeStatementService
             'gross_profit_bought_cogs_after_advisory_share' => (float) $r->gross_profit_bought_cogs_after_advisory_share,
             'opex' => (float) $r->opex,
             'opex_share_percentage' => (float) $r->opex_share_percentage,
+            'opex_breakdown' => $this->opexByType($opexTypes, (float) $r->opex),
             'net_profit_delivered_cogs' => (float) $r->net_profit_delivered_cogs,
             'net_profit_bought_cogs' => (float) $r->net_profit_bought_cogs,
         ]);
@@ -352,7 +360,7 @@ class UserProductIncomeStatementService
         $total = ['product_id' => null, 'product' => 'Total'];
 
         foreach (array_keys($products->first() ?? []) as $key) {
-            if (in_array($key, ['product_id', 'product', 'share'], true) || str_starts_with($key, 'whole_')) {
+            if (in_array($key, ['product_id', 'product', 'share', 'opex_breakdown'], true) || str_starts_with($key, 'whole_')) {
                 continue;
             }
             $total[$key] = str_contains($key, '_orders') || str_contains($key, '_units')
@@ -363,6 +371,8 @@ class UserProductIncomeStatementService
         // Across the products they run, taken together: what those products did
         // in total, and how much of it was theirs.
         $namedIds = $named->pluck('product_id')->map(fn ($id) => (string) $id)->all();
+
+        $total['opex_breakdown'] = $this->opexByType($opexTypes, $total['opex'] ?? 0.0);
 
         $total += $this->wholeAndShare(
             $this->foldFigures($all->filter(fn ($r) => in_array((string) $r->product_id, $namedIds, true))),
