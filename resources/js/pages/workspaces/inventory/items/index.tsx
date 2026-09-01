@@ -83,6 +83,12 @@ interface Item {
     /** Everything still owed on open purchase orders, at any stage. */
     waiting_for_delivery_stocks: number | null;
     three_days_average: number | null;
+    /**
+     * Units a day whatever the basis on screen — the denominator for anything
+     * dividing unit stock. Absent on the live (non-snapshot) path, where
+     * three_days_average is already in units.
+     */
+    unit_three_days_average?: number | null;
     po_qty: number | null;
     remaining_after_fulfillment: number | null;
     stocks_needed_for_lead_time: number | null;
@@ -201,39 +207,22 @@ const COLUMN_OPTIONS: ColumnOption[] = [
     { id: 'days_it_can_last', label: 'Days it can last', group: 'List' },
     { id: 'po_needed', label: 'PO needed', group: 'List' },
 
+    // One entry per window. Which denomination each shows follows the
+    // Unit/Order toggle, so the menu offers a window to switch on rather than
+    // two columns of which only one is ever the one you meant.
+    //
+    // Three days is absent because 3-Day Avg above already is it, in whichever
+    // denomination the toggle is set to. Two columns of the same number is what
+    // this whole block was untangled to stop.
     {
-        id: 'orders_3d',
-        label: 'Orders / day (3d)',
+        id: 'demand_7d',
+        label: 'Demand / day (7d)',
         defaultVisible: false,
         group: 'Demand',
     },
     {
-        id: 'units_3d',
-        label: 'Units / day (3d)',
-        defaultVisible: false,
-        group: 'Demand',
-    },
-    {
-        id: 'orders_7d',
-        label: 'Orders / day (7d)',
-        defaultVisible: false,
-        group: 'Demand',
-    },
-    {
-        id: 'units_7d',
-        label: 'Units / day (7d)',
-        defaultVisible: false,
-        group: 'Demand',
-    },
-    {
-        id: 'orders_14d',
-        label: 'Orders / day (14d)',
-        defaultVisible: false,
-        group: 'Demand',
-    },
-    {
-        id: 'units_14d',
-        label: 'Units / day (14d)',
+        id: 'demand_14d',
+        label: 'Demand / day (14d)',
         defaultVisible: false,
         group: 'Demand',
     },
@@ -1122,11 +1111,8 @@ export default function ItemIndex({
      * made it a count of orders. units_3d over three days is the same figure the
      * unit basis sums, measured from the same window.
      */
-    const unitsPerDay = (row: Item): number | null => {
-        if (!orderBasis) return row.three_days_average;
-
-        return row.units_3d == null ? null : row.units_3d / 3;
-    };
+    const unitsPerDay = (row: Item): number | null =>
+        row.unit_three_days_average ?? row.three_days_average;
 
     /**
      * A column title carrying its denomination when it is not the default.
@@ -1140,52 +1126,77 @@ export default function ItemIndex({
             ? `${title} (ord)`
             : title;
 
-    // A rate per day, so the three windows are comparable: 30 units over 3 days
-    // and 70 over 14 are 10/day against 5/day, which the totals hide.
-    const rateColumn = (
-        key:
-            | 'orders_3d'
-            | 'units_3d'
-            | 'orders_7d'
-            | 'units_7d'
-            | 'orders_14d'
-            | 'units_14d',
-        title: string,
-        days: number,
-    ): ColumnDef<Item> => ({
-        id: key,
-        enableSorting: false,
-        header: () => <ReportHeader id={key} title={title} />,
-        cell: ({ row }) => {
-            const value = row.original[key];
-            return (
-                <div className="text-center">
-                    {/* Whole units, rounded up: half a unit a day still needs a
-                        unit on the shelf. The ceiling is applied to the figure
-                        being shown — never per SKU and then summed, which is
-                        what made this disagree with the 3-day average beside
-                        it. */}
-                    <MetricCell
-                        value={value == null ? null : Math.ceil(value / days)}
-                    />
-                </div>
-            );
-        },
-    });
+    /**
+     * Demand per day over one window, in whichever denomination the toggle is
+     * set to — units of stock, or the orders that shipped them.
+     *
+     * One column per window rather than one per window per denomination: the
+     * two were never read together, and showing both put a group's order count
+     * beside a per-item unit rate with nothing to say which was which.
+     *
+     * A rate rather than the window's total, so the three are comparable: 30
+     * units over 3 days and 70 over 14 are 10/day against 5/day, which the
+     * totals hide.
+     *
+     * Every window here is recorded per GROUP: a distinct order touching two
+     * SKUs of a group is still one order to pick and cannot be split between
+     * them, and the wider unit windows sit beside those counts so they are kept
+     * at the same grain. On the flat per-SKU list they have nothing honest to
+     * say and show "—".
+     *
+     * Three days is not among them — 3-Day Avg already reports it, from the
+     * per-item demand the reorder maths divides by.
+     */
+    const rateColumn = (days: 7 | 14): ColumnDef<Item> => {
+        const key = `${orderBasis ? 'orders' : 'units'}_${days}d` as const;
+
+        return {
+            id: `demand_${days}d`,
+            enableSorting: false,
+            header: () => (
+                <ReportHeader
+                    id={key}
+                    title={`${orderBasis ? 'Orders' : 'Units'}/d ${days}d`}
+                />
+            ),
+            cell: ({ row }) => {
+                const value = summarize ? row.original[key] : null;
+
+                return (
+                    <div className="text-center">
+                        {/* Whole units, rounded up: half a unit a day still
+                            needs a unit on the shelf. The ceiling is applied to
+                            the figure being shown — never per SKU and then
+                            summed, which is what made this disagree with the
+                            3-day average beside it. */}
+                        <MetricCell
+                            value={
+                                value == null ? null : Math.ceil(value / days)
+                            }
+                        />
+                    </div>
+                );
+            },
+        };
+    };
 
     const reportColumns: ColumnDef<Item>[] = [
-        rateColumn('orders_3d', 'Orders/d 3d', 3),
-        rateColumn('units_3d', 'Units/d 3d', 3),
-        rateColumn('orders_7d', 'Orders/d 7d', 7),
-        rateColumn('units_7d', 'Units/d 7d', 7),
-        rateColumn('orders_14d', 'Orders/d 14d', 14),
-        rateColumn('units_14d', 'Units/d 14d', 14),
+        rateColumn(7),
+        rateColumn(14),
         {
             id: 'demand_trend',
             enableSorting: false,
             header: () => <ReportHeader id="demand_trend" title="Trend" />,
             cell: ({ row }) => {
-                const { units_3d: recent, units_14d: baseline } = row.original;
+                // Compares the same two windows the rate columns show, so it
+                // reads the same denomination. The 14-day figure is a group
+                // one, so there is nothing to say on a per-SKU row.
+                const recent = summarize
+                    ? row.original[orderBasis ? 'orders_3d' : 'units_3d']
+                    : null;
+                const baseline = summarize
+                    ? row.original[orderBasis ? 'orders_14d' : 'units_14d']
+                    : null;
                 if (recent == null || baseline == null || baseline <= 0) {
                     return (
                         <div className="text-center">

@@ -119,7 +119,7 @@ class InventoryItemSnapshotter
             'waiting_for_delivery_stocks', 'requested_stocks', 'remaining_after_fulfillment',
             'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'days_it_can_last',
             'product_name', 'product_winning_date', 'updated_at', 'demand_as_of',
-            'three_days_average_orders', 'unfulfilled_count_orders',
+            ...ItemReportFacts::ITEM_COLUMNS,
             ...ItemReportFacts::SNAPSHOT_COLUMNS,
         ];
     }
@@ -190,23 +190,6 @@ class InventoryItemSnapshotter
     {
         $groupFacts = $facts->for((int) ($item->parent_id ?? $item->id));
 
-        // The demand figures counted in orders instead of units, so the items
-        // list can show either without re-deriving anything.
-        //
-        // Divided per item rather than at the group: the group's order figure is
-        // then the sum of its items', exactly as it is for units, and the
-        // roll-up needs no second formula. Null when the group took no orders —
-        // there is no observed units-per-order to divide by, and any stand-in
-        // would be a guess.
-        //
-        // Stock is not converted here on purpose. It is bought and counted in
-        // units, and the reorder plan reads it against the unit rate in both
-        // bases — see InventoryItemController::buildSnapshotSummaryQuery().
-        $unitsPerOrder = $groupFacts['units_per_order'] ?? null;
-        $perOrder = fn ($units) => $unitsPerOrder > 0 && $units !== null
-            ? round((float) $units / (float) $unitsPerOrder, 4)
-            : null;
-
         return [
             'workspace_id' => $item->workspace_id,
             'inventory_item_id' => $item->id,
@@ -222,9 +205,7 @@ class InventoryItemSnapshotter
             'lead_time' => $item->lead_time ?? 0,
             'days_of_coverage' => $item->days_of_coverage ?? 0,
             'unfulfilled_count' => $item->unfulfilled_count ?? 0,
-            'unfulfilled_count_orders' => $perOrder($item->unfulfilled_count ?? 0),
             'three_days_average' => $item->three_days_average ?? 0,
-            'three_days_average_orders' => $perOrder($item->three_days_average ?? 0),
             'remaining_qty' => $item->remaining_qty,
             'item_created_at' => $item->item_created_at,
 
@@ -251,6 +232,12 @@ class InventoryItemSnapshotter
                 $groupFacts,
                 array_flip(ItemReportFacts::SNAPSHOT_COLUMNS),
             ),
+
+            // Demand for this item alone. The rate every reorder figure on the
+            // list is built from, which is why it is recorded here rather than
+            // taken from the group: it has to answer for exactly the rows a
+            // filter leaves on screen.
+            ...$facts->itemFacts($item->id),
             'demand_as_of' => $demandAsOf,
 
             'created_at' => $now,

@@ -94,15 +94,20 @@ test('the sync expands unit codes into per-item demand', function () {
 
     (new GencysDemandSync($workspace))->run();
 
-    // 3 in-window orders x 3 per bundle = 9 widgets over 3 days.
-    expect((float) $a->fresh()->three_days_average)->toBe(3.0)
-        ->and((float) $b->fresh()->three_days_average)->toBe(1.0)
-        // One order is open: 3 widgets, 1 gadget.
-        ->and($a->fresh()->unfulfilled_count)->toBe(3)
+    // One order is open: 3 widgets, 1 gadget. The sales rate is not this class's
+    // to write any more — ItemReportFacts counts the same orders once, into
+    // units_3d, and the assertion below reads it there.
+    expect($a->fresh()->unfulfilled_count)->toBe(3)
         ->and($b->fresh()->unfulfilled_count)->toBe(1);
+
+    // 3 in-window orders x 3 per bundle = 9 widgets over 3 days, per item.
+    $facts = new ItemReportFacts($workspace);
+
+    expect($facts->itemFacts($a->id)['units_3d'])->toBe(9)
+        ->and($facts->itemFacts($b->id)['units_3d'])->toBe(3);
 });
 
-test('the average is measured from the feed, not from today', function () {
+test('demand is measured from the feed, not from today', function () {
     $workspace = gencysWorkspace();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'WIDGET', 'is_active' => true]);
     demandUnitCode($workspace, 'BUNDLE-A', ['WIDGET' => 6]);
@@ -113,9 +118,8 @@ test('the average is measured from the feed, not from today', function () {
     demandOrder($workspace, 'BUNDLE-A', now()->subDays(14)->toDateString());
     demandOrder($workspace, 'BUNDLE-A', now()->subDays(15)->toDateString());
 
-    (new GencysDemandSync($workspace))->run();
-
-    expect((float) $item->fresh()->three_days_average)->toBe(4.0);
+    // 2 orders x 6 per bundle = 12 units in the window, so 4 a day.
+    expect((new ItemReportFacts($workspace))->itemFacts($item->id)['units_3d'])->toBe(12);
 });
 
 test('nothing is written when no unit code can attribute an order to an item', function () {
@@ -129,68 +133,66 @@ test('nothing is written when no unit code can attribute an order to an item', f
 
     expect((new GencysDemandSync($workspace))->run())->toBe(0);
 
-    // Zeroing here would say "nothing is selling" when the truth is "we cannot
-    // tell" — and every cover figure on the page would follow it down.
-    expect((float) $item->fresh()->three_days_average)->toBe(25.0)
-        ->and($item->fresh()->unfulfilled_count)->toBe(40);
+    // Zeroing here would say "nothing is owed" when the truth is "we cannot
+    // tell" — and the reorder maths would stop subtracting real demand.
+    expect($item->fresh()->unfulfilled_count)->toBe(40);
 });
 
-test('the snapshot recomputes demand first, then freezes it', function () {
+test('the snapshot freezes the demand it measured this run', function () {
     $workspace = gencysWorkspace();
     $item = InventoryItem::create([
-        'workspace_id' => $workspace->id, 'sku' => 'WIDGET',
-        'is_active' => true, 'three_days_average' => 0,
+        'workspace_id' => $workspace->id, 'sku' => 'WIDGET', 'is_active' => true,
     ]);
     demandUnitCode($workspace, 'BUNDLE-A', ['WIDGET' => 9]);
     demandOrder($workspace, 'BUNDLE-A', now()->toDateString());
 
     $this->artisan('inventory:snapshot-items')->assertSuccessful();
 
-    // Frozen with the demand this run computed, not the previous run's zero —
-    // the whole reason the two live in one command.
-    expect((float) $item->fresh()->three_days_average)->toBe(3.0)
-        ->and((float) InventoryItemSnapshot::where('inventory_item_id', $item->id)
-            ->where('snapshot_date', now()->toDateString())
-            ->value('three_days_average'))->toBe(3.0);
+    // Counted once, by the run that froze it — 9 units over the window, which
+    // the list divides into 3 a day.
+    expect((int) InventoryItemSnapshot::where('inventory_item_id', $item->id)
+        ->where('snapshot_date', now()->toDateString())
+        ->value('units_3d'))->toBe(9);
 });
 
 test('a workspace without ERP credentials is snapshotted but not recomputed', function () {
     $workspace = gencysWorkspace(['erp_username' => null, 'erp_password' => null]);
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'WIDGET',
-        'is_active' => true, 'three_days_average' => 12,
+        'is_active' => true, 'unfulfilled_count' => 12,
     ]);
     demandUnitCode($workspace, 'BUNDLE-A', ['WIDGET' => 9]);
     demandOrder($workspace, 'BUNDLE-A', now()->toDateString());
 
     $this->artisan('inventory:snapshot-items')->assertSuccessful();
 
-    // Left exactly as it was, and still frozen for the day.
-    expect((float) $item->fresh()->three_days_average)->toBe(12.0)
-        ->and((float) InventoryItemSnapshot::where('inventory_item_id', $item->id)
+    // What the sync owns is left exactly as it was.
+    expect($item->fresh()->unfulfilled_count)->toBe(12)
+        ->and((int) InventoryItemSnapshot::where('inventory_item_id', $item->id)
             ->where('snapshot_date', now()->toDateString())
-            ->value('three_days_average'))->toBe(12.0);
+            ->value('unfulfilled_count'))->toBe(12);
 });
 
 test('--skip-demand freezes what is stored without recomputing', function () {
     $workspace = gencysWorkspace();
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'WIDGET',
-        'is_active' => true, 'three_days_average' => 7,
+        'is_active' => true, 'unfulfilled_count' => 7,
     ]);
     demandUnitCode($workspace, 'BUNDLE-A', ['WIDGET' => 9]);
-    demandOrder($workspace, 'BUNDLE-A', now()->toDateString());
+    // An open order the sync would otherwise pick up.
+    demandOrder($workspace, 'BUNDLE-A', now()->toDateString(), 'ENCODED');
 
     $this->artisan('inventory:snapshot-items', ['--skip-demand' => true])->assertSuccessful();
 
-    expect((float) $item->fresh()->three_days_average)->toBe(7.0);
+    expect($item->fresh()->unfulfilled_count)->toBe(7);
 });
 
 test('a partial refresh freezes rows without moving the whole workspace demand', function () {
     $workspace = gencysWorkspace();
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'WIDGET',
-        'is_active' => true, 'three_days_average' => 5,
+        'is_active' => true, 'unfulfilled_count' => 5,
     ]);
     demandUnitCode($workspace, 'BUNDLE-A', ['WIDGET' => 9]);
     demandOrder($workspace, 'BUNDLE-A', now()->toDateString());
@@ -204,45 +206,40 @@ test('a partial refresh freezes rows without moving the whole workspace demand',
     $snapshotter->refresh([$item->id]);
 
     expect($snapshotter->demandSynced())->toBe(0)
-        ->and((float) $item->fresh()->three_days_average)->toBe(5.0);
+        ->and($item->fresh()->unfulfilled_count)->toBe(5);
 
     // A full refresh does own the day, and does recompute.
     $full = new InventoryItemSnapshotter($workspace, now()->toDateString());
     $full->refresh();
 
     expect($full->demandSynced())->toBe(1)
-        ->and((float) $item->fresh()->three_days_average)->toBe(3.0);
+        // No open orders in the fixture, so what was standing is cleared.
+        ->and($item->fresh()->unfulfilled_count)->toBe(0);
 });
 
-test('the stored 3-day average equals the report units-per-day, group and all', function () {
+test('a group demand is exactly the sum of its items', function () {
     $workspace = gencysWorkspace();
 
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
     $a = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'CHILD-A', 'parent_id' => $parent->id, 'is_active' => true]);
     $b = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'CHILD-B', 'parent_id' => $parent->id, 'is_active' => true]);
 
-    // Quantities chosen so per-child averages are fractional: rounding each up
-    // before summing would make the group read 4/day against a true 7/3.
+    // Quantities chosen so the per-child rates are fractional: 2/3 and 5/3 a
+    // day against a group of 7/3.
     demandUnitCode($workspace, 'BUNDLE-A', ['CHILD-A' => 2, 'CHILD-B' => 5]);
     demandOrder($workspace, 'BUNDLE-A', now()->toDateString());
 
-    (new GencysDemandSync($workspace))->run();
-    $facts = (new ItemReportFacts($workspace))->for($parent->id);
+    $facts = new ItemReportFacts($workspace);
 
-    $stored = (float) $a->fresh()->three_days_average + (float) $b->fresh()->three_days_average;
-    $reported = $facts['units_3d'] / 3;
+    // The property the roll-up depends on: summing the items reproduces the
+    // group exactly. It is what lets a filter narrow the demand to the rows it
+    // leaves on screen, and what makes one count enough for both grains.
+    $items = $facts->itemFacts($a->id)['units_3d'] + $facts->itemFacts($b->id)['units_3d'];
 
-    // Both are shown as whole units rounded up, so what has to match is the
-    // figure after that ceiling — the two sit side by side on the same row.
-    //
-    // The ceiling belongs at the group, applied once. Rounding each child up
-    // first and summing, which is what this replaced, gives 1 + 2 = 3 against a
-    // true ceil(7/3) = 3 here, and drifts further the more SKUs a group has.
-    expect((int) ceil($stored))->toBe((int) ceil($reported))
-        ->and((int) ceil($stored))->toBe(3)
-        // Stored exact so the group can do its own rounding: a per-item ceiling
-        // would be baked in and could not be undone at the group.
-        ->and(abs($stored - 7 / 3))->toBeLessThan(0.001);
+    expect($items)->toBe(7)
+        ->and($facts->for($parent->id)['units_3d'])->toBe($items)
+        // A parent carries none of its own; the group's demand is its children's.
+        ->and($facts->itemFacts($parent->id)['units_3d'])->toBe(0);
 });
 
 test('a three-day window covers three days, not four', function () {
@@ -255,10 +252,7 @@ test('a three-day window covers three days, not four', function () {
         demandOrder($workspace, 'BUNDLE-A', now()->subDays($daysBack)->toDateString());
     }
 
-    (new GencysDemandSync($workspace))->run();
-
-    // Three days of orders, three units each, over three days. Counting the
-    // fourth day and still dividing by three would read 4.
-    expect((float) $item->fresh()->three_days_average)->toBe(3.0)
-        ->and((new ItemReportFacts($workspace))->for($item->id)['units_3d'])->toBe(9);
+    // Three days of orders, three units each. Counting the fourth day and still
+    // dividing by three would read 4 a day instead of 3.
+    expect((new ItemReportFacts($workspace))->itemFacts($item->id)['units_3d'])->toBe(9);
 });

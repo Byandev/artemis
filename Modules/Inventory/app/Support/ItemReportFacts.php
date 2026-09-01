@@ -32,12 +32,27 @@ class ItemReportFacts
     public const WINDOWS = [3, 7, 14];
 
     /**
-     * The window units_per_order is measured over. Deliberately the same one
-     * three_days_average uses: the two are multiplied and divided by each other
-     * to move between the unit and order bases, and a rate taken over a
-     * different span would not cancel.
+     * Columns recorded per ITEM rather than per group, and summed by the roll-up
+     * instead of MAX'd.
+     *
+     * units_3d is the workspace's demand rate, and every reorder figure divides
+     * by it or multiplies through it — so it has to answer for exactly the rows
+     * on screen. Held per group it could not: on the flat list one SKU would
+     * report the whole group's demand, and a filter hiding half a group would
+     * narrow the stock while leaving the demand whole.
+     *
+     * The wider windows stay per group deliberately. Nothing computes from them
+     * — they are read side by side in the roll-up to show whether demand is
+     * accelerating — and the distinct-order counts they sit beside genuinely
+     * cannot be split between siblings, so keeping the pair at one grain is
+     * what makes them comparable.
+     *
+     * @var list<string>
      */
-    public const AVERAGE_DAYS = 3;
+    public const ITEM_COLUMNS = ['units_3d'];
+
+    /** The window ITEM_COLUMNS covers. The one the reorder maths divides by. */
+    public const ITEM_WINDOW = 3;
 
     /**
      * The fact keys frozen into inventory_item_snapshots, which are also the
@@ -50,11 +65,7 @@ class ItemReportFacts
      * @var list<string>
      */
     public const SNAPSHOT_COLUMNS = [
-        'orders_3d', 'units_3d', 'orders_7d', 'units_7d', 'orders_14d', 'units_14d',
-        // The group's units per order over the 3-day window, which is what the
-        // items list divides by to read its figures in orders instead of units.
-        // A group figure like the rest of these, so MAX() reads it back exactly.
-        'units_per_order',
+        'orders_3d', 'orders_7d', 'units_7d', 'orders_14d', 'units_14d',
         'last_in_date', 'last_in_count', 'last_out_date', 'last_out_count',
         'last_po_date', 'last_po_count', 'raised_not_created_days', 'raised_not_created_units',
         'earliest_expected_date', 'earliest_expected_count', 'longest_waiting_date',
@@ -100,6 +111,9 @@ class ItemReportFacts
      */
     private ?CarbonImmutable $demandAsOf = null;
 
+    /** Per-item demand, keyed by inventory item id. @var array<int, array<string, int>> */
+    private array $itemFacts = [];
+
     /**
      * @param  list<int>|null  $groupIds  restrict to these groups, or null for all.
      *                                    The list view passes the page it is about
@@ -118,6 +132,23 @@ class ItemReportFacts
     public function for(int $groupId): array
     {
         return ($this->facts[$groupId] ?? []) + $this->blank();
+    }
+
+    /**
+     * The per-item columns for one item, defaulted.
+     *
+     * Zero rather than null for an item the feed never named: the scan covered
+     * the window and found nothing for it, which is a measured zero. Null is
+     * reserved for a workspace whose feed has not arrived at all, and that case
+     * never reaches here — demandWindows() returns before recording anything.
+     *
+     * @return array<string, int|null>
+     */
+    public function itemFacts(int $itemId): array
+    {
+        $blank = array_fill_keys(self::ITEM_COLUMNS, $this->demandAsOf === null ? null : 0);
+
+        return ($this->itemFacts[$itemId] ?? []) + $blank;
     }
 
     /** The Gencys feed's own latest day, which the demand windows are measured from. */
@@ -149,10 +180,6 @@ class ItemReportFacts
             'longest_waiting_count' => null,
             'delayed_po' => 0,
             'bottleneck_stage' => null,
-            // Null rather than 0 or 1: a group with no orders has no observed
-            // units-per-order, and either number would be a guess the order
-            // basis would then divide real stock by.
-            'units_per_order' => null,
         ];
 
         foreach (self::WINDOWS as $days) {
@@ -198,9 +225,9 @@ class ItemReportFacts
 
         $this->demandAsOf = CarbonImmutable::parse($latest)->endOfDay();
 
-        $groupsByCode = $this->groupsByUnitCode();
+        [$itemsByCode, $groupByItem] = $this->itemsByUnitCode();
 
-        if (! $groupsByCode) {
+        if (! $itemsByCode) {
             return;
         }
 
@@ -215,7 +242,10 @@ class ItemReportFacts
         }
 
         $widest = min($starts);
-        $units = [];
+        // Units land on the item that ships them; orders land on the group,
+        // because one order carrying two siblings is still one order to pick.
+        $itemUnits = [];
+        $groupUnits = [];
         $orders = [];
         $lastOrder = [];
 
@@ -229,7 +259,7 @@ class ItemReportFacts
             ->cursor();
 
         foreach ($rows as $row) {
-            $components = $groupsByCode[mb_strtoupper(trim((string) $row->sku))] ?? null;
+            $components = $itemsByCode[mb_strtoupper(trim((string) $row->sku))] ?? null;
 
             if ($components === null) {
                 continue;
@@ -242,9 +272,14 @@ class ItemReportFacts
                     continue;
                 }
 
-                foreach ($components as $group => $perBundle) {
-                    $units[$days][$group] = ($units[$days][$group] ?? 0) + $perBundle;
+                foreach ($components as $item => $perBundle) {
+                    $group = $groupByItem[$item];
 
+                    $itemUnits[$days][$item] = ($itemUnits[$days][$item] ?? 0) + $perBundle;
+                    $groupUnits[$days][$group] = ($groupUnits[$days][$group] ?? 0) + $perBundle;
+
+                    // Counted once per order per group: a bundle holding two
+                    // siblings must not read as two orders against the group.
                     if (($lastOrder[$days][$group] ?? null) !== $row->order_id) {
                         $lastOrder[$days][$group] = $row->order_id;
                         $orders[$days][$group] = ($orders[$days][$group] ?? 0) + 1;
@@ -254,39 +289,38 @@ class ItemReportFacts
         }
 
         foreach (self::WINDOWS as $days) {
-            foreach ($units[$days] ?? [] as $group => $total) {
+            foreach ($groupUnits[$days] ?? [] as $group => $total) {
                 $this->facts[$group]["units_{$days}d"] = $total;
                 $this->facts[$group]["orders_{$days}d"] = $orders[$days][$group] ?? 0;
             }
         }
 
-        // How many units the group ships per order, over the same three days the
-        // stored average is taken across. This is the rate that converts between
-        // the two bases the items list can be read in, so it is measured here —
-        // beside the counts it comes from — rather than re-derived wherever it
-        // is needed.
-        foreach ($units[self::AVERAGE_DAYS] ?? [] as $group => $total) {
-            $placed = $orders[self::AVERAGE_DAYS][$group] ?? 0;
-
-            if ($placed > 0) {
-                $this->facts[$group]['units_per_order'] = round($total / $placed, 4);
-            }
+        // The 3-day window again, kept per item — see ITEM_COLUMNS.
+        foreach ($itemUnits[self::ITEM_WINDOW] ?? [] as $item => $total) {
+            $this->itemFacts[$item]['units_'.self::ITEM_WINDOW.'d'] = $total;
         }
     }
 
     /**
-     * Normalised order-line sku => [group id => units per bundle].
+     * Normalised order-line sku => [item id => units per bundle], plus the
+     * item => group map the order counts are tallied on.
+     *
+     * Resolved to the ITEM rather than collapsed straight to the group, because
+     * units are recorded per item now (see ITEM_COLUMNS) while distinct orders
+     * are still counted per group. Both need the same expansion, so it is done
+     * once and the caller folds items up where it needs the group.
      *
      * Keyed by both the unit code's label and its own sku, because an order line
-     * names it by either — the same pair GencysDemandSync accepts.
-     * Components landing on the same group are summed: a bundle holding two
-     * variants of one product is that many units against the group's supply.
+     * names it by either — the same pair GencysDemandSync accepts. Components
+     * landing on the same item are summed: a bundle holding it twice is two
+     * units of demand.
      *
-     * @return array<string, array<int, int>>
+     * @return array{0: array<string, array<int, int>>, 1: array<int, int>}
      */
-    private function groupsByUnitCode(): array
+    private function itemsByUnitCode(): array
     {
-        $groupBySku = [];
+        $itemBySku = [];
+        $groupByItem = [];
 
         foreach (DB::table('inventory_items')->where('workspace_id', $this->workspace->id)->get(['id', 'parent_id', 'sku']) as $item) {
             $group = (int) ($item->parent_id ?? $item->id);
@@ -297,20 +331,21 @@ class ItemReportFacts
                 continue;
             }
 
-            $groupBySku[mb_strtoupper(trim((string) $item->sku))] = $group;
+            $itemBySku[mb_strtoupper(trim((string) $item->sku))] = (int) $item->id;
+            $groupByItem[(int) $item->id] = $group;
         }
 
         $componentsByCode = [];
 
         foreach (DB::table('inventory_unit_code_items')->where('workspace_id', $this->workspace->id)->get(['unit_code', 'item_code', 'quantity']) as $component) {
-            $group = $groupBySku[mb_strtoupper(trim((string) $component->item_code))] ?? null;
+            $item = $itemBySku[mb_strtoupper(trim((string) $component->item_code))] ?? null;
 
-            if ($group === null) {
+            if ($item === null) {
                 continue;
             }
 
             $code = mb_strtoupper(trim((string) $component->unit_code));
-            $componentsByCode[$code][$group] = ($componentsByCode[$code][$group] ?? 0) + (int) $component->quantity;
+            $componentsByCode[$code][$item] = ($componentsByCode[$code][$item] ?? 0) + (int) $component->quantity;
         }
 
         $byOrderSku = [];
@@ -327,7 +362,7 @@ class ItemReportFacts
             }
         }
 
-        return $byOrderSku;
+        return [$byOrderSku, $groupByItem];
     }
 
     /**

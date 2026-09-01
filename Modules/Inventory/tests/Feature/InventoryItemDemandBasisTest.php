@@ -40,7 +40,6 @@ function basisItem(Workspace $workspace, string $sku = 'WIDGET'): InventoryItem
         'is_active' => true,
         'lead_time' => 10,
         'days_of_coverage' => 10,
-        'three_days_average' => 6,
     ]);
 }
 
@@ -63,15 +62,10 @@ function basisSnapshot(Workspace $workspace, InventoryItem $item, string $date, 
         'is_active' => true,
         'lead_time' => 10,
         'days_of_coverage' => 10,
-        'three_days_average' => 6,
+        // 18 units over three days is 6 a day, carried by 6 orders — 2 a day.
         'orders_3d' => 6,
         'units_3d' => 18,
-        // The demand figures the snapshotter freezes in orders beside the unit
-        // ones, each divided by the group's 3 units per order.
-        'units_per_order' => 3,
-        'three_days_average_orders' => 2,
         'unfulfilled_count' => 0,
-        'unfulfilled_count_orders' => 0,
         // Stock is frozen once, in units. It has no order sibling.
         'current_stocks' => 30,
         'waiting_for_delivery_stocks' => 0,
@@ -122,7 +116,6 @@ test('unfulfilled converts, and the stock beside it does not', function () {
     // bought in units.
     ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace([
         'unfulfilled_count' => 12,
-        'unfulfilled_count_orders' => 4,
         'waiting_for_delivery_stocks' => 6,
     ]);
 
@@ -180,10 +173,6 @@ test('a group that took no orders reports no order figures', function () {
     // rather than inventing a rate: a 0 would read as "it sold nothing".
     ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace([
         'orders_3d' => null,
-        'units_3d' => null,
-        'units_per_order' => null,
-        'three_days_average_orders' => null,
-        'unfulfilled_count_orders' => null,
     ]);
 
     $row = basisRow($owner, $workspace, '?basis=order');
@@ -191,12 +180,62 @@ test('a group that took no orders reports no order figures', function () {
     expect($row['three_days_average'])->toBeNull()
         ->and($row['unfulfilled_count'])->toBeNull();
 
-    // The plan is untouched, because it never read the order figures.
+    // The plan is untouched, because it never read the order count — it reads
+    // the units, which the day did record.
     expect($row['po_needed'])->toEqual(90)
         ->and($row['days_it_can_last'])->toEqual(5);
 
     // And the unit basis still answers for the same day, because it was measured.
     expect(basisRow($owner, $workspace)['three_days_average'])->toEqual(6);
+});
+
+test('the order rate is exactly what the Orders/d 3d column reports', function () {
+    // The bug this replaced: deriving the rate by dividing each item's unit
+    // average through a rounded units-per-order landed on 19.0008 where the
+    // truth was 19, and the ceiling the list applies made that a whole extra
+    // order. Reading orders_3d directly is the same expression the report
+    // column renders, so the two cannot drift.
+    //
+    // 19 orders a day over three days, split across two SKUs whose unit
+    // averages do not divide evenly — the shape that used to drift.
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+
+    $parent = basisItem($workspace, 'PARENT');
+    $parent->update(['is_parent' => true]);
+
+    foreach (['CHILD-A' => 21, 'CHILD-B' => 12] as $sku => $units) {
+        $child = basisItem($workspace, $sku);
+        $child->update(['parent_id' => $parent->id]);
+
+        basisSnapshot($workspace, $child, now()->toDateString(), [
+            'parent_id' => $parent->id,
+            'units_3d' => $units,
+            'orders_3d' => 57,
+        ]);
+    }
+
+    basisSnapshot($workspace, $parent, now()->toDateString(), [
+        'is_parent' => true,
+        'units_3d' => 0,
+        'orders_3d' => 57,
+    ]);
+
+    // 57 orders over three days is exactly 19 a day, and the column says 19.
+    expect(basisRow($owner, $workspace, '?basis=order')['three_days_average'])
+        ->toEqual(19);
+});
+
+test('the unit rate is sent alongside whatever basis is displayed', function () {
+    // Stockout risk and Stocks Last divide unit stock by a rate, so the page
+    // needs units a day even when the 3-Day Avg column has become orders.
+    ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace();
+
+    $order = basisRow($owner, $workspace, '?basis=order');
+
+    expect($order['three_days_average'])->toEqual(2)
+        ->and($order['unit_three_days_average'])->toEqual(6);
+
+    expect(basisRow($owner, $workspace)['unit_three_days_average'])->toEqual(6);
 });
 
 test('the flat per-SKU list ignores the order basis', function () {
@@ -222,9 +261,9 @@ test('a workspace reading live figures ignores the order basis', function () {
             ->where('basisAvailable', false));
 });
 
-test('the snapshot freezes the order figures beside the unit ones', function () {
-    // End to end: the command writes both denominations, so the toggle reads
-    // stored columns rather than re-deriving a second calculation at page load.
+test('the snapshot freezes the counts both bases are read from', function () {
+    // End to end: the command writes the order and unit counts, and the toggle
+    // reads its rate off them — no second denomination is stored.
     ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $workspace->update(['erp_username' => 'erp-user', 'erp_password' => 'erp-pass']);
 
@@ -268,16 +307,12 @@ test('the snapshot freezes the order figures beside the unit ones', function () 
         ->where('inventory_item_id', $item->id)
         ->first();
 
+    // Both counts are frozen, and the order rate is read off them at query
+    // time — 6 orders over three days is the 2 a day the list shows.
+    // One count, recorded per item: 6 orders carrying 18 units over three days.
     expect((int) $row->orders_3d)->toBe(6)
         ->and((int) $row->units_3d)->toBe(18)
-        ->and((float) $row->units_per_order)->toBe(3.0)
-        // 18 units over three days is 6 units a day, which is 2 orders a day.
-        ->and((float) $row->three_days_average)->toBe(6.0)
-        ->and((float) $row->three_days_average_orders)->toBe(2.0);
-
-    // Stock is frozen once, in units, and carries no order sibling.
-    expect((float) $row->current_stocks)->toBe(30.0)
-        ->and($row->unfulfilled_count_orders)->not->toBeNull();
+        ->and((float) $row->current_stocks)->toBe(30.0);
 });
 
 test('the page says whether the order basis is on offer', function () {
