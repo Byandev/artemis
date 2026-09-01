@@ -39,7 +39,7 @@ function listRows($owner, $workspace, string $qs = ''): array
 }
 
 test('the snapshot command stores every item column and computed metric', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $product = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'Widget']);
 
     $item = InventoryItem::create([
@@ -81,7 +81,7 @@ test('the snapshot command stores every item column and computed metric', functi
 });
 
 test('a snapshot row reproduces the same PO QTY and PO Needed the live list shows', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id,
@@ -110,7 +110,7 @@ test('a snapshot row reproduces the same PO QTY and PO Needed the live list show
 });
 
 test('re-running the command for a date refreshes rather than duplicates', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
     ledger($item, 10);
 
@@ -126,7 +126,7 @@ test('re-running the command for a date refreshes rather than duplicates', funct
 });
 
 test('each day keeps its own row so history builds up', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     ledger($item, 10, '2026-06-01');
@@ -143,7 +143,7 @@ test('each day keeps its own row so history builds up', function () {
 });
 
 test('the list reads the newest snapshot, and a date filter reads that day', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     ledger($item, 10, '2026-06-01');
@@ -162,7 +162,7 @@ test('the list reads the newest snapshot, and a date filter reads that day', fun
 });
 
 test('stock moving after the newest snapshot does not change the list until it runs again', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     ledger($item, 10, '2026-06-01');
@@ -182,7 +182,7 @@ test('stock moving after the newest snapshot does not change the list until it r
 });
 
 test('a workspace with no snapshot at all still renders, computed live', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     ledger($item, 42, '2026-06-01');
@@ -194,7 +194,7 @@ test('a workspace with no snapshot at all still renders, computed live', functio
 });
 
 test('the summarize roll-up works against a snapshot date', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
     $a = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true]);
@@ -216,7 +216,7 @@ test('the summarize roll-up works against a snapshot date', function () {
 });
 
 test('the flat snapshot view tags each child with the parent it had that day', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'GROUP', 'is_parent' => true, 'is_active' => true]);
     InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SUP-A', 'parent_id' => $parent->id, 'is_active' => true]);
@@ -232,7 +232,7 @@ test('the flat snapshot view tags each child with the parent it had that day', f
 });
 
 test('search and sort still apply on a snapshot date', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     foreach ([['ALPHA', 5], ['BETA', 50], ['ALPHA-2', 1]] as [$sku, $stock]) {
         $i = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => $sku, 'is_active' => true]);
@@ -249,7 +249,7 @@ test('search and sort still apply on a snapshot date', function () {
 });
 
 test('a date with no snapshot shows nothing rather than live data', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
     ledger($item, 55);
 
@@ -272,7 +272,7 @@ test('a date with no snapshot shows nothing rather than live data', function () 
 });
 
 test('the list reports which dates have snapshots', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
 
     $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
@@ -289,8 +289,8 @@ test('the list reports which dates have snapshots', function () {
 });
 
 test('one workspace never sees another workspace snapshots', function () {
-    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
-    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspaceA] = makeGencysWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeGencysWorkspaceWithOwner();
 
     InventoryItem::create(['workspace_id' => $workspaceB->id, 'sku' => 'B-ONLY', 'is_active' => true]);
     $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
@@ -306,7 +306,7 @@ test('one workspace never sees another workspace snapshots', function () {
 });
 
 test('the export follows the pinned date and carries every report column', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $product = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'Widget']);
     $item = InventoryItem::create([
         'workspace_id' => $workspace->id, 'product_id' => $product->id,
@@ -340,8 +340,8 @@ test('the export follows the pinned date and carries every report column', funct
 });
 
 test('the workspace option limits the snapshot to one workspace', function () {
-    ['workspace' => $workspaceA] = makeWorkspaceWithOwner();
-    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    ['workspace' => $workspaceA] = makeGencysWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeGencysWorkspaceWithOwner();
 
     InventoryItem::create(['workspace_id' => $workspaceA->id, 'sku' => 'A-1', 'is_active' => true]);
     InventoryItem::create(['workspace_id' => $workspaceB->id, 'sku' => 'B-1', 'is_active' => true]);
@@ -352,7 +352,7 @@ test('the workspace option limits the snapshot to one workspace', function () {
 });
 
 test('editing lead time rewrites today\'s snapshot so the list shows it at once', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'GROUP',
@@ -385,7 +385,7 @@ test('editing lead time rewrites today\'s snapshot so the list shows it at once'
 });
 
 test('an edit never invents a snapshot day that does not already exist', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $kept = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'OTHER', 'is_active' => true]);
     $edited = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'EDITED', 'is_active' => true, 'lead_time' => 1]);
@@ -406,7 +406,7 @@ test('an edit never invents a snapshot day that does not already exist', functio
 });
 
 test('the list reports when the snapshot it is showing was last written', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
     ledger($item, 10);
 
@@ -423,7 +423,7 @@ test('the list reports when the snapshot it is showing was last written', functi
 });
 
 test('a past date is refused, because the figures would be today\'s', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
     ledger($item, 42);
 
@@ -441,4 +441,109 @@ test('a past date is refused, because the figures would be today\'s', function (
         ->assertSuccessful();
 
     expect((int) InventoryItemSnapshot::where('inventory_item_id', $item->id)->value('current_stocks'))->toBe(42);
+});
+
+test('the command snapshots partners only', function () {
+    ['workspace' => $partner] = makeGencysWorkspaceWithOwner();
+    ['workspace' => $live] = makeWorkspaceWithOwner();
+
+    foreach ([$partner, $live] as $workspace) {
+        ledger(InventoryItem::create([
+            'workspace_id' => $workspace->id,
+            'sku' => 'SKU-1',
+            'is_active' => true,
+        ]), 10);
+    }
+
+    $this->artisan('inventory:snapshot-items')->assertSuccessful();
+
+    expect(InventoryItemSnapshot::where('workspace_id', $partner->id)->count())->toBe(1)
+        // Not merely unread — never written. A frozen row for a workspace that
+        // edits its stock in Artemis is out of date by the next save.
+        ->and(InventoryItemSnapshot::where('workspace_id', $live->id)->count())->toBe(0);
+});
+
+test('--workspace does not snapshot a non-partner', function () {
+    ['workspace' => $live] = makeWorkspaceWithOwner();
+    ledger(InventoryItem::create(['workspace_id' => $live->id, 'sku' => 'SKU-1', 'is_active' => true]), 10);
+
+    $this->artisan('inventory:snapshot-items', ['--workspace' => $live->id])->assertSuccessful();
+
+    expect(InventoryItemSnapshot::where('workspace_id', $live->id)->count())->toBe(0);
+});
+
+test('a non-partner list reads live, ignoring any snapshot it still carries', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
+    ledger($item, 10, '2026-06-01');
+
+    $this->artisan('inventory:snapshot-items')->assertSuccessful();
+
+    // Rows exist and are stale. Dropping the partner flag has to take the list
+    // off them, not leave it reading a day that no longer gets refreshed.
+    ledger($item, 77, '2026-06-02');
+    $workspace->update(['is_gencys_partner' => false]);
+
+    foreach (['0', '1'] as $summarize) {
+        $row = collect(listRows($owner, $workspace, "?summarize=$summarize"))->firstWhere('sku', 'SKU-1');
+        expect((int) $row['current_stocks'])->toBe(77);
+    }
+
+    test()->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('snapshotDate', null)
+            ->where('snapshotUpdatedAt', null)
+            // No days to offer, so the page hides the picker rather than
+            // showing a calendar with nothing selectable.
+            ->where('snapshotDates', []));
+});
+
+test('a non-partner ignores a date filter rather than showing an empty day', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
+    ledger($item, 33);
+
+    // A partner gets an explicit "nothing was frozen for that day" here. A live
+    // workspace has no frozen days at all, so the filter is meaningless and the
+    // list answers for now instead of going blank.
+    $rows = listRows($owner, $workspace, '?summarize=0&filter[date]=2026-08-01');
+
+    expect((int) collect($rows)->firstWhere('sku', 'SKU-1')['current_stocks'])->toBe(33);
+
+    test()->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace).'?filter[date]=2026-08-01')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('requestedDate', null));
+});
+
+test('a non-partner export carries live figures, not the day it was last frozen', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = InventoryItem::create(['workspace_id' => $workspace->id, 'sku' => 'SKU-1', 'is_active' => true]);
+    ledger($item, 10, '2026-06-01');
+
+    $this->artisan('inventory:snapshot-items')->assertSuccessful();
+
+    // Stock moves after that freeze, and the workspace stops being a partner.
+    ledger($item, 99, '2026-06-02');
+    $workspace->update(['is_gencys_partner' => false]);
+
+    $this->travelTo(now()->startOfSecond());
+    Excel::fake();
+
+    test()->actingAs($owner)
+        ->get(route('workspaces.inventory.item.export', $workspace))
+        ->assertOk();
+
+    // The pinned export names the day it read and carries that day's figures;
+    // the live one is stamped with the moment it ran and recomputes. A live
+    // workspace has to get the second, or the download disagrees with the page.
+    Excel::assertDownloaded('inventory-items-'.now()->format('Y-m-d-His').'.xlsx', function (InventoryItemReportExport $export) {
+        $rows = iterator_to_array($export->generator());
+
+        expect($rows[0][0])->toBe('SKU-1');
+
+        return true;
+    });
 });

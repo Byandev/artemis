@@ -37,6 +37,41 @@ export function evenShares(total: number, count: number): string[] {
 }
 
 /**
+ * `total` cut into shares proportional to `weights`, in cents so the shares add
+ * up to exactly the total — the leftover centavos of a split that doesn't divide
+ * cleanly go to the largest remainders rather than vanishing.
+ *
+ * Weightless input (no weights, or all zero) falls back to an even split: there
+ * is nothing to tell the rows apart, and returning nothing would leave the
+ * amount unallocated.
+ */
+export function proportionalShares(total: number, weights: number[]): string[] {
+    if (weights.length === 0) return [];
+
+    const positive = weights.map((w) => (w > 0 ? w : 0));
+    const weightTotal = positive.reduce((sum, w) => sum + w, 0);
+
+    if (weightTotal <= 0) return evenShares(total, weights.length);
+
+    const cents = Math.round((Number.isFinite(total) ? total : 0) * 100);
+    const exact = positive.map((w) => (cents * w) / weightTotal);
+    const shares = exact.map(Math.floor);
+
+    // Hand what the flooring dropped to the rows that lost the most to it.
+    const byRemainder = exact
+        .map((value, index) => ({ index, rem: value - Math.floor(value) }))
+        .sort((a, b) => b.rem - a.rem);
+
+    let left = cents - shares.reduce((sum, c) => sum + c, 0);
+
+    for (let i = 0; left > 0; i++, left--) {
+        shares[byRemainder[i % byRemainder.length].index]++;
+    }
+
+    return shares.map((c) => (c / 100).toFixed(2));
+}
+
+/**
  * What the rows allocate between them. A share left blank counts for nothing —
  * the form makes you put a figure in it rather than quietly handing it the
  * remainder, so the running total below is what actually gets saved.

@@ -1,13 +1,17 @@
 <?php
 
+use App\Models\Product;
 use App\Models\User;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Models\Transaction;
+use Modules\Finance\Models\TransactionProduct;
 use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\GencysERP\Models\GencysDailySalesOrderItem;
 use Modules\GencysERP\Models\Intern;
+use Modules\Inventory\Models\InventoryUnitCode;
 
 /** A delivered order credited to the given intern cell. */
 function uis_order(int $id, $workspace, string $cell, array $attrs = []): GencysDailySalesOrder
@@ -36,6 +40,38 @@ function uis_statement($workspace): IncomeStatement
         'vat_rate' => 0.12,
         'advisory_rate' => 0.30,
         'status' => 'final',
+    ]);
+}
+
+/**
+ * An outflow of the given type, tagged to a product.
+ *
+ * The goods lines are read from these tags and then shared between the sellers
+ * of the product by delivered orders — a user is reached by moving the product,
+ * not by being charged for the purchase. Ad spend still uses uis_charge below.
+ */
+function uis_tagged($workspace, Account $account, string $typeName, string $product, float $amount): void
+{
+    $type = TransactionType::create([
+        'workspace_id' => $workspace->id,
+        'name' => $typeName,
+        'income_statement_section' => 'cost_of_sales',
+    ]);
+
+    $txn = Transaction::create([
+        'workspace_id' => $workspace->id,
+        'account_id' => $account->id,
+        'date' => '2026-05-15',
+        'description' => $typeName,
+        'type' => 'out',
+        'transaction_type_id' => $type->id,
+        'amount' => $amount,
+    ]);
+
+    TransactionProduct::create([
+        'transaction_id' => $txn->id,
+        'product' => $product,
+        'amount' => $amount,
     ]);
 }
 
@@ -72,14 +108,23 @@ test('the statement snapshots a row per user through to gross profit', function 
         'user_id' => $user->id,
     ]);
 
+    // The only product on the statement, so its whole purchase lands on the
+    // only person delivering it.
+    $product = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'WIDGET']);
+    InventoryUnitCode::create([
+        'workspace_id' => $workspace->id, 'unit_code' => 'UC-W', 'product_id' => $product->id,
+    ]);
+
     // Two delivered parcels: 1,000 of revenue, 240 of goods, 100 of shipping.
-    uis_order(920001, $workspace, 'Juan Dela Cruz', ['price_final' => 500, 'total_cog' => 120, 'shipping_fee' => 50]);
-    uis_order(920002, $workspace, 'Juan Dela Cruz', ['price_final' => 500, 'total_cog' => 120, 'shipping_fee' => 50]);
+    foreach ([920001, 920002] as $id) {
+        $order = uis_order($id, $workspace, 'Juan Dela Cruz', ['price_final' => 500, 'total_cog' => 120, 'shipping_fee' => 50]);
+        GencysDailySalesOrderItem::create(['order_id' => $order->id, 'sku' => 'UC-W', 'quantity' => 1]);
+    }
 
     $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
     uis_charge($workspace, $account, 'Ad Spent', $user, 300);
-    uis_charge($workspace, $account, 'Cost of Goods', $user, 600);
-    uis_charge($workspace, $account, 'Delivery of COG', $user, 40);
+    uis_tagged($workspace, $account, 'Cost of Goods', 'WIDGET', 600);
+    uis_tagged($workspace, $account, 'Delivery of COG', 'WIDGET', 40);
 
     $statement = uis_statement($workspace);
     app(UserIncomeStatementService::class)->snapshot($statement);
@@ -92,7 +137,8 @@ test('the statement snapshots a row per user through to gross profit', function 
         ->and((float) $row->delivered_amount)->toBe(1000.0)
         ->and((int) $row->shipped_orders)->toBe(2)
         ->and((float) $row->total_shipping_fee)->toBe(100.0)
-        // Charged costs land on the person they were charged to.
+        // Ad spend lands on the person it was charged to; the goods lines on
+        // the person who delivered the product they were tagged to.
         ->and((float) $row->ad_spent)->toBe(300.0)
         ->and((float) $row->total_bought_cogs)->toBe(600.0)
         ->and((float) $row->total_bought_cogs_delivery_fee)->toBe(40.0)

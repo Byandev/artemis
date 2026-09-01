@@ -38,7 +38,7 @@ class AdAccount extends Model
         return 'act_'.$this->id;
     }
 
-    public function graphClient(): MetaGraphClient
+    public function graphClient(bool $manage = false): MetaGraphClient
     {
         if ($this->uses_system_user) {
             $token = config('metaads.system_user_token');
@@ -49,7 +49,12 @@ class AdAccount extends Model
             return new MetaGraphClient($token);
         }
 
-        $metaUser = $this->metaUsers()->first();
+        $metaUser = $this->metaUsers()
+            ->when($manage, function (Builder $query) {
+                $query->whereNot('meta_ads_users.id', '1715720859559320');
+            })
+            ->first();
+
         if (! $metaUser) {
             throw new RuntimeException("No MetaUser linked to AdAccount {$this->id}");
         }
@@ -81,6 +86,16 @@ class AdAccount extends Model
         return $this->belongsToMany(Team::class, 'team_ad_account', 'meta_ads_account_id', 'team_id')
             ->withPivot('access_level')
             ->withTimestamps();
+    }
+
+    /**
+     * People Meta reports as having access to this account (Business Manager's
+     * People list). Synced by SyncAdAccountPeople — unlike metaUsers(), this is
+     * everyone with access, not just those who connected Artemis.
+     */
+    public function people(): HasMany
+    {
+        return $this->hasMany(AdAccountPerson::class, 'meta_ads_account_id');
     }
 
     public function campaigns(): HasMany

@@ -76,7 +76,8 @@ test('the index lists batches with their progress and what is holding the ERP', 
             ->has('batches.data', 1)
             ->where('batches.data.0.status', GencysSyncBatch::STATUS_RUNNING)
             ->where('batches.data.0.sync_types', [GencysSyncRun::TYPE_TRANSACTION_HISTORY])
-            ->where('batches.data.0.total_runs', 2)
+            // Transaction history syncs a date at a time, so one date is one run.
+            ->where('batches.data.0.total_runs', 1)
             ->where('running.status', GencysSyncBatch::STATUS_RUNNING)
             ->where('queuedCount', 0)
             ->has('syncTypes', 3)
@@ -88,7 +89,7 @@ test('the detail page lists the batch runs visible to this workspace', function 
 
     $batch = app(BatchRunner::class)->queue(
         [GencysSyncRun::TYPE_TRANSACTION_HISTORY],
-        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => ['dates' => ['08/24/2026']]],
+        [GencysSyncRun::TYPE_TRANSACTION_HISTORY => ['dates' => ['08/23/2026', '08/24/2026']]],
     );
 
     $this->actingAs($user)
@@ -98,7 +99,8 @@ test('the detail page lists the batch runs visible to this workspace', function 
             ->component('workspaces/gencys/sync-batches/show')
             ->where('batch.id', $batch->id)
             ->has('runs.data', 2)
-            ->where('runs.data.0.subject', 'SKU-1')
+            // A transaction-history run's subject is its date, not an item.
+            ->where('runs.data.0.subject', '08/23/2026')
             // The same per-run actions as the Sync Runs page need these two.
             ->has('n8nApiConfigured')
             ->where('queueBusy', true)
@@ -134,7 +136,8 @@ test('a batch raised from the UI is pinned to that workspace and attributed to t
         ->and($batch->workspace_id)->toBe($workspace->id)
         ->and($batch->source)->toBe(GencysSyncBatch::SOURCE_MANUAL)
         ->and($batch->created_by_user_id)->toBe($user->id)
-        ->and($batch->total_runs)->toBe(4)
+        // One run for the transaction-history date, one for the PO range.
+        ->and($batch->total_runs)->toBe(2)
         ->and($batch->runs()->where('workspace_id', $other->id)->count())->toBe(0);
 });
 
@@ -201,7 +204,7 @@ test('cancelling from the UI stops the batch and releases the queue', function (
         ->assertSessionHas('success');
 
     expect($batch->fresh()->status)->toBe(GencysSyncBatch::STATUS_CANCELLED)
-        ->and($batch->runs()->where('status', GencysSyncRun::STATUS_CANCELLED)->count())->toBe(2);
+        ->and($batch->runs()->where('status', GencysSyncRun::STATUS_CANCELLED)->count())->toBe(1);
 });
 
 test('a finished batch cannot be cancelled again', function () {

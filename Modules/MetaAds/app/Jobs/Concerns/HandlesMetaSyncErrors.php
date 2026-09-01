@@ -109,7 +109,7 @@ trait HandlesMetaSyncErrors
             'exception' => $e,          // Monolog formats this with the full stack trace
             'job' => static::class,
             'sync_run_id' => $syncRunId,
-            'ad_account_id' => $this->adAccount?->id,
+            'ad_account_id' => isset($this->adAccount) ? $this->adAccount?->id : null,
             'attempt' => $attempts,
             'max_tries' => $this->tries,
         ];

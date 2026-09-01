@@ -32,6 +32,24 @@ return [
         'min_interval_seconds' => (int) env('META_ADS_MIN_INTERVAL', 6),
     ],
 
+    // Ad-account People list (metaads:sync-ad-account-people).
+    'people' => [
+        // Meta exposes no "restricted" flag on assigned_users, but profiles that
+        // are restricted, deactivated, or otherwise unavailable come back with
+        // no name (or a generic placeholder). Skipping those keeps the People
+        // column to real, reachable humans. Set false to store them anyway —
+        // each run records how many were skipped in its SyncRun meta either way.
+        'skip_unnamed' => (bool) env('META_ADS_PEOPLE_SKIP_UNNAMED', true),
+
+        // Names Graph hands back in place of an unavailable profile.
+        'placeholder_names' => [
+            'facebook user',
+            'meta user',
+            'private user',
+            'unknown user',
+        ],
+    ],
+
     'oauth_scopes' => [
         'ads_read',
         'ads_management',

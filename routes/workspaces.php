@@ -58,6 +58,7 @@ use Modules\Finance\Http\Controllers\DashboardController as FinanceDashboardCont
 use Modules\Finance\Http\Controllers\ExpensesController as FinanceExpensesController;
 use Modules\Finance\Http\Controllers\FundRequestController as FinanceFundRequestController;
 use Modules\Finance\Http\Controllers\IncomeStatementController as FinanceIncomeStatementController;
+use Modules\Finance\Http\Controllers\PurchasedOrderLookupController as FinancePurchasedOrderLookupController;
 use Modules\Finance\Http\Controllers\RemittanceController as FinanceRemittanceController;
 use Modules\Finance\Http\Controllers\TransactionController as FinanceTransactionController;
 use Modules\Finance\Http\Controllers\TransactionTypeController as FinanceTransactionTypeController;
@@ -442,6 +443,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/checklist', [ChecklistController::class, 'store'])->name('workspaces.checklist.store');
     Route::put('/workspaces/{workspace}/checklist/{checklist}', [ChecklistController::class, 'update'])->name('workspaces.checklist.update');
     Route::delete('/workspaces/{workspace}/checklist/{checklist}', [ChecklistController::class, 'destroy'])->name('workspaces.checklist.destroy');
+    // Registered before the {target} wildcard below, which would otherwise swallow "proof".
+    Route::get('/workspaces/{workspace}/checklist/progress/proof/{completion}', [ChecklistProgressController::class, 'showProof'])->name('workspaces.checklist.progress.proof.show');
     Route::get('/workspaces/{workspace}/checklist/progress/{target}/{targetId}', [ChecklistProgressController::class, 'index'])->name('workspaces.checklist.progress.index');
     Route::post('/workspaces/{workspace}/checklist/progress/{target}/{targetId}', [ChecklistProgressController::class, 'store'])->name('workspaces.checklist.progress.store');
     Route::delete('/workspaces/{workspace}/checklist/progress/{target}/{targetId}', [ChecklistProgressController::class, 'destroy'])->name('workspaces.checklist.progress.destroy');
@@ -506,8 +509,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/import', [CourierShipmentController::class, 'import'])->name('import');
     });
 
-    Route::get('/workspaces/{workspace}/pancake/orders', [OrderController::class, 'index'])
-        ->name('workspaces.pancake.orders.index');
+    Route::prefix('/workspaces/{workspace}/pancake/orders')->name('workspaces.pancake.orders.')->group(function () {
+        Route::get('/', [OrderController::class, 'index'])->name('index');
+        Route::post('/shipping-fees/import', [OrderController::class, 'importShippingFees'])->name('shipping-fees.import');
+        Route::get('/shipping-fees/import/status', [OrderController::class, 'shippingFeeImportStatus'])->name('shipping-fees.status');
+    });
 
     Route::prefix('/workspaces/{workspace}/inventory/purchased-orders')->name('workspaces.inventory.purchased-orders.')->group(function () {
         Route::get('/', [PurchasedOrderController::class, 'index'])->name('index');
@@ -598,9 +604,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/transactions', [FinanceTransactionController::class, 'store'])->name('transactions.store');
         Route::post('/transactions/import', [FinanceTransactionController::class, 'import'])->name('transactions.import');
         Route::put('/transactions/bulk-update-type', [FinanceTransactionController::class, 'bulkUpdateType'])->name('transactions.bulk-update-type');
-        Route::put('/transactions/bulk-update-sub-category', [FinanceTransactionController::class, 'bulkUpdateSubCategory'])->name('transactions.bulk-update-sub-category');
         Route::put('/transactions/{transaction}', [FinanceTransactionController::class, 'update'])->name('transactions.update');
         Route::delete('/transactions/{transaction}', [FinanceTransactionController::class, 'destroy'])->name('transactions.destroy');
+
+        // XHR lookup behind the transaction form's delivery-fee PO picker.
+        Route::get('/purchased-orders', FinancePurchasedOrderLookupController::class)->name('purchased-orders.index');
 
         Route::get('/income-statements', [FinanceIncomeStatementController::class, 'index'])->name('income-statements.index');
         Route::get('/income-statements/preview', [FinanceIncomeStatementController::class, 'preview'])->name('income-statements.preview');
@@ -612,6 +620,9 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/income-statements/{incomeStatement}/products', [FinanceUserIncomeStatementController::class, 'productIndex'])->name('income-statements.products.index');
         Route::get('/income-statements/{incomeStatement}/users', [FinanceUserIncomeStatementController::class, 'index'])->name('income-statements.users.index');
+        Route::get('/income-statements/{incomeStatement}/user-products', [FinanceUserIncomeStatementController::class, 'userProductIndex'])->name('income-statements.user-products.index');
+        Route::post('/income-statements/{incomeStatement}/loss-carryovers', [FinanceUserIncomeStatementController::class, 'storeLossCarryover'])->name('income-statements.loss-carryovers.store');
+        Route::get('/income-statements/{incomeStatement}/users/{user}', [FinanceUserIncomeStatementController::class, 'userShow'])->name('income-statements.users.show');
 
         Route::get('/transaction-types', [FinanceTransactionTypeController::class, 'index'])->name('transaction-types.index');
         Route::post('/transaction-types', [FinanceTransactionTypeController::class, 'store'])->name('transaction-types.store');

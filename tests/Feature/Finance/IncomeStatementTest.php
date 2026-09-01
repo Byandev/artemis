@@ -1,13 +1,21 @@
 <?php
 
 use App\Models\Page;
+use App\Models\PageDailyRecord;
+use App\Models\Product;
 use App\Models\Shop;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Finance\Models\Account;
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Models\IncomeStatementSetting;
 use Modules\Finance\Models\Transaction;
+use Modules\Finance\Models\TransactionProduct;
 use Modules\Finance\Models\TransactionType;
 use Modules\GencysERP\Models\GencysDailySalesOrder;
+use Modules\GencysERP\Models\GencysDailySalesOrderItem;
+use Modules\GencysERP\Models\Intern;
+use Modules\Inventory\Models\InventoryUnitCode;
 use Modules\Pancake\Models\Order as PancakeOrder;
 
 function isUrl($workspace, string $path = ''): string
@@ -158,6 +166,9 @@ test('store computes gross profit from cost of sales and net profit from OPEX', 
         'total_delivered' => 10000,
         'gross_profit' => 6076,
         'total_expenses' => 4924,
+        // opex is the month's OPEX-marked transactions on their own: the 1,000
+        // "expenses" and the 500 "transfer".
+        'opex' => 1500,
         'net_profit' => 3253.20,
     ]);
 
@@ -435,6 +446,7 @@ test('the statement carries the same figures as its per-product and per-user sli
         ->assertInertia(fn ($page) => $page
             ->where('figures.delivered_amount', fn ($v) => (float) $v === 11000.0)
             ->where('figures.gross_profit_delivered_cogs', fn ($v) => (float) $v === 6713.60)
+            ->has('figures.opex')
             ->has('figures.gross_profit_delivered_cogs_advisory_share')
             ->has('figures.gross_profit_bought_cogs_advisory_share')
             ->has('statement.advisory_rate')
@@ -576,4 +588,411 @@ test('neither advisory basis applies to a workspace that is not a partner', func
 
     expect((float) $statement->advisory_share_on_delivered)->toBe(0.0)
         ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0);
+});
+
+test('a non-partner takes its ad spend from the page daily records', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace); // is_gencys_partner defaults false
+
+    $page = Page::where('workspace_id', $workspace->id)->first();
+
+    $record = fn (array $attrs) => DB::table('page_daily_records')->insert(array_merge([
+        'workspace_id' => $workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => (new Page)->getMorphClass(),
+        'page_id' => $page->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $attrs));
+
+    $record(['date' => '2026-05-04', 'ad_spent' => 1200]);
+    $record(['date' => '2026-05-19', 'ad_spent' => 800]);
+    // Outside the month.
+    $record(['date' => '2026-04-28', 'ad_spent' => 5000]);
+    // The table is unique on workspace, page and date whatever wrote the row,
+    // so a row from the other importer is just another day's spend, not a
+    // duplicate to be filtered out.
+    $record(['date' => '2026-05-21', 'ad_spent' => 500, 'source' => PageDailyRecord::SOURCE_GENCYS]);
+
+    // An Ad Spent transaction must not reach a pancake workspace's statement.
+    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+    $type = TransactionType::create([
+        'workspace_id' => $workspace->id,
+        'name' => 'Ad Spent',
+        'income_statement_section' => 'cost_of_sales',
+    ]);
+    Transaction::create([
+        'workspace_id' => $workspace->id,
+        'account_id' => $account->id,
+        'date' => '2026-05-15',
+        'description' => 'Ledger ad spend',
+        'type' => 'out',
+        'transaction_type_id' => $type->id,
+        'amount' => 7777,
+    ]);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // 1,200 + 800 + 500 from the page records; not April's 5,000, and not the
+    // 7,777 sitting in the ledger.
+    expect((float) $statement->ad_spent)->toBe(2500.0)
+        // 10,000 − ad 2,500 − shipping 700 − COD 200 − VAT 24 = 6,576.
+        ->and((float) $statement->gross_profit_delivered_cogs)->toBe(6576.0);
+});
+
+test('a gencys partner still takes its ad spend from the ledger', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace); // marks the workspace as a gencys partner
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    // The 3,000 Ad Spent transaction seedMay creates, untouched by the change.
+    expect((float) IncomeStatement::first()->ad_spent)->toBe(3000.0);
+});
+
+test('the COD fee rate follows the courier the workspace ships with', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace); // is_gencys_partner defaults false
+
+    // No saved rate, so the source's own is used.
+    $this->actingAs($user)->post(isUrl($workspace), ['month' => '2026-05'])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    expect((float) $statement->cod_fee_rate)->toBe(0.0275)
+        // 2.75% of the 10,000 delivered, then 12% of that fee.
+        ->and((float) $statement->cod_fee)->toBe(275.0)
+        ->and((float) $statement->cod_fee_vat)->toBe(33.0);
+
+    // Saving writes the rate back as the workspace default.
+    expect((float) IncomeStatementSetting::where('workspace_id', $workspace->id)->value('cod_fee_rate'))
+        ->toBe(0.0275);
+});
+
+test('a gencys partner keeps the 2% COD rate', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace); // marks the workspace as a gencys partner
+
+    $this->actingAs($user)->post(isUrl($workspace), ['month' => '2026-05'])->assertRedirect();
+
+    expect((float) IncomeStatement::first()->cod_fee_rate)->toBe(0.02);
+});
+
+test('a rate the workspace saved for itself wins over the courier default', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace);
+
+    // Someone negotiated their own rate.
+    IncomeStatementSetting::create([
+        'workspace_id' => $workspace->id,
+        'cod_fee_rate' => 0.015,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+    ]);
+
+    $this->actingAs($user)->post(isUrl($workspace), ['month' => '2026-05'])->assertRedirect();
+
+    expect((float) IncomeStatement::first()->cod_fee_rate)->toBe(0.015);
+});
+
+test('freight on a goods purchase is picked up and not counted as goods', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+
+    // The wording varies in practice; each of these is freight, not goods.
+    foreach (['Delivery Fee of COGS', 'Delivery of COG', 'COG Delivery'] as $i => $name) {
+        $type = TransactionType::create([
+            'workspace_id' => $workspace->id,
+            'name' => $name,
+            'income_statement_section' => 'cost_of_sales',
+        ]);
+
+        makeTxn($workspace, $account, $type, 'out', 100 * ($i + 1), '2026-05-14');
+    }
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // 100 + 200 + 300, all three recognised as freight...
+    expect((float) $statement->total_bought_cogs_delivery_fee)->toBe(600.0)
+        // ...and none of them leaking into the goods line, which seedMay leaves
+        // empty since it books no Cost of Goods transaction.
+        ->and((float) $statement->total_bought_cogs)->toBe(0.0);
+});
+
+test('a goods purchase reaches the workspace, product and user statements alike', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+    $type = TransactionType::create([
+        'workspace_id' => $workspace->id,
+        'name' => 'Cost of Goods',
+        'income_statement_section' => 'cost_of_sales',
+    ]);
+
+    $txn = makeTxn($workspace, $account, $type, 'out', 5000, '2026-05-14');
+    // Tagged to a product, which is the only tagging the goods lines read now:
+    // a user's figure is their share of the products they moved, so the person
+    // is reached by delivering it rather than by being charged for it.
+    $product = Product::factory()->create(['workspace_id' => $workspace->id, 'name' => 'WIDGET']);
+    TransactionProduct::create([
+        'transaction_id' => $txn->id, 'product' => 'WIDGET', 'amount' => 5000,
+    ]);
+
+    // One seller, delivering that product: they carry the whole purchase.
+    InventoryUnitCode::create([
+        'workspace_id' => $workspace->id, 'unit_code' => 'UC-W', 'product_id' => $product->id,
+    ]);
+    Intern::create([
+        'workspace_id' => $workspace->id, 'intern_id' => 77,
+        'full_name' => 'Juan Dela Cruz', 'active' => true, 'user_id' => $user->id,
+    ]);
+    $delivered = makeGencysOrder($workspace, [
+        'intern_brands_name' => 'Juan Dela Cruz',
+        'parcel_status' => 'DELIVERED',
+        'parcel_updated_date' => '2026-05-11 09:00:00',
+        'shipped_out_date' => '2026-05-04',
+        'price_final' => 1200,
+    ]);
+    GencysDailySalesOrderItem::create([
+        'order_id' => $delivered->id, 'sku' => 'UC-W', 'quantity' => 1,
+    ]);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    expect((float) $statement->total_bought_cogs)->toBe(5000.0)
+        ->and((float) $statement->productStatements()->where('product_id', $product->id)->value('total_bought_cogs'))->toBe(5000.0)
+        ->and((float) $statement->userStatements()->where('user_id', $user->id)->value('total_bought_cogs'))->toBe(5000.0);
+});
+
+test('regenerate rewrites the statement it was asked for, whatever the date today', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    // A February statement, saved back when the month was current.
+    $february = IncomeStatement::create([
+        'workspace_id' => $workspace->id,
+        'period_month' => '2026-02-01',
+        'cod_fee_rate' => 0.02,
+        'vat_rate' => 0.12,
+        'advisory_rate' => 0.30,
+        'advisory_delivered_rate' => 0.09,
+        'status' => 'final',
+    ]);
+
+    // Clicked on a day February doesn't have. Carbon fills the day from today
+    // when parsing 'Y-m', so this used to resolve to March and rewrite that
+    // statement instead.
+    $this->travelTo('2026-08-31');
+
+    $this->actingAs($user)
+        ->post(isUrl($workspace, "/{$february->id}/regenerate"))
+        ->assertRedirect();
+
+    expect($february->fresh()->period_month->toDateString())->toBe('2026-02-01')
+        // And no March statement was conjured up alongside it.
+        ->and(IncomeStatement::where('workspace_id', $workspace->id)->count())->toBe(1);
+});
+
+test('regenerating an unchanged month reproduces the statement exactly', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+    seedMay($workspace);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12, 'advisory_rate' => 0.30,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+    $tracked = collect($statement->getAttributes())
+        ->except(['id', 'created_at', 'updated_at', 'generated_at'])
+        ->all();
+
+    $usersBefore = $statement->userStatements()->count();
+    $productsBefore = $statement->productStatements()->count();
+
+    // Nothing about the month has changed, so nothing about it should.
+    $this->actingAs($user)
+        ->post(isUrl($workspace, "/{$statement->id}/regenerate"))
+        ->assertRedirect();
+
+    $after = collect($statement->fresh()->getAttributes())
+        ->except(['id', 'created_at', 'updated_at', 'generated_at'])
+        ->all();
+
+    expect($after)->toBe($tracked)
+        // And the slices were rebuilt, not duplicated or dropped.
+        ->and($statement->userStatements()->count())->toBe($usersBefore)
+        ->and($statement->productStatements()->count())->toBe($productsBefore)
+        ->and(IncomeStatement::count())->toBe(1);
+});
+
+test('opex is the outflow on types marked OPEX', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+
+    // Marked OPEX — counts.
+    $rent = makeType($workspace, 'Rent and Utilities', section: 'opex');
+    makeTxn($workspace, $account, $rent, 'out', 2500, '2026-05-09');
+
+    // Marked cost of sales — belongs above gross profit, not here.
+    $freight = makeType($workspace, 'Freight', section: 'cost_of_sales');
+    makeTxn($workspace, $account, $freight, 'out', 400, '2026-05-09');
+
+    // Excluded from the statement entirely.
+    $excluded = makeType($workspace, 'Owner Drawings', section: null);
+    makeTxn($workspace, $account, $excluded, 'out', 900, '2026-05-09');
+
+    // An inflow on an OPEX type is money coming in, not an expense.
+    makeTxn($workspace, $account, $rent, 'in', 700, '2026-05-09');
+
+    // Outside the month.
+    makeTxn($workspace, $account, $rent, 'out', 5000, '2026-04-09');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    // seedMay's 1,000 + 500, plus the 2,500 rent. Nothing else.
+    expect((float) IncomeStatement::first()->opex)->toBe(4000.0);
+});
+
+test('an untyped outflow is not counted as an expense', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+
+    // No transaction type at all — it isn't marked as anything, so guessing it
+    // into OPEX would overstate expenses.
+    makeTxn($workspace, $account, null, 'out', 3000, '2026-05-09');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    expect((float) IncomeStatement::first()->opex)->toBe(1500.0);
+});
+
+test('net profit is what gross profit leaves after the advisory and OPEX', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $workspace->update(['is_gencys_partner' => true]);
+    seedMay($workspace);
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+        'advisory_rate' => 0.30, 'advisory_delivered_rate' => 0.09,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    // Gross 6,076; the advisory is the lower of 30% of that (1,822.80) and 9%
+    // of the 10,000 delivered (900), so 900. OPEX is seedMay's 1,000 + 500.
+    expect((float) $statement->gross_profit_delivered_cogs)->toBe(6076.0)
+        ->and((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(900.0)
+        ->and((float) $statement->opex)->toBe(1500.0)
+        // 6,076 − 900 − 1,500 = 3,676.
+        ->and((float) $statement->net_profit_delivered_cogs)->toBe(3676.0)
+        // The subtraction the page shows has to hold.
+        ->and((float) $statement->net_profit_delivered_cogs)
+        ->toBe(round((float) $statement->gross_profit_delivered_cogs_after_advisory_share - (float) $statement->opex, 2));
+});
+
+test('with no advisory, net profit is simply gross profit less OPEX', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMayPancake($workspace); // not a partner, so nothing is charged
+
+    $account = Account::create(['workspace_id' => $workspace->id, 'name' => 'Cash']);
+    $rent = makeType($workspace, 'Rent', section: 'opex');
+    makeTxn($workspace, $account, $rent, 'out', 1000, '2026-05-09');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+
+    expect((float) $statement->gross_profit_delivered_cogs_advisory_share)->toBe(0.0)
+        ->and((float) $statement->opex)->toBe(1000.0)
+        ->and((float) $statement->net_profit_delivered_cogs)
+        ->toBe(round((float) $statement->gross_profit_delivered_cogs - 1000.0, 2));
+
+    $this->actingAs($user)
+        ->get(isUrl($workspace, "/{$statement->id}"))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('figures.opex')
+            ->has('figures.net_profit_delivered_cogs')
+            ->has('figures.net_profit_bought_cogs')
+        );
+});
+
+test('the OPEX breakdown splits the total by transaction type', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    seedMay($workspace);
+
+    $account = Account::where('workspace_id', $workspace->id)->first();
+    $rent = makeType($workspace, 'Rent and Utilities', section: 'opex');
+    $salaries = makeType($workspace, 'Salaries and Wages', section: 'opex');
+
+    makeTxn($workspace, $account, $rent, 'out', 2500, '2026-05-09');
+    makeTxn($workspace, $account, $rent, 'out', 500, '2026-05-19');
+    makeTxn($workspace, $account, $salaries, 'out', 4000, '2026-05-15');
+    // Cost of sales, so it belongs above gross profit and not in this split.
+    makeTxn($workspace, $account, makeType($workspace, 'Freight', section: 'cost_of_sales'), 'out', 900, '2026-05-15');
+
+    $this->actingAs($user)->post(isUrl($workspace), [
+        'month' => '2026-05', 'cod_rate' => 0.02, 'vat_rate' => 0.12,
+    ])->assertRedirect();
+
+    $statement = IncomeStatement::first();
+    $rows = $statement->opexBreakdown()->get()->keyBy('transaction_type_id');
+
+    // Rent's two transactions land on one row.
+    expect((float) $rows[$rent->id]->amount)->toBe(3000.0)
+        ->and((float) $rows[$salaries->id]->amount)->toBe(4000.0)
+        // seedMay's two types are in here too, and nothing from cost of sales.
+        ->and($rows)->toHaveCount(4)
+        // The split has to add up to the header it explains.
+        ->and(round($statement->opexBreakdown()->sum('amount'), 2))->toBe((float) $statement->opex);
+
+    // Regenerating rebuilds the rows rather than stacking a second set up.
+    $this->actingAs($user)->post(isUrl($workspace, "/{$statement->id}/regenerate"))->assertRedirect();
+
+    expect($statement->opexBreakdown()->count())->toBe(4)
+        ->and(round($statement->opexBreakdown()->sum('amount'), 2))->toBe((float) $statement->fresh()->opex);
+
+    // And the page can show it.
+    $this->actingAs($user)
+        ->get(isUrl($workspace, "/{$statement->id}"))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('opexBreakdown', function ($rows) {
+                $rows = collect($rows);
+
+                return $rows->firstWhere('name', 'Salaries and Wages')['amount'] == 4000.0
+                    // Dearest first: salaries 4,000, then rent 3,000.
+                    && $rows->first()['name'] === 'Salaries and Wages'
+                    && $rows->pluck('amount')->map(fn ($a) => (float) $a)->all()
+                        === $rows->pluck('amount')->map(fn ($a) => (float) $a)->sortDesc()->values()->all();
+            })
+        );
 });
