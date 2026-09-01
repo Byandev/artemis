@@ -1717,6 +1717,31 @@ function RmoManagement({
                 },
             },
             {
+                id: 'shop_rts_rate',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Shop RTS" />
+                ),
+                cell: ({ row }) => {
+                    const rate = row.original.shop_rts_rate ?? null;
+                    if (rate === null) {
+                        return (
+                            <span className="text-center text-[12px] text-gray-300 dark:text-gray-600">
+                                —
+                            </span>
+                        );
+                    }
+                    const isHigh = rate >= 0.4;
+                    return (
+                        <span
+                            className={`text-center text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}
+                        >
+                            {percentageFormatter(rate)}
+                        </span>
+                    );
+                },
+            },
+            {
                 id: 'conferrer_name',
                 accessorKey: 'conferrer.name',
                 enableSorting: true,
