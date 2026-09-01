@@ -370,7 +370,9 @@ class InventoryItemController extends Controller
     {
         return [
             'unfulfilled_count',
+            'unfulfilled_count_orders',
             'three_days_average',
+            'three_days_average_orders',
             'remaining_qty',
             'current_stocks',
             'waiting_for_delivery_stocks',
@@ -496,8 +498,12 @@ class InventoryItemController extends Controller
      *
      * A group whose items have no rows for the day sums to NULL throughout, which
      * the list renders as "—" rather than as a confident zero.
+     *
+     * @param  string  $basis  'unit' or 'order' — see demandBasis(). Defaults to
+     *                         units, so the export keeps reading the figures it
+     *                         always has whatever the list is set to.
      */
-    private function buildSnapshotSummaryQuery(Request $request, Workspace $workspace, string $date): Builder
+    private function buildSnapshotSummaryQuery(Request $request, Workspace $workspace, string $date, string $basis = self::BASIS_UNIT): Builder
     {
         // Per-item rows for the whole workspace (parents included, so their
         // children roll into them).
@@ -516,6 +522,10 @@ class InventoryItemController extends Controller
             ->selectRaw('snap.waiting_for_delivery_stocks as waiting_for_delivery_stocks')
             ->selectRaw('snap.discrepancy as discrepancy')
             ->selectRaw('snap.remaining_after_fulfillment as remaining_after_fulfillment')
+            // The two demand figures in orders, frozen beside the unit ones.
+            // The roll-up sums whichever pair the basis asks for.
+            ->selectRaw('snap.three_days_average_orders as three_days_average_orders')
+            ->selectRaw('snap.unfulfilled_count_orders as unfulfilled_count_orders')
             ->selectRaw('snap.po_needed as po_needed')
             // The group's identity, carried on every row of the group and read
             // straight off the parent rather than off whichever rows survived the
@@ -561,15 +571,39 @@ class InventoryItemController extends Controller
         $groupLeadTime = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
         $groupDaysOfCoverage = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.days_of_coverage END), MAX(sub.days_of_coverage))';
         $groupCreatedAt = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.created_at END), MIN(sub.created_at))';
-        $summedThreeDayAvg = 'SUM(sub.three_days_average)';
-        $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
-        $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
-        $groupCoverageBuffer = "($groupDaysOfCoverage * $summedThreeDayAvg)";
+
+        // Two rates, and the difference between them is the whole design.
+        //
+        // The DISPLAYED rate follows the basis: units a day, or the orders that
+        // carried them. Same for Unfulfilled. Those two are demand, and demand is
+        // what someone switching to orders wants to read.
+        //
+        // The PLANNING rate is always units, because everything it touches is:
+        // stock is counted in units, purchase orders are raised in units, and
+        // Remaining is a unit figure. Measuring unit stock against an order rate
+        // would buy a bundled SKU short by its bundle size — a group shipping 1.5
+        // units an order would plan for two thirds of what it actually consumes
+        // and quietly run out. So Stocks Needed, PO QTY, PO Needed and cover read
+        // the unit rate in both bases and do not move when the toggle does.
+        $orderBasis = $basis === self::BASIS_ORDER;
+        $inBasis = fn (string $column) => $orderBasis ? $column.'_orders' : $column;
+
+        $displayedAverage = 'SUM(sub.'.$inBasis('three_days_average').')';
+        $planAverage = 'SUM(sub.three_days_average)';
+        $remainingOut = 'SUM(sub.remaining_after_fulfillment)';
+
+        // Coalesced to 0 for the arithmetic only. The displayed column keeps its
+        // NULL, which means "the day recorded nothing", but a NULL here would
+        // swallow the whole PO Needed expression and report nothing to buy for a
+        // group that has stock and no demand.
+        $summedRemaining = "COALESCE($remainingOut, 0)";
+        $groupStocksNeeded = "($groupLeadTime * $planAverage)";
+        $groupCoverageBuffer = "($groupDaysOfCoverage * $planAverage)";
         $groupPoNeeded = "GREATEST(0, $groupCoverageBuffer + $groupStocksNeeded - $summedRemaining)";
         // The NULL arm is what separates "the day recorded nothing for this group"
         // from "it sold nothing that day": without it a group with no snapshot
         // rows would report 0 days of cover, which reads as an emergency.
-        $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg IS NULL THEN NULL WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
+        $groupDaysItCanLast = "(CASE WHEN $planAverage IS NULL THEN NULL WHEN $planAverage > 0 THEN $summedRemaining / $planAverage ELSE 0 END)";
 
         $outer = DB::query()
             ->fromSub($inner, 'sub')
@@ -587,17 +621,19 @@ class InventoryItemController extends Controller
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('MAX(sub.is_active) as is_active')
             ->selectRaw("$groupLeadTime as lead_time")
-            ->selectRaw('SUM(sub.unfulfilled_count) as unfulfilled_count')
+            ->selectRaw('SUM(sub.'.$inBasis('unfulfilled_count').') as unfulfilled_count')
+            // Stock stays in units in both bases: it is counted on a shelf and
+            // bought in units, and the reorder plan below reads it that way.
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
             ->selectRaw('SUM(sub.waiting_for_delivery_stocks) as waiting_for_delivery_stocks')
             ->selectRaw('SUM(sub.discrepancy) as discrepancy')
             ->selectRaw('NULL as discrepancy_counted_qty')
             ->selectRaw('NULL as discrepancy_date')
-            ->selectRaw('SUM(sub.remaining_after_fulfillment) as remaining_after_fulfillment')
+            ->selectRaw("$remainingOut as remaining_after_fulfillment")
             ->selectRaw("$groupStocksNeeded as stocks_needed_for_lead_time")
             ->selectRaw("$groupCoverageBuffer as po_qty")
             ->selectRaw("$groupPoNeeded as po_needed")
-            ->selectRaw("$summedThreeDayAvg as three_days_average")
+            ->selectRaw("$displayedAverage as three_days_average")
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
             ->selectRaw("$groupCreatedAt as created_at")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
@@ -625,6 +661,55 @@ class InventoryItemController extends Controller
         }
 
         return $outer;
+    }
+
+    /**
+     * How the reorder maths is denominated: in units of stock, or in the orders
+     * that stock ships against.
+     *
+     * The demand feed counts both. An order line names a unit code, which the
+     * snapshot expands into its component items — so one order for a three-item
+     * bundle is one order and three units. `units_3d / 3` is exactly the group's
+     * summed three_days_average; `orders_3d / 3` is the same three days counted
+     * as distinct orders instead.
+     *
+     * The order basis converts BOTH sides. Demand becomes orders a day, and the
+     * stock it is measured against becomes orders' worth of stock — units
+     * divided by the units-per-order those same three days observed. Converting
+     * only the demand would read one side in orders and the other in units, and
+     * on a bundled SKU that understates what to buy by the bundle size: a group
+     * shipping 1.5 units per order would plan for two thirds of the stock it
+     * actually consumes and quietly run out.
+     *
+     * Because both sides convert, days of cover comes out identical either way.
+     * That is the check, not a shortcoming — the toggle changes the unit of
+     * account, not the decision. What it does change is what the buyer reads:
+     * "enough for 1,804 more orders" instead of "2,706 units".
+     */
+    private const BASIS_UNIT = 'unit';
+
+    private const BASIS_ORDER = 'order';
+
+    /**
+     * The basis the list should use, honoured only where it can be.
+     *
+     * Two hard limits, both from the data rather than from taste. orders_3d is a
+     * GROUP figure stamped on every row of the group, so it only means anything
+     * once the rows are rolled up — on the flat per-SKU list every sibling would
+     * repeat the group's order count as though it were its own. And it only
+     * exists on snapshot rows, so a workspace reading live has nothing to switch
+     * to. Either way this falls back to units rather than showing a toggle that
+     * silently lies.
+     */
+    private function demandBasis(Request $request, bool $summarize, ?string $snapshotDate): string
+    {
+        if (! $summarize || $snapshotDate === null) {
+            return self::BASIS_UNIT;
+        }
+
+        return $request->input('basis') === self::BASIS_ORDER
+            ? self::BASIS_ORDER
+            : self::BASIS_UNIT;
     }
 
     /**
@@ -697,9 +782,13 @@ class InventoryItemController extends Controller
         $requestedDate = $usesSnapshots ? $request->input('filter.date') : null;
         $snapshotDate = $this->snapshotDate($request, $workspace);
 
+        // Units or orders. Resolved before the query so the page and the rows it
+        // renders can never disagree about which one is on screen.
+        $basis = $this->demandBasis($request, $summarize, $snapshotDate);
+
         if ($snapshotDate) {
             $items = $summarize
-                ? $this->buildSnapshotSummaryQuery($request, $workspace, $snapshotDate)->paginate($perPage)->withQueryString()
+                ? $this->buildSnapshotSummaryQuery($request, $workspace, $snapshotDate, $basis)->paginate($perPage)->withQueryString()
                 : $this->buildSnapshotQuery($request, $workspace, $snapshotDate)->paginate($perPage)->withQueryString();
         } elseif ($requestedDate) {
             // A specific day was asked for and nothing was recorded for it.
@@ -762,10 +851,17 @@ class InventoryItemController extends Controller
                     ->map(fn ($d) => Carbon::parse($d)->toDateString())
                     ->all()
                 : [],
+            // Whether the order basis is offered at all, and whether it is on.
+            // Both come from the server because both are decided there: the
+            // toggle is only meaningful on a rolled-up snapshot, and a client
+            // that assumed otherwise would show "orders" over unit figures.
+            'basis' => $basis,
+            'basisAvailable' => $summarize && $snapshotDate !== null,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'summarize' => $summarize,
+                'basis' => $basis,
                 'filter' => $request->input('filter', []),
             ],
         ]);

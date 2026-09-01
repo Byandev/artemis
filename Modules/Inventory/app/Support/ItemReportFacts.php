@@ -32,6 +32,14 @@ class ItemReportFacts
     public const WINDOWS = [3, 7, 14];
 
     /**
+     * The window units_per_order is measured over. Deliberately the same one
+     * three_days_average uses: the two are multiplied and divided by each other
+     * to move between the unit and order bases, and a rate taken over a
+     * different span would not cancel.
+     */
+    public const AVERAGE_DAYS = 3;
+
+    /**
      * The fact keys frozen into inventory_item_snapshots, which are also the
      * column names there — the two are deliberately the same word, so a snapshot
      * row can be handed to the export as-is with no translation layer to drift.
@@ -43,6 +51,10 @@ class ItemReportFacts
      */
     public const SNAPSHOT_COLUMNS = [
         'orders_3d', 'units_3d', 'orders_7d', 'units_7d', 'orders_14d', 'units_14d',
+        // The group's units per order over the 3-day window, which is what the
+        // items list divides by to read its figures in orders instead of units.
+        // A group figure like the rest of these, so MAX() reads it back exactly.
+        'units_per_order',
         'last_in_date', 'last_in_count', 'last_out_date', 'last_out_count',
         'last_po_date', 'last_po_count', 'raised_not_created_days', 'raised_not_created_units',
         'earliest_expected_date', 'earliest_expected_count', 'longest_waiting_date',
@@ -137,6 +149,10 @@ class ItemReportFacts
             'longest_waiting_count' => null,
             'delayed_po' => 0,
             'bottleneck_stage' => null,
+            // Null rather than 0 or 1: a group with no orders has no observed
+            // units-per-order, and either number would be a guess the order
+            // basis would then divide real stock by.
+            'units_per_order' => null,
         ];
 
         foreach (self::WINDOWS as $days) {
@@ -241,6 +257,19 @@ class ItemReportFacts
             foreach ($units[$days] ?? [] as $group => $total) {
                 $this->facts[$group]["units_{$days}d"] = $total;
                 $this->facts[$group]["orders_{$days}d"] = $orders[$days][$group] ?? 0;
+            }
+        }
+
+        // How many units the group ships per order, over the same three days the
+        // stored average is taken across. This is the rate that converts between
+        // the two bases the items list can be read in, so it is measured here —
+        // beside the counts it comes from — rather than re-derived wherever it
+        // is needed.
+        foreach ($units[self::AVERAGE_DAYS] ?? [] as $group => $total) {
+            $placed = $orders[self::AVERAGE_DAYS][$group] ?? 0;
+
+            if ($placed > 0) {
+                $this->facts[$group]['units_per_order'] = round($total / $placed, 4);
             }
         }
     }

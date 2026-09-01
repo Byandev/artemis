@@ -135,11 +135,23 @@ interface Props {
     requestedDate?: string | null;
     /** Days that actually have a snapshot, newest first. */
     snapshotDates?: string[];
+    /**
+     * Which denomination the figures on screen are in. Resolved server-side —
+     * the rows and the toolbar have to agree, and only the server knows whether
+     * the request it just answered could honour the basis that was asked for.
+     */
+    basis?: DemandBasis;
+    /**
+     * Whether the order basis can be offered at all: it needs frozen order
+     * counts, which exist only on a rolled-up snapshot.
+     */
+    basisAvailable?: boolean;
     query?: {
         sort?: string | null;
         perPage?: number | string;
         page?: number | string;
         summarize?: boolean;
+        basis?: DemandBasis;
         filter?: {
             search?: string;
             is_active?: string | number | boolean;
@@ -380,6 +392,57 @@ const COLUMN_HELP: Record<string, React.ReactNode> = {
 };
 
 const COLUMNS_STORAGE_KEY = 'inventory-items-cols';
+
+/**
+ * Whether the planning figures are read in units of stock, or in the orders
+ * that stock ships against.
+ *
+ * The demand feed counts both: an order line names a bundle, which expands into
+ * its component items, so one order for a three-item bundle is one order and
+ * three units. Both denominations are frozen into the snapshot, and the toggle
+ * picks which pair of columns the roll-up reads.
+ *
+ * Remembered per browser beside the column choices — a buyer who works in
+ * orders should not have to reach for the toggle every morning.
+ */
+type DemandBasis = 'unit' | 'order';
+
+const BASIS_STORAGE_KEY = 'inventory-items-basis';
+
+/**
+ * The remembered basis, or units when nothing is remembered.
+ *
+ * Both accessors swallow their errors: storage throws outright in some
+ * contexts (private windows, blocked site data), and a preference is never
+ * worth taking the page down for.
+ */
+function readRememberedBasis(): DemandBasis {
+    try {
+        return window.localStorage.getItem(BASIS_STORAGE_KEY) === 'order'
+            ? 'order'
+            : 'unit';
+    } catch {
+        return 'unit';
+    }
+}
+
+function rememberBasis(basis: DemandBasis): void {
+    try {
+        window.localStorage.setItem(BASIS_STORAGE_KEY, basis);
+    } catch {
+        /* storage unavailable — the choice lasts this page only */
+    }
+}
+
+/**
+ * The columns that change denomination with the toggle: demand, and only demand.
+ *
+ * Stock on hand, incoming stock and the reorder figures built on them stay in
+ * units in both bases. Stock is counted on a shelf and bought in units, and a
+ * plan that measured unit stock against an order rate would buy a bundled SKU
+ * short by its bundle size.
+ */
+const ORDER_BASIS_COLUMNS = ['three_days_average', 'unfulfilled_count'];
 
 /**
  * Pins the header row and the leading identity column(s) of the items table.
@@ -694,6 +757,8 @@ export default function ItemIndex({
     snapshotUpdatedAt = null,
     requestedDate = null,
     snapshotDates = [],
+    basis = 'unit',
+    basisAvailable = false,
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -725,6 +790,9 @@ export default function ItemIndex({
     );
     // Summarize rolls SKU variants up under their parent item and sums the values.
     const [summarize, setSummarize] = useState(!!query?.summarize);
+    // Units or orders. The server is the authority on what is actually on
+    // screen, so this mirrors its answer rather than leading it.
+    const orderBasis = basis === 'order';
     // A date pins the list to that day's saved snapshot; '' is live data.
     const [dateValue, setDateValue] = useState(
         query?.filter?.date ? String(query.filter.date) : '',
@@ -806,6 +874,10 @@ export default function ItemIndex({
         // reads as "on" and the toggle would spring back the next time the URL
         // is read (a refresh, or any navigation that rebuilds these params).
         summarize: summarize ? 1 : 0,
+        // Explicit for the same reason summarize is: the server defaults to
+        // units, so an omitted param would quietly drop the order basis on the
+        // next sort or page change.
+        basis,
         page: 1,
         per_page: query?.perPage ?? items.per_page,
         ...overrides,
@@ -823,6 +895,12 @@ export default function ItemIndex({
             'snapshotUpdatedAt',
             'requestedDate',
             'snapshotDates',
+            // The basis decides what the headers claim the numbers are in, and
+            // whether the toggle is offered at all — both can change with the
+            // rows (turning summarize off withdraws the order basis), so they
+            // have to come back with them.
+            'basis',
+            'basisAvailable',
         ],
     };
 
@@ -906,6 +984,49 @@ export default function ItemIndex({
             visitOptions,
         );
     };
+
+    const handleBasisChange = (next: DemandBasis) => {
+        if (next === basis) return;
+
+        rememberBasis(next);
+        router.get(baseUrl, buildParams({ basis: next }), visitOptions);
+    };
+
+    /**
+     * Reopen the list on the basis it was last left on.
+     *
+     * The server resolves the basis from the URL, so a remembered choice can
+     * only be applied by asking again — once, on mount, and only when there is
+     * something to correct. An explicit `basis` in the URL wins and is what gets
+     * remembered instead: a link someone was sent, or a bookmark, means that
+     * basis on purpose, and silently overriding it would make shared links show
+     * different numbers to different people.
+     */
+    const reconciledBasis = useRef(false);
+    useEffect(() => {
+        if (reconciledBasis.current) return;
+        reconciledBasis.current = true;
+
+        const inUrl = new URLSearchParams(window.location.search).get('basis');
+
+        if (inUrl === 'order' || inUrl === 'unit') {
+            rememberBasis(inUrl);
+            return;
+        }
+
+        const remembered = readRememberedBasis();
+
+        if (basisAvailable && remembered !== basis) {
+            router.get(
+                baseUrl,
+                buildParams({ basis: remembered }),
+                visitOptions,
+            );
+        }
+        // Mount only: this reconciles the first render against storage, and
+        // re-running it on every basis change would fight the toggle.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleBulkStatus = (isActive: boolean) => {
         router.post(
@@ -993,6 +1114,32 @@ export default function ItemIndex({
         return () => performQuery.cancel();
     }, [searchValue]);
 
+    /**
+     * Units a day, whatever the toggle is showing.
+     *
+     * The two cover cells below divide stock by a rate, and stock is always in
+     * units — so they cannot read `three_days_average` when the order basis has
+     * made it a count of orders. units_3d over three days is the same figure the
+     * unit basis sums, measured from the same window.
+     */
+    const unitsPerDay = (row: Item): number | null => {
+        if (!orderBasis) return row.three_days_average;
+
+        return row.units_3d == null ? null : row.units_3d / 3;
+    };
+
+    /**
+     * A column title carrying its denomination when it is not the default.
+     *
+     * The banner above the table says which columns converted, but it scrolls
+     * away and the header does not — and a figure read as units when it is
+     * orders is off by the bundle size.
+     */
+    const basisTitle = (id: string, title: string) =>
+        orderBasis && ORDER_BASIS_COLUMNS.includes(id)
+            ? `${title} (ord)`
+            : title;
+
     // A rate per day, so the three windows are comparable: 30 units over 3 days
     // and 70 over 14 are 10/day against 5/day, which the totals hide.
     const rateColumn = (
@@ -1071,7 +1218,7 @@ export default function ItemIndex({
                 <ReportHeader id="stockout_risk" title="Stockout risk" />
             ),
             cell: ({ row }) => {
-                const avg = row.original.three_days_average ?? 0;
+                const avg = unitsPerDay(row.original) ?? 0;
                 const stocks = row.original.current_stocks ?? 0;
                 const { label, className } = stockoutRisk(
                     avg > 0 ? stocks / avg : null,
@@ -1118,7 +1265,7 @@ export default function ItemIndex({
             // Current stock alone, unlike Days It Can Last which also counts
             // what suppliers still owe.
             cell: ({ row }) => {
-                const avg = row.original.three_days_average ?? 0;
+                const avg = unitsPerDay(row.original) ?? 0;
                 return (
                     <div className="text-center">
                         <MetricCell
@@ -1390,7 +1537,7 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['three_days_average']}
                     column={column}
-                    title="3-Day Avg"
+                    title={basisTitle('three_days_average', '3-Day Avg')}
                     className="justify-center"
                 />
             ),
@@ -1437,7 +1584,7 @@ export default function ItemIndex({
                 <SortableHeader
                     help={COLUMN_HELP['unfulfilled_count']}
                     column={column}
-                    title="Unfulfilled"
+                    title={basisTitle('unfulfilled_count', 'Unfulfilled')}
                     className="justify-center"
                 />
             ),
@@ -1889,6 +2036,38 @@ export default function ItemIndex({
                             Summarize by parent
                         </span>
                     </label>
+
+                    {/* Units or orders. Disabled rather than hidden when it
+                        cannot be offered, so the option does not appear and
+                        vanish as the summarize toggle moves — the title says
+                        why it is greyed. */}
+                    <div
+                        className={`flex h-9 items-center gap-1 rounded-[10px] border border-black/6 bg-stone-100 px-1 dark:border-white/6 dark:bg-zinc-800 ${
+                            basisAvailable ? '' : 'opacity-50'
+                        }`}
+                        title={
+                            basisAvailable
+                                ? 'Read the planning figures in units of stock, or in the orders that stock ships against.'
+                                : 'Needs the summarized view of a saved snapshot — order counts are recorded per group, not per SKU.'
+                        }
+                    >
+                        {(['unit', 'order'] as const).map((option) => (
+                            <button
+                                key={option}
+                                type="button"
+                                disabled={!basisAvailable}
+                                onClick={() => handleBasisChange(option)}
+                                aria-pressed={basis === option}
+                                className={`rounded-[8px] px-2.5 py-1 font-mono text-[12px] font-medium transition-colors ${
+                                    basis === option
+                                        ? 'bg-white text-gray-900 shadow-sm dark:bg-zinc-700 dark:text-white'
+                                        : 'text-gray-500 hover:text-gray-700 disabled:hover:text-gray-500 dark:text-gray-400 dark:hover:text-gray-200'
+                                } ${basisAvailable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                            >
+                                {option === 'unit' ? 'Unit' : 'Order'}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {canEditItems && selectedIds.length > 0 && (
