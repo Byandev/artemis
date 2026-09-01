@@ -1,5 +1,11 @@
 import PageHeader from '@/components/common/PageHeader';
 import {
+    COGS_VIEW_IS_CHOOSABLE,
+    COGS_VIEWS,
+    CogsView,
+    DEFAULT_COGS_VIEW,
+} from '@/components/finance/cogs-view';
+import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -23,10 +29,13 @@ interface StatementContext {
     label: string; // "July 2026"
 }
 
-/**
- * A saved user row. Goods bought this month are tracked apart from the cost of
- * the goods that actually shipped — in any one month the two rarely match.
- */
+/** One transaction type's share of a column's OPEX; these sum to that OPEX. */
+interface OpexLine {
+    name: string;
+    amount: number;
+}
+
+/** A saved user — a column on this page. */
 interface UserRow {
     user_id: number | null;
     user: string;
@@ -47,16 +56,18 @@ interface UserRow {
     gross_profit_bought_cogs: number;
     gross_profit_bought_cogs_advisory_share: number;
     gross_profit_bought_cogs_after_advisory_share: number;
-    /** This row's share of the month's OPEX, by its delivered orders. */
+    /** This column's share of the month's OPEX, by its delivered orders. */
     opex: number;
     /** The share that produced it, as a percentage (0-100), not a fraction. */
     opex_share_percentage: number;
+    /** That share opened up by transaction type; sums back to `opex`. */
+    opex_breakdown: OpexLine[];
     net_profit_delivered_cogs: number;
     net_profit_bought_cogs: number;
 }
 
 /**
- * One line of what the Unassigned row is made of: an intern name written on
+ * One line of what the Unassigned column is made of: an intern name written on
  * orders that matches no user. It can show shipping against it and nothing
  * delivered, or the other way round; a null cell is orders with no name at all.
  */
@@ -91,32 +102,6 @@ const fmt = (v: number) =>
 const int = (v: number) =>
     Number.isFinite(Number(v)) ? Number(v).toLocaleString('en-PH') : '—';
 
-const CARD =
-    'rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900';
-const BTN =
-    'flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 px-3 font-mono text-[12px] text-gray-600 transition-all hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700';
-const COL = 'px-4 py-3 text-right text-[12px] whitespace-nowrap tabular-nums';
-
-// The frozen first column and the frozen header row. Both use a box-shadow in
-// place of a border: border-collapse drops borders on a sticky cell.
-//
-// Stacking, highest first: the corner cell sits above the header row, which
-// sits above the frozen column, which sits above the scrolling figures.
-const FROZEN =
-    'sticky left-0 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.06)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.06)]';
-const HEAD_BG = 'bg-white dark:bg-zinc-900';
-const STICKY_HEAD =
-    'sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.06)]';
-const STICKY_CORNER =
-    'sticky top-0 left-0 z-30 shadow-[1px_0_0_0_rgba(0,0,0,0.06),0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.06),0_1px_0_0_rgba(255,255,255,0.06)]';
-const HEAD =
-    'px-4 py-3 text-right text-[10px] font-semibold tracking-wider text-gray-400 uppercase whitespace-nowrap';
-
-/**
- * The figure columns, each with the note behind its question mark. Header, body
- * and total all render from this one list, so a column can't say one thing and
- * show another.
- */
 const pct = (fraction: number) => `${Number((fraction * 100).toFixed(4))}%`;
 
 /**
@@ -126,190 +111,190 @@ const pct = (fraction: number) => `${Number((fraction * 100).toFixed(4))}%`;
 const sharePct = (percentage: number) =>
     `${Number(Number(percentage).toFixed(4))}%`;
 
-/**
- * Which side of cost-of-goods the table is showing. They answer different
- * questions — what was sold this month, or what was purchased into stock — and
- * putting both up at once made the row hard to read, so it's one or the other.
- */
-type CogsView = 'delivered' | 'bought';
+const CARD =
+    'rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900';
+const BTN =
+    'flex h-8 items-center gap-1.5 rounded-lg border border-black/6 bg-stone-50 px-3 font-mono text-[12px] text-gray-600 transition-all hover:bg-stone-100 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-300 dark:hover:bg-zinc-700';
 
-const COGS_VIEWS: { value: CogsView; label: string }[] = [
-    { value: 'delivered', label: 'Delivered COGS' },
-    { value: 'bought', label: 'Bought COGS' },
-];
+// Two frozen columns — the figure label and the Total beside it — so a user far
+// to the right still says what the row is and what it is measured against.
+// Their widths are fixed because the second column's `left` offset has to equal
+// the first one's width exactly, and a shrink-wrapped cell can't promise that.
+const LABEL_W = 'w-[268px] min-w-[268px]';
+const VALUE_W = 'w-[150px] min-w-[150px]';
+const LABEL_LEFT = 'sticky left-0';
+const TOTAL_LEFT = 'sticky left-[268px]';
 
-/**
- * The statement's closing lines. OPEX is a company-wide pool with nothing in it
- * booked against one user, so each row takes the share matching its
- * delivered orders; net profit then follows the workspace statement's formula.
- */
-const closingColumns = (
-    net: (r: UserRow) => number,
-): {
-    label: string;
-    help: string;
-    render: (r: UserRow) => string;
-    emphasis?: boolean;
-    signed?: (r: UserRow) => number;
-}[] => [
-    {
-        label: 'OPEX Share',
-        help: 'This user\u2019s delivered orders as a percentage of every row\u2019s on this statement \u2014 the split the OPEX beside it was struck from. Saved with the statement, so it still reads back after a later sync moves the underlying counts.',
-        render: (r) => sharePct(r.opex_share_percentage),
-    },
-    {
-        label: 'Less — OPEX',
-        help: 'This user\u2019s share of the month\u2019s operating expenses, by its delivered orders over every row\u2019s. Nothing in the OPEX pool is booked against a single user, so the share is allocated rather than measured \u2014 a row that delivered nothing carries none of it.',
-        render: (r) => fmt(r.opex),
-    },
-    {
-        label: '= Net Profit',
-        help: 'Gross Profit less the advisory share and the OPEX above.',
-        render: (r) => fmt(net(r)),
-        emphasis: true,
-        signed: net,
-    },
-];
+// Stacking, highest first: the frozen header corner sits above the scrolling
+// header, which sits above the frozen body columns, which sit above the figures.
+const Z_CORNER = 'z-40';
+const Z_HEAD = 'z-30';
+const Z_FROZEN = 'z-20';
 
-const buildColumns = (
-    rates: {
-        cod: number;
-        vat: number;
-        advisory: number;
-    },
-    cogsView: CogsView,
-    gencysPartner: boolean,
-): {
+// Box-shadow rather than a border: border-collapse drops borders on a sticky
+// cell. The right-hand edge marks where the frozen pair ends.
+const EDGE =
+    'shadow-[1px_0_0_0_rgba(0,0,0,0.06)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.06)]';
+const HEAD_ROW =
+    'sticky top-0 shadow-[0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[0_1px_0_0_rgba(255,255,255,0.06)]';
+const CORNER_EDGE =
+    'shadow-[1px_0_0_0_rgba(0,0,0,0.06),0_1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.06),0_1px_0_0_rgba(255,255,255,0.06)]';
+
+const CELL =
+    'px-4 py-2.5 text-right text-[12px] whitespace-nowrap tabular-nums';
+
+interface FigureRow {
     label: string;
     help: string;
     render: (r: UserRow) => string;
     emphasis?: boolean;
     /** When set, the cell is coloured by the sign of this value. */
     signed?: (r: UserRow) => number;
-}[] => [
-    {
-        label: 'Delivered Orders',
-        help: 'Parcels delivered this month credited to this user, matched by the intern name written on the order.',
-        render: (r) => int(r.delivered_orders),
-    },
-    // Delivered Units is hidden for now, matching the product statement. It is
-    // still computed and stored on `finance_income_user_statements.delivered_units`
-    // — put this entry back to bring the column back:
-    // { label: 'Delivered Units', help: '…', render: (r) => int(r.delivered_units) },
-    {
-        label: 'Delivered Amount',
-        help: 'Revenue from those parcels. An order belongs to one intern, so nothing is split — the whole order’s value goes to them.',
-        render: (r) => fmt(r.delivered_amount),
-        emphasis: true,
-    },
-    {
-        label: 'Shipped Orders',
-        help: 'Parcels credited to this user shipped out this month, by shipped-out date and whatever became of them afterwards. A different set from Delivered Orders — the two are not expected to agree.',
-        render: (r) => int(r.shipped_orders),
-    },
-    {
-        label: 'Total Shipping Fee',
-        help: 'The courier fee on those parcels. Charged when a parcel ships, so a return is paid for too — this is not limited to what was delivered.',
-        render: (r) => fmt(r.total_shipping_fee),
-    },
-    {
-        label: 'Ad Spent',
-        help: 'Ad Spent transactions charged to this user this month, from the charge-to shares. Only charged shares count — spend nobody was charged for is left out rather than spread around on a guess.',
-        render: (r) => fmt(r.ad_spent),
-    },
-    {
-        label: 'COD Fee',
-        help: `The courier's fee for collecting on delivery — ${pct(rates.cod)} of Delivered Amount, at the rate saved on this statement.`,
-        render: (r) => fmt(r.cod_fee),
-    },
-    {
-        label: 'COD Fee VAT',
-        help: `VAT on the COD fee — ${pct(rates.vat)} of the fee itself, not of the delivered amount.`,
-        render: (r) => fmt(r.cod_fee_vat),
-    },
-    ...(cogsView === 'bought'
+    /** The row opens to show what makes it up, one sub-row per entry. */
+    breakdown?: (r: UserRow) => OpexLine[];
+}
+
+/**
+ * The rows, in the order and wording the workspace statement uses, so the same
+ * figure reads the same way on both — down to the closing OPEX and net profit.
+ */
+const buildRows = (
+    rates: { cod: number; vat: number; advisory: number },
+    cogsView: CogsView,
+    gencysPartner: boolean,
+): FigureRow[] => {
+    const advisoryRows: FigureRow[] = gencysPartner
         ? [
               {
-                  label: 'Bought COGS',
-                  help: 'This user’s share of the goods bought for the products they moved — each product’s purchases split between its sellers by their share of its delivered orders. Stock bought, which is not the same as stock sold.',
-                  render: (r: UserRow) => fmt(r.total_bought_cogs),
-                  emphasis: true,
+                  label: `Advisory Share — ${pct(rates.advisory)} of Gross Profit`,
+                  help: `A share of gross profit taken by the partner. The workspace figure is struck as the lower of ${pct(rates.advisory)} of gross profit or a share of delivered revenue, and that one charge is then divided between these columns in proportion to the profit each made. A column that lost money carries none of it.`,
+                  render: (r) =>
+                      fmt(
+                          cogsView === 'bought'
+                              ? r.gross_profit_bought_cogs_advisory_share
+                              : r.gross_profit_delivered_cogs_advisory_share,
+                      ),
               },
               {
-                  label: 'Bought COGS Delivery Fee',
-                  help: 'Freight paid on those purchases, shared out the same way.',
-                  render: (r: UserRow) => fmt(r.total_bought_cogs_delivery_fee),
-              },
-              {
-                  label: 'Gross Profit',
-                  help: 'Delivered Amount less ad spend, shipping, the COD fee and its VAT, then less what was bought into stock this month and the freight on it. What the month cost in cash, not the margin on what sold.',
-                  render: (r: UserRow) => fmt(r.gross_profit_bought_cogs),
+                  label: 'Gross Profit after Advisory',
+                  help: 'Gross Profit less the advisory share above.',
+                  render: (r) =>
+                      fmt(
+                          cogsView === 'bought'
+                              ? r.gross_profit_bought_cogs_after_advisory_share
+                              : r.gross_profit_delivered_cogs_after_advisory_share,
+                      ),
                   emphasis: true,
-                  signed: (r: UserRow) => r.gross_profit_bought_cogs,
+                  signed: (r) =>
+                      cogsView === 'bought'
+                          ? r.gross_profit_bought_cogs_after_advisory_share
+                          : r.gross_profit_delivered_cogs_after_advisory_share,
               },
-              ...(gencysPartner
-                  ? [
-                        {
-                            label: 'Advisory Share',
-                            help: `A share of gross profit taken by the partner — ${pct(rates.advisory)} of a positive Gross Profit, at the rate saved on this statement. A loss owes nothing.`,
-                            render: (r: UserRow) =>
-                                fmt(r.gross_profit_bought_cogs_advisory_share),
-                        },
-                        {
-                            label: 'Gross Profit after Advisory',
-                            help: 'Gross Profit less the advisory share.',
-                            render: (r: UserRow) =>
-                                fmt(
-                                    r.gross_profit_bought_cogs_after_advisory_share,
-                                ),
-                            emphasis: true,
-                            signed: (r: UserRow) =>
-                                r.gross_profit_bought_cogs_after_advisory_share,
-                        },
-                    ]
-                  : []),
-              ...closingColumns((r: UserRow) => r.net_profit_bought_cogs),
           ]
-        : [
-              {
-                  label: 'Delivered COGS',
-                  help: 'Cost of the goods on this user’s delivered orders, taken from the orders’ own cost figures.',
-                  render: (r: UserRow) => fmt(r.total_delivered_cogs),
-                  emphasis: true,
-              },
-              {
-                  label: 'Gross Profit',
-                  help: 'Delivered Amount less ad spend, shipping, the COD fee and its VAT, then less the cost of the goods that actually shipped. The margin on what was sold this month.',
-                  render: (r: UserRow) => fmt(r.gross_profit_delivered_cogs),
-                  emphasis: true,
-                  signed: (r: UserRow) => r.gross_profit_delivered_cogs,
-              },
-              ...(gencysPartner
-                  ? [
-                        {
-                            label: 'Advisory Share',
-                            help: `A share of gross profit taken by the partner — ${pct(rates.advisory)} of a positive Gross Profit, at the rate saved on this statement. A loss owes nothing.`,
-                            render: (r: UserRow) =>
-                                fmt(
-                                    r.gross_profit_delivered_cogs_advisory_share,
-                                ),
-                        },
-                        {
-                            label: 'Gross Profit after Advisory',
-                            help: 'Gross Profit less the advisory share.',
-                            render: (r: UserRow) =>
-                                fmt(
-                                    r.gross_profit_delivered_cogs_after_advisory_share,
-                                ),
-                            emphasis: true,
-                            signed: (r: UserRow) =>
-                                r.gross_profit_delivered_cogs_after_advisory_share,
-                        },
-                    ]
-                  : []),
-              ...closingColumns((r: UserRow) => r.net_profit_delivered_cogs),
-          ]),
-];
+        : [];
+
+    return [
+        {
+            label: 'Delivered Orders',
+            help: 'Parcels delivered this month credited to this user — on the pancake side by the page the order came in on, on the gencys side by the intern name written on it.',
+            render: (r) => int(r.delivered_orders),
+        },
+        {
+            label: 'Delivered Amount',
+            help: 'Revenue from those parcels. An order belongs to one person, so nothing is split — the whole order’s value goes to them.',
+            render: (r) => fmt(r.delivered_amount),
+            emphasis: true,
+        },
+        {
+            label: 'Shipped Orders',
+            help: 'Parcels credited to this user shipped out this month, by shipped-out date and whatever became of them afterwards. A different set from Delivered Orders — the two are not expected to agree.',
+            render: (r) => int(r.shipped_orders),
+        },
+        {
+            label: 'Total Shipping Fee',
+            help: 'The courier fee on those parcels. Charged when a parcel ships, so a return is paid for too — this is not limited to what was delivered.',
+            render: (r) => fmt(r.total_shipping_fee),
+        },
+        {
+            label: 'Ad Spent',
+            help: 'Ad spend this person is credited with: where it is recorded per page, the pages they own; otherwise the charge-to shares on the ledger.',
+            render: (r) => fmt(r.ad_spent),
+        },
+        {
+            label: 'COD Fee',
+            help: `The courier's fee for collecting on delivery — ${pct(rates.cod)} of the column's Delivered Amount, at the rate saved on this statement.`,
+            render: (r) => fmt(r.cod_fee),
+        },
+        {
+            label: 'COD Fee VAT',
+            help: `VAT on the COD fee — ${pct(rates.vat)} of the fee itself, not of the delivered amount.`,
+            render: (r) => fmt(r.cod_fee_vat),
+        },
+        ...(cogsView === 'bought'
+            ? ([
+                  {
+                      label: 'Bought COGS',
+                      help: 'This person’s share of the goods bought for the products they moved — each product’s purchases split between its sellers by their share of its delivered orders. Stock bought, which is not the same as stock sold.',
+                      render: (r) => fmt(r.total_bought_cogs),
+                      emphasis: true,
+                  },
+                  {
+                      label: 'Bought COGS Delivery Fee',
+                      help: 'Freight paid on those purchases, shared out the same way.',
+                      render: (r) => fmt(r.total_bought_cogs_delivery_fee),
+                  },
+                  {
+                      label: 'Gross Profit',
+                      help: 'Delivered Amount less ad spend, shipping, the COD fee and its VAT, then less what was bought into stock this month and the freight on it.',
+                      render: (r) => fmt(r.gross_profit_bought_cogs),
+                      emphasis: true,
+                      signed: (r) => r.gross_profit_bought_cogs,
+                  },
+              ] as FigureRow[])
+            : ([
+                  {
+                      label: 'Delivered COGS',
+                      help: 'Cost of the goods on this person’s delivered orders, taken from the orders’ own cost figures.',
+                      render: (r) => fmt(r.total_delivered_cogs),
+                      emphasis: true,
+                  },
+                  {
+                      label: 'Gross Profit',
+                      help: 'Delivered Amount less ad spend, shipping, the COD fee and its VAT, then less the cost of the goods that actually shipped.',
+                      render: (r) => fmt(r.gross_profit_delivered_cogs),
+                      emphasis: true,
+                      signed: (r) => r.gross_profit_delivered_cogs,
+                  },
+              ] as FigureRow[])),
+        ...advisoryRows,
+        {
+            label: 'OPEX Share',
+            help: 'This person’s delivered orders as a percentage of every column’s on this statement — the split the OPEX below was struck from. Saved with the statement, so it still reads back after a later sync moves the underlying counts.',
+            render: (r) => sharePct(r.opex_share_percentage),
+        },
+        {
+            label: 'Less — OPEX',
+            help: 'This person’s share of the month’s operating expenses, by the percentage above. Nothing in the OPEX pool is booked against one person, so the share is allocated rather than measured — a column that delivered nothing carries none of it. Open the row to see it by transaction type.',
+            render: (r) => fmt(r.opex),
+            breakdown: (r) => r.opex_breakdown,
+        },
+        {
+            label: '= Net Profit',
+            help: 'Gross Profit less the advisory share and the OPEX above.',
+            render: (r) =>
+                fmt(
+                    cogsView === 'bought'
+                        ? r.net_profit_bought_cogs
+                        : r.net_profit_delivered_cogs,
+                ),
+            emphasis: true,
+            signed: (r) =>
+                cogsView === 'bought'
+                    ? r.net_profit_bought_cogs
+                    : r.net_profit_delivered_cogs,
+        },
+    ];
+};
 
 export default function UserIncomeStatements({
     workspace,
@@ -321,16 +306,42 @@ export default function UserIncomeStatements({
     unassigned: unassignedRows,
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
-    const [cogsView, setCogsView] = useState<CogsView>('delivered');
+    const [cogsView, setCogsView] = useState<CogsView>(DEFAULT_COGS_VIEW);
+    const [openRows, setOpenRows] = useState<Set<string>>(new Set());
     const [unassignedOpen, setUnassignedOpen] = useState(false);
-    const unlinkedCells = unassignedRows.filter((u) => u.label !== null).length;
-    const COLUMNS = buildColumns(rates, cogsView, gencysPartner);
-    const named = users.filter((u) => u.user_id !== null);
 
-    // The cost of what shipped against what was bought — the gap is inventory
-    // moving in or out of stock, not profit.
-    const boughtAll =
-        total.total_bought_cogs + total.total_bought_cogs_delivery_fee;
+    const ROWS = buildRows(rates, cogsView, gencysPartner);
+    const named = users.filter((u) => u.user_id !== null);
+    const unlinkedCells = unassignedRows.filter((u) => u.label !== null).length;
+
+    const toggleRow = (label: string) =>
+        setOpenRows((current) => {
+            const next = new Set(current);
+
+            if (!next.delete(label)) next.add(label);
+
+            return next;
+        });
+
+    /** The tone a figure cell takes, shared by the Total and user columns. */
+    const cellTone = (row: FigureRow, r: UserRow, muted: boolean) => {
+        if (row.signed) {
+            return `font-semibold ${
+                row.signed(r) < 0
+                    ? 'text-rose-600 dark:text-rose-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
+            }`;
+        }
+        if (row.emphasis) {
+            return `font-medium ${
+                muted
+                    ? 'text-amber-700 dark:text-amber-400'
+                    : 'text-gray-800 dark:text-gray-100'
+            }`;
+        }
+
+        return 'text-gray-500 dark:text-gray-400';
+    };
 
     return (
         <AppLayout>
@@ -340,390 +351,382 @@ export default function UserIncomeStatements({
             <div className="w-full p-4 font-mono md:p-6">
                 <PageHeader
                     title="User Statement"
-                    description={`${incomeStatement.label} · every intern, for the month`}
+                    description={`${incomeStatement.label} · every person, down the same lines as the statement`}
                 >
-                    <Link
-                        href={`${finance}/income-statements/${incomeStatement.id}`}
-                        className={BTN}
-                    >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        Back to statement
-                    </Link>
-                </PageHeader>
-
-                {/* Intern names with no user behind them — the orders carrying
-                    them can't be credited, so they land in Unassigned. */}
-                {unlinkedCells > 0 && (
-                    <div className="mb-6 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/40">
-                        <div className="flex items-center gap-2 text-[12px] text-amber-800 dark:text-amber-200">
-                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                            {int(unlinkedCells)} intern name
-                            {unlinkedCells === 1 ? '' : 's'} on this
-                            month&rsquo;s orders match no user.{' '}
-                            <Link
-                                href={`/workspaces/${workspace.slug}/gencys/interns`}
-                                className="underline underline-offset-2"
-                            >
-                                Link them
-                            </Link>{' '}
-                            to clear the Unassigned row.
-                        </div>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href={`${finance}/income-statements/${incomeStatement.id}/products`}
+                            className={BTN}
+                        >
+                            Per-product
+                        </Link>
+                        <Link
+                            href={`${finance}/income-statements/${incomeStatement.id}`}
+                            className={BTN}
+                        >
+                            <ArrowLeft className="h-3.5 w-3.5" />
+                            Back to statement
+                        </Link>
                     </div>
-                )}
+                </PageHeader>
 
                 <div className={`${CARD} overflow-hidden`}>
                     <div className="flex items-center justify-between border-b border-black/6 px-5 py-4 dark:border-white/6">
                         <div>
                             <div className="text-[13px] font-semibold text-gray-800 dark:text-gray-100">
-                                Per-user figures
+                                Figures, by user
                             </div>
                             <div className="mt-0.5 text-[11px] text-gray-400">
                                 {incomeStatement.label} · {int(named.length)}{' '}
-                                {named.length === 1 ? 'user' : 'users'}
+                                {named.length === 1 ? 'person' : 'people'}
+                                {named.length > 1 && ' · scroll right for more'}
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <div
-                                role="group"
-                                aria-label="Cost of goods view"
-                                className="flex items-center gap-0.5 rounded-lg border border-black/6 bg-stone-50 p-0.5 dark:border-white/6 dark:bg-zinc-800"
-                            >
-                                {COGS_VIEWS.map((v) => {
-                                    const active = cogsView === v.value;
-                                    return (
-                                        <button
-                                            key={v.value}
-                                            type="button"
-                                            aria-pressed={active}
-                                            onClick={() => setCogsView(v.value)}
-                                            className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${
-                                                active
-                                                    ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-900 dark:text-gray-100'
-                                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                                            }`}
-                                        >
-                                            {v.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {/* Only one basis is enabled, so there is nothing to
+                                pick — see components/finance/cogs-view. */}
+                            {COGS_VIEW_IS_CHOOSABLE && (
+                                <div
+                                    role="group"
+                                    aria-label="Cost of goods view"
+                                    className="flex items-center gap-0.5 rounded-lg border border-black/6 bg-stone-50 p-0.5 dark:border-white/6 dark:bg-zinc-800"
+                                >
+                                    {COGS_VIEWS.map((v) => {
+                                        const active = cogsView === v.value;
+                                        return (
+                                            <button
+                                                key={v.value}
+                                                type="button"
+                                                aria-pressed={active}
+                                                onClick={() =>
+                                                    setCogsView(v.value)
+                                                }
+                                                className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${
+                                                    active
+                                                        ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-900 dark:text-gray-100'
+                                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                                }`}
+                                            >
+                                                {v.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                             <span className="rounded-full border border-black/6 px-2.5 py-0.5 text-[10px] tracking-wider text-gray-400 uppercase dark:border-white/6">
                                 Saved
                             </span>
                         </div>
                     </div>
 
-                    <div className="max-h-[70vh] overflow-auto">
-                        <table className="w-full">
+                    <div className="overflow-auto">
+                        <table className="border-separate border-spacing-0">
                             <thead>
                                 <tr>
                                     <th
-                                        className={`${STICKY_CORNER} ${HEAD_BG} px-5 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase`}
+                                        className={`${LABEL_W} ${LABEL_LEFT} ${CORNER_EDGE} ${Z_CORNER} sticky top-0 bg-white px-5 py-3 text-left text-[10px] font-semibold tracking-wider text-gray-400 uppercase dark:bg-zinc-900`}
                                     >
-                                        User
+                                        Figure
                                     </th>
-                                    {COLUMNS.map((c, i) => (
+                                    <th
+                                        className={`${VALUE_W} ${TOTAL_LEFT} ${CORNER_EDGE} ${Z_CORNER} sticky top-0 bg-stone-100 px-4 py-3 text-right text-[10px] font-semibold tracking-wider text-gray-600 uppercase dark:bg-zinc-800 dark:text-gray-300`}
+                                    >
+                                        Total
+                                    </th>
+                                    {users.map((u) => {
+                                        const unassigned = u.user_id === null;
+
+                                        return (
+                                            <th
+                                                key={u.user_id ?? 'unassigned'}
+                                                className={`${VALUE_W} ${HEAD_ROW} ${Z_HEAD} px-4 py-3 text-right text-[10px] font-semibold tracking-wider uppercase ${
+                                                    unassigned
+                                                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                                                        : 'bg-white text-gray-400 dark:bg-zinc-900'
+                                                }`}
+                                            >
+                                                <span className="flex items-center justify-end gap-1">
+                                                    {unassigned && (
+                                                        <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" />
+                                                    )}
+                                                    {unassigned ? (
+                                                        <span className="truncate">
+                                                            {u.user}
+                                                        </span>
+                                                    ) : (
+                                                        <Link
+                                                            href={`${finance}/income-statements/${incomeStatement.id}/users/${u.user_id}`}
+                                                            className="truncate underline-offset-2 hover:underline"
+                                                        >
+                                                            {u.user}
+                                                        </Link>
+                                                    )}
+                                                </span>
+                                            </th>
+                                        );
+                                    })}
+                                    {users.length === 0 && (
                                         <th
-                                            key={c.label}
-                                            className={`${HEAD} ${STICKY_HEAD} ${HEAD_BG} ${i === COLUMNS.length - 1 ? 'pr-5' : ''}`}
+                                            className={`${VALUE_W} ${HEAD_ROW} ${Z_HEAD} bg-white px-4 py-3 text-right text-[10px] text-gray-400 dark:bg-zinc-900`}
                                         >
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex items-center gap-1 transition-colors hover:text-gray-600 focus-visible:text-gray-600 focus-visible:outline-none dark:hover:text-gray-300 dark:focus-visible:text-gray-300"
-                                                    >
-                                                        {c.label}
-                                                        <HelpCircle className="h-3 w-3 shrink-0 opacity-60" />
-                                                    </button>
-                                                </TooltipTrigger>
-                                                <TooltipContent className="max-w-xs font-mono text-[11px] leading-relaxed normal-case">
-                                                    {c.help}
-                                                </TooltipContent>
-                                            </Tooltip>
+                                            —
                                         </th>
-                                    ))}
+                                    )}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                                {users.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={6}
-                                            className="px-5 py-12 text-center text-[12px] text-gray-400"
-                                        >
-                                            Nothing delivered in{' '}
-                                            {incomeStatement.label}.
-                                        </td>
-                                    </tr>
-                                )}
+                            <tbody>
+                                {ROWS.map((row) => {
+                                    const lines = row.breakdown?.(total) ?? [];
+                                    const expandable = lines.length > 0;
+                                    const open = openRows.has(row.label);
 
-                                {users.map((r) => {
-                                    const unassigned = r.user_id === null;
-                                    const tone = unassigned
-                                        ? 'text-amber-700 dark:text-amber-400'
-                                        : 'text-gray-800 dark:text-gray-100';
                                     return (
-                                        <Fragment
-                                            key={r.user_id ?? 'unassigned'}
-                                        >
-                                            <tr
-                                                className={
-                                                    unassigned
-                                                        ? 'group bg-amber-50/70 dark:bg-amber-500/10'
-                                                        : 'group transition-colors hover:bg-stone-50 dark:hover:bg-zinc-800/40'
-                                                }
-                                            >
-                                                <td
-                                                    className={`${FROZEN} py-3 pr-4 pl-5 ${
-                                                        unassigned
-                                                            ? 'bg-amber-50 dark:bg-amber-950'
-                                                            : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
-                                                    }`}
+                                        <Fragment key={row.label}>
+                                            <tr className="group border-t border-black/5 dark:border-white/5">
+                                                <th
+                                                    scope="row"
+                                                    className={`${LABEL_W} ${LABEL_LEFT} ${EDGE} ${Z_FROZEN} border-t border-black/5 bg-white px-5 py-2.5 text-left font-normal group-hover:bg-stone-50 dark:border-white/5 dark:bg-zinc-900 dark:group-hover:bg-zinc-800`}
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        {unassigned && (
-                                                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                                                        )}
-                                                        <span className="min-w-0">
-                                                            {/* Straight to
-                                                            their per-product
-                                                            breakdown. */}
-                                                            <Link
-                                                                href={`${finance}/income-statements/${incomeStatement.id}/users/${r.user_id ?? 'unassigned'}`}
-                                                                className={`block truncate text-[13px] font-medium underline-offset-2 hover:underline ${tone}`}
+                                                        <Tooltip>
+                                                            <TooltipTrigger
+                                                                asChild
                                                             >
-                                                                {r.user}
-                                                            </Link>
-                                                            {unassigned &&
-                                                                (unassignedRows.length >
-                                                                0 ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            setUnassignedOpen(
-                                                                                (
-                                                                                    o,
-                                                                                ) =>
-                                                                                    !o,
-                                                                            )
-                                                                        }
-                                                                        aria-expanded={
-                                                                            unassignedOpen
-                                                                        }
-                                                                        className="mt-0.5 flex items-center gap-1 text-[10px] text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
-                                                                    >
-                                                                        {unassignedOpen ? (
-                                                                            <ChevronDown className="h-3 w-3" />
-                                                                        ) : (
-                                                                            <ChevronRight className="h-3 w-3" />
-                                                                        )}
-                                                                        {unassignedOpen
-                                                                            ? 'hide'
-                                                                            : 'show'}{' '}
-                                                                        {int(
-                                                                            unassignedRows.length,
-                                                                        )}{' '}
-                                                                        unlinked{' '}
-                                                                        {unassignedRows.length ===
-                                                                        1
-                                                                            ? 'name'
-                                                                            : 'names'}
-                                                                    </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className={`flex items-center gap-1.5 text-left text-[12px] transition-colors hover:text-gray-800 focus-visible:text-gray-800 focus-visible:outline-none dark:hover:text-gray-100 ${
+                                                                        row.emphasis
+                                                                            ? 'font-medium text-gray-700 dark:text-gray-200'
+                                                                            : 'text-gray-600 dark:text-gray-300'
+                                                                    }`}
+                                                                >
+                                                                    {row.label}
+                                                                    <HelpCircle className="h-3 w-3 shrink-0 opacity-50" />
+                                                                </button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="max-w-xs font-mono text-[11px] leading-relaxed">
+                                                                {row.help}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+
+                                                        {expandable && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    toggleRow(
+                                                                        row.label,
+                                                                    )
+                                                                }
+                                                                aria-expanded={
+                                                                    open
+                                                                }
+                                                                className="flex items-center gap-0.5 text-[10px] text-gray-400 underline-offset-2 transition-colors hover:text-gray-600 hover:underline dark:hover:text-gray-300"
+                                                            >
+                                                                {open ? (
+                                                                    <ChevronDown className="h-3 w-3" />
                                                                 ) : (
-                                                                    <span className="text-[10px] text-gray-400">
-                                                                        items
-                                                                        that
-                                                                        resolve
-                                                                        to no
-                                                                        nobody
-                                                                    </span>
-                                                                ))}
-                                                        </span>
+                                                                    <ChevronRight className="h-3 w-3" />
+                                                                )}
+                                                                {int(
+                                                                    lines.length,
+                                                                )}{' '}
+                                                                {lines.length ===
+                                                                1
+                                                                    ? 'type'
+                                                                    : 'types'}
+                                                            </button>
+                                                        )}
                                                     </div>
+                                                </th>
+
+                                                <td
+                                                    className={`${VALUE_W} ${TOTAL_LEFT} ${CELL} ${EDGE} ${Z_FROZEN} border-t border-black/5 bg-stone-100 font-semibold dark:border-white/5 dark:bg-zinc-800 ${cellTone(row, total, false)}`}
+                                                >
+                                                    {row.render(total)}
                                                 </td>
-                                                {COLUMNS.map((c, i) => (
+
+                                                {users.map((u) => (
                                                     <td
-                                                        key={c.label}
-                                                        className={`${COL} ${
-                                                            i ===
-                                                            COLUMNS.length - 1
-                                                                ? 'pr-5'
-                                                                : ''
-                                                        }${
-                                                            c.signed
-                                                                ? `font-semibold ${
-                                                                      c.signed(
-                                                                          r,
-                                                                      ) < 0
-                                                                          ? 'text-rose-600 dark:text-rose-400'
-                                                                          : 'text-emerald-600 dark:text-emerald-400'
-                                                                  }`
-                                                                : c.emphasis
-                                                                  ? `font-medium ${tone}`
-                                                                  : 'text-gray-500 dark:text-gray-400'
-                                                        }`}
+                                                        key={
+                                                            u.user_id ??
+                                                            'unassigned'
+                                                        }
+                                                        className={`${VALUE_W} ${CELL} border-t border-black/5 dark:border-white/5 ${
+                                                            u.user_id === null
+                                                                ? 'bg-amber-50/60 dark:bg-amber-500/10'
+                                                                : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
+                                                        } ${cellTone(row, u, u.user_id === null)}`}
                                                     >
-                                                        {c.render(r)}
+                                                        {row.render(u)}
                                                     </td>
                                                 ))}
+                                                {users.length === 0 && (
+                                                    <td
+                                                        className={`${VALUE_W} ${CELL} border-t border-black/5 bg-white text-gray-400 dark:border-white/5 dark:bg-zinc-900`}
+                                                    >
+                                                        —
+                                                    </td>
+                                                )}
                                             </tr>
 
-                                            {unassigned && unassignedOpen && (
-                                                <tr className="bg-amber-50/40 dark:bg-amber-500/5">
-                                                    <td
-                                                        colSpan={
-                                                            COLUMNS.length + 1
-                                                        }
-                                                        className="p-0"
+                                            {/* What the row is made of, one
+                                                sub-row per transaction type.
+                                                The parts sum to the row above. */}
+                                            {expandable &&
+                                                open &&
+                                                lines.map((line, i) => (
+                                                    <tr
+                                                        key={line.name}
+                                                        className="bg-stone-50/60 dark:bg-zinc-800/30"
                                                     >
-                                                        {/* Pinned left so it stays
-                                                        readable however far the
-                                                        figures are scrolled. */}
-                                                        <div className="sticky left-0 w-max min-w-full px-5 py-4">
-                                                            <div className="mb-2 text-[10px] font-semibold tracking-wider text-amber-700 uppercase dark:text-amber-400">
-                                                                What&rsquo;s in
-                                                                Unassigned
-                                                            </div>
-                                                            <table className="text-[11px]">
-                                                                <thead>
-                                                                    <tr className="text-gray-400">
-                                                                        <th className="pr-6 pb-1 text-left font-medium">
-                                                                            Intern
-                                                                            name
-                                                                            on
-                                                                            the
-                                                                            order
-                                                                        </th>
-                                                                        <th className="px-3 pb-1 text-right font-medium">
-                                                                            Delivered
-                                                                        </th>
-                                                                        <th className="px-3 pb-1 text-right font-medium">
-                                                                            Amount
-                                                                        </th>
-                                                                        <th className="px-3 pb-1 text-right font-medium">
-                                                                            Shipped
-                                                                        </th>
-                                                                        <th className="pb-1 pl-3 text-right font-medium">
-                                                                            Shipping
-                                                                            Fee
-                                                                        </th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {unassignedRows.map(
-                                                                        (u) => (
-                                                                            <tr
-                                                                                key={
-                                                                                    u.label ??
-                                                                                    'blank'
-                                                                                }
-                                                                            >
-                                                                                <td className="py-1 pr-6">
-                                                                                    {u.label ? (
-                                                                                        <span className="text-gray-800 dark:text-gray-100">
-                                                                                            {
-                                                                                                u.label
-                                                                                            }
-                                                                                        </span>
-                                                                                    ) : (
-                                                                                        <span className="text-gray-500 italic dark:text-gray-400">
-                                                                                            orders
-                                                                                            with
-                                                                                            no
-                                                                                            items
-                                                                                            recorded
-                                                                                        </span>
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="px-3 py-1 text-right tabular-nums">
-                                                                                    {int(
-                                                                                        u.delivered_orders,
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="px-3 py-1 text-right tabular-nums">
-                                                                                    {fmt(
-                                                                                        u.delivered_amount,
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="px-3 py-1 text-right tabular-nums">
-                                                                                    {int(
-                                                                                        u.shipped_orders,
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="py-1 pl-3 text-right tabular-nums">
-                                                                                    {fmt(
-                                                                                        u.shipping_fee,
-                                                                                    )}
-                                                                                </td>
-                                                                            </tr>
-                                                                        ),
-                                                                    )}
-                                                                </tbody>
-                                                            </table>
-                                                            <div className="mt-2.5 text-[10px] text-gray-400">
-                                                                Link an intern
-                                                                on the{' '}
-                                                                <Link
-                                                                    href={`/workspaces/${workspace.slug}/gencys/interns`}
-                                                                    className="underline underline-offset-2"
-                                                                >
-                                                                    interns
-                                                                </Link>{' '}
-                                                                page and its
-                                                                figures move
-                                                                onto that user
-                                                                at the next
-                                                                regenerate.
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
+                                                        <th
+                                                            scope="row"
+                                                            className={`${LABEL_W} ${LABEL_LEFT} ${EDGE} ${Z_FROZEN} bg-stone-50 py-1.5 pr-4 pl-11 text-left text-[11px] font-normal text-gray-500 dark:bg-zinc-800 dark:text-gray-400`}
+                                                        >
+                                                            {line.name}
+                                                        </th>
+                                                        <td
+                                                            className={`${VALUE_W} ${TOTAL_LEFT} ${CELL} ${EDGE} ${Z_FROZEN} bg-stone-100 py-1.5 text-[11px] text-gray-500 dark:bg-zinc-800 dark:text-gray-400`}
+                                                        >
+                                                            {fmt(line.amount)}
+                                                        </td>
+                                                        {users.map((u) => (
+                                                            <td
+                                                                key={
+                                                                    u.user_id ??
+                                                                    'unassigned'
+                                                                }
+                                                                className={`${VALUE_W} ${CELL} py-1.5 text-[11px] text-gray-500 dark:text-gray-400 ${
+                                                                    u.user_id ===
+                                                                    null
+                                                                        ? 'bg-amber-50/40 dark:bg-amber-500/5'
+                                                                        : 'bg-stone-50/60 dark:bg-zinc-800/30'
+                                                                }`}
+                                                            >
+                                                                {fmt(
+                                                                    u
+                                                                        .opex_breakdown[
+                                                                        i
+                                                                    ]?.amount ??
+                                                                        0,
+                                                                )}
+                                                            </td>
+                                                        ))}
+                                                        {users.length === 0 && (
+                                                            <td
+                                                                className={`${VALUE_W} ${CELL} py-1.5 text-[11px] text-gray-400`}
+                                                            >
+                                                                —
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                ))}
                                         </Fragment>
                                     );
                                 })}
                             </tbody>
-                            <tfoot>
-                                <tr className="border-t border-black/6 bg-stone-100 dark:border-white/6 dark:bg-zinc-800/60">
-                                    <td
-                                        className={`${FROZEN} bg-stone-100 py-3.5 pr-4 pl-5 text-[12px] font-semibold tracking-wide text-gray-700 uppercase dark:bg-zinc-800 dark:text-gray-200`}
-                                    >
-                                        Total
-                                    </td>
-                                    {COLUMNS.map((c, i) => (
-                                        <td
-                                            key={c.label}
-                                            className={`${COL} ${
-                                                i === COLUMNS.length - 1
-                                                    ? 'pr-5'
-                                                    : ''
-                                            }font-semibold ${
-                                                c.signed
-                                                    ? c.signed(total) < 0
-                                                        ? 'text-rose-600 dark:text-rose-400'
-                                                        : 'text-emerald-600 dark:text-emerald-400'
-                                                    : c.emphasis
-                                                      ? 'text-gray-800 dark:text-gray-100'
-                                                      : 'text-gray-600 dark:text-gray-300'
-                                            }`}
-                                        >
-                                            {c.render(total)}
-                                        </td>
-                                    ))}
-                                </tr>
-                            </tfoot>
                         </table>
                     </div>
+
+                    {users.length === 0 && (
+                        <div className="border-t border-black/6 px-5 py-8 text-center text-[12px] text-gray-400 dark:border-white/6">
+                            Nothing delivered in {incomeStatement.label}.
+                        </div>
+                    )}
                 </div>
 
+                {/* The Unassigned column can't hold its own breakdown once the
+                    people are columns, so what it is made of sits here. */}
+                {unassignedRows.length > 0 && (
+                    <div className={`${CARD} mt-4 overflow-hidden`}>
+                        <button
+                            type="button"
+                            onClick={() => setUnassignedOpen((o) => !o)}
+                            aria-expanded={unassignedOpen}
+                            className="flex w-full items-center gap-2 px-5 py-3 text-left"
+                        >
+                            {unassignedOpen ? (
+                                <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                            ) : (
+                                <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+                            )}
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                            <span className="text-[12px] text-amber-800 dark:text-amber-200">
+                                What&rsquo;s in Unassigned —{' '}
+                                {int(unassignedRows.length)}{' '}
+                                {unassignedRows.length === 1 ? 'line' : 'lines'}
+                                {unlinkedCells > 0 &&
+                                    `, ${int(unlinkedCells)} of them a named intern matching nobody`}
+                            </span>
+                        </button>
+
+                        {unassignedOpen && (
+                            <div className="overflow-x-auto border-t border-black/6 px-5 py-4 dark:border-white/6">
+                                <table className="text-[11px]">
+                                    <thead>
+                                        <tr className="text-gray-400">
+                                            <th className="pr-6 pb-1 text-left font-medium">
+                                                Name on the order
+                                            </th>
+                                            <th className="px-3 pb-1 text-right font-medium">
+                                                Delivered
+                                            </th>
+                                            <th className="px-3 pb-1 text-right font-medium">
+                                                Amount
+                                            </th>
+                                            <th className="px-3 pb-1 text-right font-medium">
+                                                Shipped
+                                            </th>
+                                            <th className="pb-1 pl-3 text-right font-medium">
+                                                Shipping Fee
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {unassignedRows.map((u) => (
+                                            <tr key={u.label ?? 'no-name'}>
+                                                <td className="py-1 pr-6">
+                                                    {u.label ? (
+                                                        <span className="text-gray-800 dark:text-gray-100">
+                                                            {u.label}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-500 italic dark:text-gray-400">
+                                                            orders with no name
+                                                            on them
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-1 text-right tabular-nums">
+                                                    {int(u.delivered_orders)}
+                                                </td>
+                                                <td className="px-3 py-1 text-right tabular-nums">
+                                                    {fmt(u.delivered_amount)}
+                                                </td>
+                                                <td className="px-3 py-1 text-right tabular-nums">
+                                                    {int(u.shipped_orders)}
+                                                </td>
+                                                <td className="py-1 pl-3 text-right tabular-nums">
+                                                    {fmt(u.shipping_fee)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                <div className="mt-2.5 text-[10px] text-gray-400">
+                                    Link a name to a person and its figures move
+                                    onto their column at the next regenerate.
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <p className="mt-3 text-[11px] text-gray-400">
-                    Every figure is the user&rsquo;s own, matched through the
-                    intern name written on the order &mdash; hover a column
-                    heading for what it counts. Bought {fmt(boughtAll)} against{' '}
-                    {fmt(total.total_delivered_cogs)} delivered this month; the
-                    gap is stock moving in or out of the warehouse, not profit.
-                    The Total excludes the Unassigned row.
+                    The rows are the workspace statement&rsquo;s, in the same
+                    order, so a figure reads the same on both. Click a name to
+                    open that person&rsquo;s products. The Total covers the
+                    named people; the Unassigned column sits outside it.
                 </p>
             </div>
         </AppLayout>

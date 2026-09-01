@@ -1,5 +1,11 @@
 import PageHeader from '@/components/common/PageHeader';
 import {
+    COGS_VIEW_IS_CHOOSABLE,
+    COGS_VIEWS,
+    CogsView,
+    DEFAULT_COGS_VIEW,
+} from '@/components/finance/cogs-view';
+import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -126,18 +132,6 @@ const pct = (fraction: number) => `${Number((fraction * 100).toFixed(4))}%`;
  */
 const sharePct = (percentage: number) =>
     `${Number(Number(percentage).toFixed(4))}%`;
-
-/**
- * Which side of cost-of-goods the table is showing. They answer different
- * questions — what was sold this month, or what was purchased into stock — and
- * putting both up at once made the row hard to read, so it's one or the other.
- */
-type CogsView = 'delivered' | 'bought';
-
-const COGS_VIEWS: { value: CogsView; label: string }[] = [
-    { value: 'delivered', label: 'Delivered COGS' },
-    { value: 'bought', label: 'Bought COGS' },
-];
 
 /**
  * The statement's closing lines. OPEX is a company-wide pool with nothing in it
@@ -323,7 +317,7 @@ export default function ProductIncomeStatements({
     unresolved: unresolvedRows,
 }: Props) {
     const finance = `/workspaces/${workspace.slug}/finance`;
-    const [cogsView, setCogsView] = useState<CogsView>('delivered');
+    const [cogsView, setCogsView] = useState<CogsView>(DEFAULT_COGS_VIEW);
     const [unresolvedOpen, setUnresolvedOpen] = useState(false);
     const unmappedSkus = unresolvedRows.filter((u) => u.label !== null).length;
     const COLUMNS = buildColumns(rates, cogsView, gencysPartner);
@@ -385,30 +379,36 @@ export default function ProductIncomeStatements({
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <div
-                                role="group"
-                                aria-label="Cost of goods view"
-                                className="flex items-center gap-0.5 rounded-lg border border-black/6 bg-stone-50 p-0.5 dark:border-white/6 dark:bg-zinc-800"
-                            >
-                                {COGS_VIEWS.map((v) => {
-                                    const active = cogsView === v.value;
-                                    return (
-                                        <button
-                                            key={v.value}
-                                            type="button"
-                                            aria-pressed={active}
-                                            onClick={() => setCogsView(v.value)}
-                                            className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${
-                                                active
-                                                    ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-900 dark:text-gray-100'
-                                                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                                            }`}
-                                        >
-                                            {v.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {/* Only one basis is enabled, so there is nothing to pick —
+                                see components/finance/cogs-view. */}
+                            {COGS_VIEW_IS_CHOOSABLE && (
+                                <div
+                                    role="group"
+                                    aria-label="Cost of goods view"
+                                    className="flex items-center gap-0.5 rounded-lg border border-black/6 bg-stone-50 p-0.5 dark:border-white/6 dark:bg-zinc-800"
+                                >
+                                    {COGS_VIEWS.map((v) => {
+                                        const active = cogsView === v.value;
+                                        return (
+                                            <button
+                                                key={v.value}
+                                                type="button"
+                                                aria-pressed={active}
+                                                onClick={() =>
+                                                    setCogsView(v.value)
+                                                }
+                                                className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${
+                                                    active
+                                                        ? 'bg-white text-gray-800 shadow-sm dark:bg-zinc-900 dark:text-gray-100'
+                                                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                                }`}
+                                            >
+                                                {v.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                             <span className="rounded-full border border-black/6 px-2.5 py-0.5 text-[10px] tracking-wider text-gray-400 uppercase dark:border-white/6">
                                 Saved
                             </span>

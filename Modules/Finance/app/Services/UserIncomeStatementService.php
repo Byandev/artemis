@@ -9,6 +9,7 @@ use Modules\Finance\Models\IncomeStatement;
 use Modules\Finance\Services\Concerns\ClosesOutSlices;
 use Modules\Finance\Statements\OrderTotals;
 use Modules\Finance\Statements\ProductCostAllocator;
+use Modules\Finance\Statements\ProportionalSplit;
 use Modules\Finance\Statements\StatementOrderSourceFactory;
 use Modules\Finance\Statements\TransactionTotals;
 
@@ -165,6 +166,19 @@ class UserIncomeStatementService
     {
         $this->ensureSnapshot($statement);
 
+        // The company's OPEX split by transaction type, which each row's own
+        // share is then divided along.
+        $opexTypes = $statement->opexBreakdown()
+            ->with('transactionType:id,name')
+            ->orderByDesc('amount')
+            ->get()
+            ->map(fn ($r) => [
+                'name' => $r->transactionType?->name ?? 'Unknown',
+                'amount' => (float) $r->amount,
+            ])
+            ->values()
+            ->all();
+
         $rows = $statement->userStatements()->get()->map(fn ($r) => [
             'user_id' => $r->user_id,
             'user' => $r->user_name ?: 'Unassigned',
@@ -187,6 +201,7 @@ class UserIncomeStatementService
             'gross_profit_bought_cogs_after_advisory_share' => (float) $r->gross_profit_bought_cogs_after_advisory_share,
             'opex' => (float) $r->opex,
             'opex_share_percentage' => (float) $r->opex_share_percentage,
+            'opex_breakdown' => $this->opexByType($opexTypes, (float) $r->opex),
             'net_profit_delivered_cogs' => (float) $r->net_profit_delivered_cogs,
             'net_profit_bought_cogs' => (float) $r->net_profit_bought_cogs,
         ]);
@@ -220,6 +235,7 @@ class UserIncomeStatementService
             'gross_profit_bought_cogs_advisory_share' => $sum('gross_profit_bought_cogs_advisory_share'),
             'gross_profit_bought_cogs_after_advisory_share' => $sum('gross_profit_bought_cogs_after_advisory_share'),
             'opex' => $sum('opex'),
+            'opex_breakdown' => $this->opexByType($opexTypes, $sum('opex')),
             'opex_share_percentage' => $sum('opex_share_percentage'),
             'net_profit_delivered_cogs' => $sum('net_profit_delivered_cogs'),
             'net_profit_bought_cogs' => $sum('net_profit_bought_cogs'),
@@ -256,6 +272,35 @@ class UserIncomeStatementService
         [$from, $to] = $this->range($statement);
 
         return $this->sources->for($workspace)->unassignedUserDetail($workspace, $from, $to);
+    }
+
+    /**
+     * One row's OPEX opened up by transaction type.
+     *
+     * The row's own figure is divided along the company's split rather than
+     * each type being allocated separately, so the parts always add back to the
+     * whole they expand — a breakdown whose lines don't sum to the line above
+     * them is worse than no breakdown.
+     *
+     * @param  list<array{name:string, amount:float}>  $types
+     * @return list<array{name:string, amount:float}>
+     */
+    private function opexByType(array $types, float $opex): array
+    {
+        if ($types === [] || $opex == 0.0) {
+            return [];
+        }
+
+        $shares = ProportionalSplit::of($opex, array_column($types, 'amount'));
+
+        return collect($types)
+            ->map(fn (array $type, int $i) => [
+                'name' => $type['name'],
+                'amount' => round($shares[$i] ?? 0.0, 2),
+            ])
+            ->filter(fn (array $row) => $row['amount'] != 0.0)
+            ->values()
+            ->all();
     }
 
     private function ensureSnapshot(IncomeStatement $statement): void

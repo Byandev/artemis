@@ -3,6 +3,7 @@
 use App\Models\Product;
 use App\Models\User;
 use Modules\Finance\Models\IncomeStatement;
+use Modules\Finance\Models\TransactionType;
 use Modules\Finance\Services\ProductIncomeStatementService;
 use Modules\Finance\Services\UserIncomeStatementService;
 use Modules\Finance\Services\UserProductIncomeStatementService;
@@ -290,4 +291,69 @@ test('a statement with nothing delivered saves a zero share, not a division by z
         // on a row that delivered nothing.
         ->and((float) $row->opex_share_percentage)->toBe(0.0)
         ->and((float) $row->opex)->toBe(0.0);
+});
+
+test('the per-user OPEX opens up by transaction type, and the parts sum to it', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    opex_product($workspace, 'WIDGET', 'UC1');
+    $ana = opex_seller($workspace, 'Ana Reyes');
+    $ben = opex_seller($workspace, 'Ben Cruz');
+
+    opex_order(980001, $workspace, 'Ana Reyes', 'UC1');
+    opex_order(980002, $workspace, 'Ana Reyes', 'UC1');
+    opex_order(980003, $workspace, 'Ana Reyes', 'UC1');
+    opex_order(980004, $workspace, 'Ben Cruz', 'UC1');
+
+    $statement = opex_statement($workspace, 1000);
+
+    // The company's OPEX, split by type — what the expander divides along.
+    foreach ([['Salaries', 600], ['Rent', 300], ['Supplies', 100]] as [$name, $amount]) {
+        $type = TransactionType::create([
+            'workspace_id' => $workspace->id,
+            'name' => $name,
+            'income_statement_section' => 'opex',
+        ]);
+        $statement->opexBreakdown()->create(['transaction_type_id' => $type->id, 'amount' => $amount]);
+    }
+
+    app(UserIncomeStatementService::class)->snapshot($statement);
+    $payload = app(UserIncomeStatementService::class)->payload($statement);
+
+    $row = collect($payload['users'])->firstWhere('user_id', $ana->id);
+
+    // Ana carries 3 of the 4 delivered orders, so 750 of the 1,000 pool...
+    expect($row['opex'])->toBe(750.0)
+        // ...divided along the company's 60/30/10 split.
+        ->and(collect($row['opex_breakdown'])->pluck('amount', 'name')->all())->toBe([
+            'Salaries' => 450.0,
+            'Rent' => 225.0,
+            'Supplies' => 75.0,
+        ])
+        // The parts must add back to the line they expand, always.
+        ->and(round(collect($row['opex_breakdown'])->sum('amount'), 2))->toBe($row['opex']);
+
+    $benRow = collect($payload['users'])->firstWhere('user_id', $ben->id);
+    expect(round(collect($benRow['opex_breakdown'])->sum('amount'), 2))->toBe($benRow['opex']);
+
+    // And the Total column opens up the same way.
+    expect(round(collect($payload['total']['opex_breakdown'])->sum('amount'), 2))
+        ->toBe($payload['total']['opex']);
+});
+
+test('a statement with no OPEX types has nothing to expand', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    opex_product($workspace, 'WIDGET', 'UC1');
+    opex_seller($workspace, 'Ana Reyes');
+    opex_order(981001, $workspace, 'Ana Reyes', 'UC1');
+
+    $statement = opex_statement($workspace, 500);
+    app(UserIncomeStatementService::class)->snapshot($statement);
+
+    // The pool is allocated, but nothing says what it was made of, so the row
+    // stays closed rather than opening onto an empty list.
+    foreach (app(UserIncomeStatementService::class)->payload($statement)['users'] as $row) {
+        expect($row['opex_breakdown'])->toBe([]);
+    }
 });
