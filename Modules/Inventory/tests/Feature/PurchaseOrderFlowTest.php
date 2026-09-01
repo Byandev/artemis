@@ -94,7 +94,7 @@ function flowMember($workspace, array $teams): User
 }
 
 test('the pipeline splits open units by stage and by whether a supplier has them', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     flowOrder($workspace, $item, 1, now()->subDays(30)->toDateString(), 100);   // For Approval
@@ -121,7 +121,7 @@ test('the pipeline splits open units by stage and by whether a supplier has them
 });
 
 test('fully delivered lines are not open to anyone', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     flowOrder($workspace, $item, 6, now()->subDays(3)->toDateString(), 100, delivered: 100);
@@ -130,7 +130,7 @@ test('fully delivered lines are not open to anyone', function () {
 });
 
 test('the worklist ranks by time waiting and reports days of demand held up', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     // 10 units a day, so 400 units is 40 days of demand.
     $slow = flowItem($workspace, 'SLOW', dailyAverage: 10);
@@ -150,7 +150,7 @@ test('the worklist ranks by time waiting and reports days of demand held up', fu
 });
 
 test('supplier deliveries separate the untouched from the merely stalled', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     flowOrder($workspace, $item, 6, now()->subDays(40)->toDateString(), 500);                    // nothing arrived
@@ -174,7 +174,7 @@ test('supplier deliveries separate the untouched from the merely stalled', funct
 });
 
 test('unfulfilled demand splits by whether the stock is actually on the shelf', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $covered = flowItem($workspace, 'COVERED', dailyAverage: 10);
     $bare = flowItem($workspace, 'BARE', dailyAverage: 10);
@@ -201,7 +201,7 @@ test('unfulfilled demand splits by whether the stock is actually on the shelf', 
 });
 
 test('the bottleneck blames operations when stock never leaves the building', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     flowOrder($workspace, $item, 3, now()->subDays(40)->toDateString(), 5000);   // stuck in To Pay
@@ -215,7 +215,7 @@ test('the bottleneck blames operations when stock never leaves the building', fu
 });
 
 test('the bottleneck blames the supplier when the office is clear', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     // Released long ago, nothing delivered; nothing waiting internally.
@@ -228,7 +228,7 @@ test('the bottleneck blames the supplier when the office is clear', function () 
 });
 
 test('every panel is scoped to the teams the user belongs to', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $mine = Team::factory()->create(['workspace_id' => $workspace->id]);
     $theirs = Team::factory()->create(['workspace_id' => $workspace->id]);
@@ -268,7 +268,7 @@ test('every panel is scoped to the teams the user belongs to', function () {
 });
 
 test('a scoped user with no team sees nothing rather than everything', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $team = Team::factory()->create(['workspace_id' => $workspace->id]);
     $item = flowItem($workspace, 'SKU-1', [$team]);
@@ -282,7 +282,7 @@ test('a scoped user with no team sees nothing rather than everything', function 
 });
 
 test('a step that always completes instantly is not reported as a queue', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     $order = flowOrder($workspace, $item, 6, '2026-07-01', 100);
@@ -299,7 +299,7 @@ test('a step that always completes instantly is not reported as a queue', functi
 });
 
 test('fill levels are stamped by the delivery that crossed each one, from the issue date', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     // Issued 1 July. The clock runs door to door from here, not from release —
@@ -326,7 +326,7 @@ test('fill levels are stamped by the delivery that crossed each one, from the is
 });
 
 test('a fill level nothing has reached is absent rather than reported as zero', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     $order = flowOrder($workspace, $item, 6, '2026-07-01', 100);
@@ -341,7 +341,7 @@ test('a fill level nothing has reached is absent rather than reported as zero', 
 });
 
 test('the delivery curve covers orders with no status trail at all', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
 
     // No status logs anywhere — the internal steps have nothing to measure, but
@@ -357,7 +357,7 @@ test('the delivery curve covers orders with no status trail at all', function ()
 });
 
 test('the unfulfilled split reports when stock last arrived and last left', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
     $item = flowItem($workspace, 'SKU-1');
     $item->update(['unfulfilled_count' => 50]);
 
@@ -382,7 +382,7 @@ test('the unfulfilled split reports when stock last arrived and last left', func
 });
 
 test('movement dates roll up to the latest across a group', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $parent = flowItem($workspace, 'PARENT');
     $parent->update(['is_parent' => true]);
@@ -411,7 +411,7 @@ test('movement dates roll up to the latest across a group', function () {
 });
 
 test('idle is counted in ledger days, not against today', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $stalled = flowItem($workspace, 'STALLED');
     $moving = flowItem($workspace, 'MOVING');
@@ -447,7 +447,7 @@ test('idle is counted in ledger days, not against today', function () {
 });
 
 test('a group that has never shipped is unknown rather than idle', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = flowItem($workspace, 'NEVER-SHIPPED');
     $item->update(['unfulfilled_count' => 50]);
@@ -467,7 +467,7 @@ test('a group that has never shipped is unknown rather than idle', function () {
 });
 
 test('stock received since the last despatch is reported on its own', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = flowItem($workspace, 'RESTOCKED');
     $item->update(['unfulfilled_count' => 80]);
@@ -487,7 +487,7 @@ test('stock received since the last despatch is reported on its own', function (
 });
 
 test('idle stock with nothing behind it is supply, not the warehouse', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = flowItem($workspace, 'NO-STOCK');
     $item->update(['unfulfilled_count' => 500]);
@@ -508,7 +508,7 @@ test('idle stock with nothing behind it is supply, not the warehouse', function 
 });
 
 test('shippable now counts everything that could leave today', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     // Shipped this morning, so nothing about it is stalled — but it is still on
     // the shelf with orders against it, which is all this tile claims.
@@ -535,7 +535,7 @@ test('shippable now counts everything that could leave today', function () {
 });
 
 test('the bottleneck blames the warehouse when stock arrives and stays put', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = flowItem($workspace, 'SKU-1');
     $item->update(['unfulfilled_count' => 100]);
@@ -562,7 +562,7 @@ test('the bottleneck blames the warehouse when stock arrives and stays put', fun
 });
 
 test('a warehouse that is shipping is not blamed for unmet demand', function () {
-    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
 
     $item = flowItem($workspace, 'SKU-1');
     // Plenty owed and plenty on the shelf, but it went out yesterday — the

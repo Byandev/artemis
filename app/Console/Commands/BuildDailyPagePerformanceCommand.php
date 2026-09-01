@@ -73,7 +73,7 @@ class BuildDailyPagePerformanceCommand extends Command
         $sales = Order::where('page_id', $pageId)
             ->whereDate('confirmed_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $orders = Order::where('page_id', $pageId)
             ->whereDate('confirmed_at', $date)
@@ -84,7 +84,7 @@ class BuildDailyPagePerformanceCommand extends Command
             ->where('date', $date)
             ->sum('spend');
 
-        $roas = $ad_spent ? $sales / $ad_spent : 0;
+        $roas = $ad_spent > 0 ? $sales / $ad_spent : 0;
 
         $delivered = Order::where('page_id', $pageId)
             ->whereDate('delivered_at', $date)
@@ -94,7 +94,7 @@ class BuildDailyPagePerformanceCommand extends Command
         $delivered_amount = Order::where('page_id', $pageId)
             ->whereDate('delivered_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $returned = Order::where('page_id', $pageId)
             ->whereDate('returned_at', $date)
@@ -104,7 +104,7 @@ class BuildDailyPagePerformanceCommand extends Command
         $returned_amount = Order::where('page_id', $pageId)
             ->whereDate('returned_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         PageDailyRecord::updateOrCreate(
             [

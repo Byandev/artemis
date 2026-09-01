@@ -35,6 +35,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Checklist Proof Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where the evidence attached when a checklist item is marked complete is
+    | stored. Private like the proof-of-payment bucket: the files are served
+    | through a signed URL, never a public one.
+    |
+    */
+
+    'checklist_proof_disk' => env('CHECKLIST_PROOF_DISK', 's3'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Course Media Disk
     |--------------------------------------------------------------------------
     |

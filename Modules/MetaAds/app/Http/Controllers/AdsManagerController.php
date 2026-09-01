@@ -106,6 +106,16 @@ class AdsManagerController extends Controller
                 'ad_set' => fn ($q) => $q->where('meta_ads_ads.meta_ads_set_id', $scopeValue),
                 'account' => fn ($q) => $q->where('meta_ads_ads.meta_ads_account_id', $scopeValue),
                 'ad_name' => fn ($q) => $q->where('meta_ads_ads.name', $scopeValue),
+                // Ads reach a page through their ad set; "0" is the unassigned
+                // bucket the page breakdown emits for a null meta_page_id.
+                'page' => fn ($q) => $q->whereIn(
+                    'meta_ads_ads.meta_ads_set_id',
+                    AdSet::query()->select('id')->when(
+                        $scopeValue === '' || $scopeValue === '0',
+                        fn ($sets) => $sets->whereNull('meta_page_id'),
+                        fn ($sets) => $sets->where('meta_page_id', $scopeValue),
+                    )
+                ),
                 default => abort(400, 'Unsupported scope_by'),
             };
         } else {
@@ -141,6 +151,13 @@ class AdsManagerController extends Controller
 
     /** Same split as MEDIA_TYPE_SQL, but with the human label used as a group name. */
     private const AD_TYPE_LABEL_SQL = "CASE WHEN meta_ads_creatives.object_type = 'VIDEO' OR meta_ads_creatives.video_id IS NOT NULL THEN 'Video' ELSE 'Image' END";
+
+    /**
+     * Group name for the page breakdown. Ad sets whose promoted_object carried
+     * no page id — and pages that were deleted on our side — collect in one
+     * bucket rather than showing as a blank row.
+     */
+    private const PAGE_LABEL_SQL = "COALESCE(pages.name, 'Unassigned page')";
 
     /**
      * Returns Meta's signed ad-preview iframe src for a single ad. The raw video
@@ -243,7 +260,7 @@ class AdsManagerController extends Controller
      * Allowed group-by dimensions. Keys are the public `group_by` values; the
      * default is `ad_name`.
      */
-    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type'];
+    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type', 'page'];
 
     private function resolveGroupBy(Request $request): string
     {
@@ -422,6 +439,33 @@ class AdsManagerController extends Controller
                 ],
                 'groupBy' => [DB::raw(self::AD_TYPE_LABEL_SQL)],
                 'search' => 'meta_ads_ads.name',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
+            ],
+            // Buckets ads by the Facebook page their ad set promotes. Ad-grained
+            // like ad_name: the page id lives on meta_ads_sets, and a Pancake
+            // page's primary key IS that FB page id, so `pages` joins directly.
+            'page' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id')
+                    // A raw join skips the model's SoftDeletes, so deleted pages
+                    // are excluded here and fall into the unassigned bucket.
+                    ->leftJoin('pages', function ($join) {
+                        $join->on('pages.id', '=', 'meta_ads_sets.meta_page_id')
+                            ->whereNull('pages.deleted_at');
+                    }),
+                'selects' => [
+                    // 0, not null, so the unassigned row survives the string
+                    // cast and can be passed back as a scope value.
+                    DB::raw('COALESCE(meta_ads_sets.meta_page_id, 0) AS id'),
+                    DB::raw(self::PAGE_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => ['meta_ads_sets.meta_page_id', 'pages.name'],
+                // Searches real page names; the unassigned bucket has none.
+                'search' => 'pages.name',
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
         };
@@ -906,14 +950,16 @@ class AdsManagerController extends Controller
             return match ($groupBy) {
                 'campaign' => 'meta_ads_campaigns.created_time',
                 'ad_set' => 'meta_ads_sets.created_time',
-                'ad', 'ad_name', 'ad_type' => 'meta_ads_ads.created_time',
+                'ad', 'ad_name', 'ad_type', 'page' => 'meta_ads_ads.created_time',
                 default => null,
             };
         }
 
         return match ($groupBy) {
             'campaign' => 'meta_ads_campaigns.start_time',
-            'ad_set' => 'meta_ads_sets.start_time',
+            // The page breakdown already joins the ad set, so it reads the
+            // column directly instead of the subquery fallback below.
+            'ad_set', 'page' => 'meta_ads_sets.start_time',
             default => null,
         };
     }

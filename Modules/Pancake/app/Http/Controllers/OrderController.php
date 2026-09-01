@@ -8,8 +8,11 @@ use App\Models\Workspace;
 use App\Support\TeamVisibility;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Modules\Pancake\Jobs\ImportOrderShippingFees;
 use Modules\Pancake\Models\Order;
+use Modules\Pancake\Support\ShippingFeeImportStatus;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -103,10 +106,54 @@ class OrderController extends Controller
             'orders' => $orders,
             'statusCounts' => $statusCounts,
             'totalCount' => (int) $statusCounts->sum(),
+            'shippingFeeImport' => ShippingFeeImportStatus::get($workspace->id),
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),
             ],
+        ]);
+    }
+
+    /**
+     * Queue a courier billing export for import: its shipping cost is written
+     * onto the orders whose tracking code matches the sheet's waybill number.
+     */
+    public function importShippingFees(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ImportOrderShippingFees->value, $workspace);
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:51200'],
+        ]);
+
+        // One at a time per workspace: two sheets writing the same column would
+        // race, and the page only reports on one import.
+        if (ShippingFeeImportStatus::running($workspace->id)) {
+            throw ValidationException::withMessages([
+                'file' => 'A shipping fee import is already running for this workspace. Wait for it to finish.',
+            ]);
+        }
+
+        $file = $request->file('file');
+        $name = $file->getClientOriginalName();
+        $path = $file->store('imports/shipping-fees', 'local');
+
+        ShippingFeeImportStatus::begin($workspace->id, $name);
+
+        ImportOrderShippingFees::dispatch($workspace->id, $path, $name);
+
+        return redirect()->back()->with('success', "Queued {$name} — shipping fees will land on the orders shortly.");
+    }
+
+    /** Progress of the queued import, polled by the orders page. */
+    public function shippingFeeImportStatus(Request $request, Workspace $workspace)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewOrders->value, $workspace);
+
+        return response()->json([
+            'import' => ShippingFeeImportStatus::get($workspace->id),
         ]);
     }
 }

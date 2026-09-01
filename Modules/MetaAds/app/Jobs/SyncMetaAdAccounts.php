@@ -50,7 +50,10 @@ class SyncMetaAdAccounts implements ShouldQueue
             $accountIds = [];
             $newAccountIds = [];
 
-            $fields = 'id,account_id,name,currency,timezone_name,business_country_code,account_status,business';
+            // `tasks` = what THIS token's user may do on the account. It's the only
+            // permission signal Meta still gives for accounts outside a business
+            // portfolio, so it backs the People column there (see SyncAdAccountPeople).
+            $fields = 'id,account_id,name,currency,timezone_name,business_country_code,account_status,business,tasks';
 
             foreach ($client->paginated('me/adaccounts', ['fields' => $fields]) as $row) {
                 // Meta returns id with `act_` prefix; account_id is the bare numeric form.
@@ -74,7 +77,13 @@ class SyncMetaAdAccounts implements ShouldQueue
                     $newAccountIds[] = $accountId;
                 }
 
-                $accountIds[$accountId] = ['permitted_tasks' => null];
+                $tasks = array_values(array_filter((array) ($row['tasks'] ?? [])));
+
+                // sync() writes pivot values straight through, so encode here —
+                // the column is json and there's no cast on the pivot.
+                $accountIds[$accountId] = [
+                    'permitted_tasks' => $tasks ? json_encode($tasks) : null,
+                ];
                 $count++;
             }
 

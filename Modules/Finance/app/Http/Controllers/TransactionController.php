@@ -91,7 +91,7 @@ class TransactionController extends Controller
         $this->authorize(Permission::ViewFinanceTransactions->value, $workspace);
 
         $transactions = $this->buildQuery($workspace)
-            ->with(['account', 'remittance', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
+            ->with(['account', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
             ->orderBy('date', 'desc')
             ->orderBy('position', 'desc')
             ->paginate((int) $request->input('per_page', 100))
@@ -155,10 +155,16 @@ class TransactionController extends Controller
      */
     protected function formOptions(Request $request, Workspace $workspace, ?Transaction $editing = null): array
     {
+        $types = TransactionType::where('workspace_id', $workspace->id)
+            ->orderBy('name')->get(['id', 'name', 'nature']);
+
         return [
             'accounts' => $this->accountOptions($workspace, $editing),
-            'transactionTypes' => TransactionType::where('workspace_id', $workspace->id)
-                ->orderBy('name')->get(['id', 'name', 'nature']),
+            'transactionTypes' => $types,
+            // The types whose entries are a purchase order's freight bill: the
+            // form offers a PO picker for these and splits the amount across
+            // that order's products. See TransactionType::isCogsDelivery().
+            'cogsDeliveryTypeIds' => $types->filter->isCogsDelivery()->pluck('id')->values(),
             'users' => $workspace->users()->get(['users.id', 'users.name']),
             // The product tags the picker offers (see productOptions).
             'products' => $this->productOptions($request, $workspace, $editing),
@@ -241,29 +247,26 @@ class TransactionController extends Controller
         $accounts = Account::where('workspace_id', $workspace->id)
             ->orderBy('name')->get(['id', 'name', 'currency', 'opening_balance']);
 
-        // Newest per account, matching the ledger's date/position ordering.
-        $lastBalances = Transaction::where('workspace_id', $workspace->id)
-            ->whereIn('id', function ($q) use ($workspace, $editing) {
-                $q->selectRaw(
-                    '(SELECT t2.id FROM finance_transactions t2
-                        WHERE t2.account_id = finance_transactions.account_id
-                          AND t2.workspace_id = ?
-                          AND (? IS NULL OR t2.id <> ?)
-                        ORDER BY t2.date DESC, t2.position DESC LIMIT 1)',
-                    [$workspace->id, $editing?->getKey(), $editing?->getKey()]
-                )
-                    ->from('finance_transactions')
-                    ->where('workspace_id', $workspace->id)
-                    ->groupBy('account_id');
-            })
-            ->pluck('running_balance', 'account_id');
+        // Newest per account, matching the ledger's date/position ordering. One
+        // small indexed lookup per account rather than a single clever query: a
+        // workspace has a handful of accounts, and every "newest per group"
+        // formulation MySQL offers here either runs as a dependent subquery or
+        // sorts the whole ledger, both of which cost seconds on a large one.
+        $latest = $accounts->mapWithKeys(fn ($account) => [
+            $account->id => Transaction::where('workspace_id', $workspace->id)
+                ->where('account_id', $account->id)
+                ->when($editing, fn ($q) => $q->whereKeyNot($editing->getKey()))
+                ->orderByDesc('date')
+                ->orderByDesc('position')
+                ->first(['id', 'running_balance']),
+        ]);
 
         return $accounts->map(fn ($account) => [
             'id' => $account->id,
             'name' => $account->name,
             'currency' => $account->currency,
-            'current_balance' => (float) ($lastBalances->get($account->id) ?? $account->opening_balance),
-            'has_transactions' => $lastBalances->has($account->id),
+            'current_balance' => (float) ($latest[$account->id]?->running_balance ?? $account->opening_balance),
+            'has_transactions' => $latest[$account->id] !== null,
         ]);
     }
 
@@ -456,24 +459,6 @@ class TransactionController extends Controller
         $updated = Transaction::where('workspace_id', $workspace->id)
             ->whereIn('id', $validated['ids'])
             ->update(['transaction_type_id' => $validated['transaction_type_id'] ?? null]);
-
-        return redirect()->back()->with('success', "{$updated} transactions updated.");
-    }
-
-    public function bulkUpdateSubCategory(Request $request, Workspace $workspace)
-    {
-        $this->guard($request, $workspace);
-        $this->authorize(Permission::EditFinanceTransactions->value, $workspace);
-
-        $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer'],
-            'sub_category' => ['nullable', 'in:ad_spent,cogs,subscription,shipping_fee,delivery_fee,operation_expense,salary,transfer_fee,seminar_fee,rent,capex_payment,others'],
-        ]);
-
-        $updated = Transaction::where('workspace_id', $workspace->id)
-            ->whereIn('id', $validated['ids'])
-            ->update(['sub_category' => $validated['sub_category'] ?? null]);
 
         return redirect()->back()->with('success', "{$updated} transactions updated.");
     }

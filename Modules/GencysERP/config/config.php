@@ -21,8 +21,9 @@ return [
         // retry goes out on its own, isolated from the group that failed it.
         'max_retries' => (int) env('GENCYS_BATCH_MAX_RETRIES', 2),
 
-        // Runs per n8n request, for the flows whose payload carries an items[]
-        // array. The rest are sent one run at a time regardless.
+        // Runs per n8n request, for a flow whose payload carries a list of
+        // subjects. No flow does any more — each asks for one window and gets
+        // the whole report back — so this only matters if one is added again.
         'group_size' => (int) env('GENCYS_BATCH_GROUP_SIZE', 20),
     ],
 ];

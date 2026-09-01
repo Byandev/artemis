@@ -5,6 +5,7 @@ namespace Modules\MetaAds\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
+use Modules\MetaAds\Jobs\SyncAdAccountPeople;
 use Modules\MetaAds\Jobs\SyncAds;
 use Modules\MetaAds\Jobs\SyncAdSets;
 use Modules\MetaAds\Jobs\SyncCampaigns;
@@ -54,6 +55,7 @@ class SyncAllCommand extends Command
         $until = Carbon::today();
         foreach ($accounts as $account) {
             $chain = [
+                new SyncAdAccountPeople($account),
                 new SyncCampaigns($account),
                 new SyncAdSets($account),
                 new SyncAds($account),

@@ -23,6 +23,7 @@ export const PERMISSIONS = {
 
     // Orders (Pancake)
     ViewOrders: 'View Orders',
+    ImportOrderShippingFees: 'Import Order Shipping Fees',
 
     // Shops
     ViewShops: 'View Shops',

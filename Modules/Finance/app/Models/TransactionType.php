@@ -50,6 +50,28 @@ class TransactionType extends Model
         'opex_allocation_basis',
     ];
 
+    /**
+     * Whether this type is the freight cost carried on top of a purchase order
+     * — the "Delivery Fee of COGS" kind of entry, whose amount belongs to the
+     * products of one order rather than to the business at large.
+     *
+     * Matched on the type's name, since types are workspace-authored free text
+     * with no flag to key off (the same approach TransactionController takes to
+     * find the legacy "expenses" type). Both halves must be present, so plain
+     * "Cost of Goods" and a general "Delivery Fee" are both left out.
+     */
+    public function isCogsDelivery(): bool
+    {
+        $name = mb_strtolower($this->name ?? '');
+
+        $isCogs = str_contains($name, 'cogs') || str_contains($name, 'cost of goods');
+        $isDelivery = str_contains($name, 'delivery')
+            || str_contains($name, 'freight')
+            || str_contains($name, 'shipping');
+
+        return $isCogs && $isDelivery;
+    }
+
     /** The effective basis: the configured one, or the default when unset. */
     public function allocationBasis(): string
     {

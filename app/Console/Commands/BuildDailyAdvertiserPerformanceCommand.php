@@ -76,7 +76,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
         $sales = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('confirmed_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $orders = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('confirmed_at', $date)
@@ -98,7 +98,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
         $delivered_amount = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('delivered_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $returned = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('returned_at', $date)
@@ -108,7 +108,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
         $returned_amount = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('returned_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $returning = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('returning_at', '<=', $date)
@@ -120,7 +120,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereDate('returning_at', '<=', $date)
             ->whereNull('returned_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $overall_returning = $returning_amount + $returned_amount;
 
@@ -133,7 +133,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereDate('confirmed_at', '>=', $startOfMonth)
             ->whereDate('confirmed_at', '<=', $endOfMonth)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_orders = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('confirmed_at', '>=', $startOfMonth)
@@ -154,7 +154,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereDate('confirmed_at', '<=', $endOfMonth)
             ->whereNotNull('delivered_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_sales_order_returned_amount = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('confirmed_at', '>=', $startOfMonth)
@@ -162,7 +162,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereNotNull('returned_at')
             ->whereNotNull('returning_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_sales_order_returning_amount = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('confirmed_at', '>=', $startOfMonth)
@@ -170,7 +170,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereNotNull('returning_at')
             ->whereNull('returned_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_sales_order_overall_returning = $date_to_month_sales_order_returning_amount + $date_to_month_sales_order_returned_amount;
 
@@ -181,7 +181,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereDate('confirmed_at', '<=', $endOfMonth)
             ->whereNotNull('delivered_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_shipped_out_returned = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('confirmed_at', '>=', $startOfMonth)
@@ -189,7 +189,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereNotNull('returned_at')
             ->whereNotNull('returning_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_shipped_out_returning = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('confirmed_at', '>=', $startOfMonth)
@@ -197,7 +197,7 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereNotNull('returning_at')
             ->whereNull('returned_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_shipped_out_overall_returning = $date_to_month_shipped_out_returning + $date_to_month_shipped_out_returned;
 
@@ -207,19 +207,19 @@ class BuildDailyAdvertiserPerformanceCommand extends Command
             ->whereDate('delivered_at', '>=', $startOfMonth)
             ->whereDate('delivered_at', '<=', $endOfMonth)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_parcel_status_returned = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('returned_at', '>=', $startOfMonth)
             ->whereDate('returned_at', '<=', $endOfMonth)
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_parcel_status_returning = Order::whereHas('page', fn ($query) => $query->where('owner_id', $userId))
             ->whereDate('returning_at', '<=', $endOfMonth)
             ->whereNull('returned_at')
             ->whereNotIn('pancake_orders.status', [6, 7])
-            ->sum('total_amount');
+            ->sum('final_amount');
 
         $date_to_month_parcel_status_overall_returning = $date_to_month_parcel_status_returning + $date_to_month_parcel_status_returned;
 
