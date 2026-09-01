@@ -4,8 +4,9 @@ use App\Models\Team;
 
 /**
  * Sales & Marketing used to be one tabbed dashboard at
- * `/sales-marketing/dashboard/{tab}`. It is now five sibling pages, each with
- * its own URL and its own entry in the sidebar group.
+ * `/sales-marketing/dashboard/{tab}`. It is now a group of sibling pages, each
+ * with its own URL and its own entry in the sidebar group — including a
+ * Dashboard page that has taken the bare `/dashboard` URL back.
  *
  * These cover the seam: the flat URLs resolve, and the tabbed ones people have
  * bookmarked (and the three legacy entry points elsewhere in the route file)
@@ -32,6 +33,7 @@ test('each page answers on its own flat URL', function (string $path) {
         ->get("/workspaces/{$workspace->slug}/sales-marketing/{$path}")
         ->assertOk();
 })->with([
+    'dashboard',
     'daily-report',
     'page-roas-tracker',
     'ad-spend-goals',
@@ -51,9 +53,8 @@ test('the old tab URLs redirect to the page that replaced them', function (strin
     ['ad-spend-goals', 'ad-spend-goals'],
     ['ad-spent-summary', 'ad-spent-summary'],
     ['sales-targets', 'sales-targets'],
-    // The bare dashboard was the Daily Report tab, and an unknown segment is
-    // better off at the first page than at a 404.
-    ['', 'daily-report'],
+    // An unknown segment is better off at the first page than at a 404. The
+    // bare `/dashboard` is no longer a redirect — it is the group's own page.
     ['who-knows', 'daily-report'],
 ]);
 

@@ -103,9 +103,10 @@ export function AppSidebar() {
                       icon: Megaphone,
                       // The group shows if any one of its pages does — each
                       // item below carries its own grant, so a role with only
-                      // Sales Targets sees a one-item group rather than five
-                      // links it cannot open.
+                      // Sales Targets sees a one-item group rather than every
+                      // link it cannot open.
                       anyOf: [
+                          PERMISSIONS.ViewSalesMarketingDashboard,
                           PERMISSIONS.ViewSalesMarketingDailyReport,
                           PERMISSIONS.ViewPageRoasTracker,
                           PERMISSIONS.ViewAdSpendGoals,
@@ -113,6 +114,13 @@ export function AppSidebar() {
                           PERMISSIONS.ViewSalesTargets,
                       ],
                       items: [
+                          {
+                              title: 'Dashboard',
+                              href: `/workspaces/${slug}/sales-marketing/dashboard`,
+                              icon: LayoutDashboard,
+                              permission:
+                                  PERMISSIONS.ViewSalesMarketingDashboard,
+                          },
                           {
                               title: 'Daily Report',
                               href: `/workspaces/${slug}/sales-marketing/daily-report`,
