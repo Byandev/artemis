@@ -180,3 +180,48 @@ test('the reorder figures follow the item own demand', function () {
         // Compared at four places: MySQL returns the division at its own scale.
         ->and(round((float) $row['days_it_can_last'], 4))->toEqual(round(100 / 7, 4));
 });
+
+test('the list filters to one bottleneck stage', function () {
+    // Frozen with the day, so the filter reads the stored label rather than
+    // re-deriving a classification the page would then have to agree with.
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+
+    foreach (['Warehouse' => 'WH-SKU', 'Late PO' => 'PO-SKU'] as $stage => $sku) {
+        $item = columnsItem($workspace, $sku);
+        columnsSnapshot($workspace, $item, ['units_3d' => 30, 'bottleneck_stage' => $stage]);
+    }
+
+    // Unfiltered, both are listed.
+    expect(demandRows($owner, $workspace))->toHaveKeys(['WH-SKU', 'PO-SKU']);
+
+    $filtered = demandRows($owner, $workspace, '?filter[bottleneck_stage]=Warehouse');
+
+    expect($filtered)->toHaveKey('WH-SKU')
+        ->and($filtered)->not->toHaveKey('PO-SKU');
+});
+
+test('the page offers the classifier own stages, not its own copy', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = demandGroup();
+
+    test()->actingAs($owner)
+        ->get(route('workspaces.inventory.item.index', $workspace))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where(
+            'bottleneckStages',
+            ['Warehouse', 'Delayed Stocks', 'Scaling Item', 'Late PO'],
+        ));
+});
+
+test('the flat list filters on the stage too', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+
+    foreach (['Warehouse' => 'WH-SKU', 'Late PO' => 'PO-SKU'] as $stage => $sku) {
+        $item = columnsItem($workspace, $sku);
+        columnsSnapshot($workspace, $item, ['units_3d' => 30, 'bottleneck_stage' => $stage]);
+    }
+
+    $filtered = demandRows($owner, $workspace, '?summarize=0&filter[bottleneck_stage]=Late PO');
+
+    expect($filtered)->toHaveKey('PO-SKU')
+        ->and($filtered)->not->toHaveKey('WH-SKU');
+});

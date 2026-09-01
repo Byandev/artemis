@@ -156,6 +156,10 @@ class InventoryItemController extends Controller
                         $query->whereNull('inventory_items.product_id');
                     }
                 }),
+                // Frozen only, so a live list has no stage to filter on. Accepted
+                // and ignored rather than rejected, so the control can stay put
+                // while a workspace waits for its first snapshot.
+                AllowedFilter::callback('bottleneck_stage', function () {}),
                 // is_active is applied manually to $base above; register it as a
                 // no-op here so QueryBuilder doesn't reject the filter key.
                 AllowedFilter::callback('is_active', function () {}),
@@ -460,6 +464,12 @@ class InventoryItemController extends Controller
                 AllowedFilter::callback('product_status', function ($query, $value) {
                     $query->whereIn('products.status', (array) $value);
                 }),
+                // The stage the day was frozen with. A group figure stamped on
+                // every row of the group, so it filters the same whether the
+                // list is rolled up or flat.
+                AllowedFilter::callback('bottleneck_stage', function ($query, $value) {
+                    $query->whereIn('snap.bottleneck_stage', (array) $value);
+                }),
                 // Applied manually above / consumed by index(); registered so
                 // QueryBuilder doesn't reject the keys.
                 AllowedFilter::callback('is_active', function () {}),
@@ -601,6 +611,10 @@ class InventoryItemController extends Controller
 
         if ($request->boolean('filter.unassigned')) {
             $inner->whereNull('inventory_items.product_id');
+        }
+
+        if ($stage = $request->input('filter.bottleneck_stage')) {
+            $inner->whereIn('snap.bottleneck_stage', (array) $stage);
         }
 
         // Identical group-level formulas to the live roll-up — see buildSummaryQuery
@@ -931,6 +945,9 @@ class InventoryItemController extends Controller
             // that assumed otherwise would show "orders" over unit figures.
             'basis' => $basis,
             'basisAvailable' => $summarize && $snapshotDate !== null,
+            // The stages the filter can offer, straight from the classifier so
+            // the two cannot drift apart.
+            'bottleneckStages' => ItemReportFacts::BOTTLENECK_STAGES,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),

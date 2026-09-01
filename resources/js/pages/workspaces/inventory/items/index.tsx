@@ -150,6 +150,11 @@ interface Props {
      * counts, which exist only on a rolled-up snapshot.
      */
     basisAvailable?: boolean;
+    /**
+     * The stages the bottleneck filter can offer. Sent by the server so the
+     * page never carries its own copy of the classifier's labels.
+     */
+    bottleneckStages?: string[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -161,6 +166,7 @@ interface Props {
             is_active?: string | number | boolean;
             unassigned?: string | number | boolean;
             product_status?: string;
+            bottleneck_stage?: string;
             date?: string;
         };
     };
@@ -746,6 +752,7 @@ export default function ItemIndex({
     snapshotDates = [],
     basis = 'unit',
     basisAvailable = false,
+    bottleneckStages = [],
     query,
 }: Props) {
     const initialSorting = useMemo(
@@ -768,6 +775,12 @@ export default function ItemIndex({
     // "Unassigned only": show just the items that have no linked product yet.
     const [unassignedOnly, setUnassignedOnly] = useState(
         !!query?.filter?.unassigned && query?.filter?.unassigned !== '0',
+    );
+    // The frozen bottleneck stage; '' means every stage, including none at all.
+    const [bottleneckStage, setBottleneckStage] = useState(
+        query?.filter?.bottleneck_stage
+            ? String(query.filter.bottleneck_stage)
+            : '',
     );
     // Lifecycle stage of the linked product; '' means every stage.
     const [productStatus, setProductStatus] = useState(
@@ -856,6 +869,7 @@ export default function ItemIndex({
         'filter[is_active]': activeOnly ? 1 : 'all',
         'filter[unassigned]': unassignedOnly ? 1 : undefined,
         'filter[product_status]': productStatus || undefined,
+        'filter[bottleneck_stage]': bottleneckStage || undefined,
         'filter[date]': dateValue || undefined,
         // Always explicit: the server rolls up by default, so an omitted param
         // reads as "on" and the toggle would spring back the next time the URL
@@ -908,6 +922,7 @@ export default function ItemIndex({
             activeOnly,
             unassignedOnly,
             productStatus,
+            bottleneckStage,
             summarize,
             dateValue,
         ],
@@ -935,6 +950,15 @@ export default function ItemIndex({
                 'filter[unassigned]': checked ? 1 : undefined,
                 ...(checked ? { 'filter[product_status]': undefined } : {}),
             }),
+            visitOptions,
+        );
+    };
+
+    const handleBottleneckStageChange = (value: string) => {
+        setBottleneckStage(value);
+        router.get(
+            baseUrl,
+            buildParams({ 'filter[bottleneck_stage]': value || undefined }),
             visitOptions,
         );
     };
@@ -2015,6 +2039,25 @@ export default function ItemIndex({
                             </option>
                         ))}
                     </select>
+
+                    {/* Frozen with the day, so a live workspace has nothing to
+                        offer — the control is hidden rather than shown empty. */}
+                    {bottleneckStages.length > 0 && viewingSnapshot && (
+                        <select
+                            value={bottleneckStage}
+                            onChange={(e) =>
+                                handleBottleneckStageChange(e.target.value)
+                            }
+                            className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-3 font-mono! text-[12px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:focus:border-emerald-400"
+                        >
+                            <option value="">All bottlenecks</option>
+                            {bottleneckStages.map((stage) => (
+                                <option key={stage} value={stage}>
+                                    {stage}
+                                </option>
+                            ))}
+                        </select>
+                    )}
 
                     <label className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-black/6 bg-stone-100 px-3 dark:border-white/6 dark:bg-zinc-800">
                         <Switch
