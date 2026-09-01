@@ -66,6 +66,7 @@ class ItemReportFacts
      */
     public const SNAPSHOT_COLUMNS = [
         'orders_3d', 'orders_7d', 'units_7d', 'orders_14d', 'units_14d',
+        'unfulfilled_orders_count',
         'last_in_date', 'last_in_count', 'last_out_date', 'last_out_count',
         'last_po_date', 'last_po_count', 'raised_not_created_days', 'raised_not_created_units',
         'earliest_expected_date', 'earliest_expected_count', 'longest_waiting_date',
@@ -121,9 +122,13 @@ class ItemReportFacts
      *                                    proportional to what is on screen rather
      *                                    than to the catalogue.
      */
+    /** Memoised unit-code expansion; two scans read it. @var array{0: array, 1: array}|null */
+    private ?array $unitCodeMaps = null;
+
     public function __construct(private Workspace $workspace, private ?array $groupIds = null)
     {
         $this->demandWindows();
+        $this->unfulfilledOrders();
         $this->movements();
         $this->purchaseOrders();
     }
@@ -180,6 +185,9 @@ class ItemReportFacts
             'longest_waiting_count' => null,
             'delayed_po' => 0,
             'bottleneck_stage' => null,
+            // A measured zero: the scan covered every open order and found none
+            // touching this group.
+            'unfulfilled_orders_count' => 0,
         ];
 
         foreach (self::WINDOWS as $days) {
@@ -225,7 +233,7 @@ class ItemReportFacts
 
         $this->demandAsOf = CarbonImmutable::parse($latest)->endOfDay();
 
-        [$itemsByCode, $groupByItem] = $this->itemsByUnitCode();
+        [$itemsByCode, $groupByItem] = $this->unitCodeMaps();
 
         if (! $itemsByCode) {
             return;
@@ -317,6 +325,69 @@ class ItemReportFacts
      *
      * @return array{0: array<string, array<int, int>>, 1: array<int, int>}
      */
+    private function unitCodeMaps(): array
+    {
+        return $this->unitCodeMaps ??= $this->itemsByUnitCode();
+    }
+
+    /**
+     * How many distinct orders are committed but not yet shipped, per group.
+     *
+     * The sibling of unfulfilled_count, which counts the units those orders
+     * owe. Both answer "what do we already owe", one in stock and one in
+     * pickable orders, and the items list shows whichever the Unit/Order toggle
+     * is set to.
+     *
+     * Counted rather than converted. The obvious shortcut — unfulfilled units
+     * over the units-per-order the last three days happened to average — is an
+     * estimate of a number the feed can simply be asked for, and it drifts
+     * exactly where it matters: on a group whose bundle mix has changed since.
+     *
+     * Per group, like every other order count here, because one order carrying
+     * two siblings is still one order to pick and cannot be split between them.
+     * Deliberately not windowed: unfulfilled is whatever is sitting in those
+     * statuses right now, however long ago it was placed.
+     */
+    private function unfulfilledOrders(): void
+    {
+        [$itemsByCode, $groupByItem] = $this->unitCodeMaps();
+
+        if (! $itemsByCode) {
+            return;
+        }
+
+        $seen = [];
+
+        $rows = DB::table('gencys_orders as go')
+            ->join('gencys_order_items as goi', 'goi.order_id', '=', 'go.id')
+            ->where('go.workspace_id', $this->workspace->id)
+            ->whereIn('go.parcel_status', GencysDemandSync::UNFULFILLED_STATUSES)
+            ->whereNotNull('goi.sku')
+            ->orderBy('go.id')
+            ->select('go.id as order_id', 'goi.sku')
+            ->cursor();
+
+        foreach ($rows as $row) {
+            $components = $itemsByCode[mb_strtoupper(trim((string) $row->sku))] ?? null;
+
+            if ($components === null) {
+                continue;
+            }
+
+            foreach (array_keys($components) as $item) {
+                $group = $groupByItem[$item];
+
+                if (($seen[$group] ?? null) === $row->order_id) {
+                    continue;
+                }
+
+                $seen[$group] = $row->order_id;
+                $this->facts[$group]['unfulfilled_orders_count'] =
+                    ($this->facts[$group]['unfulfilled_orders_count'] ?? 0) + 1;
+            }
+        }
+    }
+
     private function itemsByUnitCode(): array
     {
         $itemBySku = [];
@@ -572,7 +643,7 @@ class ItemReportFacts
 
         $lead = 'COALESCE(MAX(CASE WHEN s.is_parent = 1 THEN s.lead_time END), MAX(s.lead_time))';
         $cover = 'COALESCE(MAX(CASE WHEN s.is_parent = 1 THEN s.days_of_coverage END), MAX(s.days_of_coverage))';
-        $avg = 'SUM(s.three_days_average)';
+        $avg = '(SUM(s.units_3d) / 3)';
         $remaining = 'COALESCE(SUM(s.remaining_after_fulfillment), 0)';
         $needed = "GREATEST(0, ($cover * $avg) + ($lead * $avg) - $remaining)";
 

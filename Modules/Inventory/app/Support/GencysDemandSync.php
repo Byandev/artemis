@@ -33,7 +33,7 @@ use Modules\Inventory\Models\InventoryItem;
 class GencysDemandSync
 {
     /** Order statuses that count as unfulfilled — committed, not yet shipped. */
-    private const UNFULFILLED_STATUSES = ['New', 'PENDING PRINTED WAYBILL', 'ENCODED'];
+    public const UNFULFILLED_STATUSES = ['New', 'PENDING PRINTED WAYBILL', 'ENCODED'];
 
     public function __construct(private Workspace $workspace) {}
 

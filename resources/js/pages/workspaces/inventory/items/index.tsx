@@ -70,8 +70,6 @@ interface Item {
     parent_sku?: string | null;
     is_group?: boolean | number;
     child_count?: number;
-    sales_keywords: string;
-    transaction_keywords: string;
     lead_time: number;
     unfulfilled_count: number;
     product?: { id: number; name: string; winning_date?: string | null };

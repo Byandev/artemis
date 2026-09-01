@@ -448,7 +448,7 @@ class PurchaseOrderFlowController extends Controller
         $identity = SnapshotItemScope::groupIdentity();
 
         $items = SnapshotItemScope::query($request, $workspace, $snapshotDate)
-            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.three_days_average, inventory_item_snapshots.current_stocks')
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.unfulfilled_count, inventory_item_snapshots.units_3d, inventory_item_snapshots.current_stocks')
             ->selectRaw('inventory_item_snapshots.last_in_date as last_in, inventory_item_snapshots.last_out_date as last_out')
             ->selectRaw("{$identity['group_sku']} as group_sku")
             ->get();
@@ -474,7 +474,7 @@ class PurchaseOrderFlowController extends Controller
             $groups[$key]['unfulfilled'] += $unfulfilled;
             $groups[$key]['here'] += min($stock, $unfulfilled);
             $groups[$key]['gone'] += max(0, $unfulfilled - $stock);
-            $groups[$key]['avg'] += (float) $item->three_days_average;
+            $groups[$key]['avg'] += (float) $item->units_3d / 3;
             // The group's latest movement is the latest across its children:
             // any sibling receiving or shipping means the group moved.
             $groups[$key]['last_in'] = max($groups[$key]['last_in'], $item->last_in);
@@ -765,15 +765,34 @@ class PurchaseOrderFlowController extends Controller
     /**
      * Daily demand per item group, summed across the group's visible children.
      *
+     * Read from the frozen day like every other figure on this dashboard, not
+     * from inventory_items. Demand is measured into the snapshot as units_3d
+     * now — the item column it used to read is filled only by workspaces with
+     * no Gencys feed, which is exactly the set that has no snapshot to reach
+     * this code with.
+     *
      * @return array<int, float>
      */
     private function groupDemand(Request $request, Workspace $workspace): array
     {
+        $snapshotDate = SnapshotItemScope::date($workspace);
+
+        if ($snapshotDate === null) {
+            return [];
+        }
+
         $demand = [];
 
-        foreach ($this->visibleItems($request, $workspace)->get(['inventory_items.id', 'inventory_items.parent_id', 'inventory_items.three_days_average']) as $item) {
-            $key = (int) ($item->parent_id ?? $item->id);
-            $demand[$key] = ($demand[$key] ?? 0.0) + (float) $item->three_days_average;
+        $rows = SnapshotItemScope::query($request, $workspace, $snapshotDate)
+            ->get([
+                'inventory_item_snapshots.inventory_item_id as id',
+                'inventory_item_snapshots.parent_id',
+                'inventory_item_snapshots.units_3d',
+            ]);
+
+        foreach ($rows as $row) {
+            $key = (int) ($row->parent_id ?? $row->id);
+            $demand[$key] = ($demand[$key] ?? 0.0) + (float) $row->units_3d / 3;
         }
 
         return $demand;
@@ -802,14 +821,14 @@ class PurchaseOrderFlowController extends Controller
 
         $inner = SnapshotItemScope::query($request, $workspace, $snapshotDate)
             ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent,
-                inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.three_days_average,
+                inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.units_3d,
                 inventory_item_snapshots.remaining_after_fulfillment');
 
         // The group's lead time and buffer are the parent's when it has one,
         // else the max across the group — same rule the items list applies.
         $lead = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
         $cover = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.days_of_coverage END), MAX(sub.days_of_coverage))';
-        $avg = 'SUM(sub.three_days_average)';
+        $avg = '(SUM(sub.units_3d) / 3)';
         $remaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
         $needed = "GREATEST(0, ($cover * $avg) + ($lead * $avg) - $remaining)";
 

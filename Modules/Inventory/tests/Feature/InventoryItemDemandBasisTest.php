@@ -66,6 +66,7 @@ function basisSnapshot(Workspace $workspace, InventoryItem $item, string $date, 
         'orders_3d' => 6,
         'units_3d' => 18,
         'unfulfilled_count' => 0,
+        'unfulfilled_orders_count' => 0,
         // Stock is frozen once, in units. It has no order sibling.
         'current_stocks' => 30,
         'waiting_for_delivery_stocks' => 0,
@@ -111,11 +112,12 @@ test('the unit basis reports units a day, and the order basis orders a day', fun
     expect(basisRow($owner, $workspace, '?basis=order')['three_days_average'])->toEqual(2);
 });
 
-test('unfulfilled converts, and the stock beside it does not', function () {
-    // 12 units owed across 4 orders, against stock that is still counted and
-    // bought in units.
+test('unfulfilled reports orders or units, and the stock beside it does not move', function () {
+    // 12 units owed across 4 orders — both counted from the feed, neither
+    // derived from the other. Stock is still counted and bought in units.
     ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace([
         'unfulfilled_count' => 12,
+        'unfulfilled_orders_count' => 4,
         'waiting_for_delivery_stocks' => 6,
     ]);
 
@@ -173,6 +175,7 @@ test('a group that took no orders reports no order figures', function () {
     // rather than inventing a rate: a 0 would read as "it sold nothing".
     ['owner' => $owner, 'workspace' => $workspace] = basisWorkspace([
         'orders_3d' => null,
+        'unfulfilled_orders_count' => null,
     ]);
 
     $row = basisRow($owner, $workspace, '?basis=order');
@@ -313,6 +316,45 @@ test('the snapshot freezes the counts both bases are read from', function () {
     expect((int) $row->orders_3d)->toBe(6)
         ->and((int) $row->units_3d)->toBe(18)
         ->and((float) $row->current_stocks)->toBe(30.0);
+});
+
+test('the snapshot counts unfulfilled orders rather than inferring them', function () {
+    // Two open orders carrying three units each. Converting 6 units through the
+    // 3 units-per-order the window averaged would land on 2 as well — so the
+    // fixture makes them disagree: one open order carries a single unit.
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $workspace->update(['erp_username' => 'erp-user', 'erp_password' => 'erp-pass']);
+
+    $item = basisItem($workspace);
+
+    DB::table('inventory_unit_codes')->insert([
+        ['workspace_id' => $workspace->id, 'unit_code' => 'BUNDLE-3', 'sku' => 'BUNDLE-3', 'created_at' => now(), 'updated_at' => now()],
+        ['workspace_id' => $workspace->id, 'unit_code' => 'SINGLE', 'sku' => 'SINGLE', 'created_at' => now(), 'updated_at' => now()],
+    ]);
+    DB::table('inventory_unit_code_items')->insert([
+        ['workspace_id' => $workspace->id, 'unit_code' => 'BUNDLE-3', 'item_code' => $item->sku, 'quantity' => 3, 'created_at' => now(), 'updated_at' => now()],
+        ['workspace_id' => $workspace->id, 'unit_code' => 'SINGLE', 'item_code' => $item->sku, 'quantity' => 1, 'created_at' => now(), 'updated_at' => now()],
+    ]);
+
+    // Three open orders: two bundles of three and one single. 7 units, 3 orders.
+    foreach ([['BUNDLE-3', 1], ['BUNDLE-3', 2], ['SINGLE', 3]] as [$code, $n]) {
+        DB::table('gencys_orders')->insert([
+            'id' => $n, 'workspace_id' => $workspace->id, 'order_no' => 'GO-'.$n,
+            'order_date' => now()->toDateString(), 'parcel_status' => 'ENCODED',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('gencys_order_items')->insert([
+            'order_id' => $n, 'sku' => $code, 'quantity' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+
+    test()->artisan('inventory:snapshot-items', ['--ignore-sync' => true])->assertSuccessful();
+
+    $row = DB::table('inventory_item_snapshots')->where('inventory_item_id', $item->id)->first();
+
+    expect((int) $row->unfulfilled_count)->toBe(7)
+        ->and((int) $row->unfulfilled_orders_count)->toBe(3);
 });
 
 test('the page says whether the order basis is on offer', function () {

@@ -424,8 +424,6 @@ class InventoryItemController extends Controller
                 'inventory_items.is_parent',
                 'inventory_items.sku',
                 'inventory_items.is_active',
-                'inventory_items.sales_keywords',
-                'inventory_items.transaction_keywords',
                 'inventory_items.days_of_coverage',
                 'inventory_items.created_at',
             ])
@@ -636,20 +634,21 @@ class InventoryItemController extends Controller
         // the truth was 19, and the ceiling the list applies turned eight
         // ten-thousandths into a whole extra order.
         //
-        // Unfulfilled has no order count of its own — it is whatever currently
-        // sits in the unfulfilled statuses, not a three-day window — so it is
-        // converted at the rate those three days observed. Done here over the
-        // group's totals rather than per item, which keeps it to one division
-        // and no intermediate rounding.
+        // Unfulfilled is counted the same way, in both denominations: the units
+        // owed, and the distinct orders waiting on them. Neither is derived from
+        // the other — converting the units through the units-per-order of the
+        // last three days would estimate a figure the feed was already asked
+        // for, and would drift on any group whose bundle mix has moved.
         $groupOrders3d = 'MAX(sub.orders_3d)';
-        $groupUnits3d = 'SUM(sub.units_3d)';
 
         $displayedAverage = $orderBasis
             ? "($groupOrders3d / 3)"
             : '(SUM(sub.units_3d) / 3)';
 
+        // MAX for the order count, SUM for the units: one is the group's figure
+        // stamped on every row, the other is each item's own.
         $displayedUnfulfilled = $orderBasis
-            ? "(SUM(sub.unfulfilled_count) * $groupOrders3d / NULLIF($groupUnits3d, 0))"
+            ? 'MAX(sub.unfulfilled_orders_count)'
             : 'SUM(sub.unfulfilled_count)';
 
         // Units a day, always — the rate stock is bought against. Summed rather
@@ -1026,9 +1025,6 @@ class InventoryItemController extends Controller
             'product_id' => 'nullable|exists:products,id',
             'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
             'is_active' => 'nullable|boolean',
-            'sales_keywords' => 'nullable|array',
-            'sales_keywords.*' => 'string|max:255',
-            'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
@@ -1039,8 +1035,6 @@ class InventoryItemController extends Controller
             'product_id' => $request->product_id ?: null,
             'sku' => $request->sku,
             'is_active' => $request->boolean('is_active', true),
-            'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
-            'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
@@ -1066,9 +1060,6 @@ class InventoryItemController extends Controller
                     ->ignore($item->id),
             ],
             'is_active' => 'nullable|boolean',
-            'sales_keywords' => 'nullable|array',
-            'sales_keywords.*' => 'string|max:255',
-            'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
@@ -1077,8 +1068,6 @@ class InventoryItemController extends Controller
             'product_id' => $request->product_id ?: null,
             'sku' => $request->sku,
             'is_active' => $request->boolean('is_active', true),
-            'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
-            'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
@@ -1413,27 +1402,6 @@ class InventoryItemController extends Controller
             : "{$updated} item(s) ungrouped.";
 
         return redirect()->back()->with('success', $message);
-    }
-
-    /**
-     * Split a comma-separated keyword string into a clean array:
-     * trim, drop blanks, de-duplicate.
-     *
-     * @param  mixed  $keywords
-     * @return string[]
-     */
-    private function normalizeKeywords($keywords): array
-    {
-        $list = is_array($keywords)
-            ? $keywords
-            : preg_split('/[,\n]+/', (string) $keywords);
-
-        return collect($list)
-            ->map(fn ($keyword) => trim((string) $keyword))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
     }
 
     public function destroy(Workspace $workspace, InventoryItem $item)
