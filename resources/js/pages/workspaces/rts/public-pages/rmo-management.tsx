@@ -1071,12 +1071,6 @@ function RmoManagement({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMyAssigneeOnly, showMyConfirmeeOnly, currentUserId]);
 
-    // Clear selection whenever the page data changes
-    useEffect(() => {
-        setSelectedIds(new Set());
-        setBulkConflict(null);
-    }, [orders.current_page, orders.data?.length]);
-
     // The filters currently applied to the table, as query params — so every
     // export downloads exactly the rows on screen.
     const exportParams = useCallback(() => {
@@ -1264,39 +1258,90 @@ function RmoManagement({
 
     const [copiedRider, setCopiedRider] = useState(false);
     const [copiedCustomer, setCopiedCustomer] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+    // Selected orders, keyed by id, and holding the row itself rather than just
+    // the id: the selection outlives paging, so by the time "Assign to me" runs
+    // most of what it counts is no longer in `orders.data`.
+    const [selectedOrders, setSelectedOrders] = useState<
+        Map<number, OrderForDelivery>
+    >(new Map());
+    const selectedCount = selectedOrders.size;
 
     const allPageIds = useMemo(
         () => (orders.data ?? []).map((o) => o.id),
         [orders.data],
     );
     const allSelected =
-        allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
-    const someSelected = allPageIds.some((id) => selectedIds.has(id));
+        allPageIds.length > 0 &&
+        allPageIds.every((id) => selectedOrders.has(id));
+    const someSelected = allPageIds.some((id) => selectedOrders.has(id));
+    // Selected orders sitting on some other page — worth saying out loud, since
+    // the bulk actions reach them and the table doesn't show them.
+    const selectedOffPageCount = useMemo(() => {
+        const onPage = new Set(allPageIds);
+        let count = 0;
+        selectedOrders.forEach((_, id) => {
+            if (!onPage.has(id)) count += 1;
+        });
+        return count;
+    }, [selectedOrders, allPageIds]);
 
-    const toggleRow = useCallback((id: number) => {
-        setSelectedIds((prev) => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
+    const toggleRow = useCallback((order: OrderForDelivery) => {
+        setSelectedOrders((prev) => {
+            const next = new Map(prev);
+            if (next.has(order.id)) {
+                next.delete(order.id);
+            } else {
+                next.set(order.id, order);
+            }
             return next;
         });
     }, []);
 
     const toggleAll = useCallback(() => {
-        setSelectedIds((prev) => {
-            if (allPageIds.every((id) => prev.has(id))) {
-                const next = new Set(prev);
-                allPageIds.forEach((id) => next.delete(id));
+        const pageOrders = orders.data ?? [];
+        setSelectedOrders((prev) => {
+            const next = new Map(prev);
+            if (pageOrders.every((o) => prev.has(o.id))) {
+                pageOrders.forEach((o) => next.delete(o.id));
                 return next;
             }
-            return new Set([...prev, ...allPageIds]);
+            pageOrders.forEach((o) => next.set(o.id, o));
+            return next;
         });
-    }, [allPageIds]);
+    }, [orders.data]);
 
     const clearSelection = useCallback(() => {
-        setSelectedIds(new Set());
+        setSelectedOrders(new Map());
         setBulkConflict(null);
     }, []);
+
+    // Rows the selection is holding go stale as the table reloads — an order
+    // assigned from its own row, say, comes back with an assignee. Refresh the
+    // snapshots from whichever selected rows the current page carries.
+    useEffect(() => {
+        setSelectedOrders((prev) => {
+            if (prev.size === 0) return prev;
+            const next = new Map(prev);
+            let changed = false;
+            (orders.data ?? []).forEach((o) => {
+                if (next.has(o.id)) {
+                    next.set(o.id, o);
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [orders.data]);
+
+    // Turning a page keeps the selection — the bulk actions post ids, so an
+    // order stays selected while it scrolls out of view. Re-filtering is a
+    // different set of orders though, so that still starts the selection over.
+    const selectionScope = exportParams().toString();
+    useEffect(() => {
+        setSelectedOrders(new Map());
+        setBulkConflict(null);
+    }, [selectionScope]);
 
     const [bulkConflict, setBulkConflict] = useState<{
         already: number;
@@ -1307,17 +1352,17 @@ function RmoManagement({
         (userId: string) => {
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-assign`,
-                { ids: Array.from(selectedIds), userId },
+                { ids: Array.from(selectedOrders.keys()), userId },
                 {
                     preserveScroll: true,
                     onSuccess: () => {
-                        setSelectedIds(new Set());
+                        setSelectedOrders(new Map());
                         setBulkConflict(null);
                     },
                 },
             );
         },
-        [selectedIds, workspace.slug],
+        [selectedOrders, workspace.slug],
     );
 
     const handleBulkAssignToMe = useCallback(() => {
@@ -1326,38 +1371,35 @@ function RmoManagement({
             setIsOpen(true);
             return;
         }
-        const selectedOrders = (orders.data ?? []).filter((o) =>
-            selectedIds.has(o.id),
-        );
-        const alreadyAssigned = selectedOrders.filter(
+        const alreadyAssigned = Array.from(selectedOrders.values()).filter(
             (o) => o.assignee != null,
         ).length;
         if (alreadyAssigned > 0) {
             setBulkConflict({
                 already: alreadyAssigned,
-                toAssign: selectedOrders.length - alreadyAssigned,
+                toAssign: selectedOrders.size - alreadyAssigned,
             });
             return;
         }
         doBulkAssign(userId);
-    }, [selectedIds, orders.data, doBulkAssign, currentUserId]);
+    }, [selectedOrders, doBulkAssign, currentUserId]);
 
     const handleBulkUpdateStatus = useCallback(
         (status: OrderStatus) => {
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-status`,
-                { ids: Array.from(selectedIds), status },
+                { ids: Array.from(selectedOrders.keys()), status },
                 {
                     preserveScroll: true,
                     preserveState: false,
                     onSuccess: () => {
-                        setSelectedIds(new Set());
+                        setSelectedOrders(new Map());
                         setBulkConflict(null);
                     },
                 },
             );
         },
-        [selectedIds, workspace.slug],
+        [selectedOrders, workspace.slug],
     );
 
     const pendingOrders = useMemo(
@@ -1414,8 +1456,8 @@ function RmoManagement({
                 ),
                 cell: ({ row }) => (
                     <Checkbox
-                        checked={selectedIds.has(row.original.id)}
-                        onCheckedChange={() => toggleRow(row.original.id)}
+                        checked={selectedOrders.has(row.original.id)}
+                        onCheckedChange={() => toggleRow(row.original)}
                         aria-label="Select row"
                         className="translate-y-px"
                     />
@@ -1856,7 +1898,7 @@ function RmoManagement({
             isYesterday,
             canEditPastDay,
             canEditPhone,
-            selectedIds,
+            selectedOrders,
             allSelected,
             someSelected,
             toggleAll,
@@ -2382,12 +2424,17 @@ function RmoManagement({
                     </div>
                 </div>
 
-                {selectedIds.size > 0 && (
+                {selectedCount > 0 && (
                     <div className="mb-3 space-y-2">
                         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                             <span className="text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
-                                {selectedIds.size} order
-                                {selectedIds.size !== 1 ? 's' : ''} selected
+                                {selectedCount} order
+                                {selectedCount !== 1 ? 's' : ''} selected
+                                {selectedOffPageCount > 0 && (
+                                    <span className="ml-1 font-normal text-emerald-600/80 dark:text-emerald-400/70">
+                                        ({selectedOffPageCount} on other pages)
+                                    </span>
+                                )}
                             </span>
                             <div className="h-3.5 w-px bg-emerald-200 dark:bg-emerald-500/30" />
                             <button
@@ -2417,11 +2464,8 @@ function RmoManagement({
                                         className="w-52 overflow-hidden p-1"
                                     >
                                         <p className="px-2 pt-1 pb-1.5 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                            Set {selectedIds.size} order
-                                            {selectedIds.size !== 1
-                                                ? 's'
-                                                : ''}{' '}
-                                            to
+                                            Set {selectedCount} order
+                                            {selectedCount !== 1 ? 's' : ''} to
                                         </p>
                                         <div className="max-h-72 overflow-y-auto">
                                             {ORDER_STATUSES.map((s) => (
