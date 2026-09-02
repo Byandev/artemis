@@ -44,6 +44,7 @@ import {
     Megaphone,
     MessageSquare,
     Package,
+    Palette,
     PieChart,
     ReceiptText,
     RotateCcw,
@@ -103,14 +104,15 @@ export function AppSidebar() {
                       icon: Megaphone,
                       // The group shows if any one of its pages does — each
                       // item below carries its own grant, so a role with only
-                      // Sales Targets sees a one-item group rather than five
-                      // links it cannot open.
+                      // Sales Targets sees a one-item group rather than every
+                      // link it cannot open.
                       anyOf: [
                           PERMISSIONS.ViewSalesMarketingDailyReport,
                           PERMISSIONS.ViewPageRoasTracker,
                           PERMISSIONS.ViewAdSpendGoals,
                           PERMISSIONS.ViewAdSpentSummary,
                           PERMISSIONS.ViewSalesTargets,
+                          PERMISSIONS.ViewNewCreativesTracker,
                       ],
                       items: [
                           {
@@ -150,6 +152,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/sales-marketing/sales-targets`,
                               icon: Target,
                               permission: PERMISSIONS.ViewSalesTargets,
+                          },
+                          {
+                              title: 'New Creatives Tracker',
+                              href: `/workspaces/${slug}/sales-marketing/new-creatives-tracker`,
+                              icon: Palette,
+                              permission: PERMISSIONS.ViewNewCreativesTracker,
                           },
                       ],
                   },

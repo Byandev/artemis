@@ -66,6 +66,7 @@ dataset('sm_pages', [
     'ad spend goals' => ['ad-spend-goals', PermissionEnum::ViewAdSpendGoals],
     'ad spent summary' => ['ad-spent-summary', PermissionEnum::ViewAdSpentSummary],
     'sales targets' => ['sales-targets', PermissionEnum::ViewSalesTargets],
+    'new creatives tracker' => ['new-creatives-tracker', PermissionEnum::ViewNewCreativesTracker],
 ]);
 
 test('the page opens for a role holding only its own permission', function (string $path, PermissionEnum $permission) {
@@ -86,6 +87,7 @@ test('that permission opens no other page in the group', function (string $path,
         'ad-spend-goals',
         'ad-spent-summary',
         'sales-targets',
+        'new-creatives-tracker',
     ])->reject(fn (string $other) => $other === $path);
 
     foreach ($others as $other) {
@@ -95,7 +97,7 @@ test('that permission opens no other page in the group', function (string $path,
     }
 })->with('sm_pages');
 
-test('a member with none of the five is refused everywhere', function (string $path) {
+test('a member with none of them is refused everywhere', function (string $path) {
     $workspace = smPermissionContext();
 
     $this->actingAs(smMemberWith($workspace, []))
@@ -107,9 +109,10 @@ test('a member with none of the five is refused everywhere', function (string $p
     'ad-spend-goals',
     'ad-spent-summary',
     'sales-targets',
+    'new-creatives-tracker',
 ]);
 
-test('the module switch hides all five grants from the role editor', function () {
+test('the module switch hides every grant in the group from the role editor', function () {
     $workspace = smPermissionContext();
 
     expect($workspace->hiddenPermissionNames())->not->toContain(
@@ -123,6 +126,7 @@ test('the module switch hides all five grants from the role editor', function ()
         PermissionEnum::ViewSalesMarketingDailyReport->value,
         PermissionEnum::ViewPageRoasTracker->value,
         PermissionEnum::ViewSalesTargets->value,
+        PermissionEnum::ViewNewCreativesTracker->value,
         PermissionEnum::ViewAdSpentSummary->value,
         PermissionEnum::ViewAdSpendGoals->value,
     );

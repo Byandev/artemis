@@ -27,6 +27,7 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DailyReportController;
+use App\Http\Controllers\Workspaces\SalesMarketing\NewCreativesTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\PageRoasTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\SalesTargetController;
 use App\Http\Controllers\Workspaces\SalesMarketing\TeamAdSpendGoalController;
@@ -172,6 +173,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('page-roas-tracker');
         Route::get('/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('ad-spend-goals');
         Route::get('/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('ad-spent-summary');
+
+        Route::get('/new-creatives-tracker', [NewCreativesTrackerController::class, 'index'])->name('new-creatives-tracker');
 
         Route::get('/sales-targets', [SalesTargetController::class, 'index'])->name('sales-targets');
         Route::post('/sales-targets', [SalesTargetController::class, 'store'])->name('sales-targets.store');
