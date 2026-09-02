@@ -2,6 +2,7 @@
 
 namespace Modules\Finance\Models;
 
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +51,8 @@ class IncomeStatement extends Model
         'advisory_share',
         'status',
         'generated_at',
+        'locked_at',
+        'locked_by',
     ];
 
     protected $casts = [
@@ -89,11 +92,26 @@ class IncomeStatement extends Model
         'advisory_share_on_delivered' => 'decimal:2',
         'advisory_share' => 'decimal:2',
         'generated_at' => 'datetime',
+        'locked_at' => 'datetime',
     ];
 
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    public function lockedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'locked_by');
+    }
+
+    /**
+     * A closed month. Its figures are held as they were struck: it can't be
+     * regenerated, overwritten by a save, or deleted until it is unlocked.
+     */
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null;
     }
 
     public function breakdown(): HasMany
