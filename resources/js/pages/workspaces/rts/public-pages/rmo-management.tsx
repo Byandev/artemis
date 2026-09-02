@@ -1335,47 +1335,22 @@ function RmoManagement({
         });
     }, [orders.data]);
 
-    // What the selection belongs to. Paging, sorting, searching and the
-    // assignee / confirmee narrowing only change which of a day's orders you
-    // happen to be looking at, so a selection rides through all of them — the
-    // bulk actions post ids, so an order stays selected while it scrolls out of
-    // view. That's what makes them useful together: search a rider, tick two,
-    // flip to "My Assignee Only", tick three more, assign all five. The
-    // assignee picker goes with its toggle, being the same narrowing aimed at
-    // someone else, and `callerId` follows both.
+    // The delivery date is the one control that starts the selection over. Every
+    // other one — paging, sorting, search, the status and parcel-status selects,
+    // the page / shop / user filters, the assignee picker and the two "mine
+    // only" toggles — just changes which of that day's orders you happen to be
+    // looking at, and the bulk actions post ids, so an order stays selected
+    // while it scrolls out of view. That's what makes them work together:
+    // filter to one shop, tick two, search a rider, tick three more, assign all
+    // five.
     //
-    // What's left resets the selection: the status, page, shop and user filters
-    // pick a different set of orders to work through rather than another view of
-    // the same one, and a new delivery date is a different day's work — one the
-    // server's editable-date window would mostly refuse anyway.
-    //
-    // Spelled out rather than borrowed from `exportParams`, close as the two
-    // lists are: an export that one day carries the search term or the sort
-    // order along must not quietly start clearing the selection.
-    const selectionScope = useMemo(
-        () =>
-            JSON.stringify([
-                currentStatus,
-                currentParcelStatus,
-                selectedPageIds,
-                selectedShopIds,
-                selectedUserIds,
-                deliveryDate,
-            ]),
-        [
-            currentStatus,
-            currentParcelStatus,
-            selectedPageIds,
-            selectedShopIds,
-            selectedUserIds,
-            deliveryDate,
-        ],
-    );
-
+    // A new date is a different day's work, and one the server's editable-date
+    // window would mostly refuse anyway — a selection carried into it would fail
+    // in halves rather than do anything useful.
     useEffect(() => {
         setSelectedOrders(new Map());
         setBulkConflict(null);
-    }, [selectionScope]);
+    }, [deliveryDate]);
 
     const [bulkConflict, setBulkConflict] = useState<{
         already: number;
