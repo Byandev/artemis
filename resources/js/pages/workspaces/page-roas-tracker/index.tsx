@@ -304,8 +304,11 @@ export default function PageRoasTrackerIndex({
     const cell = 'h-8 whitespace-nowrap px-2.5 text-right';
     const rowLine = 'border-b border-black/4 dark:border-white/4';
     const groupStart = 'border-l-2 border-l-black/10 dark:border-l-white/12';
-    // The roll-up reads as a summary rather than a twentieth page.
+    // The roll-up reads as a summary rather than a twentieth page. Its header
+    // ground has to be opaque — a translucent sticky cell lets the rows scroll
+    // straight through it — so the tint is baked in rather than an alpha wash.
     const rollUpCell = 'bg-brand-500/5 dark:bg-brand-500/8';
+    const rollUpHead = 'bg-brand-50 dark:bg-brand-950';
     const stickyLeft =
         'sticky left-0 border-r border-black/8 dark:border-white/8';
 
@@ -428,7 +431,7 @@ export default function PageRoasTrackerIndex({
                                                 className={cn(
                                                     cell,
                                                     groupStart,
-                                                    rollUpCell,
+                                                    rollUpHead,
                                                     'sticky top-0 z-30 text-left text-[12px] font-semibold text-gray-900 dark:text-gray-50',
                                                 )}
                                             >
@@ -465,7 +468,7 @@ export default function PageRoasTrackerIndex({
                                                     className={cn(
                                                         cell,
                                                         i === 0 && groupStart,
-                                                        rollUpCell,
+                                                        rollUpHead,
                                                         'sticky top-8 z-30 border-b border-black/10 font-mono text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:border-white/10 dark:text-gray-400',
                                                     )}
                                                 >
