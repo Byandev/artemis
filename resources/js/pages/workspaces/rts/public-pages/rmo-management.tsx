@@ -957,6 +957,38 @@ function RmoManagement({
         ],
     );
 
+    // The date picker builds its flatpickr instance once and only rebuilds it
+    // when the date itself changes, keeping whatever onChange it was handed at
+    // that moment. Passing the handler inline meant the calendar held a copy
+    // frozen at the last date change: picking a new date navigated with the
+    // filters as they stood back then, so the upsell select — and status,
+    // parcel status and search with it — was dropped from the URL and reset.
+    //
+    // Hand it one callback that never changes identity and reads the live
+    // handler and date out of a ref, so the frozen copy is still current.
+    const dateChangeRef = useRef({
+        handleDateChange,
+        deliveryDate,
+        todayLocal,
+    });
+    useEffect(() => {
+        dateChangeRef.current = { handleDateChange, deliveryDate, todayLocal };
+    });
+
+    const handleDatePicked = useCallback((_dates: Date[], dateStr: string) => {
+        const {
+            handleDateChange: onDate,
+            deliveryDate: current,
+            todayLocal: today,
+        } = dateChangeRef.current;
+
+        if (!dateStr) {
+            if (current !== today) onDate(today);
+            return;
+        }
+        if (dateStr !== current) onDate(dateStr);
+    }, []);
+
     const handleAssignUser = useCallback(
         (id: number, userId: string) => {
             router.post(
@@ -1842,15 +1874,7 @@ function RmoManagement({
                             mode="single"
                             defaultDate={deliveryDate}
                             placeholder="Select date"
-                            onChange={(_, dateStr) => {
-                                if (!dateStr) {
-                                    if (deliveryDate !== todayLocal)
-                                        handleDateChange(todayLocal);
-                                    return;
-                                }
-                                if (dateStr !== deliveryDate)
-                                    handleDateChange(dateStr);
-                            }}
+                            onChange={handleDatePicked}
                         />
                     </div>
                 </div>
