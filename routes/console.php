@@ -82,6 +82,11 @@ Schedule::command('meta-ads:sync-insights --days=3')->dailyAt('00:30')->withoutO
 Schedule::command('meta-ads:sync-insights --days=1 --until=yesterday')->hourlyAt(30)->withoutOverlapping();
 Schedule::command('meta-ads:sync-insights --days=1')->hourlyAt(30)->withoutOverlapping();
 
+// New Creatives Tracker: roll the freshly-synced insights up into per-item,
+// per-test-day records. Runs just after each insights refresh lands, so the
+// tracker reflects the same numbers the Ads Manager is showing.
+Schedule::command('metaads:sync-testing-records')->hourlyAt(45)->withoutOverlapping();
+
 // Snapshot end-of-day budgets so we have history Meta doesn't keep. Runs at
 // 23:55 server time, after the 23:30 entity sync has captured the day's
 // final budget state.

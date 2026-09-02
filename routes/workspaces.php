@@ -175,6 +175,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('ad-spent-summary');
 
         Route::get('/new-creatives-tracker', [NewCreativesTrackerController::class, 'index'])->name('new-creatives-tracker');
+        // JSON the "Add Testing Item" modal fetches as you search.
+        Route::get('/new-creatives-tracker/available-items', [NewCreativesTrackerController::class, 'availableItems'])->name('new-creatives-tracker.available-items');
+        Route::post('/new-creatives-tracker/items', [NewCreativesTrackerController::class, 'store'])->name('new-creatives-tracker.items.store');
+        Route::patch('/new-creatives-tracker/items/{item}/pause', [NewCreativesTrackerController::class, 'togglePause'])->name('new-creatives-tracker.items.pause');
+        Route::patch('/new-creatives-tracker/items/{item}', [NewCreativesTrackerController::class, 'updateDecision'])->name('new-creatives-tracker.items.update');
 
         Route::get('/sales-targets', [SalesTargetController::class, 'index'])->name('sales-targets');
         Route::post('/sales-targets', [SalesTargetController::class, 'store'])->name('sales-targets.store');
