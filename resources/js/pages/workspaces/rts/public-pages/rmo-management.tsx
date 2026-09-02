@@ -1275,8 +1275,9 @@ function RmoManagement({
         allPageIds.length > 0 &&
         allPageIds.every((id) => selectedOrders.has(id));
     const someSelected = allPageIds.some((id) => selectedOrders.has(id));
-    // Selected orders sitting on some other page — worth saying out loud, since
-    // the bulk actions reach them and the table doesn't show them.
+    // Selected orders the table isn't showing — another page of the same list,
+    // or rows a search has narrowed out of sight. Worth saying out loud: the
+    // bulk actions still reach every one of them.
     const selectedOffPageCount = useMemo(() => {
         const onPage = new Set(allPageIds);
         let count = 0;
@@ -1334,19 +1335,20 @@ function RmoManagement({
         });
     }, [orders.data]);
 
-    // What the selection belongs to: the filters, and nothing else. Paging and
-    // sorting only reshuffle the same set of orders, so a selection rides
-    // through both — the bulk actions post ids, so an order stays selected
-    // while it scrolls out of view. Changing a filter is a different set of
-    // orders, so that starts the selection over.
+    // What the selection belongs to. Paging, sorting and searching only change
+    // which of a day's orders you happen to be looking at, so a selection rides
+    // through all three — the bulk actions post ids, so an order stays selected
+    // while it scrolls out of view, and searching in turn is how you gather a
+    // selection a filter can't express: find these three, find those two, assign
+    // all five. The narrowing filters do reset it: those pick a different set of
+    // orders to work through, not a different view of the same one.
     //
     // Spelled out rather than borrowed from `exportParams`, close as the two
-    // lists are: an export that one day carries the sort order along must not
-    // quietly start clearing the selection on every sort.
+    // lists are: an export that one day carries the search term or the sort
+    // order along must not quietly start clearing the selection.
     const selectionScope = useMemo(
         () =>
             JSON.stringify([
-                searchValue,
                 currentStatus,
                 currentParcelStatus,
                 selectedPageIds,
@@ -1358,7 +1360,6 @@ function RmoManagement({
                 deliveryDate,
             ]),
         [
-            searchValue,
             currentStatus,
             currentParcelStatus,
             selectedPageIds,
@@ -2466,7 +2467,7 @@ function RmoManagement({
                                 {selectedCount !== 1 ? 's' : ''} selected
                                 {selectedOffPageCount > 0 && (
                                     <span className="ml-1 font-normal text-emerald-600/80 dark:text-emerald-400/70">
-                                        ({selectedOffPageCount} on other pages)
+                                        ({selectedOffPageCount} not shown here)
                                     </span>
                                 )}
                             </span>
