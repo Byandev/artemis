@@ -1334,10 +1334,44 @@ function RmoManagement({
         });
     }, [orders.data]);
 
-    // Turning a page keeps the selection — the bulk actions post ids, so an
-    // order stays selected while it scrolls out of view. Re-filtering is a
-    // different set of orders though, so that still starts the selection over.
-    const selectionScope = exportParams().toString();
+    // What the selection belongs to: the filters, and nothing else. Paging and
+    // sorting only reshuffle the same set of orders, so a selection rides
+    // through both — the bulk actions post ids, so an order stays selected
+    // while it scrolls out of view. Changing a filter is a different set of
+    // orders, so that starts the selection over.
+    //
+    // Spelled out rather than borrowed from `exportParams`, close as the two
+    // lists are: an export that one day carries the sort order along must not
+    // quietly start clearing the selection on every sort.
+    const selectionScope = useMemo(
+        () =>
+            JSON.stringify([
+                searchValue,
+                currentStatus,
+                currentParcelStatus,
+                selectedPageIds,
+                selectedShopIds,
+                selectedUserIds,
+                activeAssigneeId,
+                callerId,
+                showMyConfirmeeOnly ? currentUserId : '',
+                deliveryDate,
+            ]),
+        [
+            searchValue,
+            currentStatus,
+            currentParcelStatus,
+            selectedPageIds,
+            selectedShopIds,
+            selectedUserIds,
+            activeAssigneeId,
+            callerId,
+            showMyConfirmeeOnly,
+            currentUserId,
+            deliveryDate,
+        ],
+    );
+
     useEffect(() => {
         setSelectedOrders(new Map());
         setBulkConflict(null);
