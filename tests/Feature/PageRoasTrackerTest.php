@@ -47,13 +47,13 @@ it('blends every ratio over the range instead of averaging daily ratios', functi
     record([
         'date' => '2026-08-01',
         'orders' => 10, 'sales' => 1000, 'ad_spent' => 250, 'ad_sales' => 800,
-        'ad_cpp' => 8 / 250,
+        'ad_purchases' => 8,
         'returning_amount' => 100, 'returned_amount' => 50, 'delivered_amount' => 500,
     ]);
     record([
         'date' => '2026-08-02',
         'orders' => 30, 'sales' => 3000, 'ad_spent' => 750, 'ad_sales' => 2400,
-        'ad_cpp' => 12 / 750,
+        'ad_purchases' => 12,
         'returning_amount' => 200, 'returned_amount' => 150, 'delivered_amount' => 1500,
     ]);
 
@@ -67,12 +67,12 @@ it('blends every ratio over the range instead of averaging daily ratios', functi
         // Delivered is a flow, so unlike returning it does sum.
         ->and($page['total']['delivered_amount'])->toBe(2000.0);
 
-    // Ratios come off the range totals: 4000/1000, 3200/1000, 20 purchases and
-    // 40 orders against 1000 spend.
+    // Ratios come off the range totals: 4000/1000, 3200/1000, and 1000 spend
+    // against 20 Meta purchases / 40 Pancake orders.
     expect($page['total']['roas'])->toBe(4.0)
         ->and($page['total']['ad_roas'])->toBe(3.2)
-        ->and($page['total']['ad_cpp'])->toBe(0.02)
-        ->and($page['total']['cpp'])->toBe(0.04);
+        ->and($page['total']['ad_cpp'])->toBe(50.0)
+        ->and($page['total']['cpp'])->toBe(25.0);
 
     // (200 in-flight + 200 returned) / (that + 2000 delivered).
     expect($page['total']['rts_rate'])->toBe(16.67);
@@ -82,13 +82,13 @@ it('halves the amounts on the Average row but leaves the ratios blended', functi
     record([
         'date' => '2026-08-01',
         'orders' => 10, 'sales' => 1000, 'ad_spent' => 250, 'ad_sales' => 800,
-        'ad_cpp' => 8 / 250,
+        'ad_purchases' => 8,
         'returning_amount' => 100, 'returned_amount' => 50, 'delivered_amount' => 500,
     ]);
     record([
         'date' => '2026-08-02',
         'orders' => 30, 'sales' => 3000, 'ad_spent' => 750, 'ad_sales' => 2400,
-        'ad_cpp' => 12 / 750,
+        'ad_purchases' => 12,
         'returning_amount' => 200, 'returned_amount' => 150, 'delivered_amount' => 1500,
     ]);
 
@@ -100,8 +100,8 @@ it('halves the amounts on the Average row but leaves the ratios blended', functi
         ->and($page['average']['delivered_amount'])->toBe(1000.0);
 
     // A mean of daily ROAS would be 4.00 here too, so lean on ad_cpp: the daily
-    // ratios are 0.032 and 0.016 (mean 0.024), while the blend is 20/1000.
-    expect($page['average']['ad_cpp'])->toBe(0.02)
+    // costs are 250/8 and 750/12 (mean 46.88), while the blend is 1000/20.
+    expect($page['average']['ad_cpp'])->toBe(50.0)
         ->and($page['average']['roas'])->toBe(4.0)
         ->and($page['average']['rts_rate'])->toBe(16.67);
 });
@@ -140,6 +140,37 @@ it('lets a written zero clear the snapshot', function () {
     expect($page['total']['returning_amount'])->toBe(0.0);
 });
 
+it('shows a day exactly as the builder stored it, deriving nothing', function () {
+    // Ratios that disagree with their own ingredients on purpose: if the tracker
+    // recomputed any of them, it would overwrite these with 2.00 / 5.00 / 2.50.
+    record([
+        'date' => '2026-08-01',
+        'orders' => 20, 'sales' => 1000, 'ad_spent' => 500,
+        'ad_sales' => 2500, 'ad_purchases' => 100,
+        'roas' => 9.11, 'ad_roas' => 9.22, 'rts_rate' => 9.33,
+        'ad_cpp' => 9.44, 'cpp' => 9.55,
+    ]);
+
+    $day = trackerPage('2026-08-01', '2026-08-01')['days']['2026-08-01'];
+
+    expect($day['roas'])->toBe(9.11)
+        ->and($day['ad_roas'])->toBe(9.22)
+        ->and($day['rts_rate'])->toBe(9.33)
+        ->and($day['ad_cpp'])->toBe(9.44)
+        ->and($day['cpp'])->toBe(9.55);
+});
+
+it('leaves a ratio the builder never wrote as null rather than zero', function () {
+    // No spend, so the builder has no denominator — "no ROAS" is not "ROAS 0".
+    record(['date' => '2026-08-01', 'orders' => 3, 'sales' => 300]);
+
+    $day = trackerPage('2026-08-01', '2026-08-01')['days']['2026-08-01'];
+
+    expect($day['roas'])->toBeNull()
+        ->and($day['cpp'])->toBeNull()
+        ->and($day['sales'])->toBe(300.0);
+});
+
 it('sends every metric so the column toggle needs no round trip', function () {
     record(['date' => '2026-08-01', 'orders' => 1, 'sales' => 10, 'ad_spent' => 5]);
 
@@ -153,8 +184,9 @@ it('sends every metric so the column toggle needs no round trip', function () {
         ->has('pages.0.days.2026-08-01', fn (Assert $day) => $day
             ->hasAll([
                 'orders', 'sales', 'ad_spent', 'ad_sales',
+                'ad_cpp', 'cpp',
                 'delivered_amount', 'returning_amount',
-                'roas', 'ad_roas', 'rts_rate', 'ad_cpp', 'cpp',
+                'roas', 'ad_roas', 'rts_rate',
             ])
         )
     );

@@ -34,12 +34,12 @@ class PageDailyRecord extends Model
         'rts_rate' => 'decimal:2',
         'ad_spent' => 'decimal:2',
         'ad_sales' => 'decimal:2',
+        'ad_purchases' => 'integer',
         'roas' => 'decimal:2',
         'ad_roas' => 'decimal:2',
-        // Purchases/orders per unit of ad spend — sub-1 figures, so 2dp would
-        // round them all to zero.
-        'ad_cpp' => 'decimal:6',
-        'cpp' => 'decimal:6',
+        // Cost per purchase — ad spend over the Meta / Pancake counts.
+        'ad_cpp' => 'decimal:2',
+        'cpp' => 'decimal:2',
     ];
 
     /** The Artemis Pancake Page or Gencys Page this row belongs to. */

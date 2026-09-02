@@ -87,8 +87,6 @@ const format: Record<string, (n: number | null) => string> = {
     amount: (n) => (n === null ? EMPTY : whole(n)),
     ratio: (n) => (n === null ? EMPTY : n.toFixed(2)),
     percent: (n) => (n === null ? EMPTY : `${n.toFixed(1)}%`),
-    // Purchases/orders per unit of ad spend — sub-1, so 2dp would read as 0.00.
-    rate: (n) => (n === null ? EMPTY : n.toFixed(4)),
 };
 
 /* ── Tone ────────────────────────────────────────────────────────────────── */
@@ -180,18 +178,18 @@ const COLUMNS: MetricColumn[] = [
     },
     {
         id: 'ad_cpp',
-        label: 'Ad CPP (purchases / spend)',
+        label: 'Ad CPP (spend / Meta purchases)',
         head: 'Ad CPP',
         group: 'Meta Ads',
-        format: 'rate',
+        format: 'amount',
         defaultVisible: false,
     },
     {
         id: 'cpp',
-        label: 'CPP (orders / spend)',
+        label: 'CPP (spend / orders)',
         head: 'CPP',
         group: 'Meta Ads',
-        format: 'rate',
+        format: 'amount',
         defaultVisible: false,
     },
 
@@ -285,7 +283,7 @@ export default function PageRoasTrackerIndex({
 
     /* Cell rhythm. Every figure is right-aligned on the same rail, tabular and
        slashed-zero, so a column of numbers lines up digit for digit. */
-    const cell = 'h-8 whitespace-nowrap px-3 text-right';
+    const cell = 'h-8 whitespace-nowrap px-2.5 text-right';
     const rowLine = 'border-b border-black/4 dark:border-white/4';
     const groupStart = 'border-l-2 border-l-black/10 dark:border-l-white/12';
     const stickyLeft =
@@ -371,7 +369,7 @@ export default function PageRoasTrackerIndex({
                 ) : (
                     <div className="mt-4 overflow-hidden rounded-[14px] border border-black/8 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.03)] dark:border-white/8 dark:bg-zinc-900 dark:shadow-none">
                         <div className="max-h-[calc(100vh-16rem)] overflow-auto overscroll-contain">
-                            <table className="border-separate border-spacing-0 text-[12px] slashed-zero tabular-nums">
+                            <table className="border-separate border-spacing-0 font-mono text-[11px] slashed-zero tabular-nums">
                                 <thead>
                                     {/* Page names span their visible metric columns. */}
                                     <tr>
@@ -398,7 +396,7 @@ export default function PageRoasTrackerIndex({
                                             >
                                                 <span className="flex items-center gap-2">
                                                     <span className="h-3 w-[3px] shrink-0 rounded-full bg-brand-500" />
-                                                    <span className="truncate">
+                                                    <span className="truncate font-sans text-[12px]">
                                                         {page.name}
                                                     </span>
                                                 </span>
@@ -444,7 +442,7 @@ export default function PageRoasTrackerIndex({
                                                         cell,
                                                         rowLine,
                                                         stickyLeft,
-                                                        'z-20 text-left font-mono text-[11px] group-hover/row:bg-brand-500/6',
+                                                        'z-20 text-left group-hover/row:bg-brand-500/6',
                                                         weekend
                                                             ? 'bg-stone-50 text-gray-400 dark:bg-white/3 dark:text-gray-500'
                                                             : 'bg-white text-gray-600 dark:bg-zinc-900 dark:text-gray-400',

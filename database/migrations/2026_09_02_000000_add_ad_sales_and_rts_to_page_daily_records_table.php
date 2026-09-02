@@ -18,10 +18,8 @@ return new class extends Migration
             $table->decimal('ad_sales', 15, 2)->nullable()->after('ad_spent');
             $table->decimal('ad_roas', 10, 2)->nullable()->after('roas');
 
-            // Purchases (Meta) and orders (Pancake) per unit of ad spend. These
-            // land well under 1 — a few dozen purchases against thousands in
-            // spend — so 2dp would round every page to 0.00. Six is enough to
-            // recover the original count by multiplying back out.
+            // Cost per purchase: ad spend over Meta's purchase count, and over
+            // Pancake's order count.
             $table->decimal('ad_cpp', 14, 6)->nullable()->after('ad_roas');
             $table->decimal('cpp', 14, 6)->nullable()->after('ad_cpp');
         });

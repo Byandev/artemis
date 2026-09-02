@@ -98,7 +98,7 @@ class BuildDailyPagePerformanceCommand extends Command
         $roas = $ad_spent > 0 ? $sales / $ad_spent : 0;
         $ad_roas = $ad_spent > 0 ? $ad_sales / $ad_spent : 0;
 
-        // Purchases (Meta) and orders (Pancake) per unit of ad spend.
+        // Cost per purchase, against Meta's count and Pancake's.
         $ad_cpp = $ad_purchases > 0 ? ($ad_spent / $ad_purchases) : 0;
         $cpp = $orders > 0 ? ($ad_spent / $orders) : 0;
 
@@ -151,6 +151,7 @@ class BuildDailyPagePerformanceCommand extends Command
                 'rts_rate' => $rts_rate,
                 'ad_spent' => $ad_spent,
                 'ad_sales' => $ad_sales,
+                'ad_purchases' => $ad_purchases,
                 'roas' => $roas,
                 'ad_roas' => $ad_roas,
                 'ad_cpp' => $ad_cpp,
