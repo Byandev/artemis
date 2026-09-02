@@ -26,6 +26,7 @@ interface Metrics {
     sales: number;
     ad_spent: number;
     ad_sales: number;
+    ad_purchases: number;
     delivered_amount: number;
     returning_amount: number;
     roas: number | null;
@@ -86,9 +87,12 @@ const exact = (n: number) =>
         maximumFractionDigits: 2,
     });
 
+const PESO = '\u20b1';
+
 const format: Record<string, (n: number | null) => string> = {
     int: (n) => (n === null ? EMPTY : n.toLocaleString()),
     amount: (n) => (n === null ? EMPTY : whole(n)),
+    peso: (n) => (n === null ? EMPTY : PESO + whole(n)),
     ratio: (n) => (n === null ? EMPTY : n.toFixed(2)),
     percent: (n) => (n === null ? EMPTY : `${n.toFixed(1)}%`),
 };
@@ -145,14 +149,14 @@ const COLUMNS: MetricColumn[] = [
         label: 'Sales',
         head: 'Sales',
         group: 'Core',
-        format: 'amount',
+        format: 'peso',
     },
     {
         id: 'ad_spent',
         label: 'Ad Spent',
         head: 'Ad Spent',
         group: 'Core',
-        format: 'amount',
+        format: 'peso',
     },
     {
         id: 'roas',
@@ -168,7 +172,7 @@ const COLUMNS: MetricColumn[] = [
         label: 'Ad Sales',
         head: 'Ad Sales',
         group: 'Meta Ads',
-        format: 'amount',
+        format: 'peso',
         defaultVisible: false,
     },
     {
@@ -181,11 +185,19 @@ const COLUMNS: MetricColumn[] = [
         defaultVisible: false,
     },
     {
+        id: 'ad_purchases',
+        label: 'Ad Purchases',
+        head: 'Purchases',
+        group: 'Meta Ads',
+        format: 'int',
+        defaultVisible: false,
+    },
+    {
         id: 'ad_cpp',
         label: 'Ad CPP (spend / Meta purchases)',
         head: 'Ad CPP',
         group: 'Meta Ads',
-        format: 'amount',
+        format: 'peso',
         defaultVisible: false,
     },
     {
@@ -193,7 +205,7 @@ const COLUMNS: MetricColumn[] = [
         label: 'CPP (spend / orders)',
         head: 'CPP',
         group: 'Meta Ads',
-        format: 'amount',
+        format: 'peso',
         defaultVisible: false,
     },
 
@@ -202,7 +214,7 @@ const COLUMNS: MetricColumn[] = [
         label: 'Delivered',
         head: 'Delivered',
         group: 'Delivery',
-        format: 'amount',
+        format: 'peso',
         defaultVisible: false,
     },
     {
@@ -210,7 +222,7 @@ const COLUMNS: MetricColumn[] = [
         label: 'Returning',
         head: 'Returning',
         group: 'Delivery',
-        format: 'amount',
+        format: 'peso',
         defaultVisible: false,
     },
     {
@@ -243,7 +255,14 @@ function readCell(m: Metrics, col: MetricColumn) {
 
     return {
         text: format[col.format](raw),
-        title: col.format === 'amount' && raw !== null ? exact(raw) : undefined,
+        title:
+            raw === null
+                ? undefined
+                : col.format === 'peso'
+                  ? PESO + exact(raw)
+                  : col.format === 'amount'
+                    ? exact(raw)
+                    : undefined,
         tone: col.tone?.(raw),
         // A zero carries no signal in a grid this dense — keep it, but let the
         // eye slide over it so the real figures are what stand out.

@@ -38,7 +38,7 @@ class PageRoasTrackerController extends Controller
     /** What a day cell renders, read verbatim by PageRoasTally::stored(). */
     private const FIELDS = [
         'page_type', 'page_id', 'date',
-        'orders', 'sales', 'ad_spent', 'ad_sales',
+        'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
         'delivered_amount', 'returning_amount',
         'roas', 'ad_roas', 'ad_cpp', 'cpp', 'rts_rate',
     ];
@@ -64,6 +64,7 @@ class PageRoasTrackerController extends Controller
         'SUM(sales) AS sales',
         'SUM(ad_spent) AS ad_spent',
         'SUM(ad_sales) AS ad_sales',
+        'SUM(ad_purchases) AS ad_purchases',
         'SUM(delivered_amount) AS delivered_amount',
         'SUM(returning_amount) AS returning_amount',
         'SUM(sales) / NULLIF(SUM(ad_spent), 0) AS roas',
@@ -75,7 +76,7 @@ class PageRoasTrackerController extends Controller
 
     /** The amounts, which the Average row divides. Ratios never divide. */
     private const AMOUNTS = [
-        'orders', 'sales', 'ad_spent', 'ad_sales',
+        'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
         'delivered_amount', 'returning_amount',
     ];
 
@@ -214,6 +215,8 @@ class PageRoasTrackerController extends Controller
             'sales' => $amount('sales'),
             'ad_spent' => $amount('ad_spent'),
             'ad_sales' => $amount('ad_sales'),
+            // A count, like orders — Meta's purchases, the denominator of ad_cpp.
+            'ad_purchases' => (int) round((float) ($row->{$prefix.'ad_purchases'} ?? 0)),
             'delivered_amount' => $amount('delivered_amount'),
             'returning_amount' => $amount('returning_amount'),
             'roas' => $ratio('roas'),

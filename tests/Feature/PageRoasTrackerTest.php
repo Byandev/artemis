@@ -65,7 +65,10 @@ it('blends every ratio over the range instead of averaging daily ratios', functi
         ->and($page['total']['ad_spent'])->toBe(1000.0)
         ->and($page['total']['ad_sales'])->toBe(3200.0)
         // Delivered is a flow, so unlike returning it does sum.
-        ->and($page['total']['delivered_amount'])->toBe(2000.0);
+        ->and($page['total']['delivered_amount'])->toBe(2000.0)
+        // 8 + 12 Meta purchases — the denominator behind ad_cpp, now its own column.
+        ->and($page['total']['ad_purchases'])->toBe(20)
+        ->and($page['average']['ad_purchases'])->toBe(10);
 
     // Ratios come off the range totals: 4000/1000, 3200/1000, and 1000 spend
     // against 20 Meta purchases / 40 Pancake orders.
@@ -241,7 +244,7 @@ it('sends every metric so the column toggle needs no round trip', function () {
         ->component('workspaces/page-roas-tracker/index')
         ->has('pages.0.days.2026-08-01', fn (Assert $day) => $day
             ->hasAll([
-                'orders', 'sales', 'ad_spent', 'ad_sales',
+                'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
                 'ad_cpp', 'cpp',
                 'delivered_amount', 'returning_amount',
                 'roas', 'ad_roas', 'rts_rate',
