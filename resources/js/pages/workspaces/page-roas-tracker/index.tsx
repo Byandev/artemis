@@ -45,10 +45,14 @@ interface PageSeries {
     average: Metrics;
 }
 
+/** The all-pages roll-up: same shape as a page series, minus the identity. */
+type OverallSeries = Pick<PageSeries, 'days' | 'total' | 'average'>;
+
 interface Props {
     workspace: Workspace;
     dates: string[];
     pages: PageSeries[];
+    overall: OverallSeries | null;
     filterOptions: {
         pages: FilterOption[];
         shops: FilterOption[];
@@ -220,6 +224,17 @@ const COLUMNS: MetricColumn[] = [
     },
 ];
 
+/**
+ * The all-pages group toggles like a column but is not one — it is a whole extra
+ * page group, so it rides in the same menu while being filtered out of `shown`.
+ */
+const ROLLUP_ID = '__rollup';
+
+const COLUMN_OPTIONS: ColumnOption[] = [
+    ...COLUMNS,
+    { id: ROLLUP_ID, label: 'All-pages total', group: 'Summary' },
+];
+
 const COLUMNS_STORAGE_KEY = 'page-roas-tracker-cols';
 
 /** Everything one cell needs: the figure, its tone, and whether it is worth ink. */
@@ -242,6 +257,7 @@ export default function PageRoasTrackerIndex({
     workspace,
     dates,
     pages,
+    overall,
     filterOptions,
     query,
     tabs,
@@ -259,7 +275,7 @@ export default function PageRoasTrackerIndex({
     });
 
     const { visibility, setVisibility } = useColumnVisibility(
-        COLUMNS,
+        COLUMN_OPTIONS,
         COLUMNS_STORAGE_KEY,
     );
 
@@ -267,6 +283,8 @@ export default function PageRoasTrackerIndex({
         () => COLUMNS.filter((c) => visibility[c.id] !== false),
         [visibility],
     );
+
+    const rollUp = visibility[ROLLUP_ID] !== false && overall !== null;
 
     const visit = (next: PageRoasFilterValue, start: string, end: string) => {
         router.get(
@@ -286,6 +304,8 @@ export default function PageRoasTrackerIndex({
     const cell = 'h-8 whitespace-nowrap px-2.5 text-right';
     const rowLine = 'border-b border-black/4 dark:border-white/4';
     const groupStart = 'border-l-2 border-l-black/10 dark:border-l-white/12';
+    // The roll-up reads as a summary rather than a twentieth page.
+    const rollUpCell = 'bg-brand-500/5 dark:bg-brand-500/8';
     const stickyLeft =
         'sticky left-0 border-r border-black/8 dark:border-white/8';
 
@@ -316,7 +336,7 @@ export default function PageRoasTrackerIndex({
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <ColumnsDropdown
-                            options={COLUMNS}
+                            options={COLUMN_OPTIONS}
                             visibility={visibility}
                             onChange={setVisibility}
                         />
@@ -402,6 +422,21 @@ export default function PageRoasTrackerIndex({
                                                 </span>
                                             </th>
                                         ))}
+                                        {rollUp && (
+                                            <th
+                                                colSpan={shown.length}
+                                                className={cn(
+                                                    cell,
+                                                    groupStart,
+                                                    rollUpCell,
+                                                    'sticky top-0 z-30 text-left text-[12px] font-semibold text-gray-900 dark:text-gray-50',
+                                                )}
+                                            >
+                                                <span className="font-sans text-[12px]">
+                                                    All Pages
+                                                </span>
+                                            </th>
+                                        )}
                                     </tr>
                                     <tr>
                                         {pages.map((page) => (
@@ -422,6 +457,21 @@ export default function PageRoasTrackerIndex({
                                                 ))}
                                             </Fragment>
                                         ))}
+                                        {rollUp &&
+                                            shown.map((col, i) => (
+                                                <th
+                                                    key={col.id}
+                                                    title={col.label}
+                                                    className={cn(
+                                                        cell,
+                                                        i === 0 && groupStart,
+                                                        rollUpCell,
+                                                        'sticky top-8 z-30 border-b border-black/10 font-mono text-[10px] font-medium tracking-wider text-gray-500 uppercase dark:border-white/10 dark:text-gray-400',
+                                                    )}
+                                                >
+                                                    {col.head}
+                                                </th>
+                                            ))}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -493,6 +543,37 @@ export default function PageRoasTrackerIndex({
                                                         })}
                                                     </Fragment>
                                                 ))}
+                                                {rollUp &&
+                                                    shown.map((col, i) => {
+                                                        const c = readCell(
+                                                            overall!.days[date],
+                                                            col,
+                                                        );
+                                                        return (
+                                                            <td
+                                                                key={col.id}
+                                                                title={c.title}
+                                                                className={cn(
+                                                                    cell,
+                                                                    rowLine,
+                                                                    i === 0 &&
+                                                                        groupStart,
+                                                                    rollUpCell,
+                                                                    'font-semibold group-hover/row:bg-brand-500/10',
+                                                                    c.tone
+                                                                        ? TONE[
+                                                                              c
+                                                                                  .tone
+                                                                          ]
+                                                                        : c.blank
+                                                                          ? 'text-gray-400 dark:text-gray-600'
+                                                                          : 'text-gray-900 dark:text-gray-100',
+                                                                )}
+                                                            >
+                                                                {c.text}
+                                                            </td>
+                                                        );
+                                                    })}
                                             </tr>
                                         );
                                     })}
@@ -554,6 +635,37 @@ export default function PageRoasTrackerIndex({
                                                     })}
                                                 </Fragment>
                                             ))}
+                                            {rollUp &&
+                                                shown.map((col, i) => {
+                                                    const c = readCell(
+                                                        overall![key],
+                                                        col,
+                                                    );
+                                                    return (
+                                                        <td
+                                                            key={col.id}
+                                                            title={c.title}
+                                                            className={cn(
+                                                                cell,
+                                                                i === 0 &&
+                                                                    groupStart,
+                                                                'bg-brand-500/12 font-semibold dark:bg-brand-500/15',
+                                                                rowIndex ===
+                                                                    0 &&
+                                                                    'border-t border-black/12 dark:border-white/12',
+                                                                c.tone
+                                                                    ? TONE[
+                                                                          c.tone
+                                                                      ]
+                                                                    : c.blank
+                                                                      ? 'text-gray-400 dark:text-gray-600'
+                                                                      : 'text-gray-900 dark:text-gray-100',
+                                                            )}
+                                                        >
+                                                            {c.text}
+                                                        </td>
+                                                    );
+                                                })}
                                         </tr>
                                     ))}
                                 </tbody>

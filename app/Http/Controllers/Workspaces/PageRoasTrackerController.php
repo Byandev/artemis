@@ -86,13 +86,14 @@ class PageRoasTrackerController extends Controller
         $names = $this->resolvePageNames($records);
         $dayCount = max(count($dates), 1);
 
-        $pages = $records
+        $series = $records
             ->groupBy(fn ($r) => $r->page_type.'|'.$r->page_id)
             ->map(function (Collection $group, string $key) use ($dates, $names, $dayCount) {
                 $byDate = $group->keyBy('date');
 
                 $totals = self::EMPTY_TALLY;
                 $days = [];
+                $dayTallies = [];
 
                 foreach ($dates as $date) {
                     $rec = $byDate->get($date);
@@ -101,6 +102,7 @@ class PageRoasTrackerController extends Controller
                     $days[$date] = $this->day($rec);
 
                     $tally = $this->tally($rec);
+                    $dayTallies[$date] = $tally;
 
                     foreach ($tally as $field => $value) {
                         if ($field !== 'returning') {
@@ -120,23 +122,33 @@ class PageRoasTrackerController extends Controller
                 [, $pageId] = explode('|', $key, 2);
 
                 return [
-                    'page_id' => $pageId,
-                    'name' => $names[$key] ?? ('Page '.$pageId),
-                    'days' => $days,
-                    'total' => $this->summary($totals),
-                    // Average = per-day mean of the amounts; every ratio stays
-                    // blended over the whole range, so it matches the Total row.
-                    'average' => $this->summary($totals, $dayCount),
+                    'page' => [
+                        'page_id' => $pageId,
+                        'name' => $names[$key] ?? ('Page '.$pageId),
+                        'days' => $days,
+                        'total' => $this->summary($totals),
+                        // Average = per-day mean of the amounts; every ratio stays
+                        // blended over the whole range, so it matches the Total row.
+                        'average' => $this->summary($totals, $dayCount),
+                    ],
+                    // Kept for the all-pages roll-up, which has to go back to the
+                    // ingredients rather than adding up finished figures.
+                    'tally' => $totals,
+                    'dayTallies' => $dayTallies,
                 ];
             })
             // Most active pages first, so the useful columns are left-most.
-            ->sortByDesc(fn ($page) => $page['total']['sales'])
+            ->sortByDesc(fn ($entry) => $entry['page']['total']['sales'])
             ->values();
+
+        $pages = $series->pluck('page')->values();
+        $overall = $this->rollUp($series, $dates, $dayCount);
 
         return Inertia::render('workspaces/page-roas-tracker/index', [
             'workspace' => $workspace,
             'dates' => $dates,
             'pages' => $pages,
+            'overall' => $overall,
             'filterOptions' => $this->filterOptions($workspace, $user),
             'query' => [
                 'start' => $start,
@@ -192,6 +204,60 @@ class PageRoasTrackerController extends Controller
                 ->orderBy('users.name')
                 ->get(['users.id', 'users.name'])
                 ->map(fn ($u) => ['key' => (string) $u->id, 'label' => $u->name]),
+        ];
+    }
+
+    /**
+     * The right-most "All Pages" group: every visible page rolled into one.
+     *
+     * No stored row covers a set of pages, so this group is derived the same way
+     * the Total/Average rows are — back to the counts and amounts underneath.
+     * Adding up finished figures would not work: ROAS across two pages is their
+     * combined sales over their combined spend, not the sum of two ratios.
+     *
+     * @param  Collection<int, array{tally: array<string, float>, dayTallies: array<string, array<string, float>>}>  $series
+     * @return array{days: array<string, mixed>, total: array<string, mixed>, average: array<string, mixed>}|null
+     */
+    private function rollUp(Collection $series, array $dates, int $dayCount): ?array
+    {
+        if ($series->isEmpty()) {
+            return null;
+        }
+
+        $add = function (array $into, array $from): array {
+            foreach ($from as $field => $value) {
+                $into[$field] += $value;
+            }
+
+            return $into;
+        };
+
+        $days = [];
+
+        foreach ($dates as $date) {
+            $tally = self::EMPTY_TALLY;
+
+            foreach ($series as $entry) {
+                // `returning` sums here rather than carrying forward: on one day
+                // these are different pages' parcels, not the same page twice.
+                $tally = $add($tally, $entry['dayTallies'][$date]);
+            }
+
+            $days[$date] = $this->summary($tally);
+        }
+
+        $totals = self::EMPTY_TALLY;
+
+        foreach ($series as $entry) {
+            // Each page's tally already closed its own `returning` snapshot, so
+            // summing them gives what is still out across every page.
+            $totals = $add($totals, $entry['tally']);
+        }
+
+        return [
+            'days' => $days,
+            'total' => $this->summary($totals),
+            'average' => $this->summary($totals, $dayCount),
         ];
     }
 

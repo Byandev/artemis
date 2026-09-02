@@ -181,6 +181,49 @@ it('averages RTS over the days that have one, not the whole range', function () 
         ->and($page['average']['rts_rate'])->toBe(30.0);
 });
 
+it('rolls every visible page into one all-pages group', function () {
+    $second = Page::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $row = fn (array $attrs) => PageDailyRecord::create(array_merge([
+        'workspace_id' => $this->workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => $second->getMorphClass(),
+        'page_id' => $second->getKey(),
+    ], $attrs));
+
+    record(['date' => '2026-08-01', 'orders' => 10, 'sales' => 1000, 'ad_spent' => 500, 'rts_rate' => 20]);
+    $row(['date' => '2026-08-01', 'orders' => 30, 'sales' => 5000, 'ad_spent' => 500, 'rts_rate' => 40]);
+
+    $response = test()->get(route(
+        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
+    ));
+
+    $overall = $response->viewData('page')['props']['overall'];
+
+    // Amounts add up across the pages...
+    expect($overall['days']['2026-08-01']['orders'])->toBe(40)
+        ->and($overall['days']['2026-08-01']['sales'])->toBe(6000.0)
+        ->and($overall['days']['2026-08-01']['ad_spent'])->toBe(1000.0);
+
+    // ...while ROAS is the combined sales over the combined spend, not 2.00 +
+    // 10.00 and not their 6.00 mean.
+    expect($overall['days']['2026-08-01']['roas'])->toBe(6.0)
+        ->and($overall['total']['roas'])->toBe(6.0);
+
+    // RTS still averages the stored rates rather than re-deriving one.
+    expect($overall['days']['2026-08-01']['rts_rate'])->toBe(30.0);
+});
+
+it('sends no all-pages group when nothing is in view', function () {
+    $response = test()->get(route(
+        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
+    ));
+
+    expect($response->viewData('page')['props']['overall'])->toBeNull();
+});
+
 it('sends every metric so the column toggle needs no round trip', function () {
     record(['date' => '2026-08-01', 'orders' => 1, 'sales' => 10, 'ad_spent' => 5]);
 
