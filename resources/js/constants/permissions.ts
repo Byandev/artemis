@@ -160,6 +160,9 @@ export const PERMISSIONS = {
     ViewPageRoasTracker: 'View Page ROAS Tracker',
     ViewSalesTargets: 'View Sales Targets',
     ViewNewCreativesTracker: 'View New Creatives Tracker',
+    CreateNewCreativesTracker: 'Create New Creatives Tracker',
+    EditNewCreativesTracker: 'Edit New Creatives Tracker',
+    DeleteNewCreativesTracker: 'Delete New Creatives Tracker',
     ViewVideoEditorDashboard: 'View Video Editor Dashboard',
     ViewCsrDashboard: 'View CSR Dashboard',
 

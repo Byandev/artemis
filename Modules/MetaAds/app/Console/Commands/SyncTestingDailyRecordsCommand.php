@@ -21,6 +21,7 @@ class SyncTestingDailyRecordsCommand extends Command
         // Paused items are deliberately left out — they keep the history they
         // have and stop accruing days until someone resumes them.
         $items = TestingItem::active()
+            ->synced()
             ->when($workspaceId, fn ($q) => $q->where('workspace_id', $workspaceId))
             ->get();
 

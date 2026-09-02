@@ -90,19 +90,28 @@ function makeAdSet(int $accountId, int $campaignId, string $name, string $status
     return $id;
 }
 
-/** A member holding only the tracker's own grant. */
-function trackerMember(Workspace $workspace): User
+/** A member holding the given tracker grants (all four by default). */
+function trackerMember(Workspace $workspace, ?array $permissions = null): User
 {
+    $permissions ??= [
+        PermissionEnum::ViewNewCreativesTracker,
+        PermissionEnum::CreateNewCreativesTracker,
+        PermissionEnum::EditNewCreativesTracker,
+        PermissionEnum::DeleteNewCreativesTracker,
+    ];
+
     $user = User::factory()->create();
 
     $role = Role::create(['workspace_id' => $workspace->id, 'name' => 'Tracker '.uniqid()]);
 
-    $permission = Permission::firstOrCreate(
-        ['name' => PermissionEnum::ViewNewCreativesTracker->value],
-        ['category' => PermissionEnum::ViewNewCreativesTracker->category()],
-    );
+    foreach ($permissions as $permission) {
+        $row = Permission::firstOrCreate(
+            ['name' => $permission->value],
+            ['category' => $permission->category()],
+        );
 
-    DB::table('role_permissions')->insert(['role_id' => $role->id, 'permission_id' => $permission->id]);
+        DB::table('role_permissions')->insertOrIgnore(['role_id' => $role->id, 'permission_id' => $row->id]);
+    }
     $workspace->users()->attach($user->id, ['role_id' => $role->id]);
 
     return $user;
@@ -875,4 +884,551 @@ test('an invalid filter value is rejected', function () {
     $this->actingAs($owner)
         ->getJson(trackerUrl($workspace, ['type' => 'banana']))
         ->assertStatus(422);
+});
+
+/** Post a manual item, returning the response. */
+function addManual(Workspace $workspace, array $payload = [])
+{
+    return test()->post(
+        "/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/manual",
+        array_merge([
+            'item_type' => 'campaign',
+            'name' => 'Manual entry',
+            'start_date' => '2026-08-01',
+        ], $payload),
+    );
+}
+
+/** The day-cell endpoint for one item and day. */
+function dayUrl(Workspace $workspace, TestingItem $item, int $day): string
+{
+    return "/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}/days/{$day}";
+}
+
+/** A manual item ready to have its days typed in. */
+function manualItem(Workspace $workspace, string $start = '2026-08-01'): TestingItem
+{
+    return TestingItem::create([
+        'workspace_id' => $workspace->id, 'source' => 'manual', 'item_type' => 'campaign',
+        'item_id' => null, 'name' => 'Typed', 'start_date' => $start,
+    ]);
+}
+
+test('a manual item is created with its own name, account and page', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $this->actingAs($owner);
+
+    addManual($workspace, [
+        'item_type' => 'ad_set',
+        'name' => 'Hand-entered ad set',
+        'account_name' => 'Some Account',
+        'page_name' => 'Some Page',
+        'start_date' => '2026-08-10',
+    ])->assertRedirect();
+
+    $item = TestingItem::first();
+
+    expect($item->source)->toBe('manual')
+        ->and($item->item_id)->toBeNull()
+        ->and($item->name)->toBe('Hand-entered ad set')
+        ->and($item->account_name)->toBe('Some Account')
+        ->and($item->page_name)->toBe('Some Page')
+        ->and($item->start_date->toDateString())->toBe('2026-08-10');
+});
+
+test('a manual item needs a name', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/manual", [
+            'item_type' => 'campaign',
+        ])
+        ->assertStatus(422);
+
+    expect(TestingItem::count())->toBe(0);
+});
+
+test('several manual items can coexist despite the unique key', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $this->actingAs($owner);
+
+    // All three have a null item_id — the unique index tolerates that.
+    addManual($workspace, ['name' => 'First'])->assertRedirect();
+    addManual($workspace, ['name' => 'Second'])->assertRedirect();
+    addManual($workspace, ['name' => 'Third'])->assertRedirect();
+
+    expect(TestingItem::count())->toBe(3);
+});
+
+test('the sync leaves manual items alone', function () {
+    ['workspace' => $workspace, 'accountId' => $accountId] = trackerContext();
+
+    $manual = TestingItem::create([
+        'workspace_id' => $workspace->id, 'source' => 'manual', 'item_type' => 'campaign',
+        'item_id' => null, 'name' => 'Manual', 'account_name' => 'Typed in',
+        'start_date' => '2026-08-01',
+    ]);
+
+    // An insight row that would match if item_id were read as a campaign id.
+    makeInsight($accountId, (int) $manual->id, '2026-08-01', 10, 40);
+
+    app(TestingDailyRecordSync::class)->all();
+    app(TestingItemResolver::class)->resolve(collect([$manual]));
+
+    expect(DB::table('meta_ads_testing_daily_records')->count())->toBe(0)
+        ->and($manual->fresh()->account_name)->toBe('Typed in')
+        ->and($manual->fresh()->meta_ads_account_id)->toBeNull();
+});
+
+test('the page shows a manual item using its own fields', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    TestingItem::create([
+        'workspace_id' => $workspace->id, 'source' => 'manual', 'item_type' => 'campaign',
+        'item_id' => null, 'name' => 'Typed campaign', 'account_name' => 'Typed account',
+        'page_name' => 'Typed page', 'start_date' => '2026-08-05',
+    ]);
+
+    $row = $this->actingAs($owner)->get(trackerUrl($workspace))->assertOk()
+        ->viewData('page')['props']['items']['data'][0];
+
+    expect($row['name'])->toBe('Typed campaign')
+        ->and($row['source'])->toBe('manual')
+        ->and($row['account_name'])->toBe('Typed account')
+        ->and($row['page_name'])->toBe('Typed page')
+        ->and($row['start_date'])->toBe('2026-08-05');
+});
+
+test('the source filter separates manual from synced', function () {
+    ['workspace' => $workspace, 'owner' => $owner, 'accountId' => $accountId] = trackerContext();
+
+    trackCampaign($workspace, $accountId, 'Synced one');
+    TestingItem::create([
+        'workspace_id' => $workspace->id, 'source' => 'manual', 'item_type' => 'campaign',
+        'item_id' => null, 'name' => 'Manual one',
+    ]);
+
+    expect(renderedNames($this->actingAs($owner)->get(trackerUrl($workspace, ['source' => 'manual']))))
+        ->toBe(['Manual one'])
+        ->and(renderedNames($this->actingAs($owner)->get(trackerUrl($workspace, ['source' => 'meta']))))
+        ->toBe(['Synced one']);
+});
+
+test('search and date filters reach manual items too', function () {
+    ['workspace' => $workspace, 'owner' => $owner, 'accountId' => $accountId] = trackerContext();
+
+    trackCampaign($workspace, $accountId, 'Synced launch', '2026-08-10 00:00:00');
+    TestingItem::create([
+        'workspace_id' => $workspace->id, 'source' => 'manual', 'item_type' => 'campaign',
+        'item_id' => null, 'name' => 'Manual launch', 'start_date' => '2026-08-12',
+    ]);
+    TestingItem::create([
+        'workspace_id' => $workspace->id, 'source' => 'manual', 'item_type' => 'campaign',
+        'item_id' => null, 'name' => 'Manual launch old', 'start_date' => '2026-07-01',
+    ]);
+
+    // A manual row is matched on its own name and start_date, not through a
+    // Meta table it has no row in.
+    $names = renderedNames($this->actingAs($owner)->get(trackerUrl($workspace, [
+        'search' => 'launch', 'start_from' => '2026-08-01',
+    ]))->assertOk());
+
+    expect($names)->toContain('Manual launch')
+        ->and($names)->toContain('Synced launch')
+        ->and($names)->not->toContain('Manual launch old');
+});
+
+test('a manual item records its product as text', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $this->actingAs($owner);
+    addManual($workspace, ['product_name' => 'Nerve Cream'])->assertRedirect();
+
+    expect(TestingItem::first()->product_name)->toBe('Nerve Cream');
+
+    $row = $this->actingAs($owner)->get(trackerUrl($workspace))
+        ->viewData('page')['props']['items']['data'][0];
+
+    expect($row['product'])->toBe('Nerve Cream');
+});
+
+test('a manual item needs a start date', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/manual", [
+            'item_type' => 'campaign', 'name' => 'No start',
+        ])
+        ->assertStatus(422);
+});
+
+test('a day cell can be typed in, and roas follows from it', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = manualItem($workspace);
+
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 1), [
+        'sales' => 1000, 'ad_spent' => 250,
+    ])->assertRedirect();
+
+    $record = DB::table('meta_ads_testing_daily_records')->first();
+
+    expect((int) $record->day)->toBe(1)
+        // Day 1 is the start date itself.
+        ->and($record->date)->toBe('2026-08-01')
+        ->and((float) $record->sales)->toBe(1000.0)
+        ->and((float) $record->ad_spent)->toBe(250.0)
+        // Never typed — derived from the two figures that were.
+        ->and((float) $record->roas)->toBe(4.0);
+});
+
+test('a later day lands on the right date', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = manualItem($workspace, '2026-08-01');
+
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 5), ['sales' => 10, 'ad_spent' => 5])
+        ->assertRedirect();
+
+    $record = DB::table('meta_ads_testing_daily_records')->first();
+
+    expect((int) $record->day)->toBe(5)
+        ->and($record->date)->toBe('2026-08-05');
+});
+
+test('typing a day twice updates it rather than adding another', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = manualItem($workspace);
+
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 1), ['sales' => 100, 'ad_spent' => 50]);
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 1), ['sales' => 900]);
+
+    $records = DB::table('meta_ads_testing_daily_records')->get();
+
+    expect($records)->toHaveCount(1)
+        // Sending one field leaves the other in place, and roas re-derives.
+        ->and((float) $records->first()->sales)->toBe(900.0)
+        ->and((float) $records->first()->ad_spent)->toBe(50.0)
+        ->and((float) $records->first()->roas)->toBe(18.0);
+});
+
+test('a synced item refuses typed figures', function () {
+    ['workspace' => $workspace, 'owner' => $owner, 'accountId' => $accountId] = trackerContext();
+
+    $item = trackCampaign($workspace, $accountId, 'Synced', '2026-08-01 00:00:00');
+
+    // Its days are rebuilt from insights hourly, so typing over them would be
+    // lost within the hour — refused rather than silently discarded later.
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 1), ['sales' => 100])
+        ->assertForbidden();
+
+    expect(DB::table('meta_ads_testing_daily_records')->count())->toBe(0);
+});
+
+test('a day outside the window is refused', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = manualItem($workspace);
+
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 8), ['sales' => 1])->assertNotFound();
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 0), ['sales' => 1])->assertNotFound();
+});
+
+test('another workspace\'s day cannot be typed', function () {
+    ['workspace' => $mine, 'owner' => $owner] = trackerContext();
+    ['workspace' => $theirs] = trackerContext();
+
+    $item = manualItem($theirs);
+
+    $this->actingAs($owner)->patch(dayUrl($mine, $item, 1), ['sales' => 100])->assertNotFound();
+
+    expect(DB::table('meta_ads_testing_daily_records')->count())->toBe(0);
+});
+
+test('typed days survive a sync run', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = manualItem($workspace);
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 1), ['sales' => 500, 'ad_spent' => 100]);
+
+    app(TestingDailyRecordSync::class)->all();
+
+    // The sync skips manual items entirely, so nothing it does can clear these.
+    expect((float) DB::table('meta_ads_testing_daily_records')->first()->sales)->toBe(500.0);
+});
+
+test('a manual item\'s start date can be set from the row', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    // A row saved before a start date was required is recoverable rather than
+    // stuck: set the date, then its days become typeable.
+    $item = TestingItem::create([
+        'workspace_id' => $workspace->id, 'source' => 'manual', 'item_type' => 'campaign',
+        'item_id' => null, 'name' => 'No start yet',
+    ]);
+
+    $url = "/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}";
+
+    $this->actingAs($owner)->patch($url, ['start_date' => '2026-08-20'])->assertRedirect();
+
+    expect($item->fresh()->start_date->toDateString())->toBe('2026-08-20');
+
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 1), ['sales' => 300, 'ad_spent' => 100])
+        ->assertRedirect();
+
+    expect(DB::table('meta_ads_testing_daily_records')->first()->date)->toBe('2026-08-20');
+});
+
+test('a synced item refuses a typed start date', function () {
+    ['workspace' => $workspace, 'owner' => $owner, 'accountId' => $accountId] = trackerContext();
+
+    $item = trackCampaign($workspace, $accountId, 'Synced', '2026-08-01 00:00:00');
+
+    $this->actingAs($owner)
+        ->patch("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}", [
+            'start_date' => '2026-09-01',
+        ])
+        ->assertForbidden();
+
+    expect($item->fresh()->start_date)->toBeNull();
+});
+
+test('typing a day on an item with no start date is refused, not fatal', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = TestingItem::create([
+        'workspace_id' => $workspace->id, 'source' => 'manual', 'item_type' => 'campaign',
+        'item_id' => null, 'name' => 'No start',
+    ]);
+
+    $this->actingAs($owner)
+        ->patchJson(dayUrl($workspace, $item, 1), ['sales' => 100])
+        ->assertStatus(422);
+
+    expect(DB::table('meta_ads_testing_daily_records')->count())->toBe(0);
+});
+
+test('an item can be removed, taking its recorded days with it', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = manualItem($workspace);
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 1), ['sales' => 100, 'ad_spent' => 25]);
+
+    expect(DB::table('meta_ads_testing_daily_records')->count())->toBe(1);
+
+    $this->actingAs($owner)
+        ->delete("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}")
+        ->assertRedirect();
+
+    // The daily records go with it — the foreign key cascades.
+    expect(TestingItem::count())->toBe(0)
+        ->and(DB::table('meta_ads_testing_daily_records')->count())->toBe(0);
+});
+
+test('a synced item can be removed too, leaving the campaign alone', function () {
+    ['workspace' => $workspace, 'owner' => $owner, 'accountId' => $accountId] = trackerContext();
+
+    $item = trackCampaign($workspace, $accountId, 'Synced', '2026-08-01 00:00:00');
+
+    $this->actingAs($owner)
+        ->delete("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}")
+        ->assertRedirect();
+
+    expect(TestingItem::count())->toBe(0)
+        // Only the tracker row goes; the campaign itself is untouched.
+        ->and(DB::table('meta_ads_campaigns')->where('id', $item->item_id)->exists())->toBeTrue();
+});
+
+test('another workspace\'s item cannot be removed', function () {
+    ['workspace' => $mine, 'owner' => $owner] = trackerContext();
+    ['workspace' => $theirs] = trackerContext();
+
+    $item = manualItem($theirs);
+
+    $this->actingAs($owner)
+        ->delete("/workspaces/{$mine->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}")
+        ->assertNotFound();
+
+    expect(TestingItem::count())->toBe(1);
+});
+
+test('a manual item can be edited', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = manualItem($workspace);
+
+    $this->actingAs($owner)
+        ->put("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}", [
+            'item_type' => 'ad_set',
+            'name' => 'Renamed',
+            'account_name' => 'New account',
+            'page_name' => 'New page',
+            'product_name' => 'New product',
+            'start_date' => '2026-08-01',
+        ])
+        ->assertRedirect();
+
+    $item->refresh();
+
+    expect($item->name)->toBe('Renamed')
+        ->and($item->item_type)->toBe('ad_set')
+        ->and($item->account_name)->toBe('New account')
+        ->and($item->page_name)->toBe('New page')
+        ->and($item->product_name)->toBe('New product');
+});
+
+test('moving the start date re-dates the days already recorded', function () {
+    ['workspace' => $workspace, 'owner' => $owner] = trackerContext();
+
+    $item = manualItem($workspace, '2026-08-01');
+
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 1), ['sales' => 100, 'ad_spent' => 20]);
+    $this->actingAs($owner)->patch(dayUrl($workspace, $item, 3), ['sales' => 300, 'ad_spent' => 60]);
+
+    $this->actingAs($owner)
+        ->put("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}", [
+            'item_type' => 'campaign', 'name' => 'Typed', 'start_date' => '2026-09-10',
+        ])
+        ->assertRedirect();
+
+    // Day 1 follows the new start date, day 3 stays two days after it — the
+    // numbers keep the day they were entered against.
+    $byDay = DB::table('meta_ads_testing_daily_records')
+        ->where('meta_ads_testing_item_id', $item->id)
+        ->pluck('date', 'day');
+
+    expect($byDay[1])->toBe('2026-09-10')
+        ->and($byDay[3])->toBe('2026-09-12');
+});
+
+test('a synced item refuses an edit', function () {
+    ['workspace' => $workspace, 'owner' => $owner, 'accountId' => $accountId] = trackerContext();
+
+    $item = trackCampaign($workspace, $accountId, 'Synced', '2026-08-01 00:00:00');
+
+    $this->actingAs($owner)
+        ->put("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}", [
+            'item_type' => 'campaign', 'name' => 'Hijacked', 'start_date' => '2026-08-01',
+        ])
+        ->assertForbidden();
+
+    expect($item->fresh()->name)->toBeNull();
+});
+
+/** Each write endpoint, with the grant that opens it. */
+dataset('tracker_writes', [
+    'add from picker' => ['post', 'items', PermissionEnum::CreateNewCreativesTracker],
+    'add manual' => ['post', 'items/manual', PermissionEnum::CreateNewCreativesTracker],
+]);
+
+test('viewing does not grant adding', function () {
+    ['workspace' => $workspace, 'accountId' => $accountId] = trackerContext();
+
+    $viewer = trackerMember($workspace, [PermissionEnum::ViewNewCreativesTracker]);
+    $campaignId = makeCampaign($accountId, 'Addable', 'ACTIVE', '2026-08-01 00:00:00');
+
+    // The page opens...
+    $this->actingAs($viewer)->get(trackerUrl($workspace))->assertOk();
+
+    // ...but nothing can be added through it.
+    $this->actingAs($viewer)
+        ->post("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items", [
+            'items' => [['item_type' => 'campaign', 'item_id' => (string) $campaignId]],
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($viewer)
+        ->post("/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/manual", [
+            'item_type' => 'campaign', 'name' => 'Nope', 'start_date' => '2026-08-01',
+        ])
+        ->assertForbidden();
+
+    expect(TestingItem::count())->toBe(0);
+});
+
+test('adding does not grant editing or removing', function () {
+    ['workspace' => $workspace] = trackerContext();
+
+    $adder = trackerMember($workspace, [
+        PermissionEnum::ViewNewCreativesTracker,
+        PermissionEnum::CreateNewCreativesTracker,
+    ]);
+
+    $item = manualItem($workspace);
+    $base = "/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}";
+
+    $this->actingAs($adder)->patch($base, ['intern_decision' => 'scale'])->assertForbidden();
+    $this->actingAs($adder)->patch("{$base}/pause")->assertForbidden();
+    $this->actingAs($adder)->patch("{$base}/days/1", ['sales' => 10])->assertForbidden();
+    $this->actingAs($adder)->put($base, [
+        'item_type' => 'campaign', 'name' => 'x', 'start_date' => '2026-08-01',
+    ])->assertForbidden();
+    $this->actingAs($adder)->delete($base)->assertForbidden();
+
+    expect($item->fresh()->intern_decision)->toBeNull()
+        ->and(TestingItem::count())->toBe(1);
+});
+
+test('editing does not grant removing', function () {
+    ['workspace' => $workspace] = trackerContext();
+
+    $editor = trackerMember($workspace, [
+        PermissionEnum::ViewNewCreativesTracker,
+        PermissionEnum::EditNewCreativesTracker,
+    ]);
+
+    $item = manualItem($workspace);
+    $base = "/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}";
+
+    $this->actingAs($editor)->patch($base, ['finance_status' => 'collected'])->assertRedirect();
+    $this->actingAs($editor)->delete($base)->assertForbidden();
+
+    expect(TestingItem::count())->toBe(1);
+});
+
+test('removing does not grant editing', function () {
+    ['workspace' => $workspace] = trackerContext();
+
+    $remover = trackerMember($workspace, [
+        PermissionEnum::ViewNewCreativesTracker,
+        PermissionEnum::DeleteNewCreativesTracker,
+    ]);
+
+    $item = manualItem($workspace);
+    $base = "/workspaces/{$workspace->slug}/sales-marketing/new-creatives-tracker/items/{$item->id}";
+
+    $this->actingAs($remover)->patch($base, ['finance_status' => 'collected'])->assertForbidden();
+    $this->actingAs($remover)->delete($base)->assertRedirect();
+
+    expect(TestingItem::count())->toBe(0);
+});
+
+test('the page tells the client which grants it holds', function () {
+    ['workspace' => $workspace] = trackerContext();
+
+    $can = $this->actingAs(trackerMember($workspace, [
+        PermissionEnum::ViewNewCreativesTracker,
+        PermissionEnum::EditNewCreativesTracker,
+    ]))->get(trackerUrl($workspace))->assertOk()->viewData('page')['props']['can'];
+
+    // The buttons a viewer cannot use are never drawn, so the page has to know.
+    expect($can['create'])->toBeFalse()
+        ->and($can['edit'])->toBeTrue()
+        ->and($can['delete'])->toBeFalse();
+});
+
+test('the module switch hides all four tracker grants', function () {
+    ['workspace' => $workspace] = trackerContext();
+
+    $workspace->update(['sales_marketing_dashboard_module_enabled' => false]);
+
+    expect($workspace->fresh()->hiddenPermissionNames())->toContain(
+        PermissionEnum::ViewNewCreativesTracker->value,
+        PermissionEnum::CreateNewCreativesTracker->value,
+        PermissionEnum::EditNewCreativesTracker->value,
+        PermissionEnum::DeleteNewCreativesTracker->value,
+    );
 });

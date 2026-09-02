@@ -1,5 +1,16 @@
 import PageHeader from '@/components/common/PageHeader';
+import AddManualItemDialog from '@/components/sales-marketing/new-creatives-tracker/add-manual-item-dialog';
 import AddTestingItemDialog from '@/components/sales-marketing/new-creatives-tracker/add-testing-item-dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import DatePicker from '@/components/ui/date-picker';
 import Pagination from '@/components/ui/pagination';
@@ -10,12 +21,22 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useDebouncedState } from '@/hooks/use-debounced-state';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import flatpickr from 'flatpickr';
-import { Pause, Play, Plus, Search, X } from 'lucide-react';
+import {
+    Pause,
+    Pencil,
+    PencilLine,
+    Play,
+    Plus,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 import moment from 'moment';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -37,8 +58,10 @@ type FinanceStatus = 'for_collection' | 'pending' | 'collected';
 interface TestingItem {
     id: number;
     item_type: 'campaign' | 'ad_set';
-    item_id: string;
+    item_id: string | null;
+    source: 'meta' | 'manual';
     name: string | null;
+    page_name: string | null;
     account_id: string | null;
     account_name: string | null;
     product: string | null;
@@ -100,6 +123,7 @@ interface Filters {
     search: string | null;
     account: string | null;
     type: 'campaign' | 'ad_set' | null;
+    source: 'meta' | 'manual' | null;
     start_from: string | null;
     start_to: string | null;
     per_page: number;
@@ -111,6 +135,8 @@ interface Props {
     maxDay: number;
     accounts: { id: string; name: string }[];
     filters: Filters;
+    /** What this viewer may do — buttons they cannot use are not drawn. */
+    can: { create: boolean; edit: boolean; delete: boolean };
 }
 
 const TYPE_LABEL: Record<TestingItem['item_type'], string> = {
@@ -169,7 +195,7 @@ const accountLine = (item: TestingItem) => {
         item.account_name ??
         (item.account_id ? `Account ${item.account_id}` : 'No ad account');
 
-    return item.product ? `${account} | ${item.product}` : account;
+    return [account, item.page_name, item.product].filter(Boolean).join(' | ');
 };
 
 /**
@@ -180,6 +206,10 @@ const accountLine = (item: TestingItem) => {
  */
 const filterInput =
     'h-9 rounded-[10px] border border-black/8 bg-stone-50 text-[12px] text-gray-700 outline-none transition-all placeholder:text-gray-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-200 dark:placeholder:text-gray-600';
+
+/** The small square buttons in the item column — pause, edit, remove. */
+const rowAction =
+    'flex size-6 shrink-0 items-center justify-center rounded-md border border-black/8 text-gray-400 transition-colors hover:bg-stone-50 hover:text-gray-600 disabled:opacity-40 dark:border-white/8 dark:text-gray-500 dark:hover:bg-zinc-800 dark:hover:text-gray-300';
 
 const cell = 'px-2.5 py-2.5 text-right font-mono text-[11px] whitespace-nowrap';
 
@@ -205,6 +235,56 @@ const groupEnd = 'border-r border-r-black/10 dark:border-r-white/10';
 const divider = 'border-l border-l-black/6 dark:border-l-white/6';
 
 /**
+ * A typed-in figure. Holds its own draft while focused so the value does not
+ * jump around mid-edit, and only saves on blur or Enter — a request per
+ * keystroke would be both wasteful and jarring.
+ */
+function EditableFigure({
+    value,
+    onSave,
+}: {
+    value: number | null;
+    onSave: (value: number | null) => void;
+}) {
+    const [draft, setDraft] = useState<string | null>(null);
+    const shown = draft ?? (value === null ? '' : String(value));
+
+    const commit = () => {
+        if (draft === null) return;
+
+        const trimmed = draft.trim();
+        const parsed = trimmed === '' ? null : Number(trimmed);
+
+        setDraft(null);
+
+        // Nothing to send if it did not actually change, or is not a number.
+        if (parsed !== null && Number.isNaN(parsed)) return;
+        if ((parsed ?? null) === (value ?? null)) return;
+
+        onSave(parsed);
+    };
+
+    return (
+        <input
+            value={shown}
+            inputMode="decimal"
+            onChange={(e) => setDraft(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={commit}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Escape') {
+                    setDraft(null);
+                    e.currentTarget.blur();
+                }
+            }}
+            placeholder="—"
+            className="w-full min-w-[52px] rounded border border-transparent bg-transparent px-1 py-0.5 text-right font-mono text-[11px] outline-none hover:border-black/10 focus:border-emerald-500 focus:bg-white dark:hover:border-white/10 dark:focus:bg-zinc-900"
+        />
+    );
+}
+
+/**
  * The Sales / Spend / ROAS trio, used for both a day and the totals. Returns
  * three cells rather than one so the columns line up across every row.
  */
@@ -212,11 +292,14 @@ function MetricCells({
     metrics,
     emphasise = false,
     tint = false,
+    onEdit,
 }: {
     metrics?: Metrics;
     emphasise?: boolean;
     /** Wash the day's ROAS verdict across all three cells. */
     tint?: boolean;
+    /** Given for a manual item's day: makes sales and spend typeable. */
+    onEdit?: (field: 'sales' | 'ad_spent', value: number | null) => void;
 }) {
     const tone = emphasise
         ? 'font-medium text-gray-800 dark:text-gray-100'
@@ -224,18 +307,43 @@ function MetricCells({
     const empty = <span className="text-gray-200 dark:text-gray-700">—</span>;
     const bg = tint && metrics ? roasBackground(metrics.roas) : '';
 
+    // ROAS is never typed on either path — it follows from the other two.
+    const roas = metrics?.roas ?? null;
+
     return (
         <>
-            <td className={`${cell} ${groupStart} ${bg} ${tone}`}>
-                {metrics ? money(metrics.sales) : empty}
-            </td>
-            <td className={`${cell} ${divider} ${bg} ${tone}`}>
-                {metrics ? money(metrics.ad_spent) : empty}
+            <td
+                className={`${cell} ${groupStart} ${bg} ${tone} ${onEdit ? 'p-1' : ''}`}
+            >
+                {onEdit ? (
+                    <EditableFigure
+                        value={metrics?.sales ?? null}
+                        onSave={(value) => onEdit('sales', value)}
+                    />
+                ) : metrics ? (
+                    money(metrics.sales)
+                ) : (
+                    empty
+                )}
             </td>
             <td
-                className={`${cell} ${divider} ${groupEnd} ${bg} font-medium ${metrics ? roasTone(metrics.roas) : ''}`}
+                className={`${cell} ${divider} ${bg} ${tone} ${onEdit ? 'p-1' : ''}`}
             >
-                {metrics ? roasText(metrics.roas) : empty}
+                {onEdit ? (
+                    <EditableFigure
+                        value={metrics?.ad_spent ?? null}
+                        onSave={(value) => onEdit('ad_spent', value)}
+                    />
+                ) : metrics ? (
+                    money(metrics.ad_spent)
+                ) : (
+                    empty
+                )}
+            </td>
+            <td
+                className={`${cell} ${divider} ${groupEnd} ${bg} font-medium ${metrics ? roasTone(roas) : ''}`}
+            >
+                {metrics || onEdit ? roasText(roas) : empty}
             </td>
         </>
     );
@@ -303,8 +411,12 @@ export default function NewCreativesTracker({
     maxDay,
     accounts,
     filters,
+    can,
 }: Props) {
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [manualOpen, setManualOpen] = useState(false);
+    const [editing, setEditing] = useState<TestingItem | null>(null);
+    const [deleting, setDeleting] = useState<TestingItem | null>(null);
     const [pending, setPending] = useState<number | null>(null);
     const [saving, setSaving] = useState<number | null>(null);
 
@@ -333,6 +445,7 @@ export default function NewCreativesTracker({
             search: filters.search,
             account: filters.account,
             type: filters.type,
+            source: filters.source,
             start_from: filters.start_from,
             start_to: filters.start_to,
             // Kept across filter changes so the chosen page size sticks; the
@@ -369,6 +482,7 @@ export default function NewCreativesTracker({
         filters.search ||
         filters.account ||
         filters.type ||
+        filters.source ||
         filters.start_from ||
         filters.start_to,
     );
@@ -380,6 +494,37 @@ export default function NewCreativesTracker({
 
     /** Paging keeps the filters — applyFilters rebuilds them into the URL. */
     const goToPage = (page: number) => applyFilters({ page: String(page) });
+
+    const removeItem = () => {
+        if (!deleting) return;
+
+        router.delete(`${baseUrl}/items/${deleting.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Item removed.');
+                setDeleting(null);
+            },
+            onError: () => toast.error('Could not remove that item.'),
+        });
+    };
+
+    /** Save one typed figure for one day of a manual item. */
+    const saveDay = (
+        item: TestingItem,
+        day: number,
+        field: 'sales' | 'ad_spent',
+        value: number | null,
+    ) => {
+        router.patch(
+            `${baseUrl}/items/${item.id}/days/${day}`,
+            { [field]: value },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: () => toast.error('Could not save that figure.'),
+            },
+        );
+    };
 
     const togglePause = (item: TestingItem) => {
         setPending(item.id);
@@ -403,7 +548,7 @@ export default function NewCreativesTracker({
 
     const updateStatus = (
         item: TestingItem,
-        field: 'intern_decision' | 'finance_status',
+        field: 'intern_decision' | 'finance_status' | 'start_date',
         value: string | null,
     ) => {
         setSaving(item.id);
@@ -432,10 +577,25 @@ export default function NewCreativesTracker({
                     }
                     stackActionsOnMobile
                 >
-                    <Button size="sm" onClick={() => setPickerOpen(true)}>
-                        <Plus className="size-3.5" />
-                        Add Testing Item
-                    </Button>
+                    {can.create && (
+                        <>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setManualOpen(true)}
+                            >
+                                <PencilLine className="size-3.5" />
+                                Manual
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={() => setPickerOpen(true)}
+                            >
+                                <Plus className="size-3.5" />
+                                Add Testing Item
+                            </Button>
+                        </>
+                    )}
                 </PageHeader>
 
                 {/* One line of controls at their own widths — no panel, no
@@ -477,6 +637,23 @@ export default function NewCreativesTracker({
                         <option value="campaign">Campaigns</option>
                         <option value="ad_set">Ad sets</option>
                     </select>
+
+                    {/* One switch rather than an All/Synced/Manual dropdown:
+                        the ask is to pick out what was added by hand, and a
+                        two-state control says that without a third option
+                        nobody reaches for. */}
+                    <label className="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-[10px] border border-black/8 bg-stone-50 px-2.5 dark:border-white/8 dark:bg-zinc-800">
+                        <Switch
+                            checked={filters.source === 'manual'}
+                            onCheckedChange={(on) =>
+                                applyFilters({ source: on ? 'manual' : null })
+                            }
+                            className="h-4 w-7 [&>[data-slot=switch-thumb]]:size-3 [&>[data-slot=switch-thumb]]:data-[state=checked]:translate-x-3"
+                        />
+                        <span className="text-[12px] whitespace-nowrap text-gray-600 dark:text-gray-300">
+                            Manual only
+                        </span>
+                    </label>
 
                     {/* One range picker, not two date fields — start_from and
                         start_to are the two ends of a single window. */}
@@ -587,6 +764,12 @@ export default function NewCreativesTracker({
                                     >
                                         Finance Status
                                     </th>
+                                    <th
+                                        rowSpan={2}
+                                        className={`${groupStart} ${stickyBottom} sticky top-0 z-30 bg-stone-50 px-3 py-2 text-center text-[11px] font-semibold text-gray-600 dark:bg-zinc-800 dark:text-gray-200`}
+                                    >
+                                        Actions
+                                    </th>
                                 </tr>
                                 <tr className="border-b border-b-black/8 dark:border-b-white/8">
                                     {dayColumns.map((day) => (
@@ -613,6 +796,7 @@ export default function NewCreativesTracker({
                                                         togglePause(item)
                                                     }
                                                     disabled={
+                                                        !can.edit ||
                                                         pending === item.id
                                                     }
                                                     title={
@@ -625,10 +809,15 @@ export default function NewCreativesTracker({
                                                             ? `Resume tracking ${item.name ?? item.item_id}`
                                                             : `Pause tracking ${item.name ?? item.item_id}`
                                                     }
-                                                    className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border transition-colors disabled:opacity-40 ${
+                                                    // mt-0.5 here only: this one
+                                                    // sits beside the name and
+                                                    // lines up with its first
+                                                    // line, unlike the buttons
+                                                    // in the Actions column.
+                                                    className={`mt-0.5 ${
                                                         item.is_paused
-                                                            ? 'border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400'
-                                                            : 'border-black/8 text-gray-400 hover:bg-stone-50 hover:text-gray-600 dark:border-white/8 dark:text-gray-500 dark:hover:bg-zinc-800 dark:hover:text-gray-300'
+                                                            ? 'flex size-6 shrink-0 items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-600 transition-colors hover:bg-amber-100 disabled:opacity-40 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-400'
+                                                            : rowAction
                                                     }`}
                                                 >
                                                     {item.is_paused ? (
@@ -654,13 +843,61 @@ export default function NewCreativesTracker({
                                                                 item.item_type
                                                             ]
                                                         }
-                                                        {item.start_date
-                                                            ? ` · started ${item.start_date}`
-                                                            : ' · no start date'}
+                                                        {item.source !==
+                                                        'manual'
+                                                            ? item.start_date
+                                                                ? ` · started ${item.start_date}`
+                                                                : ' · no start date'
+                                                            : null}
                                                         {item.is_paused
                                                             ? ' · paused'
                                                             : ''}
+                                                        {item.source ===
+                                                        'manual' ? (
+                                                            <span className="ml-1.5 rounded border border-violet-200 bg-violet-50 px-1 py-px text-[9px] font-medium text-violet-600 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300">
+                                                                MANUAL
+                                                            </span>
+                                                        ) : null}
                                                     </span>
+                                                    {item.source ===
+                                                        'manual' && (
+                                                        <span className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                                            Started
+                                                            <input
+                                                                type="date"
+                                                                disabled={
+                                                                    !can.edit
+                                                                }
+                                                                value={
+                                                                    item.start_date ??
+                                                                    ''
+                                                                }
+                                                                onChange={(e) =>
+                                                                    e.target
+                                                                        .value &&
+                                                                    updateStatus(
+                                                                        item,
+                                                                        'start_date',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className={`rounded border px-1 py-px font-mono text-[10px] outline-none focus:border-emerald-500 ${
+                                                                    item.start_date
+                                                                        ? 'border-transparent bg-transparent text-gray-500 hover:border-black/10 dark:text-gray-400 dark:hover:border-white/10'
+                                                                        : 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300'
+                                                                }`}
+                                                            />
+                                                            {!item.start_date && (
+                                                                <span className="text-amber-600 dark:text-amber-400">
+                                                                    needed
+                                                                    before days
+                                                                    can be typed
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    )}
+
                                                     {/* Ad account | product —
                                                         their own line, since the
                                                         meta line above already
@@ -681,6 +918,24 @@ export default function NewCreativesTracker({
                                                         | undefined
                                                 }
                                                 tint
+                                                // Only a manual item's days are
+                                                // typeable — a synced one is
+                                                // rebuilt from insights hourly,
+                                                // so anything typed would be
+                                                // overwritten.
+                                                onEdit={
+                                                    can.edit &&
+                                                    item.source === 'manual' &&
+                                                    item.start_date
+                                                        ? (field, value) =>
+                                                              saveDay(
+                                                                  item,
+                                                                  day,
+                                                                  field,
+                                                                  value,
+                                                              )
+                                                        : undefined
+                                                }
                                             />
                                         ))}
 
@@ -695,7 +950,10 @@ export default function NewCreativesTracker({
                                             <StatusSelect
                                                 value={item.intern_decision}
                                                 options={DECISION_OPTIONS}
-                                                disabled={saving === item.id}
+                                                disabled={
+                                                    !can.edit ||
+                                                    saving === item.id
+                                                }
                                                 placeholder="Not decided"
                                                 onChange={(value) =>
                                                     updateStatus(
@@ -712,7 +970,10 @@ export default function NewCreativesTracker({
                                             <StatusSelect
                                                 value={item.finance_status}
                                                 options={FINANCE_OPTIONS}
-                                                disabled={saving === item.id}
+                                                disabled={
+                                                    !can.edit ||
+                                                    saving === item.id
+                                                }
                                                 placeholder="Not set"
                                                 onChange={(value) =>
                                                     updateStatus(
@@ -722,6 +983,67 @@ export default function NewCreativesTracker({
                                                     )
                                                 }
                                             />
+                                        </td>
+
+                                        <td
+                                            className={`${groupStart} px-3 py-2`}
+                                        >
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                {/* Editing is manual-only: a
+                                                    synced item's details are
+                                                    read back through its Meta
+                                                    id, so any change here would
+                                                    be undone on the next
+                                                    look-up. */}
+                                                {can.edit &&
+                                                    item.source ===
+                                                        'manual' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditing(
+                                                                    item,
+                                                                );
+                                                                setManualOpen(
+                                                                    true,
+                                                                );
+                                                            }}
+                                                            title="Edit item"
+                                                            aria-label={`Edit ${item.name ?? 'item'}`}
+                                                            className={
+                                                                rowAction
+                                                            }
+                                                        >
+                                                            <Pencil className="size-3" />
+                                                        </button>
+                                                    )}
+
+                                                {can.delete && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setDeleting(item)
+                                                        }
+                                                        title="Remove from tracker"
+                                                        aria-label={`Remove ${item.name ?? 'item'}`}
+                                                        className={`${rowAction} hover:border-red-300 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-500/40 dark:hover:bg-red-500/10 dark:hover:text-red-400`}
+                                                    >
+                                                        <Trash2 className="size-3" />
+                                                    </button>
+                                                )}
+
+                                                {/* Neither grant: say so rather
+                                                    than leaving a blank cell. */}
+                                                {!can.delete &&
+                                                    !(
+                                                        can.edit &&
+                                                        item.source === 'manual'
+                                                    ) && (
+                                                        <span className="text-[11px] text-gray-300 dark:text-gray-600">
+                                                            —
+                                                        </span>
+                                                    )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -788,7 +1110,9 @@ export default function NewCreativesTracker({
                         Each day carries its own sales, ad spend and ROAS, with
                         the period totals at the end of the row. A day is shaded
                         by its ROAS — red under 3x, amber 3x–6x, green from 6x.
-                        Numbers come from Meta insights and refresh hourly.
+                        Synced items take their numbers from Meta insights and
+                        refresh hourly; a manual item&apos;s days are typed
+                        straight into the cells, and its ROAS follows.
                     </p>
                 )}
             </div>
@@ -798,6 +1122,54 @@ export default function NewCreativesTracker({
                 open={pickerOpen}
                 onOpenChange={setPickerOpen}
             />
+
+            <AddManualItemDialog
+                workspaceSlug={workspace.slug}
+                open={manualOpen}
+                item={editing}
+                onOpenChange={(next) => {
+                    setManualOpen(next);
+                    // Drop the edit target on close so the next "Manual" click
+                    // opens a blank form rather than the last item edited.
+                    if (!next) setEditing(null);
+                }}
+            />
+
+            <AlertDialog
+                open={Boolean(deleting)}
+                onOpenChange={(open) => !open && setDeleting(null)}
+            >
+                <AlertDialogContent className="max-w-[400px] border-none shadow-2xl dark:bg-zinc-900">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-[16px] font-semibold text-gray-900 dark:text-gray-100">
+                            Remove from tracker?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                            <strong>
+                                {deleting?.name ?? deleting?.item_id}
+                            </strong>{' '}
+                            and every day recorded against it will be deleted.
+                            This cannot be undone.
+                            {deleting?.source === 'meta' && (
+                                <>
+                                    {' '}
+                                    The campaign or ad set itself is untouched —
+                                    you can add it again later.
+                                </>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="mt-4 gap-2">
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={removeItem}
+                            className="bg-red-600 text-white hover:bg-red-700"
+                        >
+                            Remove
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

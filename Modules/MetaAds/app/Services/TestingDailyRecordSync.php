@@ -46,6 +46,10 @@ class TestingDailyRecordSync
      */
     public function sync(Collection $items): int
     {
+        // Manual rows point at no campaign or ad set, so there are no
+        // insights to roll up for them.
+        $items = $items->where('source', 'meta');
+
         if ($items->isEmpty()) {
             return 0;
         }

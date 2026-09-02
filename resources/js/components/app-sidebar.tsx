@@ -113,6 +113,9 @@ export function AppSidebar() {
                           PERMISSIONS.ViewAdSpentSummary,
                           PERMISSIONS.ViewSalesTargets,
                           PERMISSIONS.ViewNewCreativesTracker,
+                          PERMISSIONS.CreateNewCreativesTracker,
+                          PERMISSIONS.EditNewCreativesTracker,
+                          PERMISSIONS.DeleteNewCreativesTracker,
                       ],
                       items: [
                           {

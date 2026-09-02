@@ -178,7 +178,11 @@ Route::middleware(['auth'])->group(function () {
         // JSON the "Add Testing Item" modal fetches as you search.
         Route::get('/new-creatives-tracker/available-items', [NewCreativesTrackerController::class, 'availableItems'])->name('new-creatives-tracker.available-items');
         Route::post('/new-creatives-tracker/items', [NewCreativesTrackerController::class, 'store'])->name('new-creatives-tracker.items.store');
+        Route::post('/new-creatives-tracker/items/manual', [NewCreativesTrackerController::class, 'storeManual'])->name('new-creatives-tracker.items.manual');
         Route::patch('/new-creatives-tracker/items/{item}/pause', [NewCreativesTrackerController::class, 'togglePause'])->name('new-creatives-tracker.items.pause');
+        Route::patch('/new-creatives-tracker/items/{item}/days/{day}', [NewCreativesTrackerController::class, 'updateDay'])->whereNumber('day')->name('new-creatives-tracker.items.day');
+        Route::put('/new-creatives-tracker/items/{item}', [NewCreativesTrackerController::class, 'updateManual'])->name('new-creatives-tracker.items.update-manual');
+        Route::delete('/new-creatives-tracker/items/{item}', [NewCreativesTrackerController::class, 'destroy'])->name('new-creatives-tracker.items.destroy');
         Route::patch('/new-creatives-tracker/items/{item}', [NewCreativesTrackerController::class, 'updateDecision'])->name('new-creatives-tracker.items.update');
 
         Route::get('/sales-targets', [SalesTargetController::class, 'index'])->name('sales-targets');

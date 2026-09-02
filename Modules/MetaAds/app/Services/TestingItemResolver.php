@@ -35,6 +35,10 @@ class TestingItemResolver
      */
     public function resolve(Collection $items): int
     {
+        // A manual row carries its own account and page as text; there is no
+        // campaign or ad set to resolve them from.
+        $items = $items->where('source', 'meta');
+
         if ($items->isEmpty()) {
             return 0;
         }

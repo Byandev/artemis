@@ -144,6 +144,9 @@ class Workspace extends Model
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewPageRoasTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesTargets->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewNewCreativesTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::CreateNewCreativesTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::EditNewCreativesTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::DeleteNewCreativesTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewAdSpentSummary->value,
             $this->sales_marketing_dashboard_module_enabled && $this->ad_spend_goals_module_enabled
                 ? null

@@ -52,6 +52,7 @@ class NewCreativesTrackerController extends Controller
             ->with(['dailyRecords', 'product:id,title'])
             ->when($filters['account'], fn ($q, $id) => $q->where('meta_ads_account_id', $id))
             ->when($filters['type'], fn ($q, $type) => $q->where('item_type', $type))
+            ->when($filters['source'], fn ($q, $source) => $q->where('source', $source))
             ->when(
                 $filters['search'] || $filters['start_from'] || $filters['start_to'],
                 fn ($q) => $this->constrainByEntity($q, $filters),
@@ -73,6 +74,11 @@ class NewCreativesTrackerController extends Controller
             // a short test shows empty cells rather than a narrower table.
             'maxDay' => TestingDailyRecordSync::MAX_DAY,
             'accounts' => $this->accountOptions($workspace),
+            'can' => [
+                'create' => $request->user()->hasPermission(Permission::CreateNewCreativesTracker->value, $workspace),
+                'edit' => $request->user()->hasPermission(Permission::EditNewCreativesTracker->value, $workspace),
+                'delete' => $request->user()->hasPermission(Permission::DeleteNewCreativesTracker->value, $workspace),
+            ],
             'filters' => $filters,
         ]);
     }
@@ -89,6 +95,7 @@ class NewCreativesTrackerController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'account' => ['nullable', 'numeric'],
             'type' => ['nullable', 'in:campaign,ad_set'],
+            'source' => ['nullable', 'in:meta,manual'],
             'start_from' => ['nullable', 'date'],
             'start_to' => ['nullable', 'date'],
             'per_page' => ['nullable', 'integer', 'min:5', 'max:100'],
@@ -98,6 +105,7 @@ class NewCreativesTrackerController extends Controller
             'search' => trim((string) ($validated['search'] ?? '')) ?: null,
             'account' => $validated['account'] ?? null,
             'type' => $validated['type'] ?? null,
+            'source' => $validated['source'] ?? null,
             'start_from' => $validated['start_from'] ?? null,
             'start_to' => $validated['start_to'] ?? null,
             'per_page' => (int) ($validated['per_page'] ?? 25),
@@ -122,10 +130,18 @@ class NewCreativesTrackerController extends Controller
         };
 
         return $query->where(fn ($q) => $q
-            ->where(fn ($q) => $q->where('item_type', 'campaign')
-                ->whereIn('item_id', $matching('meta_ads_campaigns')))
-            ->orWhere(fn ($q) => $q->where('item_type', 'ad_set')
-                ->whereIn('item_id', $matching('meta_ads_sets'))));
+            ->where(fn ($q) => $q->where('source', 'meta')
+                ->where(fn ($q) => $q
+                    ->where(fn ($q) => $q->where('item_type', 'campaign')
+                        ->whereIn('item_id', $matching('meta_ads_campaigns')))
+                    ->orWhere(fn ($q) => $q->where('item_type', 'ad_set')
+                        ->whereIn('item_id', $matching('meta_ads_sets')))))
+            // A manual row holds its own name and start date, so it is matched
+            // on its own columns rather than through a Meta table.
+            ->orWhere(fn ($q) => $q->where('source', 'manual')
+                ->when($filters['search'], fn ($q, $search) => $q->where('name', 'like', '%'.$search.'%'))
+                ->when($filters['start_from'], fn ($q, $from) => $q->whereDate('start_date', '>=', $from))
+                ->when($filters['start_to'], fn ($q, $to) => $q->whereDate('start_date', '<=', $to))));
     }
 
     /**
@@ -207,7 +223,7 @@ class NewCreativesTrackerController extends Controller
      */
     public function store(Request $request, Workspace $workspace)
     {
-        $this->guard($workspace);
+        $this->guard($workspace, Permission::CreateNewCreativesTracker);
 
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
@@ -281,7 +297,7 @@ class NewCreativesTrackerController extends Controller
      */
     public function togglePause(Workspace $workspace, TestingItem $item)
     {
-        $this->guard($workspace);
+        $this->guard($workspace, Permission::EditNewCreativesTracker);
 
         // Route binding is workspace-blind, so confirm the item is this
         // workspace's before touching it.
@@ -301,13 +317,156 @@ class NewCreativesTrackerController extends Controller
     }
 
     /**
+     * Add a campaign or ad set by hand, for anything the Meta sync does not
+     * carry. A manual row has no id to point at, so everything a synced row
+     * would read back through that id is typed in instead.
+     */
+    public function storeManual(Request $request, Workspace $workspace)
+    {
+        $this->guard($workspace, Permission::CreateNewCreativesTracker);
+
+        $validated = $request->validate([
+            'item_type' => ['required', 'in:campaign,ad_set'],
+            'name' => ['required', 'string', 'max:255'],
+            'account_name' => ['nullable', 'string', 'max:255'],
+            'page_name' => ['nullable', 'string', 'max:255'],
+            // Required: day 1 of the window is counted from here, and the day
+            // cells are stored against the dates it produces.
+            'start_date' => ['required', 'date'],
+            'product_name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        TestingItem::create([
+            'workspace_id' => $workspace->id,
+            'source' => 'manual',
+            'item_type' => $validated['item_type'],
+            // No Meta id: the unique key tolerates any number of nulls, so
+            // manual rows never collide with each other.
+            'item_id' => null,
+            'name' => $validated['name'],
+            'account_name' => $validated['account_name'] ?? null,
+            'page_name' => $validated['page_name'] ?? null,
+            'start_date' => $validated['start_date'],
+            'product_name' => $validated['product_name'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Manual item added.');
+    }
+
+    /**
+     * Edit a manual item's details. Only manual ones: a synced item's name,
+     * account and page are read back through its Meta id, so editing them here
+     * would only be undone by the next look-up.
+     */
+    public function updateManual(Request $request, Workspace $workspace, TestingItem $item)
+    {
+        $this->guard($workspace, Permission::EditNewCreativesTracker);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+        abort_unless($item->source === 'manual', 403, 'A synced item takes its details from Meta.');
+
+        $validated = $request->validate([
+            'item_type' => ['required', 'in:campaign,ad_set'],
+            'name' => ['required', 'string', 'max:255'],
+            'account_name' => ['nullable', 'string', 'max:255'],
+            'page_name' => ['nullable', 'string', 'max:255'],
+            'start_date' => ['required', 'date'],
+            'product_name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $moved = $item->start_date?->toDateString() !== $validated['start_date'];
+
+        $item->update($validated);
+
+        // The days are keyed by date and numbered from the start date, so
+        // moving it would leave every recorded day pointing at the wrong one.
+        // Re-stamp them against the new start rather than silently mismatching.
+        if ($moved) {
+            $this->restampDays($item);
+        }
+
+        return redirect()->back()->with('success', 'Item updated.');
+    }
+
+    /**
+     * Remove an item from the tracker. Its daily records go with it — the
+     * foreign key cascades — since they describe nothing on their own.
+     */
+    public function destroy(Workspace $workspace, TestingItem $item)
+    {
+        $this->guard($workspace, Permission::DeleteNewCreativesTracker);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+
+        $item->delete();
+
+        return redirect()->back()->with('success', 'Item removed from the tracker.');
+    }
+
+    /**
+     * Re-date a manual item's recorded days after its start date moves, keeping
+     * day 1 on the start date, day 2 the day after, and so on.
+     */
+    private function restampDays(TestingItem $item): void
+    {
+        foreach ($item->dailyRecords()->orderBy('day')->get() as $record) {
+            if ($record->day === null) {
+                continue;
+            }
+
+            $record->date = $item->start_date->copy()->addDays($record->day - 1);
+            $record->save();
+        }
+    }
+
+    /**
+     * Type a day's figures for a manual item.
+     *
+     * Only manual items: a synced item's days are rebuilt from meta_ads_insights
+     * on every run, so anything typed over them would be gone within the hour.
+     *
+     * The record is keyed by date, which is derived from the item's own start
+     * date — day 1 is the start date, day 2 the day after. That keeps a manual
+     * row on exactly the same footing as a synced one.
+     */
+    public function updateDay(Request $request, Workspace $workspace, TestingItem $item, int $day)
+    {
+        $this->guard($workspace, Permission::EditNewCreativesTracker);
+
+        abort_unless($item->workspace_id === $workspace->id, 404);
+        abort_unless($item->source === 'manual', 403, 'Synced items take their numbers from Meta.');
+        abort_unless($day >= 1 && $day <= TestingDailyRecordSync::MAX_DAY, 404);
+        abort_unless($item->start_date !== null, 422, 'This item needs a start date first.');
+
+        $validated = $request->validate([
+            'sales' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'ad_spent' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+        ]);
+
+        $date = $item->start_date->copy()->addDays($day - 1)->toDateString();
+
+        $record = $item->dailyRecords()->firstOrNew(['date' => $date]);
+        $record->day = $day;
+        $record->fill($validated);
+
+        // ROAS is never typed — it follows from the two figures that are, the
+        // same definition the insights rollup uses.
+        $adSpent = (float) $record->ad_spent;
+        $record->roas = $adSpent > 0 ? round((float) $record->sales / $adSpent, 2) : null;
+
+        $record->save();
+
+        return redirect()->back();
+    }
+
+    /**
      * Record the calls made about a test — the intern's verdict and where the
      * money stands. Both are set by hand and neither is touched by the sync, so
      * this is the only thing that writes them.
      */
     public function updateDecision(Request $request, Workspace $workspace, TestingItem $item)
     {
-        $this->guard($workspace);
+        $this->guard($workspace, Permission::EditNewCreativesTracker);
 
         abort_unless($item->workspace_id === $workspace->id, 404);
 
@@ -316,7 +475,14 @@ class NewCreativesTrackerController extends Controller
         $validated = $request->validate([
             'intern_decision' => ['sometimes', 'nullable', 'in:scale,split_50_50,killed'],
             'finance_status' => ['sometimes', 'nullable', 'in:for_collection,pending,collected'],
+            // Manual only: a synced item takes its start date from the campaign
+            // or ad set, and the day cells are anchored to it either way.
+            'start_date' => ['sometimes', 'required', 'date'],
         ]);
+
+        if (isset($validated['start_date']) && $item->source !== 'manual') {
+            abort(403, 'A synced item takes its start date from Meta.');
+        }
 
         $item->update($validated);
 
@@ -324,13 +490,15 @@ class NewCreativesTrackerController extends Controller
     }
 
     /**
-     * Module flag plus the page's own grant — the same gate its siblings use.
+     * Module flag plus a grant. Viewing, adding, editing and removing are four
+     * separate grants, so each action names the one it needs rather than every
+     * write riding on the view permission.
      */
-    private function guard(Workspace $workspace): void
+    private function guard(Workspace $workspace, Permission $permission = Permission::ViewNewCreativesTracker): void
     {
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
-        $this->authorize(Permission::ViewNewCreativesTracker->value, $workspace);
+        $this->authorize($permission->value, $workspace);
     }
 
     /**
@@ -368,8 +536,12 @@ class NewCreativesTrackerController extends Controller
         $accountNames = AdAccount::whereIn('id', $items->pluck('meta_ads_account_id')->filter()->unique())
             ->pluck('name', 'id');
 
-        return $items->map(function (TestingItem $item) use ($meta) {
-            $row = $meta[$item->item_type][$item->item_id] ?? null;
+        return $items->map(function (TestingItem $item) use ($meta, $accountNames) {
+            // A synced row reads its name / start date back through its Meta
+            // id; a manual one stores them on the row itself.
+            $row = $item->item_id !== null
+                ? ($meta[$item->item_type][$item->item_id] ?? null)
+                : null;
 
             // Day-keyed so the table can look up a column directly. A record
             // whose item has no start_time has no day and is left out of the
@@ -391,14 +563,19 @@ class NewCreativesTrackerController extends Controller
                 'id' => $item->id,
                 'item_type' => $item->item_type,
                 'item_id' => (string) $item->item_id,
-                'name' => $row->name ?? null,
+                'source' => $item->source,
+                'name' => $item->name ?? $row->name ?? null,
                 'account_id' => $item->meta_ads_account_id ? (string) $item->meta_ads_account_id : null,
-                'account_name' => $accountNames[$item->meta_ads_account_id] ?? null,
-                'product' => $item->product?->title,
+                // Manual rows keep the account as text; synced ones resolve it.
+                'account_name' => $item->account_name
+                    ?? ($accountNames[$item->meta_ads_account_id] ?? null),
+                'page_name' => $item->page_name,
+                'product' => $item->product_name ?? $item->product?->title,
                 'is_paused' => $item->paused_at !== null,
                 'intern_decision' => $item->intern_decision,
                 'finance_status' => $item->finance_status,
-                'start_date' => $row?->start_time ? Carbon::parse($row->start_time)->toDateString() : null,
+                'start_date' => $item->start_date?->toDateString()
+                    ?? ($row?->start_time ? Carbon::parse($row->start_time)->toDateString() : null),
                 'days' => $days,
                 'last_day' => (int) ($days->keys()->max() ?? 0),
                 'total' => [

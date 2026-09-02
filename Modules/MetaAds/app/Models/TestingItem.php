@@ -20,10 +20,32 @@ class TestingItem extends Model
 
     protected $guarded = [];
 
+    /**
+     * The column default only applies on insert, so a model built in memory has
+     * no source until it is read back. Spelling it out here means a freshly
+     * created item is already a synced one to anything that inspects it.
+     */
+    protected $attributes = [
+        'source' => 'meta',
+    ];
+
     protected $casts = [
         'item_id' => 'string',
         'paused_at' => 'datetime',
+        'start_date' => 'date',
     ];
+
+    /** Entered by hand rather than pointing at a synced campaign / ad set. */
+    public function getIsManualAttribute(): bool
+    {
+        return $this->source === 'manual';
+    }
+
+    /** Items that point at real Meta entities — the only ones a sync can touch. */
+    public function scopeSynced(Builder $query): Builder
+    {
+        return $query->where('source', 'meta');
+    }
 
     /** Whether this item is still accruing test days. */
     public function getIsPausedAttribute(): bool
