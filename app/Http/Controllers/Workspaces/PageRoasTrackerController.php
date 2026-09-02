@@ -20,8 +20,12 @@ use Inertia\Response;
 /**
  * Page ROAS Tracker: reads the page_daily_records built by
  * `build-page-daily-performance` and lays them out as a day-by-day breakdown —
- * dates down the side, one Orders/Sales/Ad Spend/ROAS column group per page,
- * with per-page Total and Average rows.
+ * dates down the side, one metric column group per page, with per-page Total
+ * and Average rows.
+ *
+ * Every metric is always sent; which of them are shown is a client-side column
+ * toggle (Orders/Sales/Ad Spend/ROAS by default), so switching a column on is
+ * instant rather than a round trip.
  */
 class PageRoasTrackerController extends Controller
 {
@@ -68,7 +72,13 @@ class PageRoasTrackerController extends Controller
             ->when($eligiblePageIds !== null, fn ($q) => $q
                 ->where('page_type', Page::class)
                 ->whereIn('page_id', $eligiblePageIds))
-            ->select('page_type', 'page_id', 'date', 'orders', 'sales', 'ad_spent')
+            ->select(
+                'page_type', 'page_id', 'date',
+                'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_cpp',
+                // Ingredients for a blended RTS rate on the Total/Average rows;
+                // delivered/returned are not columns of their own here.
+                'returning_amount', 'returned_amount', 'delivered_amount',
+            )
             ->get();
 
         $names = $this->resolvePageNames($records);
@@ -79,22 +89,26 @@ class PageRoasTrackerController extends Controller
             ->map(function (Collection $group, string $key) use ($dates, $names, $dayCount) {
                 $byDate = $group->keyBy('date');
 
-                $sumOrders = 0;
-                $sumSales = 0.0;
-                $sumAdSpent = 0.0;
+                $totals = self::EMPTY_TALLY;
                 $days = [];
 
                 foreach ($dates as $date) {
-                    $rec = $byDate->get($date);
-                    $orders = (int) ($rec->orders ?? 0);
-                    $sales = (float) ($rec->sales ?? 0);
-                    $adSpent = (float) ($rec->ad_spent ?? 0);
+                    $tally = $this->tally($byDate->get($date));
+                    $days[$date] = $this->metrics($tally);
 
-                    $days[$date] = $this->metrics($orders, $sales, $adSpent);
+                    foreach ($tally as $field => $value) {
+                        if ($field !== 'returning') {
+                            $totals[$field] += $value;
+                        }
+                    }
 
-                    $sumOrders += $orders;
-                    $sumSales += $sales;
-                    $sumAdSpent += $adSpent;
+                    // `returning` is a stock, not a flow — each row already reads
+                    // "still on the way back as of that day", so the range figure
+                    // is the closing snapshot rather than the sum of the days. A
+                    // day the builder skipped carries the last one forward.
+                    if ($byDate->has($date)) {
+                        $totals['returning'] = $tally['returning'];
+                    }
                 }
 
                 [, $pageId] = explode('|', $key, 2);
@@ -103,14 +117,10 @@ class PageRoasTrackerController extends Controller
                     'page_id' => $pageId,
                     'name' => $names[$key] ?? ('Page '.$pageId),
                     'days' => $days,
-                    'total' => $this->metrics($sumOrders, $sumSales, $sumAdSpent),
-                    // Average = per-day mean over the range; ROAS stays blended.
-                    'average' => $this->metrics(
-                        (int) round($sumOrders / $dayCount),
-                        $sumSales / $dayCount,
-                        $sumAdSpent / $dayCount,
-                        blendedRoasFrom: [$sumSales, $sumAdSpent],
-                    ),
+                    'total' => $this->metrics($totals),
+                    // Average = per-day mean of the amounts; every ratio stays
+                    // blended over the whole range, so it matches the Total row.
+                    'average' => $this->metrics($totals, $dayCount),
                 ];
             })
             // Most active pages first, so the useful columns are left-most.
@@ -180,21 +190,79 @@ class PageRoasTrackerController extends Controller
     }
 
     /**
-     * One metrics cell. ROAS is sales/ad_spent unless an explicit blended pair is
-     * given (used by the Average row so it reports the period ROAS, not a mean).
-     *
-     * @param  array{0: float, 1: float}|null  $blendedRoasFrom  [sales, adSpent]
-     * @return array{orders: int, sales: float, ad_spent: float, roas: float|null}
+     * The raw ingredients a metrics cell is derived from, all zeroed. Kept
+     * separate from the output shape because the ratios need un-rounded,
+     * un-divided inputs to stay blended across a range.
      */
-    private function metrics(int $orders, float $sales, float $adSpent, ?array $blendedRoasFrom = null): array
+    private const EMPTY_TALLY = [
+        'orders' => 0.0,
+        'sales' => 0.0,
+        'ad_spent' => 0.0,
+        'ad_sales' => 0.0,
+        'ad_purchases' => 0.0,
+        'returning' => 0.0,
+        'returned' => 0.0,
+        'delivered' => 0.0,
+    ];
+
+    /**
+     * One day's ingredients, or all zeroes for a day the builder never wrote.
+     *
+     * @return array<string, float>
+     */
+    private function tally(?object $rec): array
     {
-        [$roasSales, $roasAdSpent] = $blendedRoasFrom ?? [$sales, $adSpent];
+        $adSpent = (float) ($rec->ad_spent ?? 0);
 
         return [
-            'orders' => $orders,
-            'sales' => round($sales, 2),
-            'ad_spent' => round($adSpent, 2),
-            'roas' => $roasAdSpent > 0 ? round($roasSales / $roasAdSpent, 2) : null,
+            'orders' => (float) ($rec->orders ?? 0),
+            'sales' => (float) ($rec->sales ?? 0),
+            'ad_spent' => $adSpent,
+            'ad_sales' => (float) ($rec->ad_sales ?? 0),
+            // The builder stores ad_cpp (purchases per unit of spend), not the
+            // purchase count. Multiply back out so the count can be re-blended
+            // over a range instead of averaging daily ratios.
+            'ad_purchases' => (float) ($rec->ad_cpp ?? 0) * $adSpent,
+            'returning' => (float) ($rec->returning_amount ?? 0),
+            'returned' => (float) ($rec->returned_amount ?? 0),
+            'delivered' => (float) ($rec->delivered_amount ?? 0),
+        ];
+    }
+
+    /**
+     * One metrics cell.
+     *
+     * Amounts divide by $divisor (the day count, for the Average row); ratios
+     * never do — they are blended from the undivided tally, so the range reports
+     * its true ROAS/CPP/RTS rather than a mean of daily ratios. `returning` is a
+     * stock, so it passes through undivided on every row.
+     *
+     * @param  array<string, float>  $t
+     * @return array<string, float|int|null>
+     */
+    private function metrics(array $t, int $divisor = 1): array
+    {
+        $per = fn (float $v) => $divisor > 1 ? $v / $divisor : $v;
+        $ratio = fn (float $num, float $den) => $den > 0 ? round($num / $den, 2) : null;
+
+        // RTS counts both legs of a return — in-flight and completed — against
+        // what actually landed, matching the builder.
+        $returning = $t['returning'] + $t['returned'];
+        $rtsBase = $returning + $t['delivered'];
+
+        return [
+            'orders' => (int) round($per($t['orders'])),
+            'sales' => round($per($t['sales']), 2),
+            'ad_spent' => round($per($t['ad_spent']), 2),
+            'ad_sales' => round($per($t['ad_sales']), 2),
+            'returning_amount' => round($t['returning'], 2),
+            'roas' => $ratio($t['sales'], $t['ad_spent']),
+            'ad_roas' => $ratio($t['ad_sales'], $t['ad_spent']),
+            'rts_rate' => $rtsBase > 0 ? round($returning / $rtsBase * 100, 2) : null,
+            // Sub-1 figures — purchases/orders per unit of spend — so they need
+            // more than the 2dp the other ratios get.
+            'ad_cpp' => $t['ad_spent'] > 0 ? round($t['ad_purchases'] / $t['ad_spent'], 6) : null,
+            'cpp' => $t['ad_spent'] > 0 ? round($t['orders'] / $t['ad_spent'], 6) : null,
         ];
     }
 
