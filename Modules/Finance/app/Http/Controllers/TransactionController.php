@@ -54,7 +54,13 @@ class TransactionController extends Controller
 
     protected function buildQuery(Workspace $workspace): QueryBuilder
     {
-        return QueryBuilder::for(Transaction::where('workspace_id', $workspace->id))
+        // Wallet accounts keep their own ledger on the Go Tyme Balance page, so
+        // their rows stay out of the Finance transactions list too — the same
+        // separation the account picker and Finance → Accounts already apply.
+        return QueryBuilder::for(
+            Transaction::where('workspace_id', $workspace->id)
+                ->whereHas('account', fn ($q) => $q->excludingWallets())
+        )
             ->allowedFilters([
                 AllowedFilter::callback('search', fn ($q, $v) => $q->where(function ($q2) use ($v) {
                     $q2->where('description', 'like', "%{$v}%")
@@ -490,6 +496,9 @@ class TransactionController extends Controller
 
         $transactions = QueryBuilder::for(
             Transaction::where('workspace_id', $workspace->id)
+                // Wallet ledgers are not part of the Finance export, matching
+                // the list it mirrors.
+                ->whereHas('account', fn ($q) => $q->excludingWallets())
                 ->with(['account', 'transactionType', 'requester:id,name', 'approver:id,name', 'chargeToUsers:users.id,users.name', 'fundRequest:id,reference_no'])
         )
             ->allowedFilters([

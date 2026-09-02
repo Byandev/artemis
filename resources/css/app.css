@@ -433,6 +433,42 @@
     background-color: #344054;
 }
 
+/*
+ * A grab-able scrollbar for wide data grids. `custom-scrollbar` is 4px, which
+ * is fine for a nudge but too thin to drag a grid sideways by; this one is
+ * chunky enough to aim at, keeps a visible track so the affordance reads even
+ * where the OS hides overlay scrollbars, and darkens on hover.
+ */
+@utility grid-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: theme(--color-gray-300) transparent;
+
+    &::-webkit-scrollbar {
+        @apply size-2.5;
+    }
+
+    &::-webkit-scrollbar-track {
+        @apply rounded-full bg-black/3 dark:bg-white/3;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        @apply rounded-full border-2 border-transparent bg-gray-300 bg-clip-content dark:bg-zinc-600;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        @apply bg-gray-400 dark:bg-zinc-500;
+    }
+
+    /* Stops the two bars meeting in an empty square in the corner. */
+    &::-webkit-scrollbar-corner {
+        @apply bg-transparent;
+    }
+}
+
+.dark .grid-scrollbar {
+    scrollbar-color: #52525b transparent;
+}
+
 @layer utilities {
     /* For Remove Date Icon */
     input[type='date']::-webkit-inner-spin-button,

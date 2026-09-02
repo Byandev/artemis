@@ -48,6 +48,43 @@ class Account extends Model
     }
 
     /**
+     * Rewrite this account's stored running balances from scratch, walking its
+     * transactions in ledger order from the opening balance. Cheap (one
+     * account's rows) and the only way a back-dated entry re-flows every figure
+     * after it.
+     */
+    public function resequenceRunningBalances(): void
+    {
+        // Runs from the opening balance, not from zero: the rest of Finance
+        // reads running_balance as the account's actual balance at that entry,
+        // and falls back to opening_balance when there are no entries at all.
+        // Starting at zero made a wallet drop from its opening figure the
+        // moment its first entry landed.
+        $balance = (float) $this->opening_balance;
+
+        $this->transactions()
+            ->orderBy('date')
+            ->orderBy('position')
+            ->orderBy('id')
+            ->get(['id', 'type', 'amount', 'running_balance'])
+            ->each(function (Transaction $transaction) use (&$balance) {
+                $balance += $transaction->type === 'in'
+                    ? (float) $transaction->amount
+                    : -(float) $transaction->amount;
+
+                $rounded = round($balance, 2);
+
+                // Only touch rows whose figure actually moved — but a row that
+                // has never been written carries null, which casts to the same
+                // 0.0 as a balance of zero and would otherwise be skipped.
+                if ($transaction->running_balance === null
+                    || (float) $transaction->running_balance !== $rounded) {
+                    $transaction->forceFill(['running_balance' => $rounded])->save();
+                }
+            });
+    }
+
+    /**
      * Current balance per account: the running_balance of each account's latest
      * transaction. Accounts with no transactions are absent — callers fall back
      * to the opening balance.
@@ -66,7 +103,7 @@ class Account extends Model
         return Transaction::where('workspace_id', $workspaceId)
             ->whereIn('account_id', $accountIds)
             ->whereIn('id', function ($q) use ($workspaceId, $accountIds) {
-                $q->selectRaw('(SELECT t2.id FROM finance_transactions t2 WHERE t2.account_id = finance_transactions.account_id AND t2.workspace_id = ? ORDER BY t2.date DESC, t2.position DESC LIMIT 1)', [$workspaceId])
+                $q->selectRaw('(SELECT t2.id FROM finance_transactions t2 WHERE t2.account_id = finance_transactions.account_id AND t2.workspace_id = ? ORDER BY t2.date DESC, t2.position DESC, t2.id DESC LIMIT 1)', [$workspaceId])
                     ->from('finance_transactions')
                     ->where('workspace_id', $workspaceId)
                     ->whereIn('account_id', $accountIds)

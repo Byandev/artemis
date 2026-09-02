@@ -30,12 +30,14 @@ class Transaction extends Model
         'fund_request_id',
         'status',
         'position',
+        'is_balance_adjustment',
         'sub_category',
         'notes',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'is_balance_adjustment' => 'boolean',
     ];
 
     public function account(): BelongsTo

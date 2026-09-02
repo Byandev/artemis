@@ -12,22 +12,29 @@ import {
 } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import React, { useEffect } from 'react';
-import { WALLET_TYPES, WalletType } from './types';
+import { WALLET_TYPES, WalletRow, WalletType } from './types';
 
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     workspaceSlug: string;
+    /** The wallet being edited, or null to create one. */
+    wallet?: WalletRow | null;
 }
 
 /**
- * Create form for a Go Tyme wallet. The saved record is an ordinary Finance
- * account — this posts to the S&M endpoint, which is what stamps
+ * Create/edit form for a Go Tyme wallet. The saved record is an ordinary
+ * Finance account — this posts to the S&M endpoint, which is what stamps
  * `is_user_wallet` — plus the wallet-only Main/Backup slot, which has no
  * meaning for the company accounts the Finance dialog creates.
  */
-export function WalletFormDialog({ open, onOpenChange, workspaceSlug }: Props) {
-    const { data, setData, post, processing, errors, reset, clearErrors } =
+export function WalletFormDialog({
+    open,
+    onOpenChange,
+    workspaceSlug,
+    wallet = null,
+}: Props) {
+    const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm<{
             name: string;
             wallet_type: WalletType;
@@ -44,23 +51,47 @@ export function WalletFormDialog({ open, onOpenChange, workspaceSlug }: Props) {
             is_active: true,
         });
 
+    // Filled from the row on open, so editing starts on what is on screen and
+    // creating starts clean.
     useEffect(() => {
-        if (open) {
+        if (!open) return;
+
+        clearErrors();
+
+        if (wallet) {
+            setData({
+                name: wallet.name,
+                wallet_type: wallet.wallet_type ?? 'main',
+                opening_balance: String(wallet.opening_balance),
+                currency: wallet.currency,
+                notes: wallet.notes ?? '',
+                is_active: wallet.is_active,
+            });
+        } else {
             reset();
-            clearErrors();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open]);
+    }, [open, wallet]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(`/workspaces/${workspaceSlug}/sales-marketing/go-tyme-balance`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                reset();
-                onOpenChange(false);
-            },
-        });
+
+        const baseUrl = `/workspaces/${workspaceSlug}/sales-marketing/go-tyme-balance`;
+        const done = () => {
+            reset();
+            onOpenChange(false);
+        };
+
+        if (wallet) {
+            put(`${baseUrl}/${wallet.id}`, {
+                preserveScroll: true,
+                onSuccess: done,
+            });
+
+            return;
+        }
+
+        post(baseUrl, { preserveScroll: true, onSuccess: done });
     };
 
     return (
@@ -69,11 +100,12 @@ export function WalletFormDialog({ open, onOpenChange, workspaceSlug }: Props) {
                 <div className="border-b border-black/6 px-5 pt-5 pb-4 dark:border-white/6">
                     <DialogHeader>
                         <DialogTitle className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            Create Account
+                            {wallet ? 'Edit Account' : 'Create Account'}
                         </DialogTitle>
                         <DialogDescription className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-                            Creates a Go Tyme wallet. It is kept out of Finance
-                            → Accounts.
+                            {wallet
+                                ? 'Moving the opening balance re-flows every figure in this wallet’s ledger.'
+                                : 'Creates a Go Tyme wallet. It is kept out of Finance → Accounts.'}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -175,7 +207,7 @@ export function WalletFormDialog({ open, onOpenChange, workspaceSlug }: Props) {
 
                     <Footer
                         processing={processing}
-                        isEditing={false}
+                        isEditing={wallet !== null}
                         onCancel={() => onOpenChange(false)}
                     />
                 </form>

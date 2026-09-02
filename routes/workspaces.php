@@ -176,6 +176,13 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/go-tyme-balance', [GoTymeBalanceController::class, 'index'])->name('go-tyme-balance');
         Route::post('/go-tyme-balance', [GoTymeBalanceController::class, 'store'])->name('go-tyme-balance.store');
+        Route::get('/go-tyme-balance/{account}', [GoTymeBalanceController::class, 'show'])->name('go-tyme-balance.show');
+        Route::put('/go-tyme-balance/{account}', [GoTymeBalanceController::class, 'update'])->name('go-tyme-balance.update');
+        Route::delete('/go-tyme-balance/{account}', [GoTymeBalanceController::class, 'destroy'])->name('go-tyme-balance.destroy');
+        Route::put('/go-tyme-balance/{account}/balance', [GoTymeBalanceController::class, 'updateBalance'])->name('go-tyme-balance.balance');
+        Route::post('/go-tyme-balance/{account}/entries', [GoTymeBalanceController::class, 'storeEntry'])->name('go-tyme-balance.entries.store');
+        Route::put('/go-tyme-balance/{account}/entries/{entry}', [GoTymeBalanceController::class, 'updateEntry'])->name('go-tyme-balance.entries.update');
+        Route::delete('/go-tyme-balance/{account}/entries/{entry}', [GoTymeBalanceController::class, 'destroyEntry'])->name('go-tyme-balance.entries.destroy');
 
         Route::get('/sales-targets', [SalesTargetController::class, 'index'])->name('sales-targets');
         Route::post('/sales-targets', [SalesTargetController::class, 'store'])->name('sales-targets.store');
