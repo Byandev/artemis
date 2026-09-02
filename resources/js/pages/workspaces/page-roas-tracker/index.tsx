@@ -26,6 +26,7 @@ interface Metrics {
     sales: number;
     ad_spent: number;
     ad_sales: number;
+    delivered_amount: number;
     returning_amount: number;
     roas: number | null;
     ad_roas: number | null;
@@ -95,14 +96,14 @@ const format: Record<string, (n: number | null) => string> = {
 type Tone = 'good' | 'warn' | 'bad' | 'muted';
 
 /**
- * A low-opacity wash over the whole cell, not a chip. Across ten columns and a
- * month of rows the tint reads as a column of colour you can scan down, while
- * chips would break the numeric rail the rest of the table is aligned on.
+ * Tone is carried by the digits alone — no cell fills. With three toned columns
+ * repeated across every page group, a wash on each one turned the grid into a
+ * quilt and buried the numbers it was meant to rank.
  */
 const TONE: Record<Tone, string> = {
-    good: 'bg-emerald-500/8 text-emerald-700 dark:bg-emerald-500/12 dark:text-emerald-300',
-    warn: 'bg-amber-500/10 text-amber-800 dark:bg-amber-500/12 dark:text-amber-300',
-    bad: 'bg-rose-500/8 text-rose-700 dark:bg-rose-500/12 dark:text-rose-300',
+    good: 'text-emerald-600 dark:text-emerald-400',
+    warn: 'text-amber-600 dark:text-amber-400',
+    bad: 'text-rose-600 dark:text-rose-400',
     muted: 'text-gray-300 dark:text-gray-600',
 };
 
@@ -110,9 +111,9 @@ const TONE: Record<Tone, string> = {
 const roasTone = (n: number | null): Tone =>
     n === null || n === 0 ? 'muted' : n >= 3 ? 'good' : n >= 2 ? 'warn' : 'bad';
 
-/** RTS is inverted — less of it is better. 15%/30% are the starting bars. */
+/** RTS is inverted — less of it is better. Pitched at the 25–35% band COD runs at. */
 const rtsTone = (n: number | null): Tone =>
-    n === null ? 'muted' : n <= 15 ? 'good' : n <= 30 ? 'warn' : 'bad';
+    n === null ? 'muted' : n <= 25 ? 'good' : n <= 35 ? 'warn' : 'bad';
 
 /* ── Columns ─────────────────────────────────────────────────────────────── */
 
@@ -194,6 +195,14 @@ const COLUMNS: MetricColumn[] = [
         defaultVisible: false,
     },
 
+    {
+        id: 'delivered_amount',
+        label: 'Delivered',
+        head: 'Delivered',
+        group: 'Delivery',
+        format: 'amount',
+        defaultVisible: false,
+    },
     {
         id: 'returning_amount',
         label: 'Returning',
@@ -278,7 +287,7 @@ export default function PageRoasTrackerIndex({
        slashed-zero, so a column of numbers lines up digit for digit. */
     const cell = 'h-8 whitespace-nowrap px-3 text-right';
     const rowLine = 'border-b border-black/4 dark:border-white/4';
-    const groupStart = 'border-l border-l-black/8 dark:border-l-white/8';
+    const groupStart = 'border-l-2 border-l-black/10 dark:border-l-white/12';
     const stickyLeft =
         'sticky left-0 border-r border-black/8 dark:border-white/8';
 
@@ -471,13 +480,10 @@ export default function PageRoasTrackerIndex({
                                                                         weekend &&
                                                                             'bg-stone-50/70 dark:bg-white/2',
                                                                         c.tone
-                                                                            ? cn(
-                                                                                  TONE[
-                                                                                      c
-                                                                                          .tone
-                                                                                  ],
-                                                                                  'font-semibold',
-                                                                              )
+                                                                            ? TONE[
+                                                                                  c
+                                                                                      .tone
+                                                                              ]
                                                                             : c.blank
                                                                               ? 'text-gray-300 dark:text-gray-600'
                                                                               : 'text-gray-700 dark:text-gray-200',
@@ -494,8 +500,9 @@ export default function PageRoasTrackerIndex({
                                     })}
 
                                     {/* Summary rows — sums for the amounts, blended
-                                        for the ratios. Pinned to the bottom so the
-                                        bottom line survives a long date range. */}
+                                        for the ratios. Not pinned: a sticky bottom
+                                        row sits under the horizontal scrollbar,
+                                        which clipped the Average clean in half. */}
                                     {(
                                         [
                                             ['Total', 'total'],
@@ -507,10 +514,9 @@ export default function PageRoasTrackerIndex({
                                                 className={cn(
                                                     cell,
                                                     stickyLeft,
-                                                    'sticky z-40 bg-stone-100 text-left font-mono text-[10px] font-semibold tracking-wider text-gray-600 uppercase dark:bg-zinc-800 dark:text-gray-300',
-                                                    rowIndex === 0
-                                                        ? 'bottom-8 border-t border-black/12 dark:border-white/12'
-                                                        : 'bottom-0',
+                                                    'z-20 bg-stone-100 text-left font-mono text-[10px] font-semibold tracking-wider text-gray-600 uppercase dark:bg-zinc-800 dark:text-gray-300',
+                                                    rowIndex === 0 &&
+                                                        'border-t border-black/12 dark:border-white/12',
                                                 )}
                                             >
                                                 {label}
@@ -530,11 +536,10 @@ export default function PageRoasTrackerIndex({
                                                                     cell,
                                                                     i === 0 &&
                                                                         groupStart,
-                                                                    'sticky z-30 bg-stone-100 font-semibold dark:bg-zinc-800',
+                                                                    'bg-stone-100 font-semibold dark:bg-zinc-800',
                                                                     rowIndex ===
-                                                                        0
-                                                                        ? 'bottom-8 border-t border-black/12 dark:border-white/12'
-                                                                        : 'bottom-0',
+                                                                        0 &&
+                                                                        'border-t border-black/12 dark:border-white/12',
                                                                     c.tone
                                                                         ? TONE[
                                                                               c

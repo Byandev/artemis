@@ -75,8 +75,8 @@ class PageRoasTrackerController extends Controller
             ->select(
                 'page_type', 'page_id', 'date',
                 'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_cpp',
-                // Ingredients for a blended RTS rate on the Total/Average rows;
-                // delivered/returned are not columns of their own here.
+                // `returned_amount` is only an ingredient of the blended RTS
+                // rate; the other two are columns in their own right too.
                 'returning_amount', 'returned_amount', 'delivered_amount',
             )
             ->get();
@@ -255,6 +255,7 @@ class PageRoasTrackerController extends Controller
             'sales' => round($per($t['sales']), 2),
             'ad_spent' => round($per($t['ad_spent']), 2),
             'ad_sales' => round($per($t['ad_sales']), 2),
+            'delivered_amount' => round($per($t['delivered']), 2),
             'returning_amount' => round($t['returning'], 2),
             'roas' => $ratio($t['sales'], $t['ad_spent']),
             'ad_roas' => $ratio($t['ad_sales'], $t['ad_spent']),

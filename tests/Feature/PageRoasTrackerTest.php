@@ -63,7 +63,9 @@ it('blends every ratio over the range instead of averaging daily ratios', functi
     expect($page['total']['orders'])->toBe(40)
         ->and($page['total']['sales'])->toBe(4000.0)
         ->and($page['total']['ad_spent'])->toBe(1000.0)
-        ->and($page['total']['ad_sales'])->toBe(3200.0);
+        ->and($page['total']['ad_sales'])->toBe(3200.0)
+        // Delivered is a flow, so unlike returning it does sum.
+        ->and($page['total']['delivered_amount'])->toBe(2000.0);
 
     // Ratios come off the range totals: 4000/1000, 3200/1000, 20 purchases and
     // 40 orders against 1000 spend.
@@ -94,7 +96,8 @@ it('halves the amounts on the Average row but leaves the ratios blended', functi
 
     expect($page['average']['orders'])->toBe(20)
         ->and($page['average']['sales'])->toBe(2000.0)
-        ->and($page['average']['ad_spent'])->toBe(500.0);
+        ->and($page['average']['ad_spent'])->toBe(500.0)
+        ->and($page['average']['delivered_amount'])->toBe(1000.0);
 
     // A mean of daily ROAS would be 4.00 here too, so lean on ad_cpp: the daily
     // ratios are 0.032 and 0.016 (mean 0.024), while the blend is 20/1000.
@@ -149,7 +152,8 @@ it('sends every metric so the column toggle needs no round trip', function () {
         ->component('workspaces/page-roas-tracker/index')
         ->has('pages.0.days.2026-08-01', fn (Assert $day) => $day
             ->hasAll([
-                'orders', 'sales', 'ad_spent', 'ad_sales', 'returning_amount',
+                'orders', 'sales', 'ad_spent', 'ad_sales',
+                'delivered_amount', 'returning_amount',
                 'roas', 'ad_roas', 'rts_rate', 'ad_cpp', 'cpp',
             ])
         )
