@@ -74,8 +74,9 @@ it('blends every ratio over the range instead of averaging daily ratios', functi
         ->and($page['total']['ad_cpp'])->toBe(50.0)
         ->and($page['total']['cpp'])->toBe(25.0);
 
-    // The mean of the two stored daily rates — not re-derived from the returns.
-    expect($page['total']['rts_rate'])->toBe(25.0);
+    // 300 returning over 300 returning + 2000 delivered — the whole range, not
+    // the mean of the two daily rates (which would be 25.0).
+    expect($page['total']['rts_rate'])->toBe(13.04);
 });
 
 it('halves the amounts on the Average row but leaves the ratios blended', function () {
@@ -103,41 +104,29 @@ it('halves the amounts on the Average row but leaves the ratios blended', functi
     // costs are 250/8 and 750/12 (mean 46.88), while the blend is 1000/20.
     expect($page['average']['ad_cpp'])->toBe(50.0)
         ->and($page['average']['roas'])->toBe(4.0)
-        ->and($page['average']['rts_rate'])->toBe(25.0);
+        ->and($page['average']['rts_rate'])->toBe(13.04);
 });
 
-it('carries returning as a closing snapshot rather than summing the days', function () {
+it('sums returning like any other daily amount', function () {
     record(['date' => '2026-08-01', 'returning_amount' => 100]);
     record(['date' => '2026-08-02', 'returning_amount' => 250]);
 
     $page = trackerPage('2026-08-01', '2026-08-02');
 
-    // Not 350 — the second day already counts everything still on the way back.
-    expect($page['total']['returning_amount'])->toBe(250.0)
-        // A stock is not divided by the day count either.
-        ->and($page['average']['returning_amount'])->toBe(250.0);
+    // The builder writes what started its way back on that date, so the days do
+    // not overlap and the range is their sum.
+    expect($page['total']['returning_amount'])->toBe(350.0)
+        ->and($page['average']['returning_amount'])->toBe(175.0);
 });
 
-it('carries the last known snapshot through a day the builder skipped', function () {
+it('treats a day the builder skipped as nothing returning', function () {
     record(['date' => '2026-08-01', 'returning_amount' => 100]);
     // Nothing at all for 08-02 and 08-03.
 
     $page = trackerPage('2026-08-01', '2026-08-03');
 
-    // The day cells read zero — there is no figure to show — but the range keeps
-    // the last one the builder actually wrote.
     expect($page['days']['2026-08-03']['returning_amount'])->toBe(0.0)
         ->and($page['total']['returning_amount'])->toBe(100.0);
-});
-
-it('lets a written zero clear the snapshot', function () {
-    record(['date' => '2026-08-01', 'returning_amount' => 100]);
-    // A row exists but carries no returning figure — everything came back in.
-    record(['date' => '2026-08-02', 'orders' => 5, 'sales' => 500]);
-
-    $page = trackerPage('2026-08-01', '2026-08-02');
-
-    expect($page['total']['returning_amount'])->toBe(0.0);
 });
 
 it('shows a day exactly as the builder stored it, deriving nothing', function () {
@@ -171,14 +160,25 @@ it('leaves a ratio the builder never wrote as null rather than zero', function (
         ->and($day['sales'])->toBe(300.0);
 });
 
-it('averages RTS over the days that have one, not the whole range', function () {
-    record(['date' => '2026-08-01', 'rts_rate' => 20]);
-    record(['date' => '2026-08-02', 'rts_rate' => 40]);
-    // Nothing for 08-03: a day the builder never wrote is not a 0% day.
-    $page = trackerPage('2026-08-01', '2026-08-03');
+it('weights RTS by what actually moved, not by the day', function () {
+    // A quiet day at 50% and a heavy one at 10%. A mean of the daily rates would
+    // call that 30%; the blend says 12%, because the heavy day is most of the
+    // parcels.
+    record(['date' => '2026-08-01', 'returning_amount' => 100, 'delivered_amount' => 100]);
+    record(['date' => '2026-08-02', 'returning_amount' => 200, 'delivered_amount' => 1800]);
 
-    expect($page['total']['rts_rate'])->toBe(30.0)
-        ->and($page['average']['rts_rate'])->toBe(30.0);
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    expect($page['total']['rts_rate'])->toBe(13.64);
+});
+
+it('leaves RTS null on a range with no delivery activity at all', function () {
+    // Nothing moved, so there is no rate — not a 0% one.
+    record(['date' => '2026-08-01', 'orders' => 5, 'sales' => 500]);
+
+    $page = trackerPage('2026-08-01', '2026-08-01');
+
+    expect($page['total']['rts_rate'])->toBeNull();
 });
 
 it('rolls every visible page into one all-pages group', function () {
@@ -191,8 +191,10 @@ it('rolls every visible page into one all-pages group', function () {
         'page_id' => $second->getKey(),
     ], $attrs));
 
-    record(['date' => '2026-08-01', 'orders' => 10, 'sales' => 1000, 'ad_spent' => 500, 'rts_rate' => 20]);
-    $row(['date' => '2026-08-01', 'orders' => 30, 'sales' => 5000, 'ad_spent' => 500, 'rts_rate' => 40]);
+    record(['date' => '2026-08-01', 'orders' => 10, 'sales' => 1000, 'ad_spent' => 500,
+        'returning_amount' => 400, 'delivered_amount' => 1600]);
+    $row(['date' => '2026-08-01', 'orders' => 30, 'sales' => 5000, 'ad_spent' => 500,
+        'returning_amount' => 500, 'delivered_amount' => 500]);
 
     $response = test()->get(route(
         'workspaces.sales-marketing.dashboard.page-roas-tracker',
@@ -211,8 +213,11 @@ it('rolls every visible page into one all-pages group', function () {
     expect($overall['days']['2026-08-01']['roas'])->toBe(6.0)
         ->and($overall['total']['roas'])->toBe(6.0);
 
-    // RTS still averages the stored rates rather than re-deriving one.
+    // RTS blends across the pages too: 900 back against 900 + 2100 moved.
     expect($overall['days']['2026-08-01']['rts_rate'])->toBe(30.0);
+
+    // Returning adds up across pages exactly as it does across days.
+    expect($overall['total']['returning_amount'])->toBe(900.0);
 });
 
 it('sends no all-pages group when nothing is in view', function () {

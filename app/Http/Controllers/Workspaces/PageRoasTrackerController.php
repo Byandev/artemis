@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\SalesMarketingDashboard;
 use App\Support\TeamVisibility;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -20,8 +21,11 @@ use Inertia\Response;
 /**
  * Page ROAS Tracker: reads the page_daily_records built by
  * `build-page-daily-performance` and lays them out as a day-by-day breakdown —
- * dates down the side, one metric column group per page, with per-page Total
- * and Average rows.
+ * dates down the side, one metric column group per page, then an All Pages
+ * group, each with Total and Average rows.
+ *
+ * Day cells are stored rows read verbatim; only the summary rows and the All
+ * Pages group combine anything, and all of that lives in PageRoasTally.
  *
  * Every metric is always sent; which of them are shown is a client-side column
  * toggle (Orders/Sales/Ad Spend/ROAS by default), so switching a column on is
@@ -31,6 +35,50 @@ class PageRoasTrackerController extends Controller
 {
     use AuthorizesRequests;
 
+    /** What a day cell renders, read verbatim by PageRoasTally::stored(). */
+    private const FIELDS = [
+        'page_type', 'page_id', 'date',
+        'orders', 'sales', 'ad_spent', 'ad_sales',
+        'delivered_amount', 'returning_amount',
+        'roas', 'ad_roas', 'ad_cpp', 'cpp', 'rts_rate',
+    ];
+
+    /**
+     * Every summary cell, worked out by the database.
+     *
+     * Aliased to the stored column names so an aggregate row and a stored row
+     * are read by the same code — see cell().
+     *
+     * The ratios are computed across the whole range rather than averaged from
+     * the daily ones: a mean of daily ROAS would let a ₱10 day weigh as much as
+     * a ₱10,000 one. NULLIF leaves a zero denominator null instead of dividing
+     * by it, so "no cost per purchase" never renders as "a cost of zero".
+     *
+     * RTS blends the same way: what went back over what moved, across the range.
+     * A mean of the stored daily rates would let a page-day with two deliveries
+     * outvote one with two hundred, and would count every day with no delivery
+     * activity at all as a 0% day.
+     */
+    private const AGGREGATES = [
+        'SUM(orders) AS orders',
+        'SUM(sales) AS sales',
+        'SUM(ad_spent) AS ad_spent',
+        'SUM(ad_sales) AS ad_sales',
+        'SUM(delivered_amount) AS delivered_amount',
+        'SUM(returning_amount) AS returning_amount',
+        'SUM(sales) / NULLIF(SUM(ad_spent), 0) AS roas',
+        'SUM(ad_sales) / NULLIF(SUM(ad_spent), 0) AS ad_roas',
+        'SUM(ad_spent) / NULLIF(SUM(ad_purchases), 0) AS ad_cpp',
+        'SUM(ad_spent) / NULLIF(SUM(orders), 0) AS cpp',
+        'SUM(returning_amount) / NULLIF(SUM(returning_amount) + SUM(delivered_amount), 0) * 100 AS rts_rate',
+    ];
+
+    /** The amounts, which the Average row divides. Ratios never divide. */
+    private const AMOUNTS = [
+        'orders', 'sales', 'ad_spent', 'ad_sales',
+        'delivered_amount', 'returning_amount',
+    ];
+
     public function index(Request $request, Workspace $workspace): Response
     {
         // Rendered as the "Page ROAS Tracker" tab of the S&M dashboard, so it
@@ -39,110 +87,14 @@ class PageRoasTrackerController extends Controller
 
         $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
 
+        $user = $request->user();
         [$start, $end] = $this->resolveRange($request);
         $dates = $this->datesInRange($start, $end);
+        $filters = $this->filters($request);
 
-        $user = $request->user();
-        $selectedPages = $this->ids($request->input('pages'));
-        $selectedShops = $this->ids($request->input('shops'));
-        $selectedUsers = $this->ids($request->input('users'));
+        $base = $this->baseQuery($workspace, $user, $filters, $start, $end);
 
-        // Team visibility: scoped users only see their team(s)' pages, and the
-        // "viewing as team" switcher narrows everyone to the chosen team.
-        $scoped = TeamVisibility::shouldScope($user, $workspace);
-        $hasFilters = $selectedPages || $selectedShops || $selectedUsers;
-
-        // Page / Shop / User facets combine (AND) with team visibility into a set
-        // of eligible Pancake page ids; null means "no page scoping — every page"
-        // (only possible for unrestricted users with no facet filter applied).
-        $eligiblePageIds = ($scoped || $hasFilters)
-            ? Page::query()
-                ->where('workspace_id', $workspace->id)
-                ->when($scoped, fn ($q) => $q->visibleTo($user, $workspace))
-                ->when($selectedPages, fn ($q) => $q->whereIn('id', $selectedPages))
-                ->when($selectedShops, fn ($q) => $q->whereIn('shop_id', $selectedShops))
-                ->when($selectedUsers, fn ($q) => $q->whereIn('owner_id', $selectedUsers))
-                ->pluck('id')
-                ->all()
-            : null;
-
-        $records = DB::table('page_daily_records')
-            ->where('workspace_id', $workspace->id)
-            ->whereBetween('date', [$start, $end])
-            ->when($eligiblePageIds !== null, fn ($q) => $q
-                ->where('page_type', Page::class)
-                ->whereIn('page_id', $eligiblePageIds))
-            ->select(
-                'page_type', 'page_id', 'date',
-                // Shown as-is on a day row.
-                'orders', 'sales', 'ad_spent', 'ad_sales', 'delivered_amount',
-                'returning_amount', 'roas', 'ad_roas', 'rts_rate', 'ad_cpp', 'cpp',
-                // Only the Total/Average rows need this, to re-blend the ratios
-                // over the range.
-                'ad_purchases',
-            )
-            ->get();
-
-        $names = $this->resolvePageNames($records);
-        $dayCount = max(count($dates), 1);
-
-        $series = $records
-            ->groupBy(fn ($r) => $r->page_type.'|'.$r->page_id)
-            ->map(function (Collection $group, string $key) use ($dates, $names, $dayCount) {
-                $byDate = $group->keyBy('date');
-
-                $totals = self::EMPTY_TALLY;
-                $days = [];
-                $dayTallies = [];
-
-                foreach ($dates as $date) {
-                    $rec = $byDate->get($date);
-
-                    // A day cell is the row the builder wrote, verbatim.
-                    $days[$date] = $this->day($rec);
-
-                    $tally = $this->tally($rec);
-                    $dayTallies[$date] = $tally;
-
-                    foreach ($tally as $field => $value) {
-                        if ($field !== 'returning') {
-                            $totals[$field] += $value;
-                        }
-                    }
-
-                    // `returning` is a stock, not a flow — each row already reads
-                    // "still on the way back as of that day", so the range figure
-                    // is the closing snapshot rather than the sum of the days. A
-                    // day the builder skipped carries the last one forward.
-                    if ($byDate->has($date)) {
-                        $totals['returning'] = $tally['returning'];
-                    }
-                }
-
-                [, $pageId] = explode('|', $key, 2);
-
-                return [
-                    'page' => [
-                        'page_id' => $pageId,
-                        'name' => $names[$key] ?? ('Page '.$pageId),
-                        'days' => $days,
-                        'total' => $this->summary($totals),
-                        // Average = per-day mean of the amounts; every ratio stays
-                        // blended over the whole range, so it matches the Total row.
-                        'average' => $this->summary($totals, $dayCount),
-                    ],
-                    // Kept for the all-pages roll-up, which has to go back to the
-                    // ingredients rather than adding up finished figures.
-                    'tally' => $totals,
-                    'dayTallies' => $dayTallies,
-                ];
-            })
-            // Most active pages first, so the useful columns are left-most.
-            ->sortByDesc(fn ($entry) => $entry['page']['total']['sales'])
-            ->values();
-
-        $pages = $series->pluck('page')->values();
-        $overall = $this->rollUp($series, $dates, $dayCount);
+        [$pages, $overall] = $this->build($base, $dates);
 
         return Inertia::render('workspaces/page-roas-tracker/index', [
             'workspace' => $workspace,
@@ -154,9 +106,9 @@ class PageRoasTrackerController extends Controller
                 'start' => $start,
                 'end' => $end,
                 // String ids so they round-trip into the filter's value model.
-                'pages' => array_map('strval', $selectedPages),
-                'shops' => array_map('strval', $selectedShops),
-                'users' => array_map('strval', $selectedUsers),
+                'pages' => array_map('strval', $filters['pages']),
+                'shops' => array_map('strval', $filters['shops']),
+                'users' => array_map('strval', $filters['users']),
             ],
             'tabs' => SalesMarketingDashboard::tabs($workspace),
             'activeTab' => 'page-roas-tracker',
@@ -164,18 +116,198 @@ class PageRoasTrackerController extends Controller
     }
 
     /**
-     * Normalise a request value to a de-duped list of positive ints.
+     * Shape the stored rows into one series per page, plus the All Pages group.
      *
-     * @return list<int>
+     * Day cells come from the rows themselves; every summary is a SQL aggregate
+     * — one per grain — so nothing is added up in PHP.
+     *
+     * @param  list<string>  $dates
+     * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>|null}
      */
-    private function ids(mixed $value): array
+    private function build(Builder $base, array $dates): array
     {
-        return collect((array) $value)
+        $records = (clone $base)->select(self::FIELDS)->get();
+
+        $names = $this->resolvePageNames($records);
+        $dayCount = max(count($dates), 1);
+        $aggregates = $this->aggregates($dayCount);
+
+        $perPage = (clone $base)
+            ->selectRaw("page_type, page_id, {$aggregates}")
+            ->groupBy('page_type', 'page_id')
+            ->get()
+            ->keyBy(fn ($r) => $r->page_type.'|'.$r->page_id);
+
+        $perDate = (clone $base)
+            ->selectRaw("date, {$aggregates}")
+            ->groupBy('date')
+            ->get()
+            ->keyBy('date');
+
+        $grand = (clone $base)->selectRaw($aggregates)->first();
+
+        $pages = [];
+
+        foreach ($records->groupBy(fn ($r) => $r->page_type.'|'.$r->page_id) as $key => $group) {
+            $byDate = $group->keyBy('date');
+
+            $days = [];
+            foreach ($dates as $date) {
+                $days[$date] = $this->cell($byDate->get($date));
+            }
+
+            $totals = $perPage->get($key);
+
+            [, $pageId] = explode('|', $key, 2);
+
+            $pages[] = [
+                'page_id' => $pageId,
+                'name' => $names[$key] ?? ('Page '.$pageId),
+                'days' => $days,
+                'total' => $this->cell($totals),
+                'average' => $this->cell($totals, 'avg_'),
+            ];
+        }
+
+        if ($pages === []) {
+            return [[], null];
+        }
+
+        // Most active pages first, so the useful columns are left-most.
+        usort($pages, fn ($a, $b) => $b['total']['sales'] <=> $a['total']['sales']);
+
+        return [$pages, [
+            'days' => collect($dates)
+                ->mapWithKeys(fn (string $d) => [$d => $this->cell($perDate->get($d))])
+                ->all(),
+            'total' => $this->cell($grand),
+            'average' => $this->cell($grand, 'avg_'),
+        ]];
+    }
+
+    /**
+     * One cell of the grid, from either a stored row or a SQL aggregate.
+     *
+     * Both arrive under the same field names — AGGREGATES aliases its sums and
+     * ratios to the stored column names — so the day cells, the Total rows and
+     * the All Pages group all read the same way. Nothing is derived here: the
+     * builder owns the daily figures and the database owns the range ones.
+     *
+     * $prefix picks the Average row's pre-divided amounts, which the same query
+     * selects as avg_*. Ratios are never prefixed — they cover the whole range
+     * either way, so the Average row reads the Total row's.
+     *
+     * @return array<string, float|int|null>
+     */
+    private function cell(?object $row, string $prefix = ''): array
+    {
+        $amount = fn (string $field) => round((float) ($row->{$prefix.$field} ?? 0), 2);
+
+        // A ratio with no denominator stays null — "no cost per purchase" is not
+        // the same figure as "a cost of zero".
+        $ratio = fn (string $field) => ($row->{$field} ?? null) === null
+            ? null
+            : round((float) $row->{$field}, 2);
+
+        return [
+            'orders' => (int) round((float) ($row->{$prefix.'orders'} ?? 0)),
+            'sales' => $amount('sales'),
+            'ad_spent' => $amount('ad_spent'),
+            'ad_sales' => $amount('ad_sales'),
+            'delivered_amount' => $amount('delivered_amount'),
+            'returning_amount' => $amount('returning_amount'),
+            'roas' => $ratio('roas'),
+            'ad_roas' => $ratio('ad_roas'),
+            'ad_cpp' => $ratio('ad_cpp'),
+            'cpp' => $ratio('cpp'),
+            'rts_rate' => $ratio('rts_rate'),
+        ];
+    }
+
+    /**
+     * The summary select: Total figures, plus the Average row's amounts already
+     * divided by the calendar day count.
+     *
+     * One query serves both rows. The day count is the calendar span, so days
+     * with no rows still count — an average over a week is over seven days
+     * whether or not the builder wrote all seven.
+     */
+    private function aggregates(int $dayCount): string
+    {
+        $average = array_map(
+            fn (string $field) => "SUM({$field}) / {$dayCount} AS avg_{$field}",
+            self::AMOUNTS,
+        );
+
+        return implode(', ', [...self::AGGREGATES, ...$average]);
+    }
+
+    /**
+     * The rows for the range, narrowed to the pages this viewer may see.
+     *
+     * Returned unexecuted: every grain — day rows, per-page totals, per-date
+     * totals, the grand total — is a clone of this one query.
+     *
+     * @param  array{pages: list<int>, shops: list<int>, users: list<int>}  $filters
+     */
+    private function baseQuery(Workspace $workspace, User $user, array $filters, string $start, string $end): Builder
+    {
+        $pageIds = $this->eligiblePageIds($workspace, $user, $filters);
+
+        return DB::table('page_daily_records')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$start, $end])
+            ->when($pageIds !== null, fn ($q) => $q
+                ->where('page_type', Page::class)
+                ->whereIn('page_id', $pageIds));
+    }
+
+    /**
+     * The Page / Shop / User facets combined (AND) with team visibility.
+     *
+     * @param  array{pages: list<int>, shops: list<int>, users: list<int>}  $filters
+     * @return list<int>|null null means "no page scoping — every page"
+     */
+    private function eligiblePageIds(Workspace $workspace, User $user, array $filters): ?array
+    {
+        // Team visibility: scoped users only see their team(s)' pages, and the
+        // "viewing as team" switcher narrows everyone to the chosen team.
+        $scoped = TeamVisibility::shouldScope($user, $workspace);
+
+        // Only an unrestricted viewer with no facet applied skips scoping.
+        if (! $scoped && ! array_filter($filters)) {
+            return null;
+        }
+
+        return Page::query()
+            ->where('workspace_id', $workspace->id)
+            ->when($scoped, fn ($q) => $q->visibleTo($user, $workspace))
+            ->when($filters['pages'], fn ($q) => $q->whereIn('id', $filters['pages']))
+            ->when($filters['shops'], fn ($q) => $q->whereIn('shop_id', $filters['shops']))
+            ->when($filters['users'], fn ($q) => $q->whereIn('owner_id', $filters['users']))
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * The facets from the request, each a de-duped list of positive ints.
+     *
+     * @return array{pages: list<int>, shops: list<int>, users: list<int>}
+     */
+    private function filters(Request $request): array
+    {
+        $ids = fn (mixed $value) => collect((array) $value)
             ->map(fn ($v) => (int) $v)
             ->filter()
             ->unique()
             ->values()
             ->all();
+
+        return [
+            'pages' => $ids($request->input('pages')),
+            'shops' => $ids($request->input('shops')),
+            'users' => $ids($request->input('users')),
+        ];
     }
 
     /**
@@ -204,169 +336,6 @@ class PageRoasTrackerController extends Controller
                 ->orderBy('users.name')
                 ->get(['users.id', 'users.name'])
                 ->map(fn ($u) => ['key' => (string) $u->id, 'label' => $u->name]),
-        ];
-    }
-
-    /**
-     * The right-most "All Pages" group: every visible page rolled into one.
-     *
-     * No stored row covers a set of pages, so this group is derived the same way
-     * the Total/Average rows are — back to the counts and amounts underneath.
-     * Adding up finished figures would not work: ROAS across two pages is their
-     * combined sales over their combined spend, not the sum of two ratios.
-     *
-     * @param  Collection<int, array{tally: array<string, float>, dayTallies: array<string, array<string, float>>}>  $series
-     * @return array{days: array<string, mixed>, total: array<string, mixed>, average: array<string, mixed>}|null
-     */
-    private function rollUp(Collection $series, array $dates, int $dayCount): ?array
-    {
-        if ($series->isEmpty()) {
-            return null;
-        }
-
-        $add = function (array $into, array $from): array {
-            foreach ($from as $field => $value) {
-                $into[$field] += $value;
-            }
-
-            return $into;
-        };
-
-        $days = [];
-
-        foreach ($dates as $date) {
-            $tally = self::EMPTY_TALLY;
-
-            foreach ($series as $entry) {
-                // `returning` sums here rather than carrying forward: on one day
-                // these are different pages' parcels, not the same page twice.
-                $tally = $add($tally, $entry['dayTallies'][$date]);
-            }
-
-            $days[$date] = $this->summary($tally);
-        }
-
-        $totals = self::EMPTY_TALLY;
-
-        foreach ($series as $entry) {
-            // Each page's tally already closed its own `returning` snapshot, so
-            // summing them gives what is still out across every page.
-            $totals = $add($totals, $entry['tally']);
-        }
-
-        return [
-            'days' => $days,
-            'total' => $this->summary($totals),
-            'average' => $this->summary($totals, $dayCount),
-        ];
-    }
-
-    /**
-     * One day, exactly as `build-page-daily-performance` stored it.
-     *
-     * Nothing is derived here. The builder owns every formula, and the tracker
-     * having its own copy is what silently drifted once already — a change to
-     * the builder's cost-per-purchase had no effect on the page, because the
-     * page was quietly recomputing the old one.
-     *
-     * @return array<string, float|int|null>
-     */
-    private function day(?object $rec): array
-    {
-        // A ratio the builder had no denominator for stays null — "no cost per
-        // purchase" is not the same figure as "a cost of zero".
-        $ratio = fn (string $field) => $rec?->{$field} === null ? null : (float) $rec->{$field};
-
-        return [
-            'orders' => (int) ($rec->orders ?? 0),
-            'sales' => (float) ($rec->sales ?? 0),
-            'ad_spent' => (float) ($rec->ad_spent ?? 0),
-            'ad_sales' => (float) ($rec->ad_sales ?? 0),
-            'delivered_amount' => (float) ($rec->delivered_amount ?? 0),
-            'returning_amount' => (float) ($rec->returning_amount ?? 0),
-            'roas' => $ratio('roas'),
-            'ad_roas' => $ratio('ad_roas'),
-            'rts_rate' => $ratio('rts_rate'),
-            'ad_cpp' => $ratio('ad_cpp'),
-            'cpp' => $ratio('cpp'),
-        ];
-    }
-
-    /**
-     * The ingredients the Total/Average rows are built from, all zeroed.
-     *
-     * Only the summary rows need these: no stored row covers a date range, and
-     * a ratio cannot be summed, so a range has to go back to the counts and
-     * amounts underneath it.
-     */
-    private const EMPTY_TALLY = [
-        'orders' => 0.0,
-        'sales' => 0.0,
-        'ad_spent' => 0.0,
-        'ad_sales' => 0.0,
-        'ad_purchases' => 0.0,
-        'returning' => 0.0,
-        'delivered' => 0.0,
-        // RTS is never recomputed — the range reports the mean of the daily
-        // rates the builder wrote, so these carry the running sum and the count
-        // of days that actually had one.
-        'rts_sum' => 0.0,
-        'rts_days' => 0.0,
-    ];
-
-    /**
-     * One day's ingredients, or all zeroes for a day the builder never wrote.
-     *
-     * @return array<string, float>
-     */
-    private function tally(?object $rec): array
-    {
-        return [
-            'orders' => (float) ($rec->orders ?? 0),
-            'sales' => (float) ($rec->sales ?? 0),
-            'ad_spent' => (float) ($rec->ad_spent ?? 0),
-            'ad_sales' => (float) ($rec->ad_sales ?? 0),
-            'ad_purchases' => (float) ($rec->ad_purchases ?? 0),
-            'returning' => (float) ($rec->returning_amount ?? 0),
-            'delivered' => (float) ($rec->delivered_amount ?? 0),
-            'rts_sum' => (float) ($rec->rts_rate ?? 0),
-            'rts_days' => $rec?->rts_rate === null ? 0.0 : 1.0,
-        ];
-    }
-
-    /**
-     * The Total ($divisor 1) or Average ($divisor = day count) row.
-     *
-     * Amounts divide; ratios never do — they are blended from the undivided
-     * tally, so the range reports its true ROAS and cost per purchase rather
-     * than a mean of daily ratios, which would let a ₱10 day weigh as much as a
-     * ₱10,000 one. RTS is the exception: it is averaged from the rates the
-     * builder stored, never re-derived. A range has no stored row to read, so
-     * this is the one place the tracker still puts figures together at all.
-     *
-     * @param  array<string, float>  $t
-     * @return array<string, float|int|null>
-     */
-    private function summary(array $t, int $divisor = 1): array
-    {
-        $per = fn (float $v) => $divisor > 1 ? $v / $divisor : $v;
-        $ratio = fn (float $num, float $den) => $den > 0 ? round($num / $den, 2) : null;
-
-        return [
-            'orders' => (int) round($per($t['orders'])),
-            'sales' => round($per($t['sales']), 2),
-            'ad_spent' => round($per($t['ad_spent']), 2),
-            'ad_sales' => round($per($t['ad_sales']), 2),
-            'delivered_amount' => round($per($t['delivered']), 2),
-            // A stock, so it passes through undivided on every row.
-            'returning_amount' => round($t['returning'], 2),
-            'roas' => $ratio($t['sales'], $t['ad_spent']),
-            'ad_roas' => $ratio($t['ad_sales'], $t['ad_spent']),
-            // The mean of the stored daily rates, over the days that had one —
-            // the builder's figure, never re-derived from returns and deliveries.
-            'rts_rate' => $ratio($t['rts_sum'], $t['rts_days']),
-            'ad_cpp' => $ratio($t['ad_spent'], $t['ad_purchases']),
-            'cpp' => $ratio($t['ad_spent'], $t['orders']),
         ];
     }
 

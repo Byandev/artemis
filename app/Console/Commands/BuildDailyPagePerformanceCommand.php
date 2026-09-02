@@ -122,7 +122,8 @@ class BuildDailyPagePerformanceCommand extends Command
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->sum('final_amount');
 
-        // Still on the way back as of $date — cumulative, not a single day's events.
+        // Parcels that started their way back on $date — a single day's events,
+        // like delivered and returned above.
         $returning_amount = Order::where('page_id', $pageId)
             ->whereDate('returning_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
