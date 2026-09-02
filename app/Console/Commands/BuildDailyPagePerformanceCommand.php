@@ -99,8 +99,8 @@ class BuildDailyPagePerformanceCommand extends Command
         $ad_roas = $ad_spent > 0 ? $ad_sales / $ad_spent : 0;
 
         // Purchases (Meta) and orders (Pancake) per unit of ad spend.
-        $ad_cpp = $ad_purchases > 0 ? $ad_spent / $ad_purchases : 0;
-        $cpp = $orders > 0 ? $ad_spent / $orders : 0;
+        $ad_cpp = $ad_purchases > 0 ? ($ad_spent / $ad_purchases) : 0;
+        $cpp = $orders > 0 ? ($ad_spent / $orders) : 0;
 
         $delivered = Order::where('page_id', $pageId)
             ->whereDate('delivered_at', $date)
