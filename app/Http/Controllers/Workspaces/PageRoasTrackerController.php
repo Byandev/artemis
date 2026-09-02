@@ -77,9 +77,9 @@ class PageRoasTrackerController extends Controller
                 // Shown as-is on a day row.
                 'orders', 'sales', 'ad_spent', 'ad_sales', 'delivered_amount',
                 'returning_amount', 'roas', 'ad_roas', 'rts_rate', 'ad_cpp', 'cpp',
-                // Only the Total/Average rows need these, to re-blend the ratios
+                // Only the Total/Average rows need this, to re-blend the ratios
                 // over the range.
-                'ad_purchases', 'returned_amount',
+                'ad_purchases',
             )
             ->get();
 
@@ -240,8 +240,12 @@ class PageRoasTrackerController extends Controller
         'ad_sales' => 0.0,
         'ad_purchases' => 0.0,
         'returning' => 0.0,
-        'returned' => 0.0,
         'delivered' => 0.0,
+        // RTS is never recomputed — the range reports the mean of the daily
+        // rates the builder wrote, so these carry the running sum and the count
+        // of days that actually had one.
+        'rts_sum' => 0.0,
+        'rts_days' => 0.0,
     ];
 
     /**
@@ -258,8 +262,9 @@ class PageRoasTrackerController extends Controller
             'ad_sales' => (float) ($rec->ad_sales ?? 0),
             'ad_purchases' => (float) ($rec->ad_purchases ?? 0),
             'returning' => (float) ($rec->returning_amount ?? 0),
-            'returned' => (float) ($rec->returned_amount ?? 0),
             'delivered' => (float) ($rec->delivered_amount ?? 0),
+            'rts_sum' => (float) ($rec->rts_rate ?? 0),
+            'rts_days' => $rec?->rts_rate === null ? 0.0 : 1.0,
         ];
     }
 
@@ -267,10 +272,11 @@ class PageRoasTrackerController extends Controller
      * The Total ($divisor 1) or Average ($divisor = day count) row.
      *
      * Amounts divide; ratios never do — they are blended from the undivided
-     * tally, so the range reports its true ROAS/CPP/RTS rather than a mean of
-     * daily ratios, which would let a ₱10 day weigh as much as a ₱10,000 one.
-     * These formulas mirror the builder's; they are the one place the tracker
-     * still derives anything, because a range has no stored row to read.
+     * tally, so the range reports its true ROAS and cost per purchase rather
+     * than a mean of daily ratios, which would let a ₱10 day weigh as much as a
+     * ₱10,000 one. RTS is the exception: it is averaged from the rates the
+     * builder stored, never re-derived. A range has no stored row to read, so
+     * this is the one place the tracker still puts figures together at all.
      *
      * @param  array<string, float>  $t
      * @return array<string, float|int|null>
@@ -279,11 +285,6 @@ class PageRoasTrackerController extends Controller
     {
         $per = fn (float $v) => $divisor > 1 ? $v / $divisor : $v;
         $ratio = fn (float $num, float $den) => $den > 0 ? round($num / $den, 2) : null;
-
-        // RTS counts both legs of a return — in-flight and completed — against
-        // what actually landed, matching the builder.
-        $returning = $t['returning'] + $t['returned'];
-        $rtsBase = $returning + $t['delivered'];
 
         return [
             'orders' => (int) round($per($t['orders'])),
@@ -295,7 +296,9 @@ class PageRoasTrackerController extends Controller
             'returning_amount' => round($t['returning'], 2),
             'roas' => $ratio($t['sales'], $t['ad_spent']),
             'ad_roas' => $ratio($t['ad_sales'], $t['ad_spent']),
-            'rts_rate' => $rtsBase > 0 ? round($returning / $rtsBase * 100, 2) : null,
+            // The mean of the stored daily rates, over the days that had one —
+            // the builder's figure, never re-derived from returns and deliveries.
+            'rts_rate' => $ratio($t['rts_sum'], $t['rts_days']),
             'ad_cpp' => $ratio($t['ad_spent'], $t['ad_purchases']),
             'cpp' => $ratio($t['ad_spent'], $t['orders']),
         ];

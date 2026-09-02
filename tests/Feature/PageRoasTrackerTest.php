@@ -48,13 +48,13 @@ it('blends every ratio over the range instead of averaging daily ratios', functi
         'date' => '2026-08-01',
         'orders' => 10, 'sales' => 1000, 'ad_spent' => 250, 'ad_sales' => 800,
         'ad_purchases' => 8,
-        'returning_amount' => 100, 'returned_amount' => 50, 'delivered_amount' => 500,
+        'returning_amount' => 100, 'delivered_amount' => 500, 'rts_rate' => 20,
     ]);
     record([
         'date' => '2026-08-02',
         'orders' => 30, 'sales' => 3000, 'ad_spent' => 750, 'ad_sales' => 2400,
         'ad_purchases' => 12,
-        'returning_amount' => 200, 'returned_amount' => 150, 'delivered_amount' => 1500,
+        'returning_amount' => 200, 'delivered_amount' => 1500, 'rts_rate' => 30,
     ]);
 
     $page = trackerPage('2026-08-01', '2026-08-02');
@@ -74,8 +74,8 @@ it('blends every ratio over the range instead of averaging daily ratios', functi
         ->and($page['total']['ad_cpp'])->toBe(50.0)
         ->and($page['total']['cpp'])->toBe(25.0);
 
-    // (200 in-flight + 200 returned) / (that + 2000 delivered).
-    expect($page['total']['rts_rate'])->toBe(16.67);
+    // The mean of the two stored daily rates — not re-derived from the returns.
+    expect($page['total']['rts_rate'])->toBe(25.0);
 });
 
 it('halves the amounts on the Average row but leaves the ratios blended', function () {
@@ -83,13 +83,13 @@ it('halves the amounts on the Average row but leaves the ratios blended', functi
         'date' => '2026-08-01',
         'orders' => 10, 'sales' => 1000, 'ad_spent' => 250, 'ad_sales' => 800,
         'ad_purchases' => 8,
-        'returning_amount' => 100, 'returned_amount' => 50, 'delivered_amount' => 500,
+        'returning_amount' => 100, 'delivered_amount' => 500, 'rts_rate' => 20,
     ]);
     record([
         'date' => '2026-08-02',
         'orders' => 30, 'sales' => 3000, 'ad_spent' => 750, 'ad_sales' => 2400,
         'ad_purchases' => 12,
-        'returning_amount' => 200, 'returned_amount' => 150, 'delivered_amount' => 1500,
+        'returning_amount' => 200, 'delivered_amount' => 1500, 'rts_rate' => 30,
     ]);
 
     $page = trackerPage('2026-08-01', '2026-08-02');
@@ -103,7 +103,7 @@ it('halves the amounts on the Average row but leaves the ratios blended', functi
     // costs are 250/8 and 750/12 (mean 46.88), while the blend is 1000/20.
     expect($page['average']['ad_cpp'])->toBe(50.0)
         ->and($page['average']['roas'])->toBe(4.0)
-        ->and($page['average']['rts_rate'])->toBe(16.67);
+        ->and($page['average']['rts_rate'])->toBe(25.0);
 });
 
 it('carries returning as a closing snapshot rather than summing the days', function () {
@@ -169,6 +169,16 @@ it('leaves a ratio the builder never wrote as null rather than zero', function (
     expect($day['roas'])->toBeNull()
         ->and($day['cpp'])->toBeNull()
         ->and($day['sales'])->toBe(300.0);
+});
+
+it('averages RTS over the days that have one, not the whole range', function () {
+    record(['date' => '2026-08-01', 'rts_rate' => 20]);
+    record(['date' => '2026-08-02', 'rts_rate' => 40]);
+    // Nothing for 08-03: a day the builder never wrote is not a 0% day.
+    $page = trackerPage('2026-08-01', '2026-08-03');
+
+    expect($page['total']['rts_rate'])->toBe(30.0)
+        ->and($page['average']['rts_rate'])->toBe(30.0);
 });
 
 it('sends every metric so the column toggle needs no round trip', function () {
