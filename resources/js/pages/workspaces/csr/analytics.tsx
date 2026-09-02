@@ -492,6 +492,7 @@ export default function Analytics({ workspace, records, query }: Props) {
                     stackActionsOnMobile
                     divider={false}
                 >
+                    {/* ERP/POS toggle hidden for now
                     <div className="flex items-center rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800">
                         {['erp', 'pos'].map((value) => {
                             const label = value === 'erp' ? 'ERP' : 'POS';
@@ -515,6 +516,7 @@ export default function Analytics({ workspace, records, query }: Props) {
                             );
                         })}
                     </div>
+                    */}
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"
