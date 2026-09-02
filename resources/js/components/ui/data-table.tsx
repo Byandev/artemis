@@ -14,6 +14,7 @@ import {
     flexRender,
     getCoreRowModel,
     getExpandedRowModel,
+    getPaginationRowModel,
     getSortedRowModel,
     useReactTable
 } from "@tanstack/react-table";
@@ -50,13 +51,29 @@ declare module '@tanstack/react-table' {
         cellClassName?: string;
     }
 }
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     initialSorting?: SortingState,
+    /**
+     * Paginate (and sort) the rows already in hand instead of asking the
+     * server. Off by default, so a table driven by `onFetch` + `meta` keeps
+     * its server-side paging.
+     */
     enableInternalPagination?: boolean
+    /** Rows per page when paginating internally. Defaults to 25. */
+    internalPageSize?: number
+    /** Where internal paging starts — restore a remembered page here. */
+    initialPagination?: Partial<PaginationState>
+    /** Fires whenever the internal page or page size changes. */
+    onInternalPaginationChange?: (state: PaginationState) => void
+    /**
+     * Fires whenever sorting changes, in either mode. `onFetch` already covers
+     * the server-driven case; this one also fires when sorting is done here.
+     */
+    onSortChange?: (sorting: SortingState) => void
     onFetch?: (params?: { [key: string]: string | number | null }) => void,
     meta?: Omit<PaginatedData<TData>, 'data'>
     rowSelection?: RowSelectionState
@@ -75,6 +92,11 @@ export function DataTable<TData, TValue>({
                                              columns,
                                              data,
                                              onFetch,
+                                             enableInternalPagination = false,
+                                             internalPageSize = 25,
+                                             initialPagination,
+                                             onInternalPaginationChange,
+                                             onSortChange,
                                              initialSorting,
                                              meta,
                                              rowSelection,
@@ -99,10 +121,45 @@ export function DataTable<TData, TValue>({
     )
     const footerMeta = hasPaginationMeta ? meta : null
 
-    const pagination = useMemo<PaginationState>(() => ({
+    const [internalPagination, setInternalPagination] = useState<PaginationState>({
+        pageIndex: initialPagination?.pageIndex ?? 0,
+        pageSize: initialPagination?.pageSize ?? internalPageSize,
+    })
+
+    // Held in a ref so reporting the state back does not need the caller to
+    // memoize the callback.
+    const reportPagination = useRef(onInternalPaginationChange)
+    reportPagination.current = onInternalPaginationChange
+
+    const isFirstRender = useRef(true)
+
+    useEffect(() => {
+        if (!enableInternalPagination || isFirstRender.current) return
+
+        reportPagination.current?.(internalPagination)
+    }, [enableInternalPagination, internalPagination])
+
+    const serverPagination = useMemo<PaginationState>(() => ({
         pageIndex: meta?.current_page ? meta.current_page - 1 : 0,
         pageSize: meta?.per_page ?? 10
     }), [meta?.current_page, meta?.per_page])
+
+    const pagination = enableInternalPagination ? internalPagination : serverPagination
+
+    // Filtering upstream changes the row count under our feet; land back on the
+    // first page rather than on a page that no longer exists. Skipped on mount,
+    // so a restored page survives the first render.
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false
+
+            return
+        }
+
+        if (!enableInternalPagination) return
+
+        setInternalPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }))
+    }, [enableInternalPagination, data.length])
 
     const table = useReactTable({
         data,
@@ -111,6 +168,7 @@ export function DataTable<TData, TValue>({
         onSortingChange: (updater) => {
             const next = typeof updater === "function" ? updater(sorting) : updater
             setSorting(next)
+            onSortChange?.(next)
 
             if (onFetch) onFetch({ sort: toBackendSort(next), page: 1, per_page: meta?.per_page ?? null })
         },
@@ -138,6 +196,9 @@ export function DataTable<TData, TValue>({
                 onColumnOrderChange(next)
             }
             : undefined,
+        getPaginationRowModel: getPaginationRowModel(),
+        manualPagination: !enableInternalPagination,
+        onPaginationChange: enableInternalPagination ? setInternalPagination : undefined,
         state: {
             sorting,
             pagination,
@@ -146,9 +207,33 @@ export function DataTable<TData, TValue>({
             ...(columnOrder !== undefined ? { columnOrder } : {}),
             ...(renderSubRow ? { expanded } : {}),
         },
-        manualSorting: true,
+        // Server-driven when there is a fetcher to ask; otherwise sort the rows
+        // we already hold, so the click does something without a round trip.
+        manualSorting: Boolean(onFetch),
     })
 
+
+    const showFooter = hasPaginationMeta || (enableInternalPagination && data.length > 0)
+
+    // One shape for both modes: the server's meta, or what the table itself
+    // knows about the rows it is holding.
+    const footer = enableInternalPagination
+        ? {
+            perPage: internalPagination.pageSize,
+            currentPage: internalPagination.pageIndex + 1,
+            lastPage: Math.max(table.getPageCount(), 1),
+            total: data.length,
+            from: data.length === 0 ? 0 : internalPagination.pageIndex * internalPagination.pageSize + 1,
+            to: Math.min((internalPagination.pageIndex + 1) * internalPagination.pageSize, data.length),
+        }
+        : {
+            perPage: footerMeta?.per_page ?? 10,
+            currentPage: footerMeta?.current_page ?? 1,
+            lastPage: footerMeta?.last_page ?? 1,
+            total: footerMeta?.total ?? 0,
+            from: footerMeta?.from ?? 0,
+            to: footerMeta?.to ?? 0,
+        }
 
     return (
         <>
@@ -219,7 +304,7 @@ export function DataTable<TData, TValue>({
             </div>
 
             {
-                hasPaginationMeta &&
+                showFooter &&
                 <div className="border-t border-black/6 dark:border-white/6 px-4 py-3">
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div className="flex items-center gap-3">
@@ -228,8 +313,14 @@ export function DataTable<TData, TValue>({
                                     Rows
                                 </span>
                                 <Select
-                                    value={String(footerMeta?.per_page ?? 10)}
+                                    value={String(footer.perPage)}
                                     onValueChange={(val) => {
+                                        if (enableInternalPagination) {
+                                            setInternalPagination({ pageIndex: 0, pageSize: Number(val) })
+
+                                            return
+                                        }
+
                                         if (onFetch) onFetch({ per_page: Number(val), page: 1, sort: toBackendSort(sorting) })
                                     }}
                                 >
@@ -247,11 +338,17 @@ export function DataTable<TData, TValue>({
                             </div>
                             <div className="h-4 w-px bg-black/6 dark:bg-white/6" />
                             <p className="font-mono text-[11px] text-gray-400 dark:text-gray-500">
-                                Showing {footerMeta?.from ?? 0} to {footerMeta?.to ?? 0} of {(footerMeta?.total ?? 0).toLocaleString()} entries
+                                Showing {footer.from} to {footer.to} of {footer.total.toLocaleString()} entries
                             </p>
                         </div>
 
-                        <Pagination currentPage={footerMeta?.current_page ?? 1} totalPages={footerMeta?.last_page ?? 1} onPageChange={(page) => {
+                        <Pagination currentPage={footer.currentPage} totalPages={footer.lastPage} onPageChange={(page) => {
+                            if (enableInternalPagination) {
+                                setInternalPagination((prev) => ({ ...prev, pageIndex: page - 1 }))
+
+                                return
+                            }
+
                             if (onFetch) onFetch({ page, sort: toBackendSort(sorting), per_page: footerMeta?.per_page ?? null })
                         }} />
                     </div>
