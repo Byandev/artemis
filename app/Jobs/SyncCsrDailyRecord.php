@@ -18,8 +18,9 @@ class SyncCsrDailyRecord implements ShouldQueue
 
     /**
      * @param  string  $date  Y-m-d
+     * @param  int|null  $workspaceId  Limit the rebuild to one workspace; null covers every one.
      */
-    public function __construct(public string $date, public string $type = 'POS') {}
+    public function __construct(public string $date, public string $type = 'POS', public ?int $workspaceId = null) {}
 
     public function handle(): void
     {
@@ -30,6 +31,7 @@ class SyncCsrDailyRecord implements ShouldQueue
 
         $rows = DB::table('pancake_orders as po')
             ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
+            ->when($this->workspaceId, fn ($q, $id) => $q->where('po.workspace_id', $id))
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($q2) use ($start, $end) {
                     $q2->where('po.status', 3)
