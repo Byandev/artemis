@@ -619,6 +619,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'show'])->name('income-statements.show');
         Route::get('/income-statements/{incomeStatement}/export', [FinanceIncomeStatementController::class, 'export'])->name('income-statements.export');
         Route::post('/income-statements/{incomeStatement}/regenerate', [FinanceIncomeStatementController::class, 'regenerate'])->name('income-statements.regenerate');
+        Route::post('/income-statements/{incomeStatement}/lock', [FinanceIncomeStatementController::class, 'lock'])->name('income-statements.lock');
+        Route::delete('/income-statements/{incomeStatement}/lock', [FinanceIncomeStatementController::class, 'unlock'])->name('income-statements.unlock');
         Route::delete('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'destroy'])->name('income-statements.destroy');
 
         Route::get('/income-statements/{incomeStatement}/products', [FinanceUserIncomeStatementController::class, 'productIndex'])->name('income-statements.products.index');

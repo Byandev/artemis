@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Workspace;
 use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -131,7 +132,7 @@ class IncomeStatementController extends Controller
             ->get([
                 'id', 'period_month', 'total_delivered', 'delivered_orders',
                 'gross_profit_delivered_cogs', 'gross_profit_bought_cogs',
-                'status', 'generated_at',
+                'status', 'generated_at', 'locked_at',
             ]);
 
         return Inertia::render('workspaces/finance/income-statements/index', [
@@ -191,6 +192,9 @@ class IncomeStatementController extends Controller
             ],
             'statement' => [
                 'id' => $existing?->id,
+                // A locked month already saved here can't be overwritten by a
+                // save, so the preview says so rather than offering the button.
+                'locked_at' => $existing?->locked_at?->toIso8601String(),
                 'period_month' => $periodMonth,
                 'cod_fee_rate' => $codRate,
                 'vat_rate' => $vatRate,
@@ -221,6 +225,18 @@ class IncomeStatementController extends Controller
             // as a positive amount to deduct; 0 states the month broke even.
             'loss_brought_forward' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        // Saving writes over whatever the month already holds, so a locked
+        // statement has to refuse it the same way regenerate does.
+        $existing = IncomeStatement::where('workspace_id', $workspace->id)
+            ->whereDate('period_month', $this->resolveMonth($validated['month'])[0])
+            ->first();
+
+        if ($existing?->isLocked()) {
+            return redirect()
+                ->route('workspaces.finance.income-statements.show', [$workspace->slug, $existing->id])
+                ->with('error', 'This income statement is locked. Unlock it before saving over it.');
+        }
 
         $rates = StatementRates::resolve(
             $workspace,
@@ -262,6 +278,8 @@ class IncomeStatementController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
         $this->ensureOwns($workspace, $incomeStatement);
+
+        $incomeStatement->loadMissing('lockedBy:id,name');
 
         return Inertia::render('workspaces/finance/income-statements/show', [
             'workspace' => $workspace,
@@ -315,6 +333,8 @@ class IncomeStatementController extends Controller
                 'advisory_delivered_rate' => (float) $incomeStatement->advisory_delivered_rate,
                 'gencys_partner' => (bool) $workspace->is_gencys_partner,
                 'generated_at' => $incomeStatement->generated_at?->toIso8601String(),
+                'locked_at' => $incomeStatement->locked_at?->toIso8601String(),
+                'locked_by_name' => $incomeStatement->lockedBy?->name,
             ],
         ]);
     }
@@ -326,6 +346,10 @@ class IncomeStatementController extends Controller
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
         $this->ensureOwns($workspace, $incomeStatement);
 
+        if ($incomeStatement->isLocked()) {
+            return $this->refuseLocked('regenerated');
+        }
+
         $this->generate(
             $workspace,
             $incomeStatement->period_month->format('Y-m'),
@@ -334,6 +358,47 @@ class IncomeStatementController extends Controller
         );
 
         return redirect()->back()->with('success', 'Income statement regenerated.');
+    }
+
+    /**
+     * Close the month: hold these figures as they were struck.
+     *
+     * The statement is a snapshot of data that keeps moving — a late delivery or
+     * a backdated transaction changes what a regenerate would produce. Once the
+     * month has been reported on, locking is what says "this is the number", and
+     * anything that would rewrite it (regenerate, a save over the top, delete)
+     * is refused until someone unlocks.
+     */
+    public function lock(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
+        $this->ensureOwns($workspace, $incomeStatement);
+
+        // Already locked is the state asked for, so say so rather than moving
+        // the timestamp and losing who closed it first.
+        if ($incomeStatement->isLocked()) {
+            return redirect()->back()->with('success', 'Income statement is already locked.');
+        }
+
+        $incomeStatement->update([
+            'locked_at' => now(),
+            'locked_by' => $request->user()->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Income statement locked.');
+    }
+
+    /** Reopen a closed month so it can be regenerated, re-saved or deleted. */
+    public function unlock(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
+    {
+        $this->guard($request, $workspace);
+        $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
+        $this->ensureOwns($workspace, $incomeStatement);
+
+        $incomeStatement->update(['locked_at' => null, 'locked_by' => null]);
+
+        return redirect()->back()->with('success', 'Income statement unlocked.');
     }
 
     public function export(Request $request, Workspace $workspace, IncomeStatement $incomeStatement)
@@ -380,6 +445,10 @@ class IncomeStatementController extends Controller
         $this->guard($request, $workspace);
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
         $this->ensureOwns($workspace, $incomeStatement);
+
+        if ($incomeStatement->isLocked()) {
+            return $this->refuseLocked('deleted');
+        }
 
         $incomeStatement->delete();
 
@@ -743,5 +812,12 @@ class IncomeStatementController extends Controller
         if ($incomeStatement->workspace_id !== $workspace->id) {
             abort(404);
         }
+    }
+
+    /** @param  string  $verb  what was refused, e.g. "regenerated" */
+    private function refuseLocked(string $verb): RedirectResponse
+    {
+        return redirect()->back()
+            ->with('error', "This income statement is locked and cannot be {$verb}. Unlock it first.");
     }
 }

@@ -43,9 +43,9 @@ export interface StatementFigureSet {
     net_profit_delivered_cogs: number;
     net_profit_bought_cogs: number;
     /**
-     * What last month ended owing, as a positive amount to deduct — nought
-     * when it ended in profit. `cumulative_profit_*` is net profit less that,
-     * and is itself what next month carries, so a run of bad months chains.
+     * The month's carried deficit and what it leaves. Still computed and
+     * stored — the per-user statement is where a carryover is read and set —
+     * but not shown here, so nothing below reads them.
      */
     loss_brought_forward_delivered_cogs: number;
     loss_brought_forward_bought_cogs: number;
@@ -117,14 +117,6 @@ export default function StatementFigures({
         cogsView === 'bought'
             ? figures.net_profit_bought_cogs
             : figures.net_profit_delivered_cogs;
-    const lossBroughtForward =
-        cogsView === 'bought'
-            ? figures.loss_brought_forward_bought_cogs
-            : figures.loss_brought_forward_delivered_cogs;
-    const cumulativeProfit =
-        cogsView === 'bought'
-            ? figures.cumulative_profit_bought_cogs
-            : figures.cumulative_profit_delivered_cogs;
     const onDeliveredBasis =
         advisoryCharged > 0 &&
         advisoryCharged === figures.advisory_share_on_delivered;
@@ -165,25 +157,6 @@ export default function StatementFigures({
             emphasis: true,
             signed: netProfit,
         },
-        // A month that ended in the red is carried into this one. Shown only
-        // when there is something to carry: on a run of profitable months the
-        // line would say nought every time and only add noise.
-        ...(lossBroughtForward > 0
-            ? [
-                  {
-                      label: 'Less — Loss Brought Forward',
-                      help: 'What last month ended owing. A month in the red doesn’t stop being in the red on the first of the next one, so the deficit carries in and this month only counts as profit once it is filled. What carries is last month’s own cumulative figure, so a run of bad months adds up rather than each forgiving the one before.',
-                      value: fmt(lossBroughtForward),
-                  },
-                  {
-                      label: '= Cumulative Profit',
-                      help: 'Net Profit less the loss brought forward — what the business is actually up, counting where it started the month. This is the figure next month carries: while it is negative, the hole travels forward.',
-                      value: fmt(cumulativeProfit),
-                      emphasis: true,
-                      signed: cumulativeProfit,
-                  },
-              ]
-            : []),
     ];
 
     const rows: {
