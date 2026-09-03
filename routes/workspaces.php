@@ -297,6 +297,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/data', [AdsManagerController::class, 'data'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.data');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/timeseries', [AdsManagerController::class, 'timeseries'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-manager.timeseries');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/preview', [AdsManagerController::class, 'adPreview'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.preview');

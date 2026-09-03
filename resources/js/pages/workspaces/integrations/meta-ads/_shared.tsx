@@ -1053,6 +1053,15 @@ export function metricIsRatio(id: string): boolean {
     return spec?.formatter === pctFmt || spec?.formatter === decimalFmt;
 }
 
+/**
+ * Currency-formatted metrics (spend, and the `*_value` revenue columns). Charts
+ * use it to prefix a compacted axis tick — the full money formatter is far too
+ * wide for one.
+ */
+export function metricIsMoney(id: string): boolean {
+    return METRIC_SPECS.find((m) => m.id === id)?.formatter === moneyFmt;
+}
+
 function numCell(value: number, formatter: Formatter = intFmt) {
     return (
         <span className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
