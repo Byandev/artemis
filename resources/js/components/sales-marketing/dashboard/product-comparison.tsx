@@ -4,6 +4,7 @@ import ComparisonPanel, {
     METRICS,
     sumComparisonRows,
     useComparisonMetric,
+    useProductComparisonMetrics,
     type ComparisonBar,
 } from './comparison-panel';
 import {
@@ -45,8 +46,10 @@ export default function ProductComparison({
     /** `[start, end]` as YYYY-MM-DD. */
     dateRange: string[];
 }) {
+    const metrics = useProductComparisonMetrics();
     const [metric, chooseMetric] = useComparisonMetric(
         `sm_dashboard_product_metric_${slug}`,
+        metrics,
     );
 
     const previous = useMemo(() => previousWindow(dateRange), [dateRange]);
@@ -135,6 +138,7 @@ export default function ProductComparison({
         <ComparisonPanel
             title="Product comparison"
             metric={metric}
+            metrics={metrics}
             onMetric={chooseMetric}
             bars={bars}
             previous={previous}
