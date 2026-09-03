@@ -10,11 +10,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Modules\GencysERP\Models\GencysSyncBatch;
+use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Models\Intern;
+use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\SyncFlows\SyncFlowRegistry;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -33,6 +36,8 @@ class InternController extends Controller
         'email',
         'active',
     ];
+
+    public function __construct(private readonly SyncFlowRegistry $flows) {}
 
     public function index(Request $request, Workspace $workspace): Response
     {
@@ -148,38 +153,49 @@ class InternController extends Controller
         return back();
     }
 
-    /** Fire the n8n webhook that scrapes interns and posts them back to the callback. */
-    public function sync(Workspace $workspace): RedirectResponse
+    /**
+     * Ask the ERP for a fresh intern roster.
+     *
+     * Raised as a one-type batch rather than fired at n8n from here: a workspace
+     * has a single ERP login, so a scrape started while a batch was running would
+     * open a second session behind its back. Queued, it waits its turn like
+     * everything else and its outcome is readable on the Sync Batches page
+     * instead of vanishing into whatever n8n did with it.
+     *
+     * The credentials are checked here rather than left to the flow so the
+     * operator is told no on the page they pressed the button on — the flow's
+     * own guard only shows up as a failed run.
+     */
+    public function sync(Request $request, Workspace $workspace, BatchRunner $runner): RedirectResponse
     {
         $this->authorize(Permission::ViewGencysInterns->value, $workspace);
 
-        $webhookUrl = config('services.n8n.gencys_interns_webhook_url')
-            ?: config('services.n8n.webhook_url');
-
-        if (empty($webhookUrl)) {
+        if (blank($this->flows->for(GencysSyncRun::TYPE_INTERNS)->webhookUrl())) {
             return back()->with('error', 'Interns sync is not configured yet. Please contact support.');
         }
 
-        $apiKey = $workspace->apiKeys()->first();
-
-        if (blank($workspace->erp_username) || blank($workspace->erp_password) || ! $apiKey) {
+        if (blank($workspace->erp_username) || blank($workspace->erp_password) || ! $workspace->apiKeys()->exists()) {
             return back()->with('error', 'This workspace is not connected to the ERP. Add ERP credentials and an API key first.');
         }
 
-        $callbackBase = rtrim(config('services.n8n.callback_base_url') ?: config('app.url'), '/');
+        $batch = $runner->queue(
+            syncTypes: [GencysSyncRun::TYPE_INTERNS],
+            workspaceId: $workspace->id,
+            source: GencysSyncBatch::SOURCE_MANUAL,
+            createdByUserId: $request->user()->id,
+        );
 
-        $response = Http::timeout(30)->post($webhookUrl, [
-            'workspace_id' => $workspace->id,
-            'api_key' => $apiKey->reveal(),
-            'erp_username' => $workspace->erp_username,
-            'erp_password' => $workspace->erp_password,
-            'webhook_url' => "{$callbackBase}/api/v1/public/gencys/interns",
-        ]);
-
-        if (! $response->successful()) {
-            return back()->with('error', 'Something went wrong while syncing.'."\n".$response->body());
+        if (! $batch->wasRecentlyCreated) {
+            return back()->with('warning', "An interns sync is already queued as batch #{$batch->id} — nothing new was added.");
         }
 
-        return back()->with('success', 'Interns sync started. New records from the ERP will appear here shortly.');
+        if ($batch->total_runs === 0) {
+            return back()->with('error', 'Nothing to sync: this workspace has no ERP credentials or no API key.');
+        }
+
+        return back()->with(
+            'success',
+            "Queued batch #{$batch->id}. New records from the ERP will appear here once it runs.",
+        );
     }
 }

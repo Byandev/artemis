@@ -9,11 +9,15 @@ use Modules\GencysERP\Models\GencysSyncRun;
 class SyncFlowRegistry
 {
     /**
-     * The sync types the batch queue owns.
+     * The sync types the batch queue owns, in the order the UI offers them.
      *
-     * Intern daily records and page details are deliberately absent: they still
-     * fan out on the old fixed-timer path. Adding them is a matter of writing a
-     * flow class and listing it here.
+     * Page details are deliberately absent: they still fan out on the old
+     * fixed-timer path. Adding them is a matter of writing a flow class and
+     * listing it here.
+     *
+     * Interns is listed before intern daily records on purpose — runs are built
+     * type by type in the order given, so a batch covering both pulls the roster
+     * before the flow that reads it.
      *
      * @var array<string, class-string<SyncFlow>>
      */
@@ -21,6 +25,8 @@ class SyncFlowRegistry
         GencysSyncRun::TYPE_TRANSACTION_HISTORY => TransactionHistoryFlow::class,
         GencysSyncRun::TYPE_PURCHASE_ORDER => PurchaseOrderFlow::class,
         GencysSyncRun::TYPE_DAILY_SALES_TRACKER => DailySalesTrackerFlow::class,
+        GencysSyncRun::TYPE_INTERNS => InternFlow::class,
+        GencysSyncRun::TYPE_INTERN_DAILY_RECORDS => InternDailyRecordFlow::class,
     ];
 
     public function for(string $syncType): SyncFlow
