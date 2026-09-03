@@ -353,13 +353,16 @@ test('the scheduled sync command queues a single batch covering every sync type'
         GencysSyncRun::TYPE_TRANSACTION_HISTORY,
         GencysSyncRun::TYPE_PURCHASE_ORDER,
         GencysSyncRun::TYPE_DAILY_SALES_TRACKER,
+        GencysSyncRun::TYPE_INTERN_DAILY_RECORDS,
     ])->and($batch->status)->toBe(GencysSyncBatch::STATUS_RUNNING);
 
-    // 2 transaction dates + 1 PO range + 3 tracker dates.
+    // 2 transaction dates + 1 PO range + 3 tracker dates. No intern daily
+    // records: this workspace has no synced interns to ask about yet.
     expect($batch->total_runs)->toBe(6)
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_TRANSACTION_HISTORY)->count())->toBe(2)
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_PURCHASE_ORDER)->count())->toBe(1)
-        ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_DAILY_SALES_TRACKER)->count())->toBe(3);
+        ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_DAILY_SALES_TRACKER)->count())->toBe(3)
+        ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_INTERN_DAILY_RECORDS)->count())->toBe(0);
 
     // Each type carries its own window under its own key.
     expect($batch->parametersFor(GencysSyncRun::TYPE_TRANSACTION_HISTORY))->toHaveKey('dates')
