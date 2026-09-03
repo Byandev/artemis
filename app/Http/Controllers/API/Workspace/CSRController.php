@@ -859,7 +859,7 @@ class CSRController extends Controller
      */
 
     /** How many CSRs a metric lists. Matches the eight-slot chart palette. */
-    private const COMPARISON_ROWS = 8;
+    private const COMPARISON_ROWS = 100;
 
     public function analyticsComparison(Request $request, Workspace $workspace)
     {
