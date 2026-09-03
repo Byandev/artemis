@@ -40,11 +40,10 @@ import { omit } from 'lodash';
 import { Ban, Layers, ListChecks, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-/** One tickable sync type. `windowed` is false for the ones dates don't reach. */
+/** One tickable sync type. */
 interface SyncTypeOption {
     value: string;
     label: string;
-    windowed: boolean;
 }
 
 interface Props {
@@ -455,13 +454,6 @@ function NewBatchDialog({
         );
     };
 
-    // Ticked types the dates below don't reach — the intern roster is a list,
-    // not a window. Named rather than hidden: the fields stay required for the
-    // rest, so silence here would read as "the dates did something".
-    const undated = syncTypes
-        .filter((t) => !t.windowed && form.data.sync_types.includes(t.value))
-        .map((t) => t.label);
-
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
         form.post(indexUrl, {
@@ -550,15 +542,6 @@ function NewBatchDialog({
                         {form.errors.end_date && (
                             <p className="-mt-2 text-[11px] text-red-500">
                                 {form.errors.end_date}
-                            </p>
-                        )}
-
-                        {undated.length > 0 && (
-                            <p className="-mt-2 text-[11px] text-gray-400 dark:text-gray-500">
-                                {undated.join(' and ')}{' '}
-                                {undated.length === 1 ? 'pulls' : 'pull'} the
-                                whole list, so these dates don't apply to{' '}
-                                {undated.length === 1 ? 'it' : 'them'}.
                             </p>
                         )}
 

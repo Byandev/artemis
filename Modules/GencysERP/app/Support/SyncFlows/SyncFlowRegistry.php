@@ -15,9 +15,8 @@ class SyncFlowRegistry
      * fixed-timer path. Adding them is a matter of writing a flow class and
      * listing it here.
      *
-     * Not everything here is offered in the batch form — see
-     * SyncFlow::offeredInBatchForm(). Intern daily records is queue-owned and
-     * scheduled, but not something to raise by hand.
+     * The interns roster is registered but left off the batch form — it is
+     * raised from the Interns page instead. See SyncBatchController::index().
      *
      * @var array<string, class-string<SyncFlow>>
      */

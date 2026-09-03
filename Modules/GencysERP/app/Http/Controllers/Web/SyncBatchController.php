@@ -55,18 +55,13 @@ class SyncBatchController extends Controller
         return Inertia::render('workspaces/gencys/sync-batches/index', [
             'workspace' => $workspace,
             'batches' => $batches,
-            // Queue-owned but not hand-raiseable types are left off: the form
-            // is what a person ticks, and a scheduled-only flow has no business
-            // being ticked. The queue still runs and reports on them.
+            // The roster is raised from the Interns page, so it is not offered
+            // here. It stays registered — existing runs keep their label.
             'syncTypes' => collect($this->flows->all())
-                ->filter(fn ($flow) => $flow->offeredInBatchForm())
+                ->except([GencysSyncRun::TYPE_INTERNS])
                 ->map(fn ($flow, $type) => [
                     'value' => $type,
                     'label' => $flow->label(),
-                    // The form offers one date range for everything ticked, and
-                    // not every type is asked for one — the intern roster is a
-                    // list, not a window. Sent so the form can say so.
-                    'windowed' => $flow->usesWindow(),
                 ])
                 ->values()
                 ->all(),
@@ -204,18 +199,13 @@ class SyncBatchController extends Controller
 
     /**
      * Each flow reads its dates differently: purchase orders take one range, the
-     * others take an explicit list of days — and the intern roster takes none at
-     * all, so it is handed nothing rather than a window it would ignore.
+     * others take an explicit list of days.
      *
      * No flow can be narrowed to particular items any more — each asks the ERP
      * for a window and takes back whatever is on the report.
      */
     private function windowFor(string $syncType, Carbon $start, Carbon $end): array
     {
-        if (! $this->flows->for($syncType)->usesWindow()) {
-            return [];
-        }
-
         if ($syncType === GencysSyncRun::TYPE_PURCHASE_ORDER) {
             return [
                 'start_date' => $start->format('m/d/Y'),

@@ -73,33 +73,6 @@ abstract class SyncFlow
         return 1;
     }
 
-    /**
-     * Whether this flow is asked for a date window.
-     *
-     * Every flow but the intern roster syncs a slice of time, so the batch form
-     * offers one date range for the lot and each type reads it the way its n8n
-     * workflow expects. A flow answering false is handed no window at all, and
-     * the form says so rather than implying the dates did something.
-     */
-    public function usesWindow(): bool
-    {
-        return true;
-    }
-
-    /**
-     * Whether the Sync Batches form offers this type as a tickable option.
-     *
-     * A flow answering false is still fully owned by the queue — scheduled,
-     * retried and reported on like any other — it just isn't something to raise
-     * by hand. That is for the ones whose fan-out makes a hand-raised batch a
-     * poor idea: intern daily records opens a run per intern per day, so a week
-     * picked in the form would be hundreds of ERP calls.
-     */
-    public function offeredInBatchForm(): bool
-    {
-        return true;
-    }
-
     /** Where n8n posts its results back to. */
     protected function callbackUrl(string $path): string
     {

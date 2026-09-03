@@ -13,8 +13,8 @@ use Modules\GencysERP\Models\GencysSyncRun;
  * Alone among the flows this one has no window. The ERP's intern list is a
  * roster rather than a report of a day, so there is nothing to slice by date:
  * one run asks for the whole list and the callback upserts it, keyed on Gencys'
- * own intern id. That is why usesWindow() is false — the batch form offers one
- * date range for everything it covers, and this flow would quietly ignore it.
+ * own intern id. It is raised from the Interns page, not the batch form, and it
+ * ignores any window handed to it.
  *
  * It came into the queue late. Until now the roster was scraped by a button on
  * the Interns page firing at n8n directly, which could open a second ERP session
@@ -54,11 +54,6 @@ class InternFlow extends SyncFlow
     public function parametersForRun(GencysSyncRun $run): array
     {
         return [];
-    }
-
-    public function usesWindow(): bool
-    {
-        return false;
     }
 
     public function buildRuns(GencysSyncBatch $batch): int

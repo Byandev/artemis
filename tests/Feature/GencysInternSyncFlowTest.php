@@ -6,6 +6,7 @@ use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
 use Modules\GencysERP\Models\Intern;
 use Modules\GencysERP\Support\BatchRunner;
+use Modules\GencysERP\Support\SyncFlows\SyncFlowRegistry;
 
 /** An ERP-connected workspace, its owner, and the raw key n8n calls back with. */
 function makeInternErpWorkspace(): array
@@ -164,7 +165,7 @@ test('the interns button refuses cleanly when the workspace has no ERP credentia
     Http::assertNothingSent();
 });
 
-test('a batch covering interns and a dated type gives the dates only to the dated one', function () {
+test('the roster ignores any window a batch hands it', function () {
     ['user' => $user, 'workspace' => $workspace] = makeInternErpWorkspace();
 
     $this->actingAs($user)
@@ -181,15 +182,18 @@ test('a batch covering interns and a dated type gives the dates only to the date
 
     $batch = GencysSyncBatch::sole();
 
+    // Every type is handed the window now; the roster simply reads none of it
+    // — it asks for the whole list either way.
     expect($batch->parametersFor(GencysSyncRun::TYPE_TRANSACTION_HISTORY)['dates'])
         ->toBe(['08/24/2026', '08/25/2026'])
-        ->and($batch->parametersFor(GencysSyncRun::TYPE_INTERNS))->toBe([])
+        ->and($batch->parametersFor(GencysSyncRun::TYPE_INTERNS)['dates'])
+        ->toBe(['08/24/2026', '08/25/2026'])
         // Two dated runs, and one for the roster however wide the window was.
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_INTERNS)->count())->toBe(1)
         ->and($batch->total_runs)->toBe(3);
 });
 
-test('the batch form is told which types the date range does not reach', function () {
+test('the roster is off the batch form but still owned by the queue', function () {
     ['user' => $user, 'workspace' => $workspace] = makeInternErpWorkspace();
 
     config(['inertia.ssr.enabled' => false]);
@@ -199,11 +203,12 @@ test('the batch form is told which types the date range does not reach', functio
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->has('syncTypes', 4)
-            ->where('syncTypes.3', [
-                'value' => GencysSyncRun::TYPE_INTERNS,
-                'label' => 'Interns',
-                'windowed' => false,
-            ])
-            ->where('syncTypes.0.windowed', true)
+            ->where('syncTypes', fn ($types) => collect($types)
+                ->pluck('value')
+                ->doesntContain(GencysSyncRun::TYPE_INTERNS))
         );
+
+    // Still registered, so the Interns page can raise it and runs already on
+    // record keep their label.
+    expect(app(SyncFlowRegistry::class)->has(GencysSyncRun::TYPE_INTERNS))->toBeTrue();
 });
