@@ -85,6 +85,10 @@ class PageRoasTrackerController extends Controller
         // shares that dashboard's gating (module flag + permission).
         abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
 
+        // Gencys partners don't get this page at all — it is hidden from their
+        // sidebar, so a bookmarked URL shouldn't walk in behind that.
+        abort_if($workspace->is_gencys_partner, 404);
+
         $this->authorize(Permission::ViewPageRoasTracker->value, $workspace);
 
         $user = $request->user();

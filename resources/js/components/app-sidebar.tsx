@@ -108,10 +108,21 @@ export function AppSidebar() {
                       anyOf: [
                           PERMISSIONS.ViewSalesMarketingDashboard,
                           PERMISSIONS.ViewSalesMarketingDailyReport,
-                          PERMISSIONS.ViewPageRoasTracker,
+                          // The tracker is hidden for Gencys partners below,
+                          // so its grant must not be what opens the group for
+                          // them — otherwise they get an empty group.
+                          ...(currentWorkspace.is_gencys_partner
+                              ? []
+                              : [PERMISSIONS.ViewPageRoasTracker]),
                           PERMISSIONS.ViewAdSpendGoals,
                           PERMISSIONS.ViewAdSpentSummary,
                           PERMISSIONS.ViewSalesTargets,
+                          // The Budget Tracker below rides on the Meta Ads
+                          // grant, so that grant has to be able to open the
+                          // group on its own.
+                          ...(currentWorkspace.meta_ads_module_enabled
+                              ? [PERMISSIONS.ViewMetaAds]
+                              : []),
                       ],
                       items: [
                           {
@@ -128,12 +139,19 @@ export function AppSidebar() {
                               permission:
                                   PERMISSIONS.ViewSalesMarketingDailyReport,
                           },
-                          {
-                              title: 'Page ROAS Tracker',
-                              href: `/workspaces/${slug}/sales-marketing/page-roas-tracker`,
-                              icon: TrendingUp,
-                              permission: PERMISSIONS.ViewPageRoasTracker,
-                          },
+                          // Gencys partners track page ROAS in Gencys itself,
+                          // so the tracker is hidden for them.
+                          ...(currentWorkspace.is_gencys_partner
+                              ? []
+                              : [
+                                    {
+                                        title: 'Page ROAS Tracker',
+                                        href: `/workspaces/${slug}/sales-marketing/page-roas-tracker`,
+                                        icon: TrendingUp,
+                                        permission:
+                                            PERMISSIONS.ViewPageRoasTracker,
+                                    },
+                                ]),
                           // Ad Spend Goals is its own module switch — the rest
                           // of the group rides on the S&M one.
                           ...(currentWorkspace.ad_spend_goals_module_enabled
@@ -153,6 +171,19 @@ export function AppSidebar() {
                               icon: ReceiptText,
                               permission: PERMISSIONS.ViewAdSpentSummary,
                           },
+                          // Reads Meta Ads data and keeps its Meta Ads URL and
+                          // grant — it sits in this group in the sidebar only,
+                          // so it stays behind the Meta Ads switch.
+                          ...(currentWorkspace.meta_ads_module_enabled
+                              ? [
+                                    {
+                                        title: 'Ad Spent Budget Tracker',
+                                        href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
+                                        icon: Wallet,
+                                        permission: PERMISSIONS.ViewMetaAds,
+                                    },
+                                ]
+                              : []),
                           {
                               title: 'Sales Targets',
                               href: `/workspaces/${slug}/sales-marketing/sales-targets`,
@@ -351,12 +382,6 @@ export function AppSidebar() {
                               title: 'Ads Calendar',
                               href: `/workspaces/${slug}/integrations/meta/ads-calendar`,
                               icon: CalendarDays,
-                              permission: PERMISSIONS.ViewMetaAds,
-                          },
-                          {
-                              title: 'Ad Spent Tracker',
-                              href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
-                              icon: Wallet,
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
