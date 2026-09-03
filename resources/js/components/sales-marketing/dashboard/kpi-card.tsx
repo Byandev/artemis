@@ -1,10 +1,12 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn, currencyFormatter } from '@/lib/utils';
 import { ArrowDownRight, ArrowUpRight, RotateCcw } from 'lucide-react';
-import moment from 'moment';
 import { useMemo } from 'react';
 import StatShell from './stat-shell';
-import { useSalesMarketingStat } from './use-sales-marketing-stat';
+import {
+    previousWindow,
+    useSalesMarketingStat,
+} from './use-sales-marketing-stat';
 
 /**
  * What an endpoint answers with. Every KPI returns `value`; some carry extra
@@ -52,22 +54,6 @@ export const formatKpi = (value: number, as: KpiFormat): string => {
             return value.toFixed(2);
     }
 };
-
-/**
- * The window immediately before the selected one, of the same length, so
- * "previous period" always compares like with like. Worked out here rather than
- * server-side: the page owns the date range, and each endpoint stays a plain
- * "this figure for this window" lookup.
- */
-function previousWindow(dateRange: string[]): string[] {
-    const start = moment(dateRange[0]);
-    const days = moment(dateRange[1]).diff(start, 'days') + 1;
-
-    return [
-        start.clone().subtract(days, 'days').format('YYYY-MM-DD'),
-        start.clone().subtract(1, 'days').format('YYYY-MM-DD'),
-    ];
-}
 
 /**
  * One KPI: a figure for the selected window, against the window before it. Each

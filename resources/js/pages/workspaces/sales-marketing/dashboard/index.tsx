@@ -3,6 +3,7 @@ import KpiCard, {
     formatKpi,
 } from '@/components/sales-marketing/dashboard/kpi-card';
 import LeaderCard from '@/components/sales-marketing/dashboard/leader-card';
+import TeamComparison from '@/components/sales-marketing/dashboard/team-comparison';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
@@ -208,6 +209,8 @@ export default function SalesMarketingDashboard({ workspace }: Props) {
                         }}
                     />
                 </div>
+
+                <TeamComparison slug={workspace.slug} dateRange={dateRange} />
             </div>
         </AppLayout>
     );

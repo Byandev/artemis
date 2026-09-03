@@ -251,6 +251,54 @@ class SalesMarketingDashboardController extends Controller
     }
 
     /**
+     * Every advertiser's raw figures for the window, one row each — what the
+     * team-member comparison plots.
+     *
+     * Deliberately just sums: no ratios, no ranking, no average, no comparison
+     * against another window. Which metric is being compared is a choice the
+     * panel makes after the data has arrived (it switches between Sales, Ad
+     * spend, ROAS and RTS without refetching), so deriving any of it here would
+     * be computing something the page might not use — and would need redoing
+     * per metric anyway. The panel calls this twice, once per window, and works
+     * out the rest itself.
+     */
+    public function teamComparison(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
+        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+
+        $rows = $this->advertiserRecords($request, $workspace, $this->window($request))
+            ->groupBy('advertiser_id', 'advertiser_name')
+            ->selectRaw('
+                advertiser_id,
+                advertiser_name,
+                SUM(ad_spent) AS ad_spend,
+                SUM(sales) AS sales,
+                SUM(orders) AS orders,
+                SUM(returned_amount) AS returned_amount,
+                SUM(delivered_amount) AS delivered_amount
+            ')
+            // By name, not by size: the panel sorts on whichever metric is
+            // selected, and a server-side ranking would only be one of four.
+            ->orderBy('advertiser_name')
+            ->get()
+            ->map(fn ($row) => [
+                'advertiser' => [
+                    'id' => (int) $row->advertiser_id,
+                    'name' => $row->advertiser_name,
+                ],
+                'ad_spend' => (float) $row->ad_spend,
+                'sales' => (float) $row->sales,
+                'orders' => (int) $row->orders,
+                'returned_amount' => (float) $row->returned_amount,
+                'delivered_amount' => (float) $row->delivered_amount,
+            ]);
+
+        return response()->json(['rows' => $rows]);
+    }
+
+    /**
      * The advertiser topping $column over the window, with any $also columns
      * summed alongside it. Raw sums only — every ratio the cards show (share,
      * ROAS, AOV) is a division they do themselves, the way the KPI cards work
