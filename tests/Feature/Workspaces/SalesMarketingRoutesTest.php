@@ -36,6 +36,7 @@ test('each page answers on its own flat URL', function (string $path) {
     'dashboard',
     'daily-report',
     'page-roas-tracker',
+    'daily-tracker',
     'ad-spend-goals',
     'sales-targets',
 ]);
@@ -90,4 +91,4 @@ test('the module switch still gates the whole group', function (string $path) {
     $this->actingAs($owner)
         ->get("/workspaces/{$workspace->slug}/sales-marketing/{$path}")
         ->assertNotFound();
-})->with(['daily-report', 'page-roas-tracker', 'sales-targets']);
+})->with(['daily-report', 'page-roas-tracker', 'daily-tracker', 'sales-targets']);

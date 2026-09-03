@@ -143,6 +143,8 @@ class Workspace extends Model
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDashboard->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDailyReport->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewPageRoasTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewDailyTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ManageDailyTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesTargets->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewAdSpentSummary->value,
             $this->sales_marketing_dashboard_module_enabled && $this->ad_spend_goals_module_enabled
@@ -447,6 +449,12 @@ class Workspace extends Model
     public function checklists(): HasMany
     {
         return $this->hasMany(WorkspaceChecklist::class, 'workspace_id');
+    }
+
+    /** The Daily Tracker deliverables this workspace asks its team for. */
+    public function dailyTrackerItems(): HasMany
+    {
+        return $this->hasMany(DailyTrackerItem::class, 'workspace_id');
     }
 
     public function metricSetting()

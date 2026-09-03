@@ -177,6 +177,10 @@ enum Permission: string
     case ViewSalesMarketingDashboard = 'View S&M Dashboard';
     case ViewSalesMarketingDailyReport = 'View S&M Daily Report';
     case ViewPageRoasTracker = 'View Page ROAS Tracker';
+    case ViewDailyTracker = 'View Daily Tracker';
+    // Ticking your own row needs nothing beyond the view grant — this is the
+    // extra reach to tick (or untick) somebody else's.
+    case ManageDailyTracker = 'Manage Daily Tracker';
     case ViewSalesTargets = 'View Sales Targets';
 
     // Settings
@@ -343,6 +347,8 @@ enum Permission: string
             self::ViewSalesMarketingDashboard,
             self::ViewSalesMarketingDailyReport,
             self::ViewPageRoasTracker,
+            self::ViewDailyTracker,
+            self::ManageDailyTracker,
             self::ViewSalesTargets => 'Sales & Marketing',
 
             self::EditWorkspaceSettings,

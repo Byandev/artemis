@@ -23,6 +23,7 @@ import {
     BookOpenIcon,
     Box,
     Building2,
+    CalendarClock,
     CalendarDays,
     Check,
     Clapperboard,
@@ -109,6 +110,7 @@ export function AppSidebar() {
                           PERMISSIONS.ViewSalesMarketingDashboard,
                           PERMISSIONS.ViewSalesMarketingDailyReport,
                           PERMISSIONS.ViewPageRoasTracker,
+                          PERMISSIONS.ViewDailyTracker,
                           PERMISSIONS.ViewAdSpendGoals,
                           PERMISSIONS.ViewAdSpentSummary,
                           PERMISSIONS.ViewSalesTargets,
@@ -133,6 +135,12 @@ export function AppSidebar() {
                               href: `/workspaces/${slug}/sales-marketing/page-roas-tracker`,
                               icon: TrendingUp,
                               permission: PERMISSIONS.ViewPageRoasTracker,
+                          },
+                          {
+                              title: 'Daily Tracker',
+                              href: `/workspaces/${slug}/sales-marketing/daily-tracker`,
+                              icon: CalendarClock,
+                              permission: PERMISSIONS.ViewDailyTracker,
                           },
                           // Ad Spend Goals is its own module switch — the rest
                           // of the group rides on the S&M one.

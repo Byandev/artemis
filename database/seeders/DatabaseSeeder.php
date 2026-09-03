@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             AdminUserSeeder::class,
             SubscriptionPlanSeeder::class,
+            DailyTrackerItemSeeder::class,
         ]);
 
         // Seed RTS analytics sample data

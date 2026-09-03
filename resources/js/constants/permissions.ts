@@ -160,6 +160,8 @@ export const PERMISSIONS = {
     ViewSalesMarketingDashboard: 'View S&M Dashboard',
     ViewSalesMarketingDailyReport: 'View S&M Daily Report',
     ViewPageRoasTracker: 'View Page ROAS Tracker',
+    ViewDailyTracker: 'View Daily Tracker',
+    ManageDailyTracker: 'Manage Daily Tracker',
     ViewSalesTargets: 'View Sales Targets',
     ViewVideoEditorDashboard: 'View Video Editor Dashboard',
     ViewCsrDashboard: 'View CSR Dashboard',

@@ -27,6 +27,7 @@ use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DailyReportController;
+use App\Http\Controllers\Workspaces\SalesMarketing\DailyTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\DashboardController as SalesMarketingDashboardController;
 use App\Http\Controllers\Workspaces\SalesMarketing\PageRoasTrackerController;
 use App\Http\Controllers\Workspaces\SalesMarketing\SalesTargetController;
@@ -175,6 +176,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/daily-report/data', [DailyReportController::class, 'data'])->name('daily-report.data');
 
         Route::get('/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('page-roas-tracker');
+        Route::get('/daily-tracker', [DailyTrackerController::class, 'index'])->name('daily-tracker');
+        // JSON the checklist posts to when a box is ticked.
+        Route::put('/daily-tracker/completions', [DailyTrackerController::class, 'toggle'])->name('daily-tracker.completions.toggle');
         Route::get('/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('ad-spend-goals');
         Route::get('/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('ad-spent-summary');
 
