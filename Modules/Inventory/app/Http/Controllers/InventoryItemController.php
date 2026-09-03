@@ -156,6 +156,10 @@ class InventoryItemController extends Controller
                         $query->whereNull('inventory_items.product_id');
                     }
                 }),
+                // Frozen only, so a live list has no stage to filter on. Accepted
+                // and ignored rather than rejected, so the control can stay put
+                // while a workspace waits for its first snapshot.
+                AllowedFilter::callback('bottleneck_stage', function () {}),
                 // is_active is applied manually to $base above; register it as a
                 // no-op here so QueryBuilder doesn't reject the filter key.
                 AllowedFilter::callback('is_active', function () {}),
@@ -281,11 +285,14 @@ class InventoryItemController extends Controller
         $summedWaiting = 'COALESCE(SUM(sub.waiting_for_delivery_stocks), 0)';
         $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
 
+        // Both worked from the rate rounded up, matching the snapshot path and
+        // the figure the row displays — see buildSnapshotSummaryQuery.
+        $ceiledThreeDayAvg = "CEIL($summedThreeDayAvg)";
         // Stock needed to cover the lead time for the whole group: the group's
         // representative lead time × its summed daily average (same term po_needed uses).
-        $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
+        $groupStocksNeeded = "($groupLeadTime * $ceiledThreeDayAvg)";
         // Group safety buffer: the group's days-of-coverage × its summed daily average.
-        $groupCoverageBuffer = "($groupDaysOfCoverage * $summedThreeDayAvg)";
+        $groupCoverageBuffer = "($groupDaysOfCoverage * $ceiledThreeDayAvg)";
         $groupPoNeeded = "GREATEST(0, $groupCoverageBuffer + $groupStocksNeeded - $summedRemaining)";
         $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
 
@@ -370,7 +377,6 @@ class InventoryItemController extends Controller
     {
         return [
             'unfulfilled_count',
-            'three_days_average',
             'remaining_qty',
             'current_stocks',
             'waiting_for_delivery_stocks',
@@ -379,11 +385,8 @@ class InventoryItemController extends Controller
             'discrepancy_counted_qty',
             'discrepancy_date',
             'remaining_after_fulfillment',
-            'stocks_needed_for_lead_time',
-            'po_qty',
-            'po_needed',
-            'days_it_can_last',
             'demand_as_of',
+            ...ItemReportFacts::ITEM_COLUMNS,
             ...ItemReportFacts::SNAPSHOT_COLUMNS,
         ];
     }
@@ -428,8 +431,6 @@ class InventoryItemController extends Controller
                 'inventory_items.is_parent',
                 'inventory_items.sku',
                 'inventory_items.is_active',
-                'inventory_items.sales_keywords',
-                'inventory_items.transaction_keywords',
                 'inventory_items.days_of_coverage',
                 'inventory_items.created_at',
             ])
@@ -443,6 +444,16 @@ class InventoryItemController extends Controller
                 fn (string $column) => "snap.$column as $column",
                 $this->snapshotMetricColumns(),
             )))
+            // The item's own rate, from the item's own frozen demand — the same
+            // expression the roll-up sums, one row at a time.
+            ->selectRaw('(snap.units_3d / 3) as three_days_average')
+            // And the reorder figures derived from it, rather than read from the
+            // columns the snapshot froze. Those were computed through
+            // InventoryStockColumns off inventory_items.three_days_average,
+            // which no longer carries a Gencys partner's demand — the feed
+            // writes units_3d now, and a figure built on the abandoned column
+            // would quietly read zero. Same formulas, same inputs, one source.
+            ->selectRaw($this->snapshotReorderSql())
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where('inventory_items.sku', 'like', "%{$value}%");
@@ -455,6 +466,12 @@ class InventoryItemController extends Controller
                 }),
                 AllowedFilter::callback('product_status', function ($query, $value) {
                     $query->whereIn('products.status', (array) $value);
+                }),
+                // The stage the day was frozen with. A group figure stamped on
+                // every row of the group, so it filters the same whether the
+                // list is rolled up or flat.
+                AllowedFilter::callback('bottleneck_stage', function ($query, $value) {
+                    $query->whereIn('snap.bottleneck_stage', (array) $value);
                 }),
                 // Applied manually above / consumed by index(); registered so
                 // QueryBuilder doesn't reject the keys.
@@ -474,18 +491,60 @@ class InventoryItemController extends Controller
                 }),
                 AllowedSort::field('unfulfilled_count', 'snap.unfulfilled_count'),
                 AllowedSort::field('remaining_qty', 'snap.remaining_qty'),
-                AllowedSort::field('three_days_average', 'snap.three_days_average'),
+                AllowedSort::field('three_days_average', 'snap.units_3d'),
                 AllowedSort::field('current_stocks', 'snap.current_stocks'),
                 AllowedSort::field('waiting_for_delivery_stocks', 'snap.waiting_for_delivery_stocks'),
                 AllowedSort::field('remaining_after_fulfillment', 'snap.remaining_after_fulfillment'),
-                AllowedSort::field('days_it_can_last', 'snap.days_it_can_last'),
-                AllowedSort::field('po_needed', 'snap.po_needed'),
-                AllowedSort::field('stocks_needed_for_lead_time', 'snap.stocks_needed_for_lead_time'),
-                AllowedSort::field('po_qty', 'snap.po_qty'),
+                AllowedSort::callback('days_it_can_last', function ($query, $descending) {
+                    $query->orderByRaw('(CASE WHEN (snap.units_3d / 3) > 0 THEN COALESCE(snap.remaining_after_fulfillment, 0) / (snap.units_3d / 3) ELSE 0 END) '.($descending ? 'DESC' : 'ASC'));
+                }),
+                AllowedSort::callback('po_needed', function ($query, $descending) {
+                    $query->orderByRaw('GREATEST(0, (COALESCE(snap.days_of_coverage, inventory_items.days_of_coverage, 0) * (snap.units_3d / 3)) + (COALESCE(snap.lead_time, inventory_items.lead_time, 0) * (snap.units_3d / 3)) - COALESCE(snap.remaining_after_fulfillment, 0)) '.($descending ? 'DESC' : 'ASC'));
+                }),
+                AllowedSort::callback('stocks_needed_for_lead_time', function ($query, $descending) {
+                    $query->orderByRaw('(COALESCE(snap.lead_time, inventory_items.lead_time, 0) * (snap.units_3d / 3)) '.($descending ? 'DESC' : 'ASC'));
+                }),
+                AllowedSort::callback('po_qty', function ($query, $descending) {
+                    $query->orderByRaw('(COALESCE(snap.days_of_coverage, inventory_items.days_of_coverage, 0) * (snap.units_3d / 3)) '.($descending ? 'DESC' : 'ASC'));
+                }),
                 AllowedSort::field('discrepancy', 'snap.discrepancy'),
                 AllowedSort::field('created_at', 'inventory_items.created_at'),
             ])
             ->defaultSort('created_at');
+    }
+
+    /**
+     * The reorder figures for one snapshot row, derived from that row's own
+     * frozen demand.
+     *
+     * Mirrors the group formulas in buildSnapshotSummaryQuery exactly, one item
+     * at a time — and InventoryStockColumns before them, which still computes
+     * the same shapes for workspaces reading live. Configuration falls back to
+     * the item's current value where the day recorded none, so an inline editor
+     * always has a number rather than a dash.
+     */
+    private function snapshotReorderSql(): string
+    {
+        $rate = '(snap.units_3d / 3)';
+        $lead = 'COALESCE(snap.lead_time, inventory_items.lead_time, 0)';
+        $cover = 'COALESCE(snap.days_of_coverage, inventory_items.days_of_coverage, 0)';
+        $remaining = 'COALESCE(snap.remaining_after_fulfillment, 0)';
+
+        // Rounded up, for the same reason the roll-up does it: the rate beside
+        // these is displayed as a whole unit, and the two have to multiply out.
+        $ceiled = "CEIL($rate)";
+        $needed = "($lead * $ceiled)";
+        $buffer = "($cover * $ceiled)";
+
+        return implode(', ', [
+            "$needed as stocks_needed_for_lead_time",
+            "$buffer as po_qty",
+            "GREATEST(0, $buffer + $needed - $remaining) as po_needed",
+            // NULL where the day recorded no demand, which is not the same as a
+            // day it sold nothing: a confident 0 days of cover reads as an
+            // emergency.
+            "(CASE WHEN snap.units_3d IS NULL THEN NULL WHEN $rate > 0 THEN $remaining / $rate ELSE 0 END) as days_it_can_last",
+        ]);
     }
 
     /**
@@ -496,8 +555,12 @@ class InventoryItemController extends Controller
      *
      * A group whose items have no rows for the day sums to NULL throughout, which
      * the list renders as "—" rather than as a confident zero.
+     *
+     * @param  string  $basis  'unit' or 'order' — see demandBasis(). Defaults to
+     *                         units, so the export keeps reading the figures it
+     *                         always has whatever the list is set to.
      */
-    private function buildSnapshotSummaryQuery(Request $request, Workspace $workspace, string $date): Builder
+    private function buildSnapshotSummaryQuery(Request $request, Workspace $workspace, string $date, string $basis = self::BASIS_UNIT): Builder
     {
         // Per-item rows for the whole workspace (parents included, so their
         // children roll into them).
@@ -511,7 +574,7 @@ class InventoryItemController extends Controller
             ->selectRaw('COALESCE(snap.days_of_coverage, inventory_items.days_of_coverage) as days_of_coverage')
             // Measurements: the snapshot's alone. NULL where the day has no row.
             ->selectRaw('snap.unfulfilled_count as unfulfilled_count')
-            ->selectRaw('snap.three_days_average as three_days_average')
+            ->selectRaw('snap.units_3d as units_3d')
             ->selectRaw('snap.current_stocks as current_stocks')
             ->selectRaw('snap.waiting_for_delivery_stocks as waiting_for_delivery_stocks')
             ->selectRaw('snap.discrepancy as discrepancy')
@@ -556,20 +619,100 @@ class InventoryItemController extends Controller
             $inner->whereNull('inventory_items.product_id');
         }
 
+        if ($stage = $request->input('filter.bottleneck_stage')) {
+            $inner->whereIn('snap.bottleneck_stage', (array) $stage);
+        }
+
         // Identical group-level formulas to the live roll-up — see buildSummaryQuery
         // for why po_needed and days_it_can_last cannot simply be summed.
         $groupLeadTime = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
         $groupDaysOfCoverage = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.days_of_coverage END), MAX(sub.days_of_coverage))';
         $groupCreatedAt = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.created_at END), MIN(sub.created_at))';
-        $summedThreeDayAvg = 'SUM(sub.three_days_average)';
-        $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
-        $groupStocksNeeded = "($groupLeadTime * $summedThreeDayAvg)";
-        $groupCoverageBuffer = "($groupDaysOfCoverage * $summedThreeDayAvg)";
+
+        // Everything the reorder calculation touches is read in the basis on
+        // screen — the rate, the supply it is measured against, and the four
+        // figures built from them.
+        //
+        // Converting BOTH sides is what makes that safe. An order rate measured
+        // against unit stock would buy a bundled SKU short by its bundle size: a
+        // group shipping 1.5 units an order would plan for two thirds of what it
+        // actually consumes. So when demand becomes orders a day, the stock
+        // behind it becomes orders' worth of stock, and PO Needed comes out as
+        // the same purchase priced differently — 1,804 orders where the unit
+        // basis asks for 2,706 units, which at 1.5 units an order is the same
+        // goods.
+        $orderBasis = $basis === self::BASIS_ORDER;
+
+        // Both order figures come straight from the counts the day already
+        // froze, and neither is stored a second time.
+        //
+        // The rate is orders_3d over its three days — the identical expression
+        // the report's own "Orders/d 3d" column renders, so the two cannot
+        // disagree. An earlier version divided each item's unit average by a
+        // rounded units-per-order and summed that; it landed on 19.0008 where
+        // the truth was 19, and the ceiling the list applies turned eight
+        // ten-thousandths into a whole extra order.
+        //
+        // Unfulfilled is counted the same way, in both denominations: the units
+        // owed, and the distinct orders waiting on them. Neither is derived from
+        // the other — converting the units through the units-per-order of the
+        // last three days would estimate a figure the feed was already asked
+        // for, and would drift on any group whose bundle mix has moved.
+        $groupOrders3d = 'MAX(sub.orders_3d)';
+
+        $groupUnits3d = 'SUM(sub.units_3d)';
+
+        $displayedAverage = $orderBasis
+            ? "($groupOrders3d / 3)"
+            : "($groupUnits3d / 3)";
+
+        // MAX for the order count, SUM for the units: one is the group's figure
+        // stamped on every row, the other is each item's own.
+        $displayedUnfulfilled = $orderBasis
+            ? 'MAX(sub.unfulfilled_orders_count)'
+            : 'SUM(sub.unfulfilled_count)';
+
+        // Units a day, always. Stockout Risk and Stocks Last divide unit stock —
+        // which stays in units in both bases — so they need a unit rate even
+        // when the displayed one has become a count of orders.
+        $unitAverage = "($groupUnits3d / 3)";
+
+        // Stock, in the basis on screen. Multiplied by the order count and
+        // divided by the unit count rather than by a units-per-order quotient:
+        // one multiply and one divide instead of two divides, so MySQL's
+        // division scale is applied once. Deriving through a rounded conversion
+        // factor is what once turned 19 into 19.0008 and, after the list's
+        // ceiling, into 20.
+        $remainingOut = $orderBasis
+            ? "(SUM(sub.remaining_after_fulfillment) * $groupOrders3d / NULLIF($groupUnits3d, 0))"
+            : 'SUM(sub.remaining_after_fulfillment)';
+
+        // Coalesced to 0 for the arithmetic only. The displayed column keeps its
+        // NULL, which means "the day recorded nothing", but a NULL here would
+        // swallow the whole PO Needed expression and report nothing to buy for a
+        // group that has stock and no demand.
+        $summedRemaining = "COALESCE($remainingOut, 0)";
+
+        // Both are built on the rate ROUNDED UP, because that is the rate the
+        // row shows: 3-Day Avg is rendered as a whole unit rounded up, and a
+        // buffer worked out from the exact 5.87 behind a displayed 6 gives 58.7
+        // where the reader multiplies to 60. The plan has to be arithmetic
+        // anyone can redo from what is on screen — and rounding up is the safe
+        // direction: half a unit a day still needs a unit on the shelf.
+        $ceiledAverage = "CEIL($displayedAverage)";
+        $groupStocksNeeded = "($groupLeadTime * $ceiledAverage)";
+        $groupCoverageBuffer = "($groupDaysOfCoverage * $ceiledAverage)";
         $groupPoNeeded = "GREATEST(0, $groupCoverageBuffer + $groupStocksNeeded - $summedRemaining)";
         // The NULL arm is what separates "the day recorded nothing for this group"
         // from "it sold nothing that day": without it a group with no snapshot
         // rows would report 0 days of cover, which reads as an emergency.
-        $groupDaysItCanLast = "(CASE WHEN $summedThreeDayAvg IS NULL THEN NULL WHEN $summedThreeDayAvg > 0 THEN $summedRemaining / $summedThreeDayAvg ELSE 0 END)";
+        // Cover is the one figure that does not move: orders of stock over
+        // orders a day is the same quotient as units over units. Computed from
+        // the unit figures in both bases so it is exact rather than the same
+        // number twice through different divisions — and so a toggle that did
+        // move it would be a real signal that one side had not converted.
+        $unitRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
+        $groupDaysItCanLast = "(CASE WHEN $unitAverage IS NULL THEN NULL WHEN $unitAverage > 0 THEN $unitRemaining / $unitAverage ELSE 0 END)";
 
         $outer = DB::query()
             ->fromSub($inner, 'sub')
@@ -587,17 +730,23 @@ class InventoryItemController extends Controller
             ->selectRaw('SUM(CASE WHEN sub.is_parent = 0 THEN 1 ELSE 0 END) as child_count')
             ->selectRaw('MAX(sub.is_active) as is_active')
             ->selectRaw("$groupLeadTime as lead_time")
-            ->selectRaw('SUM(sub.unfulfilled_count) as unfulfilled_count')
+            ->selectRaw("$displayedUnfulfilled as unfulfilled_count")
+            // Stock stays in units in both bases: it is counted on a shelf and
+            // bought in units, and the reorder plan below reads it that way.
             ->selectRaw('SUM(sub.current_stocks) as current_stocks')
             ->selectRaw('SUM(sub.waiting_for_delivery_stocks) as waiting_for_delivery_stocks')
             ->selectRaw('SUM(sub.discrepancy) as discrepancy')
             ->selectRaw('NULL as discrepancy_counted_qty')
             ->selectRaw('NULL as discrepancy_date')
-            ->selectRaw('SUM(sub.remaining_after_fulfillment) as remaining_after_fulfillment')
+            ->selectRaw("$remainingOut as remaining_after_fulfillment")
             ->selectRaw("$groupStocksNeeded as stocks_needed_for_lead_time")
             ->selectRaw("$groupCoverageBuffer as po_qty")
             ->selectRaw("$groupPoNeeded as po_needed")
-            ->selectRaw("$summedThreeDayAvg as three_days_average")
+            ->selectRaw("$displayedAverage as three_days_average")
+            // Units a day regardless of the basis on screen. Stockout risk and
+            // Stocks Last divide unit stock by a rate, so they need this one
+            // even when the displayed average has become a count of orders.
+            ->selectRaw("$unitAverage as unit_three_days_average")
             ->selectRaw("$groupDaysItCanLast as days_it_can_last")
             ->selectRaw("$groupCreatedAt as created_at")
             ->groupByRaw('COALESCE(sub.parent_id, sub.id)');
@@ -607,6 +756,12 @@ class InventoryItemController extends Controller
         // Summing would multiply each by the number of SKUs in the group.
         foreach (ItemReportFacts::SNAPSHOT_COLUMNS as $column) {
             $outer->selectRaw("MAX(sub.$column) as $column");
+        }
+
+        // And SUM for the ones recorded per item, whose group figure is the
+        // total of its members — which is what lets a filter narrow them.
+        foreach (ItemReportFacts::ITEM_COLUMNS as $column) {
+            $outer->selectRaw("SUM(sub.$column) as $column");
         }
 
         $sortable = [
@@ -625,6 +780,55 @@ class InventoryItemController extends Controller
         }
 
         return $outer;
+    }
+
+    /**
+     * How the reorder maths is denominated: in units of stock, or in the orders
+     * that stock ships against.
+     *
+     * The demand feed counts both. An order line names a unit code, which the
+     * snapshot expands into its component items — so one order for a three-item
+     * bundle is one order and three units. `units_3d / 3` is the rate the list
+     * reads by default; `orders_3d / 3` is the same three days counted as
+     * distinct orders instead.
+     *
+     * The order basis converts BOTH sides. Demand becomes orders a day, and the
+     * stock it is measured against becomes orders' worth of stock — units
+     * divided by the units-per-order those same three days observed. Converting
+     * only the demand would read one side in orders and the other in units, and
+     * on a bundled SKU that understates what to buy by the bundle size: a group
+     * shipping 1.5 units per order would plan for two thirds of the stock it
+     * actually consumes and quietly run out.
+     *
+     * Because both sides convert, days of cover comes out identical either way.
+     * That is the check, not a shortcoming — the toggle changes the unit of
+     * account, not the decision. What it does change is what the buyer reads:
+     * "enough for 1,804 more orders" instead of "2,706 units".
+     */
+    private const BASIS_UNIT = 'unit';
+
+    private const BASIS_ORDER = 'order';
+
+    /**
+     * The basis the list should use, honoured only where it can be.
+     *
+     * Two hard limits, both from the data rather than from taste. orders_3d is a
+     * GROUP figure stamped on every row of the group, so it only means anything
+     * once the rows are rolled up — on the flat per-SKU list every sibling would
+     * repeat the group's order count as though it were its own. And it only
+     * exists on snapshot rows, so a workspace reading live has nothing to switch
+     * to. Either way this falls back to units rather than showing a toggle that
+     * silently lies.
+     */
+    private function demandBasis(Request $request, bool $summarize, ?string $snapshotDate): string
+    {
+        if (! $summarize || $snapshotDate === null) {
+            return self::BASIS_UNIT;
+        }
+
+        return $request->input('basis') === self::BASIS_ORDER
+            ? self::BASIS_ORDER
+            : self::BASIS_UNIT;
     }
 
     /**
@@ -697,9 +901,13 @@ class InventoryItemController extends Controller
         $requestedDate = $usesSnapshots ? $request->input('filter.date') : null;
         $snapshotDate = $this->snapshotDate($request, $workspace);
 
+        // Units or orders. Resolved before the query so the page and the rows it
+        // renders can never disagree about which one is on screen.
+        $basis = $this->demandBasis($request, $summarize, $snapshotDate);
+
         if ($snapshotDate) {
             $items = $summarize
-                ? $this->buildSnapshotSummaryQuery($request, $workspace, $snapshotDate)->paginate($perPage)->withQueryString()
+                ? $this->buildSnapshotSummaryQuery($request, $workspace, $snapshotDate, $basis)->paginate($perPage)->withQueryString()
                 : $this->buildSnapshotQuery($request, $workspace, $snapshotDate)->paginate($perPage)->withQueryString();
         } elseif ($requestedDate) {
             // A specific day was asked for and nothing was recorded for it.
@@ -762,10 +970,20 @@ class InventoryItemController extends Controller
                     ->map(fn ($d) => Carbon::parse($d)->toDateString())
                     ->all()
                 : [],
+            // Whether the order basis is offered at all, and whether it is on.
+            // Both come from the server because both are decided there: the
+            // toggle is only meaningful on a rolled-up snapshot, and a client
+            // that assumed otherwise would show "orders" over unit figures.
+            'basis' => $basis,
+            'basisAvailable' => $summarize && $snapshotDate !== null,
+            // The stages the filter can offer, straight from the classifier so
+            // the two cannot drift apart.
+            'bottleneckStages' => ItemReportFacts::BOTTLENECK_STAGES,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'summarize' => $summarize,
+                'basis' => $basis,
                 'filter' => $request->input('filter', []),
             ],
         ]);
@@ -855,9 +1073,6 @@ class InventoryItemController extends Controller
             'product_id' => 'nullable|exists:products,id',
             'sku' => 'required|string|max:255|unique:inventory_items,sku,NULL,id,workspace_id,'.$workspace->id,
             'is_active' => 'nullable|boolean',
-            'sales_keywords' => 'nullable|array',
-            'sales_keywords.*' => 'string|max:255',
-            'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
@@ -868,8 +1083,6 @@ class InventoryItemController extends Controller
             'product_id' => $request->product_id ?: null,
             'sku' => $request->sku,
             'is_active' => $request->boolean('is_active', true),
-            'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
-            'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
@@ -895,9 +1108,6 @@ class InventoryItemController extends Controller
                     ->ignore($item->id),
             ],
             'is_active' => 'nullable|boolean',
-            'sales_keywords' => 'nullable|array',
-            'sales_keywords.*' => 'string|max:255',
-            'transaction_keywords' => 'nullable|string',
             'lead_time' => 'nullable|integer|min:0',
             'unfulfilled_count' => 'nullable|integer|min:0',
             'three_days_average' => 'nullable|numeric|min:0',
@@ -906,12 +1116,15 @@ class InventoryItemController extends Controller
             'product_id' => $request->product_id ?: null,
             'sku' => $request->sku,
             'is_active' => $request->boolean('is_active', true),
-            'sales_keywords' => implode(', ', $this->normalizeKeywords($request->input('sales_keywords'))),
-            'transaction_keywords' => $request->transaction_keywords,
             'lead_time' => $request->lead_time ?? 0,
             'unfulfilled_count' => $request->unfulfilled_count ?? 0,
             'three_days_average' => $request->three_days_average ?? 0,
         ]);
+
+        // Lead time, the active flag and the linked product all change what the
+        // frozen row says, and the list reads the frozen row first — so an edit
+        // that did not rewrite it would appear to do nothing.
+        $this->refreshTodaysSnapshot($workspace, $item);
 
         return redirect()->back()
             ->with('success', 'Inventory Items record updated.');
@@ -964,9 +1177,24 @@ class InventoryItemController extends Controller
      */
     private function refreshTodaysSnapshot(Workspace $workspace, InventoryItem $item): void
     {
+        $this->refreshTodaysSnapshotFor($workspace, [$item->id]);
+    }
+
+    /**
+     * The same, for an edit that touched several items at once.
+     *
+     * Every group the given items belong to is rewritten whole, not just the
+     * rows named: the roll-up derives a group's figures from all of its
+     * members, so refreshing half of one leaves a group part before the edit
+     * and part after.
+     *
+     * @param  list<int>  $itemIds
+     */
+    private function refreshTodaysSnapshotFor(Workspace $workspace, array $itemIds): void
+    {
         // A live workspace has no snapshot to keep in step, and any row it still
         // carries from before the partner rule is one nothing reads.
-        if (! $this->usesSnapshots($workspace)) {
+        if (! $this->usesSnapshots($workspace) || ! $itemIds) {
             return;
         }
 
@@ -980,10 +1208,24 @@ class InventoryItemController extends Controller
             return;
         }
 
-        $groupId = (int) ($item->parent_id ?? $item->id);
+        // Resolved from the items as they stand now, so a regrouping is read
+        // against its new parent — and from their previous rows too, so the
+        // group they just left is rewritten without them.
+        $groupIds = InventoryItem::whereIn('id', $itemIds)
+            ->pluck('parent_id', 'id')
+            ->map(fn ($parentId, $id) => (int) ($parentId ?? $id))
+            ->merge(
+                InventoryItemSnapshot::where('snapshot_date', $today)
+                    ->whereIn('inventory_item_id', $itemIds)
+                    ->get(['inventory_item_id', 'parent_id'])
+                    ->map(fn ($row) => (int) ($row->parent_id ?? $row->inventory_item_id))
+            )
+            ->unique()
+            ->values()
+            ->all();
 
         $ids = InventoryItem::where('workspace_id', $workspace->id)
-            ->where(fn ($q) => $q->whereKey($groupId)->orWhere('parent_id', $groupId))
+            ->where(fn ($q) => $q->whereIn('id', $groupIds)->orWhereIn('parent_id', $groupIds))
             ->pluck('id')
             ->all();
 
@@ -1114,6 +1356,8 @@ class InventoryItemController extends Controller
             'discrepancy' => (int) $validated['counted_qty'] - $ledgerQty,
         ]);
 
+        $this->refreshTodaysSnapshot($workspace, $item);
+
         return redirect()->back()
             ->with('success', 'Stock count recorded.');
     }
@@ -1134,6 +1378,8 @@ class InventoryItemController extends Controller
         $updated = InventoryItem::where('workspace_id', $workspace->id)
             ->whereIn('id', $validated['ids'])
             ->update(['is_active' => $validated['is_active']]);
+
+        $this->refreshTodaysSnapshotFor($workspace, $validated['ids']);
 
         $status = $validated['is_active'] ? 'activated' : 'deactivated';
 
@@ -1163,6 +1409,8 @@ class InventoryItemController extends Controller
         $updated = InventoryItem::where('workspace_id', $workspace->id)
             ->whereIn('id', $validated['ids'])
             ->update(['product_id' => $productId]);
+
+        $this->refreshTodaysSnapshotFor($workspace, $validated['ids']);
 
         $message = $productId
             ? "Product set for {$updated} inventory item(s)."
@@ -1237,32 +1485,16 @@ class InventoryItemController extends Controller
             ->where('is_parent', false)
             ->update(['parent_id' => $parentId]);
 
+        // Both sides of the move: the items carry their new parent now, and
+        // refreshTodaysSnapshotFor also reads the parent they had this morning,
+        // so the group they left is rewritten without them.
+        $this->refreshTodaysSnapshotFor($workspace, array_merge($ids, array_filter([$parentId])));
+
         $message = $parentId
             ? "{$updated} item(s) grouped under the parent item."
             : "{$updated} item(s) ungrouped.";
 
         return redirect()->back()->with('success', $message);
-    }
-
-    /**
-     * Split a comma-separated keyword string into a clean array:
-     * trim, drop blanks, de-duplicate.
-     *
-     * @param  mixed  $keywords
-     * @return string[]
-     */
-    private function normalizeKeywords($keywords): array
-    {
-        $list = is_array($keywords)
-            ? $keywords
-            : preg_split('/[,\n]+/', (string) $keywords);
-
-        return collect($list)
-            ->map(fn ($keyword) => trim((string) $keyword))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
     }
 
     public function destroy(Workspace $workspace, InventoryItem $item)

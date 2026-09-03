@@ -3,22 +3,27 @@
 namespace Modules\Inventory\Support;
 
 use App\Models\Workspace;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
 
 /**
- * Recomputes each item's demand from the Gencys order feed: the 3-day average it
- * sells at, and how much is ordered but not yet shipped.
+ * Recomputes how much of each item is ordered but not yet shipped.
  *
- * Every cover figure on the items list divides by three_days_average, and
- * unfulfilled_count is half of what the reorder maths subtracts, so these two
- * columns decide most of what the page says. They are written here and then
- * frozen by the snapshot in the same run — see SnapshotInventoryItemsCommand.
- * Running them apart is how the page comes to show one run's demand against the
- * next run's stock.
+ * unfulfilled_count is what the reorder maths subtracts before deciding what to
+ * buy, so it is written here and then frozen by the snapshot in the same run —
+ * see SnapshotInventoryItemsCommand. Running them apart is how the page comes
+ * to show one run's demand against the next run's stock.
+ *
+ * The 3-day sales rate used to be computed here too, into
+ * inventory_items.three_days_average. It is not any more: ItemReportFacts
+ * already counted the same orders over the same window to produce units_3d, and
+ * two independent counts of one measurement is exactly how the list came to
+ * show two different numbers for it. units_3d is now the only one, recorded per
+ * item and frozen straight into the snapshot. The column it used to write
+ * survives for workspaces with no Gencys feed, which fill it by hand or through
+ * the public API.
  *
  * A Gencys order line names a unit code rather than an item, so each line is
  * expanded through inventory_unit_code_items into its components. The line's own
@@ -28,10 +33,7 @@ use Modules\Inventory\Models\InventoryItem;
 class GencysDemandSync
 {
     /** Order statuses that count as unfulfilled — committed, not yet shipped. */
-    private const UNFULFILLED_STATUSES = ['New', 'PENDING PRINTED WAYBILL', 'ENCODED'];
-
-    /** Days of orders behind the average. Matches the column's name. */
-    private const AVERAGE_DAYS = 3;
+    public const UNFULFILLED_STATUSES = ['New', 'PENDING PRINTED WAYBILL', 'ENCODED'];
 
     public function __construct(private Workspace $workspace) {}
 
@@ -69,7 +71,7 @@ class GencysDemandSync
     }
 
     /**
-     * Rewrite three_days_average and unfulfilled_count for every item.
+     * Rewrite unfulfilled_count for every item.
      *
      * @return int items written
      */
@@ -84,11 +86,6 @@ class GencysDemandSync
             return 0;
         }
 
-        $average = $this->expand(
-            $this->occurrences(fn ($q) => $q->whereBetween('gencys_orders.order_date', $this->window())),
-            $componentsByKey,
-        );
-
         $unfulfilled = $this->expand(
             $this->occurrences(fn ($q) => $q->whereIn('gencys_orders.parcel_status', self::UNFULFILLED_STATUSES)),
             $componentsByKey,
@@ -102,45 +99,11 @@ class GencysDemandSync
             $key = $this->normalize((string) $item->sku);
 
             InventoryItem::where('id', $item->id)->update([
-                // Stored exact, not rounded up. The column is decimal(10,4) and
-                // the roll-up sums it across a group: rounding each child up
-                // first makes the group's average larger than its own demand
-                // divided by three, so the stored figure and the report's
-                // units-per-day column would disagree on the same page.
-                'three_days_average' => round(($average[$key] ?? 0) / self::AVERAGE_DAYS, 4),
                 'unfulfilled_count' => $unfulfilled[$key] ?? 0,
             ]);
         }
 
         return $items->count();
-    }
-
-    /**
-     * The three days of orders the average is taken over.
-     *
-     * Measured back from the feed's own latest order date, not from today. The
-     * feed lands in batches and routinely runs days behind; anchored to today, a
-     * feed that paused last week would find no orders and write a 3-day average
-     * of zero for every item — which the list would read as "nothing is selling"
-     * and turn into infinite cover and a PO Needed of nothing.
-     *
-     * It also keeps this figure and the report's own demand windows on the same
-     * clock, so the stored average and the columns beside it cannot disagree.
-     *
-     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
-     */
-    private function window(): array
-    {
-        $latest = DB::table('gencys_orders')
-            ->where('workspace_id', $this->workspace->id)
-            ->max('order_date');
-
-        $end = $latest ? CarbonImmutable::parse($latest)->endOfDay() : CarbonImmutable::now()->endOfDay();
-
-        // AVERAGE_DAYS - 1, because $end is the end of the latest day and that
-        // day is one of the three. Subtracting the full three would count four
-        // days of orders and still divide by three.
-        return [$end->subDays(self::AVERAGE_DAYS - 1)->startOfDay(), $end];
     }
 
     /**

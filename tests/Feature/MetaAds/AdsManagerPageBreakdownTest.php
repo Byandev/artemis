@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Page;
+use App\Models\User;
 use Illuminate\Support\Carbon;
 use Modules\MetaAds\Models\Ad;
 use Modules\MetaAds\Models\AdAccount;
@@ -203,4 +204,121 @@ it('filters the page breakdown by started date through the ad set', function () 
     ]))->assertOk()->json('rows.data');
 
     expect($data)->toBeEmpty();
+});
+
+/* ── Page owner: the same ad → ad set → page chain, one join further ── */
+
+it('groups ads by the owner of the page their ad set promotes', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $mara = User::factory()->create(['name' => 'Mara Owner']);
+    $niko = User::factory()->create(['name' => 'Niko Owner']);
+
+    // Two of Mara's pages: their spend collapses into a single owner row.
+    $alpha = Page::factory()->forWorkspace($workspace)->create(['name' => 'Alpha Page', 'owner_id' => $mara->id]);
+    $beta = Page::factory()->forWorkspace($workspace)->create(['name' => 'Beta Page', 'owner_id' => $mara->id]);
+    $gamma = Page::factory()->forWorkspace($workspace)->create(['name' => 'Gamma Page', 'owner_id' => $niko->id]);
+
+    seedPageBreakdown($workspace, [
+        ['page' => $alpha, 'spend' => 100],
+        ['page' => $beta, 'spend' => 40],
+        ['page' => $gamma, 'spend' => 25],
+    ]);
+
+    $data = $this->getJson(pageDataUrl($workspace, ['group_by' => 'page_owner']))
+        ->assertOk()->json('rows.data');
+
+    expect($data)->toHaveCount(2);
+
+    // Default sort is -spend, so Mara (140 across two pages) leads.
+    expect($data[0]['name'])->toBe('Mara Owner')
+        ->and($data[0]['id'])->toBe((string) $mara->id)
+        ->and((float) $data[0]['spend'])->toBe(140.0)
+        ->and($data[0]['ads_count'])->toBe(2)
+        ->and($data[1]['name'])->toBe('Niko Owner')
+        ->and((float) $data[1]['spend'])->toBe(25.0)
+        ->and($data[1]['ads_count'])->toBe(1);
+});
+
+it('collects ads with no resolvable page owner in an unassigned bucket', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $mara = User::factory()->create(['name' => 'Mara Owner']);
+    $alpha = Page::factory()->forWorkspace($workspace)->create(['name' => 'Alpha Page', 'owner_id' => $mara->id]);
+    $gone = Page::factory()->forWorkspace($workspace)->create(['name' => 'Deleted Page', 'owner_id' => $mara->id]);
+
+    seedPageBreakdown($workspace, [
+        ['page' => $alpha, 'spend' => 10],
+        // No promoted page at all.
+        ['page' => null, 'spend' => 90],
+        // Page deleted on our side, so its owner can't be resolved either.
+        ['page' => $gone, 'spend' => 5],
+    ]);
+
+    $gone->delete();
+
+    $data = collect($this->getJson(pageDataUrl($workspace, ['group_by' => 'page_owner']))
+        ->assertOk()->json('rows.data'))->keyBy('name');
+
+    expect($data)->toHaveCount(2)
+        ->and((float) $data['Unassigned owner']['spend'])->toBe(95.0)
+        ->and($data['Unassigned owner']['ads_count'])->toBe(2)
+        // "0" so the drill-down can pass the bucket back as a scope value.
+        ->and($data['Unassigned owner']['id'])->toBe('0')
+        ->and((float) $data['Mara Owner']['spend'])->toBe(10.0);
+});
+
+it('searches the page-owner breakdown by owner name', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $mara = User::factory()->create(['name' => 'Mara Owner']);
+    $niko = User::factory()->create(['name' => 'Niko Owner']);
+
+    seedPageBreakdown($workspace, [
+        ['page' => Page::factory()->forWorkspace($workspace)->create(['owner_id' => $mara->id]), 'spend' => 100],
+        ['page' => Page::factory()->forWorkspace($workspace)->create(['owner_id' => $niko->id]), 'spend' => 25],
+    ]);
+
+    $data = $this->getJson(pageDataUrl($workspace, [
+        'group_by' => 'page_owner',
+        'filter' => ['search' => 'Niko'],
+    ]))->assertOk()->json('rows.data');
+
+    expect($data)->toHaveCount(1)
+        ->and($data[0]['name'])->toBe('Niko Owner');
+});
+
+it('drills a page-owner row down to its ads', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $mara = User::factory()->create(['name' => 'Mara Owner']);
+    $niko = User::factory()->create(['name' => 'Niko Owner']);
+
+    $alpha = Page::factory()->forWorkspace($workspace)->create(['owner_id' => $mara->id]);
+    $beta = Page::factory()->forWorkspace($workspace)->create(['owner_id' => $mara->id]);
+    $gamma = Page::factory()->forWorkspace($workspace)->create(['owner_id' => $niko->id]);
+
+    seedPageBreakdown($workspace, [
+        ['page' => $alpha, 'spend' => 100],
+        ['page' => $beta, 'spend' => 40],
+        ['page' => $gamma, 'spend' => 25],
+        ['page' => null, 'spend' => 7],
+    ]);
+
+    $data = $this->getJson(pageDataUrl($workspace, [
+        'scope_by' => 'page_owner',
+        'scope' => (string) $mara->id,
+    ]))->assertOk()->json('rows.data');
+
+    expect($data)->toHaveCount(2)
+        ->and(collect($data)->sum(fn ($row) => (float) $row['spend']))->toBe(140.0);
+
+    // The unassigned bucket drills down too, on the id the grid showed.
+    $unassigned = $this->getJson(pageDataUrl($workspace, [
+        'scope_by' => 'page_owner',
+        'scope' => '0',
+    ]))->assertOk()->json('rows.data');
+
+    expect($unassigned)->toHaveCount(1)
+        ->and((float) $unassigned[0]['spend'])->toBe(7.0);
 });

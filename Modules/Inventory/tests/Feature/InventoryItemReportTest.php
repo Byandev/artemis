@@ -115,7 +115,8 @@ function reportSnapshot(Workspace $workspace, InventoryItem $item, string $date,
         'is_active' => true,
         'lead_time' => 10,
         'days_of_coverage' => 10,
-        'three_days_average' => 10,
+        // 30 units over the window is the 10 a day these figures assume.
+        'units_3d' => 30,
         'unfulfilled_count' => 0,
         'current_stocks' => 0,
         'remaining_after_fulfillment' => 0,
@@ -289,8 +290,9 @@ test('purchase-order facts separate what we have not released from what a suppli
         // 500 units have sat un-paid for 20 days against 300 the supplier is
         // late on, and with no snapshots here neither the Late-PO nor the
         // warehouse owner can weigh in — so the internal queue is the biggest
-        // pile, and the bottleneck is ours.
-        ->and($facts['bottleneck_stage'])->toBe('Delay in Payment / Approval');
+        // pile. Nothing is owed against it here, so no stage fires — an
+        // unreleased order is no longer a stage of its own.
+        ->and($facts['bottleneck_stage'])->toBeNull();
 });
 
 test('an order raised with no expected date is stored as due two weeks later', function () {
@@ -553,110 +555,175 @@ test('stockout risk is read against the lead time, not a fixed number of days', 
         ->and($bySku['SAFE'][13])->toBe('OK');
 });
 
-test('Late PO fires when a reorder need goes unraised for more than three days', function () {
-    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+/**
+ * The bottleneck stage names the one thing holding a group up, by working down
+ * a fixed order and stopping at the first rule that fires:
+ *
+ *   1. Warehouse      — owed, stock on the shelf, nothing shipped for >2 days
+ *   2. Delayed Stocks — owed > stock, and a PO is past its expected date
+ *   3. Scaling Item   — owed > stock, and demand is >120% of its 14-day rate
+ *   4. Late PO        — owed > stock, and cover is under 15 days
+ *
+ * Priority, not "whichever pile is biggest". These tests pin the order as much
+ * as the rules: several scenarios below satisfy two at once.
+ */
 
-    $item = reportItem($workspace, 'WIDGET');
-
-    // A real reorder gap frozen on five of the last fourteen days, with no
-    // purchase order ever raised against it — the officer has not acted.
-    foreach ([1, 2, 3, 4, 5] as $daysAgo) {
-        reportSnapshot($workspace, $item, now()->subDays($daysAgo)->toDateString());
-    }
-
-    expect((new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'])
-        ->toBe('Late PO');
-});
-
-test('a persisting gap is not Late PO once a purchase order has been raised', function () {
-    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
-
-    $item = reportItem($workspace, 'WIDGET');
-
-    foreach ([1, 2, 3, 4, 5] as $daysAgo) {
-        reportSnapshot($workspace, $item, now()->subDays($daysAgo)->toDateString());
-    }
-
-    // The officer did raise one two days ago — released, nothing yet overdue.
-    // Closing the gap is now someone else's job, not a creation failure, so no
-    // owner is past its target and the row stays blank.
-    $po = PurchasedOrder::create([
-        'workspace_id' => $workspace->id,
-        'control_no' => 'CN-1',
-        'issue_date' => now()->subDays(2)->toDateString(),
-        'status' => 6,
-    ]);
-    PurchasedOrderItem::create([
-        'inventory_purchased_order_id' => $po->id,
-        'inventory_item_id' => $item->id,
-        'count' => 200,
-    ]);
-
-    expect((new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'])
-        ->toBeNull();
-});
-
-test('the warehouse owns the hold-up when shippable stock sits unshipped', function () {
-    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
-
-    $item = reportItem($workspace, 'WIDGET');
-
-    // Shipped five days ago; a receipt since moved the ledger on, so the shelf
-    // has stood four days without a despatch — past the two-day target.
+/** A despatch $daysAgo, then a receipt yesterday so the ledger has moved on. */
+function reportIdleShelf($workspace, $item, int $daysAgo = 5): void
+{
     $item->transactions()->create([
-        'workspace_id' => $workspace->id, 'date' => now()->subDays(5)->toDateString(),
+        'workspace_id' => $workspace->id, 'date' => now()->subDays($daysAgo)->toDateString(),
         'ref_no' => 'TX-OUT', 'po_qty_out' => 30, 'remaining_qty' => 70,
     ]);
     $item->transactions()->create([
-        'workspace_id' => $workspace->id, 'date' => now()->subDays(1)->toDateString(),
+        'workspace_id' => $workspace->id, 'date' => now()->subDay()->toDateString(),
         'ref_no' => 'TX-IN', 'po_qty_in' => 100, 'remaining_qty' => 170,
     ]);
+}
 
-    // 100 on hand against 40 unmet, so 40 could ship. A large incoming figure
-    // closes the reorder gap, keeping Late PO out of it.
-    reportSnapshot($workspace, $item, now()->subDays(1)->toDateString(), [
-        'current_stocks' => 100, 'unfulfilled_count' => 40,
-        'remaining_after_fulfillment' => 100000,
-    ]);
-
-    expect((new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'])
-        ->toBe('Delay in warehouse');
-});
-
-test('a late supplier outranks a smaller idle shelf', function () {
-    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
-
-    $item = reportItem($workspace, 'WIDGET');
-
-    // Released a month ago, expected a fortnight ago, still owes 300.
+/** A purchase order still owing $count, expected $overdueDays ago. */
+function reportOverduePo($workspace, $item, int $count = 300, int $overdueDays = 14): void
+{
     $po = PurchasedOrder::create([
         'workspace_id' => $workspace->id,
-        'control_no' => 'CN-1',
+        'control_no' => 'CN-'.uniqid(),
         'issue_date' => now()->subDays(30)->toDateString(),
-        'expected_delivery_date' => now()->subDays(14)->toDateString(),
+        'expected_delivery_date' => now()->subDays($overdueDays)->toDateString(),
         'status' => 6,
     ]);
     PurchasedOrderItem::create([
         'inventory_purchased_order_id' => $po->id,
         'inventory_item_id' => $item->id,
-        'count' => 300,
+        'count' => $count,
+    ]);
+}
+
+function reportStage($workspace, $item): ?string
+{
+    return (new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'];
+}
+
+test('the warehouse owns it when demand is owed and stock is sitting still', function () {
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = reportItem($workspace, 'WIDGET');
+
+    reportIdleShelf($workspace, $item);
+
+    // 40 owed against 100 on the shelf: nobody is waiting on supply.
+    reportSnapshot($workspace, $item, now()->subDay()->toDateString(), [
+        'current_stocks' => 100, 'unfulfilled_count' => 40,
+        'remaining_after_fulfillment' => 100,
     ]);
 
-    // A small idle shelf as well: 40 shippable, past the despatch target.
-    $item->transactions()->create([
-        'workspace_id' => $workspace->id, 'date' => now()->subDays(5)->toDateString(),
-        'ref_no' => 'TX-OUT', 'po_qty_out' => 10, 'remaining_qty' => 90,
-    ]);
-    $item->transactions()->create([
-        'workspace_id' => $workspace->id, 'date' => now()->subDays(1)->toDateString(),
-        'ref_no' => 'TX-IN', 'po_qty_in' => 10, 'remaining_qty' => 100,
-    ]);
-    reportSnapshot($workspace, $item, now()->subDays(1)->toDateString(), [
+    expect(reportStage($workspace, $item))->toBe('Warehouse');
+});
+
+test('a shelf that shipped within the target is not the warehouse', function () {
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = reportItem($workspace, 'WIDGET');
+
+    // Shipped yesterday — inside the two-day target, so nothing has stalled.
+    reportIdleShelf($workspace, $item, daysAgo: 1);
+
+    reportSnapshot($workspace, $item, now()->subDay()->toDateString(), [
         'current_stocks' => 100, 'unfulfilled_count' => 40,
+        'remaining_after_fulfillment' => 100,
+    ]);
+
+    expect(reportStage($workspace, $item))->toBeNull();
+});
+
+test('the warehouse is asked about before the supplier', function () {
+    // Both fire: stock is sitting, and a purchase order is a fortnight late.
+    // Order decides — picking what is already here comes first.
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = reportItem($workspace, 'WIDGET');
+
+    reportOverduePo($workspace, $item);
+    reportIdleShelf($workspace, $item);
+
+    reportSnapshot($workspace, $item, now()->subDay()->toDateString(), [
+        'current_stocks' => 100, 'unfulfilled_count' => 40,
+        'remaining_after_fulfillment' => 100,
+    ]);
+
+    expect(reportStage($workspace, $item))->toBe('Warehouse');
+});
+
+test('a supplier past its date owns it once the shelf cannot cover the demand', function () {
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = reportItem($workspace, 'WIDGET');
+
+    reportOverduePo($workspace, $item);
+
+    // 400 owed against 100 on hand — more than the shelf can fill.
+    reportSnapshot($workspace, $item, now()->subDay()->toDateString(), [
+        'current_stocks' => 100, 'unfulfilled_count' => 400,
+        'remaining_after_fulfillment' => 100,
+    ]);
+
+    expect(reportStage($workspace, $item))->toBe('Delayed Stocks');
+});
+
+test('a supplier still inside its date is not late', function () {
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = reportItem($workspace, 'WIDGET');
+
+    // Due next week. Nothing is overdue, so the next rule down decides.
+    reportOverduePo($workspace, $item, overdueDays: -7);
+
+    reportSnapshot($workspace, $item, now()->subDay()->toDateString(), [
+        'current_stocks' => 100, 'unfulfilled_count' => 400,
+        // Plenty of cover, so Late PO stays out of it too.
         'remaining_after_fulfillment' => 100000,
     ]);
 
-    // 300 units late from the supplier beat 40 idle on the shelf.
-    expect((new ItemReportFacts($workspace))->for($item->id)['bottleneck_stage'])
-        ->toBe('Delay in stocks');
+    expect(reportStage($workspace, $item))->toBeNull();
+});
+
+test('an item outgrowing its plan is scaling, not late', function () {
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = reportItem($workspace, 'WIDGET');
+    unitCode($workspace, 'BUNDLE-A', ['WIDGET' => 10]);
+
+    // Every order inside the 3-day window: the 3-day rate is 14/3 of the
+    // 14-day one, which is 466% — well past the 120% the rule looks for.
+    foreach ([0, 1, 2] as $daysAgo) {
+        gencysOrder($workspace, 'BUNDLE-A', now()->subDays($daysAgo)->toDateString());
+    }
+
+    // Owed more than the shelf holds, nothing overdue, cover comfortable.
+    reportSnapshot($workspace, $item, now()->toDateString(), [
+        'current_stocks' => 100, 'unfulfilled_count' => 400,
+        'remaining_after_fulfillment' => 100000, 'units_3d' => 30,
+    ]);
+
+    expect(reportStage($workspace, $item))->toBe('Scaling Item');
+});
+
+test('running out with nothing late to blame is a Late PO', function () {
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = reportItem($workspace, 'WIDGET');
+
+    // 10 a day against 100 left is 10 days of cover — under the 15-day mark —
+    // with no overdue order and flat demand.
+    reportSnapshot($workspace, $item, now()->toDateString(), [
+        'current_stocks' => 50, 'unfulfilled_count' => 400,
+        'remaining_after_fulfillment' => 100, 'units_3d' => 30,
+    ]);
+
+    expect(reportStage($workspace, $item))->toBe('Late PO');
+});
+
+test('comfortable cover with nothing else wrong reports no bottleneck', function () {
+    ['workspace' => $workspace] = makeGencysWorkspaceWithOwner();
+    $item = reportItem($workspace, 'WIDGET');
+
+    // Owed more than the shelf holds, but 100 days of cover behind it.
+    reportSnapshot($workspace, $item, now()->toDateString(), [
+        'current_stocks' => 50, 'unfulfilled_count' => 400,
+        'remaining_after_fulfillment' => 1000, 'units_3d' => 30,
+    ]);
+
+    expect(reportStage($workspace, $item))->toBeNull();
 });

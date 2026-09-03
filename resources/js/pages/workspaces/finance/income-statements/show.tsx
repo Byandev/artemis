@@ -1,22 +1,26 @@
 import PageHeader from '@/components/common/PageHeader';
+import { LockStatementDialog } from '@/components/finance/lock-statement-dialog';
 import StatementFigures, {
     OpexBreakdownRow,
     StatementFigureSet,
 } from '@/components/finance/statement-figures';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
     Download,
     Grid2X2,
+    Lock,
+    LockOpen,
     RefreshCw,
     Save,
     ShoppingBag,
     Users,
 } from 'lucide-react';
 import moment from 'moment';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 interface Statement {
     id: number | null;
@@ -27,6 +31,13 @@ interface Statement {
     advisory_delivered_rate: number; // fraction (0.09)
     gencys_partner: boolean;
     generated_at?: string | null;
+    /**
+     * When the month was closed, and by whom. A locked statement can't be
+     * regenerated, saved over or deleted until it is unlocked — the figures
+     * stand as they were struck. Null = open.
+     */
+    locked_at?: string | null;
+    locked_by_name?: string | null;
     /**
      * A deficit typed in rather than read off last month's statement, for the
      * months that were closed somewhere else. Null = use the month before.
@@ -60,6 +71,19 @@ export default function IncomeStatementShow({
     const monthLabel = moment(statement.period_month).format('MMMM YYYY');
 
     const [saving, setSaving] = useState(false);
+    const [lockDialogOpen, setLockDialogOpen] = useState(false);
+    const locked = Boolean(statement.locked_at);
+
+    // Locking, unlocking and a refused regenerate all come back as a flash;
+    // without this the page would just silently redraw.
+    const { flash } = usePage().props as {
+        flash?: { success?: string; error?: string };
+    };
+
+    useEffect(() => {
+        if (flash?.success) toast.success(flash.success);
+        if (flash?.error) toast.error(flash.error);
+    }, [flash?.success, flash?.error]);
 
     // What last month left owing, when it was never closed here — the months
     // before this system was in use were worked out on a spreadsheet, so the
@@ -110,9 +134,15 @@ export default function IncomeStatementShow({
                     description={
                         isPreview
                             ? `${monthLabel} · preview — nothing saved yet`
-                            : statement.generated_at
-                              ? `${monthLabel} · saved ${moment(statement.generated_at).format('MMM D, YYYY h:mm A')}`
-                              : `${monthLabel} · saved snapshot`
+                            : locked
+                              ? `${monthLabel} · locked ${moment(statement.locked_at).format('MMM D, YYYY h:mm A')}${
+                                    statement.locked_by_name
+                                        ? ` by ${statement.locked_by_name}`
+                                        : ''
+                                }`
+                              : statement.generated_at
+                                ? `${monthLabel} · saved ${moment(statement.generated_at).format('MMM D, YYYY h:mm A')}`
+                                : `${monthLabel} · saved snapshot`
                     }
                 >
                     <div className="flex items-center gap-2">
@@ -172,7 +202,12 @@ export default function IncomeStatementShow({
                         {isPreview ? (
                             <button
                                 onClick={save}
-                                disabled={saving}
+                                disabled={saving || locked}
+                                title={
+                                    locked
+                                        ? 'This month is locked — unlock it before saving over it.'
+                                        : undefined
+                                }
                                 className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 text-[12px] font-medium text-white transition-all hover:bg-emerald-700 disabled:opacity-60"
                             >
                                 <Save className="h-3.5 w-3.5" />
@@ -180,9 +215,41 @@ export default function IncomeStatementShow({
                             </button>
                         ) : (
                             <>
-                                <button onClick={regenerate} className={BTN}>
-                                    <RefreshCw className="h-3.5 w-3.5" />
-                                    Regenerate
+                                {/* A locked month has nothing to regenerate to
+                                    — that is the whole point of the lock. */}
+                                {!locked && (
+                                    <button
+                                        onClick={regenerate}
+                                        className={BTN}
+                                    >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                        Regenerate
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setLockDialogOpen(true)}
+                                    className={
+                                        locked
+                                            ? 'flex h-8 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 font-mono text-[12px] text-amber-800 transition-all hover:bg-amber-100 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200 dark:hover:bg-amber-950/60'
+                                            : BTN
+                                    }
+                                    title={
+                                        locked
+                                            ? 'Reopen this month'
+                                            : 'Close this month — no more regenerating'
+                                    }
+                                >
+                                    {locked ? (
+                                        <>
+                                            <LockOpen className="h-3.5 w-3.5" />
+                                            Unlock
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Lock className="h-3.5 w-3.5" />
+                                            Lock
+                                        </>
+                                    )}
                                 </button>
                                 <a
                                     href={`${base}/${statement.id}/export`}
@@ -198,8 +265,35 @@ export default function IncomeStatementShow({
 
                 {isPreview && statement.id && (
                     <div className="mb-6 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 text-[12px] text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
-                        A statement already exists for {monthLabel}. Saving will
-                        overwrite it.
+                        {locked ? (
+                            <>
+                                The saved statement for {monthLabel} is locked,
+                                so this preview can't be saved over it. Open the{' '}
+                                <Link
+                                    href={`${base}/${statement.id}`}
+                                    className="underline"
+                                >
+                                    saved statement
+                                </Link>{' '}
+                                and unlock it first.
+                            </>
+                        ) : (
+                            <>
+                                A statement already exists for {monthLabel}.
+                                Saving will overwrite it.
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {!isPreview && locked && (
+                    <div className="mb-6 flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 text-[12px] text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+                        <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                            This statement is locked. Its figures are held as
+                            they were struck — it can't be regenerated, saved
+                            over or deleted until it is unlocked.
+                        </span>
                     </div>
                 )}
 
@@ -220,6 +314,16 @@ export default function IncomeStatementShow({
                     The same figures cut by who sold and by what was sold are on
                     the per-user and per-product breakdowns.
                 </p>
+
+                {statement.id && (
+                    <LockStatementDialog
+                        open={lockDialogOpen}
+                        onClose={() => setLockDialogOpen(false)}
+                        mode={locked ? 'unlock' : 'lock'}
+                        statementName={monthLabel}
+                        url={`${base}/${statement.id}/lock`}
+                    />
+                )}
             </div>
         </AppLayout>
     );

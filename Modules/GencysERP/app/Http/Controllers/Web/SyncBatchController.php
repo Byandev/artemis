@@ -80,11 +80,13 @@ class SyncBatchController extends Controller
     {
         abort_unless($request->user()->isMemberOf($workspace), 403);
 
+        // Not team-scoped: a run syncs a workspace-wide ERP window, so it belongs
+        // to no team and the "viewing as team" filter has nothing to narrow. The
+        // route's "View Gencys Sync" permission is what gates these.
         $runs = QueryBuilder::for(
             $batch->runs()
                 ->getQuery()
                 ->where('workspace_id', $workspace->id)
-                ->visibleTo($request->user(), $workspace)
                 ->with('inventoryItem:id,product_id,sku')
         )
             ->allowedFilters([

@@ -2,7 +2,6 @@
 
 namespace Modules\GencysERP\Models;
 
-use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -28,8 +27,6 @@ use Modules\Inventory\Models\InventoryItem;
  */
 class GencysSyncRun extends Model
 {
-    use ScopesToVisibleTeams;
-
     /** In a batch, waiting its turn. Not yet sent to n8n. */
     public const STATUS_QUEUED = 'queued';
 
@@ -67,12 +64,6 @@ class GencysSyncRun extends Model
         'rows_saved' => 'integer',
         'attempt' => 'integer',
     ];
-
-    /** Team visibility flows through the run's inventory item. */
-    protected function visibilityTeamRelation(): string
-    {
-        return 'inventoryItem.product.shops.teams';
-    }
 
     public function workspace(): BelongsTo
     {

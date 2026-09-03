@@ -113,12 +113,13 @@ class InventoryItemSnapshotter
     {
         return [
             'workspace_id', 'product_id', 'parent_id', 'is_parent', 'sku', 'is_active',
-            'sales_keywords', 'transaction_keywords', 'lead_time', 'days_of_coverage',
-            'unfulfilled_count', 'three_days_average', 'remaining_qty', 'item_created_at',
+            'lead_time', 'days_of_coverage',
+            'unfulfilled_count', 'remaining_qty', 'item_created_at',
             'current_stocks', 'discrepancy', 'discrepancy_counted_qty', 'discrepancy_date',
             'waiting_for_delivery_stocks', 'requested_stocks', 'remaining_after_fulfillment',
             'stocks_needed_for_lead_time', 'po_qty', 'po_needed', 'days_it_can_last',
             'product_name', 'product_winning_date', 'updated_at', 'demand_as_of',
+            ...ItemReportFacts::ITEM_COLUMNS,
             ...ItemReportFacts::SNAPSHOT_COLUMNS,
         ];
     }
@@ -141,12 +142,9 @@ class InventoryItemSnapshotter
                 'inventory_items.is_parent',
                 'inventory_items.sku',
                 'inventory_items.is_active',
-                'inventory_items.sales_keywords',
-                'inventory_items.transaction_keywords',
                 'inventory_items.lead_time',
                 'inventory_items.days_of_coverage',
                 'inventory_items.unfulfilled_count',
-                'inventory_items.three_days_average',
                 'inventory_items.remaining_qty',
                 'inventory_items.created_at as item_created_at',
                 'products.name as product_name',
@@ -187,6 +185,8 @@ class InventoryItemSnapshotter
     /** @return array<string, mixed> */
     private function row(InventoryItem $item, ItemReportFacts $facts, ?string $demandAsOf, $now): array
     {
+        $groupFacts = $facts->for((int) ($item->parent_id ?? $item->id));
+
         return [
             'workspace_id' => $item->workspace_id,
             'inventory_item_id' => $item->id,
@@ -197,12 +197,9 @@ class InventoryItemSnapshotter
             'is_parent' => (bool) $item->is_parent,
             'sku' => $item->sku,
             'is_active' => (bool) $item->is_active,
-            'sales_keywords' => $item->getRawOriginal('sales_keywords'),
-            'transaction_keywords' => $item->getRawOriginal('transaction_keywords'),
             'lead_time' => $item->lead_time ?? 0,
             'days_of_coverage' => $item->days_of_coverage ?? 0,
             'unfulfilled_count' => $item->unfulfilled_count ?? 0,
-            'three_days_average' => $item->three_days_average ?? 0,
             'remaining_qty' => $item->remaining_qty,
             'item_created_at' => $item->item_created_at,
 
@@ -226,9 +223,15 @@ class InventoryItemSnapshotter
             // self-describing; the roll-up reads them back with MAX(), which is
             // exact because they are identical across it.
             ...array_intersect_key(
-                $facts->for((int) ($item->parent_id ?? $item->id)),
+                $groupFacts,
                 array_flip(ItemReportFacts::SNAPSHOT_COLUMNS),
             ),
+
+            // Demand for this item alone. The rate every reorder figure on the
+            // list is built from, which is why it is recorded here rather than
+            // taken from the group: it has to answer for exactly the rows a
+            // filter leaves on screen.
+            ...$facts->itemFacts($item->id),
             'demand_as_of' => $demandAsOf,
 
             'created_at' => $now,

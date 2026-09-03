@@ -27,6 +27,8 @@ interface StatementContext {
     period_month: string; // YYYY-MM-DD
     month: string; // YYYY-MM
     label: string; // "July 2026"
+    /** A closed month — its figures are held, so nothing here is editable. */
+    locked: boolean;
 }
 
 /** One transaction type's share of a column's OPEX; these sum to that OPEX. */

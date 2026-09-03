@@ -37,15 +37,19 @@ function flowItem($workspace, string $sku, array $teams = [], float $dailyAverag
         $shop->teams()->attach(collect($teams)->pluck('id')->all());
     }
 
-    return InventoryItem::create([
+    $item = InventoryItem::create([
         'workspace_id' => $workspace->id,
         'product_id' => $product->id,
         'sku' => $sku,
         'is_active' => true,
-        'three_days_average' => $dailyAverage,
         'lead_time' => 10,
         'days_of_coverage' => 10,
     ]);
+
+    // Demand reaches the snapshot through the order feed, not the item.
+    seedDemandFeed($item, $dailyAverage);
+
+    return $item;
 }
 
 /** A purchase order at the given stage, owing $count units of $item. */
