@@ -3,6 +3,7 @@ import KpiCard, {
     formatKpi,
 } from '@/components/sales-marketing/dashboard/kpi-card';
 import LeaderCard from '@/components/sales-marketing/dashboard/leader-card';
+import ProductBreakdown from '@/components/sales-marketing/dashboard/product-breakdown';
 import ProductComparison from '@/components/sales-marketing/dashboard/product-comparison';
 import TeamBreakdown from '@/components/sales-marketing/dashboard/team-breakdown';
 import TeamComparison from '@/components/sales-marketing/dashboard/team-comparison';
@@ -223,6 +224,8 @@ export default function SalesMarketingDashboard({ workspace }: Props) {
                     slug={workspace.slug}
                     dateRange={dateRange}
                 />
+
+                <ProductBreakdown slug={workspace.slug} dateRange={dateRange} />
             </div>
         </AppLayout>
     );
