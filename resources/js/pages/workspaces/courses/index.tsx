@@ -131,9 +131,11 @@ function CourseCard({
 
             <div className="space-y-2.5 p-3.5">
                 <div>
+                    {/* Inline-block so the hit area stops at the end of the
+                        title rather than spanning the whole card width. */}
                     <Link
                         href={`${baseUrl}/${course.id}`}
-                        className="block truncate text-[15px] font-semibold text-gray-800 transition-colors hover:text-emerald-600 dark:text-gray-100 dark:hover:text-emerald-400"
+                        className="inline-block max-w-full truncate align-top text-[15px] font-semibold text-gray-800 underline-offset-2 transition-colors hover:text-emerald-600 hover:underline dark:text-gray-100 dark:hover:text-emerald-400"
                     >
                         {course.name}
                     </Link>

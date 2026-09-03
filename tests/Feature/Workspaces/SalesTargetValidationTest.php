@@ -42,8 +42,8 @@ test('a valid date creates the target', function () {
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
     $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets")
-        ->post("/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets", salesTargetPayload($team, '2026-08-11'))
+        ->from("/workspaces/{$workspace->slug}/sales-marketing/sales-targets")
+        ->post("/workspaces/{$workspace->slug}/sales-marketing/sales-targets", salesTargetPayload($team, '2026-08-11'))
         ->assertRedirect()
         ->assertSessionHasNoErrors();
 
@@ -54,8 +54,8 @@ test('an out-of-range year is a field error, not a failed insert', function (str
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
     $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets")
-        ->post("/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets", salesTargetPayload($team, $date))
+        ->from("/workspaces/{$workspace->slug}/sales-marketing/sales-targets")
+        ->post("/workspaces/{$workspace->slug}/sales-marketing/sales-targets", salesTargetPayload($team, $date))
         ->assertRedirect()
         ->assertSessionHasErrors('date');
 
@@ -71,8 +71,8 @@ test('a date the calendar does not have is rejected', function (mixed $date) {
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
     $this->actingAs($owner)
-        ->from("/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets")
-        ->post("/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets", salesTargetPayload($team, $date))
+        ->from("/workspaces/{$workspace->slug}/sales-marketing/sales-targets")
+        ->post("/workspaces/{$workspace->slug}/sales-marketing/sales-targets", salesTargetPayload($team, $date))
         ->assertRedirect()
         ->assertSessionHasErrors('date');
 
@@ -88,7 +88,7 @@ test('a date the calendar does not have is rejected', function (mixed $date) {
 test('the same date twice is rejected with a message on the field', function () {
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
-    $url = "/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets";
+    $url = "/workspaces/{$workspace->slug}/sales-marketing/sales-targets";
 
     $this->actingAs($owner)->from($url)->post($url, salesTargetPayload($team, '2026-08-11'));
 
@@ -105,7 +105,7 @@ test('a workspace can hold the same date as another workspace', function () {
     ['owner' => $otherOwner, 'workspace' => $other, 'team' => $otherTeam] = salesTargetContext();
 
     foreach ([[$owner, $workspace, $team], [$otherOwner, $other, $otherTeam]] as [$user, $ws, $t]) {
-        $url = "/workspaces/{$ws->slug}/sales-marketing/dashboard/sales-targets";
+        $url = "/workspaces/{$ws->slug}/sales-marketing/sales-targets";
 
         $this->actingAs($user)
             ->from($url)
@@ -119,7 +119,7 @@ test('a workspace can hold the same date as another workspace', function () {
 test('editing a target without moving its date is not a clash with itself', function () {
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
-    $base = "/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets";
+    $base = "/workspaces/{$workspace->slug}/sales-marketing/sales-targets";
 
     $this->actingAs($owner)->from($base)->post($base, salesTargetPayload($team, '2026-08-11'));
 
@@ -136,7 +136,7 @@ test('editing a target without moving its date is not a clash with itself', func
 test('an out-of-range date is rejected on update too', function () {
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
-    $base = "/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets";
+    $base = "/workspaces/{$workspace->slug}/sales-marketing/sales-targets";
 
     $this->actingAs($owner)->from($base)->post($base, salesTargetPayload($team, '2026-08-11'));
 
@@ -153,7 +153,7 @@ test('an out-of-range date is rejected on update too', function () {
 test('deleting from a target detail page lands on the list, not the deleted page', function () {
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
-    $base = "/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets";
+    $base = "/workspaces/{$workspace->slug}/sales-marketing/sales-targets";
 
     $this->actingAs($owner)->from($base)->post($base, salesTargetPayload($team, '2026-08-11'));
 
@@ -170,7 +170,7 @@ test('deleting from a target detail page lands on the list, not the deleted page
 test('deleting from the list stays on the list page it was fired from', function () {
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
-    $base = "/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets";
+    $base = "/workspaces/{$workspace->slug}/sales-marketing/sales-targets";
 
     $this->actingAs($owner)->from($base)->post($base, salesTargetPayload($team, '2026-08-11'));
 
@@ -186,7 +186,7 @@ test('deleting from the list stays on the list page it was fired from', function
 test('a negative amount is rejected rather than stored', function () {
     ['owner' => $owner, 'workspace' => $workspace, 'team' => $team] = salesTargetContext();
 
-    $url = "/workspaces/{$workspace->slug}/sales-marketing/dashboard/sales-targets";
+    $url = "/workspaces/{$workspace->slug}/sales-marketing/sales-targets";
 
     $this->actingAs($owner)
         ->from($url)

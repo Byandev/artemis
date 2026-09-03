@@ -4,7 +4,9 @@ use App\Http\Controllers\API\Workspace\AnalyticsController;
 use App\Http\Controllers\API\Workspace\CSRController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
+use App\Http\Controllers\API\Workspace\ParcelJourneyStatsController;
 use App\Http\Controllers\API\Workspace\ProductController;
+use App\Http\Controllers\API\Workspace\SalesMarketingDashboardController;
 use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
@@ -39,12 +41,82 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/total-returning', [CSRController::class, 'statTotalReturning']);
         Route::get('/csrs/stats/total-rts', [CSRController::class, 'statTotalRts']);
         Route::get('/csrs/stats/total-rmo-called', [CSRController::class, 'statTotalRmoCalled']);
+        // CSR Analytics cards. Same one-endpoint-per-card shape as the stats
+        // above; they read the workspace's orders (the dashboard's source)
+        // rather than the nightly per-CSR rollup.
+        Route::get('/csrs/stats/analytics-sales', [CSRController::class, 'analyticsSales']);
+        Route::get('/csrs/stats/analytics-rts', [CSRController::class, 'analyticsRts']);
+        Route::get('/csrs/stats/analytics-rmo-called', [CSRController::class, 'analyticsRmoCalled']);
+        Route::get('/csrs/stats/analytics-rmo-time', [CSRController::class, 'analyticsRmoTime']);
+        Route::get('/csrs/stats/analytics-calls-placed', [CSRController::class, 'analyticsCallsPlaced']);
+        Route::get('/csrs/stats/analytics-real-conversations', [CSRController::class, 'analyticsRealConversations']);
+        Route::get('/csrs/stats/analytics-reach-rate', [CSRController::class, 'analyticsReachRate']);
+        Route::get('/csrs/stats/analytics-longest-call', [CSRController::class, 'analyticsLongestCall']);
+        // Leaders for the period — who came top, same source as the cards above.
+        Route::get('/csrs/stats/analytics-leader-sales', [CSRController::class, 'analyticsLeaderSales']);
+        Route::get('/csrs/stats/analytics-leader-rts', [CSRController::class, 'analyticsLeaderRts']);
+        Route::get('/csrs/stats/analytics-leader-rmo-called', [CSRController::class, 'analyticsLeaderRmoCalled']);
+        Route::get('/csrs/stats/analytics-leader-rmo-duration', [CSRController::class, 'analyticsLeaderRmoDuration']);
+        // The field behind the leaders: every CSR on one axis, all four
+        // metrics in a single response so switching tabs costs nothing.
+        Route::get('/csrs/stats/analytics-comparison', [CSRController::class, 'analyticsComparison']);
+        // Effort against results, day by day: calls placed beside the ones that
+        // turned into a conversation.
+        Route::get('/csrs/stats/analytics-daily-effort', [CSRController::class, 'analyticsDailyEffort']);
+        // The same days as numbers: where every call ended up, and the day's hit rate.
+        Route::get('/csrs/stats/analytics-daily-call-outcomes', [CSRController::class, 'analyticsDailyCallOutcomes']);
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
         Route::get('/pages', [PageController::class, 'index'])->name('pages.index');
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::get('/leaderboards', [CsrPerformanceController::class, 'leaderboards'])->name('leaderboards.index');
+
+        // Parcel journey KPIs — one endpoint per stat card so each loads,
+        // skeletons and refreshes on its own. See ParcelJourneyStatsController.
+        Route::prefix('rts/parcel-journey/kpi')->name('rts.parcel-journey.kpi.')->group(function () {
+            Route::get('/tracked-orders', [ParcelJourneyStatsController::class, 'trackedOrders'])->name('tracked-orders');
+            Route::get('/sms-sent', [ParcelJourneyStatsController::class, 'smsSent'])->name('sms-sent');
+            Route::get('/chat-sent', [ParcelJourneyStatsController::class, 'chatSent'])->name('chat-sent');
+            Route::get('/total-sent', [ParcelJourneyStatsController::class, 'totalSent'])->name('total-sent');
+        });
+
+        // The per-shop breakdown under the cards — paginated and sorted over
+        // XHR, so the page no longer carries it.
+        Route::get('/rts/parcel-journey/shops', [ParcelJourneyStatsController::class, 'shops'])
+            ->name('rts.parcel-journey.shops');
+
+        // Sales & Marketing dashboard — one endpoint per KPI so each loads,
+        // skeletons and retries independently. See SalesMarketingDashboardController.
+        Route::prefix('sales-marketing/dashboard/kpi')->name('sales-marketing.dashboard.kpi.')->group(function () {
+            Route::get('/total-sales', [SalesMarketingDashboardController::class, 'totalSales'])->name('total-sales');
+            Route::get('/total-ad-spend', [SalesMarketingDashboardController::class, 'totalAdSpend'])->name('total-ad-spend');
+            Route::get('/blended-roas', [SalesMarketingDashboardController::class, 'blendedRoas'])->name('blended-roas');
+            Route::get('/rts-rate', [SalesMarketingDashboardController::class, 'rtsRate'])->name('rts-rate');
+        });
+
+        // Per-advertiser figures the team comparison plots. Its own endpoint:
+        // the panel switches metric client-side, so one fetch serves all four.
+        Route::get('/sales-marketing/dashboard/team-comparison', [SalesMarketingDashboardController::class, 'teamComparison'])
+            ->name('sales-marketing.dashboard.team-comparison');
+        Route::get('/sales-marketing/dashboard/team-breakdown', [SalesMarketingDashboardController::class, 'teamBreakdown'])
+            ->name('sales-marketing.dashboard.team-breakdown');
+
+        // The same window cut by product instead of advertiser, on the same
+        // terms — one fetch, every metric derived from it client-side.
+        Route::get('/sales-marketing/dashboard/product-comparison', [SalesMarketingDashboardController::class, 'productComparison'])
+            ->name('sales-marketing.dashboard.product-comparison');
+        Route::get('/sales-marketing/dashboard/product-breakdown', [SalesMarketingDashboardController::class, 'productBreakdown'])
+            ->name('sales-marketing.dashboard.product-breakdown');
+
+        // "Leaders for the period" — who topped each figure, on their own
+        // endpoints so the section loads independently of the KPI row.
+        Route::prefix('sales-marketing/dashboard/leaders')->name('sales-marketing.dashboard.leaders.')->group(function () {
+            Route::get('/highest-ad-spend', [SalesMarketingDashboardController::class, 'highestAdSpend'])->name('highest-ad-spend');
+            Route::get('/highest-sales', [SalesMarketingDashboardController::class, 'highestSales'])->name('highest-sales');
+            Route::get('/highest-roas', [SalesMarketingDashboardController::class, 'highestRoas'])->name('highest-roas');
+            Route::get('/lowest-rts', [SalesMarketingDashboardController::class, 'lowestRts'])->name('lowest-rts');
+        });
 
         Route::prefix('video-editor')->name('video-editor.')->group(function () {
             Route::get('/kpi/total', [VideoEditorDashboardController::class, 'totalCreatives'])->name('kpi.total');
