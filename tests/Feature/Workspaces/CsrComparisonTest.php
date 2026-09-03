@@ -1,9 +1,11 @@
 <?php
 
+use App\Jobs\SyncCsrDailyRecord;
 use App\Models\Order;
 use App\Models\PancakeUserRmoDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Modules\Pancake\Models\User as PancakeUser;
 
 /**
@@ -24,10 +26,28 @@ const CMP_TO = '2026-08-21';
 const CMP_PREV_FROM = '2026-08-08';
 const CMP_PREV_TO = '2026-08-14';
 
+/**
+ * Write the nightly POS rollup across both periods, as the scheduler does. The
+ * previous period is the same length again, immediately before, so start there.
+ */
+function cmpSyncPos(string $from, string $to): void
+{
+    $start = CarbonImmutable::parse($from);
+    $end = CarbonImmutable::parse($to);
+    $cursor = $start->subDays($start->diffInDays($end) + 1);
+
+    while ($cursor->lessThanOrEqualTo($end)) {
+        (new SyncCsrDailyRecord($cursor->toDateString()))->handle();
+        $cursor = $cursor->addDay();
+    }
+}
+
 function comparison($owner, Workspace $workspace, ?string $from = null, ?string $to = null)
 {
     $from ??= CMP_FROM;
     $to ??= CMP_TO;
+
+    cmpSyncPos($from, $to);
 
     return test()->actingAs($owner)->getJson(
         "/api/workspaces/{$workspace->slug}/csrs/stats/analytics-comparison?from={$from}&to={$to}"
@@ -154,6 +174,23 @@ test('RTS ranks lowest first and moves in percentage points', function () {
         ->toBe(['Precious Ann Dela Cruz', 'Rafael Gutierrez']);
     expect($rts['rows'][0]['value'])->toEqual(10);
     expect($rts['rows'][0]['change'])->toEqual(-10);
+});
+
+test('a CSR whose parcels settled for nothing has no RTS to plot', function () {
+    $real = cmpCsr('Precious Ann Dela Cruz');
+    $zeroValue = cmpCsr('Rafael Gutierrez');
+
+    cmpSettled($this->workspace, $real, '2026-08-16 09:00:00', 100, true);
+    cmpSettled($this->workspace, $real, '2026-08-16 09:00:00', 900, false);
+
+    // Eligibility is money settled, as on the card and the leader — 0/0 is no
+    // rate, so this CSR is left out rather than plotted at 0%.
+    cmpSettled($this->workspace, $zeroValue, '2026-08-16 09:00:00', 0, false);
+
+    $rts = metricBlock(comparison($this->owner, $this->workspace), 'rts');
+
+    expect(collect($rts['rows'])->pluck('name')->all())->toBe(['Precious Ann Dela Cruz']);
+    expect($rts['total'])->toBe(1);
 });
 
 test('the RMO metrics come off the nightly rollup', function () {

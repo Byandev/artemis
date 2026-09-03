@@ -53,55 +53,6 @@ class CSRController extends Controller
         return [$from, $to];
     }
 
-    private function posDailySummarySub(Workspace $workspace, string $from, string $to)
-    {
-        // csr_daily_records is the nightly POS rollup written by sync:csr-daily-records.
-        // It already aggregates pancake_orders per (workspace, csr, date) with rmo_called
-        // counted as pancake_order_for_delivery rows where status != 'PENDING'.
-        // csr_id here is the system users.id, joined later via pancake_users.user_id.
-        return DB::table('csr_daily_records')
-            ->where('workspace_id', $workspace->id)
-            ->where('type', 'POS')
-            ->whereBetween('date', [$from, $to])
-            ->groupBy('csr_id')
-            ->selectRaw('
-                csr_id,
-                SUM(total_orders) as total_orders,
-                SUM(total_sales) as total_sales,
-                SUM(delivered) as delivered,
-                SUM(`returning`) as returning_count,
-                SUM(rmo_called) as total_called
-            ');
-    }
-
-    private function erpDailySummarySub(Workspace $workspace, string $from, string $to)
-    {
-        return DB::table('pancake_user_erp_daily_reports')
-            ->where('workspace_id', $workspace->id)
-            ->whereBetween('date', [$from, $to])
-            ->groupBy('pancake_user_id')
-            ->selectRaw('
-                pancake_user_id,
-                SUM(total_orders) as total_orders,
-                SUM(total_sales) as total_sales,
-                SUM(delivered) as delivered,
-                SUM(`returning`) as returning_count
-            ');
-    }
-
-    private function rmoCallTimeSub(Workspace $workspace, string $from, string $to)
-    {
-        return DB::table('pancake_user_rmo_daily_reports')
-            ->where('workspace_id', $workspace->id)
-            ->whereBetween('date', [$from, $to])
-            ->groupBy('pancake_user_id')
-            ->selectRaw('
-                pancake_user_id,
-                SUM(total_call_time) as total_call_time,
-                SUM(total_called) as total_called
-            ');
-    }
-
     public function dailyRecords(Request $request, Workspace $workspace)
     {
         if (! $request->user()->isMemberOf($workspace)) {
@@ -193,57 +144,37 @@ class CSRController extends Controller
             ->whereBetween('date', [$from, $to]);
     }
 
-    private function posSummaryQuery(Request $request, Workspace $workspace)
-    {
-        [$from, $to] = $this->range($request);
-
-        return DB::table('csr_daily_records')
-            ->where('workspace_id', $workspace->id)
-            ->where('type', 'POS')
-            ->whereBetween('date', [$from, $to]);
-    }
-
     public function statTotalSales(Request $request, Workspace $workspace)
     {
-        $value = $this->isPos($request)
-            ? $this->posSummaryQuery($request, $workspace)->sum('total_sales')
-            : $this->rollupStatQuery($request, $workspace)->sum('total_sales');
+        $value = $this->rollupStatQuery($request, $workspace)->sum('total_sales');
 
         return response()->json(['value' => $value]);
     }
 
     public function statTotalOrders(Request $request, Workspace $workspace)
     {
-        $value = $this->isPos($request)
-            ? $this->posSummaryQuery($request, $workspace)->sum('total_orders')
-            : $this->rollupStatQuery($request, $workspace)->sum('total_orders');
+        $value = $this->rollupStatQuery($request, $workspace)->sum('total_orders');
 
         return response()->json(['value' => $value]);
     }
 
     public function statTotalDelivered(Request $request, Workspace $workspace)
     {
-        $value = $this->isPos($request)
-            ? $this->posSummaryQuery($request, $workspace)->sum('delivered')
-            : $this->rollupStatQuery($request, $workspace)->sum('delivered');
+        $value = $this->rollupStatQuery($request, $workspace)->sum('delivered');
 
         return response()->json(['value' => $value]);
     }
 
     public function statTotalReturning(Request $request, Workspace $workspace)
     {
-        $value = $this->isPos($request)
-            ? $this->posSummaryQuery($request, $workspace)->sum('returning')
-            : $this->rollupStatQuery($request, $workspace)->sum('returning');
+        $value = $this->rollupStatQuery($request, $workspace)->sum('returning');
 
         return response()->json(['value' => $value]);
     }
 
     public function statTotalRts(Request $request, Workspace $workspace)
     {
-        $row = ($this->isPos($request)
-            ? $this->posSummaryQuery($request, $workspace)
-            : $this->rollupStatQuery($request, $workspace))
+        $row = $this->rollupStatQuery($request, $workspace)
             ->selectRaw('SUM(delivered) as d, SUM(`returning`) as r')
             ->first();
 
@@ -257,20 +188,10 @@ class CSRController extends Controller
     {
         [$from, $to] = $this->range($request);
 
-        if ($this->isPos($request)) {
-            // POS rmo_called is pre-aggregated nightly into csr_daily_records
-            // (count of pancake_order_for_delivery rows where status != 'PENDING').
-            $value = DB::table('csr_daily_records')
-                ->where('workspace_id', $workspace->id)
-                ->where('type', 'POS')
-                ->whereBetween('date', [$from, $to])
-                ->sum('rmo_called');
-        } else {
-            $value = DB::table('pancake_user_rmo_daily_reports')
-                ->where('workspace_id', $workspace->id)
-                ->whereBetween('date', [$from, $to])
-                ->sum('total_called');
-        }
+        $value = DB::table('pancake_user_rmo_daily_reports')
+            ->where('workspace_id', $workspace->id)
+            ->whereBetween('date', [$from, $to])
+            ->sum('total_called');
 
         return response()->json(['value' => $value]);
     }
@@ -280,19 +201,10 @@ class CSRController extends Controller
      | CSR Analytics stat cards
      |--------------------------------------------------------------------------
      |
-     | One endpoint per card, same as the stats above. What differs is the
-     | source: these read the workspace's orders through WorkspaceMetrics — the
-     | very same TotalSales / RtsRate the main dashboard reports — rather than
-     | the nightly per-CSR rollup the `total-*` endpoints above sum.
-     |
-     | That difference is deliberate. The rollup only covers days
-     | sync:csr-daily-records has run for, so a range it has not reached reads as
-     | zero on a day the dashboard shows plenty. These cards are the headline
-     | figure on the page, so they quote what the rest of the app calls total
-     | sales; the per-CSR table underneath stays attribution, not the total.
-     |
-     | Each answers with `value` like its neighbours, plus what its own card
-     | draws: the previous period's figure and the move between them.
+     | One endpoint per card, reading the workspace's orders through
+     | WorkspaceMetrics — the dashboard's own figures, so they hold for a range
+     | the nightly rollup has not reached. Each answers with `value`, the
+     | previous period's figure and the move between them.
      */
 
     public function analyticsSales(Request $request, Workspace $workspace)
@@ -310,9 +222,7 @@ class CSRController extends Controller
             'orders' => $current['orders'],
             'previous_value' => $previous['sales'],
             'previous_orders' => $previous['orders'],
-            // Null, not zero, when the previous period had no sales: there is no
-            // percentage change from nothing, and 0% would read as "flat" when
-            // it means "nothing to compare against".
+            // Null, not zero, with no previous sales: 0% would read as "flat".
             'change' => $previous['sales'] > 0
                 ? round(($current['sales'] - $previous['sales']) / $previous['sales'] * 100, 1)
                 : null,
@@ -330,9 +240,8 @@ class CSRController extends Controller
         $current = $this->orderTotals($workspace, $from, $to);
         $previous = $this->orderTotals($workspace, $previousFrom, $previousTo);
 
-        // A period with no settled parcels has no RTS rate — the metric's SQL
-        // coalesces that to 0, which is indistinguishable from a genuinely
-        // perfect period. Measuring the volume tells them apart.
+        // No settled parcels means no rate. The metric coalesces that to 0,
+        // which reads as a perfect period; the volume tells them apart.
         $settled = $current['returning'] + $current['delivered'];
         $previousSettled = $previous['returning'] + $previous['delivered'];
 
@@ -340,9 +249,7 @@ class CSRController extends Controller
             'value' => $settled > 0 ? round($current['rts'] * 100, 2) : null,
             'returning_amount' => $current['returning'],
             'previous_value' => $previousSettled > 0 ? round($previous['rts'] * 100, 2) : null,
-            // Percentage *points*, not a relative change: 12% to 15% is "+3
-            // pts". Reporting it as +25% would be arithmetically true and
-            // completely unreadable on a card about a rate.
+            // Percentage points, not a relative move: 12% to 15% is "+3 pts".
             'change' => $settled > 0 && $previousSettled > 0
                 ? round(($current['rts'] - $previous['rts']) * 100, 1)
                 : null,
@@ -366,15 +273,12 @@ class CSRController extends Controller
         $previousRate = $rate($previous);
 
         return response()->json([
-            // Null, not zero, when nothing was assigned in the range: 0% would
-            // read as "nobody rang anyone" rather than "there was nothing to
-            // ring".
+            // Null, not zero, with nothing assigned: 0% would read as "nobody rang".
             'value' => $currentRate === null ? null : round($currentRate, 2),
             'called' => $current['called'],
             'assigned' => $current['assigned'],
             'previous_value' => $previousRate === null ? null : round($previousRate, 2),
-            // Percentage points, as on the RTS card — this is a rate, and a move
-            // from 86.4% to 86.9% is "+0.5 pts", not "+0.6%".
+            // Percentage points, as on the RTS card — this is a rate.
             'change' => $currentRate !== null && $previousRate !== null
                 ? round($currentRate - $previousRate, 1)
                 : null,
@@ -395,14 +299,12 @@ class CSRController extends Controller
         return response()->json([
             'value' => $current['seconds'],
             'calls' => $current['calls'],
-            // Talk time spread over the calls placed. Null with no calls at all
-            // — an average of nothing is not zero seconds a call.
+            // Talk time over the calls placed; null with no calls to divide by.
             'average_seconds' => $current['calls'] > 0
                 ? round($current['seconds'] / $current['calls'], 1)
                 : null,
             'previous_value' => $previous['seconds'],
-            // A relative change, unlike the two rate cards: this is a magnitude,
-            // so "9% more time on the phone" is the readable form.
+            // Relative, unlike the rate cards: this is a magnitude.
             'change' => $previous['seconds'] > 0
                 ? round(($current['seconds'] - $previous['seconds']) / $previous['seconds'] * 100, 1)
                 : null,
@@ -421,12 +323,9 @@ class CSRController extends Controller
         $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            // Every call placed against an order, however short. A two-second
-            // call is still a CSR picking up the phone, and this card counts
-            // the picking up.
+            // Every call placed against an order, however short.
             'value' => $current['calls'],
-            // The subset that actually connected, carried alongside so the
-            // card can say how many of the attempts landed.
+            // The subset that connected, so the card can say how many landed.
             'connected' => $current['connected'],
             'previous_value' => $previous['calls'],
             // Relative, like the time card: a count is a magnitude, not a rate.
@@ -450,9 +349,8 @@ class CSRController extends Controller
         return response()->json([
             'value' => $current['real'],
             'placed' => $current['calls'],
-            // What share of the attempts turned into an actual conversation —
-            // the figure the count is meaningless without, since 40 out of 60
-            // and 40 out of 4,000 are not the same day's work.
+            // What share of the attempts became a conversation — 40 of 60 and
+            // 40 of 4,000 are not the same day's work.
             'share' => $current['calls'] > 0
                 ? round($current['real'] / $current['calls'] * 100, 1)
                 : null,
@@ -482,8 +380,7 @@ class CSRController extends Controller
         $previousRate = $rate($previous);
 
         return response()->json([
-            // Null, not zero, with no attempts at all: 0% would read as "rang
-            // all day and reached nobody" rather than "nobody rang".
+            // Null, not zero, with no attempts: 0% would read as "reached nobody".
             'value' => $currentRate === null ? null : round($currentRate, 1),
             'real' => $current['real'],
             'placed' => $current['calls'],
@@ -506,9 +403,8 @@ class CSRController extends Controller
         $current = $this->rmoCallTotals($workspace, $from, $to);
         $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
 
-        // The day it happened, for the footnote. A second, tiny query rather
-        // than a window function: MAX() gives the length, not the row it came
-        // from, and this is one indexed lookup on a range already scanned.
+        // The day it happened, for the footnote — a second tiny query because
+        // MAX() gives the length, not the row it came from.
         $longest = $current['longest'] > 0
             ? DB::table('call_logs')
                 ->where('workspace_id', $workspace->id)
@@ -534,18 +430,8 @@ class CSRController extends Controller
     /**
      * Calls placed against real conversations, one point per day.
      *
-     * The two call cards above give the period's totals; this is the same two
-     * figures laid out across the days that made them, so a week where the
-     * effort held up but the conversations fell away shows as the gap between
-     * the bars widening rather than as a single softened percentage.
-     *
-     * Same source and same rules as the cards — RMO calls only (an order_id on
-     * the row), `real` at the shared five-second threshold — so a day here and
-     * the card above it always agree.
-     *
-     * Every day in the range is returned, including the ones with no calls at
-     * all: a Sunday nobody worked is a gap in the run of bars, and dropping it
-     * would quietly close that gap up.
+     * Same source and rules as the call cards, so a day here agrees with the
+     * card above it. Every day in the range is returned, zeros included.
      */
     public function analyticsDailyEffort(Request $request, Workspace $workspace)
     {
@@ -564,9 +450,8 @@ class CSRController extends Controller
                 COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as real_conversations
             ')
             ->get()
-            // call_date is a DATE column, but drivers hand it back as a string
-            // with or without a time part depending on the connection — key on
-            // the first ten characters so both shapes land on the same day.
+            // call_date comes back with or without a time part depending on the
+            // driver — key on the first ten characters.
             ->keyBy(fn ($row) => substr((string) $row->call_date, 0, 10));
 
         $days = [];
@@ -599,27 +484,10 @@ class CSRController extends Controller
     /**
      * Where each day's calls ended up — the table under the effort chart.
      *
-     * The chart draws two of these figures; this is the whole split, and it is
-     * its own endpoint rather than more columns on the chart's: the two answer
-     * different questions, and a table that grows a column later should not
-     * make the chart refetch.
-     *
-     * A day's attempts fall into three buckets, narrowing in turn:
-     *
-     *   no_answer      the phone never joined — it rang out, or the line was busy
-     *   answered       somebody picked up, however briefly
-     *   conversations  the answered calls past the shared five-second threshold
-     *
-     * So calls = no_answer + answered, and conversations is a cut of answered —
-     * the gap between them is the pick-up-and-hang-up, effort that got through
-     * without becoming anything.
-     *
-     * `hit_rate` is conversations over every attempt, the same reach rate the
-     * stat card at the top of the page reports, per day. Null on a day with no
-     * calls at all: 0% would read as "rang all day and reached nobody".
-     *
-     * Same source and rules as the call cards — RMO calls only, meaning a call
-     * carrying an order_id — so a row here and a card above it always agree.
+     * Three buckets narrowing in turn: no_answer never joined, answered picked
+     * up, conversations lasted past the five-second threshold. So calls =
+     * no_answer + answered, and conversations is a cut of answered. `hit_rate`
+     * is conversations over every attempt — the reach rate card, per day.
      */
     public function analyticsDailyCallOutcomes(Request $request, Workspace $workspace)
     {
@@ -639,9 +507,8 @@ class CSRController extends Controller
                 COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as real_conversations
             ')
             ->get()
-            // call_date is a DATE column, but drivers hand it back with or
-            // without a time part depending on the connection — key on the
-            // first ten characters so both shapes land on the same day.
+            // call_date comes back with or without a time part depending on the
+            // driver — key on the first ten characters.
             ->keyBy(fn ($row) => substr((string) $row->call_date, 0, 10));
 
         $days = [];
@@ -656,8 +523,7 @@ class CSRController extends Controller
             $answered = (int) ($row->answered ?? 0);
             $real = (int) ($row->real_conversations ?? 0);
 
-            // Every day in the range gets a row, quiet ones included — the
-            // table is a record of the period, not only of the busy days.
+            // Every day gets a row, quiet ones included.
             $days[] = [
                 'date' => $date,
                 'calls' => $calls,
@@ -681,38 +547,19 @@ class CSRController extends Controller
                 'no_answer' => array_sum(array_column($days, 'no_answer')),
                 'answered' => array_sum(array_column($days, 'answered')),
                 'conversations' => $conversations,
-                // The period's own rate, not the mean of the daily ones — a
-                // twenty-call day and a two-call day do not weigh the same.
+                // The period's own rate, not the mean of the daily ones.
                 'hit_rate' => $calls > 0 ? round($conversations / $calls * 100, 1) : null,
             ],
         ]);
     }
 
     /**
-     * Time spent on RMO calls across a range, and how many calls made it up.
+     * Time spent on RMO calls across a range, and the calls behind it.
      *
-     * Only calls carrying an order_id — the ones matched to a delivery when they
-     * synced. A CSR rings numbers all day that belong to no RMO order, and this
-     * card is about RMO time, so those are left out.
-     *
-     * The match is stamped at sync time by CallLogPersona and there is no
-     * backfill, so a call logged before order_id existed has none and is not
-     * counted. That makes the card cover calls synced from that point on rather
-     * than restate history from a match made long after the fact.
-     *
-     * `connected` is the subset that actually connected — any talk time at all.
-     * A zero-second row is a call that never joined: it rang out, or the line
-     * was busy, and nobody was reached.
-     *
-     * `real` is the stricter cut: five seconds or more, the same threshold the
-     * RMO page draws, kept on RmoDailyStats so the two cannot drift apart.
-     * Under that it is a hello and a hang-up, not a conversation.
-     *
-     * So the three narrow in turn — every attempt, the ones that joined, the
-     * ones where something was actually said.
-     *
-     * `longest` is the single longest call in the range — the one figure here
-     * that is not a total, and the reason the aggregate carries a MAX.
+     * Only calls carrying an order_id — matched to a delivery at sync time by
+     * CallLogPersona, with no backfill, so this covers calls synced from that
+     * point on. `connected` is any talk time at all, `real` the stricter cut at
+     * RmoDailyStats' five-second threshold, `longest` the single longest call.
      *
      * @return array{seconds: int, calls: int, connected: int, real: int, longest: int}
      */
@@ -741,15 +588,11 @@ class CSRController extends Controller
     }
 
     /**
-     * RMO deliveries assigned in a range, and how many of them were called.
+     * RMO deliveries assigned in a range, and how many were called.
      *
-     * Straight off pancake_order_for_delivery rather than the nightly per-CSR
-     * rollup, for the same reason the sales and RTS cards read orders: the card
-     * has to be right for any range, including one the sync has not covered.
-     *
-     * "Assigned" is a delivery with an assignee — an unassigned row was nobody's
-     * to call, so counting it would drag the rate down for no one's failing.
-     * "Called" is the same rule the RMO page itself uses: any status off PENDING.
+     * Straight off pancake_order_for_delivery, so the card is right for a range
+     * the sync has not covered. "Assigned" needs an assignee — an unassigned row
+     * was nobody's to call. "Called" is any status off PENDING, as the RMO page.
      *
      * @return array{assigned: int, called: int}
      */
@@ -776,9 +619,9 @@ class CSRController extends Controller
      | Leaders for the period
      |--------------------------------------------------------------------------
      |
-     | Who came top, rather than what the workspace did. Same source and same
-     | rules as the stat cards above, so a leader's share of the total is a share
-     | of the number the Sales card actually shows.
+     | Who came top, rather than what the workspace did. All four read the
+     | nightly rollups the CSR breakdown table reads, so a leader's figure is
+     | that CSR's row — and a range the sync has not covered has no leader.
      */
 
     public function analyticsLeaderSales(Request $request, Workspace $workspace)
@@ -787,26 +630,24 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        $perCsr = DB::table('pancake_orders as po')
-            ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
-            ->where('po.workspace_id', $workspace->id)
-            // Every status, cancellations included — the same rule
-            // SyncCsrDailyRecord uses, so a CSR's figure here is the one the
-            // table below the cards shows for them.
-            //
-            // Note this is NOT the Sales card's rule: that follows the dashboard
-            // and drops statuses 6 and 7. The two will differ by the value of
-            // the period's cancelled orders, deliberately — the leaderboard
-            // credits work done, the Sales card reports money kept.
-            ->whereBetween('po.confirmed_at', [$from.' 00:00:00', $to.' 23:59:59'])
+        // Off the rollup, so this is the row the CSR table shows: everything
+        // confirmed, cancellations included — not the Sales card's rule.
+        $perCsr = DB::table('pancake_user_pos_daily_reports as r')
+            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+            ->where('r.workspace_id', $workspace->id)
+            ->whereBetween('r.date', [$from, $to])
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
-                pu.id as pancake_user_id,
                 pu.name as name,
-                COALESCE(SUM(po.final_amount), 0) as sales,
-                COUNT(*) as orders
+                COALESCE(SUM(r.total_sales), 0) as sales,
+                COALESCE(SUM(r.total_orders), 0) as orders
             ')
+            // A rollup row for a day they only had a parcel settle confirmed
+            // nothing, so it is not a contender.
+            ->havingRaw('orders > 0')
             ->orderByDesc('sales')
+            // Ties break on volume, so the same data always crowns the same person.
+            ->orderByDesc('orders')
             ->get();
 
         $leader = $perCsr->first();
@@ -815,11 +656,8 @@ class CSRController extends Controller
             return response()->json(['leader' => null]);
         }
 
-        // The total is the CSRs' own total, summed across this same breakdown —
-        // not the workspace's. An order whose confirmed_by resolves to nobody
-        // counts on the Sales card but belongs to no CSR, and dividing by a
-        // total that includes it would leave every share short of the truth.
-        // Measured this way the shares add up to 100%.
+        // The CSRs' own total, not the workspace's — an order confirmed by
+        // nobody never reaches the rollup, so the shares here add up to 100%.
         $total = (float) $perCsr->sum('sales');
         $sales = (float) $leader->sales;
         $orders = (int) $leader->orders;
@@ -831,9 +669,8 @@ class CSRController extends Controller
                 'orders' => $orders,
                 // What one order was worth on average to this CSR.
                 'aov' => $orders > 0 ? round($sales / $orders, 2) : null,
-                // Their slice of everything the CSRs confirmed between them.
-                // Null rather than 100% when that total is somehow zero — a
-                // share of nothing is not a share.
+                // Their slice of everything the CSRs confirmed; null when that
+                // total is somehow zero.
                 'share' => $total > 0 ? round($sales / $total * 100, 1) : null,
             ],
         ]);
@@ -845,40 +682,27 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        $start = $from.' 00:00:00';
-        $end = $to.' 23:59:59';
-
-        // The rollup's own definitions, so a CSR's rate here is the one the RTS
-        // Rate column shows for them: money that turned back over money that
-        // arrived, each counted on the day it happened rather than the day the
-        // order was confirmed.
-        $perCsr = DB::table('pancake_orders as po')
-            ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
-            ->where('po.workspace_id', $workspace->id)
+        // Off the same rollup, so this is the RTS Rate column: money back over
+        // money settled, counted on the day it settled. Replaces a scan of the
+        // workspace's whole order history; an uncovered range has nobody to rank.
+        $perCsr = DB::table('pancake_user_pos_daily_reports as r')
+            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+            ->where('r.workspace_id', $workspace->id)
+            ->whereBetween('r.date', [$from, $to])
             ->groupBy('pu.id', 'pu.name')
+            // `_amount` suffixes on purpose: an alias of `delivered` shadows
+            // r.delivered in the ORDER BY, which ONLY_FULL_GROUP_BY rejects.
             ->selectRaw('
                 pu.name as name,
-                COALESCE(SUM(CASE WHEN po.status IN (4, 5) AND po.returning_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END), 0) as returned,
-                COALESCE(SUM(CASE WHEN po.status = 3 AND po.delivered_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END), 0) as delivered,
-                COUNT(CASE
-                    WHEN (po.status IN (4, 5) AND po.returning_at BETWEEN ? AND ?)
-                      OR (po.status = 3 AND po.delivered_at BETWEEN ? AND ?)
-                    THEN 1
-                END) as settled_orders
-            ', [$start, $end, $start, $end, $start, $end, $start, $end])
-            // Eligibility is one settled parcel, counted — not one peso. A
-            // delivery worth nothing is still a delivery, and summing amounts
-            // would have quietly dropped whoever handled it.
-            ->havingRaw('settled_orders >= 1')
-            // NULL sorts first in MySQL, so a CSR whose settled parcels are all
-            // worth zero — an undefined rate — would otherwise take the crown.
-            // Push those to the back and let a real rate win.
-            ->orderByRaw('(returned / NULLIF(returned + delivered, 0)) IS NULL')
-            ->orderByRaw('returned / NULLIF(returned + delivered, 0) ASC')
-            // Ties are common at a clean 0%. Break them on volume, so the
-            // winner is whoever managed it over more parcels — and so the same
-            // data always crowns the same person rather than whichever row the
-            // database happened to return first.
+                COALESCE(SUM(r.returning), 0) as returned_amount,
+                COALESCE(SUM(r.delivered), 0) as delivered_amount,
+                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders
+            ')
+            // Eligibility is money settled, as on the RTS card. Parcels all
+            // worth zero have no rate to rank, so they are out rather than last.
+            ->havingRaw('returned_amount + delivered_amount > 0')
+            ->orderByRaw('returned_amount / (returned_amount + delivered_amount) ASC')
+            // Ties are common at a clean 0%; break them on volume.
             ->orderByDesc('settled_orders')
             ->first();
 
@@ -886,16 +710,14 @@ class CSRController extends Controller
             return response()->json(['leader' => null]);
         }
 
-        $returned = (float) $perCsr->returned;
-        $delivered = (float) $perCsr->delivered;
+        $returned = (float) $perCsr->returned_amount;
+        $delivered = (float) $perCsr->delivered_amount;
         $settled = $returned + $delivered;
 
         return response()->json([
             'leader' => [
                 'name' => $perCsr->name,
-                // Zero when their settled parcels are all worth nothing: they
-                // are eligible on the count, and none of it came back.
-                'value' => $settled > 0 ? round($returned / $settled * 100, 1) : 0.0,
+                'value' => round($returned / $settled * 100, 1),
                 'returned' => $returned,
                 'delivered' => $delivered,
                 'orders' => (int) $perCsr->settled_orders,
@@ -909,18 +731,8 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        // Read off the same rollup the CSR table reads, using the table's own
-        // RMO % — total_called over total_confirmed — so the leader's figure is
-        // the number in that CSR's row rather than a second opinion on it.
-        //
-        // Note those two are different roles: total_called counts deliveries
-        // assigned to them that moved off PENDING, total_confirmed counts
-        // deliveries they confirmed. The table divides one by the other, and
-        // this follows it deliberately.
-        //
-        // Consequence worth knowing: because the rollup is written nightly, a
-        // range the sync has not covered has no leader here, where the stat
-        // cards above would still have figures.
+        // The CSR table's own RMO % — total_called (deliveries assigned to them
+        // that moved off PENDING) over total_confirmed (deliveries they confirmed).
         $leader = DB::table('pancake_user_rmo_daily_reports as r')
             ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
             ->where('r.workspace_id', $workspace->id)
@@ -934,8 +746,7 @@ class CSRController extends Controller
             // Nothing confirmed is no rate at all, not a zero one.
             ->havingRaw('confirmed > 0')
             ->orderByRaw('called / confirmed DESC')
-            // Ties break on volume, so the same data always crowns the same
-            // person rather than whichever row came back first.
+            // Ties break on volume, so the same data always crowns the same person.
             ->orderByDesc('confirmed')
             ->first();
 
@@ -962,9 +773,8 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        // Off the same rollup the CSR table reads, so this is that CSR's "RMO
-        // Call Time" column summed over the range, and the average uses the
-        // call count sitting beside it in "RMO Called".
+        // The CSR table's "RMO Call Time" summed over the range, averaged over
+        // the call count sitting beside it in "RMO Called".
         $leader = DB::table('pancake_user_rmo_daily_reports as r')
             ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
             ->where('r.workspace_id', $workspace->id)
@@ -975,8 +785,7 @@ class CSRController extends Controller
                 COALESCE(SUM(r.total_call_time), 0) as seconds,
                 COALESCE(SUM(r.total_rmo_call_attempts), 0) as calls
             ')
-            // No time on the phone is not "most time on calls". Without this the
-            // card would crown somebody at 00:00 on a quiet week.
+            // Without this the card would crown somebody at 00:00 on a quiet week.
             ->havingRaw('seconds > 0')
             ->orderByDesc('seconds')
             ->first();
@@ -993,20 +802,16 @@ class CSRController extends Controller
                 'name' => $leader->name,
                 'value' => $seconds,
                 'calls' => $calls,
-                // Null when the rollup recorded time but no calls to divide it
-                // between — the two columns are written independently, so that
-                // is possible and an average of nothing is not zero.
+                // Null when the rollup recorded time but no calls: the two
+                // columns are written independently.
                 'average_seconds' => $calls > 0 ? round($seconds / $calls, 1) : null,
             ],
         ]);
     }
 
     /**
-     * The equally long stretch ending the day before $from.
-     *
-     * Aug 1–5 is measured against Jul 27–31: same length, so the two figures are
-     * comparable; immediately before, so "up on last period" means the period a
-     * user just scrolled past.
+     * The equally long stretch ending the day before $from — so Aug 1–5 is
+     * measured against Jul 27–31.
      *
      * @return array{0: string, 1: string}
      */
@@ -1047,15 +852,10 @@ class CSRController extends Controller
      | CSR comparison
      |--------------------------------------------------------------------------
      |
-     | The leaders above name one winner per metric. This is the field behind
-     | them: every CSR on the same axis, against the period's average and
-     | against their own previous-period figure.
-     |
-     | One endpoint, all four metrics. They come from two scans — the orders
-     | table and the RMO rollup — and each scan already carries everything both
-     | of its metrics need, so splitting this into four requests would repeat
-     | the same two queries twice over. Switching tabs is then instant, and
-     | costs nothing.
+     | The field behind the leaders: every CSR on one axis, against the period's
+     | average and their own previous figure. One endpoint for all four metrics —
+     | they come from two rollup scans that each already carry both of theirs, so
+     | a request per tab would run the same two queries twice over.
      */
 
     /** How many CSRs a metric lists. Matches the eight-slot chart palette. */
@@ -1077,10 +877,9 @@ class CSRController extends Controller
                 fn ($r) => $r->previous_sales > 0 ? (float) $r->previous_sales : null,
             ),
             $this->comparisonMetric('rts', 'RTS', 'percent', ' pts', false, $csrs,
-                // Eligibility is one settled parcel, counted — the rule the RTS
-                // leader card uses. A parcel worth nothing is still a parcel.
-                fn ($r) => $r->settled_orders >= 1 ? $this->rate($r->returned, $r->returned + $r->delivered) : null,
-                fn ($r) => $r->previous_settled_orders >= 1 ? $this->rate($r->previous_returned, $r->previous_returned + $r->previous_delivered) : null,
+                // Eligibility is one settled parcel counted, as on the RTS leader.
+                fn ($r) => $r->returned_amount + $r->delivered_amount > 0 ? $this->rate($r->returned_amount, $r->returned_amount + $r->delivered_amount) : null,
+                fn ($r) => $r->previous_returned_amount + $r->previous_delivered_amount > 0 ? $this->rate($r->previous_returned_amount, $r->previous_returned_amount + $r->previous_delivered_amount) : null,
             ),
             $this->comparisonMetric('rmo_called', 'RMO called', 'percent', ' pts', true, $rmo,
                 // Nothing confirmed is no rate at all, not a zero one.
@@ -1109,63 +908,36 @@ class CSRController extends Controller
     /**
      * Sales and RTS per CSR, both periods, in one scan.
      *
-     * The two periods are contiguous, so a single WHERE over the whole span
-     * bounds the scan; the conditional sums split it back apart. Same rules as
-     * the leader cards: sales are every order the CSR confirmed in the window,
-     * cancellations included, and RTS counts money on the day it settled rather
-     * than the day the order was taken.
+     * Off the same rollup as the leader cards, so the field and the winner agree.
+     * The periods are contiguous, so one indexed range covers both and the
+     * conditional sums split them apart; an uncovered range is empty here.
      */
     private function comparisonOrderFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
     {
-        $span = [$previousFrom.' 00:00:00', $to.' 23:59:59'];
-        $now = [$from.' 00:00:00', $to.' 23:59:59'];
-        $before = [$previousFrom.' 00:00:00', $previousTo.' 23:59:59'];
-
-        return DB::table('pancake_orders as po')
-            ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
-            ->where('po.workspace_id', $workspace->id)
-            // Any row that feeds either period has one of these three stamps
-            // inside the span. Without it this reads the workspace's whole
-            // order history to answer a question about two weeks of it.
-            ->where(function ($q) use ($span) {
-                $q->whereBetween('po.confirmed_at', $span)
-                    ->orWhereBetween('po.returning_at', $span)
-                    ->orWhereBetween('po.delivered_at', $span);
-            })
+        return DB::table('pancake_user_pos_daily_reports as r')
+            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+            ->where('r.workspace_id', $workspace->id)
+            ->whereBetween('r.date', [$previousFrom, $to])
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
                 pu.id as id,
                 pu.name as name,
-                COALESCE(SUM(CASE WHEN po.confirmed_at BETWEEN ? AND ? THEN po.final_amount END), 0) as sales,
-                COALESCE(SUM(CASE WHEN po.status IN (4, 5) AND po.returning_at BETWEEN ? AND ? THEN po.final_amount END), 0) as returned,
-                COALESCE(SUM(CASE WHEN po.status = 3 AND po.delivered_at BETWEEN ? AND ? THEN po.final_amount END), 0) as delivered,
-                COUNT(CASE
-                    WHEN (po.status IN (4, 5) AND po.returning_at BETWEEN ? AND ?)
-                      OR (po.status = 3 AND po.delivered_at BETWEEN ? AND ?)
-                    THEN 1
-                END) as settled_orders,
-                COALESCE(SUM(CASE WHEN po.confirmed_at BETWEEN ? AND ? THEN po.final_amount END), 0) as previous_sales,
-                COALESCE(SUM(CASE WHEN po.status IN (4, 5) AND po.returning_at BETWEEN ? AND ? THEN po.final_amount END), 0) as previous_returned,
-                COALESCE(SUM(CASE WHEN po.status = 3 AND po.delivered_at BETWEEN ? AND ? THEN po.final_amount END), 0) as previous_delivered,
-                COUNT(CASE
-                    WHEN (po.status IN (4, 5) AND po.returning_at BETWEEN ? AND ?)
-                      OR (po.status = 3 AND po.delivered_at BETWEEN ? AND ?)
-                    THEN 1
-                END) as previous_settled_orders
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_sales END), 0) as sales,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.returning END), 0) as returned_amount,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as delivered_amount,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_sales END), 0) as previous_sales,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.returning END), 0) as previous_returned_amount,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as previous_delivered_amount
             ', [
-                ...$now, ...$now, ...$now, ...$now, ...$now,
-                ...$before, ...$before, ...$before, ...$before, ...$before,
+                $from, $to, $from, $to, $from, $to,
+                $previousFrom, $previousTo, $previousFrom, $previousTo, $previousFrom, $previousTo,
             ])
             ->get();
     }
 
     /**
      * RMO % and talk time per CSR, both periods, off the nightly rollup — the
-     * same source the CSR table and the two RMO leader cards read, so a row
-     * here is that CSR's row there.
-     *
-     * Consequence worth knowing: a range the sync has not covered yet is empty
-     * on these two metrics, where the order-based ones still have figures.
+     * same rows the CSR table and the two RMO leaders read.
      */
     private function comparisonRmoFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
     {
@@ -1191,12 +963,9 @@ class CSRController extends Controller
     }
 
     /**
-     * One metric block: the CSRs who qualify, ranked, with the period's average
-     * to draw them against.
-     *
-     * The average is over everyone who qualified, not over the listed rows —
-     * a top eight measured against its own mean would put half the field above
-     * average by construction.
+     * One metric block: the CSRs who qualify, ranked, with the period's average.
+     * That average is over everyone who qualified, not the listed rows — a top
+     * eight measured against its own mean is half above average by construction.
      */
     private function comparisonMetric(
         string $key,
@@ -1210,8 +979,8 @@ class CSRController extends Controller
     ): array {
         $eligible = $rows
             ->map(fn ($row) => [
-                // pancake_users.id is a UUID — keep it a string. Casting it to
-                // an int lands every CSR on 0, which quietly merges them.
+                // pancake_users.id is a UUID — casting it to an int lands every
+                // CSR on 0, quietly merging them.
                 'id' => (string) $row->id,
                 'name' => $row->name,
                 'value' => $value($row),
@@ -1229,9 +998,8 @@ class CSRController extends Controller
             'key' => $key,
             'label' => $label,
             'format' => $format,
-            // Percentage points for the metrics that are already rates: 12% to
-            // 15% is "+3 pts", not "+25%". The stat cards above report the same
-            // two that way.
+            // Percentage points for the metrics that are already rates, as on
+            // the stat cards above.
             'delta_unit' => $deltaUnit,
             'higher_is_better' => $higherIsBetter,
             'average' => $eligible->isNotEmpty() ? round($eligible->avg('value'), 2) : null,
@@ -1244,10 +1012,8 @@ class CSRController extends Controller
     }
 
     /**
-     * This period against the one before, in the metric's own unit.
-     *
-     * Null rather than zero when there is nothing to compare against: a CSR's
-     * first period has no previous figure, and 0 there would read as "flat".
+     * This period against the one before, in the metric's own unit. Null rather
+     * than zero with nothing to compare against — 0 would read as "flat".
      */
     private function comparisonChange(float $value, ?float $previous, string $deltaUnit): ?float
     {
@@ -1263,12 +1029,9 @@ class CSRController extends Controller
     }
 
     /**
-     * A fixed chart colour per CSR, assigned once across all four metrics.
-     *
-     * Keyed to the person, not to their rank: the sales ranking picks the
-     * order, and every other tab reuses it, so flipping tabs moves the bars
-     * without repainting them. Past eight distinct CSRs the slots wrap — the
-     * name label carries identity, the hue only helps the eye track a row.
+     * A fixed chart colour per CSR across all four metrics, keyed to the person
+     * rather than their rank, so flipping tabs moves the bars without repainting
+     * them. Past eight CSRs the slots wrap; the name label carries identity.
      */
     private function withColourSlots(array $metrics): array
     {

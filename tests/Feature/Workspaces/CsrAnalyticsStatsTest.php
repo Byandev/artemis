@@ -1,11 +1,13 @@
 <?php
 
+use App\Jobs\SyncCsrDailyRecord;
 use App\Models\CallLog;
 use App\Models\Order;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\RmoDailyStats;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User as PancakeUser;
@@ -716,8 +718,25 @@ test('a range with no calls has no longest and no day', function () {
         ->assertJsonPath('change', null);
 });
 
+/**
+ * Run the nightly POS rollup across a range, as the scheduler does. The leader
+ * cards read it, so the tests seed orders and then write the rollup for real.
+ */
+function syncPosRollup(string $from, string $to): void
+{
+    $cursor = CarbonImmutable::parse($from);
+    $end = CarbonImmutable::parse($to);
+
+    while ($cursor->lessThanOrEqualTo($end)) {
+        (new SyncCsrDailyRecord($cursor->toDateString()))->handle();
+        $cursor = $cursor->addDay();
+    }
+}
+
 function csrSalesLeader($owner, Workspace $workspace, string $from, string $to)
 {
+    syncPosRollup($from, $to);
+
     return csrStat($owner, $workspace, 'analytics-leader-sales', $from, $to);
 }
 
@@ -847,8 +866,101 @@ test('another workspace\'s leader is not borrowed', function () {
         ->assertJsonPath('leader', null);
 });
 
+test('the sales leader comes off the nightly rollup', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Angeline Mercado']);
+
+    // No pancake_orders at all — only the row the nightly sync leaves behind.
+    PancakeUserPosDailyReport::create([
+        'workspace_id' => $workspace->id,
+        'pancake_user_id' => $csr->id,
+        'date' => '2026-08-02',
+        'total_orders' => 3,
+        'total_sales' => 9000,
+    ]);
+
+    csrStat($owner, $workspace, 'analytics-leader-sales', '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('leader.name', 'Angeline Mercado')
+        ->assertJsonPath('leader.value', 9000)
+        ->assertJsonPath('leader.orders', 3)
+        ->assertJsonPath('leader.aov', 3000);
+});
+
+test('a range the rollup has not covered has no leader', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Angeline Mercado']);
+    orderConfirmedBy($workspace, $csr, '2026-08-02 10:00:00', 6000);
+
+    // The orders are there and the Sales card reports them, but the sync has
+    // not written those days — so there is nobody to crown.
+    csrStat($owner, $workspace, 'analytics-leader-sales', '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('leader', null);
+
+    csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 6000);
+});
+
+test('rollup days outside the range do not count towards the leader', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Angeline Mercado']);
+
+    orderConfirmedBy($workspace, $csr, '2026-08-02 10:00:00', 1000);
+    orderConfirmedBy($workspace, $csr, '2026-08-09 10:00:00', 9000);
+
+    syncPosRollup('2026-08-01', '2026-08-10');
+
+    csrStat($owner, $workspace, 'analytics-leader-sales', '2026-08-01', '2026-08-05')
+        ->assertJsonPath('leader.value', 1000)
+        ->assertJsonPath('leader.orders', 1);
+});
+
+test('a CSR the rollup carries with nothing confirmed cannot lead', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Angeline Mercado']);
+
+    // What the sync writes for a day whose only activity was a parcel
+    // settling: a row, but nothing taken.
+    PancakeUserPosDailyReport::create([
+        'workspace_id' => $workspace->id,
+        'pancake_user_id' => $csr->id,
+        'date' => '2026-08-02',
+        'total_orders' => 0,
+        'total_sales' => 0,
+        'delivered' => 4000,
+    ]);
+
+    csrStat($owner, $workspace, 'analytics-leader-sales', '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('leader', null);
+});
+
+test('a tie on sales is broken by volume', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $steady = PancakeUser::create(['name' => 'Angeline Mercado']);
+    $lucky = PancakeUser::create(['name' => 'Someone Else']);
+
+    // The same money, taken over more orders.
+    orderConfirmedBy($workspace, $steady, '2026-08-02 10:00:00', 2000);
+    orderConfirmedBy($workspace, $steady, '2026-08-02 11:00:00', 2000);
+    orderConfirmedBy($workspace, $steady, '2026-08-02 12:00:00', 2000);
+    orderConfirmedBy($workspace, $lucky, '2026-08-02 13:00:00', 6000);
+
+    csrSalesLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('leader.name', 'Angeline Mercado')
+        ->assertJsonPath('leader.orders', 3);
+});
+
 function csrRtsLeader($owner, Workspace $workspace, string $from, string $to)
 {
+    syncPosRollup($from, $to);
+
     return csrStat($owner, $workspace, 'analytics-leader-rts', $from, $to);
 }
 
@@ -939,23 +1051,21 @@ test('a period where nothing settled has no RTS leader', function () {
         ->assertJsonPath('leader', null);
 });
 
-test('one settled parcel is enough, even a zero-value one', function () {
+test('parcels that settled for nothing are not a rate', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     $csr = PancakeUser::create(['name' => 'Mariel Bautista']);
 
-    // Eligibility is one settled parcel counted, not one peso. Summing amounts
-    // would have dropped this CSR entirely.
+    // Eligibility is money settled, as on the RTS card. 0/0 is no rate at all,
+    // so this CSR is out of the ranking rather than sitting in it at 0%.
     deliveredBy($workspace, $csr, '2026-08-02 10:00:00', 0);
 
     csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('leader.name', 'Mariel Bautista')
-        ->assertJsonPath('leader.orders', 1)
-        ->assertJsonPath('leader.value', 0);
+        ->assertJsonPath('leader', null);
 });
 
-test('a real rate beats an undefined one', function () {
+test('a CSR with a real rate wins over one who settled nothing of value', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     $real = PancakeUser::create(['name' => 'Mariel Bautista']);
@@ -965,8 +1075,7 @@ test('a real rate beats an undefined one', function () {
     deliveredBy($workspace, $real, '2026-08-02 10:00:00', 900);
     returnedBy($workspace, $real, '2026-08-03 10:00:00', 100);
 
-    // Settled, but worth nothing, so their rate is 0/0. MySQL sorts NULL first,
-    // which would have handed them the crown — they must come last instead.
+    // Settled, but worth nothing — no rate, so not in the running at all.
     deliveredBy($workspace, $zeroValue, '2026-08-02 10:00:00', 0);
 
     csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
