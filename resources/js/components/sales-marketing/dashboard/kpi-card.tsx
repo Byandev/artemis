@@ -3,6 +3,7 @@ import { cn, currencyFormatter } from '@/lib/utils';
 import { ArrowDownRight, ArrowUpRight, RotateCcw } from 'lucide-react';
 import moment from 'moment';
 import { useMemo } from 'react';
+import StatShell from './stat-shell';
 import { useSalesMarketingStat } from './use-sales-marketing-stat';
 
 /**
@@ -21,7 +22,12 @@ export interface StatData {
  * amounts; `currencyExact` spells them out, for a caption where the exact
  * figure is the point.
  */
-export type KpiFormat = 'currency' | 'currencyExact' | 'ratio' | 'percent';
+export type KpiFormat =
+    | 'currency'
+    | 'currencyExact'
+    | 'ratio'
+    | 'percent'
+    | 'number';
 
 const pesos = new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -29,12 +35,16 @@ const pesos = new Intl.NumberFormat('en-PH', {
     maximumFractionDigits: 0,
 });
 
+const counts = new Intl.NumberFormat('en-PH', { maximumFractionDigits: 0 });
+
 export const formatKpi = (value: number, as: KpiFormat): string => {
     switch (as) {
         case 'currency':
             return currencyFormatter(value);
         case 'currencyExact':
             return pesos.format(value);
+        case 'number':
+            return counts.format(value);
         case 'percent':
             // Rates arrive as a 0–1 ratio, the way the metrics report them.
             return `${(value * 100).toFixed(2)}%`;
@@ -76,7 +86,7 @@ export default function KpiCard({
 }: {
     slug: string;
     label: string;
-    /** The KPI's own endpoint under `.../dashboard/kpi/`. */
+    /** The KPI's own endpoint under `.../dashboard/`. */
     endpoint: string;
     /** `[start, end]` as YYYY-MM-DD. */
     dateRange: string[];
@@ -131,14 +141,12 @@ export default function KpiCard({
         : null;
 
     return (
-        <div className="rounded-[14px] border border-black/6 bg-white p-[18px] pb-6 transition-colors hover:border-black/10 dark:border-white/6 dark:bg-zinc-900 dark:hover:border-white/10">
-            {/* Label left, trend on the top-right corner — where the icon used
-                to sit, so the direction reads at a glance down a row of cards. */}
-            <div className="flex items-start justify-between gap-3">
-                <p className="text-[11px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                    {label}
-                </p>
-                {loading ? (
+        // The trend sits in the shell's top-right slot — where the icon used to
+        // be, so the direction reads at a glance down a row of cards.
+        <StatShell
+            label={label}
+            aside={
+                loading ? (
                     <Skeleton className="h-4 w-12" />
                 ) : (
                     change !== null && (
@@ -154,10 +162,10 @@ export default function KpiCard({
                             {Math.abs(change).toFixed(1)}%
                         </span>
                     )
-                )}
-            </div>
-
-            <div className="mt-4">
+                )
+            }
+        >
+            <>
                 {loading ? (
                     <>
                         <Skeleton className="h-[30px] w-32" />
@@ -206,7 +214,7 @@ export default function KpiCard({
                         )}
                     </>
                 )}
-            </div>
-        </div>
+            </>
+        </StatShell>
     );
 }

@@ -120,6 +120,172 @@ class SalesMarketingDashboardController extends Controller
         ]);
     }
 
+    /**
+     * The advertiser who spent the most over the window, with what that spend
+     * bought: their attributed sales, and the workspace's whole spend so the
+     * card can state their share of it.
+     *
+     * `advertiser` is null when nothing was spent at all; the card says so
+     * rather than showing a leader of nothing.
+     */
+    public function highestAdSpend(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
+        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+
+        $window = $this->window($request);
+        $leader = $this->topAdvertiser($request, $workspace, $window, 'ad_spent', ['sales']);
+
+        return response()->json([
+            'advertiser' => $this->advertiserOf($leader),
+            'value' => (float) ($leader->value ?? 0),
+            'total' => $this->adSpendIn($request, $workspace, $window),
+            // The card divides this by the spend for the ROAS it states.
+            'sales' => (float) ($leader->sales ?? 0),
+        ]);
+    }
+
+    /**
+     * The advertiser whose ads were credited with the most sales over the
+     * window, with the order count behind it and the workspace's whole
+     * attributed sales for the share.
+     */
+    public function highestSales(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
+        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+
+        $window = $this->window($request);
+        $leader = $this->topAdvertiser($request, $workspace, $window, 'sales', ['orders']);
+
+        return response()->json([
+            'advertiser' => $this->advertiserOf($leader),
+            'value' => (float) ($leader->value ?? 0),
+            'total' => $this->attributedSalesIn($request, $workspace, $window),
+            // The card divides the sales by this for the AOV it states.
+            'orders' => (int) ($leader->orders ?? 0),
+        ]);
+    }
+
+    /**
+     * The advertiser who turned spend into sales most efficiently over the
+     * window — the highest sales-to-spend ratio, not the largest number.
+     *
+     * Only advertisers who actually spent are eligible; a ratio over no spend
+     * is not efficiency, it is a division by zero. There is deliberately no
+     * minimum-spend floor beyond that, so this reports the literal highest
+     * ROAS — a small spend that happened to convert can top it.
+     *
+     * Unlike the other leaders there is no "share of total" to state: a ratio
+     * is not a slice of anything, so the card labels it as efficiency instead.
+     */
+    public function highestRoas(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
+        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+
+        $leader = $this->advertiserRecords($request, $workspace, $this->window($request))
+            ->groupBy('advertiser_id', 'advertiser_name')
+            ->selectRaw('
+                advertiser_id,
+                advertiser_name,
+                ROUND(SUM(sales) / NULLIF(SUM(ad_spent), 0), 2) AS value,
+                SUM(ad_spent) AS ad_spend,
+                SUM(sales) AS sales
+            ')
+            ->havingRaw('SUM(ad_spent) > 0')
+            ->orderByDesc('value')
+            ->first();
+
+        return response()->json([
+            'advertiser' => $this->advertiserOf($leader),
+            'value' => (float) ($leader->value ?? 0),
+            // The card states both sides of the ratio underneath it.
+            'ad_spend' => (float) ($leader->ad_spend ?? 0),
+            'sales' => (float) ($leader->sales ?? 0),
+        ]);
+    }
+
+    /**
+     * The advertiser whose parcels came back least often over the window — the
+     * lowest share of delivery outcomes that ended in a return.
+     *
+     * Rate is computed from the amounts rather than averaged off the stored
+     * per-day `rts_rate`: a mean of daily rates weights a quiet day the same as
+     * a busy one. Only advertisers with an outcome either way are eligible —
+     * nothing delivered and nothing returned is not a perfect record.
+     */
+    public function lowestRts(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
+        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+
+        $leader = $this->advertiserRecords($request, $workspace, $this->window($request))
+            ->groupBy('advertiser_id', 'advertiser_name')
+            ->selectRaw('
+                advertiser_id,
+                advertiser_name,
+                ROUND(
+                    SUM(returned_amount) / NULLIF(SUM(returned_amount + delivered_amount), 0),
+                    4
+                ) AS value,
+                SUM(returned_amount) AS returned_amount
+            ')
+            ->havingRaw('SUM(returned_amount + delivered_amount) > 0')
+            ->orderBy('value')
+            ->first();
+
+        return response()->json([
+            // A zero rate is the best possible result here, not an absent one,
+            // so this leader is judged on having an outcome at all.
+            'advertiser' => $leader
+                ? ['id' => (int) $leader->advertiser_id, 'name' => $leader->advertiser_name]
+                : null,
+            'value' => (float) ($leader->value ?? 0),
+            'returned_amount' => (float) ($leader->returned_amount ?? 0),
+        ]);
+    }
+
+    /**
+     * The advertiser topping $column over the window, with any $also columns
+     * summed alongside it. Raw sums only — every ratio the cards show (share,
+     * ROAS, AOV) is a division they do themselves, the way the KPI cards work
+     * out their own trend.
+     *
+     * $column and $also are this class's own literals, never request input.
+     *
+     * @param  list<string>  $also
+     */
+    private function topAdvertiser(Request $request, Workspace $workspace, array $window, string $column, array $also = []): ?object
+    {
+        $sums = collect(["SUM({$column}) AS value"])
+            ->merge(array_map(fn (string $c) => "SUM({$c}) AS {$c}", $also))
+            ->implode(', ');
+
+        return $this->advertiserRecords($request, $workspace, $window)
+            ->groupBy('advertiser_id', 'advertiser_name')
+            ->selectRaw("advertiser_id, advertiser_name, {$sums}")
+            ->orderByDesc('value')
+            ->first();
+    }
+
+    /**
+     * The leader's identity, or null when they led on nothing — a workspace
+     * with no spend has no biggest spender.
+     *
+     * @return array{id: int, name: ?string}|null
+     */
+    private function advertiserOf(?object $leader): ?array
+    {
+        return $leader && $leader->value > 0
+            ? ['id' => (int) $leader->advertiser_id, 'name' => $leader->advertiser_name]
+            : null;
+    }
+
     /** The `totalSales` metric over the window — the main dashboard's own path. */
     private function salesIn(Request $request, Workspace $workspace, array $window): float
     {
