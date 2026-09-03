@@ -159,3 +159,84 @@ it('refuses a workspace the user is not a member of', function () {
         'scope' => '6100',
     ]))->assertStatus(403);
 });
+
+/* ── Row-level start-time filter, shared by the grid and the timeline ── */
+
+it('narrows the timeline to ads whose ad set started in range', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $today = Carbon::today()->toDateString();
+
+    ['campaign' => $campaign, 'set' => $set] = seedTimeseries($workspace, [
+        ['ad' => 6101, 'date' => $today, 'spend' => 60],
+        ['ad' => 6102, 'date' => $today, 'spend' => 40],
+    ]);
+
+    $set->update(['start_time' => Carbon::today()->subDays(10)]);
+
+    $filter = fn (string $op, string $value) => json_encode([[
+        'field' => 'started_date', 'op' => $op, 'value' => $value,
+    ]]);
+
+    // The ad set started 10 days ago, so "after yesterday" excludes every ad.
+    $excluded = $this->getJson(timeseriesUrl($workspace, [
+        'scope_by' => 'campaign',
+        'scope' => (string) $campaign->id,
+        'since' => $today,
+        'until' => $today,
+        'date_filters' => $filter('after', Carbon::yesterday()->toDateString()),
+    ]))->assertOk()->json('points');
+
+    expect((float) $excluded[0]['spend'])->toBe(0.0);
+
+    // "before yesterday" keeps them, so the chart matches the grid row.
+    $included = $this->getJson(timeseriesUrl($workspace, [
+        'scope_by' => 'campaign',
+        'scope' => (string) $campaign->id,
+        'since' => $today,
+        'until' => $today,
+        'date_filters' => $filter('before', Carbon::yesterday()->toDateString()),
+    ]))->assertOk()->json('points');
+
+    expect((float) $included[0]['spend'])->toBe(100.0);
+});
+
+it('hands the start-time filter back to the page so a refresh keeps it', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedTimeseries($workspace, []);
+
+    $url = route('workspaces.metaads.ads-manager', ['workspace' => $workspace]).'?'.http_build_query([
+        'date_filters' => json_encode([
+            ['field' => 'started_date', 'op' => 'between', 'value' => '2026-08-10', 'value2' => '2026-08-20'],
+            // A created_date filter is not the start-time control's business.
+            ['field' => 'created_date', 'op' => 'on', 'value' => '2026-08-01'],
+        ]),
+    ]);
+
+    $this->get($url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('query.startTime.op', 'between')
+            ->where('query.startTime.value', '2026-08-10')
+            ->where('query.startTime.value2', '2026-08-20')
+            ->missing('query.startTime.field'));
+});
+
+it('ignores a malformed start-time filter rather than erroring', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $today = Carbon::today()->toDateString();
+    ['campaign' => $campaign] = seedTimeseries($workspace, [
+        ['ad' => 6101, 'date' => $today, 'spend' => 60],
+    ]);
+
+    $points = $this->getJson(timeseriesUrl($workspace, [
+        'scope_by' => 'campaign',
+        'scope' => (string) $campaign->id,
+        'since' => $today,
+        'until' => $today,
+        'date_filters' => json_encode([['field' => 'started_date', 'op' => 'nonsense', 'value' => 'not-a-date']]),
+    ]))->assertOk()->json('points');
+
+    expect((float) $points[0]['spend'])->toBe(60.0);
+});

@@ -59,6 +59,7 @@ class AdsManagerController extends Controller
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
                 'metricFilters' => $this->parseMetricFilters($request),
+                'startTime' => $this->startTimeFilter($request),
             ],
         ]);
     }
@@ -192,6 +193,11 @@ class AdsManagerController extends Controller
             ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds);
 
         ($this->scopeFor($scopeBy, $scopeValue))($query);
+
+        // The grid's row-level date filters narrow which ads count toward a
+        // row, so the chart applies them too or its totals would disagree with
+        // the row that opened it. Always ad-grained here, hence the 'ad' shape.
+        $this->applyDateFilters($query, $this->parseDateFilters($request), 'ad');
 
         // Same creator filter the grid is under, so the chart matches the row.
         $creatorFilter = (string) $request->query('creator_id', '');
@@ -1062,6 +1068,26 @@ class AdsManagerController extends Controller
         }
 
         return $valid;
+    }
+
+    /**
+     * The started_date filter alone, shaped for the Ads Manager's start-time
+     * control (which offers that one field), so a refresh or a shared link
+     * restores it. Null when no valid one was sent.
+     *
+     * @return array{op: string, value: string, value2?: string}|null
+     */
+    private function startTimeFilter(Request $request): ?array
+    {
+        foreach ($this->parseDateFilters($request) as $filter) {
+            if ($filter['field'] === 'started_date') {
+                unset($filter['field']);
+
+                return $filter;
+            }
+        }
+
+        return null;
     }
 
     /**
