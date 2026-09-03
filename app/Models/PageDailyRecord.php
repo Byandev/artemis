@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  *
  * `source` distinguishes the pipeline ('gencys' | 'artemis') and the page is
  * polymorphic — an Artemis Pancake Page or a Gencys Page — via page_type /
- * page_id. `sales` is the purchase value, so ROAS = sales / ad_spent.
+ * page_id. `sales` is the Pancake purchase value, so ROAS = sales / ad_spent;
+ * `ad_sales` is Meta's attributed purchase value, so ad_roas = ad_sales / ad_spent.
  */
 class PageDailyRecord extends Model
 {
@@ -29,8 +30,16 @@ class PageDailyRecord extends Model
         'delivered_amount' => 'decimal:2',
         'returned' => 'integer',
         'returned_amount' => 'decimal:2',
+        'returning_amount' => 'decimal:2',
+        'rts_rate' => 'decimal:2',
         'ad_spent' => 'decimal:2',
+        'ad_sales' => 'decimal:2',
+        'ad_purchases' => 'integer',
         'roas' => 'decimal:2',
+        'ad_roas' => 'decimal:2',
+        // Cost per purchase — ad spend over the Meta / Pancake counts.
+        'ad_cpp' => 'decimal:2',
+        'cpp' => 'decimal:2',
     ];
 
     /** The Artemis Pancake Page or Gencys Page this row belongs to. */

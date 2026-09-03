@@ -368,6 +368,9 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('search', function ($query, $value) {
                     $this->applyRmoSearch($query, $value);
                 }),
+                AllowedFilter::callback('upsell', function ($query, $value) {
+                    $this->applyUpsellFilter($query, $value);
+                }),
             ])
             ->allowedSorts([
                 'status',
@@ -605,6 +608,9 @@ class ForDeliveryController extends Controller
                 AllowedFilter::callback('search', function ($query, $value) {
                     $this->applyRmoSearch($query, $value);
                 }),
+                AllowedFilter::callback('upsell', function ($query, $value) {
+                    $this->applyUpsellFilter($query, $value);
+                }),
             ])
             ->whereDate('delivery_date', $deliveryDate);
     }
@@ -647,6 +653,41 @@ class ForDeliveryController extends Controller
         $filename = 'rmo-management-'.$deliveryDate.'-'.now()->format('His').'.xlsx';
 
         return Excel::download(new RmoManagementExport($query, $columns), $filename);
+    }
+
+    /**
+     * Narrow the list by whether the order carries an upsell.
+     *
+     * An upsell is a positive `upsell_price` — the same test the table uses to
+     * draw the "Upsell ₱x" badge, so the filter and the badge can't disagree.
+     * Accepts `with` / `without`; anything else leaves the query untouched.
+     *
+     * The value is `mixed` on purpose: Spatie coerces a bare "true"/"false"
+     * filter value into a boolean before it reaches us.
+     *
+     * @param  string|array<int, string>|bool|null  $value
+     */
+    private function applyUpsellFilter(Builder $query, mixed $value): void
+    {
+        $value = is_array($value) ? ($value[0] ?? null) : $value;
+
+        if (is_bool($value)) {
+            $value = $value ? 'with' : 'without';
+        }
+
+        $value = strtolower(trim((string) $value));
+
+        if (in_array($value, ['with', '1', 'true', 'yes'], true)) {
+            $query->where('upsell_price', '>', 0);
+
+            return;
+        }
+
+        if (in_array($value, ['without', '0', 'false', 'no'], true)) {
+            $query->where(function ($q) {
+                $q->whereNull('upsell_price')->orWhere('upsell_price', '<=', 0);
+            });
+        }
     }
 
     /**

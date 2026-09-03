@@ -36,16 +36,8 @@ class InventoryItemResolver
     {
         InventoryItem::query()
             ->where('workspace_id', $this->workspaceId)
-            ->get(['id', 'workspace_id', 'sku', 'transaction_keywords'])
-            ->each(function (InventoryItem $item) {
-                // The SKU wins: a keyword is a fallback spelling, and one item's
-                // keyword must never shadow another item's actual name.
-                $this->remember($item->sku, $item, overwrite: true);
-
-                foreach ($this->keywords($item) as $keyword) {
-                    $this->remember($keyword, $item);
-                }
-            });
+            ->get(['id', 'workspace_id', 'sku'])
+            ->each(fn (InventoryItem $item) => $this->remember($item->sku, $item, overwrite: true));
     }
 
     /** The item this ERP name refers to, or null if we don't know it. */
@@ -109,19 +101,6 @@ class InventoryItemResolver
         }
 
         $this->byName[$key] = $item;
-    }
-
-    /**
-     * An item's transaction keywords, stored comma- or newline-separated.
-     *
-     * @return array<int, string>
-     */
-    private function keywords(InventoryItem $item): array
-    {
-        return collect(preg_split('/[,\n]+/', (string) $item->transaction_keywords))
-            ->map(fn (string $keyword) => trim($keyword))
-            ->filter()
-            ->all();
     }
 
     /** The name as we'd store it: trimmed, with runs of whitespace collapsed. */

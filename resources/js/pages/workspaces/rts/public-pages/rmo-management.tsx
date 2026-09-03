@@ -101,6 +101,8 @@ interface Props {
             shop_id?: string | string[];
             user_id?: string | string[];
             parcel_status?: string | string[];
+            /** 'with' | 'without' — orders that carry an upsell, or don't. */
+            upsell?: string | string[];
         };
         page?: number;
         perPage?: number;
@@ -485,6 +487,14 @@ function RmoManagement({
         [query?.filter?.parcel_status],
     );
 
+    const currentUpsell = useMemo(
+        () =>
+            Array.isArray(query?.filter?.upsell)
+                ? (query.filter.upsell[0] ?? '')
+                : (query?.filter?.upsell ?? ''),
+        [query?.filter?.upsell],
+    );
+
     // CSRs by name, for the assignee picker — the list comes off the shops in
     // this workspace, in whatever order the query returned it.
     const assigneeOptions = useMemo(
@@ -591,6 +601,7 @@ function RmoManagement({
                 userIds?: string[];
                 assigneeId?: string;
             },
+            upsell?: string,
         ) => {
             const pageIds = ids?.pageIds ?? selectedPageIds;
             const shopIds = ids?.shopIds ?? selectedShopIds;
@@ -615,6 +626,13 @@ function RmoManagement({
                         : {}
                     : currentParcelStatus
                       ? { 'filter[parcel_status]': currentParcelStatus }
+                      : {}),
+                ...(upsell !== undefined
+                    ? upsell
+                        ? { 'filter[upsell]': upsell }
+                        : {}
+                    : currentUpsell
+                      ? { 'filter[upsell]': currentUpsell }
                       : {}),
                 ...(pageIds.length
                     ? { 'filter[page_id]': pageIds.join(',') }
@@ -641,6 +659,7 @@ function RmoManagement({
             searchValue,
             currentStatus,
             currentParcelStatus,
+            currentUpsell,
             selectedPageIds,
             selectedShopIds,
             selectedUserIds,
@@ -728,6 +747,25 @@ function RmoManagement({
         [workspace, buildAllParams, query?.sort],
     );
 
+    const handleUpsellChange = useCallback(
+        (upsell: string) => {
+            router.get(
+                publicPage.rmoManagement({ workspace }),
+                buildAllParams(
+                    query?.sort,
+                    1,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    upsell,
+                ),
+                { preserveState: true, replace: true, preserveScroll: true },
+            );
+        },
+        [workspace, buildAllParams, query?.sort],
+    );
+
     useEffect(() => {
         const name = localStorage.getItem('user_name');
         if (name) setUserName(name);
@@ -808,6 +846,7 @@ function RmoManagement({
         if (currentStatus) params.set('filter[status]', currentStatus);
         if (currentParcelStatus)
             params.set('filter[parcel_status]', currentParcelStatus);
+        if (currentUpsell) params.set('filter[upsell]', currentUpsell);
         if (selectedPageIds.length)
             params.set('filter[page_id]', selectedPageIds.join(','));
         if (selectedShopIds.length)
@@ -829,6 +868,7 @@ function RmoManagement({
         searchValue,
         currentStatus,
         currentParcelStatus,
+        currentUpsell,
         selectedPageIds,
         selectedShopIds,
         selectedUserIds,
@@ -873,6 +913,9 @@ function RmoManagement({
                     ...(currentParcelStatus
                         ? { 'filter[parcel_status]': currentParcelStatus }
                         : {}),
+                    ...(currentUpsell
+                        ? { 'filter[upsell]': currentUpsell }
+                        : {}),
                     ...(selectedPageIds.length
                         ? { 'filter[page_id]': selectedPageIds.join(',') }
                         : {}),
@@ -902,6 +945,7 @@ function RmoManagement({
             searchValue,
             currentStatus,
             currentParcelStatus,
+            currentUpsell,
             selectedPageIds,
             selectedShopIds,
             selectedUserIds,
@@ -912,6 +956,38 @@ function RmoManagement({
             orders.per_page,
         ],
     );
+
+    // The date picker builds its flatpickr instance once and only rebuilds it
+    // when the date itself changes, keeping whatever onChange it was handed at
+    // that moment. Passing the handler inline meant the calendar held a copy
+    // frozen at the last date change: picking a new date navigated with the
+    // filters as they stood back then, so the upsell select — and status,
+    // parcel status and search with it — was dropped from the URL and reset.
+    //
+    // Hand it one callback that never changes identity and reads the live
+    // handler and date out of a ref, so the frozen copy is still current.
+    const dateChangeRef = useRef({
+        handleDateChange,
+        deliveryDate,
+        todayLocal,
+    });
+    useEffect(() => {
+        dateChangeRef.current = { handleDateChange, deliveryDate, todayLocal };
+    });
+
+    const handleDatePicked = useCallback((_dates: Date[], dateStr: string) => {
+        const {
+            handleDateChange: onDate,
+            deliveryDate: current,
+            todayLocal: today,
+        } = dateChangeRef.current;
+
+        if (!dateStr) {
+            if (current !== today) onDate(today);
+            return;
+        }
+        if (dateStr !== current) onDate(dateStr);
+    }, []);
 
     const handleAssignUser = useCallback(
         (id: number, userId: string) => {
@@ -1798,15 +1874,7 @@ function RmoManagement({
                             mode="single"
                             defaultDate={deliveryDate}
                             placeholder="Select date"
-                            onChange={(_, dateStr) => {
-                                if (!dateStr) {
-                                    if (deliveryDate !== todayLocal)
-                                        handleDateChange(todayLocal);
-                                    return;
-                                }
-                                if (dateStr !== deliveryDate)
-                                    handleDateChange(dateStr);
-                            }}
+                            onChange={handleDatePicked}
                         />
                     </div>
                 </div>
@@ -1890,6 +1958,17 @@ function RmoManagement({
                                     </option>
                                 ),
                             )}
+                        </select>
+
+                        <select
+                            value={currentUpsell}
+                            onChange={(e) => handleUpsellChange(e.target.value)}
+                            title="Show only orders with an upsell, or leave them out"
+                            className="h-8 rounded-lg border border-black/6 bg-stone-100 px-2 text-[12px]! text-gray-700 outline-none focus:border-emerald-500 dark:bg-zinc-800 dark:text-gray-300"
+                        >
+                            <option value="">All Orders</option>
+                            <option value="with">With Upsell</option>
+                            <option value="without">Without Upsell</option>
                         </select>
 
                         <select

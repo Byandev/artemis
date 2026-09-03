@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, Link, router } from '@inertiajs/react';
-import { Download, FileText, Trash2 } from 'lucide-react';
+import { Download, FileText, Lock, Trash2 } from 'lucide-react';
 import moment from 'moment';
 import { useState } from 'react';
 
@@ -15,6 +15,8 @@ interface StatementRow {
     gross_profit_delivered_cogs: number;
     status: string;
     generated_at: string | null;
+    /** Set once the month is closed — a locked statement can't be deleted. */
+    locked_at: string | null;
 }
 
 interface Props {
@@ -112,14 +114,24 @@ export default function IncomeStatementsIndex({
                                     className="border-t hover:bg-muted/30"
                                 >
                                     <td className="px-4 py-3">
-                                        <Link
-                                            href={`${base}/${s.id}`}
-                                            className="font-medium text-primary hover:underline"
-                                        >
-                                            {moment(s.period_month).format(
-                                                'MMMM YYYY',
+                                        <div className="flex items-center gap-1.5">
+                                            <Link
+                                                href={`${base}/${s.id}`}
+                                                className="font-medium text-primary hover:underline"
+                                            >
+                                                {moment(s.period_month).format(
+                                                    'MMMM YYYY',
+                                                )}
+                                            </Link>
+                                            {s.locked_at && (
+                                                <span
+                                                    title={`Locked ${moment(s.locked_at).format('MMM D, YYYY h:mm A')}`}
+                                                    aria-label="Locked"
+                                                >
+                                                    <Lock className="h-3.5 w-3.5 text-amber-600" />
+                                                </span>
                                             )}
-                                        </Link>
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3 text-right tabular-nums">
                                         {fmt(s.total_delivered)}
@@ -171,10 +183,18 @@ export default function IncomeStatementsIndex({
                                                     <Download className="h-4 w-4" />
                                                 </a>
                                             </Button>
+                                            {/* A locked month is held as it
+                                                stands; deleting it loses more
+                                                than regenerating would. */}
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
-                                                title="Delete"
+                                                disabled={Boolean(s.locked_at)}
+                                                title={
+                                                    s.locked_at
+                                                        ? 'Locked — unlock it on the statement to delete'
+                                                        : 'Delete'
+                                                }
                                                 onClick={() => remove(s.id)}
                                             >
                                                 <Trash2 className="h-4 w-4 text-red-600" />
