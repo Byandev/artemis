@@ -3,6 +3,7 @@ import KpiCard, {
     formatKpi,
 } from '@/components/sales-marketing/dashboard/kpi-card';
 import LeaderCard from '@/components/sales-marketing/dashboard/leader-card';
+import ProductComparison from '@/components/sales-marketing/dashboard/product-comparison';
 import TeamBreakdown from '@/components/sales-marketing/dashboard/team-breakdown';
 import TeamComparison from '@/components/sales-marketing/dashboard/team-comparison';
 import DatePicker from '@/components/ui/date-picker';
@@ -214,6 +215,14 @@ export default function SalesMarketingDashboard({ workspace }: Props) {
                 <TeamComparison slug={workspace.slug} dateRange={dateRange} />
 
                 <TeamBreakdown slug={workspace.slug} dateRange={dateRange} />
+
+                {/* The same window cut by product rather than by who ran
+                    the ads — its own endpoint, so it loads independently of
+                    the team panels above it. */}
+                <ProductComparison
+                    slug={workspace.slug}
+                    dateRange={dateRange}
+                />
             </div>
         </AppLayout>
     );
