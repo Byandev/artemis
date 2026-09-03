@@ -10,10 +10,12 @@ export interface TrackerItem {
     tags: string[];
 }
 
-/** Someone whose row appears on the board. */
+/** Someone the board tracks — a member whose role grants "Tracked on Daily Tracker". */
 export interface TrackerMember {
     id: number;
     name: string;
+    /** True when this row belongs to the viewer, who may then tick it. */
+    is_self: boolean;
 }
 
 /**
@@ -42,7 +44,6 @@ export interface TrackerCategory {
 }
 
 export interface TrackerViewer {
-    id: number;
-    /** Whether this viewer may tick somebody else's row. */
+    /** Whether this viewer may tick a row that is not their own. */
     can_manage: boolean;
 }

@@ -18,14 +18,18 @@ use Inertia\Response;
 
 /**
  * Daily Tracker: the team's deliverables checklist for a day, one column of
- * boxes per member.
+ * boxes per tracked member.
  *
  * The board itself is assembled by DailyTrackerBoardQuery; this controller
- * resolves the day being viewed, decides who may tick what, and writes ticks.
+ * resolves the day and the view being looked at, decides who may tick what, and
+ * writes ticks.
  */
 class DailyTrackerController extends Controller
 {
     use AuthorizesRequests;
+
+    /** The views the page can open on; the first is the default. */
+    private const VIEWS = ['checklist', 'matrix'];
 
     public function index(Request $request, Workspace $workspace): Response
     {
@@ -42,6 +46,9 @@ class DailyTrackerController extends Controller
         return Inertia::render('workspaces/sales-marketing/daily-tracker/index', [
             'workspace' => $workspace,
             'date' => $date->toDateString(),
+            // Which of the two views to open on. It lives in the URL so a reload
+            // (and a shared link) comes back to the one you were reading.
+            'view' => $this->resolveView($request),
             'members' => $board['members'],
             'items' => $board['items'],
             // Cast so the map is always a JSON object. Member ids never start
@@ -49,7 +56,6 @@ class DailyTrackerController extends Controller
             // these keys as member ids, and a list would silently mean indices.
             'completions' => (object) $board['completions'],
             'viewer' => [
-                'id' => $user->id,
                 // Everyone ticks their own row; this is the reach to tick
                 // somebody else's, and it drives whether the box is clickable.
                 'can_manage' => $user->hasPermission(Permission::ManageDailyTracker, $workspace),
@@ -62,7 +68,7 @@ class DailyTrackerController extends Controller
      *
      * Idempotent in both directions: ticking twice leaves one row, unticking
      * something that was never ticked is a no-op. The unique index on
-     * (item, user, period) is what makes a double-click safe.
+     * (item, member, period) is what makes a double-click safe.
      */
     public function toggle(ToggleDailyTrackerCompletionRequest $request, Workspace $workspace): JsonResponse
     {
@@ -72,6 +78,14 @@ class DailyTrackerController extends Controller
 
         $user = $request->user();
         $targetId = $request->integer('user_id');
+
+        // Only a row the board actually draws can be ticked, read from the same
+        // definition the roster is built from.
+        abort_unless(
+            $workspace->dailyTrackerMembers()->whereKey($targetId)->exists(),
+            404,
+            'That member is not tracked on this board.',
+        );
 
         // Your own row is yours to tick. Anyone else's needs the manage grant.
         abort_unless(
@@ -112,6 +126,17 @@ class DailyTrackerController extends Controller
             'user_id' => $targetId,
             'completed' => $completed,
         ]);
+    }
+
+    /**
+     * Which view to open on. Anything unrecognised falls back to the checklist,
+     * for the same reason the date does.
+     */
+    private function resolveView(Request $request): string
+    {
+        return in_array($request->query('view'), self::VIEWS, true)
+            ? $request->query('view')
+            : self::VIEWS[0];
     }
 
     /**

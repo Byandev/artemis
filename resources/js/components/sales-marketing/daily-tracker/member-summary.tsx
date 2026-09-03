@@ -3,8 +3,8 @@ import MemberAvatar from './member-avatar';
 import type { MemberProgress } from './types';
 
 /**
- * The header above the checklist: who it belongs to, how much is left, and a
- * bar that turns green only when nothing is.
+ * The header above the checklist: whose it is, how much is left, and a bar that
+ * turns green only when nothing is.
  */
 export default function MemberSummary({
     progress,

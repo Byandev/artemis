@@ -145,6 +145,7 @@ class Workspace extends Model
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewPageRoasTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewDailyTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ManageDailyTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::TrackedOnDailyTracker->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesTargets->value,
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewAdSpentSummary->value,
             $this->sales_marketing_dashboard_module_enabled && $this->ad_spend_goals_module_enabled
@@ -455,6 +456,24 @@ class Workspace extends Model
     public function dailyTrackerItems(): HasMany
     {
         return $this->hasMany(DailyTrackerItem::class, 'workspace_id');
+    }
+
+    /**
+     * The members the Daily Tracker asks for deliverables: those whose role
+     * holds "Tracked on Daily Tracker".
+     *
+     * The one definition of who is on that board. Both the board's roster and
+     * the endpoint that ticks a box read it, so a row can never be written for
+     * someone the board does not draw.
+     */
+    public function dailyTrackerMembers(): BelongsToMany
+    {
+        $trackedRoleIds = Role::query()
+            ->where('workspace_id', $this->id)
+            ->whereHas('permissions', fn ($query) => $query->where('name', PermissionEnum::TrackedOnDailyTracker->value))
+            ->pluck('id');
+
+        return $this->users()->whereIn('workspace_user.role_id', $trackedRoleIds);
     }
 
     public function metricSetting()

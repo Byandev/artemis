@@ -35,6 +35,9 @@ class ToggleDailyTrackerCompletionRequest extends FormRequest
                     ->where('workspace_id', $workspace->id)
                     ->where('active', true),
             ],
+            // Membership only — that this member actually has a row on the
+            // board is the controller's check, against the same definition the
+            // roster is drawn from.
             'user_id' => [
                 'required',
                 'integer',

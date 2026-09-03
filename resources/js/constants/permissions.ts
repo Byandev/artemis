@@ -162,6 +162,7 @@ export const PERMISSIONS = {
     ViewPageRoasTracker: 'View Page ROAS Tracker',
     ViewDailyTracker: 'View Daily Tracker',
     ManageDailyTracker: 'Manage Daily Tracker',
+    TrackedOnDailyTracker: 'Tracked on Daily Tracker',
     ViewSalesTargets: 'View Sales Targets',
     ViewVideoEditorDashboard: 'View Video Editor Dashboard',
     ViewCsrDashboard: 'View CSR Dashboard',

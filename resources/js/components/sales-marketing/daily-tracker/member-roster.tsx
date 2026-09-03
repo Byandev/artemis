@@ -4,8 +4,8 @@ import ProgressRing from './progress-ring';
 import type { MemberProgress, TrackerMember } from './types';
 
 /**
- * The team down the left: who is on the board, how far each has got, and which
- * one the checklist beside it is showing.
+ * The members down the left: who is on the board, how far each has got, and
+ * which one the checklist beside it is showing.
  */
 export default function MemberRoster({
     members,
@@ -25,7 +25,7 @@ export default function MemberRoster({
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-3 dark:border-white/6 dark:bg-zinc-900">
             <p className="px-2 py-1 font-mono! text-[10px]! font-medium tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
-                Team · {complete}/{members.length} complete
+                Interns · {complete}/{members.length} complete
             </p>
 
             <ul className="mt-1 flex flex-col gap-0.5">

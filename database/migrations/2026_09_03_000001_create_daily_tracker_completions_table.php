@@ -12,7 +12,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('workspace_id')->constrained()->cascadeOnDelete();
             $table->foreignId('daily_tracker_item_id')->constrained()->cascadeOnDelete();
-            // Whose row was ticked — not necessarily who ticked it.
+            // Whose row was ticked — not necessarily who ticked it. Rows survive
+            // a role change: taking someone off the board hides their column
+            // from that day on, it does not erase the days they worked.
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             // The first day of the period the tick satisfies (the day itself for
             // a daily item, the Monday of the week for a weekly one), so the

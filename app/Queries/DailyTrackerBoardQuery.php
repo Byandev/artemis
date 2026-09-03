@@ -6,7 +6,6 @@ use App\Models\DailyTrackerCompletion;
 use App\Models\DailyTrackerItem;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -19,9 +18,12 @@ use Illuminate\Support\Collection;
  * tallies and the team matrix from that one map, so a member's progress has a
  * single definition rather than one per view.
  *
- * The roster is the workspace's members narrowed by team visibility, the same
- * rule the rest of Sales & Marketing uses: a scoped user sees their team(s), and
- * the "viewing as team" switcher narrows everyone to one team.
+ * **Who is on the board** is a grant, not a guess: the workspace members whose
+ * role holds "Tracked on Daily Tracker", and nobody else. Reading the board and
+ * appearing on it are separate — a lead with the view grant watches without
+ * being asked for deliverables, and the owner is on the board only if a role
+ * puts them there. Taking the grant away removes the column from the next day
+ * on and leaves the days already worked intact.
  *
  * Completions are keyed by the period a tick satisfies, not by the day it was
  * made (see App\Enums\DailyTrackerCadence) — so one equality lookup covers both
@@ -37,7 +39,7 @@ class DailyTrackerBoardQuery
 
     /**
      * @return array{
-     *     members: array<int, array{id: int, name: string}>,
+     *     members: array<int, array{id: int, name: string, is_self: bool}>,
      *     items: array<int, array{id: int, category: string, label: string, cadence: string, tags: array<int, string>}>,
      *     completions: array<int, array<int, int>>
      * }
@@ -48,9 +50,12 @@ class DailyTrackerBoardQuery
         $items = $this->items();
 
         return [
-            'members' => $members->map(fn (User $user) => [
-                'id' => $user->id,
-                'name' => $user->name,
+            'members' => $members->map(fn (User $member) => [
+                'id' => $member->id,
+                'name' => $member->name,
+                // Drives whether the viewer may tick this row without the
+                // manage grant.
+                'is_self' => $member->id === $this->viewer->id,
             ])->all(),
             'items' => $items->map(fn (DailyTrackerItem $item) => [
                 'id' => $item->id,
@@ -64,24 +69,17 @@ class DailyTrackerBoardQuery
     }
 
     /**
-     * The members whose rows this viewer may see, ordered the way the roster
-     * lists them.
+     * The members the board tracks, ordered the way the roster lists them.
      *
      * @return Collection<int, User>
      */
     private function members(): Collection
     {
-        return $this->workspace->users()
-            ->when(
-                TeamVisibility::shouldScope($this->viewer, $this->workspace),
-                fn ($query) => $query->whereIn('users.id', function ($sub) {
-                    $sub->select('user_id')
-                        ->from('team_user')
-                        ->whereIn('team_id', TeamVisibility::scopeTeamIds($this->viewer, $this->workspace) ?? []);
-                }),
-            )
+        return $this->workspace->dailyTrackerMembers()
             ->orderBy('users.name')
             ->get(['users.id', 'users.name'])
+            // A member can hold more than one workspace row; the board draws
+            // them once.
             ->unique('id')
             ->values();
     }

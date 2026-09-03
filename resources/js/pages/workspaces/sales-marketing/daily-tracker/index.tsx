@@ -23,6 +23,8 @@ interface Props {
     workspace: Workspace;
     /** The day on screen, `YYYY-MM-DD`. */
     date: string;
+    /** The view the URL asked for, already validated by the controller. */
+    view: TrackerView;
     members: TrackerMember[];
     items: TrackerItem[];
     completions: CompletionPayload;
@@ -47,7 +49,7 @@ const longDate = (value: string) =>
         year: 'numeric',
     });
 
-/** A card for the two cases where there is nothing to draw. */
+/** A card for the cases where there is nothing to draw. */
 function EmptyBoard({ message }: { message: string }) {
     return (
         <div className="rounded-[14px] border border-black/6 bg-white p-10 text-center dark:border-white/6 dark:bg-zinc-900">
@@ -61,23 +63,28 @@ function EmptyBoard({ message }: { message: string }) {
 export default function DailyTrackerIndex({
     workspace,
     date,
+    view: initialView,
     members,
     items,
     completions,
     viewer,
 }: Props) {
-    const [view, setView] = useState<TrackerView>('checklist');
+    const [view, setView] = useState<TrackerView>(initialView);
 
-    // Open on yourself when you are on the board — the common case is ticking
-    // your own row — and fall back to whoever is first.
+    // Follow the server on a real visit (a date change, back/forward).
+    useEffect(() => setView(initialView), [initialView]);
+
+    // Open on your own row when you have one — the common case is ticking your
+    // own deliverables — and fall back to whoever is first.
     const [selectedId, setSelectedId] = useState<number | null>(
         () =>
-            members.find((member) => member.id === viewer.id)?.id ??
+            members.find((member) => member.is_self)?.id ??
             members[0]?.id ??
             null,
     );
 
-    // The roster changes when the team filter does; keep the selection valid.
+    // The roster changes as members are activated or retired; keep the
+    // selection valid.
     useEffect(() => {
         setSelectedId((current) =>
             members.some((member) => member.id === current)
@@ -100,14 +107,32 @@ export default function DailyTrackerIndex({
         [board.progress, selectedId],
     );
 
-    // The day lives in the URL so a board can be linked to and a refresh keeps
-    // it. `preserveState` holds the selected member and view across the visit.
+    /** The page's URL for a given day and view — what the address bar should read. */
+    const urlFor = (day: string, tab: TrackerView) =>
+        DailyTrackerController.index.url(workspace.slug, {
+            query: { date: day, view: tab },
+        });
+
+    // Switching tab is pure presentation — no data changes — so the URL is
+    // rewritten in place rather than re-fetched. A reload then lands on the
+    // same tab, and so does anyone the link is sent to.
+    const applyView = (next: TrackerView) => {
+        setView(next);
+        window.history.replaceState(
+            window.history.state,
+            '',
+            urlFor(date, next),
+        );
+    };
+
+    // The day needs the server, and carries the current tab with it so the
+    // address bar does not lose it on the way.
     const applyDate = (value: string) => {
         if (!value || value === date) return;
 
         router.get(
-            DailyTrackerController.index.url(workspace.slug),
-            { date: value },
+            urlFor(value, view),
+            {},
             { preserveState: true, preserveScroll: true, replace: true },
         );
     };
@@ -119,10 +144,10 @@ export default function DailyTrackerIndex({
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
                 <PageHeader
                     title="Daily Tracker"
-                    description={`Deliverables checklist per member · ${longDate(date)}`}
+                    description={`Deliverables checklist per intern · ${longDate(date)}`}
                     stackActionsOnMobile
                 >
-                    <ViewSwitch value={view} onChange={setView} />
+                    <ViewSwitch value={view} onChange={applyView} />
                     <DatePicker
                         id="daily-tracker-date"
                         key={date}
@@ -136,7 +161,7 @@ export default function DailyTrackerIndex({
                 </PageHeader>
 
                 {members.length === 0 ? (
-                    <EmptyBoard message="No one on this board yet." />
+                    <EmptyBoard message="No one is tracked on this board yet. A role granted “Tracked on Daily Tracker” puts its people on it." />
                 ) : items.length === 0 ? (
                     <EmptyBoard message="No deliverables have been set up for this workspace yet." />
                 ) : view === 'matrix' ? (

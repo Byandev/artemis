@@ -181,6 +181,10 @@ enum Permission: string
     // Ticking your own row needs nothing beyond the view grant — this is the
     // extra reach to tick (or untick) somebody else's.
     case ManageDailyTracker = 'Manage Daily Tracker';
+    // Not a reach but a membership: a role holding this puts its people ON the
+    // Daily Tracker, one row each. Everyone else can read the board without
+    // appearing on it.
+    case TrackedOnDailyTracker = 'Tracked on Daily Tracker';
     case ViewSalesTargets = 'View Sales Targets';
 
     // Settings
@@ -349,6 +353,7 @@ enum Permission: string
             self::ViewPageRoasTracker,
             self::ViewDailyTracker,
             self::ManageDailyTracker,
+            self::TrackedOnDailyTracker,
             self::ViewSalesTargets => 'Sales & Marketing',
 
             self::EditWorkspaceSettings,

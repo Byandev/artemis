@@ -132,10 +132,21 @@ export function useTrackerBoard({
         [pending],
     );
 
+    /** The rows that belong to the viewer, and so are theirs to tick. */
+    const ownRows = useMemo(
+        () =>
+            new Set(
+                members
+                    .filter((member) => member.is_self)
+                    .map((member) => member.id),
+            ),
+        [members],
+    );
+
     /** Everyone ticks their own row; ticking another's needs the manage grant. */
     const canTick = useCallback(
-        (memberId: number) => viewer.can_manage || memberId === viewer.id,
-        [viewer],
+        (memberId: number) => viewer.can_manage || ownRows.has(memberId),
+        [viewer, ownRows],
     );
 
     const progress = useMemo(() => {

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A ticked box: one member's deliverable, done for one period.
+ * A ticked box: one tracked member's deliverable, done for one period.
  *
  * Rows only exist for completed deliverables — unticking deletes the row rather
  * than storing a false, so the board reads "done" as presence.
@@ -51,7 +51,7 @@ class DailyTrackerCompletion extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** Who ticked it — a manager ticking for someone else is not the user. */
+    /** Who ticked it — a lead ticking for someone else is not that someone. */
     public function checkedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'checked_by');

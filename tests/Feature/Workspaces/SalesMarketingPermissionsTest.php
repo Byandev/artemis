@@ -129,6 +129,7 @@ test('the module switch hides every grant in the group from the role editor', fu
         PermissionEnum::ViewPageRoasTracker->value,
         PermissionEnum::ViewDailyTracker->value,
         PermissionEnum::ManageDailyTracker->value,
+        PermissionEnum::TrackedOnDailyTracker->value,
         PermissionEnum::ViewSalesTargets->value,
         PermissionEnum::ViewAdSpentSummary->value,
         PermissionEnum::ViewAdSpendGoals->value,
