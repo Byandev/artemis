@@ -2,7 +2,6 @@
 
 namespace Modules\GencysERP\Models;
 
-use App\Models\Concerns\ScopesToVisibleTeams;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -28,8 +27,6 @@ use Modules\Inventory\Models\InventoryItem;
  */
 class GencysSyncRun extends Model
 {
-    use ScopesToVisibleTeams;
-
     /** In a batch, waiting its turn. Not yet sent to n8n. */
     public const STATUS_QUEUED = 'queued';
 
@@ -67,12 +64,6 @@ class GencysSyncRun extends Model
         'rows_saved' => 'integer',
         'attempt' => 'integer',
     ];
-
-    /** Team visibility flows through the run's inventory item. */
-    protected function visibilityTeamRelation(): string
-    {
-        return 'inventoryItem.product.shops.teams';
-    }
 
     public function workspace(): BelongsTo
     {
@@ -179,6 +170,24 @@ class GencysSyncRun extends Model
         return self::query()
             ->where('workspace_id', $workspaceId)
             ->whereKey($syncRunId)
+            ->first();
+    }
+
+    /**
+     * The run a callback belongs to when n8n didn't echo an id back.
+     *
+     * Only safe for the sync types a batch sends one subject at a time — the
+     * transaction-history report covers a whole date, so a workspace never has
+     * two of them in flight, and the oldest one still waiting is the one this
+     * callback answers. Types that go out in groups must echo the id instead.
+     */
+    public static function oldestInFlight(int $workspaceId, string $syncType): ?self
+    {
+        return self::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('sync_type', $syncType)
+            ->pending()
+            ->orderBy('id')
             ->first();
     }
 

@@ -199,7 +199,7 @@ class InventoryDashboardStatsController extends Controller
             // this in March" is the point, and an order that has since arrived
             // does not stop being when we last ordered.
             ->leftJoinSub($this->lastOrderedQuery(), 'last_po', 'last_po.inventory_item_id', '=', 'inventory_item_snapshots.inventory_item_id')
-            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.three_days_average')
+            ->selectRaw('inventory_item_snapshots.inventory_item_id as id, inventory_item_snapshots.parent_id, inventory_item_snapshots.is_parent, inventory_item_snapshots.sku, inventory_item_snapshots.lead_time, inventory_item_snapshots.days_of_coverage, inventory_item_snapshots.units_3d')
             ->selectRaw('last_po.last_issued_at')
             ->selectRaw('inventory_item_snapshots.current_stocks, inventory_item_snapshots.remaining_after_fulfillment')
             ->selectRaw("{$identity['group_sku']} as group_sku")
@@ -209,7 +209,10 @@ class InventoryDashboardStatsController extends Controller
         // else the max across the group — same rule the items list applies.
         $groupLeadTime = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.lead_time END), MAX(sub.lead_time))';
         $groupDaysOfCoverage = 'COALESCE(MAX(CASE WHEN sub.is_parent = 1 THEN sub.days_of_coverage END), MAX(sub.days_of_coverage))';
-        $summedThreeDayAvg = 'SUM(sub.three_days_average)';
+        // Units a day: the frozen three-day demand over its window. Summed
+        // because units_3d is recorded per item, so a group's rate is its
+        // members' — see ItemReportFacts::ITEM_COLUMNS.
+        $summedThreeDayAvg = '(SUM(sub.units_3d) / 3)';
         $summedRemaining = 'COALESCE(SUM(sub.remaining_after_fulfillment), 0)';
         $groupPoNeeded = "GREATEST(0, ($groupDaysOfCoverage * $summedThreeDayAvg) + ($groupLeadTime * $summedThreeDayAvg) - $summedRemaining)";
 

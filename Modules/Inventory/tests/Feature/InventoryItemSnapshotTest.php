@@ -2,6 +2,7 @@
 
 use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Facades\Excel;
 use Modules\Inventory\Exports\InventoryItemReportExport;
@@ -25,6 +26,44 @@ function ledger(InventoryItem $item, int $remaining, string $date = '2026-06-01'
 }
 
 /** Rows the items list renders, for a given query string. */
+/**
+ * Give the item a Gencys feed selling $perDay of it a day.
+ *
+ * The snapshot's demand comes from the order feed now rather than from a value
+ * typed onto the item, so a test that wants a rate has to supply orders. One
+ * unit code carrying $perDay of the item, ordered once on each of the window's
+ * three days.
+ */
+function demandFeed(InventoryItem $item, int $perDay): void
+{
+    static $nextOrder = 90000;
+
+    DB::table('inventory_unit_codes')->insertOrIgnore([
+        'workspace_id' => $item->workspace_id,
+        'unit_code' => 'UC-'.$item->id, 'sku' => 'UC-'.$item->id,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('inventory_unit_code_items')->insert([
+        'workspace_id' => $item->workspace_id,
+        'unit_code' => 'UC-'.$item->id, 'item_code' => $item->sku, 'quantity' => $perDay,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    foreach ([0, 1, 2] as $daysBack) {
+        $id = $nextOrder++;
+
+        DB::table('gencys_orders')->insert([
+            'id' => $id, 'workspace_id' => $item->workspace_id, 'order_no' => 'GO-'.$id,
+            'order_date' => now()->subDays($daysBack)->toDateString(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('gencys_order_items')->insert([
+            'order_id' => $id, 'sku' => 'UC-'.$item->id, 'quantity' => 1,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+    }
+}
+
 function listRows($owner, $workspace, string $qs = ''): array
 {
     $rows = [];
@@ -89,9 +128,12 @@ test('a snapshot row reproduces the same PO QTY and PO Needed the live list show
         'is_active' => true,
         'lead_time' => 5,
         'days_of_coverage' => 7,
+        // The live list reads this; the snapshot reads the feed below. The two
+        // agree only when both are told the same demand, which is the point.
         'three_days_average' => 4,
     ]);
     ledger($item, 10);
+    demandFeed($item, 4);
 
     $this->artisan('inventory:snapshot-items', ['--date' => '2026-08-01', '--force' => true]);
 
@@ -360,9 +402,10 @@ test('editing lead time rewrites today\'s snapshot so the list shows it at once'
     ]);
     $child = InventoryItem::create([
         'workspace_id' => $workspace->id, 'sku' => 'CHILD', 'parent_id' => $parent->id,
-        'is_active' => true, 'lead_time' => 2, 'three_days_average' => 3,
+        'is_active' => true, 'lead_time' => 2,
     ]);
     ledger($child, 50);
+    demandFeed($child, 3);
 
     $this->artisan('inventory:snapshot-items')->assertSuccessful();
 

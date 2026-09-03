@@ -10,8 +10,8 @@ import { Switch } from '@/components/ui/switch';
 import { Product } from '@/types/models/Product';
 import { Workspace } from '@/types/models/Workspace';
 import { useForm } from '@inertiajs/react';
-import { Plus, X } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
+import React, { useEffect } from 'react';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -19,8 +19,6 @@ interface InventoryItem {
     sku: string;
     is_active: boolean;
     product_id: number | null;
-    sales_keywords: string;
-    transaction_keywords: string;
     lead_time: number;
     unfulfilled_count: number;
     three_days_average: number;
@@ -50,8 +48,6 @@ export function ItemFormDialog({
 }: ItemFormDialogProps) {
     const isEditing = !!item;
 
-    const [showAdditional, setShowAdditional] = useState(false);
-
     const { data, setData, post, put, processing, errors, reset, clearErrors } =
         useForm({
             id: '',
@@ -61,8 +57,6 @@ export function ItemFormDialog({
             lead_time: '',
             unfulfilled_count: '',
             three_days_average: '',
-            sales_keywords: [] as string[],
-            transaction_keywords: '',
         });
 
     useEffect(() => {
@@ -78,11 +72,6 @@ export function ItemFormDialog({
                         item.unfulfilled_count?.toString() ?? '0',
                     three_days_average:
                         item.three_days_average?.toString() ?? '0',
-                    sales_keywords: (item.sales_keywords ?? '')
-                        .split(',')
-                        .map((keyword) => keyword.trim())
-                        .filter(Boolean),
-                    transaction_keywords: item.transaction_keywords ?? '',
                 });
             } else {
                 reset();
@@ -279,63 +268,6 @@ export function ItemFormDialog({
                                 </p>
                             )}
                         </div>
-
-                        {/* 3. Additional Settings Accordion */}
-                        <div className="mt-2 space-y-3">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setShowAdditional(!showAdditional)
-                                }
-                                className="flex w-full items-center justify-between rounded-[10px] border border-black/8 bg-stone-50/50 px-4 py-2.5 font-mono! text-[13px]! font-medium text-gray-600 transition-all hover:bg-stone-100 dark:border-white/8 dark:bg-zinc-800/50 dark:text-gray-300"
-                            >
-                                <span>Additional Settings</span>
-                                <span
-                                    className={`transition-transform duration-200 ${showAdditional ? 'rotate-180' : ''}`}
-                                >
-                                    ▼
-                                </span>
-                            </button>
-
-                            {showAdditional && (
-                                <div className="animate-in fade-in slide-in-from-top-1 mt-2 space-y-4 rounded-xl border border-dashed border-black/10 bg-black/[0.01] p-4 dark:border-white/10 dark:bg-white/[0.01]">
-                                    {/* Sales Keywords */}
-                                    <KeywordsInput
-                                        label="Sales Keywords"
-                                        placeholder="Enter a sales keyword..."
-                                        addLabel="Add more sales keyword"
-                                        values={data.sales_keywords}
-                                        onChange={(next) =>
-                                            setData('sales_keywords', next)
-                                        }
-                                        error={errors.sales_keywords}
-                                    />
-
-                                    {/* Transaction Keyword */}
-                                    <div className="space-y-1.5">
-                                        <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                            Transaction Keyword
-                                        </label>
-                                        <textarea
-                                            placeholder="Enter transaction keyword..."
-                                            value={data.transaction_keywords}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'transaction_keywords',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="min-h-[80px] w-full resize-none rounded-[10px] border border-black/8 bg-white p-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-100"
-                                        />
-                                        {errors.transaction_keywords && (
-                                            <p className="mt-1 font-mono text-[11px] text-red-500">
-                                                {errors.transaction_keywords}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                     </div>
 
                     {/* Footer Actions */}
@@ -364,86 +296,5 @@ export function ItemFormDialog({
                 </form>
             </DialogContent>
         </Dialog>
-    );
-}
-
-interface KeywordsInputProps {
-    label: string;
-    values: string[];
-    onChange: (next: string[]) => void;
-    placeholder?: string;
-    addLabel: string;
-    error?: string;
-}
-
-function KeywordsInput({
-    label,
-    values,
-    onChange,
-    placeholder,
-    addLabel,
-    error,
-}: KeywordsInputProps) {
-    // Always render at least one row so there is somewhere to type.
-    const rows = values.length > 0 ? values : [''];
-
-    const updateRow = (index: number, value: string) => {
-        const next = [...rows];
-        next[index] = value;
-        onChange(next);
-    };
-
-    const addRow = () => {
-        onChange([...rows, '']);
-    };
-
-    const removeRow = (index: number) => {
-        onChange(rows.filter((_, i) => i !== index));
-    };
-
-    return (
-        <div className="space-y-1.5">
-            <label className="block font-mono text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                {label}
-            </label>
-
-            <div className="space-y-2">
-                {rows.map((value, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            value={value}
-                            onChange={(e) => updateRow(index, e.target.value)}
-                            placeholder={placeholder}
-                            className="h-10 w-full rounded-[10px] border border-black/8 bg-white px-3 font-mono! text-[13px]! text-gray-800 transition-all outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-900 dark:text-gray-100"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => removeRow(index)}
-                            disabled={rows.length === 1}
-                            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-black/8 bg-white text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/8 dark:bg-zinc-900 dark:hover:bg-red-500/10"
-                        >
-                            <X className="h-4 w-4" />
-                            <span className="sr-only">Remove keyword</span>
-                        </button>
-                    </div>
-                ))}
-            </div>
-
-            <button
-                type="button"
-                onClick={addRow}
-                className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1 font-mono! text-[12px]! font-medium text-emerald-600 transition-colors hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
-            >
-                <Plus className="h-3.5 w-3.5" />
-                {addLabel}
-            </button>
-
-            {error && (
-                <p className="mt-1 font-mono text-[11px] text-red-500">
-                    {error}
-                </p>
-            )}
-        </div>
     );
 }
