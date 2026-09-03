@@ -35,6 +35,7 @@ import flatpickr from 'flatpickr';
 import { omit } from 'lodash';
 import type { LucideIcon } from 'lucide-react';
 import {
+    CalendarClock,
     ChartColumn,
     Check,
     ChevronDown,
@@ -60,6 +61,7 @@ import {
     SetStateAction,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from 'react';
 import { InlineOwner, OwnerOption } from '../components/inline-owner';
@@ -93,14 +95,45 @@ const GROUP_BY_OPTIONS: {
     value: GroupBy;
     label: string;
     icon: LucideIcon;
+    hint: string;
 }[] = [
-    { value: 'ad_name', label: 'Ad Name', icon: Type },
-    { value: 'ad', label: 'Ad Id', icon: ImageIcon },
-    { value: 'campaign', label: 'Campaign', icon: Megaphone },
-    { value: 'ad_set', label: 'Ad Set', icon: Layers },
-    { value: 'account', label: 'Ad Account', icon: Wallet },
-    { value: 'page', label: 'Page', icon: Flag },
-    { value: 'page_owner', label: 'Page Owner', icon: UserRound },
+    {
+        value: 'ad_name',
+        label: 'Ad Name',
+        icon: Type,
+        hint: 'Ads sharing a name, collapsed',
+    },
+    { value: 'ad', label: 'Ad Id', icon: ImageIcon, hint: 'One row per ad' },
+    {
+        value: 'campaign',
+        label: 'Campaign',
+        icon: Megaphone,
+        hint: 'Rolled up per campaign',
+    },
+    {
+        value: 'ad_set',
+        label: 'Ad Set',
+        icon: Layers,
+        hint: 'Rolled up per ad set',
+    },
+    {
+        value: 'account',
+        label: 'Ad Account',
+        icon: Wallet,
+        hint: 'Rolled up per ad account',
+    },
+    {
+        value: 'page',
+        label: 'Page',
+        icon: Flag,
+        hint: 'The page the ad set promotes',
+    },
+    {
+        value: 'page_owner',
+        label: 'Page Owner',
+        icon: UserRound,
+        hint: 'Who owns that page',
+    },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -166,6 +199,7 @@ interface Props {
         until?: string;
         filter?: { search?: string };
         metricFilters?: unknown[];
+        startTime?: StartTimeFilter | null;
     };
 }
 
@@ -1177,6 +1211,218 @@ function AccountMultiPicker({
 
 /* ───────────────────── Group-by selector ────────────────────── */
 
+type StartTimeOp = 'on' | 'before' | 'after' | 'between';
+
+interface StartTimeFilter {
+    op: StartTimeOp;
+    value: string; // YYYY-MM-DD
+    value2?: string; // upper bound, 'between' only
+}
+
+const START_OP_LABELS: Record<StartTimeOp, string> = {
+    on: 'is on',
+    before: 'is before',
+    after: 'is after',
+    between: 'is between',
+};
+
+/**
+ * Breakdowns whose rows carry a start time. Ads have none of their own, so an
+ * ad-grained filter resolves through the owning ad set (the server does that);
+ * ad accounts have no such date at all, so the filter can't apply there.
+ */
+const START_TIME_UNSUPPORTED: GroupBy[] = ['account'];
+
+/** Compact "Jan 3" / "Jan 3 – Jan 9" summary for the trigger button. */
+function startTimeSummary(f: StartTimeFilter): string {
+    const short = (d: string) => formatDate(new Date(d), 'MMM d');
+
+    return f.op === 'between'
+        ? `${short(f.value)} – ${short(f.value2 ?? f.value)}`
+        : `${START_OP_LABELS[f.op].replace('is ', '')} ${short(f.value)}`;
+}
+
+/**
+ * Filters rows by when their ads started running — distinct from the page's
+ * date range, which picks which insight days to sum.
+ */
+function StartTimeSelect({
+    value,
+    supported,
+    onChange,
+}: {
+    value: StartTimeFilter | null;
+    supported: boolean;
+    onChange: (next: StartTimeFilter | null) => void;
+}) {
+    const [open, setOpen] = useState(false);
+
+    // DatePicker only rebuilds flatpickr when `defaultDate` changes, so its
+    // onChange can hold a closure captured before an operator switch. Merging
+    // against a ref of the current filter keeps that switch from being reverted.
+    const current = useRef(value);
+    current.current = value;
+
+    const patch = (next: Partial<StartTimeFilter>) => {
+        const base = current.current ?? {
+            op: 'after' as StartTimeOp,
+            value: moment().format('YYYY-MM-DD'),
+        };
+        onChange({ ...base, ...next });
+    };
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!supported}
+                    title={
+                        supported
+                            ? undefined
+                            : 'Ad accounts have no start time to filter on'
+                    }
+                    className={clsx(
+                        'h-9 gap-1.5 font-mono! text-[12px]!',
+                        !supported && 'cursor-not-allowed opacity-50',
+                    )}
+                >
+                    <CalendarClock className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                    <span className="text-gray-400 dark:text-gray-500">
+                        Start time
+                    </span>
+                    {value && (
+                        <span className="font-medium">
+                            {startTimeSummary(value)}
+                        </span>
+                    )}
+                    <ChevronDown className="h-3 w-3 text-gray-400" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                align="start"
+                className="w-80 overflow-hidden p-0 font-mono text-[12px]"
+            >
+                <div className="border-b border-black/6 px-3.5 py-2.5 dark:border-white/6">
+                    <p className="text-[12px] font-medium text-gray-700 dark:text-gray-200">
+                        Start time
+                    </p>
+                    <p className="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+                        When the ads began running — not the reporting range
+                        above.
+                    </p>
+                </div>
+
+                <div className="space-y-3 p-3">
+                    <div>
+                        <p className="pb-1.5 text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
+                            Condition
+                        </p>
+                        <Select
+                            value={value?.op ?? 'after'}
+                            onValueChange={(op) =>
+                                patch({
+                                    op: op as StartTimeOp,
+                                    // Seed the upper bound so "between" is
+                                    // valid the moment it's picked.
+                                    value2:
+                                        op === 'between'
+                                            ? (current.current?.value2 ??
+                                              current.current?.value ??
+                                              moment().format('YYYY-MM-DD'))
+                                            : undefined,
+                                })
+                            }
+                        >
+                            <SelectTrigger className="h-9 w-full font-mono text-[12px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {(
+                                    Object.keys(
+                                        START_OP_LABELS,
+                                    ) as StartTimeOp[]
+                                ).map((op) => (
+                                    <SelectItem
+                                        key={op}
+                                        value={op}
+                                        className="text-[12px]"
+                                    >
+                                        {START_OP_LABELS[op]}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <p className="pb-1.5 text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
+                            {value?.op === 'between' ? 'From' : 'Date'}
+                        </p>
+                        <DatePicker
+                            id="meta-ads-start-time-from"
+                            fullWidth
+                            clearable={false}
+                            placeholder="Pick a date"
+                            defaultDate={value?.value}
+                            onChange={(dates) => {
+                                if (dates.length > 0) {
+                                    patch({
+                                        value: moment(dates[0]).format(
+                                            'YYYY-MM-DD',
+                                        ),
+                                    });
+                                }
+                            }}
+                        />
+                    </div>
+
+                    {value?.op === 'between' && (
+                        <div>
+                            <p className="pb-1.5 text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
+                                To
+                            </p>
+                            <DatePicker
+                                id="meta-ads-start-time-to"
+                                fullWidth
+                                clearable={false}
+                                placeholder="Pick an end date"
+                                defaultDate={value.value2 ?? value.value}
+                                onChange={(dates) => {
+                                    if (dates.length > 0) {
+                                        patch({
+                                            value2: moment(dates[0]).format(
+                                                'YYYY-MM-DD',
+                                            ),
+                                        });
+                                    }
+                                }}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                {value && (
+                    <div className="border-t border-black/6 p-2 dark:border-white/6">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onChange(null);
+                                setOpen(false);
+                            }}
+                            className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg text-[12px] text-gray-500 transition-colors hover:bg-stone-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-zinc-700 dark:hover:text-gray-200"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                            Clear filter
+                        </button>
+                    </div>
+                )}
+            </PopoverContent>
+        </Popover>
+    );
+}
+
 function GroupBySelect({
     value,
     onChange,
@@ -1206,25 +1452,62 @@ function GroupBySelect({
             </PopoverTrigger>
             <PopoverContent
                 align="start"
-                className="w-44 p-1 font-mono text-[11px]"
+                className="w-80 overflow-hidden p-0 font-mono text-[12px]"
             >
-                {GROUP_BY_OPTIONS.map((o) => (
-                    <button
-                        key={o.value}
-                        type="button"
-                        onClick={() => {
-                            onChange(o.value);
-                            setOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
-                    >
-                        <o.icon className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
-                        <span className="flex-1">{o.label}</span>
-                        {o.value === value && (
-                            <Check className="h-3 w-3 shrink-0 text-emerald-500" />
-                        )}
-                    </button>
-                ))}
+                <p className="border-b border-black/6 px-3.5 py-2.5 text-[12px] font-medium text-gray-700 dark:border-white/6 dark:text-gray-200">
+                    Group rows by
+                </p>
+                <div className="p-2">
+                    {GROUP_BY_OPTIONS.map((o) => {
+                        const active = o.value === value;
+
+                        return (
+                            <button
+                                key={o.value}
+                                type="button"
+                                role="menuitemradio"
+                                aria-checked={active}
+                                onClick={() => {
+                                    onChange(o.value);
+                                    setOpen(false);
+                                }}
+                                className={clsx(
+                                    'flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
+                                    active
+                                        ? 'bg-emerald-50 dark:bg-emerald-500/10'
+                                        : 'hover:bg-stone-100 dark:hover:bg-zinc-700',
+                                )}
+                            >
+                                <o.icon
+                                    className={clsx(
+                                        'mt-0.5 h-4 w-4 shrink-0',
+                                        active
+                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                            : 'text-gray-400 dark:text-gray-500',
+                                    )}
+                                />
+                                <span className="min-w-0 flex-1">
+                                    <span
+                                        className={clsx(
+                                            'block truncate font-medium',
+                                            active
+                                                ? 'text-emerald-700 dark:text-emerald-300'
+                                                : 'text-gray-700 dark:text-gray-300',
+                                        )}
+                                    >
+                                        {o.label}
+                                    </span>
+                                    <span className="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-500">
+                                        {o.hint}
+                                    </span>
+                                </span>
+                                {active && (
+                                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
             </PopoverContent>
         </Popover>
     );
@@ -1261,6 +1544,9 @@ export default function MetaAdsManager({
     const [loading, setLoading] = useState(true);
     const [previewAd, setPreviewAd] = useState<Row | null>(null);
     const [groupTarget, setGroupTarget] = useState<GroupTarget | null>(null);
+    const [startTime, setStartTime] = useState<StartTimeFilter | null>(
+        query?.startTime ?? null,
+    );
     const [timelineTarget, setTimelineTarget] = useState<TimelineTarget | null>(
         null,
     );
@@ -1274,6 +1560,11 @@ export default function MetaAdsManager({
 
     // The creator column, filter, and selection are only meaningful per-ad.
     const showCreator = groupBy === 'ad';
+    const startTimeSupported = !START_TIME_UNSUPPORTED.includes(groupBy);
+    const serializedDateFilters =
+        startTime && startTimeSupported
+            ? JSON.stringify([{ field: 'started_date', ...startTime }])
+            : null;
 
     const groupLabel =
         GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Ad Name';
@@ -1299,6 +1590,11 @@ export default function MetaAdsManager({
         if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
         const mf = serializeMetricFilters(metricFilters);
         if (mf) qs.set('metric_filters', mf);
+        // Row-level start time. The server drops it for breakdowns with no such
+        // date, but there's no point sending it when the UI already knows.
+        if (serializedDateFilters) {
+            qs.set('date_filters', serializedDateFilters);
+        }
         // Creator filter is ad-level only.
         if (groupBy === 'ad' && creatorFilter) {
             qs.set('creator_id', creatorFilter);
@@ -1339,6 +1635,7 @@ export default function MetaAdsManager({
         metricFilters,
         creatorFilter,
         debouncedSearch,
+        serializedDateFilters,
         accounts.length,
         workspace.slug,
     ]);
@@ -1353,6 +1650,11 @@ export default function MetaAdsManager({
         clear();
         // The creator filter only applies to the ad grouping.
         if (next !== 'ad') setCreatorFilter('');
+    };
+    const onStartTime = (next: StartTimeFilter | null) => {
+        setStartTime(next);
+        setPage(1);
+        clear();
     };
     const onCreatorFilter = (value: string) => {
         setCreatorFilter(value === 'all' ? '' : value);
@@ -1426,6 +1728,11 @@ export default function MetaAdsManager({
                         onChange={onAccounts}
                     />
                     <GroupBySelect value={groupBy} onChange={onGroupBy} />
+                    <StartTimeSelect
+                        value={startTime}
+                        supported={startTimeSupported}
+                        onChange={onStartTime}
+                    />
                     <div className="relative min-w-[180px] flex-1">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
@@ -1529,6 +1836,7 @@ export default function MetaAdsManager({
                 selectedAccounts={selected}
                 accountsTotal={accounts.length}
                 groupLabel={groupLabel}
+                dateFilters={serializedDateFilters}
                 onClose={() => setTimelineTarget(null)}
             />
 

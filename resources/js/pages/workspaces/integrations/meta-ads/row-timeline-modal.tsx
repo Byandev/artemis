@@ -710,6 +710,7 @@ export function RowTimelineModal({
     selectedAccounts,
     accountsTotal,
     groupLabel,
+    dateFilters,
     onClose,
 }: {
     slug: string;
@@ -718,6 +719,9 @@ export function RowTimelineModal({
     selectedAccounts: string[];
     accountsTotal: number;
     groupLabel: string;
+    /** The grid's row-level date filters, already serialised, so the chart
+     *  covers the same ads the row's totals came from. */
+    dateFilters?: string | null;
     onClose: () => void;
 }) {
     const [points, setPoints] = useState<TimeseriesPoint[] | null>(null);
@@ -743,6 +747,7 @@ export function RowTimelineModal({
         if (selectedAccounts.length !== accountsTotal) {
             selectedAccounts.forEach((a) => qs.append('accounts[]', a));
         }
+        if (dateFilters) qs.set('date_filters', dateFilters);
 
         fetch(
             `/workspaces/${slug}/integrations/meta/ads-manager/timeseries?${qs.toString()}`,
@@ -766,6 +771,7 @@ export function RowTimelineModal({
         dateRange.until,
         selectedAccounts,
         accountsTotal,
+        dateFilters,
         slug,
     ]);
 
