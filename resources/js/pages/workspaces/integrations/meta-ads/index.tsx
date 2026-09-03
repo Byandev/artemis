@@ -1243,6 +1243,24 @@ function startTimeSummary(f: StartTimeFilter): string {
 }
 
 /**
+ * flatpickr appends its calendar to <body> unless it finds a dialog to live in
+ * — a Popover is `popover-content`, not `dialog-content`, so it never does here.
+ * That puts the calendar outside the popover's DOM, and Radix dismisses on any
+ * interaction outside it, so picking a date would shut the whole thing.
+ *
+ * The calendar stays in <body> on purpose (the popover is `overflow-hidden` and
+ * would clip it); this just tells Radix that clicks in there are not "outside".
+ */
+function isInsideCalendar(
+    event: Event & { detail?: { originalEvent?: Event } },
+) {
+    const node = (event.detail?.originalEvent?.target ??
+        event.target) as HTMLElement | null;
+
+    return !!node?.closest?.('.flatpickr-calendar');
+}
+
+/**
  * Filters rows by when their ads started running — distinct from the page's
  * date range, which picks which insight days to sum.
  */
@@ -1302,6 +1320,11 @@ function StartTimeSelect({
             </PopoverTrigger>
             <PopoverContent
                 align="start"
+                onInteractOutside={(e) => {
+                    if (isInsideCalendar(e as unknown as Event)) {
+                        e.preventDefault();
+                    }
+                }}
                 className="w-80 overflow-hidden p-0 font-mono text-[12px]"
             >
                 <div className="border-b border-black/6 px-3.5 py-2.5 dark:border-white/6">
