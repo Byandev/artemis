@@ -20,6 +20,7 @@ import {
 import { Fragment } from 'react';
 
 import Pagination from '@/components/ui/pagination';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
     Select,
     SelectContent,
@@ -70,6 +71,12 @@ interface DataTableProps<TData, TValue> {
     /** When provided, rows become expandable and this renders the expanded panel. */
     renderSubRow?: (row: Row<TData>) => React.ReactNode
     /**
+     * Swaps the rows for placeholder bars while a fetch is in flight. The
+     * header and the pager stay put, so sorting or turning a page doesn't
+     * collapse the table — and stale rows can't be read as the new ones.
+     */
+    loading?: boolean
+    /**
      * Pin the header row while the rows scroll under it. Opt-in because it
      * bounds the table's height: the body gets its own scrollport instead of
      * growing the page, which only pays off on wide/long lists.
@@ -93,6 +100,7 @@ export function DataTable<TData, TValue>({
                                              onColumnOrderChange,
                                              renderSubRow,
                                              stickyHeader = false,
+                                             loading = false,
                                          }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = useState<SortingState>(initialSorting ?? [])
     const [expanded, setExpanded] = useState<ExpandedState>({})
@@ -195,7 +203,19 @@ export function DataTable<TData, TValue>({
                         ))}
                     </TableHeader>
                     <TableBody>
-                        {table.getRowModel().rows?.length ? (
+                        {loading ? (
+                            // Hold the height the table had: the rows on screen
+                            // if there are any, otherwise a page's worth.
+                            Array.from({ length: Math.min(data.length || meta?.per_page || 5, 10) }).map((_, i) => (
+                                <TableRow key={`skeleton-${i}`} className="hover:bg-transparent">
+                                    {table.getVisibleFlatColumns().map((column) => (
+                                        <TableCell key={column.id} className={cn('px-4 py-3 border-b border-black/6 dark:border-white/6', column.columnDef.meta?.cellClassName)}>
+                                            <Skeleton className="h-3.5 w-full max-w-[140px]" />
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
                                 <Fragment key={row.id}>
                                     <TableRow

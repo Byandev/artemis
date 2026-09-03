@@ -1,4 +1,4 @@
-import { formatPeso } from '@/pages/workspaces/sales-targets/shared';
+import { formatPeso } from '@/pages/workspaces/sales-marketing/sales-targets/shared';
 import { ArrowUp, Flame } from 'lucide-react';
 
 export interface TeamPerformance {

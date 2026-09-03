@@ -18,7 +18,6 @@ use App\Http\Controllers\Workspaces\DepartmentController;
 use App\Http\Controllers\Workspaces\OnboardingController;
 use App\Http\Controllers\Workspaces\PageController;
 use App\Http\Controllers\Workspaces\PageDailyBudgetRecordController;
-use App\Http\Controllers\Workspaces\PageRoasTrackerController;
 use App\Http\Controllers\Workspaces\Product\AnalyticsController;
 use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
@@ -27,12 +26,14 @@ use App\Http\Controllers\Workspaces\RTS\AnalyticController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
-use App\Http\Controllers\Workspaces\SalesMarketingDashboardController;
-use App\Http\Controllers\Workspaces\SalesTargetController;
+use App\Http\Controllers\Workspaces\SalesMarketing\DailyReportController;
+use App\Http\Controllers\Workspaces\SalesMarketing\DashboardController as SalesMarketingDashboardController;
+use App\Http\Controllers\Workspaces\SalesMarketing\PageRoasTrackerController;
+use App\Http\Controllers\Workspaces\SalesMarketing\SalesTargetController;
+use App\Http\Controllers\Workspaces\SalesMarketing\TeamAdSpendGoalController;
 use App\Http\Controllers\Workspaces\ShopController;
 use App\Http\Controllers\Workspaces\SupportTicketController;
 use App\Http\Controllers\Workspaces\TeamAdAccountController;
-use App\Http\Controllers\Workspaces\TeamAdSpendGoalController;
 use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
 use App\Http\Controllers\Workspaces\TeamShopController;
@@ -128,6 +129,7 @@ Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/remove-assig
 Route::post('/public/workspaces/{workspace}/rts/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('public-page.rmo-management.updatePhones');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('public-page.rmo-management.callLogs');
 Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('public-page.rmo-management.callLogs.export');
+Route::get('/public/workspaces/{workspace}/rts/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('public-page.rmo-management.callLogs.breakdown');
 
 Route::middleware(['auth'])->group(function () {
     // Workspace setup (first-time after registration)
@@ -159,21 +161,42 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/activity-logs', [ActivityLogController::class, 'index'])->name('workspace.activity-logs.index');
 
     // Role-specific dashboards (scaffold — gated by granular permissions)
-    // The S&M dashboard is tabbed; each tab is its own URL segment. The JSON
-    // `data` route is registered before the `{tab?}` route so it isn't captured
-    // as a tab. Daily Report is the default (bare dashboard path).
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/data', [SalesMarketingDashboardController::class, 'data'])->name('workspaces.sales-marketing.dashboard.data');
-    // Page ROAS Tracker and Ad Spend Goals are dashboard tabs — their own URLs,
-    // registered before the {tab?} catch-all so they aren't swallowed by it.
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('workspaces.sales-marketing.dashboard.page-roas-tracker');
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spend-goals');
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('workspaces.sales-marketing.dashboard.ad-spent-summary');
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets', [SalesTargetController::class, 'index'])->name('workspaces.sales-marketing.dashboard.sales-targets');
-    Route::post('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets', [SalesTargetController::class, 'store'])->name('workspaces.sales-marketing.dashboard.sales-targets.store');
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'show'])->name('workspaces.sales-marketing.dashboard.sales-targets.show');
-    Route::put('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'update'])->name('workspaces.sales-marketing.dashboard.sales-targets.update');
-    Route::delete('/workspaces/{workspace}/sales-marketing/dashboard/sales-targets/{salesTarget}', [SalesTargetController::class, 'destroy'])->name('workspaces.sales-marketing.dashboard.sales-targets.destroy');
-    Route::get('/workspaces/{workspace}/sales-marketing/dashboard/{tab?}', [SalesMarketingDashboardController::class, 'index'])->name('workspaces.sales-marketing.dashboard');
+    //
+    // Sales & Marketing is a group of sibling pages, each with its own URL and its own
+    // entry in the sidebar's "Sales & Marketing" group. It used to be a single
+    // tabbed dashboard at .../dashboard/{tab}; the redirects at the end of this
+    // group keep those URLs — and the three legacy entry points further down
+    // this file — landing in the right place.
+    Route::prefix('/workspaces/{workspace}/sales-marketing')->name('workspaces.sales-marketing.')->group(function () {
+        Route::get('/dashboard', [SalesMarketingDashboardController::class, 'index'])->name('dashboard');
+
+        Route::get('/daily-report', [DailyReportController::class, 'index'])->name('daily-report');
+        // JSON the Daily Report page fetches when the date changes.
+        Route::get('/daily-report/data', [DailyReportController::class, 'data'])->name('daily-report.data');
+
+        Route::get('/page-roas-tracker', [PageRoasTrackerController::class, 'index'])->name('page-roas-tracker');
+        Route::get('/ad-spend-goals', [TeamAdSpendGoalController::class, 'index'])->name('ad-spend-goals');
+        Route::get('/ad-spent-summary', [AdSpentSummaryController::class, 'index'])->name('ad-spent-summary');
+
+        Route::get('/sales-targets', [SalesTargetController::class, 'index'])->name('sales-targets');
+        Route::post('/sales-targets', [SalesTargetController::class, 'store'])->name('sales-targets.store');
+        Route::get('/sales-targets/{salesTarget}', [SalesTargetController::class, 'show'])->name('sales-targets.show');
+        Route::put('/sales-targets/{salesTarget}', [SalesTargetController::class, 'update'])->name('sales-targets.update');
+        Route::delete('/sales-targets/{salesTarget}', [SalesTargetController::class, 'destroy'])->name('sales-targets.destroy');
+
+        // The tabbed dashboard's old tab URLs. `{tab}` is last or it swallows
+        // the more specific redirect above it. `/dashboard` itself is no longer
+        // a redirect — it is the group's own page, declared at the top.
+        Route::permanentRedirect('/dashboard/data', '/workspaces/{workspace}/sales-marketing/daily-report/data');
+        Route::get('/dashboard/{tab}', function (Workspace $workspace, string $tab) {
+            $moved = ['page-roas-tracker', 'ad-spend-goals', 'ad-spent-summary', 'sales-targets'];
+
+            return redirect()->route(
+                'workspaces.sales-marketing.'.(in_array($tab, $moved, true) ? $tab : 'daily-report'),
+                $workspace,
+            );
+        })->name('dashboard.legacy-tab');
+    });
     Route::get('/workspaces/{workspace}/video-editor/dashboard', VideoEditorDashboardController::class)->name('workspaces.video-editor.dashboard');
 
     // Workspace CRUD routes
@@ -247,7 +270,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Moved to the S&M dashboard's "Page ROAS Tracker" tab — keep the old URL
     // working by redirecting to the new tab route.
-    Route::get('/workspaces/{workspace}/page-roas-tracker', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.dashboard.page-roas-tracker', $workspace))->name('workspaces.page-roas-tracker.index');
+    Route::get('/workspaces/{workspace}/page-roas-tracker', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.page-roas-tracker', $workspace))->name('workspaces.page-roas-tracker.index');
 
     // Product routes
     // Redirect to analytics by default for navigation item active state
@@ -297,6 +320,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/data', [AdsManagerController::class, 'data'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.data');
+    Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/timeseries', [AdsManagerController::class, 'timeseries'])
+        ->middleware('can:View Meta Ads,workspace')
+        ->name('workspaces.metaads.ads-manager.timeseries');
     Route::get('/workspaces/{workspace}/integrations/meta/ads-manager/ads/{ad}/preview', [AdsManagerController::class, 'adPreview'])
         ->middleware('can:View Meta Ads,workspace')
         ->name('workspaces.metaads.ads-manager.preview');
@@ -320,7 +346,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('workspaces.metaads.budget-tracker');
     // Moved to the S&M dashboard's "Ad Spent Summary" tab — keep the old Meta
     // Ads URL working by redirecting to the new tab route.
-    Route::get('/workspaces/{workspace}/integrations/meta/ad-spent-summary', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.dashboard.ad-spent-summary', $workspace))
+    Route::get('/workspaces/{workspace}/integrations/meta/ad-spent-summary', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.ad-spent-summary', $workspace))
         ->name('workspaces.metaads.ad-spent-summary');
 
     // Meta Ads optimization rules
@@ -437,6 +463,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/workspaces/{workspace}/csr/rmo-management/{id}/update-phones', [ForDeliveryController::class, 'publicUpdatePhones'])->name('workspaces.csr.rmo-management.updatePhones');
     Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('workspaces.csr.rmo-management.callLogs');
     Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('workspaces.csr.rmo-management.callLogs.export');
+    Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('workspaces.csr.rmo-management.callLogs.breakdown');
 
     // Checklist routes
     Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');
@@ -460,7 +487,7 @@ Route::middleware(['auth'])->group(function () {
     // Team ad-spend goal routes (daily target per team)
     // Moved to the S&M dashboard's "Ad Spend Goals" tab — keep the old list URL
     // working by redirecting to the new tab route.
-    Route::get('/workspaces/{workspace}/ad-spend-goals', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.dashboard.ad-spend-goals', $workspace))->name('workspaces.ad-spend-goals.index');
+    Route::get('/workspaces/{workspace}/ad-spend-goals', fn (Workspace $workspace) => redirect()->route('workspaces.sales-marketing.ad-spend-goals', $workspace))->name('workspaces.ad-spend-goals.index');
     Route::get('/workspaces/{workspace}/ad-spend-goals/{goal}', [TeamAdSpendGoalController::class, 'show'])->name('workspaces.ad-spend-goals.show');
     Route::post('/workspaces/{workspace}/ad-spend-goals', [TeamAdSpendGoalController::class, 'store'])->name('workspaces.ad-spend-goals.store');
     Route::put('/workspaces/{workspace}/ad-spend-goals/{goal}', [TeamAdSpendGoalController::class, 'update'])->name('workspaces.ad-spend-goals.update');
@@ -616,6 +643,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'show'])->name('income-statements.show');
         Route::get('/income-statements/{incomeStatement}/export', [FinanceIncomeStatementController::class, 'export'])->name('income-statements.export');
         Route::post('/income-statements/{incomeStatement}/regenerate', [FinanceIncomeStatementController::class, 'regenerate'])->name('income-statements.regenerate');
+        Route::post('/income-statements/{incomeStatement}/lock', [FinanceIncomeStatementController::class, 'lock'])->name('income-statements.lock');
+        Route::delete('/income-statements/{incomeStatement}/lock', [FinanceIncomeStatementController::class, 'unlock'])->name('income-statements.unlock');
         Route::delete('/income-statements/{incomeStatement}', [FinanceIncomeStatementController::class, 'destroy'])->name('income-statements.destroy');
 
         Route::get('/income-statements/{incomeStatement}/products', [FinanceUserIncomeStatementController::class, 'productIndex'])->name('income-statements.products.index');

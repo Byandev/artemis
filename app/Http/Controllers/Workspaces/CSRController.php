@@ -84,10 +84,16 @@ class CSRController extends Controller
         ]);
     }
 
-    public function analytics(Request $request, Workspace $workspace)
+    /**
+     * The range and report type the analytics page is showing.
+     *
+     * Shared by the page and the stats endpoint so the cards and the table can
+     * never be reading different days.
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private function analyticsPeriod(Request $request): array
     {
-        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
-
         $from = $request->input('from')
             ? CarbonImmutable::parse($request->input('from'))->toDateString()
             : CarbonImmutable::now()->subDays(6)->toDateString();
@@ -96,7 +102,31 @@ class CSRController extends Controller
             ? CarbonImmutable::parse($request->input('to'))->toDateString()
             : CarbonImmutable::now()->toDateString();
 
-        $type = strtolower((string) $request->input('type', 'pos'));
+        $type = strtolower((string) $request->input('type', 'pos')) === 'erp' ? 'erp' : 'pos';
+
+        return [$from, $to, $type];
+    }
+
+    /**
+     * Which CSR comparison tab the page opens on.
+     *
+     * Kept in the URL rather than the browser so a reload, a shared link and
+     * the back button all land on the metric that was being read. Anything
+     * that isn't one of the endpoint's four keys falls back to sales.
+     */
+    private function comparisonTab(Request $request): string
+    {
+        $tab = (string) $request->input('comparison', 'sales');
+
+        return in_array($tab, ['sales', 'rts', 'rmo_called', 'call_time'], true) ? $tab : 'sales';
+    }
+
+    public function analytics(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to, $type] = $this->analyticsPeriod($request);
+
         $isErp = $type === 'erp';
         $drClass = $isErp ? PancakeUserErpDailyReport::class : PancakeUserPosDailyReport::class;
 
@@ -200,6 +230,7 @@ class CSRController extends Controller
                 'page' => $request->integer('page', 1),
                 'per_page' => $request->integer('per_page', 10),
                 'search' => data_get($request->input('filter', []), 'search'),
+                'comparison' => $this->comparisonTab($request),
             ],
         ]);
     }

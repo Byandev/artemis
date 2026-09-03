@@ -128,6 +128,13 @@ class UserIncomeStatementController extends Controller
         $this->authorize(Permission::ViewFinanceDashboard->value, $workspace);
         $this->ensureOwns($workspace, $incomeStatement);
 
+        // Saving a carryover re-snapshots every slice, so it would rewrite a
+        // closed month's figures just as a regenerate would.
+        if ($incomeStatement->isLocked()) {
+            return redirect()->back()
+                ->with('error', 'This income statement is locked and cannot be changed. Unlock it first.');
+        }
+
         $validated = $request->validate([
             // Null is the bucket for orders credited to nobody.
             'user_id' => ['nullable', 'integer', Rule::exists('users', 'id')],
@@ -160,7 +167,7 @@ class UserIncomeStatementController extends Controller
         return redirect()->back()->with('success', 'Loss carried forward saved.');
     }
 
-    /** @return array{id:int, period_month:string, month:string, label:string} */
+    /** @return array{id:int, period_month:string, month:string, label:string, locked:bool} */
     private function statementContext(IncomeStatement $incomeStatement): array
     {
         return [
@@ -168,6 +175,9 @@ class UserIncomeStatementController extends Controller
             'period_month' => $incomeStatement->period_month->toDateString(),
             'month' => $incomeStatement->period_month->format('Y-m'),
             'label' => $incomeStatement->period_month->format('F Y'),
+            // A closed month is read-only here too: the carryover boxes write
+            // figures the lock is holding still.
+            'locked' => $incomeStatement->isLocked(),
         ];
     }
 

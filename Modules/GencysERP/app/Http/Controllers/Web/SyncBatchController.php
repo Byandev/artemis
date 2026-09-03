@@ -56,7 +56,10 @@ class SyncBatchController extends Controller
             'workspace' => $workspace,
             'batches' => $batches,
             'syncTypes' => collect($this->flows->all())
-                ->map(fn ($flow, $type) => ['value' => $type, 'label' => $flow->label()])
+                ->map(fn ($flow, $type) => [
+                    'value' => $type,
+                    'label' => $flow->label(),
+                ])
                 ->values()
                 ->all(),
             'queuedCount' => GencysSyncBatch::query()->queued()->count(),

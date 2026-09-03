@@ -136,8 +136,18 @@ class Workspace extends Model
      */
     public function hiddenPermissionNames(): array
     {
-        return array_values(array_filter([
+        return array_values(array_unique(array_filter([
+            // Sales & Marketing is a group of pages behind one module switch,
+            // so the switch hides every grant in the group. Ad Spend Goals has a second switch
+            // of its own and can be hidden while the rest of the group is on.
             $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDashboard->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesMarketingDailyReport->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewPageRoasTracker->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewSalesTargets->value,
+            $this->sales_marketing_dashboard_module_enabled ? null : PermissionEnum::ViewAdSpentSummary->value,
+            $this->sales_marketing_dashboard_module_enabled && $this->ad_spend_goals_module_enabled
+                ? null
+                : PermissionEnum::ViewAdSpendGoals->value,
             $this->video_editor_dashboard_module_enabled ? null : PermissionEnum::ViewVideoEditorDashboard->value,
             $this->csr_dashboard_module_enabled ? null : PermissionEnum::ViewCsrDashboard->value,
             // RMO lives in the RTS category and the leaderboard in CSR, so each
@@ -145,7 +155,10 @@ class Workspace extends Model
             $this->rmo_module_enabled ? null : PermissionEnum::ViewRmoManagement->value,
             $this->rmo_module_enabled ? null : PermissionEnum::ManageRmoSettings->value,
             $this->leaderboard_module_enabled ? null : PermissionEnum::ViewLeaderboards->value,
-        ]));
+            // Gencys partners read page ROAS in Gencys itself, so the tracker is
+            // hidden for them even with the rest of the S&M group switched on.
+            $this->is_gencys_partner ? PermissionEnum::ViewPageRoasTracker->value : null,
+        ])));
     }
 
     /**

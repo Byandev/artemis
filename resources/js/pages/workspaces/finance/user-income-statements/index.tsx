@@ -27,6 +27,8 @@ interface StatementContext {
     period_month: string; // YYYY-MM-DD
     month: string; // YYYY-MM
     label: string; // "July 2026"
+    /** A closed month — its figures are held, so nothing here is editable. */
+    locked: boolean;
 }
 
 /** One transaction type's share of a column's OPEX; these sum to that OPEX. */
@@ -611,7 +613,8 @@ export default function UserIncomeStatements({
                                                                 : 'bg-white group-hover:bg-stone-50 dark:bg-zinc-900 dark:group-hover:bg-zinc-800'
                                                         } ${cellTone(row, u, u.user_id === null)}`}
                                                     >
-                                                        {row.editable ? (
+                                                        {row.editable &&
+                                                        !incomeStatement.locked ? (
                                                             <input
                                                                 // Uncontrolled, so it remounts to pick up a
                                                                 // value the server worked out; keying on the

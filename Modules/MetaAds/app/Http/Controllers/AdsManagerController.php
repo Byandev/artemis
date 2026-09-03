@@ -3,6 +3,7 @@
 namespace Modules\MetaAds\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Page;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Http\JsonResponse;
@@ -101,23 +102,7 @@ class AdsManagerController extends Controller
 
         if ($scopeBy !== '') {
             $groupBy = 'ad';
-            $scope = match ($scopeBy) {
-                'campaign' => fn ($q) => $q->where('meta_ads_ads.meta_ads_campaign_id', $scopeValue),
-                'ad_set' => fn ($q) => $q->where('meta_ads_ads.meta_ads_set_id', $scopeValue),
-                'account' => fn ($q) => $q->where('meta_ads_ads.meta_ads_account_id', $scopeValue),
-                'ad_name' => fn ($q) => $q->where('meta_ads_ads.name', $scopeValue),
-                // Ads reach a page through their ad set; "0" is the unassigned
-                // bucket the page breakdown emits for a null meta_page_id.
-                'page' => fn ($q) => $q->whereIn(
-                    'meta_ads_ads.meta_ads_set_id',
-                    AdSet::query()->select('id')->when(
-                        $scopeValue === '' || $scopeValue === '0',
-                        fn ($sets) => $sets->whereNull('meta_page_id'),
-                        fn ($sets) => $sets->where('meta_page_id', $scopeValue),
-                    )
-                ),
-                default => abort(400, 'Unsupported scope_by'),
-            };
+            $scope = $this->scopeFor($scopeBy, $scopeValue);
         } else {
             $groupBy = $this->resolveGroupBy($request);
             $scope = null;
@@ -126,6 +111,114 @@ class AdsManagerController extends Controller
         $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter, $dateFilters);
 
         return response()->json(['rows' => $rows]);
+    }
+
+    /**
+     * Narrows an ad-grained query to the ads under one row of a breakdown.
+     * Shared by the drill-down table and the per-row timeline, so a chart always
+     * covers exactly the ads its modal would have listed.
+     */
+    private function scopeFor(string $scopeBy, string $scopeValue): callable
+    {
+        return match ($scopeBy) {
+            // A row of the `ad` breakdown is a single ad, charted on its own.
+            'ad' => fn ($q) => $q->where('meta_ads_ads.id', $scopeValue),
+            'campaign' => fn ($q) => $q->where('meta_ads_ads.meta_ads_campaign_id', $scopeValue),
+            'ad_set' => fn ($q) => $q->where('meta_ads_ads.meta_ads_set_id', $scopeValue),
+            'account' => fn ($q) => $q->where('meta_ads_ads.meta_ads_account_id', $scopeValue),
+            'ad_name' => fn ($q) => $q->where('meta_ads_ads.name', $scopeValue),
+            // Ads reach a page through their ad set; "0" is the unassigned
+            // bucket the page breakdown emits for a null meta_page_id.
+            'page' => fn ($q) => $q->whereIn(
+                'meta_ads_ads.meta_ads_set_id',
+                AdSet::query()->select('id')->when(
+                    $scopeValue === '' || $scopeValue === '0',
+                    fn ($sets) => $sets->whereNull('meta_page_id'),
+                    fn ($sets) => $sets->where('meta_page_id', $scopeValue),
+                )
+            ),
+            // Same chain one step further: the ad set's page, then that page's
+            // owner. "0" is the bucket for ads whose ad set promotes no page,
+            // or one that resolves to no owner.
+            'page_owner' => fn ($q) => $q->whereIn(
+                'meta_ads_ads.meta_ads_set_id',
+                AdSet::query()->select('id')->when(
+                    $scopeValue === '' || $scopeValue === '0',
+                    fn ($sets) => $sets->where(fn ($w) => $w
+                        ->whereNull('meta_page_id')
+                        ->orWhereNotIn('meta_page_id', $this->ownedPageIds())),
+                    fn ($sets) => $sets->whereIn('meta_page_id', $this->ownedPageIds($scopeValue)),
+                )
+            ),
+            default => abort(400, 'Unsupported scope_by'),
+        };
+    }
+
+    /**
+     * Day-by-day metrics for one breakdown row, for the per-row timeline chart.
+     * Returns the same raw insight columns the grid does — one point per day
+     * instead of one row per entity — so the frontend derives computed metrics
+     * (ROAS, CTR, CPM…) per day with the very same formulas the table uses.
+     *
+     * Every day in the range is emitted, including days the ads didn't run, so
+     * the line shows real gaps as zeroes rather than silently compressing time.
+     */
+    public function timeseries(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($request->user()->isMemberOf($workspace), 403);
+
+        [$since, $until] = $this->resolveDateRange($request);
+
+        $allAccountIds = $this->accountIdsForWorkspace($workspace, $request->user())->map(fn ($id) => (string) $id);
+        $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
+
+        $scopeBy = (string) $request->query('scope_by', '');
+        $scopeValue = (string) $request->query('scope', '');
+
+        if ($scopeBy === '') {
+            abort(400, 'scope_by is required');
+        }
+
+        $selects = [DB::raw('meta_ads_insights.date AS date')];
+        foreach (self::INSIGHTS_METRICS as $col) {
+            $selects[] = DB::raw("COALESCE(SUM(meta_ads_insights.{$col}), 0) AS {$col}");
+        }
+
+        // Joined to the ads table so the shared scope closures — which all read
+        // meta_ads_ads columns — apply unchanged.
+        $query = DB::table('meta_ads_insights')
+            ->join('meta_ads_ads', 'meta_ads_ads.id', '=', 'meta_ads_insights.meta_ads_ad_id')
+            ->whereBetween('meta_ads_insights.date', [$since, $until])
+            ->whereIn('meta_ads_ads.meta_ads_account_id', $accountIds);
+
+        ($this->scopeFor($scopeBy, $scopeValue))($query);
+
+        // Same creator filter the grid is under, so the chart matches the row.
+        $creatorFilter = (string) $request->query('creator_id', '');
+        $this->applyCreatorFilter($query, $creatorFilter === '' ? null : $creatorFilter);
+
+        $byDate = $query->select($selects)
+            ->groupBy('meta_ads_insights.date')
+            ->get()
+            ->keyBy(fn ($row) => Carbon::parse($row->date)->toDateString());
+
+        $zero = array_fill_keys(self::INSIGHTS_METRICS, 0);
+        $points = [];
+
+        for ($day = Carbon::parse($since); $day->lte(Carbon::parse($until)); $day->addDay()) {
+            $key = $day->toDateString();
+            $row = $byDate->get($key);
+
+            $points[] = [
+                'date' => $key,
+                ...($row ? array_map(
+                    fn ($col) => (float) ($row->{$col} ?? 0),
+                    array_combine(self::INSIGHTS_METRICS, self::INSIGHTS_METRICS),
+                ) : $zero),
+            ];
+        }
+
+        return response()->json(['points' => $points]);
     }
 
     /**
@@ -158,6 +251,13 @@ class AdsManagerController extends Controller
      * bucket rather than showing as a blank row.
      */
     private const PAGE_LABEL_SQL = "COALESCE(pages.name, 'Unassigned page')";
+
+    /**
+     * Group name for the page-owner breakdown. Ads whose page is unknown — no
+     * promoted page, a page deleted on our side, or an owner with no user row —
+     * share one bucket instead of showing as blank rows.
+     */
+    private const PAGE_OWNER_LABEL_SQL = "COALESCE(users.name, 'Unassigned owner')";
 
     /**
      * Returns Meta's signed ad-preview iframe src for a single ad. The raw video
@@ -260,7 +360,7 @@ class AdsManagerController extends Controller
      * Allowed group-by dimensions. Keys are the public `group_by` values; the
      * default is `ad_name`.
      */
-    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type', 'page'];
+    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type', 'page', 'page_owner'];
 
     private function resolveGroupBy(Request $request): string
     {
@@ -468,7 +568,49 @@ class AdsManagerController extends Controller
                 'search' => 'pages.name',
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
+            // Buckets ads by the workspace member who owns the Facebook page
+            // their ad set promotes. Same ad-grained chain as `page`, one join
+            // further: ad -> ad set -> page -> owning user.
+            'page_owner' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id')
+                    // A raw join skips the model's SoftDeletes, so deleted pages
+                    // are excluded here and fall into the unassigned bucket.
+                    ->leftJoin('pages', function ($join) {
+                        $join->on('pages.id', '=', 'meta_ads_sets.meta_page_id')
+                            ->whereNull('pages.deleted_at');
+                    })
+                    ->leftJoin('users', 'users.id', '=', 'pages.owner_id'),
+                'selects' => [
+                    // Keyed off the joined user, not pages.owner_id, so an owner
+                    // whose user row is gone lands in the unassigned bucket (id
+                    // 0) rather than in a nameless row of its own.
+                    DB::raw('COALESCE(users.id, 0) AS id'),
+                    DB::raw(self::PAGE_OWNER_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => ['users.id', 'users.name'],
+                // Searches real owner names; the unassigned bucket has none.
+                'search' => 'users.name',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
+            ],
         };
+    }
+
+    /**
+     * Page ids that resolve to a real owner, optionally a single one. Mirrors
+     * the page_owner breakdown's joins — soft-deleted pages and owners with no
+     * user row drop out — so a drill-down buckets ads exactly as the grid did.
+     */
+    private function ownedPageIds(?string $ownerId = null)
+    {
+        return Page::query()
+            ->join('users', 'users.id', '=', 'pages.owner_id')
+            ->when($ownerId !== null, fn ($q) => $q->where('users.id', $ownerId))
+            ->select('pages.id');
     }
 
     private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null, array $dateFilters = []): array
@@ -950,16 +1092,16 @@ class AdsManagerController extends Controller
             return match ($groupBy) {
                 'campaign' => 'meta_ads_campaigns.created_time',
                 'ad_set' => 'meta_ads_sets.created_time',
-                'ad', 'ad_name', 'ad_type', 'page' => 'meta_ads_ads.created_time',
+                'ad', 'ad_name', 'ad_type', 'page', 'page_owner' => 'meta_ads_ads.created_time',
                 default => null,
             };
         }
 
         return match ($groupBy) {
             'campaign' => 'meta_ads_campaigns.start_time',
-            // The page breakdown already joins the ad set, so it reads the
+            // The page breakdowns already join the ad set, so they read the
             // column directly instead of the subquery fallback below.
-            'ad_set', 'page' => 'meta_ads_sets.start_time',
+            'ad_set', 'page', 'page_owner' => 'meta_ads_sets.start_time',
             default => null,
         };
     }

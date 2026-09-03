@@ -13,9 +13,10 @@ use Modules\Pancake\Models\Order;
 /**
  * Build Artemis-source page performance rows, one per Pancake page per day,
  * combining:
- *   - Meta Ads:   ad spend + purchase value (= sales), attributed via
- *                 ad set → meta_page_id → page.
- *   - Pancake POS: orders + delivered/returned (count + amount), via page_id.
+ *   - Meta Ads:   ad spend + purchases (count) + purchase value (= ad_sales),
+ *                 attributed via ad set → meta_page_id → page.
+ *   - Pancake POS: orders + delivered/returned/returning (count + amount), via
+ *                 page_id.
  *
  * Only non-Gencys-partner workspaces (they default to the Artemis source).
  * Writes to the unified page_daily_records table (source=artemis, page=Page).
@@ -34,8 +35,7 @@ class BuildDailyPagePerformanceCommand extends Command
         $dates = $this->resolveDates();
         $total = 0;
 
-        Workspace::where('is_gencys_partner', false)
-            ->with('pages')
+        Workspace::with('pages')
             ->get()
             ->each(function (Workspace $workspace) use ($dates, &$total) {
                 foreach ($dates as $date) {
@@ -80,11 +80,26 @@ class BuildDailyPagePerformanceCommand extends Command
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->count('*');
 
-        $ad_spent = Insight::whereHas('adSet', fn ($query) => $query->whereHas('page', fn ($query) => $query->whereKey($pageId)))
+        // One pass over the insights — spend, purchases and purchase value all
+        // come from the same rows. Aliased away from the column names so the
+        // model's decimal casts don't reshape the aggregates.
+        $ads = Insight::whereHas('adSet', fn ($query) => $query->whereHas('page', fn ($query) => $query->whereKey($pageId)))
             ->where('date', $date)
-            ->sum('spend');
+            ->selectRaw('COALESCE(SUM(spend), 0) as spend_sum')
+            ->selectRaw('COALESCE(SUM(purchases), 0) as purchases_sum')
+            ->selectRaw('COALESCE(SUM(purchase_value), 0) as purchase_value_sum')
+            ->first();
+
+        $ad_spent = (float) ($ads->spend_sum ?? 0);
+        $ad_purchases = (int) ($ads->purchases_sum ?? 0);
+        $ad_sales = (float) ($ads->purchase_value_sum ?? 0);
 
         $roas = $ad_spent > 0 ? $sales / $ad_spent : 0;
+        $ad_roas = $ad_spent > 0 ? $ad_sales / $ad_spent : 0;
+
+        // Cost per purchase, against Meta's count and Pancake's.
+        $ad_cpp = $ad_purchases > 0 ? ($ad_spent / $ad_purchases) : 0;
+        $cpp = $orders > 0 ? ($ad_spent / $orders) : 0;
 
         $delivered = Order::where('page_id', $pageId)
             ->whereDate('delivered_at', $date)
@@ -106,6 +121,17 @@ class BuildDailyPagePerformanceCommand extends Command
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->sum('final_amount');
 
+        // Parcels that started their way back on $date — a single day's events,
+        // like delivered and returned above.
+        $returning_amount = Order::where('page_id', $pageId)
+            ->whereDate('returning_at', $date)
+            ->whereNotIn('pancake_orders.status', [6, 7])
+            ->sum('final_amount');
+
+        $overall_returning = $returning_amount;
+
+        $rts_rate = $overall_returning ? $overall_returning / ($overall_returning + $delivered_amount) * 100 : 0;
+
         PageDailyRecord::updateOrCreate(
             [
                 'workspace_id' => $workspace->id,
@@ -121,8 +147,15 @@ class BuildDailyPagePerformanceCommand extends Command
                 'delivered_amount' => $delivered_amount,
                 'returned' => $returned,
                 'returned_amount' => $returned_amount,
+                'returning_amount' => $returning_amount,
+                'rts_rate' => $rts_rate,
                 'ad_spent' => $ad_spent,
+                'ad_sales' => $ad_sales,
+                'ad_purchases' => $ad_purchases,
                 'roas' => $roas,
+                'ad_roas' => $ad_roas,
+                'ad_cpp' => $ad_cpp,
+                'cpp' => $cpp,
             ],
         );
 

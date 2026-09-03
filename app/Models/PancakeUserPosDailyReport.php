@@ -16,6 +16,9 @@ class PancakeUserPosDailyReport extends Model
         'total_sales',
         'returning',
         'delivered',
+        // The parcel counts behind `returning` / `delivered`, which are money.
+        'returning_count',
+        'delivered_count',
         'rts_rate',
     ];
 

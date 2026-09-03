@@ -32,6 +32,7 @@ import {
     ExternalLink,
     Facebook,
     FileText,
+    Goal,
     GraduationCap,
     History,
     Landmark,
@@ -56,6 +57,7 @@ import {
     Store,
     Tags,
     Target,
+    TrendingUp,
     Trophy,
     Truck,
     User,
@@ -97,10 +99,98 @@ export function AppSidebar() {
         ...(currentWorkspace.sales_marketing_dashboard_module_enabled
             ? [
                   {
-                      title: 'S&M Dashboard',
-                      href: `/workspaces/${slug}/sales-marketing/dashboard`,
+                      title: 'Sales & Marketing',
                       icon: Megaphone,
-                      permission: PERMISSIONS.ViewSalesMarketingDashboard,
+                      // The group shows if any one of its pages does — each
+                      // item below carries its own grant, so a role with only
+                      // Sales Targets sees a one-item group rather than every
+                      // link it cannot open.
+                      anyOf: [
+                          PERMISSIONS.ViewSalesMarketingDashboard,
+                          PERMISSIONS.ViewSalesMarketingDailyReport,
+                          // The tracker is hidden for Gencys partners below,
+                          // so its grant must not be what opens the group for
+                          // them — otherwise they get an empty group.
+                          ...(currentWorkspace.is_gencys_partner
+                              ? []
+                              : [PERMISSIONS.ViewPageRoasTracker]),
+                          PERMISSIONS.ViewAdSpendGoals,
+                          PERMISSIONS.ViewAdSpentSummary,
+                          PERMISSIONS.ViewSalesTargets,
+                          // The Budget Tracker below rides on the Meta Ads
+                          // grant, so that grant has to be able to open the
+                          // group on its own.
+                          ...(currentWorkspace.meta_ads_module_enabled
+                              ? [PERMISSIONS.ViewMetaAds]
+                              : []),
+                      ],
+                      items: [
+                          {
+                              title: 'Dashboard',
+                              href: `/workspaces/${slug}/sales-marketing/dashboard`,
+                              icon: LayoutDashboard,
+                              permission:
+                                  PERMISSIONS.ViewSalesMarketingDashboard,
+                          },
+                          {
+                              title: 'Daily Report',
+                              href: `/workspaces/${slug}/sales-marketing/daily-report`,
+                              icon: CalendarDays,
+                              permission:
+                                  PERMISSIONS.ViewSalesMarketingDailyReport,
+                          },
+                          // Gencys partners track page ROAS in Gencys itself,
+                          // so the tracker is hidden for them.
+                          ...(currentWorkspace.is_gencys_partner
+                              ? []
+                              : [
+                                    {
+                                        title: 'Page ROAS Tracker',
+                                        href: `/workspaces/${slug}/sales-marketing/page-roas-tracker`,
+                                        icon: TrendingUp,
+                                        permission:
+                                            PERMISSIONS.ViewPageRoasTracker,
+                                    },
+                                ]),
+                          // Ad Spend Goals is its own module switch — the rest
+                          // of the group rides on the S&M one.
+                          ...(currentWorkspace.ad_spend_goals_module_enabled
+                              ? [
+                                    {
+                                        title: 'Ad Spend Goals',
+                                        href: `/workspaces/${slug}/sales-marketing/ad-spend-goals`,
+                                        icon: Goal,
+                                        permission:
+                                            PERMISSIONS.ViewAdSpendGoals,
+                                    },
+                                ]
+                              : []),
+                          {
+                              title: 'Ad Spent Summary',
+                              href: `/workspaces/${slug}/sales-marketing/ad-spent-summary`,
+                              icon: ReceiptText,
+                              permission: PERMISSIONS.ViewAdSpentSummary,
+                          },
+                          // Reads Meta Ads data and keeps its Meta Ads URL and
+                          // grant — it sits in this group in the sidebar only,
+                          // so it stays behind the Meta Ads switch.
+                          ...(currentWorkspace.meta_ads_module_enabled
+                              ? [
+                                    {
+                                        title: 'Ad Spent Budget Tracker',
+                                        href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
+                                        icon: Wallet,
+                                        permission: PERMISSIONS.ViewMetaAds,
+                                    },
+                                ]
+                              : []),
+                          {
+                              title: 'Sales Targets',
+                              href: `/workspaces/${slug}/sales-marketing/sales-targets`,
+                              icon: Target,
+                              permission: PERMISSIONS.ViewSalesTargets,
+                          },
+                      ],
                   },
               ]
             : []),
@@ -295,12 +385,6 @@ export function AppSidebar() {
                               permission: PERMISSIONS.ViewMetaAds,
                           },
                           {
-                              title: 'Ad Spent Tracker',
-                              href: `/workspaces/${slug}/integrations/meta/budget-tracker`,
-                              icon: Wallet,
-                              permission: PERMISSIONS.ViewMetaAds,
-                          },
-                          {
                               title: 'Optimization Rules',
                               href: `/workspaces/${slug}/integrations/meta/optimization-rules`,
                               icon: SlidersHorizontal,
@@ -331,7 +415,7 @@ export function AppSidebar() {
         ...(currentWorkspace.csr_module_enabled
             ? [
                   {
-                      title: 'CSR',
+                      title: 'Operations',
                       icon: User,
                       anyOf: [
                           PERMISSIONS.ViewCsrManagement,
@@ -339,13 +423,13 @@ export function AppSidebar() {
                       ],
                       items: [
                           {
-                              title: 'Management',
+                              title: 'CSR Management',
                               href: `/workspaces/${slug}/csr/management`,
                               icon: User,
                               permission: PERMISSIONS.ViewCsrManagement,
                           },
                           {
-                              title: 'Analytics',
+                              title: 'CSR Analytics',
                               href: `/workspaces/${slug}/csr/analytics`,
                               icon: BarChart2,
                               permission: PERMISSIONS.ViewCsrAnalytics,
@@ -637,7 +721,7 @@ function PublicLinks({
         PERMISSIONS.ViewLeaderboards,
     ]);
     const canViewSalesTargetsLink = useAnyPermission([
-        PERMISSIONS.ViewSalesMarketingDashboard,
+        PERMISSIONS.ViewSalesTargets,
     ]);
 
     const links = [

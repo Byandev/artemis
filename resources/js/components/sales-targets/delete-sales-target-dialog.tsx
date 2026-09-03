@@ -32,7 +32,7 @@ export function DeleteSalesTargetDialog({ workspace, target, onClose }: Props) {
         if (!target) return;
 
         destroy(
-            `/workspaces/${workspace.slug}/sales-marketing/dashboard/sales-targets/${target.id}`,
+            `/workspaces/${workspace.slug}/sales-marketing/sales-targets/${target.id}`,
             {
                 preserveScroll: true,
                 onSuccess: () => {

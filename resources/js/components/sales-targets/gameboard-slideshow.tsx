@@ -5,7 +5,7 @@ import { TeamPerformance } from '@/components/sales-targets/gameboard-teams';
 import {
     formatLongDate,
     formatPeso,
-} from '@/pages/workspaces/sales-targets/shared';
+} from '@/pages/workspaces/sales-marketing/sales-targets/shared';
 import {
     ChevronLeft,
     ChevronRight,
