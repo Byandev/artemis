@@ -60,6 +60,8 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         // the panel switches metric client-side, so one fetch serves all four.
         Route::get('/sales-marketing/dashboard/team-comparison', [SalesMarketingDashboardController::class, 'teamComparison'])
             ->name('sales-marketing.dashboard.team-comparison');
+        Route::get('/sales-marketing/dashboard/team-breakdown', [SalesMarketingDashboardController::class, 'teamBreakdown'])
+            ->name('sales-marketing.dashboard.team-breakdown');
 
         // "Leaders for the period" — who topped each figure, on their own
         // endpoints so the section loads independently of the KPI row.

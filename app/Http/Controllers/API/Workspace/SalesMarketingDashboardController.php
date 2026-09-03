@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * Per-KPI endpoints for the Sales & Marketing dashboard. Each statistic gets its
@@ -268,7 +269,42 @@ class SalesMarketingDashboardController extends Controller
 
         $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
 
-        $rows = $this->advertiserRecords($request, $workspace, $this->window($request))
+        return response()->json([
+            'rows' => $this->advertiserRows($request, $workspace, $this->window($request)),
+        ]);
+    }
+
+    /**
+     * The same per-advertiser rows, for the breakdown table beneath the chart.
+     *
+     * Its own endpoint so the table loads, skeletons and refreshes on its own
+     * rather than waiting on the chart, but deliberately the same query: the
+     * table states what the chart plots, and two implementations of one figure
+     * is how the two would eventually disagree.
+     *
+     * Totals are the page's job, not this one's — the sub-total row's blended
+     * ROAS and overall RTS are divisions of these sums, computed alongside every
+     * other ratio on the dashboard.
+     */
+    public function teamBreakdown(Request $request, Workspace $workspace): JsonResponse
+    {
+        abort_unless($workspace->sales_marketing_dashboard_module_enabled, 404);
+
+        $this->authorize(Permission::ViewSalesMarketingDashboard->value, $workspace);
+
+        return response()->json([
+            'rows' => $this->advertiserRows($request, $workspace, $this->window($request)),
+        ]);
+    }
+
+    /**
+     * One row of raw sums per advertiser over the window.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function advertiserRows(Request $request, Workspace $workspace, array $window)
+    {
+        return $this->advertiserRecords($request, $workspace, $window)
             ->groupBy('advertiser_id', 'advertiser_name')
             ->selectRaw('
                 advertiser_id,
@@ -279,8 +315,8 @@ class SalesMarketingDashboardController extends Controller
                 SUM(returned_amount) AS returned_amount,
                 SUM(delivered_amount) AS delivered_amount
             ')
-            // By name, not by size: the panel sorts on whichever metric is
-            // selected, and a server-side ranking would only be one of four.
+            // By name, not by size: the callers sort on whichever metric is
+            // selected, and a server-side ranking would only ever be one of them.
             ->orderBy('advertiser_name')
             ->get()
             ->map(fn ($row) => [
@@ -294,8 +330,6 @@ class SalesMarketingDashboardController extends Controller
                 'returned_amount' => (float) $row->returned_amount,
                 'delivered_amount' => (float) $row->delivered_amount,
             ]);
-
-        return response()->json(['rows' => $rows]);
     }
 
     /**
