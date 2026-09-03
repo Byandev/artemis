@@ -15,16 +15,12 @@ class SyncFlowRegistry
      * fixed-timer path. Adding them is a matter of writing a flow class and
      * listing it here.
      *
-     * The interns roster is registered but left off the batch form — it is
-     * raised from the Interns page instead. See SyncBatchController::index().
-     *
      * @var array<string, class-string<SyncFlow>>
      */
     private const FLOWS = [
         GencysSyncRun::TYPE_TRANSACTION_HISTORY => TransactionHistoryFlow::class,
         GencysSyncRun::TYPE_PURCHASE_ORDER => PurchaseOrderFlow::class,
         GencysSyncRun::TYPE_DAILY_SALES_TRACKER => DailySalesTrackerFlow::class,
-        GencysSyncRun::TYPE_INTERNS => InternFlow::class,
         GencysSyncRun::TYPE_INTERN_DAILY_RECORDS => InternDailyRecordFlow::class,
     ];
 

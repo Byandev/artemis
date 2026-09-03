@@ -55,10 +55,7 @@ class SyncBatchController extends Controller
         return Inertia::render('workspaces/gencys/sync-batches/index', [
             'workspace' => $workspace,
             'batches' => $batches,
-            // The roster is raised from the Interns page, so it is not offered
-            // here. It stays registered — existing runs keep their label.
             'syncTypes' => collect($this->flows->all())
-                ->except([GencysSyncRun::TYPE_INTERNS])
                 ->map(fn ($flow, $type) => [
                     'value' => $type,
                     'label' => $flow->label(),
