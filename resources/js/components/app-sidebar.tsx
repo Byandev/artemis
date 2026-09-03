@@ -108,7 +108,12 @@ export function AppSidebar() {
                       anyOf: [
                           PERMISSIONS.ViewSalesMarketingDashboard,
                           PERMISSIONS.ViewSalesMarketingDailyReport,
-                          PERMISSIONS.ViewPageRoasTracker,
+                          // The tracker is hidden for Gencys partners below,
+                          // so its grant must not be what opens the group for
+                          // them — otherwise they get an empty group.
+                          ...(currentWorkspace.is_gencys_partner
+                              ? []
+                              : [PERMISSIONS.ViewPageRoasTracker]),
                           PERMISSIONS.ViewAdSpendGoals,
                           PERMISSIONS.ViewAdSpentSummary,
                           PERMISSIONS.ViewSalesTargets,
@@ -128,12 +133,19 @@ export function AppSidebar() {
                               permission:
                                   PERMISSIONS.ViewSalesMarketingDailyReport,
                           },
-                          {
-                              title: 'Page ROAS Tracker',
-                              href: `/workspaces/${slug}/sales-marketing/page-roas-tracker`,
-                              icon: TrendingUp,
-                              permission: PERMISSIONS.ViewPageRoasTracker,
-                          },
+                          // Gencys partners track page ROAS in Gencys itself,
+                          // so the tracker is hidden for them.
+                          ...(currentWorkspace.is_gencys_partner
+                              ? []
+                              : [
+                                    {
+                                        title: 'Page ROAS Tracker',
+                                        href: `/workspaces/${slug}/sales-marketing/page-roas-tracker`,
+                                        icon: TrendingUp,
+                                        permission:
+                                            PERMISSIONS.ViewPageRoasTracker,
+                                    },
+                                ]),
                           // Ad Spend Goals is its own module switch — the rest
                           // of the group rides on the S&M one.
                           ...(currentWorkspace.ad_spend_goals_module_enabled

@@ -2,7 +2,7 @@ import RefreshButton from '@/components/inventory/dashboard/refresh-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useMemo } from 'react';
-import { sumComparisonRows } from './comparison-panel';
+import { sumComparisonRows, useProductSpendShown } from './comparison-panel';
 import { formatKpi } from './kpi-card';
 import {
     assignProductFills,
@@ -61,6 +61,10 @@ export default function ProductBreakdown({
     /** `[start, end]` as YYYY-MM-DD. */
     dateRange: string[];
 }) {
+    // Gencys partners have no per-product spend to state, so the two columns
+    // derived from it come out — the same rule that trims the chart's switcher.
+    const spendShown = useProductSpendShown();
+
     const { data, loading, error, refetch } = useSalesMarketingStat<Breakdown>(
         slug,
         'product-breakdown',
@@ -155,7 +159,12 @@ export default function ProductBreakdown({
                     >
                         {/* border-separate, not collapse: a collapsed table
                             drops the borders of sticky cells as they move. */}
-                        <table className="w-full min-w-[52rem] border-separate border-spacing-0 text-[12px]">
+                        <table
+                            className={cn(
+                                'w-full border-separate border-spacing-0 text-[12px]',
+                                spendShown ? 'min-w-[52rem]' : 'min-w-[38rem]',
+                            )}
+                        >
                             <thead>
                                 <tr>
                                     <Th align="left" sticky>
@@ -163,8 +172,12 @@ export default function ProductBreakdown({
                                     </Th>
                                     <Th>Orders</Th>
                                     <Th>Sales</Th>
-                                    <Th>Ad spend</Th>
-                                    <Th>ROAS</Th>
+                                    {spendShown && (
+                                        <>
+                                            <Th>Ad spend</Th>
+                                            <Th>ROAS</Th>
+                                        </>
+                                    )}
                                     <Th>RTS rate</Th>
                                     <Th>RTS amount</Th>
                                 </tr>
@@ -191,28 +204,37 @@ export default function ProductBreakdown({
                                                 'currencyExact',
                                             )}
                                         </Td>
-                                        <Td>
-                                            {formatKpi(
-                                                r.adSpend,
-                                                'currencyExact',
-                                            )}
-                                        </Td>
-                                        {/* Colour is emphasis, never the only
-                                            carrier — the figure itself is
-                                            readable without it. */}
-                                        <Td
-                                            className={
-                                                r.roas === null
-                                                    ? undefined
-                                                    : r.roas >= ROAS_TARGET
-                                                      ? 'font-semibold text-emerald-600 dark:text-emerald-400'
-                                                      : 'font-semibold text-red-600 dark:text-red-400'
-                                            }
-                                        >
-                                            {r.roas === null
-                                                ? '—'
-                                                : formatKpi(r.roas, 'ratio')}
-                                        </Td>
+                                        {spendShown && (
+                                            <>
+                                                <Td>
+                                                    {formatKpi(
+                                                        r.adSpend,
+                                                        'currencyExact',
+                                                    )}
+                                                </Td>
+                                                {/* Colour is emphasis, never
+                                                    the only carrier — the
+                                                    figure itself is readable
+                                                    without it. */}
+                                                <Td
+                                                    className={
+                                                        r.roas === null
+                                                            ? undefined
+                                                            : r.roas >=
+                                                                ROAS_TARGET
+                                                              ? 'font-semibold text-emerald-600 dark:text-emerald-400'
+                                                              : 'font-semibold text-red-600 dark:text-red-400'
+                                                    }
+                                                >
+                                                    {r.roas === null
+                                                        ? '—'
+                                                        : formatKpi(
+                                                              r.roas,
+                                                              'ratio',
+                                                          )}
+                                                </Td>
+                                            </>
+                                        )}
                                         <Td
                                             className={
                                                 r.rts !== null &&
@@ -249,17 +271,24 @@ export default function ProductBreakdown({
                                             'currencyExact',
                                         )}
                                     </Td>
-                                    <Td foot>
-                                        {formatKpi(
-                                            total.adSpend,
-                                            'currencyExact',
-                                        )}
-                                    </Td>
-                                    <Td foot>
-                                        {total.roas === null
-                                            ? '—'
-                                            : formatKpi(total.roas, 'ratio')}
-                                    </Td>
+                                    {spendShown && (
+                                        <>
+                                            <Td foot>
+                                                {formatKpi(
+                                                    total.adSpend,
+                                                    'currencyExact',
+                                                )}
+                                            </Td>
+                                            <Td foot>
+                                                {total.roas === null
+                                                    ? '—'
+                                                    : formatKpi(
+                                                          total.roas,
+                                                          'ratio',
+                                                      )}
+                                            </Td>
+                                        </>
+                                    )}
                                     <Td foot>
                                         {total.rts === null
                                             ? '—'
