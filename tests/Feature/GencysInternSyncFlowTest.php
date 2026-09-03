@@ -198,19 +198,11 @@ test('the batch form is told which types the date range does not reach', functio
         ->get("/workspaces/{$workspace->slug}/gencys/sync-batches")
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->has('syncTypes', 5)
-            // The roster is the one type with no window to offer.
+            ->has('syncTypes', 4)
             ->where('syncTypes.3', [
                 'value' => GencysSyncRun::TYPE_INTERNS,
                 'label' => 'Interns',
                 'windowed' => false,
-            ])
-            // Its daily records do take the range, and follow the roster so a
-            // batch covering both pulls the interns before reading them.
-            ->where('syncTypes.4', [
-                'value' => GencysSyncRun::TYPE_INTERN_DAILY_RECORDS,
-                'label' => 'Intern daily records',
-                'windowed' => true,
             ])
             ->where('syncTypes.0.windowed', true)
         );

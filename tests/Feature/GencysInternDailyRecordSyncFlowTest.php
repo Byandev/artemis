@@ -40,14 +40,32 @@ beforeEach(function () {
     Http::fake(['n8n.test/*' => Http::response(['ok' => true], 200)]);
 });
 
-test('it is offered by the batch queue as a windowed sync type', function () {
-    $flow = app(SyncFlowRegistry::class)->for(GencysSyncRun::TYPE_INTERN_DAILY_RECORDS);
+test('it is owned by the queue but kept out of the batch form', function () {
+    $registry = app(SyncFlowRegistry::class);
+    $flow = $registry->for(GencysSyncRun::TYPE_INTERN_DAILY_RECORDS);
 
     expect($flow->label())->toBe('Intern daily records')
-        // It syncs a slice of time, so the batch form hands it the date range.
         ->and($flow->usesWindow())->toBeTrue()
-        ->and(app(SyncFlowRegistry::class)->types())
-        ->toContain(GencysSyncRun::TYPE_INTERN_DAILY_RECORDS);
+        // Scheduled, retried and reported on like any other type…
+        ->and($registry->types())->toContain(GencysSyncRun::TYPE_INTERN_DAILY_RECORDS)
+        // …but a run per intern per day is no thing to raise by hand.
+        ->and($flow->offeredInBatchForm())->toBeFalse();
+});
+
+test('the batch form does not offer it', function () {
+    ['user' => $user, 'workspace' => $workspace] = makeDailyRecordErpWorkspace();
+
+    config(['inertia.ssr.enabled' => false]);
+
+    $this->actingAs($user)
+        ->get("/workspaces/{$workspace->slug}/gencys/sync-batches")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('syncTypes', 4)
+            ->where('syncTypes', fn ($types) => collect($types)
+                ->pluck('value')
+                ->doesntContain(GencysSyncRun::TYPE_INTERN_DAILY_RECORDS))
+        );
 });
 
 test('it opens one run per intern per date', function () {

@@ -84,7 +84,7 @@ test('the index lists batches with their progress and what is holding the ERP', 
             ->where('batches.data.0.total_runs', 1)
             ->where('running.status', GencysSyncBatch::STATUS_RUNNING)
             ->where('queuedCount', 0)
-            ->has('syncTypes', 5)
+            ->has('syncTypes', 4)
         );
 });
 

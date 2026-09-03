@@ -5,7 +5,6 @@ use Illuminate\Support\Facades\Queue;
 use Modules\GencysERP\Jobs\SendGencysSyncGroup;
 use Modules\GencysERP\Models\GencysSyncBatch;
 use Modules\GencysERP\Models\GencysSyncRun;
-use Modules\GencysERP\Models\Intern;
 use Modules\GencysERP\Support\BatchRunner;
 use Modules\Inventory\Models\InventoryItem;
 
@@ -354,45 +353,21 @@ test('the scheduled sync command queues a single batch covering every sync type'
         GencysSyncRun::TYPE_TRANSACTION_HISTORY,
         GencysSyncRun::TYPE_PURCHASE_ORDER,
         GencysSyncRun::TYPE_DAILY_SALES_TRACKER,
-        // The roster runs before the records built from it.
-        GencysSyncRun::TYPE_INTERNS,
         GencysSyncRun::TYPE_INTERN_DAILY_RECORDS,
     ])->and($batch->status)->toBe(GencysSyncBatch::STATUS_RUNNING);
 
-    // 2 transaction dates + 1 PO range + 3 tracker dates + 1 roster. No intern
-    // daily records: this workspace has no synced interns to ask about yet.
-    expect($batch->total_runs)->toBe(7)
+    // 2 transaction dates + 1 PO range + 3 tracker dates. No intern daily
+    // records: this workspace has no synced interns to ask about yet.
+    expect($batch->total_runs)->toBe(6)
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_TRANSACTION_HISTORY)->count())->toBe(2)
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_PURCHASE_ORDER)->count())->toBe(1)
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_DAILY_SALES_TRACKER)->count())->toBe(3)
-        ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_INTERNS)->count())->toBe(1)
         ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_INTERN_DAILY_RECORDS)->count())->toBe(0);
 
-    // Each type carries its own window under its own key — bar the roster,
-    // which has no window to carry.
+    // Each type carries its own window under its own key.
     expect($batch->parametersFor(GencysSyncRun::TYPE_TRANSACTION_HISTORY))->toHaveKey('dates')
         ->and($batch->parametersFor(GencysSyncRun::TYPE_PURCHASE_ORDER))->toHaveKey('start_date')
-        ->and($batch->parametersFor(GencysSyncRun::TYPE_DAILY_SALES_TRACKER))->toHaveKey('dates')
-        ->and($batch->parametersFor(GencysSyncRun::TYPE_INTERNS))->toBe([])
-        ->and($batch->parametersFor(GencysSyncRun::TYPE_INTERN_DAILY_RECORDS))->toHaveKey('dates');
-});
-
-test('the scheduled pass asks about every synced intern, after refreshing the roster', function () {
-    ['workspace' => $workspace] = makeErpWorkspace();
-
-    Intern::create(['workspace_id' => $workspace->id, 'intern_id' => 41, 'name' => 'Ann', 'active' => true]);
-    Intern::create(['workspace_id' => $workspace->id, 'intern_id' => 42, 'name' => 'Ben', 'active' => true]);
-
-    $this->artisan('gencys-erp:sync', ['--force' => true])->assertSuccessful();
-
-    $batch = GencysSyncBatch::sole();
-
-    // Yesterday for each of the two interns, behind the one roster run.
-    expect($batch->runs()->where('sync_type', GencysSyncRun::TYPE_INTERNS)->count())->toBe(1)
-        ->and($batch->runs()->where('sync_type', GencysSyncRun::TYPE_INTERN_DAILY_RECORDS)->count())->toBe(2)
-        // Serial as ever: the widest-fanning type does not get to open a second
-        // ERP session just because it has the most to ask.
-        ->and($batch->runs()->pending()->count())->toBe(1);
+        ->and($batch->parametersFor(GencysSyncRun::TYPE_DAILY_SALES_TRACKER))->toHaveKey('dates');
 });
 
 test('the batch works through its types in order, one run at a time', function () {

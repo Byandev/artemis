@@ -55,7 +55,11 @@ class SyncBatchController extends Controller
         return Inertia::render('workspaces/gencys/sync-batches/index', [
             'workspace' => $workspace,
             'batches' => $batches,
+            // Queue-owned but not hand-raiseable types are left off: the form
+            // is what a person ticks, and a scheduled-only flow has no business
+            // being ticked. The queue still runs and reports on them.
             'syncTypes' => collect($this->flows->all())
+                ->filter(fn ($flow) => $flow->offeredInBatchForm())
                 ->map(fn ($flow, $type) => [
                     'value' => $type,
                     'label' => $flow->label(),

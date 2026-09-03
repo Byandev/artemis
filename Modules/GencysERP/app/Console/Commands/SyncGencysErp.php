@@ -28,12 +28,9 @@ class SyncGencysErp extends Command
      * batch does hold up the daily sales tracker behind it. Pass --type to
      * change the order (the flags are honoured in the order given).
      *
-     * The two intern types come last, and in this order for a reason: the roster
-     * is one cheap run per workspace, and the daily records that follow build
-     * their fan-out FROM that roster — so a newly added intern is picked up and
-     * asked about in the same pass. Daily records fan the widest of anything
-     * here (one run per intern per day), which is the other reason they sit at
-     * the back rather than holding up the shorter batches.
+     * Intern daily records goes last because it fans the widest of anything
+     * here — one run per intern per day — so putting it earlier would hold up
+     * the shorter batches behind it.
      */
     private const ORDER = [
         GencysSyncRun::TYPE_TRANSACTION_HISTORY,
@@ -48,7 +45,7 @@ class SyncGencysErp extends Command
         {--sync : POST to n8n in-process instead of handing it to the erp queue worker (use this to hit a test-mode webhook)}
         {--force : Run outside production (by default this command only runs on production)}';
 
-    protected $description = 'Queue the Gencys ERP sync batches (transaction history, purchase orders, daily sales tracker, interns, intern daily records)';
+    protected $description = 'Queue the Gencys ERP sync batches (transaction history, purchase orders, daily sales tracker, intern daily records)';
 
     public function handle(BatchRunner $runner, SyncFlowRegistry $flows): int
     {

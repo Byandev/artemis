@@ -64,6 +64,16 @@ class InternDailyRecordFlow extends SyncFlow
         ]);
     }
 
+    /**
+     * Scheduled only. One run per intern per day means a range picked by hand
+     * would fan into hundreds of ERP calls, so this isn't offered in the form —
+     * the daily pass asks for yesterday and that is enough.
+     */
+    public function offeredInBatchForm(): bool
+    {
+        return false;
+    }
+
     public function buildRuns(GencysSyncBatch $batch): int
     {
         $parameters = $batch->parametersFor($this->type());

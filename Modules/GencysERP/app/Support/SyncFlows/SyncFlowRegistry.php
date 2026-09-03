@@ -15,9 +15,9 @@ class SyncFlowRegistry
      * fixed-timer path. Adding them is a matter of writing a flow class and
      * listing it here.
      *
-     * Interns is listed before intern daily records on purpose — runs are built
-     * type by type in the order given, so a batch covering both pulls the roster
-     * before the flow that reads it.
+     * Not everything here is offered in the batch form — see
+     * SyncFlow::offeredInBatchForm(). Intern daily records is queue-owned and
+     * scheduled, but not something to raise by hand.
      *
      * @var array<string, class-string<SyncFlow>>
      */
