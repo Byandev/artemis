@@ -39,8 +39,8 @@ class PublicSalesTargetController extends Controller
 {
     public function index(Request $request, Workspace $workspace, ?int $salesTarget = null)
     {
-        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewSalesMarketingDashboard)) {
-            return Inertia::render('workspaces/sales-targets/public-pages/sales-targets', [
+        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewSalesTargets)) {
+            return Inertia::render('workspaces/sales-marketing/sales-targets/public-pages/sales-targets', [
                 'workspace' => $workspace->only('id', 'name', 'slug'),
                 'locked' => true,
             ]);
@@ -67,7 +67,7 @@ class PublicSalesTargetController extends Controller
             $teamId = null;
         }
 
-        return Inertia::render('workspaces/sales-targets/public-pages/sales-targets', [
+        return Inertia::render('workspaces/sales-marketing/sales-targets/public-pages/sales-targets', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
             'locked' => false,
             'featured' => $featured ? [
@@ -128,7 +128,7 @@ class PublicSalesTargetController extends Controller
      */
     private function section(Request $request, Workspace $workspace, callable $resolve): JsonResponse
     {
-        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewSalesMarketingDashboard)) {
+        if (! PublicWorkspaceGate::isUnlocked($request, $workspace, Permission::ViewSalesTargets)) {
             abort(403, 'This board is locked.');
         }
 

@@ -4,17 +4,11 @@ namespace App\Http\Controllers\Workspaces\RTS;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
-use App\Models\ParcelJourneyNotification;
-use App\Models\ParcelJourneyNotificationLog;
 use App\Models\ParcelJourneyNotificationTemplate;
-use App\Models\Shop;
 use App\Models\Workspace;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Spatie\QueryBuilder\AllowedSort;
-use Spatie\QueryBuilder\QueryBuilder;
 
 class ParcelUpdateNotificationTemplateController extends Controller
 {
@@ -84,92 +78,16 @@ class ParcelUpdateNotificationTemplateController extends Controller
             ->paginate($request->integer('per_page', 10))
             ->withQueryString();
 
-        $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
-        $endDate = $request->input('end_date', now()->endOfMonth()->toDateString());
-
-        $logs = ParcelJourneyNotificationLog::whereHas('shop', function ($q) use ($workspace) {
-            $q->where('workspace_id', $workspace->id);
-        })->whereBetween('date', [$startDate, $endDate]);
-
-        $logsTrackedOrders = (clone $logs)->sum('tracked_orders');
-        $logsSmsSent = (clone $logs)->sum('sms_sent');
-        $logsChatSent = (clone $logs)->sum('chat_sent');
-
-        $notifBase = ParcelJourneyNotification::whereHas('order', function ($q) use ($workspace) {
-            $q->where('workspace_id', $workspace->id);
-        })->whereBetween('created_at', [$startDate, $endDate.' 23:59:59']);
-
-        $notifTrackedOrders = (clone $notifBase)->distinct('order_id')->count('order_id');
-        $notifSmsSent = (clone $notifBase)->where('type', 'sms')->whereIn('status', ['sent', 'delivered'])->count();
-        $notifChatSent = (clone $notifBase)->where('type', 'chat')->whereIn('status', ['sent', 'delivered'])->count();
-
-        $trackedOrders = $logsTrackedOrders + $notifTrackedOrders;
-        $smsSent = $logsSmsSent + $notifSmsSent;
-        $chatSent = $logsChatSent + $notifChatSent;
-        $totalSent = $smsSent + $chatSent;
-
-        $logsAgg = DB::table('parcel_journey_notification_logs as pjnl')
-            ->whereBetween('pjnl.date', [$startDate, $endDate])
-            ->selectRaw('pjnl.shop_id, MIN(pjnl.date) as first_date, SUM(pjnl.tracked_orders) as tracked_orders, SUM(pjnl.sms_sent) as sms_sent, SUM(pjnl.chat_sent) as chat_sent')
-            ->groupBy('pjnl.shop_id');
-
-        $notifAgg = DB::table('parcel_journey_notifications as pjn')
-            ->join('pancake_orders as po', 'po.id', '=', 'pjn.order_id')
-            ->whereBetween('pjn.created_at', [$startDate.' 00:00:00', $endDate.' 23:59:59'])
-            ->whereIn('pjn.status', ['sent', 'delivered'])
-            ->selectRaw('po.shop_id, MIN(DATE(pjn.created_at)) as first_date, COUNT(DISTINCT pjn.order_id) as tracked_orders, SUM(pjn.type = "sms") as sms_sent, SUM(pjn.type = "chat") as chat_sent')
-            ->groupBy('po.shop_id');
-
-        $shopQuery = Shop::where('shops.workspace_id', $workspace->id)
-            ->visibleTo(request()->user(), $workspace)
-            ->leftJoinSub($logsAgg, 'logs_agg', 'logs_agg.shop_id', '=', 'shops.id')
-            ->leftJoinSub($notifAgg, 'notif_agg', 'notif_agg.shop_id', '=', 'shops.id')
-            ->selectRaw('
-                shops.id,
-                shops.name as shop_name,
-                CASE
-                    WHEN logs_agg.first_date IS NOT NULL AND notif_agg.first_date IS NOT NULL
-                        THEN LEAST(logs_agg.first_date, notif_agg.first_date)
-                    WHEN logs_agg.first_date IS NOT NULL THEN logs_agg.first_date
-                    ELSE notif_agg.first_date
-                END as parcel_journey_started,
-                COALESCE(logs_agg.tracked_orders, 0) + COALESCE(notif_agg.tracked_orders, 0) as tracked_orders,
-                COALESCE(logs_agg.sms_sent, 0) + COALESCE(notif_agg.sms_sent, 0) as sms_sent,
-                COALESCE(logs_agg.chat_sent, 0) + COALESCE(notif_agg.chat_sent, 0) as chat_sent
-            ')
-            ->havingRaw('parcel_journey_started IS NOT NULL OR tracked_orders > 0');
-
-        $shopStats = QueryBuilder::for($shopQuery)
-            ->allowedSorts([
-                AllowedSort::field('shop_name'),
-                AllowedSort::field('parcel_journey_started'),
-                AllowedSort::field('tracked_orders'),
-                AllowedSort::field('sms_sent'),
-                AllowedSort::field('chat_sent'),
-            ])
-            ->defaultSort('-parcel_journey_started')
-            ->paginate(
-                perPage: $request->integer('per_page_stats', 10),
-                pageName: 'stats_page',
-            )
-            ->withQueryString();
-
+        // Neither the stat cards nor the per-shop table are computed here any
+        // more: each fetches its own figures from ParcelJourneyStatsController,
+        // so the page renders — and sorts, and pages — without waiting on the
+        // aggregates. The window is echoed back only to seed the date picker.
         return Inertia::render('workspaces/rts/parcel-update-notification-templates', [
             'workspace' => $workspace,
             'templates' => $templates,
-            'shopStats' => $shopStats,
-            'analytics' => [
-                'tracked_orders' => $trackedOrders,
-                'sms_sent' => $smsSent,
-                'chat_sent' => $chatSent,
-                'total_sent' => $totalSent,
-            ],
             'query' => [
-                'start_date' => $startDate,
-                'end_date' => $endDate,
-                'sort' => $request->input('sort'),
-                'stats_page' => $request->integer('stats_page', 1),
-                'stats_per_page' => $request->integer('per_page_stats', 10),
+                'start_date' => $request->input('start_date', now()->startOfMonth()->toDateString()),
+                'end_date' => $request->input('end_date', now()->endOfMonth()->toDateString()),
             ],
         ]);
     }

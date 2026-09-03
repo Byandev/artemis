@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Tooltip,
     TooltipContent,
@@ -204,6 +205,281 @@ function EditablePhone({
             {value || '—'}
             <Pencil className="h-2.5 w-2.5 shrink-0 opacity-0 group-hover/phone:opacity-100" />
         </button>
+    );
+}
+
+/** The three things a CSR rings, in the order the modal lists them. */
+const BREAKDOWN_GROUPS = [
+    {
+        key: 'rmo_customer' as const,
+        label: 'RMO Customer',
+        hint: 'Calls to the customer on a delivery loaded for this day.',
+    },
+    {
+        key: 'rmo_rider' as const,
+        label: 'RMO Rider',
+        hint: "Calls to the rider carrying one of this day's deliveries.",
+    },
+    {
+        key: 'order_verification' as const,
+        label: 'Order Verification',
+        hint: 'Not tracked yet — verification calls are not marked as such at the source, and a call that matched no delivery is just as likely a wrong number or a late-syncing order.',
+    },
+];
+
+interface BreakdownLog {
+    id: number;
+    phone_number: string;
+    type: string;
+    duration: number;
+    call_time: string;
+    persona: string | null;
+    called_by: string | null;
+    order_number: string | null;
+}
+
+interface BreakdownGroup {
+    calls: number;
+    duration: number;
+    connected: number;
+    logs: BreakdownLog[];
+}
+
+type BreakdownResponse = {
+    date: string;
+    groups: Record<
+        'rmo_customer' | 'rmo_rider' | 'order_verification',
+        BreakdownGroup
+    >;
+};
+
+/**
+ * The day's calls split by who was on the other end.
+ *
+ * The stat cards say how many calls were made; this says what they were for,
+ * which is the question that actually follows. Each tab carries its own totals
+ * so the split is readable before opening any of them.
+ */
+function CallLogBreakdownModal({
+    open,
+    onOpenChange,
+    workspaceSlug,
+    date,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    workspaceSlug: string;
+    date: string;
+}) {
+    const [data, setData] = useState<BreakdownResponse | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [tab, setTab] = useState<string>(BREAKDOWN_GROUPS[0].key);
+
+    useEffect(() => {
+        if (!open) return;
+        setLoading(true);
+        fetch(
+            `/public/workspaces/${workspaceSlug}/rts/rmo-management/call-logs/breakdown?date=${date}`,
+        )
+            .then((r) => r.json())
+            .then(setData)
+            .finally(() => setLoading(false));
+    }, [open, workspaceSlug, date]);
+
+    const totalCalls = data
+        ? BREAKDOWN_GROUPS.reduce(
+              (sum, g) => sum + (data.groups[g.key]?.calls ?? 0),
+              0,
+          )
+        : 0;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle className="text-sm font-semibold">
+                        Call Logs Breakdown
+                    </DialogTitle>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                        {date} · {totalCalls} call{totalCalls !== 1 ? 's' : ''}{' '}
+                        across all users
+                    </p>
+                </DialogHeader>
+
+                {loading ? (
+                    <p className="py-10 text-center text-[12px] text-gray-400">
+                        Loading…
+                    </p>
+                ) : !data ? (
+                    <p className="py-10 text-center text-[12px] text-gray-400">
+                        Could not load the breakdown
+                    </p>
+                ) : (
+                    <Tabs value={tab} onValueChange={setTab}>
+                        <TabsList className="grid w-full grid-cols-3">
+                            {BREAKDOWN_GROUPS.map((g) => (
+                                <TabsTrigger
+                                    key={g.key}
+                                    value={g.key}
+                                    className="text-[11px]"
+                                >
+                                    {g.label}
+                                    <span className="ml-1.5 rounded-full bg-black/5 px-1.5 py-0.5 font-mono text-[10px] dark:bg-white/10">
+                                        {data.groups[g.key]?.calls ?? '—'}
+                                    </span>
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+
+                        {BREAKDOWN_GROUPS.map((g) => {
+                            const group = data.groups[g.key];
+
+                            // Null is "we don't measure this yet" — a zeroed-out
+                            // panel would read as a quiet day instead.
+                            if (!group) {
+                                return (
+                                    <TabsContent key={g.key} value={g.key}>
+                                        <div className="py-10 text-center">
+                                            <p className="text-[12px] font-medium text-gray-500 dark:text-gray-400">
+                                                Not tracked yet
+                                            </p>
+                                            <p className="mx-auto mt-1 max-w-sm text-[11px] text-gray-400 dark:text-gray-500">
+                                                {g.hint}
+                                            </p>
+                                        </div>
+                                    </TabsContent>
+                                );
+                            }
+
+                            return (
+                                <TabsContent key={g.key} value={g.key}>
+                                    <p className="mb-3 text-[11px] text-gray-400 dark:text-gray-500">
+                                        {g.hint}
+                                    </p>
+
+                                    <div className="mb-3 grid grid-cols-3 gap-2">
+                                        {[
+                                            {
+                                                label: 'Calls',
+                                                value: group.calls.toLocaleString(),
+                                            },
+                                            {
+                                                label: 'Duration',
+                                                value: formatDuration(
+                                                    group.duration,
+                                                ),
+                                            },
+                                            {
+                                                label: 'Connected (5s+)',
+                                                value: group.connected.toLocaleString(),
+                                            },
+                                        ].map((stat) => (
+                                            <div
+                                                key={stat.label}
+                                                className="rounded-[10px] border border-black/6 px-3 py-2 dark:border-white/6"
+                                            >
+                                                <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                                                    {stat.label}
+                                                </p>
+                                                <p className="font-mono text-[14px] font-semibold text-gray-900 tabular-nums dark:text-gray-100">
+                                                    {stat.value}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {group.logs.length === 0 ? (
+                                        <p className="py-8 text-center text-[12px] text-gray-400">
+                                            No calls in this group
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <div className="max-h-64 overflow-y-auto">
+                                                <table className="w-full text-[12px]">
+                                                    <thead>
+                                                        <tr className="border-b text-left text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
+                                                            <th className="pr-3 pb-2">
+                                                                Time
+                                                            </th>
+                                                            <th className="pr-3 pb-2">
+                                                                Number
+                                                            </th>
+                                                            <th className="pr-3 pb-2">
+                                                                Order
+                                                            </th>
+                                                            <th className="pr-3 pb-2">
+                                                                By
+                                                            </th>
+                                                            <th className="pr-3 pb-2 text-right">
+                                                                Duration
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {group.logs.map(
+                                                            (log) => (
+                                                                <tr
+                                                                    key={log.id}
+                                                                    className="border-b border-black/5 dark:border-white/5"
+                                                                >
+                                                                    <td className="py-2 pr-3 font-mono text-gray-600 dark:text-gray-300">
+                                                                        {
+                                                                            log.call_time
+                                                                        }
+                                                                    </td>
+                                                                    <td className="py-2 pr-3 font-mono text-[11px] text-gray-600 dark:text-gray-300">
+                                                                        {
+                                                                            log.phone_number
+                                                                        }
+                                                                    </td>
+                                                                    <td className="py-2 pr-3 font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                                                                        {log.order_number ??
+                                                                            '—'}
+                                                                    </td>
+                                                                    <td className="py-2 pr-3 text-[11px] text-gray-600 dark:text-gray-300">
+                                                                        {log.called_by ??
+                                                                            '—'}
+                                                                    </td>
+                                                                    <td className="py-2 pr-3 text-right font-mono text-gray-600 dark:text-gray-300">
+                                                                        {formatDuration(
+                                                                            log.duration,
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            ),
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {group.logs.length <
+                                                group.calls && (
+                                                <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+                                                    Showing the{' '}
+                                                    {group.logs.length} most
+                                                    recent of {group.calls}{' '}
+                                                    calls. The totals above
+                                                    cover all of them.
+                                                </p>
+                                            )}
+                                        </>
+                                    )}
+                                </TabsContent>
+                            );
+                        })}
+                    </Tabs>
+                )}
+
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => onOpenChange(false)}
+                        className="rounded-lg border border-black/10 px-4 py-1.5 text-[12px] font-medium text-gray-600 hover:bg-gray-50 dark:border-white/10 dark:text-gray-400 dark:hover:bg-zinc-800"
+                    >
+                        Close
+                    </button>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -432,6 +708,7 @@ function RmoManagement({
     const [stats, setStats] = useState<RmoStats | null>(null);
     const [statsLoading, setStatsLoading] = useState(true);
     const [exportModalOpen, setExportModalOpen] = useState(false);
+    const [breakdownOpen, setBreakdownOpen] = useState(false);
     const [exportColumns, setExportColumns] = useState<string[]>(() => {
         const saved = localStorage.getItem('rmo_export_columns');
         return saved ? JSON.parse(saved) : [...ALL_COLUMN_KEYS];
@@ -832,12 +1109,6 @@ function RmoManagement({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMyAssigneeOnly, showMyConfirmeeOnly, currentUserId]);
 
-    // Clear selection whenever the page data changes
-    useEffect(() => {
-        setSelectedIds(new Set());
-        setBulkConflict(null);
-    }, [orders.current_page, orders.data?.length]);
-
     // The filters currently applied to the table, as query params — so every
     // export downloads exactly the rows on screen.
     const exportParams = useCallback(() => {
@@ -1063,39 +1334,99 @@ function RmoManagement({
 
     const [copiedRider, setCopiedRider] = useState(false);
     const [copiedCustomer, setCopiedCustomer] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+    // Selected orders, keyed by id, and holding the row itself rather than just
+    // the id: the selection outlives paging, so by the time "Assign to me" runs
+    // most of what it counts is no longer in `orders.data`.
+    const [selectedOrders, setSelectedOrders] = useState<
+        Map<number, OrderForDelivery>
+    >(new Map());
+    const selectedCount = selectedOrders.size;
 
     const allPageIds = useMemo(
         () => (orders.data ?? []).map((o) => o.id),
         [orders.data],
     );
     const allSelected =
-        allPageIds.length > 0 && allPageIds.every((id) => selectedIds.has(id));
-    const someSelected = allPageIds.some((id) => selectedIds.has(id));
+        allPageIds.length > 0 &&
+        allPageIds.every((id) => selectedOrders.has(id));
+    const someSelected = allPageIds.some((id) => selectedOrders.has(id));
+    // Selected orders the table isn't showing — another page of the same list,
+    // or rows a search has narrowed out of sight. Worth saying out loud: the
+    // bulk actions still reach every one of them.
+    const selectedOffPageCount = useMemo(() => {
+        const onPage = new Set(allPageIds);
+        let count = 0;
+        selectedOrders.forEach((_, id) => {
+            if (!onPage.has(id)) count += 1;
+        });
+        return count;
+    }, [selectedOrders, allPageIds]);
 
-    const toggleRow = useCallback((id: number) => {
-        setSelectedIds((prev) => {
-            const next = new Set(prev);
-            next.has(id) ? next.delete(id) : next.add(id);
+    const toggleRow = useCallback((order: OrderForDelivery) => {
+        setSelectedOrders((prev) => {
+            const next = new Map(prev);
+            if (next.has(order.id)) {
+                next.delete(order.id);
+            } else {
+                next.set(order.id, order);
+            }
             return next;
         });
     }, []);
 
     const toggleAll = useCallback(() => {
-        setSelectedIds((prev) => {
-            if (allPageIds.every((id) => prev.has(id))) {
-                const next = new Set(prev);
-                allPageIds.forEach((id) => next.delete(id));
+        const pageOrders = orders.data ?? [];
+        setSelectedOrders((prev) => {
+            const next = new Map(prev);
+            if (pageOrders.every((o) => prev.has(o.id))) {
+                pageOrders.forEach((o) => next.delete(o.id));
                 return next;
             }
-            return new Set([...prev, ...allPageIds]);
+            pageOrders.forEach((o) => next.set(o.id, o));
+            return next;
         });
-    }, [allPageIds]);
+    }, [orders.data]);
 
     const clearSelection = useCallback(() => {
-        setSelectedIds(new Set());
+        setSelectedOrders(new Map());
         setBulkConflict(null);
     }, []);
+
+    // Rows the selection is holding go stale as the table reloads — an order
+    // assigned from its own row, say, comes back with an assignee. Refresh the
+    // snapshots from whichever selected rows the current page carries.
+    useEffect(() => {
+        setSelectedOrders((prev) => {
+            if (prev.size === 0) return prev;
+            const next = new Map(prev);
+            let changed = false;
+            (orders.data ?? []).forEach((o) => {
+                if (next.has(o.id)) {
+                    next.set(o.id, o);
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [orders.data]);
+
+    // The delivery date is the one control that starts the selection over. Every
+    // other one — paging, sorting, search, the status and parcel-status selects,
+    // the page / shop / user filters, the assignee picker and the two "mine
+    // only" toggles — just changes which of that day's orders you happen to be
+    // looking at, and the bulk actions post ids, so an order stays selected
+    // while it scrolls out of view. That's what makes them work together:
+    // filter to one shop, tick two, search a rider, tick three more, assign all
+    // five.
+    //
+    // A new date is a different day's work, and one the server's editable-date
+    // window would mostly refuse anyway — a selection carried into it would fail
+    // in halves rather than do anything useful.
+    useEffect(() => {
+        setSelectedOrders(new Map());
+        setBulkConflict(null);
+    }, [deliveryDate]);
 
     const [bulkConflict, setBulkConflict] = useState<{
         already: number;
@@ -1106,17 +1437,17 @@ function RmoManagement({
         (userId: string) => {
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-assign`,
-                { ids: Array.from(selectedIds), userId },
+                { ids: Array.from(selectedOrders.keys()), userId },
                 {
                     preserveScroll: true,
                     onSuccess: () => {
-                        setSelectedIds(new Set());
+                        setSelectedOrders(new Map());
                         setBulkConflict(null);
                     },
                 },
             );
         },
-        [selectedIds, workspace.slug],
+        [selectedOrders, workspace.slug],
     );
 
     const handleBulkAssignToMe = useCallback(() => {
@@ -1125,38 +1456,35 @@ function RmoManagement({
             setIsOpen(true);
             return;
         }
-        const selectedOrders = (orders.data ?? []).filter((o) =>
-            selectedIds.has(o.id),
-        );
-        const alreadyAssigned = selectedOrders.filter(
+        const alreadyAssigned = Array.from(selectedOrders.values()).filter(
             (o) => o.assignee != null,
         ).length;
         if (alreadyAssigned > 0) {
             setBulkConflict({
                 already: alreadyAssigned,
-                toAssign: selectedOrders.length - alreadyAssigned,
+                toAssign: selectedOrders.size - alreadyAssigned,
             });
             return;
         }
         doBulkAssign(userId);
-    }, [selectedIds, orders.data, doBulkAssign, currentUserId]);
+    }, [selectedOrders, doBulkAssign, currentUserId]);
 
     const handleBulkUpdateStatus = useCallback(
         (status: OrderStatus) => {
             router.post(
                 `/public/workspaces/${workspace.slug}/rts/rmo-management/bulk-status`,
-                { ids: Array.from(selectedIds), status },
+                { ids: Array.from(selectedOrders.keys()), status },
                 {
                     preserveScroll: true,
                     preserveState: false,
                     onSuccess: () => {
-                        setSelectedIds(new Set());
+                        setSelectedOrders(new Map());
                         setBulkConflict(null);
                     },
                 },
             );
         },
-        [selectedIds, workspace.slug],
+        [selectedOrders, workspace.slug],
     );
 
     const pendingOrders = useMemo(
@@ -1213,8 +1541,8 @@ function RmoManagement({
                 ),
                 cell: ({ row }) => (
                     <Checkbox
-                        checked={selectedIds.has(row.original.id)}
-                        onCheckedChange={() => toggleRow(row.original.id)}
+                        checked={selectedOrders.has(row.original.id)}
+                        onCheckedChange={() => toggleRow(row.original)}
                         aria-label="Select row"
                         className="translate-y-px"
                     />
@@ -1516,6 +1844,31 @@ function RmoManagement({
                 },
             },
             {
+                id: 'shop_rts_rate',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Shop RTS" />
+                ),
+                cell: ({ row }) => {
+                    const rate = row.original.shop_rts_rate ?? null;
+                    if (rate === null) {
+                        return (
+                            <span className="text-center text-[12px] text-gray-300 dark:text-gray-600">
+                                —
+                            </span>
+                        );
+                    }
+                    const isHigh = rate >= 0.4;
+                    return (
+                        <span
+                            className={`text-center text-[12px] font-medium tabular-nums ${isHigh ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}
+                        >
+                            {percentageFormatter(rate)}
+                        </span>
+                    );
+                },
+            },
+            {
                 id: 'conferrer_name',
                 accessorKey: 'conferrer.name',
                 enableSorting: true,
@@ -1630,7 +1983,7 @@ function RmoManagement({
             isYesterday,
             canEditPastDay,
             canEditPhone,
-            selectedIds,
+            selectedOrders,
             allSelected,
             someSelected,
             toggleAll,
@@ -1649,6 +2002,13 @@ function RmoManagement({
                 }}
                 users={users}
                 onSubmit={handleUserSelected}
+            />
+
+            <CallLogBreakdownModal
+                open={breakdownOpen}
+                onOpenChange={setBreakdownOpen}
+                workspaceSlug={workspace.slug}
+                date={deliveryDate}
             />
 
             <CallLogModal
@@ -1893,6 +2253,15 @@ function RmoManagement({
 
                 {showStats && (
                     <div className="mb-6">
+                        <div className="mb-2 flex justify-end">
+                            <button
+                                onClick={() => setBreakdownOpen(true)}
+                                className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400"
+                            >
+                                <ListChecks className="h-3.5 w-3.5" />
+                                Call logs breakdown
+                            </button>
+                        </div>
                         <RmoStatCards
                             total_for_delivery_today={
                                 stats?.total_for_delivery_today ?? 0
@@ -2143,12 +2512,17 @@ function RmoManagement({
                     </div>
                 </div>
 
-                {selectedIds.size > 0 && (
+                {selectedCount > 0 && (
                     <div className="mb-3 space-y-2">
                         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 dark:border-emerald-500/30 dark:bg-emerald-500/10">
                             <span className="text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">
-                                {selectedIds.size} order
-                                {selectedIds.size !== 1 ? 's' : ''} selected
+                                {selectedCount} order
+                                {selectedCount !== 1 ? 's' : ''} selected
+                                {selectedOffPageCount > 0 && (
+                                    <span className="ml-1 font-normal text-emerald-600/80 dark:text-emerald-400/70">
+                                        ({selectedOffPageCount} not shown here)
+                                    </span>
+                                )}
                             </span>
                             <div className="h-3.5 w-px bg-emerald-200 dark:bg-emerald-500/30" />
                             <button
@@ -2178,11 +2552,8 @@ function RmoManagement({
                                         className="w-52 overflow-hidden p-1"
                                     >
                                         <p className="px-2 pt-1 pb-1.5 font-mono text-[10px] tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                                            Set {selectedIds.size} order
-                                            {selectedIds.size !== 1
-                                                ? 's'
-                                                : ''}{' '}
-                                            to
+                                            Set {selectedCount} order
+                                            {selectedCount !== 1 ? 's' : ''} to
                                         </p>
                                         <div className="max-h-72 overflow-y-auto">
                                             {ORDER_STATUSES.map((s) => (

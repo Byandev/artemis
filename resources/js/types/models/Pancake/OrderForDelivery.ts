@@ -145,6 +145,9 @@ export interface OrderForDelivery {
     customer_call_duration: number | null;
     rider_call_duration: number | null;
     rider_rts_rate: number | null;
+    // Shop's rolling RTS rate over the previous 14 days, snapshotted onto
+    // shops.rts_snapshot by `sync:shop-rts-snapshot`. Fraction (0-1).
+    shop_rts_rate: number | null;
     caller_id: string | null;
     conferrer_id: string | null;
     delivery_date: string; // ISO date

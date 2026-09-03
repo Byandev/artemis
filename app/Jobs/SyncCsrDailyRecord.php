@@ -76,6 +76,10 @@ class SyncCsrDailyRecord implements ShouldQueue
                     'total_sales' => (float) $row->total_sales,
                     'returning' => (float) $row->returning,
                     'delivered' => (float) $row->delivered,
+                    // The parcels behind those two amounts: CSR analytics ranks
+                    // on the rate but qualifies on the count.
+                    'returning_count' => (int) $row->returning_count,
+                    'delivered_count' => (int) $row->delivered_count,
                 ]
             );
         }
