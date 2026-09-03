@@ -33,16 +33,24 @@ import clsx from 'clsx';
 import { formatDate } from 'date-fns';
 import flatpickr from 'flatpickr';
 import { omit } from 'lodash';
+import type { LucideIcon } from 'lucide-react';
 import {
+    ChartColumn,
     Check,
     ChevronDown,
     Download,
+    Flag,
     Image as ImageIcon,
+    Layers,
     LayoutGrid,
     Loader2,
+    Megaphone,
     Play,
     Search,
+    Type,
     UserPlus,
+    UserRound,
+    Wallet,
     X,
 } from 'lucide-react';
 import moment from 'moment';
@@ -68,6 +76,7 @@ import {
     serializeMetricFilters,
     useColumnPresets,
 } from './_shared';
+import { RowTimelineModal, TimelineTarget } from './row-timeline-modal';
 
 import DateOption = flatpickr.Options.DateOption;
 
@@ -80,14 +89,18 @@ type GroupBy =
     | 'page'
     | 'page_owner';
 
-const GROUP_BY_OPTIONS: { value: GroupBy; label: string }[] = [
-    { value: 'ad_name', label: 'Ad Name' },
-    { value: 'ad', label: 'Ad Id' },
-    { value: 'campaign', label: 'Campaign' },
-    { value: 'ad_set', label: 'Ad Set' },
-    { value: 'account', label: 'Ad Account' },
-    { value: 'page', label: 'Page' },
-    { value: 'page_owner', label: 'Page Owner' },
+const GROUP_BY_OPTIONS: {
+    value: GroupBy;
+    label: string;
+    icon: LucideIcon;
+}[] = [
+    { value: 'ad_name', label: 'Ad Name', icon: Type },
+    { value: 'ad', label: 'Ad Id', icon: ImageIcon },
+    { value: 'campaign', label: 'Campaign', icon: Megaphone },
+    { value: 'ad_set', label: 'Ad Set', icon: Layers },
+    { value: 'account', label: 'Ad Account', icon: Wallet },
+    { value: 'page', label: 'Page', icon: Flag },
+    { value: 'page_owner', label: 'Page Owner', icon: UserRound },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -390,6 +403,7 @@ function GridTable({
     onFetch,
     onSelectAd,
     onOpenGroup,
+    onOpenTimeline,
     // Creator tagging (only wired for the `ad` grouping + the ads-in-group modal).
     showCreator = false,
     members = [],
@@ -411,6 +425,7 @@ function GridTable({
     onFetch: (params?: { [key: string]: string | number | null }) => void;
     onSelectAd: (ad: Row) => void;
     onOpenGroup?: (row: Row) => void;
+    onOpenTimeline?: (row: Row) => void;
     showCreator?: boolean;
     members?: OwnerOption[];
     canEditCreator?: boolean;
@@ -549,6 +564,22 @@ function GridTable({
                             </span>
                         )}
                     </div>
+                    {onOpenTimeline && (
+                        <button
+                            type="button"
+                            // The row itself opens the creative / ads drill-down,
+                            // so the chart has to claim its own click.
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenTimeline(row.original);
+                            }}
+                            title="View timeline"
+                            aria-label={`View the timeline for ${row.original.name ?? 'this row'}`}
+                            className="mt-0.5 shrink-0 rounded-md p-1 text-gray-300 transition-colors hover:bg-stone-100 hover:text-emerald-600 dark:text-gray-600 dark:hover:bg-zinc-700 dark:hover:text-emerald-400"
+                        >
+                            <ChartColumn className="h-3.5 w-3.5" />
+                        </button>
+                    )}
                 </div>
             ),
         },
@@ -712,6 +743,7 @@ function GroupAdsModal({
     canEditCreator,
     onClose,
     onSelectAd,
+    onOpenTimeline,
 }: {
     slug: string;
     target: GroupTarget | null;
@@ -722,6 +754,7 @@ function GroupAdsModal({
     canEditCreator: boolean;
     onClose: () => void;
     onSelectAd: (ad: Row) => void;
+    onOpenTimeline?: (row: Row) => void;
 }) {
     const open = target != null;
     const [rows, setRows] = useState<PaginatedData<Row> | null>(null);
@@ -817,6 +850,7 @@ function GroupAdsModal({
                                 setPerPage(Number(p.per_page) || 25);
                         }}
                         onSelectAd={onSelectAd}
+                        onOpenTimeline={onOpenTimeline}
                         showCreator
                         members={members}
                         canEditCreator={canEditCreator}
@@ -1165,6 +1199,7 @@ function GroupBySelect({
                     <span className="text-gray-400 dark:text-gray-500">
                         Group by
                     </span>
+                    <active.icon className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
                     <span className="font-medium">{active.label}</span>
                     <ChevronDown className="h-3 w-3 text-gray-400" />
                 </Button>
@@ -1181,11 +1216,12 @@ function GroupBySelect({
                             onChange(o.value);
                             setOpen(false);
                         }}
-                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
                     >
-                        {o.label}
+                        <o.icon className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                        <span className="flex-1">{o.label}</span>
                         {o.value === value && (
-                            <Check className="h-3 w-3 text-emerald-500" />
+                            <Check className="h-3 w-3 shrink-0 text-emerald-500" />
                         )}
                     </button>
                 ))}
@@ -1225,6 +1261,9 @@ export default function MetaAdsManager({
     const [loading, setLoading] = useState(true);
     const [previewAd, setPreviewAd] = useState<Row | null>(null);
     const [groupTarget, setGroupTarget] = useState<GroupTarget | null>(null);
+    const [timelineTarget, setTimelineTarget] = useState<TimelineTarget | null>(
+        null,
+    );
 
     const {
         saving: creatorSaving,
@@ -1440,6 +1479,18 @@ export default function MetaAdsManager({
                     sort={sort}
                     onFetch={onTableFetch}
                     onSelectAd={setPreviewAd}
+                    onOpenTimeline={(row) =>
+                        setTimelineTarget({
+                            scopeBy: groupBy,
+                            // ad_name groups by the name itself, so that's what
+                            // identifies the group server-side.
+                            scope:
+                                groupBy === 'ad_name'
+                                    ? (row.name ?? '')
+                                    : String(row.id),
+                            label: row.name ?? '—',
+                        })
+                    }
                     onOpenGroup={(row) =>
                         setGroupTarget({
                             groupBy,
@@ -1471,6 +1522,16 @@ export default function MetaAdsManager({
                 onClose={() => setPreviewAd(null)}
             />
 
+            <RowTimelineModal
+                slug={workspace.slug}
+                target={timelineTarget}
+                dateRange={range}
+                selectedAccounts={selected}
+                accountsTotal={accounts.length}
+                groupLabel={groupLabel}
+                onClose={() => setTimelineTarget(null)}
+            />
+
             <GroupAdsModal
                 slug={workspace.slug}
                 target={groupTarget}
@@ -1481,6 +1542,13 @@ export default function MetaAdsManager({
                 canEditCreator={canEditCreator}
                 onClose={() => setGroupTarget(null)}
                 onSelectAd={(ad) => setPreviewAd(ad)}
+                onOpenTimeline={(row) =>
+                    setTimelineTarget({
+                        scopeBy: 'ad',
+                        scope: String(row.id),
+                        label: row.name ?? '—',
+                    })
+                }
             />
         </AppLayout>
     );
