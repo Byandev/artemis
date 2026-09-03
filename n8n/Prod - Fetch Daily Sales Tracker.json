@@ -1,399 +1,407 @@
 {
-  "name": "Prod - Fetch Daily Sales Tracker",
-  "nodes": [
-    {
-      "parameters": {
-        "operation": "runCustomScript",
-        "scriptCode": "const username = $json.body.erp_username;\nconst password = $json.body.erp_password;\n\n// Open ERP login page\nawait $page.goto(\n  'https://meta-digitrading.lhike-erp.com/home',\n  {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }\n);\n\n// Wait for login form\nawait $page.waitForSelector('input[name=\"txtusername\"]', {\n  timeout: 30000\n});\n\n// Fill credentials\nawait $page.type('input[name=\"txtusername\"]', username, {\n  delay: 50\n});\n\nawait $page.type('input[name=\"txtpass\"]', password, {\n  delay: 50\n});\n\n// Submit login form\nawait Promise.all([\n  $page.click('button[type=\"submit\"]'),\n  $page.waitForNavigation({\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }).catch(() => null)\n]);\n\n// Check for login error\nconst loginError = await $page.$('.alert-danger');\n\nif (loginError) {\n  const errorText = await $page.evaluate(\n    el => el.textContent.trim(),\n    loginError\n  );\n\n  throw new Error(`Login failed: ${errorText}`);\n}\n\n// Optional: verify login succeeded\nconst currentUrl = $page.url();\n\nif (currentUrl.includes('/login')) {\n  throw new Error('Login may have failed. Still on login page.');\n}\n\n// Get cookies\nconst cookies = await $page.cookies();\n\nreturn [\n  {\n    json: {\n      success: true,\n      currentUrl,\n      cookies\n    }\n  }\n];",
-        "options": {
-          "browserWSEndpoint": "ws://chrome:3000"
-        }
-      },
-      "type": "n8n-nodes-puppeteer.puppeteer",
-      "typeVersion": 1,
-      "position": [
-        48,
-        16
-      ],
-      "id": "a23a2ee7-551e-4d65-9410-67673908a0b5",
-      "name": "Login"
-    },
-    {
-      "parameters": {
-        "jsCode": "const cookies = $('Login').first().json.cookies;\nconst items = $input.all();\n\n// Yesterday's date as MM/DD/YYYY\nconst now = new Date();\nnow.setDate(now.getDate() - 1);\nconst yesterday =\n  String(now.getMonth() + 1).padStart(2, '0') + '/' +\n  String(now.getDate()).padStart(2, '0') + '/' +\n  now.getFullYear();\n\n// Use webhook date if provided, otherwise yesterday\nconst webhookDate = $('Webhook').first().json.body.date;\nconst date = webhookDate || yesterday;\n\nfor (const item of items) {\n  item.json.cookies = cookies;\n  item.json.date = date;\n}\n\nreturn items;"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        368,
-        16
-      ],
-      "id": "c1ff5df3-db2f-4a46-b36b-1ea431ed4e3b",
-      "name": "Code in JavaScript"
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "b2411d93-98a0-47cd-afa5-8d44ea221b7a",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        -272,
-        16
-      ],
-      "id": "17d788b7-19ff-41b6-9a57-ff0d60ee1ae3",
-      "name": "Webhook",
-      "webhookId": "b2411d93-98a0-47cd-afa5-8d44ea221b7a"
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $json.webhook }}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{ $json.api_key }}"
-            }
-          ]
+    "name": "Prod - Fetch Daily Sales Tracker",
+    "nodes": [
+        {
+            "parameters": {
+                "operation": "runCustomScript",
+                "scriptCode": "const username = $json.body.erp_username;\nconst password = $json.body.erp_password;\n\n// Open ERP login page\nawait $page.goto(\n  'https://meta-digitrading.lhike-erp.com/home',\n  {\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }\n);\n\n// Wait for login form\nawait $page.waitForSelector('input[name=\"txtusername\"]', {\n  timeout: 30000\n});\n\n// Fill credentials\nawait $page.type('input[name=\"txtusername\"]', username, {\n  delay: 50\n});\n\nawait $page.type('input[name=\"txtpass\"]', password, {\n  delay: 50\n});\n\n// Submit login form\nawait Promise.all([\n  $page.click('button[type=\"submit\"]'),\n  $page.waitForNavigation({\n    waitUntil: 'networkidle2',\n    timeout: 60000\n  }).catch(() => null)\n]);\n\n// Check for login error\nconst loginError = await $page.$('.alert-danger');\n\nif (loginError) {\n  const errorText = await $page.evaluate(\n    el => el.textContent.trim(),\n    loginError\n  );\n\n  throw new Error(`Login failed: ${errorText}`);\n}\n\n// Optional: verify login succeeded\nconst currentUrl = $page.url();\n\nif (currentUrl.includes('/login')) {\n  throw new Error('Login may have failed. Still on login page.');\n}\n\n// Get cookies\nconst cookies = await $page.cookies();\n\nreturn [\n  {\n    json: {\n      success: true,\n      currentUrl,\n      cookies\n    }\n  }\n];",
+                "options": {
+                    "browserWSEndpoint": "ws://chrome:3000"
+                }
+            },
+            "type": "n8n-nodes-puppeteer.puppeteer",
+            "typeVersion": 1,
+            "position": [48, 16],
+            "id": "a23a2ee7-551e-4d65-9410-67673908a0b5",
+            "name": "Login"
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  workspace_id: $('Webhook').first().json.body.workspace_id,\n  api_key: $json.api_key,\n  inventory_id: $('Webhook').first().json.body.inventory_item_id,\n  purchase_orders: $json.orders\n}) }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [
-        2256,
-        80
-      ],
-      "id": "96b72f01-8985-40d3-81ed-31be3846b99d",
-      "name": "HTTP Request",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const orders = $input.all().map(item => item.json);\n\n\nreturn [\n  {\n    json: {\n      orders,\n    },\n  },\n];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        912,
-        -160
-      ],
-      "id": "8f906fb0-4b1b-4e3e-b6ec-d1dc3b1a3094",
-      "name": "Code in JavaScript1"
-    },
-    {
-      "parameters": {},
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        1248,
-        64
-      ],
-      "id": "1f53c1b4-080b-448b-b5c3-8fed77683c52",
-      "name": "Merge",
-      "executeOnce": true
-    },
-    {
-      "parameters": {
-        "jsCode": "const orders = $input.all().map(item => item.json);\n\n\nreturn [\n  {\n    json: {\n      orders,\n    },\n  },\n];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        912,
-        288
-      ],
-      "id": "cc0d8657-d52e-47cc-9575-173597174a82",
-      "name": "Code in JavaScript2"
-    },
-    {
-      "parameters": {
-        "jsCode": "const items = $input.all();\nconst body = $('Webhook').first().json.body;\nconst webhook = body.webhook_url;\nconst api_key = body.workspace_api_key;\nconst workspace_id = body.workspace_id;\n\n// Flatten every branch's orders into one list\nlet orders = items.flatMap(i => i.json.orders || []);\n\n// Drop DataTables \"No data available in table\" placeholder rows\norders = orders.filter(o =>\n  !Object.values(o).some(v => /no data available in table/i.test(String(v)))\n);\n\n// Dedupe on tracking number (in case an order shows under both statuses)\nconst seen = new Set();\norders = orders.filter(o => {\n  const t = o['Tracking Number'];\n  if (!t) return true;\n  if (seen.has(t)) return false;\n  seen.add(t);\n  return true;\n});\n\n// Split into batches of 1000 — one n8n item per batch\nconst SIZE = 1000;\nconst batches = [];\nfor (let i = 0; i < orders.length; i += SIZE) {\n  batches.push(orders.slice(i, i + SIZE));\n}\n\nconst batch_id = `${workspace_id}-${new Date().toISOString().slice(0, 10)}-${Date.now()}`;\n\nreturn batches.map((batch, index) => ({\n  json: {\n    orders: batch,\n    orders_count: batch.length,\n    total_count: orders.length,\n    batch_index: index + 1,\n    batch_total: batches.length,\n    batch_id,\n    webhook,\n    api_key,\n    workspace_id,\n  },\n}));"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1600,
-        64
-      ],
-      "id": "94c52a7d-57a5-4e5a-b3b1-babd2942c597",
-      "name": "Code in JavaScript3"
-    },
-    {
-      "parameters": {
-        "operation": "runCustomScript",
-        "scriptCode": "// n8n Puppeteer node — one script for both workflows.\n// Input $json: { cookies, date (MM/DD/YYYY), columns?, type: 'orderdate' | 'shipdate' }\n//\n// Scrapes the rendered table, so every value is already formatted exactly as\n// the UI shows it (innerText), no HTML parsing.\n\nconst { cookies, date, columns, type = 'shipdate' } = $json;\n\n// ---------------------------------------------------------------- config\n\nconst [mm, dd, yyyy] = (date || '').split('/');\nif (!mm || !dd || !yyyy) throw new Error(`bad date input: ${JSON.stringify(date)} (expected MM/DD/YYYY)`);\n\n// orderdate pickers accept MM/DD/YYYY; shipdate pickers only accept YYYY-MM-DD.\n// A format that won't stick in the field is skipped WITHOUT clicking search —\n// that skip is what stops shipdate from wasting a full 350k-row scan.\nconst DATE_FORMATS = [`${mm}/${dd}/${yyyy}`, `${yyyy}-${mm}-${dd}`, `${dd}/${mm}/${yyyy}`];\n\nconst PRESETS = {\n  orderdate: ['#sorderdate', '#eorderdate'],\n  shipdate:  ['#sshipdate',  '#sshipdate2'],\n};\nconst FILTER_TYPE = (type || '').toString().trim().toLowerCase();\nif (!PRESETS[FILTER_TYPE]) {\n  throw new Error(`type must be one of ${Object.keys(PRESETS).join(' | ')} — got ${JSON.stringify(type)}`);\n}\nconst [FROM_SEL, TO_SEL] = PRESETS[FILTER_TYPE];\n\nconst PAGE_LEN = 300;        // 7,009 shipdate rows -> 24 draws instead of 71\nconst MAX_PAGES = 60;\nconst DRAW_TIMEOUT = 120000; // the first unfiltered draw scans ~350k rows\n\nconst WANT = Array.isArray(columns) && columns.length ? columns : [\n  'Order ID', 'Order Date', 'CSR', 'Verifier Name', 'Upsell By', 'Customer Name',\n  'Address', 'Province', 'City', 'Brgy', 'Contact', 'Order', 'Total Qty',\n  'Price (Final)', 'Page', 'Platform', 'Tracking No.', 'Courier', 'Parcel Status',\n  'Encoded Date', 'Parcel Update', 'Shipping Fee', 'MoP', 'Order Status',\n  'Shipped Out Date', 'Date Added', 'Price (Initial)', 'Price (Upsell)',\n  'Intern & Brands Name', 'Total COG',\n];\n\nlet wantIdx = [];\nlet wantNameOnly = WANT;\n\nconst log = [];\nconst attempts = [];\n\n// drop images/fonts — pure overhead, and the container is memory-tight\ntry {\n  await $page.setRequestInterception(true);\n  $page.on('request', (req) => {\n    try {\n      if (req.isInterceptResolutionHandled && req.isInterceptResolutionHandled()) return;\n      const t = req.resourceType();\n      if (t === 'image' || t === 'media' || t === 'font') req.abort().catch(() => {});\n      else req.continue().catch(() => {});\n    } catch (_) {\n      try { req.continue().catch(() => {}); } catch (__) {}\n    }\n  });\n} catch (e) {\n  log.push(`interception unavailable: ${e?.message}`);\n}\n\nif (cookies && cookies.length) await $page.setCookie(...cookies);\nawait $page.setViewport({ width: 1280, height: 800 });\n\n// ---------------------------------------------------------------- helpers\n\nasync function alive() {\n  try { await $page.evaluate(() => 1); return true; } catch (_) { return false; }\n}\n\nasync function snap(name) {\n  try {\n    const data = await $page.screenshot({ encoding: 'base64', fullPage: false });\n    return { [name]: { data, mimeType: 'image/png', fileName: `${name}.png`, fileExtension: 'png' } };\n  } catch (_) { return {}; }\n}\n\nasync function armDraw() {\n  const ok = await $page.evaluate(() => {\n    const jq = window.jQuery || window.$;\n    if (!(jq && jq.fn.dataTable && jq.fn.dataTable.isDataTable('#tblorders'))) return false;\n    window.__drawn = false;\n    jq('#tblorders').DataTable().one('draw.dt', () => { window.__drawn = true; });\n    return true;\n  });\n  if (!ok) throw new Error('#tblorders is not an initialised DataTable');\n}\n\nasync function waitDraw(timeout = DRAW_TIMEOUT) {\n  await $page.waitForFunction(() => window.__drawn === true, { timeout, polling: 500 });\n}\n\nasync function tableInfo() {\n  return await $page.evaluate(() => {\n    const jq = window.jQuery || window.$;\n    return jq('#tblorders').DataTable().page.info();\n  });\n}\n\n// read the real name -> data-column map off the toggle pills\nasync function buildColMap() {\n  return await $page.evaluate(() => {\n    const n = (s) => (s || '').replace(/\\s+/g, ' ').trim();\n    const out = {};\n    document.querySelectorAll('[data-column]').forEach(el => {\n      const name = n(el.innerText);\n      const idx = parseInt(el.getAttribute('data-column'), 10);\n      if (name && Number.isInteger(idx) && !(name in out)) out[name] = idx;\n    });\n    return out;\n  });\n}\n\nasync function setField(selector, value) {\n  const tag = await $page.evaluate((sel) => {\n    const el = document.querySelector(sel);\n    return el ? el.tagName.toLowerCase() : null;\n  }, selector);\n  if (tag === 'select') { await $page.select(selector, value); return true; }\n\n  await $page.evaluate((sel, val) => {\n    const el = document.querySelector(sel);\n    if (!el) return;\n    const proto = Object.getPrototypeOf(el);\n    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;\n    setter ? setter.call(el, val) : (el.value = val);\n    el.dispatchEvent(new Event('input',  { bubbles: true }));\n    el.dispatchEvent(new Event('change', { bubbles: true }));\n    el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));\n    if (el.blur) el.blur();\n  }, selector, value);\n\n  let live = await $page.evaluate(sel => document.querySelector(sel)?.value ?? null, selector);\n  if (live === value) return true;\n\n  try {\n    await $page.click(selector, { clickCount: 3 });\n    await $page.keyboard.press('Backspace');\n    await $page.type(selector, value, { delay: 25 });\n    await $page.keyboard.press('Escape');\n    live = await $page.evaluate(sel => document.querySelector(sel)?.value ?? null, selector);\n  } catch (_) {}\n  return live === value;\n}\n\nasync function selectColumns(idxArr, nameArr) {\n  await armDraw();\n  await $page.evaluate((idxs, names) => {\n    const n = (s) => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();\n    const idxSet = new Set(idxs);\n    const want = names.map(n).filter(Boolean);\n    const jq = window.jQuery || window.$;\n    const dt = jq('#tblorders').DataTable();\n\n    dt.columns().every(function () {\n      const idx = this.index();\n      const th = this.header();\n      const text = n(th ? th.innerText : '');\n      let hasViewLink = false;\n      try {\n        const nodes = this.nodes();\n        for (let i = 0; i < nodes.length; i++) {\n          if (nodes[i].querySelector && nodes[i].querySelector('a[href*=\"/view/\"]')) { hasViewLink = true; break; }\n        }\n      } catch (_) {}\n      const keep = idxSet.has(idx)\n                   || want.some(w => text === w || text.includes(w))\n                   || text === '' || text === 'no' || text === '#' || text === 'actions'\n                   || hasViewLink;\n      this.visible(keep, false);\n    });\n    dt.columns.adjust().draw(false);\n  }, idxArr, nameArr);\n  await waitDraw();\n}\n\n// innerText — values come out exactly as rendered in the UI\nasync function extractTable() {\n  return await $page.evaluate(() => {\n    const table = document.querySelector('#tblorders') || document.querySelector('table');\n    if (!table) return [];\n    const headers = Array.from(table.querySelectorAll('thead th')).map(th => {\n      const c = th.cloneNode(true);\n      c.querySelectorAll('select, input, textarea, button').forEach(x => x.remove());\n      return c.innerText.trim();\n    });\n    return Array.from(table.querySelectorAll('tbody tr')).map(tr => {\n      const cells = Array.from(tr.querySelectorAll('td'));\n      if (!cells.length) return null;\n      const obj = {};\n      cells.forEach((td, i) => { obj[headers[i] || `col_${i}`] = td.innerText.trim(); });\n      const link = tr.querySelector('a[href*=\"/view/\"]');\n      if (link) {\n        const m = link.getAttribute('href').match(/\\/view\\/(\\d+)/);\n        if (m) obj.id = m[1];\n      }\n      return obj;\n    }).filter(Boolean);\n  });\n}\n\nfunction normalize(row) {\n  const out = {};\n  for (const [rawKey, value] of Object.entries(row)) {\n    const key = (rawKey || '').trim();\n    if (!key) continue;\n    if (/^col_\\d+$/i.test(key)) continue;\n    if (/[\\n\\r]/.test(key)) continue;\n    if (/^(actions?|search)$/i.test(key)) continue;\n    out[key] = value;\n  }\n  return out;\n}\n\n// ---------------------------------------------------------------- main\n\ntry {\n  await $page.goto('https://meta-digitrading.lhike-erp.com/customer', {\n    waitUntil: 'domcontentloaded', timeout: 60000,\n  });\n\n  await $page.waitForFunction(() => {\n    const jq = window.jQuery || window.$;\n    return !!(jq && jq.fn.dataTable && jq.fn.dataTable.isDataTable('#tblorders'));\n  }, { timeout: 60000, polling: 250 });\n  log.push(`datatable ready, type=${FILTER_TYPE}`);\n\n  // The filter panel only renders once the first draw lands, and that draw\n  // scans the whole table — so wait on the FIELD, generously.\n  try {\n    await $page.waitForSelector(FROM_SEL, { timeout: DRAW_TIMEOUT });\n    await $page.waitForSelector(TO_SEL,   { timeout: 30000 });\n  } catch (_) {\n    const ids = await $page.evaluate(() =>\n      Array.from(document.querySelectorAll('input[id]')).map(el => '#' + el.id));\n    throw new Error(`${FROM_SEL} / ${TO_SEL} never rendered. Inputs present: ${JSON.stringify(ids)}`);\n  }\n  log.push('filter panel rendered');\n\n  const colMap = await buildColMap();\n  wantIdx = WANT.map(n => colMap[n]).filter(i => i !== undefined);\n  wantNameOnly = WANT.filter(n => colMap[n] === undefined);\n  log.push(`columns: ${wantIdx.length} by index, ${wantNameOnly.length} by name`);\n\n  const baseline = await tableInfo();\n  log.push(`baseline ${baseline.recordsTotal} rows`);\n\n  // ---- filter -----------------------------------------------------------\n  let info = null, usedFormat = null;\n\n  for (const val of DATE_FORMATS) {\n    const okFrom = await setField(FROM_SEL, val);\n    const okTo   = await setField(TO_SEL, val);\n\n    if (!(okFrom && okTo)) {\n      attempts.push({ value: val, setOk: false, skipped: true });\n      log.push(`\"${val}\" rejected by the picker — search skipped`);\n      continue;\n    }\n\n    await armDraw();\n    await $page.click('a#btndtsearch');\n    await waitDraw();\n\n    const i2 = await tableInfo();\n    attempts.push({ value: val, setOk: true, recordsDisplay: i2.recordsDisplay });\n    log.push(`\"${val}\" -> ${i2.recordsDisplay} rows`);\n\n    if (i2.recordsDisplay < baseline.recordsTotal) { info = i2; usedFormat = val; break; }\n  }\n\n  if (!usedFormat) {\n    return [{\n      json: { error: `${FILTER_TYPE} filter never applied — still ${baseline.recordsTotal} rows`,\n              url: $page.url(), date, type: FILTER_TYPE, attempts, log },\n      binary: await snap('filter-failed'),\n    }];\n  }\n\n  // ---- columns FIRST, then page length ----------------------------------\n  // Enlarging pages while all ~35 columns are visible renders 300 x 35 cells\n  // per draw. Hiding first cuts that substantially.\n  await selectColumns(wantIdx, wantNameOnly);\n\n  await armDraw();\n  await $page.evaluate((len) => {\n    const jq = window.jQuery || window.$;\n    jq('#tblorders').DataTable().page.len(len).draw('page');\n  }, PAGE_LEN);\n  await waitDraw();\n\n  info = await tableInfo();\n  log.push(`${info.recordsDisplay} rows over ${info.pages} pages @ ${PAGE_LEN}`);\n  if (info.pages > MAX_PAGES) {\n    throw new Error(`${info.pages} pages (${info.recordsDisplay} rows) — refusing to paginate`);\n  }\n\n  // ---- paginate ---------------------------------------------------------\n  const all = [];\n  const seen = new Set();\n\n  for (let p = 0; p < info.pages; p++) {\n    if (p > 0) {\n      await armDraw();\n      await $page.evaluate(() => {\n        const jq = window.jQuery || window.$;\n        jq('#tblorders').DataTable().page('next').draw('page');\n      });\n      await waitDraw();\n    }\n\n    const rows = await extractTable();\n    if (!rows.length) throw new Error(`page ${p + 1}/${info.pages} came back empty`);\n\n    for (const raw of rows) {\n      const key = raw.id ?? JSON.stringify(raw);\n      if (seen.has(key)) continue;\n      seen.add(key);\n      all.push(normalize(raw));\n    }\n    log.push(`page ${p + 1}/${info.pages} -> ${all.length}`);\n  }\n\n  if (all.length < info.recordsDisplay) {\n    throw new Error(`scraped ${all.length} of ${info.recordsDisplay} rows`);\n  }\n\n  log.push(`done: ${all.length} rows via \"${usedFormat}\"`);\n  return all.map(r => ({ json: { ...r, _meta: { type: FILTER_TYPE, date, usedFormat } } }));\n\n} catch (err) {\n  const msg = err?.message ?? 'Something went wrong';\n  const sessionDied = /Target closed|detached|Session closed|disconnected|Protocol error/i.test(msg);\n  const up = await alive();\n  return [{\n    json: {\n      error: msg, sessionDied, pageAlive: up,\n      hint: sessionDied ? 'browserless dropped the session — raise CONNECTION_TIMEOUT and container memory' : undefined,\n      url: up ? $page.url() : null,\n      date, type: FILTER_TYPE, attempts, log,\n    },\n    binary: up ? await snap('error') : {},\n  }];\n}",
-        "options": {
-          "browserWSEndpoint": "ws://chrome:3000"
-        }
-      },
-      "type": "n8n-nodes-puppeteer.puppeteer",
-      "typeVersion": 1,
-      "position": [
-        672,
-        288
-      ],
-      "id": "1224988c-dfae-4bd1-a06a-b726ddce686e",
-      "name": "Shipped"
-    },
-    {
-      "parameters": {
-        "operation": "runCustomScript",
-        "scriptCode": "// n8n Puppeteer node — one script for both workflows.\n// Input $json: { cookies, date (MM/DD/YYYY), columns?, type: 'orderdate' | 'shipdate' }\n//\n// Scrapes the rendered table, so every value is already formatted exactly as\n// the UI shows it (innerText), no HTML parsing.\n\nconst { cookies, date, columns, type = 'orderdate' } = $json;\n\n// ---------------------------------------------------------------- config\n\nconst [mm, dd, yyyy] = (date || '').split('/');\nif (!mm || !dd || !yyyy) throw new Error(`bad date input: ${JSON.stringify(date)} (expected MM/DD/YYYY)`);\n\n// orderdate pickers accept MM/DD/YYYY; shipdate pickers only accept YYYY-MM-DD.\n// A format that won't stick in the field is skipped WITHOUT clicking search —\n// that skip is what stops shipdate from wasting a full 350k-row scan.\nconst DATE_FORMATS = [`${mm}/${dd}/${yyyy}`, `${yyyy}-${mm}-${dd}`, `${dd}/${mm}/${yyyy}`];\n\nconst PRESETS = {\n  orderdate: ['#sorderdate', '#eorderdate'],\n  shipdate:  ['#sshipdate',  '#sshipdate2'],\n};\nconst FILTER_TYPE = (type || '').toString().trim().toLowerCase();\nif (!PRESETS[FILTER_TYPE]) {\n  throw new Error(`type must be one of ${Object.keys(PRESETS).join(' | ')} — got ${JSON.stringify(type)}`);\n}\nconst [FROM_SEL, TO_SEL] = PRESETS[FILTER_TYPE];\n\nconst PAGE_LEN = 300;        // 7,009 shipdate rows -> 24 draws instead of 71\nconst MAX_PAGES = 60;\nconst DRAW_TIMEOUT = 120000; // the first unfiltered draw scans ~350k rows\n\nconst WANT = Array.isArray(columns) && columns.length ? columns : [\n  'Order ID', 'Order Date', 'CSR', 'Verifier Name', 'Upsell By', 'Customer Name',\n  'Address', 'Province', 'City', 'Brgy', 'Contact', 'Order', 'Total Qty',\n  'Price (Final)', 'Page', 'Platform', 'Tracking No.', 'Courier', 'Parcel Status',\n  'Encoded Date', 'Parcel Update', 'Shipping Fee', 'MoP', 'Order Status',\n  'Shipped Out Date', 'Date Added', 'Price (Initial)', 'Price (Upsell)',\n  'Intern & Brands Name', 'Total COG',\n];\n\nlet wantIdx = [];\nlet wantNameOnly = WANT;\n\nconst log = [];\nconst attempts = [];\n\n// drop images/fonts — pure overhead, and the container is memory-tight\ntry {\n  await $page.setRequestInterception(true);\n  $page.on('request', (req) => {\n    try {\n      if (req.isInterceptResolutionHandled && req.isInterceptResolutionHandled()) return;\n      const t = req.resourceType();\n      if (t === 'image' || t === 'media' || t === 'font') req.abort().catch(() => {});\n      else req.continue().catch(() => {});\n    } catch (_) {\n      try { req.continue().catch(() => {}); } catch (__) {}\n    }\n  });\n} catch (e) {\n  log.push(`interception unavailable: ${e?.message}`);\n}\n\nif (cookies && cookies.length) await $page.setCookie(...cookies);\nawait $page.setViewport({ width: 1280, height: 800 });\n\n// ---------------------------------------------------------------- helpers\n\nasync function alive() {\n  try { await $page.evaluate(() => 1); return true; } catch (_) { return false; }\n}\n\nasync function snap(name) {\n  try {\n    const data = await $page.screenshot({ encoding: 'base64', fullPage: false });\n    return { [name]: { data, mimeType: 'image/png', fileName: `${name}.png`, fileExtension: 'png' } };\n  } catch (_) { return {}; }\n}\n\nasync function armDraw() {\n  const ok = await $page.evaluate(() => {\n    const jq = window.jQuery || window.$;\n    if (!(jq && jq.fn.dataTable && jq.fn.dataTable.isDataTable('#tblorders'))) return false;\n    window.__drawn = false;\n    jq('#tblorders').DataTable().one('draw.dt', () => { window.__drawn = true; });\n    return true;\n  });\n  if (!ok) throw new Error('#tblorders is not an initialised DataTable');\n}\n\nasync function waitDraw(timeout = DRAW_TIMEOUT) {\n  await $page.waitForFunction(() => window.__drawn === true, { timeout, polling: 500 });\n}\n\nasync function tableInfo() {\n  return await $page.evaluate(() => {\n    const jq = window.jQuery || window.$;\n    return jq('#tblorders').DataTable().page.info();\n  });\n}\n\n// read the real name -> data-column map off the toggle pills\nasync function buildColMap() {\n  return await $page.evaluate(() => {\n    const n = (s) => (s || '').replace(/\\s+/g, ' ').trim();\n    const out = {};\n    document.querySelectorAll('[data-column]').forEach(el => {\n      const name = n(el.innerText);\n      const idx = parseInt(el.getAttribute('data-column'), 10);\n      if (name && Number.isInteger(idx) && !(name in out)) out[name] = idx;\n    });\n    return out;\n  });\n}\n\nasync function setField(selector, value) {\n  const tag = await $page.evaluate((sel) => {\n    const el = document.querySelector(sel);\n    return el ? el.tagName.toLowerCase() : null;\n  }, selector);\n  if (tag === 'select') { await $page.select(selector, value); return true; }\n\n  await $page.evaluate((sel, val) => {\n    const el = document.querySelector(sel);\n    if (!el) return;\n    const proto = Object.getPrototypeOf(el);\n    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;\n    setter ? setter.call(el, val) : (el.value = val);\n    el.dispatchEvent(new Event('input',  { bubbles: true }));\n    el.dispatchEvent(new Event('change', { bubbles: true }));\n    el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));\n    if (el.blur) el.blur();\n  }, selector, value);\n\n  let live = await $page.evaluate(sel => document.querySelector(sel)?.value ?? null, selector);\n  if (live === value) return true;\n\n  try {\n    await $page.click(selector, { clickCount: 3 });\n    await $page.keyboard.press('Backspace');\n    await $page.type(selector, value, { delay: 25 });\n    await $page.keyboard.press('Escape');\n    live = await $page.evaluate(sel => document.querySelector(sel)?.value ?? null, selector);\n  } catch (_) {}\n  return live === value;\n}\n\nasync function selectColumns(idxArr, nameArr) {\n  await armDraw();\n  await $page.evaluate((idxs, names) => {\n    const n = (s) => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();\n    const idxSet = new Set(idxs);\n    const want = names.map(n).filter(Boolean);\n    const jq = window.jQuery || window.$;\n    const dt = jq('#tblorders').DataTable();\n\n    dt.columns().every(function () {\n      const idx = this.index();\n      const th = this.header();\n      const text = n(th ? th.innerText : '');\n      let hasViewLink = false;\n      try {\n        const nodes = this.nodes();\n        for (let i = 0; i < nodes.length; i++) {\n          if (nodes[i].querySelector && nodes[i].querySelector('a[href*=\"/view/\"]')) { hasViewLink = true; break; }\n        }\n      } catch (_) {}\n      const keep = idxSet.has(idx)\n                   || want.some(w => text === w || text.includes(w))\n                   || text === '' || text === 'no' || text === '#' || text === 'actions'\n                   || hasViewLink;\n      this.visible(keep, false);\n    });\n    dt.columns.adjust().draw(false);\n  }, idxArr, nameArr);\n  await waitDraw();\n}\n\n// innerText — values come out exactly as rendered in the UI\nasync function extractTable() {\n  return await $page.evaluate(() => {\n    const table = document.querySelector('#tblorders') || document.querySelector('table');\n    if (!table) return [];\n    const headers = Array.from(table.querySelectorAll('thead th')).map(th => {\n      const c = th.cloneNode(true);\n      c.querySelectorAll('select, input, textarea, button').forEach(x => x.remove());\n      return c.innerText.trim();\n    });\n    return Array.from(table.querySelectorAll('tbody tr')).map(tr => {\n      const cells = Array.from(tr.querySelectorAll('td'));\n      if (!cells.length) return null;\n      const obj = {};\n      cells.forEach((td, i) => { obj[headers[i] || `col_${i}`] = td.innerText.trim(); });\n      const link = tr.querySelector('a[href*=\"/view/\"]');\n      if (link) {\n        const m = link.getAttribute('href').match(/\\/view\\/(\\d+)/);\n        if (m) obj.id = m[1];\n      }\n      return obj;\n    }).filter(Boolean);\n  });\n}\n\nfunction normalize(row) {\n  const out = {};\n  for (const [rawKey, value] of Object.entries(row)) {\n    const key = (rawKey || '').trim();\n    if (!key) continue;\n    if (/^col_\\d+$/i.test(key)) continue;\n    if (/[\\n\\r]/.test(key)) continue;\n    if (/^(actions?|search)$/i.test(key)) continue;\n    out[key] = value;\n  }\n  return out;\n}\n\n// ---------------------------------------------------------------- main\n\ntry {\n  await $page.goto('https://meta-digitrading.lhike-erp.com/customer', {\n    waitUntil: 'domcontentloaded', timeout: 60000,\n  });\n\n  await $page.waitForFunction(() => {\n    const jq = window.jQuery || window.$;\n    return !!(jq && jq.fn.dataTable && jq.fn.dataTable.isDataTable('#tblorders'));\n  }, { timeout: 60000, polling: 250 });\n  log.push(`datatable ready, type=${FILTER_TYPE}`);\n\n  // The filter panel only renders once the first draw lands, and that draw\n  // scans the whole table — so wait on the FIELD, generously.\n  try {\n    await $page.waitForSelector(FROM_SEL, { timeout: DRAW_TIMEOUT });\n    await $page.waitForSelector(TO_SEL,   { timeout: 30000 });\n  } catch (_) {\n    const ids = await $page.evaluate(() =>\n      Array.from(document.querySelectorAll('input[id]')).map(el => '#' + el.id));\n    throw new Error(`${FROM_SEL} / ${TO_SEL} never rendered. Inputs present: ${JSON.stringify(ids)}`);\n  }\n  log.push('filter panel rendered');\n\n  const colMap = await buildColMap();\n  wantIdx = WANT.map(n => colMap[n]).filter(i => i !== undefined);\n  wantNameOnly = WANT.filter(n => colMap[n] === undefined);\n  log.push(`columns: ${wantIdx.length} by index, ${wantNameOnly.length} by name`);\n\n  const baseline = await tableInfo();\n  log.push(`baseline ${baseline.recordsTotal} rows`);\n\n  // ---- filter -----------------------------------------------------------\n  let info = null, usedFormat = null;\n\n  for (const val of DATE_FORMATS) {\n    const okFrom = await setField(FROM_SEL, val);\n    const okTo   = await setField(TO_SEL, val);\n\n    if (!(okFrom && okTo)) {\n      attempts.push({ value: val, setOk: false, skipped: true });\n      log.push(`\"${val}\" rejected by the picker — search skipped`);\n      continue;\n    }\n\n    await armDraw();\n    await $page.click('a#btndtsearch');\n    await waitDraw();\n\n    const i2 = await tableInfo();\n    attempts.push({ value: val, setOk: true, recordsDisplay: i2.recordsDisplay });\n    log.push(`\"${val}\" -> ${i2.recordsDisplay} rows`);\n\n    if (i2.recordsDisplay < baseline.recordsTotal) { info = i2; usedFormat = val; break; }\n  }\n\n  if (!usedFormat) {\n    return [{\n      json: { error: `${FILTER_TYPE} filter never applied — still ${baseline.recordsTotal} rows`,\n              url: $page.url(), date, type: FILTER_TYPE, attempts, log },\n      binary: await snap('filter-failed'),\n    }];\n  }\n\n  // ---- columns FIRST, then page length ----------------------------------\n  // Enlarging pages while all ~35 columns are visible renders 300 x 35 cells\n  // per draw. Hiding first cuts that substantially.\n  await selectColumns(wantIdx, wantNameOnly);\n\n  await armDraw();\n  await $page.evaluate((len) => {\n    const jq = window.jQuery || window.$;\n    jq('#tblorders').DataTable().page.len(len).draw('page');\n  }, PAGE_LEN);\n  await waitDraw();\n\n  info = await tableInfo();\n  log.push(`${info.recordsDisplay} rows over ${info.pages} pages @ ${PAGE_LEN}`);\n  if (info.pages > MAX_PAGES) {\n    throw new Error(`${info.pages} pages (${info.recordsDisplay} rows) — refusing to paginate`);\n  }\n\n  // ---- paginate ---------------------------------------------------------\n  const all = [];\n  const seen = new Set();\n\n  for (let p = 0; p < info.pages; p++) {\n    if (p > 0) {\n      await armDraw();\n      await $page.evaluate(() => {\n        const jq = window.jQuery || window.$;\n        jq('#tblorders').DataTable().page('next').draw('page');\n      });\n      await waitDraw();\n    }\n\n    const rows = await extractTable();\n    if (!rows.length) throw new Error(`page ${p + 1}/${info.pages} came back empty`);\n\n    for (const raw of rows) {\n      const key = raw.id ?? JSON.stringify(raw);\n      if (seen.has(key)) continue;\n      seen.add(key);\n      all.push(normalize(raw));\n    }\n    log.push(`page ${p + 1}/${info.pages} -> ${all.length}`);\n  }\n\n  if (all.length < info.recordsDisplay) {\n    throw new Error(`scraped ${all.length} of ${info.recordsDisplay} rows`);\n  }\n\n  log.push(`done: ${all.length} rows via \"${usedFormat}\"`);\n  return all.map(r => ({ json: { ...r, _meta: { type: FILTER_TYPE, date, usedFormat } } }));\n\n} catch (err) {\n  const msg = err?.message ?? 'Something went wrong';\n  const sessionDied = /Target closed|detached|Session closed|disconnected|Protocol error/i.test(msg);\n  const up = await alive();\n  return [{\n    json: {\n      error: msg, sessionDied, pageAlive: up,\n      hint: sessionDied ? 'browserless dropped the session — raise CONNECTION_TIMEOUT and container memory' : undefined,\n      url: up ? $page.url() : null,\n      date, type: FILTER_TYPE, attempts, log,\n    },\n    binary: up ? await snap('error') : {},\n  }];\n}",
-        "options": {
-          "browserWSEndpoint": "ws://chrome:3000"
-        }
-      },
-      "type": "n8n-nodes-puppeteer.puppeteer",
-      "typeVersion": 1,
-      "position": [
-        672,
-        -160
-      ],
-      "id": "1b450a7f-a700-49ca-9cc1-bf814a6b1ab7",
-      "name": "Ordered"
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        1936,
-        64
-      ],
-      "id": "0baefb86-823e-4d03-b399-50604d8a05aa",
-      "name": "Loop Over Items"
-    },
-    {
-      "parameters": {
-        "amount": 2
-      },
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        2608,
-        80
-      ],
-      "id": "67ba7547-f8f8-4c58-b5d3-91bad9a0e9e8",
-      "name": "Wait",
-      "webhookId": "7a26ac27-a50b-45c0-a1a2-5261f1182335"
-    }
-  ],
-  "pinData": {
-    "Webhook": [
-      {
-        "json": {
-          "headers": {
-            "host": "n8n.byandev.com",
-            "x-real-ip": "165.232.171.5",
-            "x-forwarded-for": "165.232.171.5",
-            "x-forwarded-proto": "https",
-            "connection": "upgrade",
-            "content-length": "291",
-            "user-agent": "GuzzleHttp/7",
-            "content-type": "application/json",
-            "baggage": "sentry-trace_id=5045ad344f0043f09dfbbc86a6c34434,sentry-sample_rand=0.546777,sentry-sample_rate=0.1,sentry-public_key=a6821d7e205b79c38c66b9cff573c483,sentry-org_id=4511255889051648,sentry-environment=production",
-            "sentry-trace": "5045ad344f0043f09dfbbc86a6c34434-b81b5a95979f498a-0"
-          },
-          "params": {},
-          "query": {},
-          "body": {
-            "workspace_id": 11,
-            "workspace_slug": "meta-digitrading",
-            "workspace_api_key": "art_dxkhViuteRWV6YRA5Aiyw3YjOL7aG0itKwWt50a1",
-            "erp_username": "bryan.tech",
-            "erp_password": "meta.tech.erp@2026",
-            "date": "08/06/2026",
-            "webhook_url": "https://artemis.ph/api/v1/public/gencys/daily-sales-tracker"
-          },
-          "webhookUrl": "https://n8n.byandev.com/webhook/b2411d93-98a0-47cd-afa5-8d44ea221b7a",
-          "executionMode": "production"
+        {
+            "parameters": {
+                "jsCode": "const cookies = $('Login').first().json.cookies;\nconst items = $input.all();\n\n// Yesterday's date as MM/DD/YYYY\nconst now = new Date();\nnow.setDate(now.getDate() - 1);\nconst yesterday =\n  String(now.getMonth() + 1).padStart(2, '0') + '/' +\n  String(now.getDate()).padStart(2, '0') + '/' +\n  now.getFullYear();\n\n// Use webhook date if provided, otherwise yesterday\nconst webhookDate = $('Webhook').first().json.body.date;\nconst date = webhookDate || yesterday;\n\nfor (const item of items) {\n  item.json.cookies = cookies;\n  item.json.date = date;\n}\n\nreturn items;"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [368, 16],
+            "id": "c1ff5df3-db2f-4a46-b36b-1ea431ed4e3b",
+            "name": "Code in JavaScript"
         },
-        "pairedItem": {
-          "item": 0
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "b2411d93-98a0-47cd-afa5-8d44ea221b7a",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2.1,
+            "position": [-544, 16],
+            "id": "17d788b7-19ff-41b6-9a57-ff0d60ee1ae3",
+            "name": "Webhook",
+            "webhookId": "b2411d93-98a0-47cd-afa5-8d44ea221b7a"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $json.webhook }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $json.api_key }}"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify({\n  workspace_id: $('Webhook').first().json.body.workspace_id,\n  api_key: $json.api_key,\n  inventory_id: $('Webhook').first().json.body.inventory_item_id,\n  purchase_orders: $json.orders\n}) }}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.3,
+            "position": [2256, 80],
+            "id": "96b72f01-8985-40d3-81ed-31be3846b99d",
+            "name": "HTTP Request",
+            "executeOnce": true
+        },
+        {
+            "parameters": {
+                "jsCode": "const orders = $input.all().map(item => item.json);\n\n\nreturn [\n  {\n    json: {\n      orders,\n    },\n  },\n];"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [912, -160],
+            "id": "8f906fb0-4b1b-4e3e-b6ec-d1dc3b1a3094",
+            "name": "Code in JavaScript1"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 3.2,
+            "position": [1248, 64],
+            "id": "1f53c1b4-080b-448b-b5c3-8fed77683c52",
+            "name": "Merge",
+            "executeOnce": true
+        },
+        {
+            "parameters": {
+                "jsCode": "const orders = $input.all().map(item => item.json);\n\n\nreturn [\n  {\n    json: {\n      orders,\n    },\n  },\n];"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [912, 288],
+            "id": "cc0d8657-d52e-47cc-9575-173597174a82",
+            "name": "Code in JavaScript2"
+        },
+        {
+            "parameters": {
+                "jsCode": "const items = $input.all();\nconst body = $('Webhook').first().json.body;\nconst webhook = body.webhook_url;\nconst api_key = body.workspace_api_key;\nconst workspace_id = body.workspace_id;\n\n// Flatten every branch's orders into one list\nlet orders = items.flatMap(i => i.json.orders || []);\n\n// Drop DataTables \"No data available in table\" placeholder rows\norders = orders.filter(o =>\n  !Object.values(o).some(v => /no data available in table/i.test(String(v)))\n);\n\n// Dedupe on tracking number (in case an order shows under both statuses)\nconst seen = new Set();\norders = orders.filter(o => {\n  const t = o['Tracking Number'];\n  if (!t) return true;\n  if (seen.has(t)) return false;\n  seen.add(t);\n  return true;\n});\n\n// Split into batches of 1000 — one n8n item per batch\nconst SIZE = 1000;\nconst batches = [];\nfor (let i = 0; i < orders.length; i += SIZE) {\n  batches.push(orders.slice(i, i + SIZE));\n}\n\nconst batch_id = `${workspace_id}-${new Date().toISOString().slice(0, 10)}-${Date.now()}`;\n\nreturn batches.map((batch, index) => ({\n  json: {\n    orders: batch,\n    orders_count: batch.length,\n    total_count: orders.length,\n    batch_index: index + 1,\n    batch_total: batches.length,\n    batch_id,\n    webhook,\n    api_key,\n    workspace_id,\n  },\n}));"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [1600, 64],
+            "id": "94c52a7d-57a5-4e5a-b3b1-babd2942c597",
+            "name": "Code in JavaScript3"
+        },
+        {
+            "parameters": {
+                "operation": "runCustomScript",
+                "scriptCode": "// n8n Puppeteer node — one script for both workflows.\n// Input $json: { cookies, date (MM/DD/YYYY), columns?, type: 'orderdate' | 'shipdate' }\n//\n// Scrapes the rendered table, so every value is already formatted exactly as\n// the UI shows it (innerText), no HTML parsing.\n\nconst { cookies, date, columns, type = 'shipdate' } = $json;\n\n// ---------------------------------------------------------------- config\n\nconst [mm, dd, yyyy] = (date || '').split('/');\nif (!mm || !dd || !yyyy) throw new Error(`bad date input: ${JSON.stringify(date)} (expected MM/DD/YYYY)`);\n\n// orderdate pickers accept MM/DD/YYYY; shipdate pickers only accept YYYY-MM-DD.\n// A format that won't stick in the field is skipped WITHOUT clicking search —\n// that skip is what stops shipdate from wasting a full 350k-row scan.\nconst DATE_FORMATS = [`${mm}/${dd}/${yyyy}`, `${yyyy}-${mm}-${dd}`, `${dd}/${mm}/${yyyy}`];\n\nconst PRESETS = {\n  orderdate: ['#sorderdate', '#eorderdate'],\n  shipdate:  ['#sshipdate',  '#sshipdate2'],\n};\nconst FILTER_TYPE = (type || '').toString().trim().toLowerCase();\nif (!PRESETS[FILTER_TYPE]) {\n  throw new Error(`type must be one of ${Object.keys(PRESETS).join(' | ')} — got ${JSON.stringify(type)}`);\n}\nconst [FROM_SEL, TO_SEL] = PRESETS[FILTER_TYPE];\n\nconst PAGE_LEN = 300;        // 7,009 shipdate rows -> 24 draws instead of 71\nconst MAX_PAGES = 60;\nconst DRAW_TIMEOUT = 120000; // the first unfiltered draw scans ~350k rows\n\nconst WANT = Array.isArray(columns) && columns.length ? columns : [\n  'Order ID', 'Order Date', 'CSR', 'Verifier Name', 'Upsell By', 'Customer Name',\n  'Address', 'Province', 'City', 'Brgy', 'Contact', 'Order', 'Total Qty',\n  'Price (Final)', 'Page', 'Platform', 'Tracking No.', 'Courier', 'Parcel Status',\n  'Encoded Date', 'Parcel Update', 'Shipping Fee', 'MoP', 'Order Status',\n  'Shipped Out Date', 'Date Added', 'Price (Initial)', 'Price (Upsell)',\n  'Intern & Brands Name', 'Total COG',\n];\n\nlet wantIdx = [];\nlet wantNameOnly = WANT;\n\nconst log = [];\nconst attempts = [];\n\n// drop images/fonts — pure overhead, and the container is memory-tight\ntry {\n  await $page.setRequestInterception(true);\n  $page.on('request', (req) => {\n    try {\n      if (req.isInterceptResolutionHandled && req.isInterceptResolutionHandled()) return;\n      const t = req.resourceType();\n      if (t === 'image' || t === 'media' || t === 'font') req.abort().catch(() => {});\n      else req.continue().catch(() => {});\n    } catch (_) {\n      try { req.continue().catch(() => {}); } catch (__) {}\n    }\n  });\n} catch (e) {\n  log.push(`interception unavailable: ${e?.message}`);\n}\n\nif (cookies && cookies.length) await $page.setCookie(...cookies);\nawait $page.setViewport({ width: 1280, height: 800 });\n\n// ---------------------------------------------------------------- helpers\n\nasync function alive() {\n  try { await $page.evaluate(() => 1); return true; } catch (_) { return false; }\n}\n\nasync function snap(name) {\n  try {\n    const data = await $page.screenshot({ encoding: 'base64', fullPage: false });\n    return { [name]: { data, mimeType: 'image/png', fileName: `${name}.png`, fileExtension: 'png' } };\n  } catch (_) { return {}; }\n}\n\nasync function armDraw() {\n  const ok = await $page.evaluate(() => {\n    const jq = window.jQuery || window.$;\n    if (!(jq && jq.fn.dataTable && jq.fn.dataTable.isDataTable('#tblorders'))) return false;\n    window.__drawn = false;\n    jq('#tblorders').DataTable().one('draw.dt', () => { window.__drawn = true; });\n    return true;\n  });\n  if (!ok) throw new Error('#tblorders is not an initialised DataTable');\n}\n\nasync function waitDraw(timeout = DRAW_TIMEOUT) {\n  await $page.waitForFunction(() => window.__drawn === true, { timeout, polling: 500 });\n}\n\nasync function tableInfo() {\n  return await $page.evaluate(() => {\n    const jq = window.jQuery || window.$;\n    return jq('#tblorders').DataTable().page.info();\n  });\n}\n\n// read the real name -> data-column map off the toggle pills\nasync function buildColMap() {\n  return await $page.evaluate(() => {\n    const n = (s) => (s || '').replace(/\\s+/g, ' ').trim();\n    const out = {};\n    document.querySelectorAll('[data-column]').forEach(el => {\n      const name = n(el.innerText);\n      const idx = parseInt(el.getAttribute('data-column'), 10);\n      if (name && Number.isInteger(idx) && !(name in out)) out[name] = idx;\n    });\n    return out;\n  });\n}\n\nasync function setField(selector, value) {\n  const tag = await $page.evaluate((sel) => {\n    const el = document.querySelector(sel);\n    return el ? el.tagName.toLowerCase() : null;\n  }, selector);\n  if (tag === 'select') { await $page.select(selector, value); return true; }\n\n  await $page.evaluate((sel, val) => {\n    const el = document.querySelector(sel);\n    if (!el) return;\n    const proto = Object.getPrototypeOf(el);\n    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;\n    setter ? setter.call(el, val) : (el.value = val);\n    el.dispatchEvent(new Event('input',  { bubbles: true }));\n    el.dispatchEvent(new Event('change', { bubbles: true }));\n    el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));\n    if (el.blur) el.blur();\n  }, selector, value);\n\n  let live = await $page.evaluate(sel => document.querySelector(sel)?.value ?? null, selector);\n  if (live === value) return true;\n\n  try {\n    await $page.click(selector, { clickCount: 3 });\n    await $page.keyboard.press('Backspace');\n    await $page.type(selector, value, { delay: 25 });\n    await $page.keyboard.press('Escape');\n    live = await $page.evaluate(sel => document.querySelector(sel)?.value ?? null, selector);\n  } catch (_) {}\n  return live === value;\n}\n\nasync function selectColumns(idxArr, nameArr) {\n  await armDraw();\n  await $page.evaluate((idxs, names) => {\n    const n = (s) => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();\n    const idxSet = new Set(idxs);\n    const want = names.map(n).filter(Boolean);\n    const jq = window.jQuery || window.$;\n    const dt = jq('#tblorders').DataTable();\n\n    dt.columns().every(function () {\n      const idx = this.index();\n      const th = this.header();\n      const text = n(th ? th.innerText : '');\n      let hasViewLink = false;\n      try {\n        const nodes = this.nodes();\n        for (let i = 0; i < nodes.length; i++) {\n          if (nodes[i].querySelector && nodes[i].querySelector('a[href*=\"/view/\"]')) { hasViewLink = true; break; }\n        }\n      } catch (_) {}\n      const keep = idxSet.has(idx)\n                   || want.some(w => text === w || text.includes(w))\n                   || text === '' || text === 'no' || text === '#' || text === 'actions'\n                   || hasViewLink;\n      this.visible(keep, false);\n    });\n    dt.columns.adjust().draw(false);\n  }, idxArr, nameArr);\n  await waitDraw();\n}\n\n// innerText — values come out exactly as rendered in the UI\nasync function extractTable() {\n  return await $page.evaluate(() => {\n    const table = document.querySelector('#tblorders') || document.querySelector('table');\n    if (!table) return [];\n    const headers = Array.from(table.querySelectorAll('thead th')).map(th => {\n      const c = th.cloneNode(true);\n      c.querySelectorAll('select, input, textarea, button').forEach(x => x.remove());\n      return c.innerText.trim();\n    });\n    return Array.from(table.querySelectorAll('tbody tr')).map(tr => {\n      const cells = Array.from(tr.querySelectorAll('td'));\n      if (!cells.length) return null;\n      const obj = {};\n      cells.forEach((td, i) => { obj[headers[i] || `col_${i}`] = td.innerText.trim(); });\n      const link = tr.querySelector('a[href*=\"/view/\"]');\n      if (link) {\n        const m = link.getAttribute('href').match(/\\/view\\/(\\d+)/);\n        if (m) obj.id = m[1];\n      }\n      return obj;\n    }).filter(Boolean);\n  });\n}\n\nfunction normalize(row) {\n  const out = {};\n  for (const [rawKey, value] of Object.entries(row)) {\n    const key = (rawKey || '').trim();\n    if (!key) continue;\n    if (/^col_\\d+$/i.test(key)) continue;\n    if (/[\\n\\r]/.test(key)) continue;\n    if (/^(actions?|search)$/i.test(key)) continue;\n    out[key] = value;\n  }\n  return out;\n}\n\n// ---------------------------------------------------------------- main\n\ntry {\n  await $page.goto('https://meta-digitrading.lhike-erp.com/customer', {\n    waitUntil: 'domcontentloaded', timeout: 60000,\n  });\n\n  await $page.waitForFunction(() => {\n    const jq = window.jQuery || window.$;\n    return !!(jq && jq.fn.dataTable && jq.fn.dataTable.isDataTable('#tblorders'));\n  }, { timeout: 60000, polling: 250 });\n  log.push(`datatable ready, type=${FILTER_TYPE}`);\n\n  // The filter panel only renders once the first draw lands, and that draw\n  // scans the whole table — so wait on the FIELD, generously.\n  try {\n    await $page.waitForSelector(FROM_SEL, { timeout: DRAW_TIMEOUT });\n    await $page.waitForSelector(TO_SEL,   { timeout: 30000 });\n  } catch (_) {\n    const ids = await $page.evaluate(() =>\n      Array.from(document.querySelectorAll('input[id]')).map(el => '#' + el.id));\n    throw new Error(`${FROM_SEL} / ${TO_SEL} never rendered. Inputs present: ${JSON.stringify(ids)}`);\n  }\n  log.push('filter panel rendered');\n\n  const colMap = await buildColMap();\n  wantIdx = WANT.map(n => colMap[n]).filter(i => i !== undefined);\n  wantNameOnly = WANT.filter(n => colMap[n] === undefined);\n  log.push(`columns: ${wantIdx.length} by index, ${wantNameOnly.length} by name`);\n\n  const baseline = await tableInfo();\n  log.push(`baseline ${baseline.recordsTotal} rows`);\n\n  // ---- filter -----------------------------------------------------------\n  let info = null, usedFormat = null;\n\n  for (const val of DATE_FORMATS) {\n    const okFrom = await setField(FROM_SEL, val);\n    const okTo   = await setField(TO_SEL, val);\n\n    if (!(okFrom && okTo)) {\n      attempts.push({ value: val, setOk: false, skipped: true });\n      log.push(`\"${val}\" rejected by the picker — search skipped`);\n      continue;\n    }\n\n    await armDraw();\n    await $page.click('a#btndtsearch');\n    await waitDraw();\n\n    const i2 = await tableInfo();\n    attempts.push({ value: val, setOk: true, recordsDisplay: i2.recordsDisplay });\n    log.push(`\"${val}\" -> ${i2.recordsDisplay} rows`);\n\n    if (i2.recordsDisplay < baseline.recordsTotal) { info = i2; usedFormat = val; break; }\n  }\n\n  if (!usedFormat) {\n    return [{\n      json: { error: `${FILTER_TYPE} filter never applied — still ${baseline.recordsTotal} rows`,\n              url: $page.url(), date, type: FILTER_TYPE, attempts, log },\n      binary: await snap('filter-failed'),\n    }];\n  }\n\n  // ---- columns FIRST, then page length ----------------------------------\n  // Enlarging pages while all ~35 columns are visible renders 300 x 35 cells\n  // per draw. Hiding first cuts that substantially.\n  await selectColumns(wantIdx, wantNameOnly);\n\n  await armDraw();\n  await $page.evaluate((len) => {\n    const jq = window.jQuery || window.$;\n    jq('#tblorders').DataTable().page.len(len).draw('page');\n  }, PAGE_LEN);\n  await waitDraw();\n\n  info = await tableInfo();\n  log.push(`${info.recordsDisplay} rows over ${info.pages} pages @ ${PAGE_LEN}`);\n  if (info.pages > MAX_PAGES) {\n    throw new Error(`${info.pages} pages (${info.recordsDisplay} rows) — refusing to paginate`);\n  }\n\n  // ---- paginate ---------------------------------------------------------\n  const all = [];\n  const seen = new Set();\n\n  for (let p = 0; p < info.pages; p++) {\n    if (p > 0) {\n      await armDraw();\n      await $page.evaluate(() => {\n        const jq = window.jQuery || window.$;\n        jq('#tblorders').DataTable().page('next').draw('page');\n      });\n      await waitDraw();\n    }\n\n    const rows = await extractTable();\n    if (!rows.length) throw new Error(`page ${p + 1}/${info.pages} came back empty`);\n\n    for (const raw of rows) {\n      const key = raw.id ?? JSON.stringify(raw);\n      if (seen.has(key)) continue;\n      seen.add(key);\n      all.push(normalize(raw));\n    }\n    log.push(`page ${p + 1}/${info.pages} -> ${all.length}`);\n  }\n\n  if (all.length < info.recordsDisplay) {\n    throw new Error(`scraped ${all.length} of ${info.recordsDisplay} rows`);\n  }\n\n  log.push(`done: ${all.length} rows via \"${usedFormat}\"`);\n  return all.map(r => ({ json: { ...r, _meta: { type: FILTER_TYPE, date, usedFormat } } }));\n\n} catch (err) {\n  const msg = err?.message ?? 'Something went wrong';\n  const sessionDied = /Target closed|detached|Session closed|disconnected|Protocol error/i.test(msg);\n  const up = await alive();\n  return [{\n    json: {\n      error: msg, sessionDied, pageAlive: up,\n      hint: sessionDied ? 'browserless dropped the session — raise CONNECTION_TIMEOUT and container memory' : undefined,\n      url: up ? $page.url() : null,\n      date, type: FILTER_TYPE, attempts, log,\n    },\n    binary: up ? await snap('error') : {},\n  }];\n}",
+                "options": {
+                    "browserWSEndpoint": "ws://chrome:3000"
+                }
+            },
+            "type": "n8n-nodes-puppeteer.puppeteer",
+            "typeVersion": 1,
+            "position": [672, 288],
+            "id": "1224988c-dfae-4bd1-a06a-b726ddce686e",
+            "name": "Shipped"
+        },
+        {
+            "parameters": {
+                "operation": "runCustomScript",
+                "scriptCode": "// n8n Puppeteer node — one script for both workflows.\n// Input $json: { cookies, date (MM/DD/YYYY), columns?, type: 'orderdate' | 'shipdate' }\n//\n// Scrapes the rendered table, so every value is already formatted exactly as\n// the UI shows it (innerText), no HTML parsing.\n\nconst { cookies, date, columns, type = 'orderdate' } = $json;\n\n// ---------------------------------------------------------------- config\n\nconst [mm, dd, yyyy] = (date || '').split('/');\nif (!mm || !dd || !yyyy) throw new Error(`bad date input: ${JSON.stringify(date)} (expected MM/DD/YYYY)`);\n\n// orderdate pickers accept MM/DD/YYYY; shipdate pickers only accept YYYY-MM-DD.\n// A format that won't stick in the field is skipped WITHOUT clicking search —\n// that skip is what stops shipdate from wasting a full 350k-row scan.\nconst DATE_FORMATS = [`${mm}/${dd}/${yyyy}`, `${yyyy}-${mm}-${dd}`, `${dd}/${mm}/${yyyy}`];\n\nconst PRESETS = {\n  orderdate: ['#sorderdate', '#eorderdate'],\n  shipdate:  ['#sshipdate',  '#sshipdate2'],\n};\nconst FILTER_TYPE = (type || '').toString().trim().toLowerCase();\nif (!PRESETS[FILTER_TYPE]) {\n  throw new Error(`type must be one of ${Object.keys(PRESETS).join(' | ')} — got ${JSON.stringify(type)}`);\n}\nconst [FROM_SEL, TO_SEL] = PRESETS[FILTER_TYPE];\n\nconst PAGE_LEN = 300;        // 7,009 shipdate rows -> 24 draws instead of 71\nconst MAX_PAGES = 60;\nconst DRAW_TIMEOUT = 120000; // the first unfiltered draw scans ~350k rows\n\nconst WANT = Array.isArray(columns) && columns.length ? columns : [\n  'Order ID', 'Order Date', 'CSR', 'Verifier Name', 'Upsell By', 'Customer Name',\n  'Address', 'Province', 'City', 'Brgy', 'Contact', 'Order', 'Total Qty',\n  'Price (Final)', 'Page', 'Platform', 'Tracking No.', 'Courier', 'Parcel Status',\n  'Encoded Date', 'Parcel Update', 'Shipping Fee', 'MoP', 'Order Status',\n  'Shipped Out Date', 'Date Added', 'Price (Initial)', 'Price (Upsell)',\n  'Intern & Brands Name', 'Total COG',\n];\n\nlet wantIdx = [];\nlet wantNameOnly = WANT;\n\nconst log = [];\nconst attempts = [];\n\n// drop images/fonts — pure overhead, and the container is memory-tight\ntry {\n  await $page.setRequestInterception(true);\n  $page.on('request', (req) => {\n    try {\n      if (req.isInterceptResolutionHandled && req.isInterceptResolutionHandled()) return;\n      const t = req.resourceType();\n      if (t === 'image' || t === 'media' || t === 'font') req.abort().catch(() => {});\n      else req.continue().catch(() => {});\n    } catch (_) {\n      try { req.continue().catch(() => {}); } catch (__) {}\n    }\n  });\n} catch (e) {\n  log.push(`interception unavailable: ${e?.message}`);\n}\n\nif (cookies && cookies.length) await $page.setCookie(...cookies);\nawait $page.setViewport({ width: 1280, height: 800 });\n\n// ---------------------------------------------------------------- helpers\n\nasync function alive() {\n  try { await $page.evaluate(() => 1); return true; } catch (_) { return false; }\n}\n\nasync function snap(name) {\n  try {\n    const data = await $page.screenshot({ encoding: 'base64', fullPage: false });\n    return { [name]: { data, mimeType: 'image/png', fileName: `${name}.png`, fileExtension: 'png' } };\n  } catch (_) { return {}; }\n}\n\nasync function armDraw() {\n  const ok = await $page.evaluate(() => {\n    const jq = window.jQuery || window.$;\n    if (!(jq && jq.fn.dataTable && jq.fn.dataTable.isDataTable('#tblorders'))) return false;\n    window.__drawn = false;\n    jq('#tblorders').DataTable().one('draw.dt', () => { window.__drawn = true; });\n    return true;\n  });\n  if (!ok) throw new Error('#tblorders is not an initialised DataTable');\n}\n\nasync function waitDraw(timeout = DRAW_TIMEOUT) {\n  await $page.waitForFunction(() => window.__drawn === true, { timeout, polling: 500 });\n}\n\nasync function tableInfo() {\n  return await $page.evaluate(() => {\n    const jq = window.jQuery || window.$;\n    return jq('#tblorders').DataTable().page.info();\n  });\n}\n\n// read the real name -> data-column map off the toggle pills\nasync function buildColMap() {\n  return await $page.evaluate(() => {\n    const n = (s) => (s || '').replace(/\\s+/g, ' ').trim();\n    const out = {};\n    document.querySelectorAll('[data-column]').forEach(el => {\n      const name = n(el.innerText);\n      const idx = parseInt(el.getAttribute('data-column'), 10);\n      if (name && Number.isInteger(idx) && !(name in out)) out[name] = idx;\n    });\n    return out;\n  });\n}\n\nasync function setField(selector, value) {\n  const tag = await $page.evaluate((sel) => {\n    const el = document.querySelector(sel);\n    return el ? el.tagName.toLowerCase() : null;\n  }, selector);\n  if (tag === 'select') { await $page.select(selector, value); return true; }\n\n  await $page.evaluate((sel, val) => {\n    const el = document.querySelector(sel);\n    if (!el) return;\n    const proto = Object.getPrototypeOf(el);\n    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;\n    setter ? setter.call(el, val) : (el.value = val);\n    el.dispatchEvent(new Event('input',  { bubbles: true }));\n    el.dispatchEvent(new Event('change', { bubbles: true }));\n    el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));\n    if (el.blur) el.blur();\n  }, selector, value);\n\n  let live = await $page.evaluate(sel => document.querySelector(sel)?.value ?? null, selector);\n  if (live === value) return true;\n\n  try {\n    await $page.click(selector, { clickCount: 3 });\n    await $page.keyboard.press('Backspace');\n    await $page.type(selector, value, { delay: 25 });\n    await $page.keyboard.press('Escape');\n    live = await $page.evaluate(sel => document.querySelector(sel)?.value ?? null, selector);\n  } catch (_) {}\n  return live === value;\n}\n\nasync function selectColumns(idxArr, nameArr) {\n  await armDraw();\n  await $page.evaluate((idxs, names) => {\n    const n = (s) => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();\n    const idxSet = new Set(idxs);\n    const want = names.map(n).filter(Boolean);\n    const jq = window.jQuery || window.$;\n    const dt = jq('#tblorders').DataTable();\n\n    dt.columns().every(function () {\n      const idx = this.index();\n      const th = this.header();\n      const text = n(th ? th.innerText : '');\n      let hasViewLink = false;\n      try {\n        const nodes = this.nodes();\n        for (let i = 0; i < nodes.length; i++) {\n          if (nodes[i].querySelector && nodes[i].querySelector('a[href*=\"/view/\"]')) { hasViewLink = true; break; }\n        }\n      } catch (_) {}\n      const keep = idxSet.has(idx)\n                   || want.some(w => text === w || text.includes(w))\n                   || text === '' || text === 'no' || text === '#' || text === 'actions'\n                   || hasViewLink;\n      this.visible(keep, false);\n    });\n    dt.columns.adjust().draw(false);\n  }, idxArr, nameArr);\n  await waitDraw();\n}\n\n// innerText — values come out exactly as rendered in the UI\nasync function extractTable() {\n  return await $page.evaluate(() => {\n    const table = document.querySelector('#tblorders') || document.querySelector('table');\n    if (!table) return [];\n    const headers = Array.from(table.querySelectorAll('thead th')).map(th => {\n      const c = th.cloneNode(true);\n      c.querySelectorAll('select, input, textarea, button').forEach(x => x.remove());\n      return c.innerText.trim();\n    });\n    return Array.from(table.querySelectorAll('tbody tr')).map(tr => {\n      const cells = Array.from(tr.querySelectorAll('td'));\n      if (!cells.length) return null;\n      const obj = {};\n      cells.forEach((td, i) => { obj[headers[i] || `col_${i}`] = td.innerText.trim(); });\n      const link = tr.querySelector('a[href*=\"/view/\"]');\n      if (link) {\n        const m = link.getAttribute('href').match(/\\/view\\/(\\d+)/);\n        if (m) obj.id = m[1];\n      }\n      return obj;\n    }).filter(Boolean);\n  });\n}\n\nfunction normalize(row) {\n  const out = {};\n  for (const [rawKey, value] of Object.entries(row)) {\n    const key = (rawKey || '').trim();\n    if (!key) continue;\n    if (/^col_\\d+$/i.test(key)) continue;\n    if (/[\\n\\r]/.test(key)) continue;\n    if (/^(actions?|search)$/i.test(key)) continue;\n    out[key] = value;\n  }\n  return out;\n}\n\n// ---------------------------------------------------------------- main\n\ntry {\n  await $page.goto('https://meta-digitrading.lhike-erp.com/customer', {\n    waitUntil: 'domcontentloaded', timeout: 60000,\n  });\n\n  await $page.waitForFunction(() => {\n    const jq = window.jQuery || window.$;\n    return !!(jq && jq.fn.dataTable && jq.fn.dataTable.isDataTable('#tblorders'));\n  }, { timeout: 60000, polling: 250 });\n  log.push(`datatable ready, type=${FILTER_TYPE}`);\n\n  // The filter panel only renders once the first draw lands, and that draw\n  // scans the whole table — so wait on the FIELD, generously.\n  try {\n    await $page.waitForSelector(FROM_SEL, { timeout: DRAW_TIMEOUT });\n    await $page.waitForSelector(TO_SEL,   { timeout: 30000 });\n  } catch (_) {\n    const ids = await $page.evaluate(() =>\n      Array.from(document.querySelectorAll('input[id]')).map(el => '#' + el.id));\n    throw new Error(`${FROM_SEL} / ${TO_SEL} never rendered. Inputs present: ${JSON.stringify(ids)}`);\n  }\n  log.push('filter panel rendered');\n\n  const colMap = await buildColMap();\n  wantIdx = WANT.map(n => colMap[n]).filter(i => i !== undefined);\n  wantNameOnly = WANT.filter(n => colMap[n] === undefined);\n  log.push(`columns: ${wantIdx.length} by index, ${wantNameOnly.length} by name`);\n\n  const baseline = await tableInfo();\n  log.push(`baseline ${baseline.recordsTotal} rows`);\n\n  // ---- filter -----------------------------------------------------------\n  let info = null, usedFormat = null;\n\n  for (const val of DATE_FORMATS) {\n    const okFrom = await setField(FROM_SEL, val);\n    const okTo   = await setField(TO_SEL, val);\n\n    if (!(okFrom && okTo)) {\n      attempts.push({ value: val, setOk: false, skipped: true });\n      log.push(`\"${val}\" rejected by the picker — search skipped`);\n      continue;\n    }\n\n    await armDraw();\n    await $page.click('a#btndtsearch');\n    await waitDraw();\n\n    const i2 = await tableInfo();\n    attempts.push({ value: val, setOk: true, recordsDisplay: i2.recordsDisplay });\n    log.push(`\"${val}\" -> ${i2.recordsDisplay} rows`);\n\n    if (i2.recordsDisplay < baseline.recordsTotal) { info = i2; usedFormat = val; break; }\n  }\n\n  if (!usedFormat) {\n    return [{\n      json: { error: `${FILTER_TYPE} filter never applied — still ${baseline.recordsTotal} rows`,\n              url: $page.url(), date, type: FILTER_TYPE, attempts, log },\n      binary: await snap('filter-failed'),\n    }];\n  }\n\n  // ---- columns FIRST, then page length ----------------------------------\n  // Enlarging pages while all ~35 columns are visible renders 300 x 35 cells\n  // per draw. Hiding first cuts that substantially.\n  await selectColumns(wantIdx, wantNameOnly);\n\n  await armDraw();\n  await $page.evaluate((len) => {\n    const jq = window.jQuery || window.$;\n    jq('#tblorders').DataTable().page.len(len).draw('page');\n  }, PAGE_LEN);\n  await waitDraw();\n\n  info = await tableInfo();\n  log.push(`${info.recordsDisplay} rows over ${info.pages} pages @ ${PAGE_LEN}`);\n  if (info.pages > MAX_PAGES) {\n    throw new Error(`${info.pages} pages (${info.recordsDisplay} rows) — refusing to paginate`);\n  }\n\n  // ---- paginate ---------------------------------------------------------\n  const all = [];\n  const seen = new Set();\n\n  for (let p = 0; p < info.pages; p++) {\n    if (p > 0) {\n      await armDraw();\n      await $page.evaluate(() => {\n        const jq = window.jQuery || window.$;\n        jq('#tblorders').DataTable().page('next').draw('page');\n      });\n      await waitDraw();\n    }\n\n    const rows = await extractTable();\n    if (!rows.length) throw new Error(`page ${p + 1}/${info.pages} came back empty`);\n\n    for (const raw of rows) {\n      const key = raw.id ?? JSON.stringify(raw);\n      if (seen.has(key)) continue;\n      seen.add(key);\n      all.push(normalize(raw));\n    }\n    log.push(`page ${p + 1}/${info.pages} -> ${all.length}`);\n  }\n\n  if (all.length < info.recordsDisplay) {\n    throw new Error(`scraped ${all.length} of ${info.recordsDisplay} rows`);\n  }\n\n  log.push(`done: ${all.length} rows via \"${usedFormat}\"`);\n  return all.map(r => ({ json: { ...r, _meta: { type: FILTER_TYPE, date, usedFormat } } }));\n\n} catch (err) {\n  const msg = err?.message ?? 'Something went wrong';\n  const sessionDied = /Target closed|detached|Session closed|disconnected|Protocol error/i.test(msg);\n  const up = await alive();\n  return [{\n    json: {\n      error: msg, sessionDied, pageAlive: up,\n      hint: sessionDied ? 'browserless dropped the session — raise CONNECTION_TIMEOUT and container memory' : undefined,\n      url: up ? $page.url() : null,\n      date, type: FILTER_TYPE, attempts, log,\n    },\n    binary: up ? await snap('error') : {},\n  }];\n}",
+                "options": {
+                    "browserWSEndpoint": "ws://chrome:3000"
+                }
+            },
+            "type": "n8n-nodes-puppeteer.puppeteer",
+            "typeVersion": 1,
+            "position": [672, -160],
+            "id": "1b450a7f-a700-49ca-9cc1-bf814a6b1ab7",
+            "name": "Ordered"
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "type": "n8n-nodes-base.splitInBatches",
+            "typeVersion": 3,
+            "position": [1936, 64],
+            "id": "0baefb86-823e-4d03-b399-50604d8a05aa",
+            "name": "Loop Over Items"
+        },
+        {
+            "parameters": {
+                "amount": 2
+            },
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [2608, 80],
+            "id": "67ba7547-f8f8-4c58-b5d3-91bad9a0e9e8",
+            "name": "Wait",
+            "webhookId": "7a26ac27-a50b-45c0-a1a2-5261f1182335"
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n  \"execution_id\": {{ $execution.id }}\n}",
+                "options": {}
+            },
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1.5,
+            "position": [-272, 16],
+            "id": "b5484e7f-c3fb-4d85-8022-dc5f5d5ef347",
+            "name": "Respond to Webhook"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $json.webhook }}",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "api_key",
+                            "value": "={{ $json.api_key }}"
+                        },
+                        {
+                            "name": "sync_run_id",
+                            "value": "={{ $json.sync_run_id }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.3,
+            "position": [2432, -160],
+            "id": "1776604a-4d54-4f16-823f-4ace90753917",
+            "name": "HTTP Request1"
+        },
+        {
+            "parameters": {
+                "jsCode": "return [\n  {\n    \"webhook\": $('Respond to Webhook').first().json.body.finish_webhook_url,\n    \"api_key\": $('Respond to Webhook').first().json.body.workspace_api_key,\n    \"sync_run_id\": $('Respond to Webhook').first().json.body.sync_run_id,\n  }\n]"
+            },
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [2176, -160],
+            "id": "8253c607-b795-4d8a-8060-27b0299b5ce4",
+            "name": "Code in JavaScript4"
         }
-      }
     ],
-    "Code in JavaScript2": [
-      {
-        "json": {
-          "orders": [
+    "pinData": {
+        "Code in JavaScript2": [
             {
-              "error": "waitForFunction failed: frame got detached.",
-              "sessionDied": true,
-              "pageAlive": false,
-              "hint": "browserless dropped the session. The ajax path avoids rendering entirely — if this still fires, raise the browserless connection timeout / container memory.",
-              "url": null,
-              "date": "08/06/2026",
-              "type": "shipdate",
-              "attempts": [],
-              "log": [
-                "baseline 349710 rows"
-              ]
+                "json": {
+                    "orders": [
+                        {
+                            "error": "waitForFunction failed: frame got detached.",
+                            "sessionDied": true,
+                            "pageAlive": false,
+                            "hint": "browserless dropped the session. The ajax path avoids rendering entirely — if this still fires, raise the browserless connection timeout / container memory.",
+                            "url": null,
+                            "date": "08/06/2026",
+                            "type": "shipdate",
+                            "attempts": [],
+                            "log": ["baseline 349710 rows"]
+                        }
+                    ]
+                }
             }
-          ]
+        ]
+    },
+    "connections": {
+        "Login": {
+            "main": [
+                [
+                    {
+                        "node": "Code in JavaScript",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Code in JavaScript": {
+            "main": [
+                [
+                    {
+                        "node": "Ordered",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Shipped",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Code in JavaScript1": {
+            "main": [
+                [
+                    {
+                        "node": "Merge",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Merge": {
+            "main": [
+                [
+                    {
+                        "node": "Code in JavaScript3",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Code in JavaScript2": {
+            "main": [
+                [
+                    {
+                        "node": "Merge",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Code in JavaScript3": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Over Items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Shipped": {
+            "main": [
+                [
+                    {
+                        "node": "Code in JavaScript2",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Ordered": {
+            "main": [
+                [
+                    {
+                        "node": "Code in JavaScript1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Loop Over Items": {
+            "main": [
+                [
+                    {
+                        "node": "Code in JavaScript4",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "HTTP Request",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "HTTP Request": {
+            "main": [
+                [
+                    {
+                        "node": "Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait": {
+            "main": [
+                [
+                    {
+                        "node": "Loop Over Items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Respond to Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Login",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Code in JavaScript4": {
+            "main": [
+                [
+                    {
+                        "node": "HTTP Request1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
         }
-      }
-    ]
-  },
-  "connections": {
-    "Login": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     },
-    "Code in JavaScript": {
-      "main": [
-        [
-          {
-            "node": "Ordered",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Shipped",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "active": true,
+    "settings": {
+        "executionOrder": "v1",
+        "availableInMCP": false,
+        "timeSavedMode": "fixed",
+        "callerPolicy": "workflowsFromSameOwner",
+        "saveManualExecutions": true,
+        "saveDataSuccessExecution": "all"
     },
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Login",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "versionId": "85b579d7-da9e-4f51-bb9b-98bacf268d3e",
+    "meta": {
+        "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
     },
-    "Code in JavaScript1": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript2": {
-      "main": [
-        [
-          {
-            "node": "Merge",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Code in JavaScript3": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Shipped": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript2",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Ordered": {
-      "main": [
-        [
-          {
-            "node": "Code in JavaScript1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Loop Over Items": {
-      "main": [
-        [],
-        [
-          {
-            "node": "HTTP Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTTP Request": {
-      "main": [
-        [
-          {
-            "node": "Wait",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait": {
-      "main": [
-        [
-          {
-            "node": "Loop Over Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "active": true,
-  "settings": {
-    "executionOrder": "v1",
-    "availableInMCP": false
-  },
-  "versionId": "efc8b2ce-fb8d-4395-b3f4-80a587f2d058",
-  "meta": {
-    "instanceId": "6a18a402dbaa02f7255ad6086d88d7b481f246e7274bd8ebfa6dcb2fbf2ba343"
-  },
-  "id": "iaUTB99zPLyRPGAa",
-  "tags": []
+    "id": "iaUTB99zPLyRPGAa",
+    "tags": []
 }
