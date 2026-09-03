@@ -14,9 +14,12 @@ export interface StatState<T> {
 }
 
 /**
- * Self-contained fetcher for a single Sales & Marketing dashboard KPI. Hits its
- * own endpoint, cancels an in-flight request on unmount, and exposes an error
- * flag plus refetch so each tile renders its own skeleton and retry.
+ * Self-contained fetcher for a single Sales & Marketing dashboard figure. Hits
+ * its own endpoint, cancels an in-flight request on unmount, and exposes an
+ * error flag plus refetch so each tile renders its own skeleton and retry.
+ *
+ * `endpoint` is the path under `.../dashboard/` — `kpi/total-sales`,
+ * `leaders/highest-ad-spend`.
  */
 export function useSalesMarketingStat<T>(
     workspaceSlug: string,
@@ -47,7 +50,7 @@ export function useSalesMarketingStat<T>(
 
         axios
             .get<T>(
-                `/api/workspaces/${workspaceSlug}/sales-marketing/dashboard/kpi/${endpoint}`,
+                `/api/workspaces/${workspaceSlug}/sales-marketing/dashboard/${endpoint}`,
                 { params: JSON.parse(paramKey), signal: controller.signal },
             )
             .then((res) => setData(res.data))

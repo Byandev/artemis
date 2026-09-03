@@ -56,6 +56,15 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/rts-rate', [SalesMarketingDashboardController::class, 'rtsRate'])->name('rts-rate');
         });
 
+        // "Leaders for the period" — who topped each figure, on their own
+        // endpoints so the section loads independently of the KPI row.
+        Route::prefix('sales-marketing/dashboard/leaders')->name('sales-marketing.dashboard.leaders.')->group(function () {
+            Route::get('/highest-ad-spend', [SalesMarketingDashboardController::class, 'highestAdSpend'])->name('highest-ad-spend');
+            Route::get('/highest-sales', [SalesMarketingDashboardController::class, 'highestSales'])->name('highest-sales');
+            Route::get('/highest-roas', [SalesMarketingDashboardController::class, 'highestRoas'])->name('highest-roas');
+            Route::get('/lowest-rts', [SalesMarketingDashboardController::class, 'lowestRts'])->name('lowest-rts');
+        });
+
         Route::prefix('video-editor')->name('video-editor.')->group(function () {
             Route::get('/kpi/total', [VideoEditorDashboardController::class, 'totalCreatives'])->name('kpi.total');
             Route::get('/kpi/awaiting-review', [VideoEditorDashboardController::class, 'awaitingReview'])->name('kpi.awaiting-review');
