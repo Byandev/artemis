@@ -48,7 +48,7 @@ test('it is a sync type the batch queue owns and the form offers', function () {
         ->and($registry->types())->toContain(GencysSyncRun::TYPE_INTERN_DAILY_RECORDS);
 });
 
-test('the batch form offers it, and leaves the roster off', function () {
+test('the batch form offers it', function () {
     ['user' => $user, 'workspace' => $workspace] = makeDailyRecordErpWorkspace();
 
     config(['inertia.ssr.enabled' => false]);
@@ -60,8 +60,6 @@ test('the batch form offers it, and leaves the roster off', function () {
             ->has('syncTypes', 4)
             ->where('syncTypes', fn ($types) => collect($types)->pluck('value')
                 ->contains(GencysSyncRun::TYPE_INTERN_DAILY_RECORDS))
-            ->where('syncTypes', fn ($types) => collect($types)->pluck('value')
-                ->doesntContain(GencysSyncRun::TYPE_INTERNS))
         );
 });
 

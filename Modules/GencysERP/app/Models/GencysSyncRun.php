@@ -44,9 +44,6 @@ class GencysSyncRun extends Model
 
     public const TYPE_PURCHASE_ORDER = 'purchase_order';
 
-    /** The workspace's intern roster, fetched whole rather than by window. */
-    public const TYPE_INTERNS = 'interns';
-
     public const TYPE_INTERN_DAILY_RECORDS = 'intern_daily_records';
 
     public const TYPE_PAGE_DETAILS = 'page_details';
