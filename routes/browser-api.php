@@ -95,6 +95,29 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/rts-rate', [SalesMarketingDashboardController::class, 'rtsRate'])->name('rts-rate');
         });
 
+        // Per-advertiser figures the team comparison plots. Its own endpoint:
+        // the panel switches metric client-side, so one fetch serves all four.
+        Route::get('/sales-marketing/dashboard/team-comparison', [SalesMarketingDashboardController::class, 'teamComparison'])
+            ->name('sales-marketing.dashboard.team-comparison');
+        Route::get('/sales-marketing/dashboard/team-breakdown', [SalesMarketingDashboardController::class, 'teamBreakdown'])
+            ->name('sales-marketing.dashboard.team-breakdown');
+
+        // The same window cut by product instead of advertiser, on the same
+        // terms — one fetch, every metric derived from it client-side.
+        Route::get('/sales-marketing/dashboard/product-comparison', [SalesMarketingDashboardController::class, 'productComparison'])
+            ->name('sales-marketing.dashboard.product-comparison');
+        Route::get('/sales-marketing/dashboard/product-breakdown', [SalesMarketingDashboardController::class, 'productBreakdown'])
+            ->name('sales-marketing.dashboard.product-breakdown');
+
+        // "Leaders for the period" — who topped each figure, on their own
+        // endpoints so the section loads independently of the KPI row.
+        Route::prefix('sales-marketing/dashboard/leaders')->name('sales-marketing.dashboard.leaders.')->group(function () {
+            Route::get('/highest-ad-spend', [SalesMarketingDashboardController::class, 'highestAdSpend'])->name('highest-ad-spend');
+            Route::get('/highest-sales', [SalesMarketingDashboardController::class, 'highestSales'])->name('highest-sales');
+            Route::get('/highest-roas', [SalesMarketingDashboardController::class, 'highestRoas'])->name('highest-roas');
+            Route::get('/lowest-rts', [SalesMarketingDashboardController::class, 'lowestRts'])->name('lowest-rts');
+        });
+
         Route::prefix('video-editor')->name('video-editor.')->group(function () {
             Route::get('/kpi/total', [VideoEditorDashboardController::class, 'totalCreatives'])->name('kpi.total');
             Route::get('/kpi/awaiting-review', [VideoEditorDashboardController::class, 'awaitingReview'])->name('kpi.awaiting-review');

@@ -1,6 +1,23 @@
 import { usePage } from '@inertiajs/react';
 import axios from 'axios';
+import moment from 'moment';
 import { useCallback, useEffect, useState } from 'react';
+
+/**
+ * The window immediately before the given one, of the same length, so "previous
+ * period" always compares like with like. Worked out client-side: the page owns
+ * the date range, and every endpoint stays a plain "figures for this window"
+ * lookup rather than growing a comparison of its own.
+ */
+export function previousWindow(dateRange: string[]): string[] {
+    const start = moment(dateRange[0]);
+    const days = moment(dateRange[1]).diff(start, 'days') + 1;
+
+    return [
+        start.clone().subtract(days, 'days').format('YYYY-MM-DD'),
+        start.clone().subtract(1, 'days').format('YYYY-MM-DD'),
+    ];
+}
 
 interface TeamScope {
     activeTeamId: number | null;
@@ -14,9 +31,12 @@ export interface StatState<T> {
 }
 
 /**
- * Self-contained fetcher for a single Sales & Marketing dashboard KPI. Hits its
- * own endpoint, cancels an in-flight request on unmount, and exposes an error
- * flag plus refetch so each tile renders its own skeleton and retry.
+ * Self-contained fetcher for a single Sales & Marketing dashboard figure. Hits
+ * its own endpoint, cancels an in-flight request on unmount, and exposes an
+ * error flag plus refetch so each tile renders its own skeleton and retry.
+ *
+ * `endpoint` is the path under `.../dashboard/` — `kpi/total-sales`,
+ * `leaders/highest-ad-spend`.
  */
 export function useSalesMarketingStat<T>(
     workspaceSlug: string,
@@ -47,7 +67,7 @@ export function useSalesMarketingStat<T>(
 
         axios
             .get<T>(
-                `/api/workspaces/${workspaceSlug}/sales-marketing/dashboard/kpi/${endpoint}`,
+                `/api/workspaces/${workspaceSlug}/sales-marketing/dashboard/${endpoint}`,
                 { params: JSON.parse(paramKey), signal: controller.signal },
             )
             .then((res) => setData(res.data))
