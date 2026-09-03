@@ -5,49 +5,22 @@ import ComparisonPanel, {
     sumComparisonRows,
     useComparisonMetric,
     type ComparisonBar,
-    type ComparisonSums,
 } from './comparison-panel';
+import {
+    assignProductFills,
+    OTHERS_FILL,
+    productName,
+    VISIBLE_PRODUCTS,
+    type ProductRow,
+} from './product-palette';
 import {
     previousWindow,
     useSalesMarketingStat,
 } from './use-sales-marketing-stat';
 
-/** One product's raw sums for a window, exactly as the endpoint answers. */
-interface ProductRow extends ComparisonSums {
-    product: { id: number; name: string | null };
-}
-
 interface ProductComparison {
     rows: ProductRow[];
 }
-
-/**
- * Categorical fills, one per plotted product, in fixed order — never cycled,
- * which is why the list ends where the folding begins.
- *
- * Both columns are validated as a set against their own surface (lightness
- * band, chroma floor, colour-vision separation and contrast); the light steps
- * sit under 3:1 on white, which is allowed here because every bar carries its
- * product's name and figure beside it, so nothing rests on colour alone.
- */
-const PRODUCT_FILLS = [
-    { light: '#2a78d6', dark: '#3987e5' }, // blue
-    { light: '#eb6834', dark: '#d95926' }, // orange
-    { light: '#1baf7a', dark: '#199e70' }, // aqua
-    { light: '#eda100', dark: '#c98500' }, // yellow
-    { light: '#e87ba4', dark: '#d55181' }, // magenta
-    { light: '#008300', dark: '#008300' }, // green
-    { light: '#4a3aa7', dark: '#9085e9' }, // violet
-];
-
-/**
- * The fold-in bar is deliberately grey: it is a remainder, not a product, and a
- * neutral says so where an eighth hue would claim it was one more of the same.
- */
-const OTHERS_FILL = { light: '#9ca3af', dark: '#71717a' };
-
-/** How many products get a bar of their own before the rest fold into one. */
-const VISIBLE_PRODUCTS = PRODUCT_FILLS.length;
 
 /**
  * Product comparison: every product on one scale for the selected metric,
@@ -89,23 +62,12 @@ export default function ProductComparison({
         { start: previous[0], end: previous[1] },
     );
 
-    /**
-     * Colour per product id, fixed for as long as the window's data is. Ranked
-     * by sales rather than by the selected metric so switching metric reorders
-     * the bars without repainting them.
-     */
-    const fills = useMemo(() => {
-        const byProduct = new Map<number, (typeof PRODUCT_FILLS)[number]>();
-
-        [...(current.data?.rows ?? [])]
-            .sort((a, b) => b.sales - a.sales)
-            .slice(0, VISIBLE_PRODUCTS)
-            .forEach((row, i) =>
-                byProduct.set(row.product.id, PRODUCT_FILLS[i]),
-            );
-
-        return byProduct;
-    }, [current.data]);
+    // Shared with the breakdown table below, so a product's bar and its swatch
+    // are always the same colour.
+    const fills = useMemo(
+        () => assignProductFills(current.data?.rows ?? []),
+        [current.data],
+    );
 
     const { bars, total } = useMemo(() => {
         if (!current.data) return { bars: [] as ComparisonBar[], total: 0 };
@@ -128,7 +90,7 @@ export default function ProductComparison({
 
                 return {
                     key: row.product.id,
-                    name: row.product.name?.trim() || 'Unnamed product',
+                    name: productName(row),
                     value,
                     was,
                     change: changeFrom(value, was),
