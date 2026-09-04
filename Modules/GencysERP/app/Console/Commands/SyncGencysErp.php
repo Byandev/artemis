@@ -36,7 +36,7 @@ class SyncGencysErp extends Command
         GencysSyncRun::TYPE_TRANSACTION_HISTORY,
         GencysSyncRun::TYPE_PURCHASE_ORDER,
         GencysSyncRun::TYPE_DAILY_SALES_TRACKER,
-        GencysSyncRun::TYPE_INTERN_DAILY_RECORDS,
+//        GencysSyncRun::TYPE_INTERN_DAILY_RECORDS,
     ];
 
     protected $signature = 'gencys-erp:sync

@@ -29,7 +29,7 @@ class RmoDailyStats
      * but nobody spoke. Hit rate is only meaningful if those are kept out of
      * the numerator.
      */
-    public const CONNECTED_CALL_MIN_SECONDS = 5;
+    public const CONNECTED_CALL_MIN_SECONDS = 3;
 
     /**
      * @return array{

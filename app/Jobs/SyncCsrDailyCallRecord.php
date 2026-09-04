@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\PancakeUserDailyCallReport;
 use App\Support\CallLogPersona;
+use App\Support\RmoDailyStats;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Query\Builder;
@@ -55,6 +56,9 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                     'total_rmo_called' => (int) ($call?->total_rmo_called ?? 0),
                     'total_rmo_call_time' => (int) ($call?->total_rmo_call_time ?? 0),
+                    'total_rmo_connected_called' => (int) ($call?->total_rmo_connected_called ?? 0),
+                    'total_rmo_real_called' => (int) ($call?->total_rmo_real_called ?? 0),
+                    'longest_rmo_call_time' => (int) ($call?->longest_rmo_call_time ?? 0),
                     'total_rmo_customer_called' => (int) ($call?->total_rmo_customer_called ?? 0),
                     'total_rmo_customer_call_time' => (int) ($call?->total_rmo_customer_call_time ?? 0),
                     'total_rmo_rider_called' => (int) ($call?->total_rmo_rider_called ?? 0),
@@ -123,6 +127,10 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN 1 ELSE 0 END) AS total_rmo_called,
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN cl.duration ELSE 0 END) AS total_rmo_call_time,
+
+                SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration > 0 THEN 1 ELSE 0 END) AS total_rmo_connected_called,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 ELSE 0 END) AS total_rmo_real_called,
+                COALESCE(MAX(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN cl.duration END), 0) AS longest_rmo_call_time,
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.persona = ? THEN 1 ELSE 0 END) AS total_rmo_customer_called,
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.persona = ? THEN cl.duration ELSE 0 END) AS total_rmo_customer_call_time,
