@@ -40,7 +40,7 @@ Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapp
 // Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
 
 Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
-Schedule::command('sync:csr-rmo-daily-records')->dailyAt('04:00');
+Schedule::command('sync:csr-daily-call-records')->dailyAt('04:15');
 
 // Roll each shop's previous-14-days RTS rate onto shops.rts_snapshot so the RMO
 // table can show and sort by it without aggregating pancake_orders per request.
