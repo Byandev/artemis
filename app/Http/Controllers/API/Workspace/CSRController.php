@@ -4,9 +4,9 @@ namespace App\Http\Controllers\API\Workspace;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\PancakeUserDailyCallReport;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
-use App\Models\PancakeUserRmoDailyReport;
 use App\Models\Workspace;
 use App\Support\RmoDailyStats;
 use Carbon\CarbonImmutable;
@@ -73,16 +73,20 @@ class CSRController extends Controller
                 SUM(delivered)      as total_delivered
             ');
 
-        $rmoSummary = PancakeUserRmoDailyReport::query()
+        // The call report, summed back over the shops it splits a CSR's day into.
+        // Aliased to the names the table's columns already sort on: RMO Assigned
+        // is now every delivery handed over, PENDING included, where it used to
+        // count only the ones that had moved off it.
+        $rmoSummary = PancakeUserDailyCallReport::query()
             ->where('workspace_id', $workspace->id)
             ->whereBetween('date', [$from, $to])
             ->groupBy('pancake_user_id')
             ->selectRaw('
                 pancake_user_id,
-                SUM(total_called)             as total_called,
-                SUM(total_call_time)          as total_call_time,
-                SUM(total_rmo_call_attempts)  as total_rmo_call_attempts,
-                SUM(total_confirmed)          as total_confirmed
+                SUM(total_rmo_assigned_count)  as total_called,
+                SUM(total_rmo_call_time)       as total_call_time,
+                SUM(total_rmo_called)          as total_rmo_call_attempts,
+                SUM(total_rmo_confirmed_count) as total_confirmed
             ');
 
         $base = User::query()
@@ -188,10 +192,10 @@ class CSRController extends Controller
     {
         [$from, $to] = $this->range($request);
 
-        $value = DB::table('pancake_user_rmo_daily_reports')
+        $value = DB::table('pancake_user_daily_call_reports')
             ->where('workspace_id', $workspace->id)
             ->whereBetween('date', [$from, $to])
-            ->sum('total_called');
+            ->sum('total_rmo_assigned_count');
 
         return response()->json(['value' => $value]);
     }
@@ -733,15 +737,15 @@ class CSRController extends Controller
 
         // The CSR table's own RMO % — total_called (deliveries assigned to them
         // that moved off PENDING) over total_confirmed (deliveries they confirmed).
-        $leader = DB::table('pancake_user_rmo_daily_reports as r')
+        $leader = DB::table('pancake_user_daily_call_reports as r')
             ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
             ->where('r.workspace_id', $workspace->id)
             ->whereBetween('r.date', [$from, $to])
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
                 pu.name as name,
-                COALESCE(SUM(r.total_called), 0) as called,
-                COALESCE(SUM(r.total_confirmed), 0) as confirmed
+                COALESCE(SUM(r.total_rmo_assigned_count), 0) as called,
+                COALESCE(SUM(r.total_rmo_confirmed_count), 0) as confirmed
             ')
             // Nothing confirmed is no rate at all, not a zero one.
             ->havingRaw('confirmed > 0')
@@ -775,15 +779,15 @@ class CSRController extends Controller
 
         // The CSR table's "RMO Call Time" summed over the range, averaged over
         // the call count sitting beside it in "RMO Called".
-        $leader = DB::table('pancake_user_rmo_daily_reports as r')
+        $leader = DB::table('pancake_user_daily_call_reports as r')
             ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
             ->where('r.workspace_id', $workspace->id)
             ->whereBetween('r.date', [$from, $to])
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
                 pu.name as name,
-                COALESCE(SUM(r.total_call_time), 0) as seconds,
-                COALESCE(SUM(r.total_rmo_call_attempts), 0) as calls
+                COALESCE(SUM(r.total_rmo_call_time), 0) as seconds,
+                COALESCE(SUM(r.total_rmo_called), 0) as calls
             ')
             // Without this the card would crown somebody at 00:00 on a quiet week.
             ->havingRaw('seconds > 0')
@@ -936,12 +940,12 @@ class CSRController extends Controller
     }
 
     /**
-     * RMO % and talk time per CSR, both periods, off the nightly rollup — the
-     * same rows the CSR table and the two RMO leaders read.
+     * RMO % and talk time per CSR, both periods, off the call report — the same
+     * rows the CSR table and the two RMO leaders read.
      */
     private function comparisonRmoFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
     {
-        return DB::table('pancake_user_rmo_daily_reports as r')
+        return DB::table('pancake_user_daily_call_reports as r')
             ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
             ->where('r.workspace_id', $workspace->id)
             ->whereBetween('r.date', [$previousFrom, $to])
@@ -949,12 +953,12 @@ class CSRController extends Controller
             ->selectRaw('
                 pu.id as id,
                 pu.name as name,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_called END), 0) as called,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_confirmed END), 0) as confirmed,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_call_time END), 0) as seconds,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_called END), 0) as previous_called,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_confirmed END), 0) as previous_confirmed,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_call_time END), 0) as previous_seconds
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_assigned_count END), 0) as called,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_confirmed_count END), 0) as confirmed,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_call_time END), 0) as seconds,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_assigned_count END), 0) as previous_called,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_confirmed_count END), 0) as previous_confirmed,
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_call_time END), 0) as previous_seconds
             ', [
                 $from, $to, $from, $to, $from, $to,
                 $previousFrom, $previousTo, $previousFrom, $previousTo, $previousFrom, $previousTo,

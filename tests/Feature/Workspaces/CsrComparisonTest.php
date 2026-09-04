@@ -2,7 +2,7 @@
 
 use App\Jobs\SyncCsrDailyRecord;
 use App\Models\Order;
-use App\Models\PancakeUserRmoDailyReport;
+use App\Models\PancakeUserDailyCallReport;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
@@ -91,14 +91,18 @@ function cmpSettled(Workspace $workspace, PancakeUser $csr, string $on, float $a
 
 function cmpRollup(Workspace $workspace, PancakeUser $csr, string $date, array $figures): void
 {
-    PancakeUserRmoDailyReport::create([
+    // Every reader sums across shops, so which shop these land on is immaterial.
+    PancakeUserDailyCallReport::create([
         'workspace_id' => $workspace->id,
         'pancake_user_id' => $csr->id,
+        'shop_id' => 0,
         'date' => $date,
-        'total_called' => $figures['called'] ?? 0,
-        'total_confirmed' => $figures['confirmed'] ?? 0,
+        'total_rmo_assigned_count' => $figures['called'] ?? 0,
+        'total_rmo_confirmed_count' => $figures['confirmed'] ?? 0,
         'total_call_time' => $figures['seconds'] ?? 0,
-        'total_rmo_call_attempts' => $figures['attempts'] ?? 0,
+        'total_rmo_call_time' => $figures['seconds'] ?? 0,
+        'total_called' => $figures['attempts'] ?? 0,
+        'total_rmo_called' => $figures['attempts'] ?? 0,
     ]);
 }
 

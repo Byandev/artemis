@@ -1119,14 +1119,18 @@ function rmoRollup(
     int $callTime = 0,
     int $attempts = 0,
 ): void {
-    DB::table('pancake_user_rmo_daily_reports')->insert([
+    // Every reader sums across shops, so which shop these land on is immaterial.
+    DB::table('pancake_user_daily_call_reports')->insert([
         'workspace_id' => $workspace->id,
         'pancake_user_id' => $csr->id,
+        'shop_id' => 0,
         'date' => $date,
-        'total_called' => $called,
-        'total_confirmed' => $confirmed,
+        'total_rmo_assigned_count' => $called,
+        'total_rmo_confirmed_count' => $confirmed,
         'total_call_time' => $callTime,
-        'total_rmo_call_attempts' => $attempts,
+        'total_rmo_call_time' => $callTime,
+        'total_called' => $attempts,
+        'total_rmo_called' => $attempts,
     ]);
 }
 
