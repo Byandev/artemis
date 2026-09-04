@@ -53,6 +53,25 @@ test('the rollup keeps the parcel counts beside the amounts', function () {
         ->and((int) $row->returning_count)->toBe(1);
 });
 
+test('the rollup stores the day\'s return rate', function () {
+    posOrder(['status' => 3, 'final_amount' => 8000, 'delivered_at' => '2026-08-02 10:00:00']);
+    posOrder(['status' => 4, 'final_amount' => 2000, 'returning_at' => '2026-08-02 11:00:00']);
+
+    // 2000 of the 10000 that settled. The CSR analytics RTS card reads this
+    // column rather than rebuilding the rate from the two amounts.
+    expect((float) syncedRow($this->workspace, $this->csr, '2026-08-02')->rts_rate)
+        ->toBe(20.0);
+});
+
+test('a day with nothing settled stores no rate', function () {
+    posOrder(['status' => 1, 'final_amount' => 5000, 'confirmed_at' => '2026-08-02 09:00:00']);
+
+    // Zero, the column's default — the readers gate on the amounts, which is
+    // what tells "no returns" apart from "nothing has landed yet".
+    expect((float) syncedRow($this->workspace, $this->csr, '2026-08-02')->rts_rate)
+        ->toBe(0.0);
+});
+
 test('a parcel worth nothing still counts as a parcel', function () {
     posOrder(['status' => 3, 'final_amount' => 0, 'delivered_at' => '2026-08-02 10:00:00']);
 

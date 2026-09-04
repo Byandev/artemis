@@ -4,6 +4,7 @@ use App\Jobs\SyncCsrDailyRecord;
 use App\Models\CallLog;
 use App\Models\Order;
 use App\Models\PancakeUserPosDailyReport;
+use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\RmoDailyStats;
@@ -96,6 +97,13 @@ function csrStats($owner, Workspace $workspace, string $from, string $to)
 
 function csrRtsStat($owner, Workspace $workspace, string $from, string $to)
 {
+    // Same rollup as the Sales card, over the range and the stretch before it.
+    $start = CarbonImmutable::parse($from);
+    syncPosRollup(
+        $start->subDays($start->diffInDays(CarbonImmutable::parse($to)) + 1)->toDateString(),
+        $to,
+    );
+
     return csrStat($owner, $workspace, 'analytics-rts', $from, $to);
 }
 
@@ -251,8 +259,22 @@ test('the endpoint needs the CSR analytics permission', function () {
 });
 
 /**
- * A parcel that came back, counted by RtsRate's numerator: `returning_at` set,
- * and not a cancelled status.
+ * The one shop the RTS tests' parcels go through.
+ *
+ * The rollup writes a row — and an rts_rate — per CSR, per shop, per day, so
+ * parcels that are meant to share a rate have to share a shop.
+ */
+function salesShop(Workspace $workspace): Shop
+{
+    return Shop::firstOrCreate(
+        ['workspace_id' => $workspace->id, 'name' => 'Sales Shop'],
+    );
+}
+
+/**
+ * A parcel that came back — the rollup's `returning` money, and the numerator
+ * behind its stored rts_rate. Credited to a CSR, since the rollup is keyed by
+ * who confirmed it.
  */
 function returningOrder(Workspace $workspace, string $returningAt, float $amount): Order
 {
@@ -260,29 +282,62 @@ function returningOrder(Workspace $workspace, string $returningAt, float $amount
         'status' => 4,
         'final_amount' => $amount,
         'returning_at' => $returningAt,
+        'confirmed_by' => salesCsr()->id,
+        'shop_id' => salesShop($workspace)->id,
     ]);
 }
 
-/** A parcel that arrived — RtsRate's denominator, with the returning amount. */
+/** A parcel that arrived — the rest of that day's denominator. */
 function deliveredOrder(Workspace $workspace, string $deliveredAt, float $amount): Order
 {
     return Order::factory()->forWorkspace($workspace)->create([
         'status' => 3,
         'final_amount' => $amount,
         'delivered_at' => $deliveredAt,
+        'confirmed_by' => salesCsr()->id,
+        'shop_id' => salesShop($workspace)->id,
     ]);
 }
 
-test('the RTS rate is returning over returning plus delivered, as on the dashboard', function () {
+test('the RTS rate is the rollup\'s own rts_rate column', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
+    // One CSR, one shop, one day — so the range is a single rollup row, and
+    // the card is that row's stored rate: 2000 / (2000 + 8000) = 20%.
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
-    deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
 
-    // 2000 / (2000 + 8000) = 20%
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 20)
         ->assertJsonPath('returning_amount', 2000);
+});
+
+test('a range of several rows is the mean of their rates, not the rate of the whole', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Aug 2 returned everything it settled and Aug 3 returned none of it, so
+    // the two stored rates are 100 and 0 and the card reads 50 — the money
+    // says 2000 of 10000, which is 20. Reading the column means the days
+    // count equally, however much each settled.
+    returningOrder($workspace, '2026-08-02 10:00:00', 2000);
+    deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
+
+    csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 50);
+});
+
+test('a day that settled nothing has no rate to average in', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    returningOrder($workspace, '2026-08-02 10:00:00', 2000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
+
+    // Confirmed on the 3rd but still in transit: the row is there with a
+    // stored rts_rate of 0, and letting that in would halve the card to 10%.
+    csrSale($workspace, '2026-08-03 09:00:00', 5000);
+
+    csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 20);
 });
 
 test('the RTS change is reported in percentage points, not a relative move', function () {
@@ -290,10 +345,10 @@ test('the RTS change is reported in percentage points, not a relative move', fun
 
     // Previous period: 10%. Current: 20%. That is +10 points, not +100%.
     returningOrder($workspace, '2026-07-28 10:00:00', 1000);
-    deliveredOrder($workspace, '2026-07-29 10:00:00', 9000);
+    deliveredOrder($workspace, '2026-07-28 14:00:00', 9000);
 
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
-    deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
 
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 20)
@@ -306,7 +361,7 @@ test('a range where nothing settled has no rate rather than a perfect one', func
 
     // Sales happened, but nothing was delivered or returned yet. A 0% RTS here
     // would read as a flawless period rather than an unfinished one.
-    confirmedOrder($workspace, '2026-08-02 10:00:00', 5000);
+    csrSale($workspace, '2026-08-02 10:00:00', 5000);
 
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', null)
@@ -317,7 +372,7 @@ test('an empty previous period leaves the RTS comparison undefined', function ()
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
-    deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
 
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 20)

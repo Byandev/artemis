@@ -203,12 +203,12 @@ class CSRController extends Controller
      | CSR Analytics stat cards
      |--------------------------------------------------------------------------
      |
-     | One endpoint per card. Sales reads the nightly POS rollup — the same
-     | pancake_user_pos_daily_reports rows the leader, the comparison and the
-     | table below them read, so the period's total is the sum of the CSRs
-     | listed under it. The rest read the workspace's orders through
-     | WorkspaceMetrics. Each answers with `value`, the previous period's
-     | figure and the move between them.
+     | One endpoint per card. Sales and RTS read the nightly POS rollup — the
+     | same pancake_user_pos_daily_reports rows the leaders, the comparison and
+     | the table below them read, so the period's totals are the sum of the
+     | CSRs listed under them. The RMO cards read the call report and the
+     | delivery rows. Each answers with `value`, the previous period's figure
+     | and the move between them.
      */
 
     public function analyticsSales(Request $request, Workspace $workspace)
@@ -218,8 +218,8 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->posSalesTotals($workspace, $from, $to);
-        $previous = $this->posSalesTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->posTotals($workspace, $from, $to);
+        $previous = $this->posTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
             'value' => $current['sales'],
@@ -241,21 +241,22 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->orderTotals($workspace, $from, $to);
-        $previous = $this->orderTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->posTotals($workspace, $from, $to);
+        $previous = $this->posTotals($workspace, $previousFrom, $previousTo);
 
-        // No settled parcels means no rate. The metric coalesces that to 0,
-        // which reads as a perfect period; the volume tells them apart.
-        $settled = $current['returning'] + $current['delivered'];
-        $previousSettled = $previous['returning'] + $previous['delivered'];
+        // The rollup's stored rts_rate. Null, not zero, when nothing in the
+        // range settled: a 0% would read as a perfect period rather than an
+        // unfinished one.
+        $rate = $current['rts_rate'];
+        $previousRate = $previous['rts_rate'];
 
         return response()->json([
-            'value' => $settled > 0 ? round($current['rts'] * 100, 2) : null,
+            'value' => $rate === null ? null : round($rate, 2),
             'returning_amount' => $current['returning'],
-            'previous_value' => $previousSettled > 0 ? round($previous['rts'] * 100, 2) : null,
+            'previous_value' => $previousRate === null ? null : round($previousRate, 2),
             // Percentage points, not a relative move: 12% to 15% is "+3 pts".
-            'change' => $settled > 0 && $previousSettled > 0
-                ? round(($current['rts'] - $previous['rts']) * 100, 1)
+            'change' => $rate !== null && $previousRate !== null
+                ? round($rate - $previousRate, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -884,17 +885,32 @@ class CSRController extends Controller
     }
 
     /**
-     * Sales and orders over one date range, off the POS rollup.
+     * Everything the Sales and RTS cards need, over one date range, off the
+     * nightly POS rollup.
      *
-     * The card is the sum of the CSR rows the page already shows: the leader,
-     * the comparison and the breakdown table all read
-     * pancake_user_pos_daily_reports, so the total above them agrees with the
-     * names under it. The rollup is written nightly, so a range the sync has
-     * not reached reads as zero rather than as the dashboard's order figures.
+     * The cards are the sum of the CSR rows the page already shows: the
+     * leaders, the comparison and the breakdown table all read
+     * pancake_user_pos_daily_reports, so the totals at the top agree with the
+     * names under them. `returning` and `delivered` are money, as on the RTS
+     * leader — the parcel counts beside them are only backfilled from
+     * 2026-09-03 on, so a rate built from them would be wrong on older rows.
      *
-     * @return array{sales: float, orders: int}
+     * `rts_rate` is the rollup's own column, averaged over the rows that
+     * actually settled something — a CSR-shop-day with no parcels yet has no
+     * rate to contribute, and letting its stored 0 in would read as a period
+     * with fewer returns than it had. The mean of the days is not the rate of
+     * the whole range, so this figure is a shade off the amount-weighted one
+     * the leader and the table compute from `returning` / `delivered`.
+     *
+     * The rollup is written nightly, so a range the sync has not reached reads
+     * as nothing rather than as the dashboard's order figures. Rows written
+     * before SyncCsrDailyRecord started storing the rate carry 0.00, and there
+     * is no telling those from a genuine 0% here — `sync:csr-daily-records
+     * --days=N` rewrites them.
+     *
+     * @return array{sales: float, orders: int, returning: float, rts_rate: float|null}
      */
-    private function posSalesTotals(Workspace $workspace, string $from, string $to): array
+    private function posTotals(Workspace $workspace, string $from, string $to): array
     {
         $row = $this->scopeToVisibleShops(
             DB::table((new PancakeUserPosDailyReport)->getTable())
@@ -904,37 +920,18 @@ class CSRController extends Controller
         )
             ->selectRaw('
                 COALESCE(SUM(total_sales), 0)  as sales,
-                COALESCE(SUM(total_orders), 0) as orders
+                COALESCE(SUM(total_orders), 0) as orders,
+                COALESCE(SUM(`returning`), 0)  as returning_amount,
+                AVG(CASE WHEN `returning` + delivered > 0 THEN rts_rate END) as rts_rate
             ')
             ->first();
 
         return [
             'sales' => (float) ($row->sales ?? 0),
             'orders' => (int) ($row->orders ?? 0),
-        ];
-    }
-
-    /**
-     * The order figures behind the RTS card, over one date range.
-     *
-     * @return array{rts: float, returning: float, delivered: float}
-     */
-    private function orderTotals(Workspace $workspace, string $from, string $to): array
-    {
-        // The metric layer narrows by shop ids rather than by a query, which is
-        // the same team filter the rollup-backed cards apply to their rows.
-        $shopIds = $this->visibleShopIds($workspace);
-
-        $metrics = $workspace->metrics(
-            ['start_date' => $from, 'end_date' => $to],
-            $shopIds === null ? [] : ['shop_ids' => $shopIds],
-        )->extract(['rtsRate', 'returningAmount', 'deliveredAmount']);
-
-        return [
-            // A ratio, 0..1 — the card turns it into a percentage.
-            'rts' => (float) $metrics['rtsRate'],
-            'returning' => (float) $metrics['returningAmount'],
-            'delivered' => (float) $metrics['deliveredAmount'],
+            'returning' => (float) ($row->returning_amount ?? 0),
+            // Null, not zero: no settled row in the range is no rate at all.
+            'rts_rate' => ($row->rts_rate ?? null) === null ? null : (float) $row->rts_rate,
         ];
     }
 
