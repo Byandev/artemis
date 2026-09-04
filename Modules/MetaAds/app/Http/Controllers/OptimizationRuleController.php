@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Page;
 use App\Models\Workspace;
 use App\Support\TeamVisibility;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -118,8 +119,8 @@ class OptimizationRuleController extends Controller
     public function approvals(Request $request, Workspace $workspace): Response
     {
         $perPage = (int) $request->integer('per_page', 15);
-        $accountIds = array_values(array_filter((array) $request->input('ad_account_id', []), fn ($v) => $v !== '' && $v !== null));
-        $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
+        $accountIds = $this->filterIds($request, 'ad_account_id');
+        $actions = $this->filterIds($request, 'action');
 
         $user = $request->user();
 
@@ -182,13 +183,15 @@ class OptimizationRuleController extends Controller
 
     /**
      * Full history of every action optimization rules have taken in this
-     * workspace, newest first, filterable by rule and action.
+     * workspace, newest first, filterable by rule, action, ad account and page.
      */
     public function logs(Request $request, Workspace $workspace): Response
     {
         $perPage = (int) $request->integer('per_page', 25);
-        $ruleIds = array_values(array_filter((array) $request->input('rule_id', []), fn ($v) => $v !== '' && $v !== null));
-        $actions = array_values(array_filter((array) $request->input('action', []), fn ($v) => $v !== '' && $v !== null));
+        $ruleIds = $this->filterIds($request, 'rule_id');
+        $actions = $this->filterIds($request, 'action');
+        $accountIds = $this->filterIds($request, 'ad_account_id');
+        $pageIds = $this->filterIds($request, 'page_id');
 
         $user = $request->user();
 
@@ -197,43 +200,53 @@ class OptimizationRuleController extends Controller
         // scope by the actual target's (campaign / ad set) account rather than the
         // rule's accounts (a rule can span manageable and non-manageable accounts).
         $manageableAccountIds = TeamVisibility::manageableAccountIds($user, $workspace);
-        $manageScope = function ($query) use ($manageableAccountIds) {
-            $query->where(function ($q) use ($manageableAccountIds) {
-                $q->where(fn ($q) => $q->where('target_type', 'campaign')
-                    ->whereIn('target_id', Campaign::whereIn('meta_ads_account_id', $manageableAccountIds)->select('id')))
-                    ->orWhere(fn ($q) => $q->where('target_type', 'ad_set')
-                        ->whereIn('target_id', AdSet::whereIn('meta_ads_account_id', $manageableAccountIds)->select('id')));
-            });
-        };
 
-        $logs = OptimizationRuleLog::where('workspace_id', $workspace->id)
-            ->when($manageableAccountIds !== null, $manageScope)
+        // Every list on this page starts from the same manage-scoped set of logs.
+        $base = fn () => OptimizationRuleLog::where('workspace_id', $workspace->id)
+            ->when(
+                $manageableAccountIds !== null,
+                fn ($q) => $this->scopeLogsToAccounts($q, $manageableAccountIds),
+            );
+
+        $logs = $base()
             ->when($ruleIds, fn ($q) => $q->whereIn('meta_ads_optimization_rule_id', $ruleIds))
             ->when($actions, fn ($q) => $q->whereIn('action_taken', $actions))
+            ->when($accountIds, fn ($q) => $this->scopeLogsToAccounts($q, $accountIds))
+            ->when($pageIds, fn ($q) => $this->scopeLogsToPages($q, $pageIds))
             ->with('rule:id,name')
             ->latest('triggered_at')
             ->paginate($perPage)
             ->withQueryString();
 
-        // Filter options are drawn from the rules / actions that actually have
-        // logged history in this workspace, so the dropdowns never list a value
-        // with zero matching rows.
-        $loggedRuleIds = OptimizationRuleLog::where('workspace_id', $workspace->id)
-            ->when($manageableAccountIds !== null, $manageScope)
-            ->distinct()
-            ->pluck('meta_ads_optimization_rule_id');
-
-        $filterRules = OptimizationRule::whereIn('id', $loggedRuleIds)
+        // Filter options are drawn from the rules / actions / accounts / pages
+        // that actually have logged history in this workspace, so the dropdowns
+        // never list a value with zero matching rows.
+        $filterRules = OptimizationRule::whereIn('id', $base()->distinct()->select('meta_ads_optimization_rule_id'))
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (OptimizationRule $r) => ['id' => (string) $r->id, 'name' => $r->name])
             ->values();
 
-        $filterActions = OptimizationRuleLog::where('workspace_id', $workspace->id)
-            ->when($manageableAccountIds !== null, $manageScope)
+        $filterActions = $base()
             ->distinct()
             ->orderBy('action_taken')
             ->pluck('action_taken')
+            ->values();
+
+        $filterAccounts = AdAccount::where(fn ($q) => $q
+            ->whereIn('id', Campaign::whereIn('id', $base()->where('target_type', 'campaign')->select('target_id'))->select('meta_ads_account_id'))
+            ->orWhereIn('id', AdSet::whereIn('id', $base()->where('target_type', 'ad_set')->select('target_id'))->select('meta_ads_account_id')))
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (AdAccount $a) => ['id' => (string) $a->id, 'name' => $a->name])
+            ->values();
+
+        $filterPages = Page::where('workspace_id', $workspace->id)
+            ->whereIn('id', $this->loggedPageIds($base))
+            ->visibleTo($user, $workspace)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Page $p) => ['id' => (string) $p->id, 'name' => $p->name ?: 'Untitled page'])
             ->values();
 
         return Inertia::render('workspaces/integrations/meta-ads/optimization-rules/logs', [
@@ -241,13 +254,77 @@ class OptimizationRuleController extends Controller
             'logs' => $logs,
             'rules' => $filterRules,
             'actions' => $filterActions,
+            'adAccounts' => $filterAccounts,
+            'pages' => $filterPages,
             'query' => [
                 'page' => $request->integer('page', 1),
                 'perPage' => $perPage,
                 'ruleIds' => array_map('strval', $ruleIds),
                 'actions' => array_map('strval', $actions),
+                'accountIds' => array_map('strval', $accountIds),
+                'pageIds' => array_map('strval', $pageIds),
             ],
         ]);
+    }
+
+    /**
+     * The non-empty values of a repeated query filter (`?rule_id[]=1&rule_id[]=2`).
+     *
+     * @return array<int, mixed>
+     */
+    private function filterIds(Request $request, string $key): array
+    {
+        return array_values(array_filter((array) $request->input($key, []), fn ($v) => $v !== '' && $v !== null));
+    }
+
+    /**
+     * Limit a log query to targets living in the given ad accounts. A log stores
+     * only target_type + target_id, so the account is resolved through the
+     * target (campaign / ad set) itself.
+     *
+     * @param  array<int, int|string>  $accountIds
+     */
+    private function scopeLogsToAccounts($query, array $accountIds): void
+    {
+        $query->where(function ($q) use ($accountIds) {
+            $q->where(fn ($q) => $q->where('target_type', 'campaign')
+                ->whereIn('target_id', Campaign::whereIn('meta_ads_account_id', $accountIds)->select('id')))
+                ->orWhere(fn ($q) => $q->where('target_type', 'ad_set')
+                    ->whereIn('target_id', AdSet::whereIn('meta_ads_account_id', $accountIds)->select('id')));
+        });
+    }
+
+    /**
+     * Limit a log query to targets promoting the given pages. Ad sets carry
+     * meta_page_id directly; a campaign counts as being on a page when any of
+     * its ad sets promotes it — the same rule the evaluator applies when it
+     * narrows a rule to pages.
+     *
+     * @param  array<int, int|string>  $pageIds
+     */
+    private function scopeLogsToPages($query, array $pageIds): void
+    {
+        $query->where(function ($q) use ($pageIds) {
+            $q->where(fn ($q) => $q->where('target_type', 'campaign')
+                ->whereIn('target_id', AdSet::whereIn('meta_page_id', $pageIds)->select('meta_ads_campaign_id')))
+                ->orWhere(fn ($q) => $q->where('target_type', 'ad_set')
+                    ->whereIn('target_id', AdSet::whereIn('meta_page_id', $pageIds)->select('id')));
+        });
+    }
+
+    /**
+     * Page ids promoted by the targets that appear in a set of logs — the page
+     * filter's options.
+     *
+     * @param  callable(): Builder  $base
+     */
+    private function loggedPageIds(callable $base)
+    {
+        return AdSet::whereNotNull('meta_page_id')
+            ->where(fn ($q) => $q
+                ->whereIn('id', $base()->where('target_type', 'ad_set')->select('target_id'))
+                ->orWhereIn('meta_ads_campaign_id', $base()->where('target_type', 'campaign')->select('target_id')))
+            ->select('meta_page_id');
     }
 
     /**

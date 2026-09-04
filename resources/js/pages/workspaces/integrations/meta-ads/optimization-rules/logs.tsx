@@ -20,6 +20,7 @@ import {
     metricLabel,
     type OptimizationRuleLog,
     optimizationRulesUrl,
+    type PageOption,
     titleCase,
 } from './types';
 
@@ -28,11 +29,15 @@ interface Props {
     logs: PaginatedData<OptimizationRuleLog>;
     rules: AdAccountOption[];
     actions: string[];
+    adAccounts: AdAccountOption[];
+    pages: PageOption[];
     query?: {
         page?: number | string;
         perPage?: number | string;
         ruleIds?: string[];
         actions?: string[];
+        accountIds?: string[];
+        pageIds?: string[];
     };
 }
 
@@ -131,6 +136,8 @@ export default function OptimizationLogs({
     logs,
     rules,
     actions,
+    adAccounts,
+    pages,
     query,
 }: Props) {
     const indexUrl = optimizationRulesUrl(workspace.slug);
@@ -138,6 +145,10 @@ export default function OptimizationLogs({
     const [actionFilters, setActionFilters] = useState<string[]>(
         query?.actions ?? [],
     );
+    const [accountIds, setAccountIds] = useState<string[]>(
+        query?.accountIds ?? [],
+    );
+    const [pageIds, setPageIds] = useState<string[]>(query?.pageIds ?? []);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Optimization Rules', href: indexUrl },
@@ -152,13 +163,22 @@ export default function OptimizationLogs({
                 per_page: query?.perPage ?? logs.per_page,
                 rule_id: ruleIds.length ? ruleIds : undefined,
                 action: actionFilters.length ? actionFilters : undefined,
+                ad_account_id: accountIds.length ? accountIds : undefined,
+                page_id: pageIds.length ? pageIds : undefined,
                 ...overrides,
             },
             {
                 preserveState: true,
                 replace: true,
                 preserveScroll: true,
-                only: ['logs', 'rules', 'actions', 'query'],
+                only: [
+                    'logs',
+                    'rules',
+                    'actions',
+                    'adAccounts',
+                    'pages',
+                    'query',
+                ],
             },
         );
 
@@ -169,6 +189,14 @@ export default function OptimizationLogs({
     const onActions = (next: string[]) => {
         setActionFilters(next);
         navigate({ page: 1, action: next.length ? next : undefined });
+    };
+    const onAccounts = (next: string[]) => {
+        setAccountIds(next);
+        navigate({ page: 1, ad_account_id: next.length ? next : undefined });
+    };
+    const onPages = (next: string[]) => {
+        setPageIds(next);
+        navigate({ page: 1, page_id: next.length ? next : undefined });
     };
 
     const columns: ColumnDef<OptimizationRuleLog>[] = [
@@ -293,6 +321,24 @@ export default function OptimizationLogs({
                     title="Optimization History"
                     description="Every change optimization rules have made across your campaigns and ad sets."
                 >
+                    <MultiFilter
+                        label="ad accounts"
+                        options={adAccounts.map((a) => ({
+                            value: a.id,
+                            label: a.name,
+                        }))}
+                        selected={accountIds}
+                        onChange={onAccounts}
+                    />
+                    <MultiFilter
+                        label="pages"
+                        options={pages.map((p) => ({
+                            value: p.id,
+                            label: p.name,
+                        }))}
+                        selected={pageIds}
+                        onChange={onPages}
+                    />
                     <MultiFilter
                         label="rules"
                         options={rules.map((r) => ({
