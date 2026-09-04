@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\PancakeUserDailyCallReport;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
-use App\Models\PancakeUserRmoDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -144,22 +145,39 @@ class CSRController extends Controller
             ');
 
         // RMO calling activity is tracked separately from the sales reports.
-        $rmoSummary = PancakeUserRmoDailyReport::query()
+        // The call report, summed back over the shops it splits a CSR's day into.
+        // Aliased to the names the table's columns already sort on: RMO Assigned
+        // is now every delivery handed over, PENDING included, where it used to
+        // count only the ones that had moved off it.
+        $rmoSummary = PancakeUserDailyCallReport::query()
             ->where('workspace_id', $workspace->id)
             ->whereBetween('date', [$from, $to])
             ->groupBy('pancake_user_id')
             ->selectRaw('
                 pancake_user_id,
-                SUM(total_called)             as total_called,
-                SUM(total_call_time)          as total_call_time,
-                SUM(total_rmo_call_attempts)  as total_rmo_call_attempts,
-                SUM(total_confirmed)          as total_confirmed
+                SUM(total_rmo_assigned_count)  as total_called,
+                SUM(total_rmo_call_time)       as total_call_time,
+                SUM(total_rmo_called)          as total_rmo_call_attempts,
+                SUM(total_rmo_confirmed_count) as total_confirmed
             ');
 
         $base = PancakeUser::query()
             ->whereHas('shops', function ($query) use ($workspace) {
                 $query->where('workspace_id', $workspace->id);
             });
+
+        // Both rollups are keyed by shop, so the "viewing as team" switcher
+        // narrows the table the same way it narrows the cards above it. The ERP
+        // report carries no shop, so only the POS side can be scoped.
+        $shopIds = TeamVisibility::scopeShopIds($request->user(), $workspace);
+
+        if ($shopIds !== null) {
+            $rmoSummary->whereIn('shop_id', $shopIds);
+
+            if (! $isErp) {
+                $drSummary->whereIn('shop_id', $shopIds);
+            }
+        }
 
         $records = QueryBuilder::for($base)
             ->leftJoinSub($drSummary, 'dr', 'dr.pancake_user_id', '=', 'pancake_users.id')
