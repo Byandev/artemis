@@ -23,6 +23,8 @@ function dailyEffort($owner, Workspace $workspace, ?string $from = null, ?string
     $from ??= EFFORT_FROM;
     $to ??= EFFORT_TO;
 
+    syncCallReport($from, $to);
+
     return test()->actingAs($owner)->getJson(
         "/api/workspaces/{$workspace->slug}/csrs/stats/analytics-daily-effort?from={$from}&to={$to}"
     );
@@ -40,6 +42,9 @@ function effortCall(Workspace $workspace, string $date, int $seconds, bool $matc
         'order_id' => $matched
             ? Order::factory()->forWorkspace($workspace)->create()->id
             : null,
+        // The delivery stamp is what makes a call RMO work rather than order
+        // verification; the order beside it is what names the shop.
+        'order_for_delivery_id' => $matched ? 1 : null,
     ]);
 }
 
@@ -109,7 +114,8 @@ test('the totals are the days added up, matching the cards above', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     effortCall($workspace, '2026-08-14', 120);
-    effortCall($workspace, '2026-08-15', 3);
+    // Under the threshold, so it is effort without a conversation.
+    effortCall($workspace, '2026-08-15', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1);
     effortCall($workspace, '2026-08-16', 30);
 
     $response = dailyEffort($owner, $workspace)->assertOk();

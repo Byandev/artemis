@@ -35,8 +35,7 @@ class BuildDailyPagePerformanceCommand extends Command
         $dates = $this->resolveDates();
         $total = 0;
 
-        Workspace::where('is_gencys_partner', false)
-            ->with('pages')
+        Workspace::with('pages')
             ->get()
             ->each(function (Workspace $workspace) use ($dates, &$total) {
                 foreach ($dates as $date) {

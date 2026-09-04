@@ -1,8 +1,10 @@
 import RefreshButton from '@/components/inventory/dashboard/refresh-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Workspace } from '@/types/models/Workspace';
+import { usePage } from '@inertiajs/react';
 import moment from 'moment';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { formatKpi, type KpiFormat } from './kpi-card';
 
 /**
@@ -59,6 +61,47 @@ export const METRICS: Record<MetricKey, MetricSpec> = {
     },
 };
 
+/** Every metric, in the order the switcher lays them out. */
+const ALL_METRICS = Object.keys(METRICS) as MetricKey[];
+
+/** The metrics derived from ad spend, hidden together or not at all. */
+const SPEND_METRICS: MetricKey[] = ['ad_spend', 'roas'];
+
+/**
+ * Whether the per-product panels state ad spend. A Gencys partner's spend is not
+ * attributed per product on our side, so those panels drop the spend column and
+ * the two metrics derived from it rather than stating sums they only half know.
+ * The team panels keep all four — spend there is per advertiser, which we do
+ * have.
+ *
+ * Read from the shared workspace rather than passed down, so the chart and the
+ * table under it can't disagree about what this workspace shows.
+ */
+export function useProductSpendShown(): boolean {
+    const { currentWorkspace } = usePage().props as unknown as {
+        currentWorkspace?: Workspace;
+    };
+
+    return !currentWorkspace?.is_gencys_partner;
+}
+
+/**
+ * Which metrics the product comparison may offer here — the switcher and the
+ * remembered selection both read it, so neither can name a metric the other
+ * doesn't have.
+ */
+export function useProductComparisonMetrics(): MetricKey[] {
+    const spendShown = useProductSpendShown();
+
+    return useMemo(
+        () =>
+            spendShown
+                ? ALL_METRICS
+                : ALL_METRICS.filter((key) => !SPEND_METRICS.includes(key)),
+        [spendShown],
+    );
+}
+
 /**
  * Raw sums added together — how a set of rows folded into one bar ("Others")
  * gets its figures. Summing first and deriving after is the only order that
@@ -93,17 +136,20 @@ export const changeFrom = (value: number, was: number | null): number | null =>
  */
 export function useComparisonMetric(
     storageKey: string,
+    available: MetricKey[] = ALL_METRICS,
 ): [MetricKey, (key: MetricKey) => void] {
     const [metric, setMetric] = useState<MetricKey>(() => {
         try {
             const saved = localStorage.getItem(storageKey);
-            // Guarded: a stored value from an older build might name a metric
-            // that no longer exists.
-            if (saved && saved in METRICS) return saved as MetricKey;
+            // Guarded: a stored value can name a metric that no longer exists,
+            // or one this workspace is no longer offered.
+            if (saved && available.includes(saved as MetricKey)) {
+                return saved as MetricKey;
+            }
         } catch {
             // Unreadable storage — fall through to the default.
         }
-        return 'sales';
+        return available[0] ?? 'sales';
     });
 
     const choose = (key: MetricKey) => {
@@ -148,6 +194,7 @@ const DEFAULT_FILL = { light: '#059669', dark: '#059669' };
 export default function ComparisonPanel({
     title,
     metric,
+    metrics = ALL_METRICS,
     onMetric,
     bars,
     previous,
@@ -161,6 +208,8 @@ export default function ComparisonPanel({
 }: {
     title: string;
     metric: MetricKey;
+    /** The metrics the switcher offers — see `useComparisonMetrics`. */
+    metrics?: MetricKey[];
     onMetric: (key: MetricKey) => void;
     bars: ComparisonBar[];
     /** `[start, end]` of the window the ticks compare against. */
@@ -199,7 +248,7 @@ export default function ComparisonPanel({
                     {/* Controls above the chart they scope. Switching metric is
                         a client-side re-read — no refetch, no skeleton. */}
                     <div className="flex items-center gap-0.5 rounded-lg border border-black/6 bg-white p-0.5 dark:border-white/8 dark:bg-zinc-900">
-                        {(Object.keys(METRICS) as MetricKey[]).map((key) => (
+                        {metrics.map((key) => (
                             <button
                                 key={key}
                                 type="button"

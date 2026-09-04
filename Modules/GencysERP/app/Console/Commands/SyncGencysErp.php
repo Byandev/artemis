@@ -27,11 +27,16 @@ class SyncGencysErp extends Command
      * more now than it did then — the queue is serial, so a slow purchase-order
      * batch does hold up the daily sales tracker behind it. Pass --type to
      * change the order (the flags are honoured in the order given).
+     *
+     * Intern daily records goes last because it fans the widest of anything
+     * here — one run per intern per day — so putting it earlier would hold up
+     * the shorter batches behind it.
      */
     private const ORDER = [
         GencysSyncRun::TYPE_TRANSACTION_HISTORY,
         GencysSyncRun::TYPE_PURCHASE_ORDER,
         GencysSyncRun::TYPE_DAILY_SALES_TRACKER,
+//        GencysSyncRun::TYPE_INTERN_DAILY_RECORDS,
     ];
 
     protected $signature = 'gencys-erp:sync
@@ -40,7 +45,7 @@ class SyncGencysErp extends Command
         {--sync : POST to n8n in-process instead of handing it to the erp queue worker (use this to hit a test-mode webhook)}
         {--force : Run outside production (by default this command only runs on production)}';
 
-    protected $description = 'Queue the Gencys ERP sync batches (transaction history, purchase orders, daily sales tracker)';
+    protected $description = 'Queue the Gencys ERP sync batches (transaction history, purchase orders, daily sales tracker, intern daily records)';
 
     public function handle(BatchRunner $runner, SyncFlowRegistry $flows): int
     {

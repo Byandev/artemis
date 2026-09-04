@@ -24,6 +24,8 @@ function callOutcomes($owner, Workspace $workspace, ?string $from = null, ?strin
     $from ??= OUTCOMES_FROM;
     $to ??= OUTCOMES_TO;
 
+    syncCallReport($from, $to);
+
     return test()->actingAs($owner)->getJson(
         "/api/workspaces/{$workspace->slug}/csrs/stats/analytics-daily-call-outcomes?from={$from}&to={$to}"
     );
@@ -41,6 +43,9 @@ function outcomeCall(Workspace $workspace, string $date, int $seconds, bool $mat
         'order_id' => $matched
             ? Order::factory()->forWorkspace($workspace)->create()->id
             : null,
+        // The delivery stamp is what makes a call RMO work rather than order
+        // verification; the order beside it is what names the shop.
+        'order_for_delivery_id' => $matched ? 1 : null,
     ]);
 }
 

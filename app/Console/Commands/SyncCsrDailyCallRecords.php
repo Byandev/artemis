@@ -2,19 +2,19 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\SyncCsrRmoDailyRecord;
+use App\Jobs\SyncCsrDailyCallRecord;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
-class SyncCsrRmoDailyRecords extends Command
+class SyncCsrDailyCallRecords extends Command
 {
-    protected $signature = 'sync:csr-rmo-daily-records
+    protected $signature = 'sync:csr-daily-call-records
                             {--date= : Single target date in Y-m-d format. If omitted, the last --days days are dispatched (one job per day).}
-                            {--days=14 : Number of trailing days to backfill when --date is not provided. Defaults to 7.}
+                            {--days=14 : Number of trailing days to backfill when --date is not provided.}
                             {--workspace= : Limit to one workspace, by id or slug. Defaults to every workspace.}';
 
-    protected $description = 'Dispatch SyncCsrRmoDailyRecord jobs to aggregate per-CSR RMO call metrics. Backfills the last 7 days by default.';
+    protected $description = 'Dispatch SyncCsrDailyCallRecord jobs to aggregate per-CSR call metrics. Backfills the last 14 days by default.';
 
     public function handle(): int
     {
@@ -28,8 +28,8 @@ class SyncCsrRmoDailyRecords extends Command
 
         if ($this->option('date')) {
             $date = CarbonImmutable::parse($this->option('date'))->toDateString();
-            SyncCsrRmoDailyRecord::dispatch($date, $workspaceId);
-            $this->info("Dispatched SyncCsrRmoDailyRecord for {$date}{$scope}.");
+            SyncCsrDailyCallRecord::dispatch($date, $workspaceId);
+            $this->info("Dispatched SyncCsrDailyCallRecord for {$date}{$scope}.");
 
             return self::SUCCESS;
         }
@@ -39,10 +39,10 @@ class SyncCsrRmoDailyRecords extends Command
 
         for ($i = 0; $i < $days; $i++) {
             $date = $start->subDays($i)->toDateString();
-            SyncCsrRmoDailyRecord::dispatch($date, $workspaceId);
+            SyncCsrDailyCallRecord::dispatch($date, $workspaceId);
         }
 
-        $this->info("Dispatched {$days} SyncCsrRmoDailyRecord job(s){$scope} covering {$start->subDays($days - 1)->toDateString()} → {$start->toDateString()}.");
+        $this->info("Dispatched {$days} SyncCsrDailyCallRecord job(s){$scope} covering {$start->subDays($days - 1)->toDateString()} → {$start->toDateString()}.");
 
         return self::SUCCESS;
     }

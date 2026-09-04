@@ -12,6 +12,69 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.35.0',
+        date: '2026-09-03',
+        sections: [
+            {
+                title: 'Sales & Marketing — Dashboard (New)',
+                items: [
+                    'A Dashboard page now opens the Sales & Marketing group with four headline tiles — Sales, Ad Spend, Blended ROAS and RTS Rate — each loading and refreshing on its own, so a slow figure never holds up the rest of the row, and the window you pick is remembered per workspace',
+                    'Blended ROAS carries the attributed figure beside it: what the ad platform credits to the ads, against every peso of sales over every peso of spend — the gap between the two is the sales your ads were never credited with, which is the whole reason both are shown',
+                    '“Leaders for the period” names who spent the most, who sold the most, whose ads worked hardest and whose parcels came back least, each with their share of the workspace total so a big number reads as a standout rather than just a big team',
+                    'Team and product comparison charts sit below, each with a breakdown table beneath it stating exactly what the chart plots, and you can switch between Sales, Ad spend, ROAS and RTS without the page fetching anything again',
+                    'The old tabbed dashboard is now five sibling pages in the menu — Dashboard, Daily Report, Ad Spent Summary, Sales Targets, and the trackers beneath them — with the previous links redirecting, and every role that could open the old dashboard can still open all five',
+                ],
+            },
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'Eight figures now head the page — sales, RTS rate, RMO called %, total call time, calls placed, real conversations, reach rate and the longest call — each measured against the equally long stretch ending the day before your range, so the arrow beside it tells you whether the period actually moved',
+                    'A comparison panel plots the whole field on whichever of four metrics you pick, every CSR against the period’s average and against their own previous figure; each person keeps the same colour as you switch tabs, and the tab you were reading survives a reload or a shared link',
+                    'A daily chart sets calls placed against the ones that became real conversations, with a table beneath it splitting each day into never answered, answered and conversations plus that day’s hit rate — where the two bars sit furthest apart is effort spent without return',
+                    '“Leaders for the period” names the CSR with the highest sales, the lowest RTS, the most RMO calls and the most time on the phone',
+                    'The breakdown table keeps its header and the CSR name in place as you scroll across the eleven columns of figures, so a row of numbers is never stranded from the person it belongs to',
+                ],
+            },
+            {
+                title: 'RMO Management',
+                items: [
+                    'Orders you tick stay ticked as you page through, sort, search and narrow by assignee or confirmee, with a count of how many are selected on pages you can’t see; only changing the delivery date clears the selection, because that is the one change that makes the old set meaningless',
+                    'Every shop now carries an RTS snapshot — its value-weighted return rate over the previous 14 days, refreshed twice daily — so you can tell at a glance whether a parcel comes from a shop that usually lands',
+                    'A new Upsell filter picks out the orders carrying an upsell, or leaves them out, on the table and in the export alike',
+                    'A day’s calls open as a breakdown from the row itself, so you can see how they went without leaving the list',
+                    'Changing the date range no longer drops the other filters you had set',
+                ],
+            },
+            {
+                title: 'Finance — Income Statements',
+                items: [
+                    'A month can now be locked once it is settled: regenerating, overwriting and deleting are all refused until someone deliberately unlocks it, so a statement you have already reported on or paid against cannot quietly change when a late order lands — and the lock records who closed the month, and when',
+                    'A new per-seller-per-product statement answers “how did this person do on this product”, which neither of the existing views could — one adds a person’s products together, the other adds a product’s sellers together — and each seller’s figures now open on a page of their own',
+                    'OPEX is broken down by transaction type, one line per type with outflow that month, and every row keeps the share of the pool it was given beside the amount it produced, so a saved statement can still say what split it actually used after a later sync moves the counts underneath it',
+                    'A deficit can be carried into a month against a seller and a product, and it survives a regenerate — the figure you typed is kept apart from the snapshots that get rebuilt on every save, and can be entered before the month has ever been closed',
+                ],
+            },
+            {
+                title: 'Meta Ads Manager',
+                items: [
+                    'Two new groupings, Page and Page Owner, bucket ads by the Facebook page their ad set promotes and by the workspace member who owns that page; ads whose page has been deleted, or whose owner no longer has an account, land in an unassigned row rather than vanishing from the totals',
+                    'Any row in the breakdown opens a timeline of its day-by-day figures, with every day in the range drawn even where the ads did not run, so a quiet stretch reads as a gap instead of closing up',
+                    'Each ad account now lists the people who can reach it, refreshed from Business Manager once a day',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Gencys partners no longer see the Page ROAS Tracker, or the Ad spend and ROAS tabs on the product comparison — those are tracked in Gencys itself and the ad spend isn’t attributed per product on our side, so figures that could only be half stated have come out rather than sitting there as sums nobody can act on',
+                    'Shipping fees can be imported onto orders from a spreadsheet, straight from the orders page',
+                    'Checking off a checklist item now takes a proof file and a note alongside it',
+                    'Intern daily records are now part of the Gencys batch sync rather than a separate pass',
+                    'Parcel journey has its own stat cards and a per-shop table, each loading and refreshing on its own, and the CSR menu group is now called Operations',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.34.0',
         date: '2026-08-30',
         sections: [

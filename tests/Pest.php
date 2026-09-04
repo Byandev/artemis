@@ -1,10 +1,12 @@
 <?php
 
+use App\Jobs\SyncCsrDailyCallRecord;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryItem;
@@ -35,6 +37,26 @@ expect()->extend('toBeOne', function () {
 | Helpers
 |--------------------------------------------------------------------------
 */
+
+/**
+ * Build the nightly call report across a range, as the scheduler does.
+ *
+ * The CSR analytics call figures read pancake_user_daily_call_reports, so tests
+ * seed call_logs — the way the data arrives — and then run the real job. The
+ * previous period is covered too, since every card measures the range against
+ * the equally long stretch before it.
+ */
+function syncCallReport(string $from, string $to): void
+{
+    $start = CarbonImmutable::parse($from);
+    $end = CarbonImmutable::parse($to);
+    $cursor = $start->subDays($start->diffInDays($end) + 1);
+
+    while ($cursor->lessThanOrEqualTo($end)) {
+        (new SyncCsrDailyCallRecord($cursor->toDateString()))->handle();
+        $cursor = $cursor->addDay();
+    }
+}
 
 /**
  * Create a workspace owned by a fresh user, plus the user attached as 'owner'.
