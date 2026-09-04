@@ -83,3 +83,72 @@ test('the counts follow the day the parcel settled, not the day it was taken', f
     expect((int) $settled->delivered_count)->toBe(1)
         ->and((int) $settled->total_orders)->toBe(0);
 });
+
+/**
+ * --workspace scopes a rebuild to one workspace.
+ *
+ * Without it every pass rewrites every workspace's day, which is right nightly
+ * and wrong when you are re-running to fix one client's figures.
+ */
+test('a scoped rebuild leaves the other workspaces alone', function () {
+    ['workspace' => $other] = makeWorkspaceWithOwner();
+    $theirCsr = PancakeUser::create(['name' => 'Elsewhere CSR']);
+
+    Order::factory()->forWorkspace($this->workspace)->create([
+        'status' => 1,
+        'final_amount' => 1000,
+        'confirmed_at' => '2026-08-02 10:00:00',
+        'confirmed_by' => $this->csr->id,
+    ]);
+
+    Order::factory()->forWorkspace($other)->create([
+        'status' => 1,
+        'final_amount' => 5000,
+        'confirmed_at' => '2026-08-02 10:00:00',
+        'confirmed_by' => $theirCsr->id,
+    ]);
+
+    (new SyncCsrDailyRecord('2026-08-02', 'POS', $this->workspace->id))->handle();
+
+    expect(PancakeUserPosDailyReport::where('workspace_id', $this->workspace->id)->count())->toBe(1)
+        ->and(PancakeUserPosDailyReport::where('workspace_id', $other->id)->count())->toBe(0);
+});
+
+test('an unscoped rebuild still covers every workspace', function () {
+    ['workspace' => $other] = makeWorkspaceWithOwner();
+    $theirCsr = PancakeUser::create(['name' => 'Elsewhere CSR']);
+
+    Order::factory()->forWorkspace($this->workspace)->create([
+        'status' => 1,
+        'final_amount' => 1000,
+        'confirmed_at' => '2026-08-02 10:00:00',
+        'confirmed_by' => $this->csr->id,
+    ]);
+
+    Order::factory()->forWorkspace($other)->create([
+        'status' => 1,
+        'final_amount' => 5000,
+        'confirmed_at' => '2026-08-02 10:00:00',
+        'confirmed_by' => $theirCsr->id,
+    ]);
+
+    (new SyncCsrDailyRecord('2026-08-02'))->handle();
+
+    expect(PancakeUserPosDailyReport::count())->toBe(2);
+});
+
+test('the command takes the workspace by slug or by id', function () {
+    foreach ([$this->workspace->slug, (string) $this->workspace->id] as $option) {
+        $this->artisan('sync:csr-daily-records', [
+            '--date' => '2026-08-02',
+            '--workspace' => $option,
+        ])->assertSuccessful();
+    }
+});
+
+test('the command refuses a workspace it cannot find rather than rebuilding them all', function () {
+    $this->artisan('sync:csr-daily-records', [
+        '--date' => '2026-08-02',
+        '--workspace' => 'no-such-workspace',
+    ])->assertFailed();
+});

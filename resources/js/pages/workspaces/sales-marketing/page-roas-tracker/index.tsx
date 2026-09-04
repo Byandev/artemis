@@ -1,8 +1,4 @@
 import {
-    DashboardTab,
-    DashboardTabNav,
-} from '@/components/sales-marketing/dashboard-tabs';
-import {
     ColumnOption,
     ColumnsDropdown,
     useColumnVisibility,
@@ -328,8 +324,6 @@ export default function PageRoasTrackerIndex({
         <AppLayout>
             <Head title={`${workspace.name} - Page ROAS Tracker`} />
             <div className="mx-auto w-full max-w-(--breakpoint-2xl) p-4 md:p-6">
-                {hasTabs && <DashboardTabNav tabs={tabs!} active={activeTab} />}
-
                 {/* Title on the left, columns + filters + date range on the right. */}
                 <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
                     <div>

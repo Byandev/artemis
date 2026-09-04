@@ -18,15 +18,25 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
 
     /**
      * @param  string  $date  Y-m-d
+     * @param  int|null  $workspaceId  Limit the rebuild to one workspace; null covers every one.
      */
-    public function __construct(public string $date) {}
+    public function __construct(public string $date, public ?int $workspaceId = null) {}
 
     public function handle(): void
     {
         $date = $this->date;
 
+        // Applied to every scan rather than only to the key list below: each
+        // aggregate is a derived table MySQL materialises whole, so narrowing
+        // them at the source is what keeps a one-workspace rebuild cheap.
+        $workspaceId = $this->workspaceId;
+        $onlyWorkspace = fn ($query, string $column = 'workspace_id') => $query->when(
+            $workspaceId,
+            fn ($q, $id) => $q->where($column, $id)
+        );
+
         // total_called: pancake_order_for_delivery rows assigned to the user where status != 'PENDING'.
-        $assignedAgg = DB::table('pancake_order_for_delivery')
+        $assignedAgg = $onlyWorkspace(DB::table('pancake_order_for_delivery'))
             ->whereNotNull('assignee_id')
             ->where('delivery_date', $date)
             ->groupBy('workspace_id', 'assignee_id')
@@ -39,7 +49,7 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
         // total_rmo_call_attempts / totaaddl_call_time: per (workspace, user), count and sum call_logs
         // whose phone_number matches any customer_phone or rider_phone from that user's deliveries
         // on the date. Each call_log is counted once even if multiple deliveries share the same phone.
-        $callsAgg = DB::table('call_logs as cl')
+        $callsAgg = $onlyWorkspace(DB::table('call_logs as cl'), 'cl.workspace_id')
             ->where('cl.call_date', $date)
             ->whereExists(function ($q) use ($date) {
                 $q->select(DB::raw(1))
@@ -57,7 +67,7 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
                 COALESCE(SUM(cl.duration), 0) AS total_duration
             ');
 
-        $confirmedAgg = DB::table('pancake_order_for_delivery')
+        $confirmedAgg = $onlyWorkspace(DB::table('pancake_order_for_delivery'))
             ->whereNotNull('conferrer_id')
             ->where('delivery_date', $date)
             ->groupBy('workspace_id', 'conferrer_id')
@@ -71,12 +81,12 @@ class SyncCsrRmoDailyRecord implements ShouldQueue
         // appears in the report even if they only confirmed (without being assigned), and vice versa.
         $keys = DB::query()
             ->fromSub(
-                DB::table('pancake_order_for_delivery')
+                $onlyWorkspace(DB::table('pancake_order_for_delivery'))
                     ->where('delivery_date', $date)
                     ->whereNotNull('assignee_id')
                     ->select('workspace_id', DB::raw('assignee_id AS pancake_user_id'))
                     ->union(
-                        DB::table('pancake_order_for_delivery')
+                        $onlyWorkspace(DB::table('pancake_order_for_delivery'))
                             ->where('delivery_date', $date)
                             ->whereNotNull('conferrer_id')
                             ->select('workspace_id', DB::raw('conferrer_id AS pancake_user_id'))
