@@ -123,7 +123,7 @@ class BackfillCallLogPersonas extends Command
             $rule,
         ));
 
-        $totals = ['scanned' => 0, 'delivery' => 0, 'verification' => 0, 'ambiguous' => 0, 'unmatched' => 0];
+        $totals = ['rider' => 0, 'customer' => 0, 'verification' => 0];
 
         $bar = $this->output->createProgressBar($days->count());
         $bar->start();
@@ -142,19 +142,11 @@ class BackfillCallLogPersonas extends Command
         $this->newLine(2);
 
         $this->table(['', 'Calls'], [
-            ['Scanned', $totals['scanned']],
-            ['Matched to a delivery', $totals['delivery']],
+            ['Matched to a rider', $totals['rider']],
+            ['Matched to a customer', $totals['customer']],
             ['Matched to a confirmed order', $totals['verification']],
-            ['Still unmatched', $totals['unmatched']],
+            ['Stamped', array_sum($totals)],
         ]);
-
-        if ($totals['ambiguous'] > 0) {
-            $this->warn(sprintf(
-                '%d verification match%s had more than one order confirmed that day for the same number; the earliest confirmation was used.',
-                $totals['ambiguous'],
-                $totals['ambiguous'] === 1 ? '' : 'es',
-            ));
-        }
 
         if ($dryRun) {
             $this->comment('Dry run — nothing was written.');
@@ -176,11 +168,15 @@ class BackfillCallLogPersonas extends Command
     }
 
     /**
-     * The (workspace, date) pairs that have anything left to stamp.
+     * The (workspace, date) pairs with calls still to stamp.
+     *
+     * persona IS NULL is the whole test, the same one every UPDATE carries: a
+     * row that has a persona is finished, and one that never matched anything
+     * costs a no-op statement to look at again.
      */
     private function daysWithWork(?int $workspaceId, ?string $since, ?string $until)
     {
-        return BackfillCallLogPersonasForDay::pending(CallLog::query())
+        return CallLog::whereNull('persona')
             ->when($workspaceId, fn ($q) => $q->where('workspace_id', $workspaceId))
             ->when($since, fn ($q) => $q->whereDate('call_date', '>=', $since))
             ->when($until, fn ($q) => $q->whereDate('call_date', '<=', $until))

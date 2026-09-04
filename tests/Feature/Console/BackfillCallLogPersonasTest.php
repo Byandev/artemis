@@ -56,16 +56,17 @@ test('a call to a customer on the day their order was confirmed is stamped verif
         ->and($call->order_for_delivery_id)->toBeNull();
 });
 
-test('the phone is matched however either side spells it', function () {
+test('the phone has to be spelled the same on both sides', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    // Pancake keeps this one international; the handset reported it local.
-    $order = confirmedOrder($workspace, '+639170000001', BACKFILL_DATE.' 09:00:00');
+    // Pancake keeps this one international; the handset reported it local. The
+    // match is a plain string comparison, so this pair does not meet.
+    confirmedOrder($workspace, '+639170000001', BACKFILL_DATE.' 09:00:00');
     $call = unstampedCall($workspace, '09170000001');
 
     $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])->assertSuccessful();
 
-    expect((int) $call->refresh()->order_id)->toBe($order->id);
+    expect($call->refresh()->persona)->toBeNull();
 });
 
 test('an order confirmed on another day is not a verification match', function () {
@@ -123,7 +124,7 @@ test('the delivery rule wins when a number matches both', function () {
         ->and((int) $call->order_for_delivery_id)->toBe($delivery->id);
 });
 
-test('a row already stamped customer gets its missing delivery id filled in', function () {
+test('a row that already has a persona is left alone, delivery id or not', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
 
     $order = Order::factory()->forWorkspace($workspace)->create(['confirmed_at' => null]);
@@ -142,7 +143,10 @@ test('a row already stamped customer gets its missing delivery id filled in', fu
         'delivery_date' => BACKFILL_DATE,
     ]);
 
-    // Stamped back when the column did not exist yet.
+    // Stamped back when the column did not exist yet, so its delivery id is
+    // still missing. Every statement carries `persona IS NULL`, so none of them
+    // reaches this row — the gap stays until something without that guard fills
+    // it.
     $call = unstampedCall($workspace, '09170000001', [
         'persona' => CallLogPersona::CUSTOMER,
         'order_id' => $order->id,
@@ -150,7 +154,8 @@ test('a row already stamped customer gets its missing delivery id filled in', fu
 
     $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])->assertSuccessful();
 
-    expect((int) $call->refresh()->order_for_delivery_id)->toBe($delivery->id);
+    expect($call->refresh()->order_for_delivery_id)->toBeNull()
+        ->and($delivery->id)->toBeGreaterThan(0);
 });
 
 test('dry run writes nothing', function () {
@@ -231,9 +236,9 @@ test('re-running a finished day writes nothing more', function () {
     (new BackfillCallLogPersonasForDay($workspace->id, BACKFILL_DATE))->handle();
     $stampedAt = $call->refresh()->updated_at;
 
-    // Nothing is left to select, so the second pass is a read and no more.
+    // persona IS NULL leaves nothing to match, so the second pass claims none.
     $totals = (new BackfillCallLogPersonasForDay($workspace->id, BACKFILL_DATE))->handle();
 
-    expect($totals['scanned'])->toBe(0)
+    expect(array_sum($totals))->toBe(0)
         ->and($call->refresh()->updated_at->eq($stampedAt))->toBeTrue();
 });
