@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\DB;
  * stays true — the sync payload is not changing. So the match is made here,
  * against the deliveries loaded for that same day: a number on a delivery's
  * customer_phone was a customer call, one on rider_phone was a rider call, and
- * the order id comes off whichever delivery matched. A number on neither was
- * not part of an RMO delivery at all, and is left unstamped.
+ * the order id and the delivery's own id come off whichever delivery matched.
+ * A number on neither was not part of an RMO delivery at all, and is left
+ * unstamped.
  */
 class CallLogPersona
 {
@@ -21,7 +22,7 @@ class CallLogPersona
     public const RIDER = 'rider';
 
     /**
-     * Persona + order id for each phone number, keyed by number.
+     * Persona, order id and delivery id for each phone number, keyed by number.
      *
      * One query per workspace/day rather than one per call — a sync posts
      * hundreds of rows at a time, and most of them share a handful of numbers.
@@ -31,7 +32,7 @@ class CallLogPersona
      * number is the one more likely to be reused across orders.
      *
      * @param  list<string>  $phoneNumbers
-     * @return array<string, array{persona: string, order_id: int|null}>
+     * @return array<string, array{persona: string, order_id: int|null, order_for_delivery_id: int|null}>
      */
     public static function resolve(int $workspaceId, string $date, array $phoneNumbers): array
     {
@@ -48,7 +49,7 @@ class CallLogPersona
                 $query->whereIn('customer_phone', $phoneNumbers)
                     ->orWhereIn('rider_phone', $phoneNumbers);
             })
-            ->get(['order_id', 'customer_phone', 'rider_phone']);
+            ->get(['id', 'order_id', 'customer_phone', 'rider_phone']);
 
         $resolved = [];
 
@@ -59,6 +60,7 @@ class CallLogPersona
                 $resolved[$delivery->rider_phone] ??= [
                     'persona' => self::RIDER,
                     'order_id' => $delivery->order_id,
+                    'order_for_delivery_id' => $delivery->id,
                 ];
             }
         }
@@ -68,6 +70,7 @@ class CallLogPersona
                 $resolved[$delivery->customer_phone] = [
                     'persona' => self::CUSTOMER,
                     'order_id' => $delivery->order_id,
+                    'order_for_delivery_id' => $delivery->id,
                 ];
             }
         }
@@ -76,7 +79,7 @@ class CallLogPersona
     }
 
     /**
-     * Stamp persona/order_id onto rows headed for call_logs.
+     * Stamp persona/order_id/order_for_delivery_id onto rows headed for call_logs.
      *
      * Rows are grouped by date first: a single sync can span midnight, and a
      * number's persona is only meaningful against the day it was called on.
@@ -107,6 +110,7 @@ class CallLogPersona
             // call looks like, not a gap to be guessed at.
             $row['persona'] = $match['persona'] ?? null;
             $row['order_id'] = $match['order_id'] ?? null;
+            $row['order_for_delivery_id'] = $match['order_for_delivery_id'] ?? null;
 
             return $row;
         }, $rows);
