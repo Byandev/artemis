@@ -59,7 +59,7 @@ class CallLogController extends Controller
             $inserted += CallLog::upsert(
                 $chunk,
                 ['workspace_id', 'user_id', 'phone_number', 'call_date', 'call_time'],
-                ['type', 'duration', 'order_id', 'persona', 'updated_at']
+                ['type', 'duration', 'order_id', 'order_for_delivery_id', 'persona', 'updated_at']
             );
         }
 
