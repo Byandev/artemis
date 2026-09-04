@@ -203,10 +203,12 @@ class CSRController extends Controller
      | CSR Analytics stat cards
      |--------------------------------------------------------------------------
      |
-     | One endpoint per card, reading the workspace's orders through
-     | WorkspaceMetrics — the dashboard's own figures, so they hold for a range
-     | the nightly rollup has not reached. Each answers with `value`, the
-     | previous period's figure and the move between them.
+     | One endpoint per card. Sales reads the nightly POS rollup — the same
+     | pancake_user_pos_daily_reports rows the leader, the comparison and the
+     | table below them read, so the period's total is the sum of the CSRs
+     | listed under it. The rest read the workspace's orders through
+     | WorkspaceMetrics. Each answers with `value`, the previous period's
+     | figure and the move between them.
      */
 
     public function analyticsSales(Request $request, Workspace $workspace)
@@ -216,8 +218,8 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->orderTotals($workspace, $from, $to);
-        $previous = $this->orderTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->posSalesTotals($workspace, $from, $to);
+        $previous = $this->posSalesTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
             'value' => $current['sales'],
@@ -882,9 +884,40 @@ class CSRController extends Controller
     }
 
     /**
-     * Every order figure the analytics cards need, over one date range.
+     * Sales and orders over one date range, off the POS rollup.
      *
-     * @return array{sales: float, orders: int, rts: float, returning: float, delivered: float}
+     * The card is the sum of the CSR rows the page already shows: the leader,
+     * the comparison and the breakdown table all read
+     * pancake_user_pos_daily_reports, so the total above them agrees with the
+     * names under it. The rollup is written nightly, so a range the sync has
+     * not reached reads as zero rather than as the dashboard's order figures.
+     *
+     * @return array{sales: float, orders: int}
+     */
+    private function posSalesTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->scopeToVisibleShops(
+            DB::table((new PancakeUserPosDailyReport)->getTable())
+                ->where('workspace_id', $workspace->id)
+                ->whereBetween('date', [$from, $to]),
+            $workspace,
+        )
+            ->selectRaw('
+                COALESCE(SUM(total_sales), 0)  as sales,
+                COALESCE(SUM(total_orders), 0) as orders
+            ')
+            ->first();
+
+        return [
+            'sales' => (float) ($row->sales ?? 0),
+            'orders' => (int) ($row->orders ?? 0),
+        ];
+    }
+
+    /**
+     * The order figures behind the RTS card, over one date range.
+     *
+     * @return array{rts: float, returning: float, delivered: float}
      */
     private function orderTotals(Workspace $workspace, string $from, string $to): array
     {
@@ -895,11 +928,9 @@ class CSRController extends Controller
         $metrics = $workspace->metrics(
             ['start_date' => $from, 'end_date' => $to],
             $shopIds === null ? [] : ['shop_ids' => $shopIds],
-        )->extract(['totalSales', 'totalOrders', 'rtsRate', 'returningAmount', 'deliveredAmount']);
+        )->extract(['rtsRate', 'returningAmount', 'deliveredAmount']);
 
         return [
-            'sales' => (float) $metrics['totalSales'],
-            'orders' => (int) $metrics['totalOrders'],
             // A ratio, 0..1 — the card turns it into a percentage.
             'rts' => (float) $metrics['rtsRate'],
             'returning' => (float) $metrics['returningAmount'],

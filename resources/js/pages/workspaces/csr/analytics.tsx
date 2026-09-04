@@ -236,9 +236,11 @@ export default function Analytics({ workspace, records, query }: Props) {
     // up the card beside it, and the table's sorting, paging and search never
     // touch either.
     //
-    // Not keyed on the POS/ERP switch: these read the workspace's orders, the
-    // source the main dashboard's total sales comes from, and an order has no
-    // POS/ERP side. That switch only picks the rollup the table is built from.
+    // Not keyed on the POS/ERP switch. Sales reads the POS rollup, the same
+    // rows the leader and the comparison below it read, so the total and the
+    // names under it always agree; the rest read the workspace's orders, which
+    // have no POS/ERP side. That switch only picks the rollup the table is
+    // built from.
     const [salesStat, salesLoading] = useAnalyticsStat<SalesStat>(
         workspace.slug,
         'analytics-sales',

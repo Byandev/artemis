@@ -15,12 +15,12 @@ use Modules\Pancake\Models\User as PancakeUser;
 /**
  * The CSR Analytics stat cards.
  *
- * They read the workspace's orders through WorkspaceMetrics — the same
- * TotalSales/TotalOrders the main dashboard reports — rather than the per-CSR
- * daily rollup the table below them uses. The rollup is written nightly, so a
- * range it has not covered reads as zero on a day the dashboard shows plenty;
- * the card is there to answer "how did we do", so it answers with the figure
- * the rest of the app calls total sales.
+ * Sales reads pancake_user_pos_daily_reports — the nightly per-CSR rollup the
+ * leader, the comparison and the breakdown table below it already read — so
+ * the total at the top of the page is the sum of the names under it. The
+ * rollup is written nightly, so a range the sync has not reached reads as
+ * zero. The remaining cards read the workspace's orders through
+ * WorkspaceMetrics.
  *
  * One endpoint per card, alongside the other /csrs/stats/* endpoints, because
  * each card measures the chosen range twice — once as itself, once against the
@@ -35,10 +35,10 @@ function csrStatsContext(): array
 }
 
 /**
- * A confirmed order counted by TotalSales.
+ * A confirmed order belonging to no CSR.
  *
- * `confirmed_at` is the date column the metric filters on and `final_amount`
- * the figure it sums; statuses 6 and 7 are excluded as cancelled/removed.
+ * `confirmed_at` is the date column the metrics filter on and `final_amount`
+ * the figure they sum; statuses 6 and 7 are excluded as cancelled/removed.
  */
 function confirmedOrder(Workspace $workspace, string $confirmedAt, float $amount): Order
 {
@@ -46,6 +46,28 @@ function confirmedOrder(Workspace $workspace, string $confirmedAt, float $amount
         'status' => 1,
         'final_amount' => $amount,
         'confirmed_at' => $confirmedAt,
+    ]);
+}
+
+/** The CSR every sale in the Sales card's own tests is credited to. */
+function salesCsr(): PancakeUser
+{
+    return PancakeUser::firstOrCreate(['name' => 'Sales CSR']);
+}
+
+/**
+ * An order the POS rollup counts as one CSR's sale.
+ *
+ * `confirmed_by` is what puts it in a rollup row at all — the nightly job
+ * joins pancake_users on it, so an order nobody confirmed is in none.
+ */
+function csrSale(Workspace $workspace, string $confirmedAt, float $amount): Order
+{
+    return Order::factory()->forWorkspace($workspace)->create([
+        'status' => 1,
+        'final_amount' => $amount,
+        'confirmed_at' => $confirmedAt,
+        'confirmed_by' => salesCsr()->id,
     ]);
 }
 
@@ -60,6 +82,15 @@ function csrStat($owner, Workspace $workspace, string $stat, string $from, strin
 
 function csrStats($owner, Workspace $workspace, string $from, string $to)
 {
+    // The card reads the nightly POS rollup, so write it for real — over the
+    // range and over the equally long stretch before it, which is what the
+    // change is measured against.
+    $start = CarbonImmutable::parse($from);
+    syncPosRollup(
+        $start->subDays($start->diffInDays(CarbonImmutable::parse($to)) + 1)->toDateString(),
+        $to,
+    );
+
     return csrStat($owner, $workspace, 'analytics-sales', $from, $to);
 }
 
@@ -68,13 +99,13 @@ function csrRtsStat($owner, Workspace $workspace, string $from, string $to)
     return csrStat($owner, $workspace, 'analytics-rts', $from, $to);
 }
 
-test('sales and orders come from the same source as the dashboard', function () {
+test('sales and orders are summed off the POS daily rollup', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    confirmedOrder($workspace, '2026-08-01 09:00:00', 1000);
-    confirmedOrder($workspace, '2026-08-03 14:00:00', 2500);
+    csrSale($workspace, '2026-08-01 09:00:00', 1000);
+    csrSale($workspace, '2026-08-03 14:00:00', 2500);
     // Outside the range on purpose.
-    confirmedOrder($workspace, '2026-08-09 10:00:00', 9999);
+    csrSale($workspace, '2026-08-09 10:00:00', 9999);
 
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
@@ -87,22 +118,43 @@ test('the whole last day of the range is included', function () {
 
     // Late on the closing day — a range compared as dates rather than
     // timestamps would drop this.
-    confirmedOrder($workspace, '2026-08-05 23:30:00', 800);
+    csrSale($workspace, '2026-08-05 23:30:00', 800);
 
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 800)
         ->assertJsonPath('orders', 1);
 });
 
-test('cancelled orders are left out, as they are on the dashboard', function () {
+test('a cancelled order still counts, as it does for the CSR who confirmed it', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    confirmedOrder($workspace, '2026-08-02 10:00:00', 1000);
+    csrSale($workspace, '2026-08-02 10:00:00', 1000);
 
+    // The rollup credits a CSR with everything they confirmed, whatever became
+    // of it later. Excluding this here would put the card below the sum of the
+    // leader, the comparison and the table it sits above.
     Order::factory()->forWorkspace($workspace)->create([
         'status' => 6,
         'final_amount' => 5000,
         'confirmed_at' => '2026-08-02 11:00:00',
+        'confirmed_by' => salesCsr()->id,
+    ]);
+
+    csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 6000)
+        ->assertJsonPath('orders', 2);
+});
+
+test('an order nobody confirmed is in no CSR row, so the card leaves it out', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    csrSale($workspace, '2026-08-02 10:00:00', 1000);
+
+    Order::factory()->forWorkspace($workspace)->create([
+        'status' => 1,
+        'final_amount' => 7500,
+        'confirmed_at' => '2026-08-02 11:00:00',
+        'confirmed_by' => null,
     ]);
 
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
@@ -110,17 +162,19 @@ test('cancelled orders are left out, as they are on the dashboard', function () 
         ->assertJsonPath('orders', 1);
 });
 
-test('the CSR daily rollup no longer feeds the card', function () {
+test('a range the nightly sync has not reached reads as zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // The rollup being empty is exactly the case that made the card read zero
-    // while the dashboard showed sales. The orders decide the figure now.
+    // The orders are there, but the rollup that has not run yet holds no rows
+    // for them — the card follows the rollup, so it reports nothing.
+    csrSale($workspace, '2026-08-02 10:00:00', 4200);
+
     expect(PancakeUserPosDailyReport::count())->toBe(0);
 
-    confirmedOrder($workspace, '2026-08-02 10:00:00', 4200);
-
-    csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 4200);
+    $this->actingAs($owner)
+        ->getJson("/api/workspaces/{$workspace->slug}/csrs/stats/analytics-sales?from=2026-08-01&to=2026-08-05")
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('orders', 0);
 });
 
 test('the comparison window is the same length, ending the day before', function () {
@@ -141,8 +195,8 @@ test('a single-day range compares against the day before', function () {
 test('the change is the percentage move on the previous period', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    confirmedOrder($workspace, '2026-07-28 10:00:00', 2000);
-    confirmedOrder($workspace, '2026-08-02 10:00:00', 3000);
+    csrSale($workspace, '2026-07-28 10:00:00', 2000);
+    csrSale($workspace, '2026-08-02 10:00:00', 3000);
 
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 3000)
@@ -154,8 +208,8 @@ test('the change is the percentage move on the previous period', function () {
 test('a fall reports a negative change', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    confirmedOrder($workspace, '2026-07-28 10:00:00', 4000);
-    confirmedOrder($workspace, '2026-08-02 10:00:00', 1000);
+    csrSale($workspace, '2026-07-28 10:00:00', 4000);
+    csrSale($workspace, '2026-08-02 10:00:00', 1000);
 
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('change', -75);
@@ -164,7 +218,7 @@ test('a fall reports a negative change', function () {
 test('an empty previous period has no percentage rather than zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    confirmedOrder($workspace, '2026-08-02 10:00:00', 3000);
+    csrSale($workspace, '2026-08-02 10:00:00', 3000);
 
     // 0% would read as "flat"; this is the first period with any sales at all.
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
@@ -176,7 +230,7 @@ test('another workspace\'s orders are not counted', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
     ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    confirmedOrder($other, '2026-08-02 10:00:00', 7000);
+    csrSale($other, '2026-08-02 10:00:00', 7000);
 
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 0)
@@ -791,9 +845,10 @@ test('the share is of the CSRs\' own total, not the workspace\'s', function () {
         ->assertJsonPath('leader.value', 4000)
         ->assertJsonPath('leader.share', 100);
 
-    // The Sales card still sees the whole workspace — the two differ on purpose.
+    // The card is the same rollup, so it leaves the stray order out too — a
+    // 100% share of a figure smaller than the card's would not add up.
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 8000);
+        ->assertJsonPath('value', 4000);
 });
 
 test('the shares across CSRs add up to the whole', function () {
@@ -830,7 +885,7 @@ test('cancelled orders still count towards a leader, as they do in the table', f
         ->assertJsonPath('leader.orders', 2);
 });
 
-test('the leader and the Sales card differ by the cancelled orders', function () {
+test('the leader and the Sales card agree, cancellations included', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     $csr = PancakeUser::create(['name' => 'Angeline Mercado']);
@@ -844,13 +899,13 @@ test('the leader and the Sales card differ by the cancelled orders', function ()
         'confirmed_by' => $csr->id,
     ]);
 
-    // Pinned so the gap stays a known, deliberate one: the leaderboard credits
-    // work done, the Sales card reports money kept.
+    // One CSR, so the leader is the whole field — and the card above them is
+    // the same rollup summed, cancelled orders and all.
     csrSalesLeader($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('leader.value', 1500);
 
     csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1000);
+        ->assertJsonPath('value', 1500);
 });
 
 test('a period with no confirmed orders has no leader', function () {
@@ -900,14 +955,15 @@ test('a range the rollup has not covered has no leader', function () {
     $csr = PancakeUser::create(['name' => 'Angeline Mercado']);
     orderConfirmedBy($workspace, $csr, '2026-08-02 10:00:00', 6000);
 
-    // The orders are there and the Sales card reports them, but the sync has
-    // not written those days — so there is nobody to crown.
+    // The orders are there, but the sync has not written those days — so there
+    // is nobody to crown, and the card above reads zero for the same reason.
     csrStat($owner, $workspace, 'analytics-leader-sales', '2026-08-01', '2026-08-05')
         ->assertOk()
         ->assertJsonPath('leader', null);
 
-    csrStats($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 6000);
+    $this->actingAs($owner)
+        ->getJson("/api/workspaces/{$workspace->slug}/csrs/stats/analytics-sales?from=2026-08-01&to=2026-08-05")
+        ->assertJsonPath('value', 0);
 });
 
 test('rollup days outside the range do not count towards the leader', function () {
