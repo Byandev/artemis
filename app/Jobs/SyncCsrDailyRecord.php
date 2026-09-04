@@ -18,8 +18,9 @@ class SyncCsrDailyRecord implements ShouldQueue
 
     /**
      * @param  string  $date  Y-m-d
+     * @param  int|null  $workspaceId  Limit the rebuild to one workspace; null covers every one.
      */
-    public function __construct(public string $date, public string $type = 'POS') {}
+    public function __construct(public string $date, public string $type = 'POS', public ?int $workspaceId = null) {}
 
     public function handle(): void
     {
@@ -30,6 +31,7 @@ class SyncCsrDailyRecord implements ShouldQueue
 
         $rows = DB::table('pancake_orders as po')
             ->join('pancake_users as pu', 'pu.id', '=', 'po.confirmed_by')
+            ->when($this->workspaceId, fn ($q, $id) => $q->where('po.workspace_id', $id))
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($q2) use ($start, $end) {
                     $q2->where('po.status', 3)
@@ -41,10 +43,12 @@ class SyncCsrDailyRecord implements ShouldQueue
                     })
                     ->orWhereBetween('po.confirmed_at', [$start, $end]);
             })
-            ->groupBy('po.workspace_id', 'pu.id')
+            // One row per shop the CSR worked that day, not one per CSR.
+            ->groupBy('po.workspace_id', 'pu.id', 'po.shop_id')
             ->selectRaw('
                 po.workspace_id as workspace_id,
                 pu.id as pancake_user_id,
+                po.shop_id as shop_id,
 
                 SUM(CASE WHEN po.confirmed_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as total_orders,
                 SUM(CASE WHEN po.confirmed_at BETWEEN ? AND ? THEN po.final_amount ELSE 0 END) as total_sales,
@@ -69,6 +73,7 @@ class SyncCsrDailyRecord implements ShouldQueue
                 [
                     'workspace_id' => $row->workspace_id,
                     'pancake_user_id' => $row->pancake_user_id,
+                    'shop_id' => $row->shop_id,
                     'date' => $date,
                 ],
                 [

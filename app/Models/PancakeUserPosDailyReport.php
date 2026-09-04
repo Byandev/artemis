@@ -11,6 +11,8 @@ class PancakeUserPosDailyReport extends Model
     protected $fillable = [
         'workspace_id',
         'pancake_user_id',
+        // The shop the day's figures belong to.
+        'shop_id',
         'date',
         'total_orders',
         'total_sales',
