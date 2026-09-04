@@ -503,10 +503,11 @@ function csrRmoTimeStat($owner, Workspace $workspace, string $from, string $to)
 }
 
 /**
- * A logged call of $seconds on $date.
+ * A logged RMO call of $seconds on $date.
  *
- * Carries an order_id by default — that is what marks it as an RMO call. Pass
- * $matched false for one that reached a number belonging to no delivery.
+ * Carries both an order and a delivery stamp by default. Pass $matched false
+ * for one that reached a number belonging to no order at all — the nightly
+ * report has no row for it, so no card can count it.
  */
 function rmoCall(Workspace $workspace, string $date, int $seconds, bool $matched = true): void
 {
@@ -525,7 +526,22 @@ function rmoCall(Workspace $workspace, string $date, int $seconds, bool $matched
     ]);
 }
 
-test('RMO total time is the talk time across the range\'s RMO calls', function () {
+test('the total called time is every call\'s duration, verification included', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // The card reads total_call_time and total_called, so a verification call
+    // — an order with no delivery stamp — is in both, unlike the narrower
+    // total_rmo_* pair the calls-placed card beside it reads.
+    rmoCall($workspace, '2026-08-02', 120);
+    placedCall($workspace, '2026-08-02', rmo: false);
+
+    csrRmoTimeStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 180)
+        ->assertJsonPath('calls', 2)
+        ->assertJsonPath('average_seconds', 90);
+});
+
+test('the total called time is the talk time across the range\'s calls', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     rmoCall($workspace, '2026-08-02', 120);

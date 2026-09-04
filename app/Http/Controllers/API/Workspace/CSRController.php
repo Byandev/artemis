@@ -269,8 +269,8 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->totalCalled($workspace, $from, $to);
-        $previous = $this->totalCalled($workspace, $previousFrom, $previousTo);
+        $current = $this->callTotals($workspace, $from, $to)['calls'];
+        $previous = $this->callTotals($workspace, $previousFrom, $previousTo)['calls'];
 
         return response()->json([
             'value' => $current,
@@ -290,8 +290,8 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->callTotals($workspace, $from, $to);
+        $previous = $this->callTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
             'value' => $current['seconds'],
@@ -572,14 +572,29 @@ class CSRController extends Controller
     }
 
     /**
-     * Calls the CSRs placed over a range — the call report's own `total_called`.
+     * Calls placed and time spent on them over a range — the call report's own
+     * `total_called` and `total_call_time`.
      *
-     * Every call against an order, RMO or not, which is the column the report
-     * counts. The rollup is nightly, so a range the sync has not reached is 0.
+     * Every call against an order, RMO work and order verification alike,
+     * which is what those two columns count; the `total_rmo_*` pair beside
+     * them is the narrower figure the other call cards read. The rollup is
+     * nightly, so a range the sync has not reached is zero on both.
+     *
+     * @return array{calls: int, seconds: int}
      */
-    private function totalCalled(Workspace $workspace, string $from, string $to): int
+    private function callTotals(Workspace $workspace, string $from, string $to): array
     {
-        return (int) $this->callReport($workspace, $from, $to)->sum('total_called');
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_called), 0)    as calls,
+                COALESCE(SUM(total_call_time), 0) as seconds
+            ')
+            ->first();
+
+        return [
+            'calls' => (int) ($row->calls ?? 0),
+            'seconds' => (int) ($row->seconds ?? 0),
+        ];
     }
 
     /**

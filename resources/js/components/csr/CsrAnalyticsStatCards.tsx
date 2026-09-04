@@ -316,7 +316,7 @@ export function RmoTimeStatCard({
 }) {
     return (
         <StatCard
-            title="RMO Total Time"
+            title="Total Called Time"
             icon={Timer}
             loading={loading || stat === null}
             value={stat ? duration(stat.value) : ''}
