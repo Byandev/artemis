@@ -43,14 +43,12 @@ export interface RmoTimeStat extends StatPayload {
 
 export interface CallsPlacedStat extends StatPayload {
     value: number;
-    connected: number;
 }
 
 export interface RealConversationsStat extends StatPayload {
     value: number;
-    placed: number;
-    /** Share of the attempts that became a conversation, or null with none. */
-    share: number | null;
+    calls: number;
+    average_seconds: number | null;
 }
 
 export interface ReachRateStat extends StatPayload {
@@ -348,15 +346,16 @@ export function CallsPlacedStatCard({
 }) {
     return (
         <StatCard
-            title="Calls Placed"
+            title="Total Verification Called"
             icon={PhoneOutgoing}
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
-            // The connected count is worth carrying: the gap between the two
-            // is the calls that rang and got nothing, which is the context the
-            // headline number is missing on its own.
+            // The time behind these is the card beside this one, so the
+            // footnote names the unit rather than restating that figure.
             footnote={
-                stat ? `${stat.connected.toLocaleString()} connected` : ''
+                stat
+                    ? `verification call${stat.value === 1 ? '' : 's'} in the range`
+                    : ''
             }
             trend={
                 <Trend
@@ -381,16 +380,14 @@ export function RealConversationsStatCard({
 }) {
     return (
         <StatCard
-            title="Real Conversations"
+            title="Total Verification Call Time"
             icon={MessagesSquare}
             loading={loading || stat === null}
-            value={stat ? stat.value.toLocaleString() : ''}
-            // The share of attempts this represents is the Reach Rate card, so
-            // the footnote gives the denominator without restating the rate.
+            value={stat ? duration(stat.value) : ''}
             footnote={
-                !stat || stat.share === null
-                    ? 'No calls placed in this period'
-                    : `of ${stat.placed.toLocaleString()} placed`
+                !stat || stat.average_seconds === null
+                    ? 'No verification calls in this period'
+                    : `avg ${perCall(stat.average_seconds)} per call`
             }
             trend={
                 <Trend

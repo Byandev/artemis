@@ -316,14 +316,11 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->verificationTotals($workspace, $from, $to);
+        $previous = $this->verificationTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            // Every call placed against an order, however short.
             'value' => $current['calls'],
-            // The subset that connected, so the card can say how many landed.
-            'connected' => $current['connected'],
             'previous_value' => $previous['calls'],
             // Relative, like the time card: a count is a magnitude, not a rate.
             'change' => $previous['calls'] > 0
@@ -340,20 +337,20 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->verificationTotals($workspace, $from, $to);
+        $previous = $this->verificationTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            'value' => $current['real'],
-            'placed' => $current['calls'],
-            // What share of the attempts became a conversation — 40 of 60 and
-            // 40 of 4,000 are not the same day's work.
-            'share' => $current['calls'] > 0
-                ? round($current['real'] / $current['calls'] * 100, 1)
+            'value' => $current['seconds'],
+            'calls' => $current['calls'],
+            // Talk time over the calls behind it; null with none to divide by.
+            'average_seconds' => $current['calls'] > 0
+                ? round($current['seconds'] / $current['calls'], 1)
                 : null,
-            'previous_value' => $previous['real'],
-            'change' => $previous['real'] > 0
-                ? round(($current['real'] - $previous['real']) / $previous['real'] * 100, 1)
+            'previous_value' => $previous['seconds'],
+            // Relative, like the other time card: a duration is a magnitude.
+            'change' => $previous['seconds'] > 0
+                ? round(($current['seconds'] - $previous['seconds']) / $previous['seconds'] * 100, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -550,13 +547,39 @@ class CSRController extends Controller
      *
      * @return array{seconds: int, calls: int, connected: int, real: int, longest: int}
      */
+    /**
+     * Order-verification calls over a range — the call report's own
+     * `total_verification_called`, and the time spent on them.
+     *
+     * A verification call is one placed against an order with no delivery
+     * behind it: the CSR ringing to confirm the order rather than to chase the
+     * parcel, which is the split SyncCsrDailyCallRecord makes on
+     * `order_for_delivery_id`. The rollup is nightly, so a range the sync has
+     * not reached is zero on both.
+     *
+     * @return array{calls: int, seconds: int}
+     */
+    private function verificationTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_verification_called), 0)    as calls,
+                COALESCE(SUM(total_verification_call_time), 0) as seconds
+            ')
+            ->first();
+
+        return [
+            'calls' => (int) ($row->calls ?? 0),
+            'seconds' => (int) ($row->seconds ?? 0),
+        ];
+    }
+
     private function rmoCallTotals(Workspace $workspace, string $from, string $to): array
     {
         $row = $this->callReport($workspace, $from, $to)
             ->selectRaw('
                 COALESCE(SUM(total_rmo_called), 0) as calls,
                 COALESCE(SUM(total_rmo_call_time), 0) as seconds,
-                COALESCE(SUM(total_rmo_connected_called), 0) as connected,
                 COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
                 COALESCE(MAX(longest_rmo_call_time), 0) as longest
             ')
@@ -565,7 +588,6 @@ class CSRController extends Controller
         return [
             'seconds' => (int) ($row->seconds ?? 0),
             'calls' => (int) ($row->calls ?? 0),
-            'connected' => (int) ($row->connected ?? 0),
             'real' => (int) ($row->real_conversations ?? 0),
             'longest' => (int) ($row->longest ?? 0),
         ];

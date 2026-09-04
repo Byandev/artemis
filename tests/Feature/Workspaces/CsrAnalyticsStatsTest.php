@@ -620,42 +620,72 @@ function csrCallsPlacedStat($owner, Workspace $workspace, string $from, string $
     return csrStat($owner, $workspace, 'analytics-calls-placed', $from, $to);
 }
 
-test('calls placed counts every call against an order, however short', function () {
+/**
+ * A verification call of $seconds on $date.
+ *
+ * An order with no delivery behind it — the CSR ringing to confirm the order
+ * rather than to chase a parcel. That is the split the nightly report makes on
+ * order_for_delivery_id, and total_verification_called is its count.
+ */
+function verificationCall(Workspace $workspace, string $date, int $seconds): void
+{
+    CallLog::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => rmoAssignee()->id,
+        'phone_number' => '09170000001',
+        'call_date' => $date,
+        'duration' => $seconds,
+        'order_id' => Order::factory()->forWorkspace($workspace)->create()->id,
+        'order_for_delivery_id' => null,
+    ]);
+}
+
+test('total verification called counts the calls with no delivery behind them', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 5);
-    // A one-second call still counts as placed — the CSR rang and was answered.
-    rmoCall($workspace, '2026-08-02', 1);
-    // Zero seconds never joined: it rang out or the line was busy.
-    rmoCall($workspace, '2026-08-03', 0);
+    verificationCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-02', 5);
+    // A one-second call still counts: the CSR rang and was answered.
+    verificationCall($workspace, '2026-08-03', 1);
+    // Outside the range on purpose.
+    verificationCall($workspace, '2026-08-09', 99);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('value', 4)
-        ->assertJsonPath('connected', 3);
+        ->assertJsonPath('value', 3);
 });
 
-test('a call matched to no order is not a call placed', function () {
+test('an RMO call is not a verification call', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-02', 30);
+    // Stamped to a delivery, so the report files it under the RMO columns.
+    rmoCall($workspace, '2026-08-02', 60);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1);
+});
+
+test('a call against no order is in no report row, verification included', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    verificationCall($workspace, '2026-08-02', 30);
+    // No order at all: the nightly report joins on it, so this is in no row.
     rmoCall($workspace, '2026-08-02', 60, matched: false);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1)
-        ->assertJsonPath('connected', 1);
+        ->assertJsonPath('value', 1);
 });
 
-test('the calls placed change is relative', function () {
+test('the verification called change is relative, as a count rather than a rate', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-07-28', 30);
-    rmoCall($workspace, '2026-07-29', 30);
+    verificationCall($workspace, '2026-07-28', 30);
+    verificationCall($workspace, '2026-07-29', 30);
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-03', 30);
+    verificationCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-03', 30);
 
     // 2 to 3 calls is +50%.
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
@@ -664,38 +694,24 @@ test('the calls placed change is relative', function () {
         ->assertJsonPath('change', 50);
 });
 
-test('a one-second call counts as both placed and connected', function () {
+test('a range with no verification calls reads zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 1);
+    rmoCall($workspace, '2026-08-02', 60);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1)
-        ->assertJsonPath('connected', 1)
+        ->assertJsonPath('value', 0)
         ->assertJsonPath('change', null);
 });
 
-test('a call that never joined is placed but not connected', function () {
+test('another workspace\'s verification calls are not counted', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+    ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    rmoCall($workspace, '2026-08-02', 0);
+    verificationCall($other, '2026-08-02', 30);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1)
-        ->assertJsonPath('connected', 0);
-});
-
-test('connected here is looser than the RMO page\'s threshold', function () {
-    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
-
-    // The RMO page counts a call as connected only past its threshold. This
-    // card counts any talk time at all, so the two differ on purpose — pinned
-    // here so the divergence stays deliberate rather than becoming a surprise.
-    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1);
-
-    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('connected', 1)
-        ->assertJsonPath('value', 1);
+        ->assertJsonPath('value', 0);
 });
 
 function csrRealConversationsStat($owner, Workspace $workspace, string $from, string $to)
@@ -703,64 +719,77 @@ function csrRealConversationsStat($owner, Workspace $workspace, string $from, st
     return csrStat($owner, $workspace, 'analytics-real-conversations', $from, $to);
 }
 
-test('real conversations counts only calls at or over the threshold', function () {
+test('the verification call time is the talk time across those calls', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    $threshold = RmoDailyStats::CONNECTED_CALL_MIN_SECONDS;
-
-    rmoCall($workspace, '2026-08-02', $threshold * 6);
-    rmoCall($workspace, '2026-08-02', $threshold);
-    // A hello and a hang-up is not a conversation.
-    rmoCall($workspace, '2026-08-02', $threshold - 1);
-    rmoCall($workspace, '2026-08-03', 1);
-    rmoCall($workspace, '2026-08-03', 0);
+    verificationCall($workspace, '2026-08-02', 120);
+    verificationCall($workspace, '2026-08-03', 60);
+    // Outside the range on purpose.
+    verificationCall($workspace, '2026-08-09', 9999);
 
     csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('value', 2)
-        ->assertJsonPath('placed', 5)
-        ->assertJsonPath('share', 40);
-
-    // The same ratio is the Reach Rate card's headline.
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 40);
+        ->assertJsonPath('value', 180)
+        ->assertJsonPath('calls', 2)
+        ->assertJsonPath('average_seconds', 90);
 });
 
-test('the three call figures narrow in turn', function () {
+test('RMO talk time is not verification talk time', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 2);
-    rmoCall($workspace, '2026-08-02', 0);
-
-    // Placed counts every attempt, connected any talk time, real 5s+.
-    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 3)
-        ->assertJsonPath('connected', 2);
+    verificationCall($workspace, '2026-08-02', 30);
+    // Stamped to a delivery, so its seconds land in the RMO columns instead.
+    rmoCall($workspace, '2026-08-02', 600);
 
     csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1);
+        ->assertJsonPath('value', 30)
+        ->assertJsonPath('calls', 1);
 });
 
-test('a call matched to no order is not a real conversation', function () {
+test('the average counts every call, the unanswered ones included', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 60, matched: false);
+    verificationCall($workspace, '2026-08-02', 100);
+    verificationCall($workspace, '2026-08-02', 50);
+    verificationCall($workspace, '2026-08-02', 0);
 
+    // 150 seconds over 3 calls — the one that never joined is still an attempt.
     csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1)
-        ->assertJsonPath('placed', 1);
+        ->assertJsonPath('calls', 3)
+        ->assertJsonPath('average_seconds', 50);
 });
 
-test('a range with no calls placed has no share', function () {
+test('the verification time change is relative, not in points', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    verificationCall($workspace, '2026-07-28', 100);
+    verificationCall($workspace, '2026-08-02', 150);
+
+    // A duration is a magnitude, so +50% is the readable form.
+    csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 150)
+        ->assertJsonPath('previous_value', 100)
+        ->assertJsonPath('change', 50);
+});
+
+test('a range with no verification calls has no average and no comparison', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 0)
-        ->assertJsonPath('placed', 0)
-        ->assertJsonPath('share', null)
+        ->assertJsonPath('calls', 0)
+        ->assertJsonPath('average_seconds', null)
         ->assertJsonPath('change', null);
+});
+
+test('another workspace\'s verification talk time is not counted', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+    ['workspace' => $other] = makeWorkspaceWithOwner();
+
+    verificationCall($other, '2026-08-02', 300);
+
+    csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0);
 });
 
 function csrReachRateStat($owner, Workspace $workspace, string $from, string $to)
