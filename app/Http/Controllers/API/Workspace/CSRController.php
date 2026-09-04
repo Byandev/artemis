@@ -9,6 +9,7 @@ use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\Workspace;
 use App\Support\RmoDailyStats;
+use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -192,10 +193,7 @@ class CSRController extends Controller
     {
         [$from, $to] = $this->range($request);
 
-        $value = DB::table('pancake_user_daily_call_reports')
-            ->where('workspace_id', $workspace->id)
-            ->whereBetween('date', [$from, $to])
-            ->sum('total_rmo_assigned_count');
+        $value = $this->callReport($workspace, $from, $to)->sum('total_rmo_assigned_count');
 
         return response()->json(['value' => $value]);
     }
@@ -409,19 +407,15 @@ class CSRController extends Controller
 
         // The day it happened, for the footnote — a second tiny query because
         // MAX() gives the length, not the row it came from.
-        $longest = $current['longest'] > 0
-            ? DB::table('call_logs')
-                ->where('workspace_id', $workspace->id)
-                ->whereNotNull('order_id')
-                ->whereBetween('call_date', [$from, $to])
-                ->orderByDesc('duration')
-                ->first(['call_date', 'order_id'])
+        $longestDate = $current['longest'] > 0
+            ? $this->callReport($workspace, $from, $to)
+                ->orderByDesc('longest_rmo_call_time')
+                ->value('date')
             : null;
 
         return response()->json([
             'value' => $current['longest'],
-            'call_date' => $longest?->call_date,
-            'order_id' => $longest?->order_id,
+            'call_date' => $longestDate ? substr((string) $longestDate, 0, 10) : null,
             'previous_value' => $previous['longest'],
             // Relative: a duration is a magnitude, not a rate.
             'change' => $previous['longest'] > 0
@@ -443,20 +437,17 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        $rows = DB::table('call_logs')
-            ->where('workspace_id', $workspace->id)
-            ->whereNotNull('order_id')
-            ->whereBetween('call_date', [$from, $to])
-            ->groupBy('call_date')
+        $rows = $this->callReport($workspace, $from, $to)
+            ->groupBy('date')
             ->selectRaw('
-                call_date,
-                COUNT(*) as calls,
-                COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as real_conversations
+                date,
+                COALESCE(SUM(total_rmo_called), 0) as calls,
+                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations
             ')
             ->get()
-            // call_date comes back with or without a time part depending on the
+            // date comes back with or without a time part depending on the
             // driver — key on the first ten characters.
-            ->keyBy(fn ($row) => substr((string) $row->call_date, 0, 10));
+            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
 
         $days = [];
         $cursor = CarbonImmutable::parse($from);
@@ -499,21 +490,18 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        $rows = DB::table('call_logs')
-            ->where('workspace_id', $workspace->id)
-            ->whereNotNull('order_id')
-            ->whereBetween('call_date', [$from, $to])
-            ->groupBy('call_date')
+        $rows = $this->callReport($workspace, $from, $to)
+            ->groupBy('date')
             ->selectRaw('
-                call_date,
-                COUNT(*) as calls,
-                COUNT(CASE WHEN duration > 0 THEN 1 END) as answered,
-                COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as real_conversations
+                date,
+                COALESCE(SUM(total_rmo_called), 0) as calls,
+                COALESCE(SUM(total_rmo_connected_called), 0) as answered,
+                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations
             ')
             ->get()
-            // call_date comes back with or without a time part depending on the
+            // date comes back with or without a time part depending on the
             // driver — key on the first ten characters.
-            ->keyBy(fn ($row) => substr((string) $row->call_date, 0, 10));
+            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
 
         $days = [];
         $cursor = CarbonImmutable::parse($from);
@@ -569,16 +557,13 @@ class CSRController extends Controller
      */
     private function rmoCallTotals(Workspace $workspace, string $from, string $to): array
     {
-        $row = DB::table('call_logs')
-            ->where('workspace_id', $workspace->id)
-            ->whereNotNull('order_id')
-            ->whereBetween('call_date', [$from, $to])
+        $row = $this->callReport($workspace, $from, $to)
             ->selectRaw('
-                COUNT(*) as calls,
-                COALESCE(SUM(duration), 0) as seconds,
-                COUNT(CASE WHEN duration > 0 THEN 1 END) as connected,
-                COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as real_conversations,
-                COALESCE(MAX(duration), 0) as longest
+                COALESCE(SUM(total_rmo_called), 0) as calls,
+                COALESCE(SUM(total_rmo_call_time), 0) as seconds,
+                COALESCE(SUM(total_rmo_connected_called), 0) as connected,
+                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
+                COALESCE(MAX(longest_rmo_call_time), 0) as longest
             ')
             ->first();
 
@@ -592,6 +577,54 @@ class CSRController extends Controller
     }
 
     /**
+     * The nightly call report over a range, narrowed to what the viewer may see.
+     *
+     * Every call figure on the page reads through here, so the team filter is
+     * applied once rather than remembered at a dozen call sites.
+     */
+    private function callReport(Workspace $workspace, string $from, string $to)
+    {
+        return $this->scopeToVisibleShops(
+            DB::table('pancake_user_daily_call_reports')
+                ->where('workspace_id', $workspace->id)
+                ->whereBetween('date', [$from, $to]),
+            $workspace,
+        );
+    }
+
+    /**
+     * Narrow a shop-keyed query to the shops the viewer's team can see.
+     *
+     * The rollups are keyed by shop, and a shop belongs to teams — the same path
+     * Order and Page take through ScopesToVisibleTeams. Unrestricted viewers
+     * with no team picked are left alone; a scoped viewer with no team at all
+     * sees nothing, which is the fail-closed the trait uses.
+     */
+    private function scopeToVisibleShops($query, Workspace $workspace, string $column = 'shop_id')
+    {
+        $shopIds = $this->visibleShopIds($workspace);
+
+        if ($shopIds === null) {
+            return $query;
+        }
+
+        return $query->whereIn($column, $shopIds);
+    }
+
+    /**
+     * The shop ids the viewer's team can see, or null for "no restriction".
+     *
+     * The order-based cards go through WorkspaceMetrics, which takes shop ids
+     * as a filter rather than a query to narrow.
+     *
+     * @return array<int, int>|null
+     */
+    private function visibleShopIds(Workspace $workspace): ?array
+    {
+        return TeamVisibility::scopeShopIds(request()->user(), $workspace);
+    }
+
+    /**
      * RMO deliveries assigned in a range, and how many were called.
      *
      * Straight off pancake_order_for_delivery, so the card is right for a range
@@ -602,10 +635,13 @@ class CSRController extends Controller
      */
     private function rmoTotals(Workspace $workspace, string $from, string $to): array
     {
-        $row = DB::table('pancake_order_for_delivery')
-            ->where('workspace_id', $workspace->id)
-            ->whereNotNull('assignee_id')
-            ->whereBetween('delivery_date', [$from, $to])
+        $row = $this->scopeToVisibleShops(
+            DB::table('pancake_order_for_delivery')
+                ->where('workspace_id', $workspace->id)
+                ->whereNotNull('assignee_id')
+                ->whereBetween('delivery_date', [$from, $to]),
+            $workspace,
+        )
             ->selectRaw("
                 COUNT(*) as assigned,
                 SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called
@@ -636,10 +672,14 @@ class CSRController extends Controller
 
         // Off the rollup, so this is the row the CSR table shows: everything
         // confirmed, cancellations included — not the Sales card's rule.
-        $perCsr = DB::table('pancake_user_pos_daily_reports as r')
-            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
-            ->where('r.workspace_id', $workspace->id)
-            ->whereBetween('r.date', [$from, $to])
+        $perCsr = $this->scopeToVisibleShops(
+            DB::table('pancake_user_pos_daily_reports as r')
+                ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+                ->where('r.workspace_id', $workspace->id)
+                ->whereBetween('r.date', [$from, $to]),
+            $workspace,
+            'r.shop_id',
+        )
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
                 pu.name as name,
@@ -689,10 +729,14 @@ class CSRController extends Controller
         // Off the same rollup, so this is the RTS Rate column: money back over
         // money settled, counted on the day it settled. Replaces a scan of the
         // workspace's whole order history; an uncovered range has nobody to rank.
-        $perCsr = DB::table('pancake_user_pos_daily_reports as r')
-            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
-            ->where('r.workspace_id', $workspace->id)
-            ->whereBetween('r.date', [$from, $to])
+        $perCsr = $this->scopeToVisibleShops(
+            DB::table('pancake_user_pos_daily_reports as r')
+                ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+                ->where('r.workspace_id', $workspace->id)
+                ->whereBetween('r.date', [$from, $to]),
+            $workspace,
+            'r.shop_id',
+        )
             ->groupBy('pu.id', 'pu.name')
             // `_amount` suffixes on purpose: an alias of `delivered` shadows
             // r.delivered in the ORDER BY, which ONLY_FULL_GROUP_BY rejects.
@@ -737,10 +781,14 @@ class CSRController extends Controller
 
         // The CSR table's own RMO % — total_called (deliveries assigned to them
         // that moved off PENDING) over total_confirmed (deliveries they confirmed).
-        $leader = DB::table('pancake_user_daily_call_reports as r')
-            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
-            ->where('r.workspace_id', $workspace->id)
-            ->whereBetween('r.date', [$from, $to])
+        $leader = $this->scopeToVisibleShops(
+            DB::table('pancake_user_daily_call_reports as r')
+                ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+                ->where('r.workspace_id', $workspace->id)
+                ->whereBetween('r.date', [$from, $to]),
+            $workspace,
+            'r.shop_id',
+        )
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
                 pu.name as name,
@@ -779,10 +827,14 @@ class CSRController extends Controller
 
         // The CSR table's "RMO Call Time" summed over the range, averaged over
         // the call count sitting beside it in "RMO Called".
-        $leader = DB::table('pancake_user_daily_call_reports as r')
-            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
-            ->where('r.workspace_id', $workspace->id)
-            ->whereBetween('r.date', [$from, $to])
+        $leader = $this->scopeToVisibleShops(
+            DB::table('pancake_user_daily_call_reports as r')
+                ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+                ->where('r.workspace_id', $workspace->id)
+                ->whereBetween('r.date', [$from, $to]),
+            $workspace,
+            'r.shop_id',
+        )
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
                 pu.name as name,
@@ -836,9 +888,13 @@ class CSRController extends Controller
      */
     private function orderTotals(Workspace $workspace, string $from, string $to): array
     {
+        // The metric layer narrows by shop ids rather than by a query, which is
+        // the same team filter the rollup-backed cards apply to their rows.
+        $shopIds = $this->visibleShopIds($workspace);
+
         $metrics = $workspace->metrics(
             ['start_date' => $from, 'end_date' => $to],
-            [],
+            $shopIds === null ? [] : ['shop_ids' => $shopIds],
         )->extract(['totalSales', 'totalOrders', 'rtsRate', 'returningAmount', 'deliveredAmount']);
 
         return [
@@ -918,10 +974,14 @@ class CSRController extends Controller
      */
     private function comparisonOrderFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
     {
-        return DB::table('pancake_user_pos_daily_reports as r')
-            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
-            ->where('r.workspace_id', $workspace->id)
-            ->whereBetween('r.date', [$previousFrom, $to])
+        return $this->scopeToVisibleShops(
+            DB::table('pancake_user_pos_daily_reports as r')
+                ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+                ->where('r.workspace_id', $workspace->id)
+                ->whereBetween('r.date', [$previousFrom, $to]),
+            $workspace,
+            'r.shop_id',
+        )
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
                 pu.id as id,
@@ -945,10 +1005,14 @@ class CSRController extends Controller
      */
     private function comparisonRmoFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
     {
-        return DB::table('pancake_user_daily_call_reports as r')
-            ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
-            ->where('r.workspace_id', $workspace->id)
-            ->whereBetween('r.date', [$previousFrom, $to])
+        return $this->scopeToVisibleShops(
+            DB::table('pancake_user_daily_call_reports as r')
+                ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
+                ->where('r.workspace_id', $workspace->id)
+                ->whereBetween('r.date', [$previousFrom, $to]),
+            $workspace,
+            'r.shop_id',
+        )
             ->groupBy('pu.id', 'pu.name')
             ->selectRaw('
                 pu.id as id,

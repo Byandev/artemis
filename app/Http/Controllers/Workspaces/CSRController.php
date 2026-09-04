@@ -9,6 +9,7 @@ use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -164,6 +165,19 @@ class CSRController extends Controller
             ->whereHas('shops', function ($query) use ($workspace) {
                 $query->where('workspace_id', $workspace->id);
             });
+
+        // Both rollups are keyed by shop, so the "viewing as team" switcher
+        // narrows the table the same way it narrows the cards above it. The ERP
+        // report carries no shop, so only the POS side can be scoped.
+        $shopIds = TeamVisibility::scopeShopIds($request->user(), $workspace);
+
+        if ($shopIds !== null) {
+            $rmoSummary->whereIn('shop_id', $shopIds);
+
+            if (! $isErp) {
+                $drSummary->whereIn('shop_id', $shopIds);
+            }
+        }
 
         $records = QueryBuilder::for($base)
             ->leftJoinSub($drSummary, 'dr', 'dr.pancake_user_id', '=', 'pancake_users.id')

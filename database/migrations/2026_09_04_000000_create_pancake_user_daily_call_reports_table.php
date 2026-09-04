@@ -36,6 +36,15 @@ return new class extends Migration
             $table->unsignedInteger('total_rmo_called')->default(0);
             $table->unsignedInteger('total_rmo_call_time')->default(0);
 
+            // How far the RMO calls got: one that joined at all, and one that
+            // lasted past the shared five-second mark. Under that it is a hello
+            // and a hang-up, not a conversation.
+            $table->unsignedInteger('total_rmo_connected_called')->default(0);
+            $table->unsignedInteger('total_rmo_real_called')->default(0);
+            // The single longest RMO call — a max, so it survives being summed
+            // over a range by taking the max of the maxes.
+            $table->unsignedInteger('longest_rmo_call_time')->default(0);
+
             // That same set split by who answered.
             $table->unsignedInteger('total_rmo_customer_called')->default(0);
             $table->unsignedInteger('total_rmo_customer_call_time')->default(0);

@@ -51,6 +51,8 @@ function confirmedOrder(Workspace $workspace, string $confirmedAt, float $amount
 
 function csrStat($owner, Workspace $workspace, string $stat, string $from, string $to)
 {
+    syncCallReport($from, $to);
+
     return test()->actingAs($owner)->getJson(
         "/api/workspaces/{$workspace->slug}/csrs/stats/{$stat}?from={$from}&to={$to}"
     );
@@ -397,6 +399,9 @@ function rmoCall(Workspace $workspace, string $date, int $seconds, bool $matched
         'order_id' => $matched
             ? Order::factory()->forWorkspace($workspace)->create()->id
             : null,
+        // The delivery stamp is what makes a call RMO work rather than order
+        // verification; the order beside it is what names the shop.
+        'order_for_delivery_id' => $matched ? 1 : null,
     ]);
 }
 
@@ -544,18 +549,17 @@ test('a call that never joined is placed but not connected', function () {
         ->assertJsonPath('connected', 0);
 });
 
-test('connected here is looser than the RMO page\'s five-second rule', function () {
+test('connected here is looser than the RMO page\'s threshold', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // The RMO page counts a call as connected only at 5s+. This card counts any
-    // talk time at all, so the two figures differ on purpose — pinned here so
-    // the divergence stays deliberate rather than becoming a surprise.
-    rmoCall($workspace, '2026-08-02', 2);
-
-    expect(RmoDailyStats::CONNECTED_CALL_MIN_SECONDS)->toBe(5);
+    // The RMO page counts a call as connected only past its threshold. This
+    // card counts any talk time at all, so the two differ on purpose — pinned
+    // here so the divergence stays deliberate rather than becoming a surprise.
+    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('connected', 1);
+        ->assertJsonPath('connected', 1)
+        ->assertJsonPath('value', 1);
 });
 
 function csrRealConversationsStat($owner, Workspace $workspace, string $from, string $to)
@@ -563,13 +567,15 @@ function csrRealConversationsStat($owner, Workspace $workspace, string $from, st
     return csrStat($owner, $workspace, 'analytics-real-conversations', $from, $to);
 }
 
-test('real conversations counts only calls of five seconds or more', function () {
+test('real conversations counts only calls at or over the threshold', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 5);
+    $threshold = RmoDailyStats::CONNECTED_CALL_MIN_SECONDS;
+
+    rmoCall($workspace, '2026-08-02', $threshold * 6);
+    rmoCall($workspace, '2026-08-02', $threshold);
     // A hello and a hang-up is not a conversation.
-    rmoCall($workspace, '2026-08-02', 4);
+    rmoCall($workspace, '2026-08-02', $threshold - 1);
     rmoCall($workspace, '2026-08-03', 1);
     rmoCall($workspace, '2026-08-03', 0);
 
@@ -629,9 +635,9 @@ function csrReachRateStat($owner, Workspace $workspace, string $from, string $to
 test('reach rate is real conversations over calls placed', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // 1 of 4 attempts lasted five seconds — 25%.
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 4);
+    // 1 of 4 attempts reached the threshold — 25%.
+    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS * 10);
+    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1);
     rmoCall($workspace, '2026-08-02', 1);
     rmoCall($workspace, '2026-08-03', 0);
 
