@@ -269,23 +269,15 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoTotals($workspace, $from, $to);
-        $previous = $this->rmoTotals($workspace, $previousFrom, $previousTo);
-
-        $rate = fn (array $t) => $t['assigned'] > 0 ? $t['called'] / $t['assigned'] * 100 : null;
-
-        $currentRate = $rate($current);
-        $previousRate = $rate($previous);
+        $current = $this->totalCalled($workspace, $from, $to);
+        $previous = $this->totalCalled($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            // Null, not zero, with nothing assigned: 0% would read as "nobody rang".
-            'value' => $currentRate === null ? null : round($currentRate, 2),
-            'called' => $current['called'],
-            'assigned' => $current['assigned'],
-            'previous_value' => $previousRate === null ? null : round($previousRate, 2),
-            // Percentage points, as on the RTS card — this is a rate.
-            'change' => $currentRate !== null && $previousRate !== null
-                ? round($currentRate - $previousRate, 1)
+            'value' => $current,
+            'previous_value' => $previous,
+            // Relative, unlike the rate cards: this is a count.
+            'change' => $previous > 0
+                ? round(($current - $previous) / $previous * 100, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -580,6 +572,17 @@ class CSRController extends Controller
     }
 
     /**
+     * Calls the CSRs placed over a range — the call report's own `total_called`.
+     *
+     * Every call against an order, RMO or not, which is the column the report
+     * counts. The rollup is nightly, so a range the sync has not reached is 0.
+     */
+    private function totalCalled(Workspace $workspace, string $from, string $to): int
+    {
+        return (int) $this->callReport($workspace, $from, $to)->sum('total_called');
+    }
+
+    /**
      * The nightly call report over a range, narrowed to what the viewer may see.
      *
      * Every call figure on the page reads through here, so the team filter is
@@ -625,36 +628,6 @@ class CSRController extends Controller
     private function visibleShopIds(Workspace $workspace): ?array
     {
         return TeamVisibility::scopeShopIds(request()->user(), $workspace);
-    }
-
-    /**
-     * RMO deliveries assigned in a range, and how many were called.
-     *
-     * Straight off pancake_order_for_delivery, so the card is right for a range
-     * the sync has not covered. "Assigned" needs an assignee — an unassigned row
-     * was nobody's to call. "Called" is any status off PENDING, as the RMO page.
-     *
-     * @return array{assigned: int, called: int}
-     */
-    private function rmoTotals(Workspace $workspace, string $from, string $to): array
-    {
-        $row = $this->scopeToVisibleShops(
-            DB::table('pancake_order_for_delivery')
-                ->where('workspace_id', $workspace->id)
-                ->whereNotNull('assignee_id')
-                ->whereBetween('delivery_date', [$from, $to]),
-            $workspace,
-        )
-            ->selectRaw("
-                COUNT(*) as assigned,
-                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called
-            ")
-            ->first();
-
-        return [
-            'assigned' => (int) ($row->assigned ?? 0),
-            'called' => (int) ($row->called ?? 0),
-        ];
     }
 
     /*

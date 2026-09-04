@@ -32,8 +32,7 @@ export interface RtsStat extends StatPayload {
 }
 
 export interface RmoCalledStat extends StatPayload {
-    called: number;
-    assigned: number;
+    value: number;
 }
 
 export interface RmoTimeStat extends StatPayload {
@@ -285,18 +284,13 @@ export function RmoCalledStatCard({
 }) {
     return (
         <StatCard
-            title="RMO Called %"
+            title="Total Called"
             icon={PhoneCall}
             loading={loading || stat === null}
-            // Null when nothing was assigned in the range — a dash, not 0%,
-            // which would read as "nobody rang anyone" rather than "there was
-            // nothing to ring".
-            value={
-                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
-            }
+            value={stat ? stat.value.toLocaleString() : ''}
             footnote={
                 stat
-                    ? `${stat.called.toLocaleString()} of ${stat.assigned.toLocaleString()} assigned`
+                    ? `call${stat.value === 1 ? '' : 's'} placed in the range`
                     : ''
             }
             trend={
@@ -307,7 +301,6 @@ export function RmoCalledStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
-                    unit=" pts"
                 />
             }
         />
