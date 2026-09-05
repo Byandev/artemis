@@ -363,25 +363,21 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
-
-        // How often picking up the phone reached somebody: the conversations
-        // that lasted, over every attempt made.
-        $rate = fn (array $t) => $t['calls'] > 0 ? $t['real'] / $t['calls'] * 100 : null;
-
-        $currentRate = $rate($current);
-        $previousRate = $rate($previous);
+        $current = $this->verificationBacklog($workspace, $from, $to);
+        $previous = $this->verificationBacklog($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            // Null, not zero, with no attempts: 0% would read as "reached nobody".
-            'value' => $currentRate === null ? null : round($currentRate, 1),
-            'real' => $current['real'],
-            'placed' => $current['calls'],
-            'previous_value' => $previousRate === null ? null : round($previousRate, 1),
-            // Percentage points, as on the other rate cards.
-            'change' => $currentRate !== null && $previousRate !== null
-                ? round($currentRate - $previousRate, 1)
+            'value' => $current['needs_verification'],
+            // The two reasons, so the card can say which is driving it.
+            'no_report' => $current['no_report'],
+            'high_rts' => $current['high_rts'],
+            'orders' => $current['orders'],
+            'previous_value' => $previous['needs_verification'],
+            // Relative: this is a count of orders, not a rate.
+            'change' => $previous['needs_verification'] > 0
+                ? round((
+                    $current['needs_verification'] - $previous['needs_verification']
+                ) / $previous['needs_verification'] * 100, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -547,6 +543,72 @@ class CSRController extends Controller
      *
      * @return array{seconds: int, calls: int, connected: int, real: int, longest: int}
      */
+    /**
+     * The customer's own return rate for an order, or NULL when the number has
+     * no report behind it.
+     *
+     * The same expression CxRtsRateSort and RiskScoreSort rank on, so an order
+     * this card counts is one the RTS pages show at the same rate. `latest` is
+     * the report as it stands now; the `initial` row beside it is what the
+     * number looked like when the order came in.
+     */
+    private const CX_RTS_SQL = "(
+        SELECT SUM(r.order_fail) / NULLIF(SUM(r.order_fail) + SUM(r.order_success), 0)
+        FROM pancake_order_phone_number_reports r
+        WHERE r.order_id = po.id AND r.type = 'latest'
+    )";
+
+    /** At or above this customer return rate, an order is worth ringing first. */
+    private const VERIFICATION_RTS_THRESHOLD = 0.55;
+
+    /**
+     * Orders confirmed in a range that are worth a verification call.
+     *
+     * Two reasons qualify, and they cannot overlap: the customer's number has
+     * no report at all — nothing is known about them — or it has one and the
+     * return rate on it is at or above the threshold. Everything else is a
+     * customer with a record of taking delivery.
+     *
+     * Counted on `confirmed_at`, so the card is the work the range created:
+     * verification is what happens between a CSR confirming an order and the
+     * parcel going out. Orders never confirmed have no date to fall in and are
+     * out of it entirely.
+     *
+     * @return array{orders: int, no_report: int, high_rts: int, needs_verification: int}
+     */
+    private function verificationBacklog(Workspace $workspace, string $from, string $to): array
+    {
+        $orders = $this->scopeToVisibleShops(
+            DB::table('pancake_orders as po')
+                ->where('po.workspace_id', $workspace->id)
+                ->whereBetween(DB::raw('DATE(po.confirmed_at)'), [$from, $to])
+                ->selectRaw(self::CX_RTS_SQL.' as cx_rts'),
+            $workspace,
+            'po.shop_id',
+        );
+
+        // Wrapped rather than repeated in the SELECT: the rate is a correlated
+        // subquery, and both tests would run it once each per order.
+        $row = DB::query()
+            ->fromSub($orders, 'o')
+            ->selectRaw('
+                COUNT(*)                  as orders,
+                SUM(o.cx_rts IS NULL)     as no_report,
+                SUM(o.cx_rts >= ?)        as high_rts
+            ', [self::VERIFICATION_RTS_THRESHOLD])
+            ->first();
+
+        $noReport = (int) ($row->no_report ?? 0);
+        $highRts = (int) ($row->high_rts ?? 0);
+
+        return [
+            'orders' => (int) ($row->orders ?? 0),
+            'no_report' => $noReport,
+            'high_rts' => $highRts,
+            'needs_verification' => $noReport + $highRts,
+        ];
+    }
+
     /**
      * Order-verification calls over a range — the call report's own
      * `total_verification_called`, and the time spent on them.

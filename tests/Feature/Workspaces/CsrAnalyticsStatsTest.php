@@ -7,7 +7,6 @@ use App\Models\PancakeUserPosDailyReport;
 use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Support\RmoDailyStats;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\OrderForDelivery;
@@ -797,45 +796,149 @@ function csrReachRateStat($owner, Workspace $workspace, string $from, string $to
     return csrStat($owner, $workspace, 'analytics-reach-rate', $from, $to);
 }
 
-test('reach rate is real conversations over calls placed', function () {
+/**
+ * An order confirmed on $on whose customer number carries the given report.
+ *
+ * Pass null for $fail to leave the number unreported — the "nothing is known
+ * about this customer" half of the card. The rate the card reads is
+ * order_fail / (order_fail + order_success) off the `latest` row.
+ */
+function orderNeedingCheck(Workspace $workspace, string $on, ?int $fail, int $success = 0): Order
+{
+    $order = Order::factory()->forWorkspace($workspace)->create([
+        'status' => 1,
+        'confirmed_at' => $on,
+        'confirmed_by' => salesCsr()->id,
+    ]);
+
+    if ($fail === null) {
+        return $order;
+    }
+
+    foreach (['latest', 'initial'] as $type) {
+        DB::table('pancake_order_phone_number_reports')->insert([
+            'order_id' => $order->id,
+            'phone_number' => '09170000001',
+            'order_fail' => $fail,
+            'order_success' => $success,
+            'warning' => 0,
+            'type' => $type,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    return $order;
+}
+
+test('an order needs verification when the number has no report at all', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // 1 of 4 attempts reached the threshold — 25%.
-    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS * 10);
-    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1);
-    rmoCall($workspace, '2026-08-02', 1);
-    rmoCall($workspace, '2026-08-03', 0);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+    // A customer who takes delivery: 1 of 10 back is 10%.
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 1, success: 9);
 
     csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('value', 25)
-        ->assertJsonPath('real', 1)
-        ->assertJsonPath('placed', 4);
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('no_report', 1)
+        ->assertJsonPath('high_rts', 0)
+        ->assertJsonPath('orders', 2);
 });
 
-test('the reach rate change is in percentage points', function () {
+test('an order needs verification at or above the 55% threshold', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // Previous: 1 of 2 = 50%. Current: 2 of 2 = 100%. +50 pts.
-    rmoCall($workspace, '2026-07-28', 30);
-    rmoCall($workspace, '2026-07-28', 1);
-
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-03', 30);
+    // Exactly 55% counts — the threshold is inclusive.
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: 55, success: 45);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 6, success: 4);
+    // 54% is under it, however close.
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 54, success: 46);
 
     csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 100)
-        ->assertJsonPath('previous_value', 50)
+        ->assertJsonPath('value', 2)
+        ->assertJsonPath('high_rts', 2)
+        ->assertJsonPath('no_report', 0)
+        ->assertJsonPath('orders', 3);
+});
+
+test('a report of nothing at all is unreported rather than a clean record', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Zero fails and zero successes divides by nothing, so the rate is null —
+    // the same "nothing known" as having no row, not a 0% record.
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 0, success: 0);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('no_report', 1);
+});
+
+test('orders confirmed outside the range are not counted', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-09 10:00:00', fail: null);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('orders', 1);
+});
+
+test('an order that was never confirmed is not counted', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+
+    // No confirmed_at, so it has no day to fall in — verification is what
+    // happens after a CSR confirms.
+    Order::factory()->forWorkspace($workspace)->create([
+        'status' => 1,
+        'confirmed_at' => null,
+    ]);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('orders', 1);
+});
+
+test('the verification backlog change is relative, as a count of orders', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    orderNeedingCheck($workspace, '2026-07-28 10:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-07-29 10:00:00', fail: null);
+
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 8, success: 2);
+    orderNeedingCheck($workspace, '2026-08-03 10:00:00', fail: null);
+
+    // 2 to 3 is +50%.
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 3)
+        ->assertJsonPath('previous_value', 2)
         ->assertJsonPath('change', 50);
 });
 
-test('a range with no attempts has no reach rate rather than zero', function () {
+test('a range where every customer has a clean record reads zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // 0% would read as "rang all day and reached nobody".
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 0, success: 10);
+
     csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', null)
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('orders', 1)
         ->assertJsonPath('change', null);
+});
+
+test('another workspace\'s orders are not in the verification backlog', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+    ['workspace' => $other] = makeWorkspaceWithOwner();
+
+    orderNeedingCheck($other, '2026-08-02 10:00:00', fail: null);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('orders', 0);
 });
 
 function csrLongestCallStat($owner, Workspace $workspace, string $from, string $to)
