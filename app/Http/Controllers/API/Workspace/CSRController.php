@@ -390,24 +390,18 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
-
-        // The day it happened, for the footnote — a second tiny query because
-        // MAX() gives the length, not the row it came from.
-        $longestDate = $current['longest'] > 0
-            ? $this->callReport($workspace, $from, $to)
-                ->orderByDesc('longest_rmo_call_time')
-                ->value('date')
-            : null;
+        $current = $this->verifiedCoverage($workspace, $from, $to);
+        $previous = $this->verifiedCoverage($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            'value' => $current['longest'],
-            'call_date' => $longestDate ? substr((string) $longestDate, 0, 10) : null,
-            'previous_value' => $previous['longest'],
-            // Relative: a duration is a magnitude, not a rate.
-            'change' => $previous['longest'] > 0
-                ? round(($current['longest'] - $previous['longest']) / $previous['longest'] * 100, 1)
+            'value' => $current['rate'],
+            // Both sides of the division, so the card can show its own working.
+            'calls' => $current['calls'],
+            'needs_verification' => $current['needs_verification'],
+            'previous_value' => $previous['rate'],
+            // Percentage points, as on the other rate cards.
+            'change' => $current['rate'] !== null && $previous['rate'] !== null
+                ? round($current['rate'] - $previous['rate'], 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -544,6 +538,37 @@ class CSRController extends Controller
      * @return array{seconds: int, calls: int, connected: int, real: int, longest: int}
      */
     /**
+     * How much of the range's verification work actually got done.
+     *
+     * Verification calls placed over the orders that needed one — the two cards
+     * beside this one, divided. Null rather than zero with nothing to verify: a
+     * 0% would read as "nobody rang" instead of "there was nothing to ring".
+     *
+     * It can pass 100%. The numerator counts calls and the denominator counts
+     * orders, so a customer rung twice, or a CSR checking an order that was
+     * never flagged, both push it over — which is a real signal about the
+     * range, not an error to clamp away.
+     *
+     * The two sides are also counted on different days: a call belongs to the
+     * day it was placed, an order to the day it was confirmed. Over a range of
+     * any length that washes out, but a single-day range can read oddly when
+     * the calls chase the day before's orders.
+     *
+     * @return array{rate: float|null, calls: int, needs_verification: int}
+     */
+    private function verifiedCoverage(Workspace $workspace, string $from, string $to): array
+    {
+        $calls = $this->verificationTotals($workspace, $from, $to)['calls'];
+        $needed = $this->verificationBacklog($workspace, $from, $to)['needs_verification'];
+
+        return [
+            'rate' => $needed > 0 ? round($calls / $needed * 100, 1) : null,
+            'calls' => $calls,
+            'needs_verification' => $needed,
+        ];
+    }
+
+    /**
      * The customer's own return rate for an order, or NULL when the number has
      * no report behind it.
      *
@@ -633,25 +658,6 @@ class CSRController extends Controller
         return [
             'calls' => (int) ($row->calls ?? 0),
             'seconds' => (int) ($row->seconds ?? 0),
-        ];
-    }
-
-    private function rmoCallTotals(Workspace $workspace, string $from, string $to): array
-    {
-        $row = $this->callReport($workspace, $from, $to)
-            ->selectRaw('
-                COALESCE(SUM(total_rmo_called), 0) as calls,
-                COALESCE(SUM(total_rmo_call_time), 0) as seconds,
-                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
-                COALESCE(MAX(longest_rmo_call_time), 0) as longest
-            ')
-            ->first();
-
-        return [
-            'seconds' => (int) ($row->seconds ?? 0),
-            'calls' => (int) ($row->calls ?? 0),
-            'real' => (int) ($row->real_conversations ?? 0),
-            'longest' => (int) ($row->longest ?? 0),
         ];
     }
 

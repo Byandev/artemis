@@ -946,50 +946,96 @@ function csrLongestCallStat($owner, Workspace $workspace, string $from, string $
     return csrStat($owner, $workspace, 'analytics-longest-call', $from, $to);
 }
 
-test('longest call is the single longest in the range, with the day it landed', function () {
+test('total verified orders is the verification calls over the orders needing one', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 90);
-    rmoCall($workspace, '2026-08-03', 750);
-    rmoCall($workspace, '2026-08-04', 120);
-    // Outside the range, and longer — must not win.
-    rmoCall($workspace, '2026-08-09', 9999);
+    // Four orders confirmed, two of them needing a call.
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 8, success: 2);
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 1, success: 9);
+    orderNeedingCheck($workspace, '2026-08-03 09:00:00', fail: 0, success: 5);
+
+    // One of the two got rung.
+    verificationCall($workspace, '2026-08-02', 60);
 
     csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('value', 750)
-        ->assertJsonPath('call_date', '2026-08-03');
+        ->assertJsonPath('value', 50)
+        ->assertJsonPath('calls', 1)
+        ->assertJsonPath('needs_verification', 2);
 });
 
-test('an unmatched call cannot be the longest', function () {
+test('the rate passes 100% when more calls were placed than orders needed', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 60);
-    rmoCall($workspace, '2026-08-02', 6000, matched: false);
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: null);
+
+    // The same customer rung twice, or a CSR checking an order nothing flagged.
+    // Clamping this to 100% would hide that the range was over-called.
+    verificationCall($workspace, '2026-08-02', 60);
+    verificationCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-03', 45);
 
     csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 60);
+        ->assertJsonPath('value', 300);
 });
 
-test('the longest call change is relative', function () {
+test('an RMO call does not count as a verification', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-07-28', 100);
-    rmoCall($workspace, '2026-08-02', 150);
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+
+    verificationCall($workspace, '2026-08-02', 60);
+    // Stamped to a delivery, so the report files it under the RMO columns.
+    rmoCall($workspace, '2026-08-02', 600);
 
     csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 150)
-        ->assertJsonPath('previous_value', 100)
+        ->assertJsonPath('value', 50)
+        ->assertJsonPath('calls', 1);
+});
+
+test('the verified change is reported in percentage points', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Previous: 1 call over 2 orders = 50%. Current: 2 over 2 = 100%. +50 pts.
+    orderNeedingCheck($workspace, '2026-07-28 09:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-07-29 09:00:00', fail: null);
+    verificationCall($workspace, '2026-07-28', 60);
+
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-03 09:00:00', fail: null);
+    verificationCall($workspace, '2026-08-02', 60);
+    verificationCall($workspace, '2026-08-03', 60);
+
+    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 100)
+        ->assertJsonPath('previous_value', 50)
         ->assertJsonPath('change', 50);
 });
 
-test('a range with no calls has no longest and no day', function () {
+test('a range where nothing needed verifying has no rate rather than zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
+    // Every customer has a clean record, so there was nothing to ring — a 0%
+    // here would read as a period the CSRs ignored.
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: 0, success: 10);
+
     csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 0)
-        ->assertJsonPath('call_date', null)
+        ->assertJsonPath('value', null)
+        ->assertJsonPath('needs_verification', 0)
         ->assertJsonPath('change', null);
+});
+
+test('calls with nothing to verify against leave the rate undefined', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Calls but no orders at all: there is no denominator to divide by.
+    verificationCall($workspace, '2026-08-02', 60);
+
+    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', null)
+        ->assertJsonPath('calls', 1);
 });
 
 /**

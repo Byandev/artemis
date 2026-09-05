@@ -68,9 +68,10 @@ export interface ReachRateStat extends StatPayload {
 }
 
 export interface LongestCallStat extends StatPayload {
-    value: number;
-    /** The day it happened, or null when no calls were placed. */
-    call_date: string | null;
+    /** Null when the range needed no verification at all. */
+    value: number | null;
+    calls: number;
+    needs_verification: number;
 }
 
 /** Seconds as `502h 32m` / `12m 05s` / `45s`, dropping units that read as zero. */
@@ -458,16 +459,20 @@ export function LongestCallStatCard({
 }) {
     return (
         <StatCard
-            title="Longest Call"
+            title="Total Verified Orders"
             icon={PhoneForwarded}
             loading={loading || stat === null}
-            value={stat ? duration(stat.value) : ''}
-            // Which day it landed on, since a single outlier is worth being able
-            // to go and look at rather than just wonder about.
+            // A dash, not 0%, when nothing needed verifying — there is no rate
+            // to report rather than a rate of nothing.
+            value={
+                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
+            }
+            // The division itself, since the figure can pass 100% and the two
+            // counts are the only thing that explains how.
             footnote={
-                !stat || stat.call_date === null
-                    ? 'No calls in this period'
-                    : `on ${stat.call_date}`
+                !stat || stat.value === null
+                    ? 'Nothing needed verifying in this period'
+                    : `${stat.calls.toLocaleString()} calls of ${stat.needs_verification.toLocaleString()} orders`
             }
             trend={
                 <Trend
@@ -477,6 +482,7 @@ export function LongestCallStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
+                    unit=" pts"
                 />
             }
         />
