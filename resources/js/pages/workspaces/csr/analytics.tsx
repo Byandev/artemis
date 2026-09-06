@@ -17,6 +17,7 @@ import {
     RealConversationsStatCard,
     RmoCallTimeStatCard,
     RmoCalledStatCard,
+    RmoRealConversationsStatCard,
     RmoTimeStatCard,
     RtsStatCard,
     SalesStatCard,
@@ -27,6 +28,7 @@ import {
     type RealConversationsStat,
     type RmoCallTimeStat,
     type RmoCalledStat,
+    type RmoRealConversationsStat,
     type RmoTimeStat,
     type RtsStat,
     type SalesStat,
@@ -274,6 +276,13 @@ export default function Analytics({ workspace, records, query }: Props) {
         useAnalyticsStat<RmoCallTimeStat>(
             workspace.slug,
             'analytics-rmo-call-time',
+            fromStr,
+            toStr,
+        );
+    const [rmoRealStat, rmoRealLoading] =
+        useAnalyticsStat<RmoRealConversationsStat>(
+            workspace.slug,
+            'analytics-rmo-real-conversations',
             fromStr,
             toStr,
         );
@@ -596,6 +605,10 @@ export default function Analytics({ workspace, records, query }: Props) {
                     <RmoCallTimeStatCard
                         stat={rmoCallTimeStat}
                         loading={rmoCallTimeLoading}
+                    />
+                    <RmoRealConversationsStatCard
+                        stat={rmoRealStat}
+                        loading={rmoRealLoading}
                     />
                 </div>
 

@@ -333,6 +333,33 @@ class CSRController extends Controller
         ]);
     }
 
+    public function analyticsRmoRealConversations(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoRealTotals($workspace, $from, $to);
+        $previous = $this->rmoRealTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['real'],
+            'calls' => $current['calls'],
+            // The share of RMO calls that got past the threshold; null with no
+            // calls to divide by.
+            'rate' => $current['calls'] > 0
+                ? round($current['real'] / $current['calls'] * 100, 1)
+                : null,
+            'previous_value' => $previous['real'],
+            // Relative, like the other counts: this is not a rate.
+            'change' => $previous['real'] > 0
+                ? round(($current['real'] - $previous['real']) / $previous['real'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
     public function analyticsRmoTime(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
@@ -707,6 +734,33 @@ class CSRController extends Controller
         return [
             'calls' => (int) ($row->calls ?? 0),
             'seconds' => (int) ($row->seconds ?? 0),
+        ];
+    }
+
+    /**
+     * RMO calls that turned into a conversation over a range — the call
+     * report's own `total_rmo_real_called`, and the RMO calls behind them.
+     *
+     * A real conversation is an RMO call that lasted past
+     * RmoDailyStats::CONNECTED_CALL_MIN_SECONDS; under that it is a hello and a
+     * hang-up, which is the cut SyncCsrDailyCallRecord makes. The call count
+     * comes back with it because it is what the figure is read against. The
+     * rollup is nightly, so a range the sync has not reached is zero on both.
+     *
+     * @return array{real: int, calls: int}
+     */
+    private function rmoRealTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
+                COALESCE(SUM(total_rmo_called), 0)      as calls
+            ')
+            ->first();
+
+        return [
+            'real' => (int) ($row->real_conversations ?? 0),
+            'calls' => (int) ($row->calls ?? 0),
         ];
     }
 
