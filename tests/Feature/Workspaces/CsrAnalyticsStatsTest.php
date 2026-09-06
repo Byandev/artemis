@@ -385,105 +385,116 @@ function csrRmoStat($owner, Workspace $workspace, string $from, string $to)
     return csrStat($owner, $workspace, 'analytics-rmo-called', $from, $to);
 }
 
-/** The CSR every assigned delivery in these tests belongs to. */
+/** The CSR every call in these tests belongs to. */
 function rmoAssignee(): PancakeUser
 {
     return PancakeUser::firstOrCreate(['name' => 'RMO CSR']);
 }
 
-/** An RMO delivery row. Pass $assigned false for one nobody owns. */
-function rmoDelivery(Workspace $workspace, string $date, string $status, bool $assigned = true): void
+/**
+ * A call the nightly report counts in `total_called`.
+ *
+ * Every call against an order is one, so `$rmo` false gives an order
+ * verification call rather than RMO work — the column counts both. A call
+ * against no order at all is in no row, and cannot be counted.
+ */
+function placedCall(Workspace $workspace, string $date, bool $rmo = true): void
 {
-    $order = Order::factory()->forWorkspace($workspace)->create();
-
-    OrderForDelivery::create([
-        'order_id' => $order->id,
-        'page_id' => $order->page_id,
-        'shop_id' => $order->shop_id,
+    CallLog::factory()->create([
         'workspace_id' => $workspace->id,
-        'status' => $status,
-        'parcel_status' => 'on delivery',
-        'customer_name' => 'Cx',
-        'customer_phone' => '09170000001',
-        'rider_name' => 'Rider',
-        'rider_phone' => '09180000001',
-        'assignee_id' => $assigned ? rmoAssignee()->id : null,
-        'delivery_date' => $date,
+        'user_id' => rmoAssignee()->id,
+        'phone_number' => '09170000001',
+        'call_date' => $date,
+        'duration' => 60,
+        'order_id' => Order::factory()->forWorkspace($workspace)->create()->id,
+        'order_for_delivery_id' => $rmo ? 1 : null,
     ]);
 }
 
-test('RMO called % is the called share of the assigned deliveries', function () {
+test('RMO called is the calls placed across the range', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // Three assigned, two off PENDING.
-    rmoDelivery($workspace, '2026-08-02', 'CALLED');
-    rmoDelivery($workspace, '2026-08-03', 'ANSWERED');
-    rmoDelivery($workspace, '2026-08-03', 'PENDING');
+    placedCall($workspace, '2026-08-02');
+    placedCall($workspace, '2026-08-03');
+    // Outside the range on purpose.
+    placedCall($workspace, '2026-08-09');
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('called', 2)
-        ->assertJsonPath('assigned', 3)
-        ->assertJsonPath('value', 66.67);
+        ->assertJsonPath('value', 2);
 });
 
-test('unassigned deliveries are not counted against the rate', function () {
+test('a verification call counts too — total_called is every call on an order', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoDelivery($workspace, '2026-08-02', 'CALLED');
-    // Nobody's to call, so it must not drag the rate down.
-    rmoDelivery($workspace, '2026-08-02', 'PENDING', assigned: false);
+    placedCall($workspace, '2026-08-02');
+    placedCall($workspace, '2026-08-02', rmo: false);
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('assigned', 1)
-        ->assertJsonPath('value', 100);
+        ->assertJsonPath('value', 2);
 });
 
-test('deliveries outside the range are left out', function () {
+test('a call against no order is in no report row', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoDelivery($workspace, '2026-08-02', 'CALLED');
-    rmoDelivery($workspace, '2026-08-09', 'PENDING');
+    placedCall($workspace, '2026-08-02');
+
+    CallLog::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => rmoAssignee()->id,
+        'call_date' => '2026-08-02',
+        'duration' => 60,
+        'order_id' => null,
+    ]);
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('assigned', 1)
-        ->assertJsonPath('called', 1);
+        ->assertJsonPath('value', 1);
 });
 
-test('the RMO change is reported in percentage points', function () {
+test('the RMO called change is relative, as a count rather than a rate', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // Previous period: 1 of 2 called = 50%. Current: 2 of 2 = 100%. +50 pts.
-    rmoDelivery($workspace, '2026-07-28', 'CALLED');
-    rmoDelivery($workspace, '2026-07-28', 'PENDING');
+    // Two in the previous period, three in this one: +50%.
+    placedCall($workspace, '2026-07-28');
+    placedCall($workspace, '2026-07-29');
 
-    rmoDelivery($workspace, '2026-08-02', 'CALLED');
-    rmoDelivery($workspace, '2026-08-03', 'CALLED');
+    placedCall($workspace, '2026-08-02');
+    placedCall($workspace, '2026-08-03');
+    placedCall($workspace, '2026-08-03');
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 100)
-        ->assertJsonPath('previous_value', 50)
+        ->assertJsonPath('value', 3)
+        ->assertJsonPath('previous_value', 2)
         ->assertJsonPath('change', 50);
 });
 
-test('a range with nothing assigned has no rate rather than zero', function () {
+test('a previous period with no calls has no percentage rather than zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // 0% would read as "nobody rang anyone" rather than "nothing to ring".
+    placedCall($workspace, '2026-08-02');
+
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', null)
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('previous_value', 0)
         ->assertJsonPath('change', null);
 });
 
-test('another workspace\'s deliveries are not counted', function () {
+test('a range with no calls reads zero', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('change', null);
+});
+
+test('another workspace\'s calls are not in the RMO called total', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
     ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    rmoDelivery($other, '2026-08-02', 'CALLED');
+    placedCall($other, '2026-08-02');
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('assigned', 0)
-        ->assertJsonPath('value', null);
+        ->assertJsonPath('value', 0);
 });
 
 function csrRmoTimeStat($owner, Workspace $workspace, string $from, string $to)
