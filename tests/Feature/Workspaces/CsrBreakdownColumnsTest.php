@@ -161,6 +161,8 @@ test('the parcel counts come through beside the money they belong to', function 
         'delivered_count' => 3,
         'returning' => 100,
         'returning_count' => 1,
+        // What SyncCsrDailyRecord stores for those amounts: 100 of 1000.
+        'rts_rate' => 10,
     ]);
 
     $row = breakdownRow($this->owner, $this->workspace, 'Mariel Bautista');
@@ -169,7 +171,6 @@ test('the parcel counts come through beside the money they belong to', function 
         ->and((int) $row['delivered_count'])->toBe(3)
         ->and((float) $row['total_returning'])->toBe(100.0)
         ->and((int) $row['returning_count'])->toBe(1)
-        // 100 of 1000 settled.
         ->and((float) $row['rts_rate'])->toBe(10.0);
 });
 

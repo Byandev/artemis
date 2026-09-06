@@ -141,7 +141,8 @@ class CSRController extends Controller
                 SUM(total_orders)   as total_orders,
                 SUM(total_sales)    as total_sales,
                 SUM(delivered)      as total_delivered,
-                SUM(`returning`)    as total_returning
+                SUM(`returning`)    as total_returning,
+                AVG(CASE WHEN `returning` + delivered > 0 THEN rts_rate END) as rts_rate
             ')
             // The parcel counts behind those two amounts. The ERP rollup has no
             // such columns, so it answers zero rather than failing to compile —
@@ -224,17 +225,12 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_rmo_confirmed_count, 0)      as total_rmo_confirmed_count')
             ->selectRaw('COALESCE(rmo.total_verification_called, 0)      as total_verification_called')
             ->selectRaw('COALESCE(rmo.total_verification_call_time, 0)   as total_verification_call_time')
-            ->selectRaw('
-                CASE
-                    WHEN (COALESCE(dr.total_returning, 0) + COALESCE(dr.total_delivered, 0)) > 0
-                    THEN ROUND(
-                        COALESCE(dr.total_returning, 0)
-                        / (COALESCE(dr.total_returning, 0) + COALESCE(dr.total_delivered, 0))
-                        * 100, 2
-                    )
-                    ELSE 0
-                END as rts_rate
-            ')
+            // The rollup's own rts_rate, averaged over the CSR's days that
+            // settled something — the same column and the same rule the RTS
+            // card above the table reads, so the two cannot disagree. Rows
+            // written before SyncCsrDailyRecord began storing it carry 0.00
+            // until `sync:csr-daily-records --days=N` rewrites them.
+            ->selectRaw('ROUND(COALESCE(dr.rts_rate, 0), 2) as rts_rate')
             // RMO % = RMO assigned over RMO confirmed. Mirrors the frontend
             // computation so the column is sortable server-side.
             ->selectRaw('
