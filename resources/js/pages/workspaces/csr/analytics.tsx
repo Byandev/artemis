@@ -45,6 +45,11 @@ import CsrDailyCallOutcomesTable, {
 import CsrDailyEffortChart, {
     type DailyEffortResponse,
 } from '@/components/csr/CsrDailyEffortChart';
+import {
+    ColumnsDropdown,
+    useColumnVisibility,
+    type ColumnOption,
+} from '@/components/ui/columns-dropdown';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
@@ -58,22 +63,47 @@ import { format, parseISO, subDays } from 'date-fns';
 import { omit } from 'lodash';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+/**
+ * One CSR's row in the breakdown.
+ *
+ * Every metric on it is a column of `pancake_user_pos_daily_reports` or
+ * `pancake_user_daily_call_reports`, summed over the range and carrying the
+ * name the column itself has — `total_called` is the call report's
+ * `total_called`, not RMO's share of it. `rts_rate` and `rmo_percentage` are
+ * the two the server derives, so they can be sorted like any other.
+ */
 interface CsrRecord {
     id: number;
     name: string;
     pancake_user_id: string;
+
+    // pancake_user_pos_daily_reports
     total_orders: number;
     total_sales: number;
-    delivered: number;
+    total_delivered: number;
+    delivered_count: number;
+    total_returning: number;
     returning_count: number;
     rts_rate: number;
+
+    // pancake_user_daily_call_reports
     total_called: number;
     total_call_time: number;
-    total_rmo_call_attempts: number;
-    total_confirmed: number;
+    total_rmo_called: number;
+    total_rmo_call_time: number;
+    total_rmo_connected_called: number;
+    total_rmo_real_called: number;
+    longest_rmo_call_time: number;
+    total_rmo_customer_called: number;
+    total_rmo_customer_call_time: number;
+    total_rmo_rider_called: number;
+    total_rmo_rider_call_time: number;
+    total_rmo_assigned_count: number;
+    total_rmo_confirmed_count: number;
+    total_verification_called: number;
+    total_verification_call_time: number;
+
     rmo_percentage: number;
-    total_delivered: number;
-    total_returning: number;
 }
 
 interface Props {
@@ -168,6 +198,201 @@ const STICKY_HEADER_CELL =
 // The body has to scroll for a header to stick to anything, so the container
 // DataTable renders is capped here. The page then stays put while a long table
 // is read, instead of the columns scrolling out of sight.
+/** How a metric column's raw figure is drawn. */
+type CsrFormat = 'number' | 'peso' | 'percent' | 'duration' | 'rmoPercent';
+
+interface CsrMetricColumn {
+    /** The column's own name — also the sort key the server accepts. */
+    id: Exclude<keyof CsrRecord, 'id' | 'name' | 'pancake_user_id'>;
+    label: string;
+    format: CsrFormat;
+    /** Heading it sits under in the Columns menu. */
+    group: string;
+    /** Off until switched on. The rollups carry far more than fits a screen. */
+    hidden?: boolean;
+}
+
+/**
+ * Every metric the two rollups carry, in the order the table lays them out.
+ *
+ * The ones without `hidden` are the columns the table has always shown, so a
+ * first visit looks exactly as it did before the rest became available. A
+ * hidden column takes its declared place the moment it is switched on rather
+ * than being appended at the end.
+ */
+const CSR_METRIC_COLUMNS: CsrMetricColumn[] = [
+    // pancake_user_pos_daily_reports
+    {
+        id: 'total_orders',
+        label: 'Orders',
+        format: 'number',
+        group: 'Sales & delivery',
+    },
+    {
+        id: 'total_sales',
+        label: 'Sales',
+        format: 'peso',
+        group: 'Sales & delivery',
+    },
+    {
+        id: 'total_delivered',
+        label: 'Delivered',
+        format: 'peso',
+        group: 'Sales & delivery',
+    },
+    {
+        id: 'delivered_count',
+        label: 'Delivered Parcels',
+        format: 'number',
+        group: 'Sales & delivery',
+        hidden: true,
+    },
+    {
+        id: 'total_returning',
+        label: 'Returning',
+        format: 'peso',
+        group: 'Sales & delivery',
+    },
+    {
+        id: 'returning_count',
+        label: 'Returning Parcels',
+        format: 'number',
+        group: 'Sales & delivery',
+        hidden: true,
+    },
+    {
+        id: 'rts_rate',
+        label: 'RTS Rate',
+        format: 'percent',
+        group: 'Sales & delivery',
+    },
+
+    // pancake_user_daily_call_reports — the RMO side
+    {
+        id: 'total_rmo_confirmed_count',
+        label: 'RMO Confirmed',
+        format: 'number',
+        group: 'RMO',
+    },
+    {
+        id: 'total_rmo_assigned_count',
+        label: 'RMO Assigned',
+        format: 'number',
+        group: 'RMO',
+    },
+    {
+        id: 'total_rmo_called',
+        label: 'RMO Called',
+        format: 'number',
+        group: 'RMO',
+    },
+    {
+        id: 'rmo_percentage',
+        label: 'RMO %',
+        format: 'rmoPercent',
+        group: 'RMO',
+    },
+    {
+        id: 'total_rmo_call_time',
+        label: 'RMO Call Time',
+        format: 'duration',
+        group: 'RMO',
+    },
+    {
+        id: 'total_rmo_connected_called',
+        label: 'RMO Connected',
+        format: 'number',
+        group: 'RMO',
+        hidden: true,
+    },
+    {
+        id: 'total_rmo_real_called',
+        label: 'RMO Real Conversations',
+        format: 'number',
+        group: 'RMO',
+        hidden: true,
+    },
+    {
+        id: 'longest_rmo_call_time',
+        label: 'Longest RMO Call',
+        format: 'duration',
+        group: 'RMO',
+        hidden: true,
+    },
+    {
+        id: 'total_rmo_customer_called',
+        label: 'RMO Customer Called',
+        format: 'number',
+        group: 'RMO',
+        hidden: true,
+    },
+    {
+        id: 'total_rmo_customer_call_time',
+        label: 'RMO Customer Call Time',
+        format: 'duration',
+        group: 'RMO',
+        hidden: true,
+    },
+    {
+        id: 'total_rmo_rider_called',
+        label: 'RMO Rider Called',
+        format: 'number',
+        group: 'RMO',
+        hidden: true,
+    },
+    {
+        id: 'total_rmo_rider_call_time',
+        label: 'RMO Rider Call Time',
+        format: 'duration',
+        group: 'RMO',
+        hidden: true,
+    },
+
+    // pancake_user_daily_call_reports — every call, and the verification half
+    {
+        id: 'total_called',
+        label: 'Total Called',
+        format: 'number',
+        group: 'All calls',
+        hidden: true,
+    },
+    {
+        id: 'total_call_time',
+        label: 'Total Call Time',
+        format: 'duration',
+        group: 'All calls',
+        hidden: true,
+    },
+    {
+        id: 'total_verification_called',
+        label: 'Verification Called',
+        format: 'number',
+        group: 'All calls',
+        hidden: true,
+    },
+    {
+        id: 'total_verification_call_time',
+        label: 'Verification Call Time',
+        format: 'duration',
+        group: 'All calls',
+        hidden: true,
+    },
+];
+
+const CSR_COLUMN_OPTIONS: ColumnOption[] = [
+    // Pinned and always drawn: a row of figures with the name scrolled off is
+    // unreadable, so it is not a column anyone may switch off.
+    { id: 'name', label: 'CSR', group: 'CSR', required: true },
+    ...CSR_METRIC_COLUMNS.map((column) => ({
+        id: column.id,
+        label: column.label,
+        group: column.group,
+        defaultVisible: !column.hidden,
+    })),
+];
+
+const CSR_COLUMNS_STORAGE_KEY = 'csr-analytics-cols';
+
 const SCROLL_BODY =
     '[&_.custom-scrollbar]:max-h-[32rem] [&_.custom-scrollbar]:overflow-y-auto';
 
@@ -180,6 +405,8 @@ export default function Analytics({ workspace, records, query }: Props) {
         to: query?.to ? parseISO(query.to) : today,
     };
     const [searchInput, setSearchInput] = useState(query?.search ?? '');
+    const { visibility: columnVisibility, setVisibility: setColumnVisibility } =
+        useColumnVisibility(CSR_COLUMN_OPTIONS, CSR_COLUMNS_STORAGE_KEY);
     const [comparisonTab, setComparisonTab] = useState(
         query?.comparison ?? 'sales',
     );
@@ -404,8 +631,9 @@ export default function Analytics({ workspace, records, query }: Props) {
                 // name (e.g. assignees not yet pulled into pancake_users).
                 cell: ({ row }) => row.original.name,
                 size: 220,
-                // Eleven columns of figures are wider than any screen, and a
-                // row of numbers with the name scrolled off is unreadable — so
+                // The figures run wider than any screen once more than a
+                // handful are switched on, and a row of numbers with the name
+                // scrolled off is unreadable — so
                 // the name column is pinned and the figures scroll past it. It
                 // repaints the surface (the body would otherwise show through)
                 // and carries the edge as an inset shadow rather than a border,
@@ -417,88 +645,34 @@ export default function Analytics({ workspace, records, query }: Props) {
                         'sticky left-0 z-10 bg-white dark:bg-zinc-900 shadow-[inset_-1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]',
                 },
             },
-            {
-                accessorKey: 'total_orders',
+            ...CSR_METRIC_COLUMNS.map<ColumnDef<CsrRecord>>((metric) => ({
+                accessorKey: metric.id,
                 header: ({ column }) => (
-                    <SortableHeader column={column} title="Orders" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.total_orders).toLocaleString(),
-            },
-            {
-                accessorKey: 'total_sales',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Sales" />
-                ),
-                cell: ({ row }) => peso(row.original.total_sales),
-            },
-            {
-                accessorKey: 'total_delivered',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Delivered" />
-                ),
-                cell: ({ row }) => peso(row.original.total_delivered),
-            },
-            {
-                accessorKey: 'total_returning',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Returning" />
-                ),
-                cell: ({ row }) => peso(row.original.total_returning),
-            },
-            {
-                accessorKey: 'rts_rate',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RTS Rate" />
-                ),
-                cell: ({ row }) =>
-                    `${Number(row.original.rts_rate).toFixed(2)}%`,
-            },
-            {
-                accessorKey: 'total_confirmed',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Confirmed" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.total_confirmed).toLocaleString(),
-            },
-            {
-                accessorKey: 'total_called',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Assigned" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.total_called).toLocaleString(),
-            },
-            {
-                accessorKey: 'total_rmo_call_attempts',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Called" />
-                ),
-                cell: ({ row }) =>
-                    Number(
-                        row.original.total_rmo_call_attempts,
-                    ).toLocaleString(),
-            },
-            {
-                accessorKey: 'rmo_percentage',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO %" />
+                    <SortableHeader column={column} title={metric.label} />
                 ),
                 cell: ({ row }) => {
-                    // RMO % = RMO assigned / RMO confirmed (computed on the backend).
-                    const confirmed = Number(row.original.total_confirmed) || 0;
-                    if (confirmed === 0) return '—';
-                    return `${Number(row.original.rmo_percentage).toFixed(2)}%`;
+                    const value = Number(row.original[metric.id]) || 0;
+
+                    switch (metric.format) {
+                        case 'peso':
+                            return peso(value);
+                        case 'percent':
+                            return `${value.toFixed(2)}%`;
+                        case 'duration':
+                            return formatCallTime(value);
+                        case 'rmoPercent':
+                            // Assigned over confirmed. With nothing confirmed
+                            // there is no rate — a dash, not a clean 0%.
+                            return Number(
+                                row.original.total_rmo_confirmed_count,
+                            ) > 0
+                                ? `${value.toFixed(2)}%`
+                                : '—';
+                        default:
+                            return value.toLocaleString();
+                    }
                 },
-            },
-            {
-                accessorKey: 'total_call_time',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Call Time" />
-                ),
-                cell: ({ row }) => formatCallTime(row.original.total_call_time),
-            },
+            })),
         ],
         [],
     );
@@ -672,13 +846,21 @@ export default function Analytics({ workspace, records, query }: Props) {
                         CSR breakdown
                     </h2>
 
-                    <input
-                        type="text"
-                        placeholder="Search CSR..."
-                        value={searchInput}
-                        onChange={(e) => setSearchInput(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none sm:w-64 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
-                    />
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            placeholder="Search CSR..."
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none sm:w-64 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+                        />
+
+                        <ColumnsDropdown
+                            options={CSR_COLUMN_OPTIONS}
+                            visibility={columnVisibility}
+                            onChange={setColumnVisibility}
+                        />
+                    </div>
                 </div>
 
                 <div
@@ -693,6 +875,8 @@ export default function Analytics({ workspace, records, query }: Props) {
                         data={records.data ?? []}
                         initialSorting={initialSorting}
                         meta={omit(records, ['data'])}
+                        columnVisibility={columnVisibility}
+                        onColumnVisibilityChange={setColumnVisibility}
                         onFetch={(params) => {
                             const overrides: Record<
                                 string,

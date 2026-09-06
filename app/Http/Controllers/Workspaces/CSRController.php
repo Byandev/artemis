@@ -142,23 +142,43 @@ class CSRController extends Controller
                 SUM(total_sales)    as total_sales,
                 SUM(delivered)      as total_delivered,
                 SUM(`returning`)    as total_returning
-            ');
+            ')
+            // The parcel counts behind those two amounts. The ERP rollup has no
+            // such columns, so it answers zero rather than failing to compile —
+            // the outer query stays one shape whichever report is selected.
+            ->selectRaw($isErp
+                ? '0 as delivered_count, 0 as returning_count'
+                : 'SUM(delivered_count) as delivered_count, SUM(returning_count) as returning_count');
 
         // RMO calling activity is tracked separately from the sales reports.
         // The call report, summed back over the shops it splits a CSR's day into.
-        // Aliased to the names the table's columns already sort on: RMO Assigned
-        // is now every delivery handed over, PENDING included, where it used to
-        // count only the ones that had moved off it.
+        //
+        // Every column comes through under its own name, so a table column and
+        // the column it reads are the same word. They used to be aliased —
+        // `total_called` meant RMO assigned, which is a different figure from
+        // the report's own `total_called` — and there is no room for that once
+        // both are on the page.
         $rmoSummary = PancakeUserDailyCallReport::query()
             ->where('workspace_id', $workspace->id)
             ->whereBetween('date', [$from, $to])
             ->groupBy('pancake_user_id')
             ->selectRaw('
                 pancake_user_id,
-                SUM(total_rmo_assigned_count)  as total_called,
-                SUM(total_rmo_call_time)       as total_call_time,
-                SUM(total_rmo_called)          as total_rmo_call_attempts,
-                SUM(total_rmo_confirmed_count) as total_confirmed
+                SUM(total_called)                 as total_called,
+                SUM(total_call_time)              as total_call_time,
+                SUM(total_rmo_called)             as total_rmo_called,
+                SUM(total_rmo_call_time)          as total_rmo_call_time,
+                SUM(total_rmo_connected_called)   as total_rmo_connected_called,
+                SUM(total_rmo_real_called)        as total_rmo_real_called,
+                SUM(total_rmo_customer_called)    as total_rmo_customer_called,
+                SUM(total_rmo_customer_call_time) as total_rmo_customer_call_time,
+                SUM(total_rmo_rider_called)       as total_rmo_rider_called,
+                SUM(total_rmo_rider_call_time)    as total_rmo_rider_call_time,
+                SUM(total_rmo_assigned_count)     as total_rmo_assigned_count,
+                SUM(total_rmo_confirmed_count)    as total_rmo_confirmed_count,
+                SUM(total_verification_called)    as total_verification_called,
+                SUM(total_verification_call_time) as total_verification_call_time,
+                MAX(longest_rmo_call_time)        as longest_rmo_call_time
             ');
 
         $base = PancakeUser::query()
@@ -183,14 +203,27 @@ class CSRController extends Controller
             ->leftJoinSub($drSummary, 'dr', 'dr.pancake_user_id', '=', 'pancake_users.id')
             ->leftJoinSub($rmoSummary, 'rmo', 'rmo.pancake_user_id', '=', 'pancake_users.id')
             ->select('pancake_users.*')
-            ->selectRaw('COALESCE(dr.total_orders, 0)              as total_orders')
-            ->selectRaw('COALESCE(dr.total_sales, 0)               as total_sales')
-            ->selectRaw('COALESCE(dr.total_delivered, 0)           as total_delivered')
-            ->selectRaw('COALESCE(dr.total_returning, 0)           as total_returning')
-            ->selectRaw('COALESCE(rmo.total_called, 0)             as total_called')
-            ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
-            ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
-            ->selectRaw('COALESCE(rmo.total_confirmed, 0)          as total_confirmed')
+            ->selectRaw('COALESCE(dr.total_orders, 0)                    as total_orders')
+            ->selectRaw('COALESCE(dr.total_sales, 0)                     as total_sales')
+            ->selectRaw('COALESCE(dr.total_delivered, 0)                 as total_delivered')
+            ->selectRaw('COALESCE(dr.total_returning, 0)                 as total_returning')
+            ->selectRaw('COALESCE(dr.delivered_count, 0)                 as delivered_count')
+            ->selectRaw('COALESCE(dr.returning_count, 0)                 as returning_count')
+            ->selectRaw('COALESCE(rmo.total_called, 0)                   as total_called')
+            ->selectRaw('COALESCE(rmo.total_call_time, 0)                as total_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_called, 0)               as total_rmo_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_call_time, 0)            as total_rmo_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_connected_called, 0)     as total_rmo_connected_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_real_called, 0)          as total_rmo_real_called')
+            ->selectRaw('COALESCE(rmo.longest_rmo_call_time, 0)          as longest_rmo_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_customer_called, 0)      as total_rmo_customer_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_customer_call_time, 0)   as total_rmo_customer_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_rider_called, 0)         as total_rmo_rider_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_rider_call_time, 0)      as total_rmo_rider_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_assigned_count, 0)       as total_rmo_assigned_count')
+            ->selectRaw('COALESCE(rmo.total_rmo_confirmed_count, 0)      as total_rmo_confirmed_count')
+            ->selectRaw('COALESCE(rmo.total_verification_called, 0)      as total_verification_called')
+            ->selectRaw('COALESCE(rmo.total_verification_call_time, 0)   as total_verification_call_time')
             ->selectRaw('
                 CASE
                     WHEN (COALESCE(dr.total_returning, 0) + COALESCE(dr.total_delivered, 0)) > 0
@@ -206,10 +239,10 @@ class CSRController extends Controller
             // computation so the column is sortable server-side.
             ->selectRaw('
                 CASE
-                    WHEN COALESCE(rmo.total_confirmed, 0) > 0
+                    WHEN COALESCE(rmo.total_rmo_confirmed_count, 0) > 0
                     THEN ROUND(
-                        COALESCE(rmo.total_called, 0)
-                        / COALESCE(rmo.total_confirmed, 0)
+                        COALESCE(rmo.total_rmo_assigned_count, 0)
+                        / COALESCE(rmo.total_rmo_confirmed_count, 0)
                         * 100, 2
                     )
                     ELSE 0
@@ -221,11 +254,24 @@ class CSRController extends Controller
                 'total_sales',
                 'total_delivered',
                 'total_returning',
+                'delivered_count',
+                'returning_count',
+                'rts_rate',
                 'total_called',
                 'total_call_time',
-                'total_rmo_call_attempts',
-                'total_confirmed',
-                'rts_rate',
+                'total_rmo_called',
+                'total_rmo_call_time',
+                'total_rmo_connected_called',
+                'total_rmo_real_called',
+                'longest_rmo_call_time',
+                'total_rmo_customer_called',
+                'total_rmo_customer_call_time',
+                'total_rmo_rider_called',
+                'total_rmo_rider_call_time',
+                'total_rmo_assigned_count',
+                'total_rmo_confirmed_count',
+                'total_verification_called',
+                'total_verification_call_time',
                 'rmo_percentage',
             ])
             ->allowedFilters([
