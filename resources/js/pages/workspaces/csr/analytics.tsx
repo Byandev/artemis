@@ -15,6 +15,7 @@ import {
     LongestCallStatCard,
     ReachRateStatCard,
     RealConversationsStatCard,
+    RmoCallTimeStatCard,
     RmoCalledStatCard,
     RmoTimeStatCard,
     RtsStatCard,
@@ -24,6 +25,7 @@ import {
     type LongestCallStat,
     type ReachRateStat,
     type RealConversationsStat,
+    type RmoCallTimeStat,
     type RmoCalledStat,
     type RmoTimeStat,
     type RtsStat,
@@ -265,6 +267,13 @@ export default function Analytics({ workspace, records, query }: Props) {
         useAnalyticsStat<TotalRmoCalledStat>(
             workspace.slug,
             'analytics-total-rmo-called',
+            fromStr,
+            toStr,
+        );
+    const [rmoCallTimeStat, rmoCallTimeLoading] =
+        useAnalyticsStat<RmoCallTimeStat>(
+            workspace.slug,
+            'analytics-rmo-call-time',
             fromStr,
             toStr,
         );
@@ -583,6 +592,10 @@ export default function Analytics({ workspace, records, query }: Props) {
                     <TotalRmoCalledStatCard
                         stat={totalRmoCalledStat}
                         loading={totalRmoCalledLoading}
+                    />
+                    <RmoCallTimeStatCard
+                        stat={rmoCallTimeStat}
+                        loading={rmoCallTimeLoading}
                     />
                 </div>
 

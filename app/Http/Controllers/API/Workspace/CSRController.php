@@ -306,6 +306,33 @@ class CSRController extends Controller
         ]);
     }
 
+    public function analyticsRmoCallTime(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCalledTotals($workspace, $from, $to);
+        $previous = $this->rmoCalledTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['seconds'],
+            'calls' => $current['calls'],
+            // Talk time over the RMO calls behind it, which is the card beside
+            // this one; null with none to divide by.
+            'average_seconds' => $current['calls'] > 0
+                ? round($current['seconds'] / $current['calls'], 1)
+                : null,
+            'previous_value' => $previous['seconds'],
+            // Relative, like the other time cards: a duration is a magnitude.
+            'change' => $previous['seconds'] > 0
+                ? round(($current['seconds'] - $previous['seconds']) / $previous['seconds'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
     public function analyticsRmoTime(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
