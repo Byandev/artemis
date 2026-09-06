@@ -13,6 +13,7 @@ use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -697,6 +698,15 @@ class CSRController extends Controller
     private const VERIFICATION_RTS_THRESHOLD = 0.55;
 
     /**
+     * How little a CSR may have settled and still be ranked on their return
+     * rate, as a share of what the average contender settled.
+     *
+     * Guards the Lowest RTS leader against a rate built on nothing. See
+     * rtsLeaderAmong().
+     */
+    private const LEADER_MIN_SETTLED_SHARE_OF_AVERAGE = 0.2;
+
+    /**
      * Orders confirmed in a range that are worth a verification call.
      *
      * Two reasons qualify, and they cannot overlap: the customer's number has
@@ -994,27 +1004,64 @@ class CSRController extends Controller
             // worth zero have no rate to rank, so they are out rather than last.
             ->havingRaw('returned_amount + delivered_amount > 0')
             ->orderByRaw('returned_amount / (returned_amount + delivered_amount) ASC')
-            // Ties are common at a clean 0%; break them on volume.
-            ->orderByDesc('settled_orders')
-            ->first();
+            // Ties are common at a clean 0%; break them on the money settled.
+            // Not on settled_orders: those counts read zero on every rollup row
+            // written before the 2026_09_03 migration added them, so until a
+            // `sync:csr-daily-records` backfill lands they break nothing.
+            ->orderByRaw('returned_amount + delivered_amount DESC')
+            ->get();
 
-        if ($perCsr === null) {
+        $leader = $this->rtsLeaderAmong($perCsr);
+
+        if ($leader === null) {
             return response()->json(['leader' => null]);
         }
 
-        $returned = (float) $perCsr->returned_amount;
-        $delivered = (float) $perCsr->delivered_amount;
+        $returned = (float) $leader->returned_amount;
+        $delivered = (float) $leader->delivered_amount;
         $settled = $returned + $delivered;
 
         return response()->json([
             'leader' => [
-                'name' => $perCsr->name,
+                'name' => $leader->name,
                 'value' => round($returned / $settled * 100, 1),
                 'returned' => $returned,
                 'delivered' => $delivered,
-                'orders' => (int) $perCsr->settled_orders,
+                'orders' => (int) $leader->settled_orders,
             ],
         ]);
+    }
+
+    /**
+     * The lowest return rate worth crowning, out of the CSRs who settled anything.
+     *
+     * Rate alone hands the card to whoever settled least: one small parcel that
+     * happened not to come back is a clean 0%, and it outranks a CSR running
+     * real volume at 30%. That is arithmetic, not a result, so a contender has
+     * to have carried a fair share of the field's parcels before their rate is
+     * read as an achievement.
+     *
+     * The floor is a share of what the average contender settled rather than a
+     * peso figure, so it means the same thing in a workspace of five CSRs and
+     * one of fifty. Someone always clears it — the largest contender is at or
+     * above the average by definition — so a real 0% over real volume still
+     * wins, which is the point of keeping this a floor rather than a ban on
+     * zero.
+     *
+     * @param  Collection<int, object>  $contenders  Ordered best rate first.
+     */
+    private function rtsLeaderAmong(Collection $contenders): ?object
+    {
+        if ($contenders->isEmpty()) {
+            return null;
+        }
+
+        $settled = fn ($row) => (float) $row->returned_amount + (float) $row->delivered_amount;
+
+        $floor = $contenders->avg($settled) * self::LEADER_MIN_SETTLED_SHARE_OF_AVERAGE;
+
+        return $contenders->first(fn ($row) => $settled($row) >= $floor)
+            ?? $contenders->first();
     }
 
     public function analyticsLeaderRmoCalled(Request $request, Workspace $workspace)

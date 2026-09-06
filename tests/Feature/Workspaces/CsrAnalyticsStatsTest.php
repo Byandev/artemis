@@ -1784,6 +1784,75 @@ test('a CSR with a real rate wins over one who settled nothing of value', functi
         ->assertJsonPath('leader.value', 10);
 });
 
+test('a clean 0% on one small parcel does not outrank real volume', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $real = PancakeUser::create(['name' => 'Mariel Bautista']);
+    $thin = PancakeUser::create(['name' => 'Thin Sample CSR']);
+
+    // 30,000 of 100,000 settled = 30%, over money that means something.
+    deliveredBy($workspace, $real, '2026-08-02 10:00:00', 70000);
+    returnedBy($workspace, $real, '2026-08-03 10:00:00', 30000);
+
+    // One small parcel that happened not to come back. A clean 0%, but the
+    // rate is arithmetic rather than a result, so it does not take the card.
+    deliveredBy($workspace, $thin, '2026-08-02 10:00:00', 500);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('leader.name', 'Mariel Bautista')
+        ->assertJsonPath('leader.value', 30);
+});
+
+test('a real 0% over real volume still wins', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $perfect = PancakeUser::create(['name' => 'Mariel Bautista']);
+    $other = PancakeUser::create(['name' => 'Someone Else']);
+
+    // Nothing came back across a comparable pile of money — an achievement,
+    // not an absence, so the floor must not bar it.
+    deliveredBy($workspace, $perfect, '2026-08-02 10:00:00', 90000);
+
+    deliveredBy($workspace, $other, '2026-08-02 10:00:00', 70000);
+    returnedBy($workspace, $other, '2026-08-03 10:00:00', 30000);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('leader.name', 'Mariel Bautista')
+        ->assertJsonPath('leader.value', 0);
+});
+
+test('a tie at the top breaks on money settled, not the parcel counts', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $bigger = PancakeUser::create(['name' => 'Mariel Bautista']);
+    $smaller = PancakeUser::create(['name' => 'Smaller CSR']);
+
+    // Both at a clean 0%. The counts behind these amounts read zero on rollup
+    // rows written before the 2026_09_03 migration, so the tie has to break on
+    // the money or it does not break at all.
+    deliveredBy($workspace, $bigger, '2026-08-02 10:00:00', 80000);
+    deliveredBy($workspace, $smaller, '2026-08-02 10:00:00', 60000);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('leader.name', 'Mariel Bautista')
+        ->assertJsonPath('leader.value', 0)
+        ->assertJsonPath('leader.delivered', 80000);
+});
+
+test('the floor never empties the board', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // A single contender is their own average, so they clear their own floor —
+    // one thin CSR is still a leader when there is nobody to be thin against.
+    $only = PancakeUser::create(['name' => 'Mariel Bautista']);
+    deliveredBy($workspace, $only, '2026-08-02 10:00:00', 500);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('leader.name', 'Mariel Bautista')
+        ->assertJsonPath('leader.value', 0);
+});
+
 function csrRmoCalledLeader($owner, Workspace $workspace, string $from, string $to)
 {
     return csrStat($owner, $workspace, 'analytics-leader-rmo-called', $from, $to);
