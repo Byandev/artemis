@@ -326,6 +326,24 @@ test('a range of several rows is the mean of their rates, not the rate of the wh
         ->assertJsonPath('value', 50);
 });
 
+test('the card follows the stored column, even where it disagrees with the amounts', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    returningOrder($workspace, '2026-08-02 10:00:00', 2000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
+    syncPosRollup('2026-07-27', '2026-08-05');
+
+    // The amounts still say 20%. Overwritten on purpose: the card reports what
+    // the column holds, which is what makes a rollup the sync has not rewritten
+    // read 0.00 rather than the rate its amounts imply.
+    DB::table('pancake_user_pos_daily_reports')
+        ->where('workspace_id', $workspace->id)
+        ->update(['rts_rate' => 42]);
+
+    csrStat($owner, $workspace, 'analytics-rts', '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 42);
+});
+
 test('a day that settled nothing has no rate to average in', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
@@ -1673,6 +1691,9 @@ function deliveredBy(Workspace $workspace, PancakeUser $csr, string $at, float $
         'final_amount' => $amount,
         'delivered_at' => $at,
         'confirmed_by' => $csr->id,
+        // The rollup writes a row — and an rts_rate — per CSR, per shop, per
+        // day, so parcels meant to share a rate have to share a shop.
+        'shop_id' => salesShop($workspace)->id,
     ]);
 }
 
@@ -1684,6 +1705,7 @@ function returnedBy(Workspace $workspace, PancakeUser $csr, string $at, float $a
         'final_amount' => $amount,
         'returning_at' => $at,
         'confirmed_by' => $csr->id,
+        'shop_id' => salesShop($workspace)->id,
     ]);
 }
 
@@ -1693,13 +1715,13 @@ test('the RTS leader is the CSR with the lowest return rate', function () {
     $best = PancakeUser::create(['name' => 'Mariel Bautista']);
     $worst = PancakeUser::create(['name' => 'Someone Else']);
 
-    // Best: 200 returned of 1000 settled = 20%.
+    // Best: 200 returned of 1000 settled on the day, so the rollup stores 20.
     deliveredBy($workspace, $best, '2026-08-02 10:00:00', 800);
-    returnedBy($workspace, $best, '2026-08-03 10:00:00', 200);
+    returnedBy($workspace, $best, '2026-08-02 14:00:00', 200);
 
-    // Worst: 600 of 1000 = 60%.
+    // Worst: 600 of 1000 = 60.
     deliveredBy($workspace, $worst, '2026-08-02 10:00:00', 400);
-    returnedBy($workspace, $worst, '2026-08-03 10:00:00', 600);
+    returnedBy($workspace, $worst, '2026-08-02 14:00:00', 600);
 
     csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
@@ -1772,9 +1794,9 @@ test('a CSR with a real rate wins over one who settled nothing of value', functi
     $real = PancakeUser::create(['name' => 'Mariel Bautista']);
     $zeroValue = PancakeUser::create(['name' => 'Zero Value CSR']);
 
-    // 100 of 1000 settled = 10%.
+    // 100 of 1000 settled on the day = a stored 10.
     deliveredBy($workspace, $real, '2026-08-02 10:00:00', 900);
-    returnedBy($workspace, $real, '2026-08-03 10:00:00', 100);
+    returnedBy($workspace, $real, '2026-08-02 14:00:00', 100);
 
     // Settled, but worth nothing — no rate, so not in the running at all.
     deliveredBy($workspace, $zeroValue, '2026-08-02 10:00:00', 0);
@@ -1784,15 +1806,40 @@ test('a CSR with a real rate wins over one who settled nothing of value', functi
         ->assertJsonPath('leader.value', 10);
 });
 
+test('returns and deliveries on different days average, they do not weigh', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Mariel Bautista']);
+
+    // Aug 2 delivered everything and Aug 3 returned everything, so the rollup
+    // stores 0 for one day and 100 for the other and the leader reads 50. The
+    // money says 200 of 1000, which is 20.
+    //
+    // This is the cost of reading the rollup's own rts_rate rather than
+    // dividing the amounts: each day counts once, however much it settled, and
+    // a CSR's parcels rarely deliver and return on the same day. Pinned so the
+    // trade-off is a decision on the record rather than a surprise.
+    deliveredBy($workspace, $csr, '2026-08-02 10:00:00', 800);
+    returnedBy($workspace, $csr, '2026-08-03 10:00:00', 200);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('leader.value', 50)
+        // The amounts beside it are still the money, so the footnote is right
+        // even where the rate is a mean.
+        ->assertJsonPath('leader.returned', 200)
+        ->assertJsonPath('leader.delivered', 800);
+});
+
 test('a clean 0% on one small parcel does not outrank real volume', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     $real = PancakeUser::create(['name' => 'Mariel Bautista']);
     $thin = PancakeUser::create(['name' => 'Thin Sample CSR']);
 
-    // 30,000 of 100,000 settled = 30%, over money that means something.
+    // 30,000 of 100,000 settled on the day = a stored 30, over money that
+    // means something.
     deliveredBy($workspace, $real, '2026-08-02 10:00:00', 70000);
-    returnedBy($workspace, $real, '2026-08-03 10:00:00', 30000);
+    returnedBy($workspace, $real, '2026-08-02 14:00:00', 30000);
 
     // One small parcel that happened not to come back. A clean 0%, but the
     // rate is arithmetic rather than a result, so it does not take the card.

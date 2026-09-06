@@ -69,6 +69,8 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-daily-effort', [CSRController::class, 'analyticsDailyEffort']);
         // The same days as numbers: where every call ended up, and the day's hit rate.
         Route::get('/csrs/stats/analytics-daily-call-outcomes', [CSRController::class, 'analyticsDailyCallOutcomes']);
+        // Every call split by who it reached, daily or by hour of day.
+        Route::get('/csrs/stats/analytics-call-mix', [CSRController::class, 'analyticsCallMix']);
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');

@@ -36,6 +36,10 @@ import {
     type SalesStat,
     type TotalRmoCalledStat,
 } from '@/components/csr/CsrAnalyticsStatCards';
+import CsrCallMixChart, {
+    type CallMixGranularity,
+    type CallMixResponse,
+} from '@/components/csr/CsrCallMixChart';
 import CsrComparisonPanel, {
     type ComparisonResponse,
 } from '@/components/csr/CsrComparisonPanel';
@@ -59,7 +63,7 @@ import { PaginatedData } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { format, parseISO, subDays } from 'date-fns';
+import { eachDayOfInterval, format, parseISO, subDays } from 'date-fns';
 import { omit } from 'lodash';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -136,6 +140,9 @@ const formatCallTime = (seconds: number) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
 };
+/** Stable default, so the hook's query string does not change every render. */
+const NO_EXTRA_PARAMS: Record<string, string> = {};
+
 /**
  * One CSR analytics stat card's figures.
  *
@@ -148,23 +155,23 @@ function useAnalyticsStat<T>(
     stat: string,
     from: string,
     to: string,
+    extraParams: Record<string, string> = NO_EXTRA_PARAMS,
 ): [T | null, boolean] {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // A string, so a caller passing a fresh object literal each render does not
+    // re-fire the request; the effect keys on what the query actually says.
+    const search = new URLSearchParams({ from, to, ...extraParams }).toString();
 
     useEffect(() => {
         const controller = new AbortController();
         setLoading(true);
 
-        const params = new URLSearchParams({ from, to });
-
-        fetch(
-            `/api/workspaces/${workspaceSlug}/csrs/stats/${stat}?${params.toString()}`,
-            {
-                signal: controller.signal,
-                headers: { Accept: 'application/json' },
-            },
-        )
+        fetch(`/api/workspaces/${workspaceSlug}/csrs/stats/${stat}?${search}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+        })
             .then((response) => {
                 if (!response.ok) throw new Error(String(response.status));
                 return response.json();
@@ -181,7 +188,7 @@ function useAnalyticsStat<T>(
             });
 
         return () => controller.abort();
-    }, [workspaceSlug, stat, from, to]);
+    }, [workspaceSlug, stat, search]);
 
     return [data, loading];
 }
@@ -407,6 +414,15 @@ export default function Analytics({ workspace, records, query }: Props) {
     const [searchInput, setSearchInput] = useState(query?.search ?? '');
     const { visibility: columnVisibility, setVisibility: setColumnVisibility } =
         useColumnVisibility(CSR_COLUMN_OPTIONS, CSR_COLUMNS_STORAGE_KEY);
+
+    // Kept in component state rather than the URL: the chart's own reading, not
+    // something the page's other blocks or a shared link need to agree with.
+    const [callMixGranularity, setCallMixGranularity] =
+        useState<CallMixGranularity>('daily');
+    const [hiddenCallMix, setHiddenCallMix] = useState<
+        ('customer' | 'rider' | 'verification')[]
+    >([]);
+    const [callMixDay, setCallMixDay] = useState<string | null>(null);
     const [comparisonTab, setComparisonTab] = useState(
         query?.comparison ?? 'sales',
     );
@@ -571,6 +587,44 @@ export default function Analytics({ workspace, records, query }: Props) {
 
     // The field behind the leaders. One request for all four metrics — they
     // come from the same two scans, so a call per tab would repeat the work.
+    // The days the hourly tabs offer. Derived from the range rather than stored,
+    // so moving the date picker cannot leave a tab pointing outside it.
+    const callMixDays = useMemo(
+        () =>
+            eachDayOfInterval({
+                start: parseISO(fromStr),
+                end: parseISO(toStr),
+            }).map((day) => format(day, 'yyyy-MM-dd')),
+        [fromStr, toStr],
+    );
+
+    // The last day of the range unless one was picked and is still in it — the
+    // most recent day is the one worth opening on.
+    const callMixReadDay =
+        callMixDay && callMixDays.includes(callMixDay)
+            ? callMixDay
+            : callMixDays[callMixDays.length - 1];
+
+    const [callMix, callMixLoading] = useAnalyticsStat<CallMixResponse>(
+        workspace.slug,
+        'analytics-call-mix',
+        fromStr,
+        toStr,
+        useMemo<Record<string, string>>(() => {
+            const params: Record<string, string> = {
+                granularity: callMixGranularity,
+            };
+
+            // Only sent for hourly: a day on a daily request would read as a
+            // narrower range than the one the page is showing.
+            if (callMixGranularity === 'hourly') {
+                params.day = callMixReadDay;
+            }
+
+            return params;
+        }, [callMixGranularity, callMixReadDay]),
+    );
+
     const [comparison, comparisonLoading] =
         useAnalyticsStat<ComparisonResponse>(
             workspace.slug,
@@ -832,6 +886,24 @@ export default function Analytics({ workspace, records, query }: Props) {
                 <CsrDailyEffortChart
                     data={dailyEffort}
                     loading={dailyEffortLoading}
+                />
+
+                <CsrCallMixChart
+                    data={callMix}
+                    loading={callMixLoading}
+                    granularity={callMixGranularity}
+                    onGranularityChange={setCallMixGranularity}
+                    days={callMixDays}
+                    day={callMixReadDay}
+                    onDayChange={setCallMixDay}
+                    hidden={hiddenCallMix}
+                    onToggleSeries={(id) =>
+                        setHiddenCallMix((current) =>
+                            current.includes(id)
+                                ? current.filter((series) => series !== id)
+                                : [...current, id],
+                        )
+                    }
                 />
 
                 <CsrDailyCallOutcomesTable

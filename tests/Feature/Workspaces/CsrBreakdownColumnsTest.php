@@ -339,6 +339,49 @@ test('the team filter narrows the newly offered columns too', function () {
     expect($rows)->toBe(['In The Team']);
 });
 
+test('the RTS Rate card and the table\'s RTS Rate column both read the stored column', function () {
+    // One CSR, so the workspace's rate and that CSR's row are the same figure.
+    // The stored rate is deliberately not what the amounts imply — 2000 of
+    // 10000 would be 20% — so a reader that divides the money instead of
+    // reading the column shows 20 here and fails.
+    breakdownCsr($this->workspace, 'Mariel Bautista', pos: [
+        'returning' => 2000,
+        'delivered' => 8000,
+        'rts_rate' => 37.5,
+    ]);
+
+    $card = $this->actingAs($this->owner)
+        ->getJson("/api/workspaces/{$this->workspace->slug}/csrs/stats/analytics-rts?from=2026-08-01&to=2026-08-05")
+        ->assertOk()
+        ->json();
+
+    $column = (float) breakdownRow($this->owner, $this->workspace, 'Mariel Bautista')['rts_rate'];
+
+    expect((float) $card['value'])->toBe(37.5)
+        ->and($column)->toBe(37.5)
+        // The amounts still travel beside it — the card's footnote is money.
+        ->and((float) $card['returning_amount'])->toBe(2000.0);
+});
+
+test('an unwritten rts_rate reads zero on both, whatever the amounts say', function () {
+    // The state of every row today: money settled, stored rate never written.
+    // Both readers report 0.00 rather than the 20% the amounts imply, and
+    // `sync:csr-daily-records --days=N` is what changes that.
+    breakdownCsr($this->workspace, 'Mariel Bautista', pos: [
+        'returning' => 2000,
+        'delivered' => 8000,
+    ]);
+
+    $card = $this->actingAs($this->owner)
+        ->getJson("/api/workspaces/{$this->workspace->slug}/csrs/stats/analytics-rts?from=2026-08-01&to=2026-08-05")
+        ->assertOk()
+        ->json();
+
+    expect((float) $card['value'])->toBe(0.0)
+        ->and((float) breakdownRow($this->owner, $this->workspace, 'Mariel Bautista')['rts_rate'])
+        ->toBe(0.0);
+});
+
 test('every column the table offers can be sorted on', function () {
     breakdownCsr($this->workspace, 'Mariel Bautista');
 

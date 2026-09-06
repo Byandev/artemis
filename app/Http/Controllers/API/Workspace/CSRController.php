@@ -8,6 +8,7 @@ use App\Models\PancakeUserDailyCallReport;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\Workspace;
+use App\Support\CallLogPersona;
 use App\Support\RmoDailyStats;
 use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
@@ -72,7 +73,8 @@ class CSRController extends Controller
                 SUM(total_orders)   as total_orders,
                 SUM(total_sales)    as total_sales,
                 SUM(`returning`)    as total_returning,
-                SUM(delivered)      as total_delivered
+                SUM(delivered)      as total_delivered,
+                AVG(CASE WHEN `returning` + delivered > 0 THEN rts_rate END) as rts_rate
             ');
 
         // The call report, summed back over the shops it splits a CSR's day into.
@@ -106,17 +108,10 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
             ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
             ->selectRaw('COALESCE(rmo.total_confirmed, 0)          as total_confirmed')
-            ->selectRaw('
-                CASE
-                    WHEN (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0)) > 0
-                    THEN ROUND(
-                        COALESCE(pos.total_returning, 0)
-                        / (COALESCE(pos.total_returning, 0) + COALESCE(pos.total_delivered, 0))
-                        * 100, 2
-                    )
-                    ELSE 0
-                END as rts_rate
-            ')
+            // The rollup's own rts_rate, averaged over the days that settled
+            // something — the same column and rule the Inertia breakdown, the
+            // RTS card and the RTS leader read.
+            ->selectRaw('ROUND(COALESCE(pos.rts_rate, 0), 2) as rts_rate')
             ->allowedSorts([
                 AllowedSort::field('csr_name', 'pancake_users.name'),
                 'total_orders',
@@ -570,6 +565,171 @@ class CSRController extends Controller
     }
 
     /**
+     * Every call placed, split by who it reached, over time.
+     *
+     * The three series are a partition of `total_called`, not a sample of it: a
+     * call with a delivery behind it went to that delivery's customer or its
+     * rider, and one without a delivery is order verification. So the stack's
+     * height is the period's Total Called, and no call is counted twice or
+     * left out.
+     *
+     * Daily reads the nightly rollup. Hourly cannot — the rollup has one row
+     * per day — so it goes to call_logs, applying the same three rules
+     * SyncCsrDailyCallRecord applies when it writes those columns, and the two
+     * granularities agree on any day the sync has covered.
+     *
+     * Hourly reads one day at a time. `day` picks which — the page offers a tab
+     * per day in the range — because the hours of several days folded together
+     * are not any day's shape. Left off, it falls back to hour-of-day across
+     * the whole range, which is still 24 buckets rather than one per hour of
+     * every day.
+     */
+    public function analyticsCallMix(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+
+        $hourly = strtolower((string) $request->input('granularity', 'daily')) === 'hourly';
+        $day = $hourly ? $this->dayWithin($request->input('day'), $from, $to) : null;
+
+        $buckets = $hourly
+            ? $this->callMixByHour($workspace, $day ?? $from, $day ?? $to)
+            : $this->callMixByDay($workspace, $from, $to);
+
+        return response()->json([
+            'range' => ['from' => $from, 'to' => $to],
+            'granularity' => $hourly ? 'hourly' : 'daily',
+            // Which day the hours belong to, so the page can tell that its tab
+            // was honoured rather than quietly ignored.
+            'day' => $day,
+            'buckets' => $buckets,
+            'totals' => [
+                'customer' => array_sum(array_column($buckets, 'customer')),
+                'rider' => array_sum(array_column($buckets, 'rider')),
+                'verification' => array_sum(array_column($buckets, 'verification')),
+            ],
+        ]);
+    }
+
+    /**
+     * A `Y-m-d` inside the range, or null for anything else.
+     *
+     * An unparseable or out-of-range day is dropped rather than rejected: it
+     * means the tab and the date picker have got out of step for a render, and
+     * the whole range is a truthful answer to fall back on.
+     */
+    private function dayWithin(mixed $day, string $from, string $to): ?string
+    {
+        if (! is_string($day) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) {
+            return null;
+        }
+
+        return $day >= $from && $day <= $to ? $day : null;
+    }
+
+    /**
+     * One bucket per day in the range, off the nightly rollup.
+     *
+     * Every day is returned, quiet ones included, so a gap in the calling reads
+     * as a gap rather than as a day the chart skipped.
+     *
+     * @return list<array{key: string, label: string, customer: int, rider: int, verification: int}>
+     */
+    private function callMixByDay(Workspace $workspace, string $from, string $to): array
+    {
+        $rows = $this->callReport($workspace, $from, $to)
+            ->groupBy('date')
+            ->selectRaw('
+                date,
+                COALESCE(SUM(total_rmo_customer_called), 0) as customer,
+                COALESCE(SUM(total_rmo_rider_called), 0)    as rider,
+                COALESCE(SUM(total_verification_called), 0) as verification
+            ')
+            ->get()
+            // date comes back with or without a time part depending on the
+            // driver — key on the first ten characters.
+            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+        $buckets = [];
+        $cursor = CarbonImmutable::parse($from);
+        $end = CarbonImmutable::parse($to);
+
+        while ($cursor->lessThanOrEqualTo($end)) {
+            $date = $cursor->toDateString();
+            $row = $rows->get($date);
+
+            $buckets[] = [
+                'key' => $date,
+                'label' => $cursor->format('M j'),
+                'customer' => (int) ($row->customer ?? 0),
+                'rider' => (int) ($row->rider ?? 0),
+                'verification' => (int) ($row->verification ?? 0),
+            ];
+
+            $cursor = $cursor->addDay();
+        }
+
+        return $buckets;
+    }
+
+    /**
+     * Twenty-four buckets, one per hour of the day, off call_logs.
+     *
+     * The rollup cannot answer this — it holds a day per row — so the rules are
+     * restated here against the raw log: a delivery id makes the call RMO work,
+     * and the persona beside it says whether it reached the customer or the
+     * rider; no delivery id is order verification, whatever its persona.
+     *
+     * Hour-of-day, so the count is bounded at 24 however long the range is. The
+     * chart asks for this over one day at a time, where that is simply that
+     * day's hours.
+     *
+     * The join to pancake_orders is only there to name the shop the team filter
+     * narrows on, which is the same reason SyncCsrDailyCallRecord joins it. A
+     * call matched to no order therefore falls out here exactly as it does from
+     * the rollup, so the two granularities count the same calls.
+     *
+     * @return list<array{key: string, label: string, customer: int, rider: int, verification: int}>
+     */
+    private function callMixByHour(Workspace $workspace, string $from, string $to): array
+    {
+        $rows = $this->scopeToVisibleShops(
+            DB::table('call_logs as cl')
+                ->join('pancake_orders as po', 'po.id', '=', 'cl.order_id')
+                ->where('cl.workspace_id', $workspace->id)
+                ->whereBetween('cl.call_date', [$from, $to]),
+            $workspace,
+            'po.shop_id',
+        )
+            ->groupByRaw('HOUR(cl.call_time)')
+            ->selectRaw('
+                HOUR(cl.call_time) as hour,
+                SUM(cl.order_for_delivery_id IS NOT NULL AND cl.persona = ?) as customer,
+                SUM(cl.order_for_delivery_id IS NOT NULL AND cl.persona = ?) as rider,
+                SUM(cl.order_for_delivery_id IS NULL)                        as verification
+            ', [CallLogPersona::CUSTOMER, CallLogPersona::RIDER])
+            ->get()
+            ->keyBy(fn ($row) => (int) $row->hour);
+
+        $buckets = [];
+
+        for ($hour = 0; $hour < 24; $hour++) {
+            $row = $rows->get($hour);
+
+            $buckets[] = [
+                'key' => sprintf('%02d', $hour),
+                'label' => sprintf('%02d:00', $hour),
+                'customer' => (int) ($row->customer ?? 0),
+                'rider' => (int) ($row->rider ?? 0),
+                'verification' => (int) ($row->verification ?? 0),
+            ];
+        }
+
+        return $buckets;
+    }
+
+    /**
      * Where each day's calls ended up — the table under the effort chart.
      *
      * Three buckets narrowing in turn: no_answer never joined, answered picked
@@ -980,9 +1140,11 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        // Off the same rollup, so this is the RTS Rate column: money back over
-        // money settled, counted on the day it settled. Replaces a scan of the
-        // workspace's whole order history; an uncovered range has nobody to rank.
+        // Off the same rollup, and off its own rts_rate column — the same one
+        // the RTS card and the breakdown table read, averaged the same way, so
+        // the figure at the top and the name under it cannot disagree. The
+        // amounts come with it: they are the card's footnote and the volume
+        // floor below. An uncovered range has nobody to rank.
         $perCsr = $this->scopeToVisibleShops(
             DB::table('pancake_user_pos_daily_reports as r')
                 ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
@@ -998,12 +1160,13 @@ class CSRController extends Controller
                 pu.name as name,
                 COALESCE(SUM(r.returning), 0) as returned_amount,
                 COALESCE(SUM(r.delivered), 0) as delivered_amount,
-                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders
+                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders,
+                AVG(CASE WHEN r.`returning` + r.delivered > 0 THEN r.rts_rate END) as rts_rate
             ')
             // Eligibility is money settled, as on the RTS card. Parcels all
             // worth zero have no rate to rank, so they are out rather than last.
             ->havingRaw('returned_amount + delivered_amount > 0')
-            ->orderByRaw('returned_amount / (returned_amount + delivered_amount) ASC')
+            ->orderByRaw('rts_rate ASC')
             // Ties are common at a clean 0%; break them on the money settled.
             // Not on settled_orders: those counts read zero on every rollup row
             // written before the 2026_09_03 migration added them, so until a
@@ -1017,16 +1180,13 @@ class CSRController extends Controller
             return response()->json(['leader' => null]);
         }
 
-        $returned = (float) $leader->returned_amount;
-        $delivered = (float) $leader->delivered_amount;
-        $settled = $returned + $delivered;
-
         return response()->json([
             'leader' => [
                 'name' => $leader->name,
-                'value' => round($returned / $settled * 100, 1),
-                'returned' => $returned,
-                'delivered' => $delivered,
+                // The rollup's own rate, not a division done here.
+                'value' => round((float) $leader->rts_rate, 1),
+                'returned' => (float) $leader->returned_amount,
+                'delivered' => (float) $leader->delivered_amount,
                 'orders' => (int) $leader->settled_orders,
             ],
         ]);
@@ -1183,18 +1343,23 @@ class CSRController extends Controller
      * leader — the parcel counts beside them are only backfilled from
      * 2026-09-03 on, so a rate built from them would be wrong on older rows.
      *
-     * `rts_rate` is the rollup's own column, averaged over the rows that
-     * actually settled something — a CSR-shop-day with no parcels yet has no
-     * rate to contribute, and letting its stored 0 in would read as a period
-     * with fewer returns than it had. The mean of the days is not the rate of
-     * the whole range, so this figure is a shade off the amount-weighted one
-     * the leader and the table compute from `returning` / `delivered`.
+     * `rts_rate` is the rollup's own stored column, averaged over the rows that
+     * settled something — the breakdown table's column reads it the same way,
+     * so the figure at the top and the names under it cannot disagree. A
+     * CSR-shop-day with no parcels yet has no rate to contribute, and letting
+     * its stored 0 in would read as a period with fewer returns than it had.
+     *
+     * Two things follow from reading the column rather than dividing the
+     * amounts. Rows written before SyncCsrDailyRecord started storing the rate
+     * carry 0.00, and there is no telling those from a genuine 0% — until
+     * `sync:csr-daily-records --days=N` rewrites them, a range that predates it
+     * reads near zero. And the mean of the days is not the rate of the whole
+     * range: a day that settled a hundred pesos weighs as much as one that
+     * settled half a million, so this figure sits a shade off the
+     * amount-weighted one the RTS leader computes.
      *
      * The rollup is written nightly, so a range the sync has not reached reads
-     * as nothing rather than as the dashboard's order figures. Rows written
-     * before SyncCsrDailyRecord started storing the rate carry 0.00, and there
-     * is no telling those from a genuine 0% here — `sync:csr-daily-records
-     * --days=N` rewrites them.
+     * as nothing rather than as the dashboard's order figures.
      *
      * @return array{sales: float, orders: int, returning: float, rts_rate: float|null}
      */
@@ -1210,6 +1375,7 @@ class CSRController extends Controller
                 COALESCE(SUM(total_sales), 0)  as sales,
                 COALESCE(SUM(total_orders), 0) as orders,
                 COALESCE(SUM(`returning`), 0)  as returning_amount,
+                COALESCE(SUM(delivered), 0)    as delivered_amount,
                 AVG(CASE WHEN `returning` + delivered > 0 THEN rts_rate END) as rts_rate
             ')
             ->first();
@@ -1218,6 +1384,7 @@ class CSRController extends Controller
             'sales' => (float) ($row->sales ?? 0),
             'orders' => (int) ($row->orders ?? 0),
             'returning' => (float) ($row->returning_amount ?? 0),
+            'delivered' => (float) ($row->delivered_amount ?? 0),
             // Null, not zero: no settled row in the range is no rate at all.
             'rts_rate' => ($row->rts_rate ?? null) === null ? null : (float) $row->rts_rate,
         ];
@@ -1253,9 +1420,10 @@ class CSRController extends Controller
                 fn ($r) => $r->previous_sales > 0 ? (float) $r->previous_sales : null,
             ),
             $this->comparisonMetric('rts', 'RTS', 'percent', ' pts', false, $csrs,
-                // Eligibility is one settled parcel counted, as on the RTS leader.
-                fn ($r) => $r->returned_amount + $r->delivered_amount > 0 ? $this->rate($r->returned_amount, $r->returned_amount + $r->delivered_amount) : null,
-                fn ($r) => $r->previous_returned_amount + $r->previous_delivered_amount > 0 ? $this->rate($r->previous_returned_amount, $r->previous_returned_amount + $r->previous_delivered_amount) : null,
+                // The rollup's own rts_rate, as on the RTS leader and the card
+                // — null, not zero, for a CSR with nothing settled to rate.
+                fn ($r) => $r->rts_rate === null ? null : round((float) $r->rts_rate, 1),
+                fn ($r) => $r->previous_rts_rate === null ? null : round((float) $r->previous_rts_rate, 1),
             ),
             $this->comparisonMetric('rmo_called', 'RMO called', 'percent', ' pts', true, $rmo,
                 // Nothing confirmed is no rate at all, not a zero one.
@@ -1307,10 +1475,14 @@ class CSRController extends Controller
                 COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as delivered_amount,
                 COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_sales END), 0) as previous_sales,
                 COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.returning END), 0) as previous_returned_amount,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as previous_delivered_amount
+                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as previous_delivered_amount,
+                AVG(CASE WHEN r.date BETWEEN ? AND ? AND r.`returning` + r.delivered > 0 THEN r.rts_rate END) as rts_rate,
+                AVG(CASE WHEN r.date BETWEEN ? AND ? AND r.`returning` + r.delivered > 0 THEN r.rts_rate END) as previous_rts_rate
             ', [
                 $from, $to, $from, $to, $from, $to,
                 $previousFrom, $previousTo, $previousFrom, $previousTo, $previousFrom, $previousTo,
+                $from, $to,
+                $previousFrom, $previousTo,
             ])
             ->get();
     }

@@ -3,6 +3,7 @@
 use App\Jobs\SyncCsrDailyRecord;
 use App\Models\Order;
 use App\Models\PancakeUserDailyCallReport;
+use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
@@ -77,6 +78,18 @@ function cmpSale(Workspace $workspace, PancakeUser $csr, string $confirmedAt, fl
 }
 
 /** A parcel of theirs that settled — returned (status 4) or delivered (3). */
+/**
+ * The one shop this file's parcels settle through.
+ *
+ * The rollup stores an rts_rate per CSR, per shop, per day, and the RTS figures
+ * read that column — so parcels meant to make up one rate have to share a shop,
+ * or each lands in a row of its own at a clean 0 or 100.
+ */
+function cmpShop(Workspace $workspace): Shop
+{
+    return Shop::firstOrCreate(['workspace_id' => $workspace->id, 'name' => 'Comparison Shop']);
+}
+
 function cmpSettled(Workspace $workspace, PancakeUser $csr, string $on, float $amount, bool $returned): Order
 {
     return Order::factory()->forWorkspace($workspace)->create([
@@ -86,6 +99,7 @@ function cmpSettled(Workspace $workspace, PancakeUser $csr, string $on, float $a
         'final_amount' => $amount,
         'returning_at' => $returned ? $on : null,
         'delivered_at' => $returned ? null : $on,
+        'shop_id' => cmpShop($workspace)->id,
     ]);
 }
 
