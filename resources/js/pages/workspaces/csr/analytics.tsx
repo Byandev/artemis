@@ -17,6 +17,7 @@ import {
     RealConversationsStatCard,
     RmoCallTimeStatCard,
     RmoCalledStatCard,
+    RmoHitRateStatCard,
     RmoRealConversationsStatCard,
     RmoTimeStatCard,
     RtsStatCard,
@@ -28,6 +29,7 @@ import {
     type RealConversationsStat,
     type RmoCallTimeStat,
     type RmoCalledStat,
+    type RmoHitRateStat,
     type RmoRealConversationsStat,
     type RmoTimeStat,
     type RtsStat,
@@ -283,6 +285,13 @@ export default function Analytics({ workspace, records, query }: Props) {
         useAnalyticsStat<RmoRealConversationsStat>(
             workspace.slug,
             'analytics-rmo-real-conversations',
+            fromStr,
+            toStr,
+        );
+    const [rmoHitRateStat, rmoHitRateLoading] =
+        useAnalyticsStat<RmoHitRateStat>(
+            workspace.slug,
+            'analytics-rmo-hit-rate',
             fromStr,
             toStr,
         );
@@ -609,6 +618,10 @@ export default function Analytics({ workspace, records, query }: Props) {
                     <RmoRealConversationsStatCard
                         stat={rmoRealStat}
                         loading={rmoRealLoading}
+                    />
+                    <RmoHitRateStatCard
+                        stat={rmoHitRateStat}
+                        loading={rmoHitRateLoading}
                     />
                 </div>
 

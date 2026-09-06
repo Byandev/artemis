@@ -12,6 +12,7 @@ import {
     PhoneOutgoing,
     RotateCcw,
     ShieldAlert,
+    Target,
     Timer,
     Wallet,
 } from 'lucide-react';
@@ -62,6 +63,13 @@ export interface RmoRealConversationsStat extends StatPayload {
     calls: number;
     /** Conversations over calls, as a percentage; null with no calls. */
     rate: number | null;
+}
+
+export interface RmoHitRateStat extends StatPayload {
+    /** Null when no RMO call was placed — no rate, rather than a rate of none. */
+    value: number | null;
+    conversations: number;
+    calls: number;
 }
 
 export interface RmoTimeStat extends StatPayload {
@@ -419,12 +427,12 @@ export function RmoRealConversationsStatCard({
             icon={Headset}
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
-            // The share it came out of: the count alone cannot tell a good day
-            // on few calls from a poor one on many.
+            // The pool it came out of. The share itself is the Hit Rate card
+            // beside this one, so the footnote does not restate it.
             footnote={
                 !stat || stat.rate === null
                     ? 'No RMO calls in this period'
-                    : `${stat.rate.toFixed(1)}% of ${stat.calls.toLocaleString()} RMO calls`
+                    : `of ${stat.calls.toLocaleString()} RMO call${stat.calls === 1 ? '' : 's'} placed`
             }
             trend={
                 <Trend
@@ -434,6 +442,44 @@ export function RmoRealConversationsStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
+                />
+            }
+        />
+    );
+}
+
+export function RmoHitRateStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoHitRateStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="Hit Rate"
+            icon={Target}
+            loading={loading || stat === null}
+            // A dash, not 0%, when nothing was placed — there is no rate to
+            // report rather than a rate of nothing.
+            value={
+                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
+            }
+            // The division itself, so the figure can be read against its volume.
+            footnote={
+                !stat || stat.value === null
+                    ? 'No RMO calls in this period'
+                    : `${stat.conversations.toLocaleString()} conversations of ${stat.calls.toLocaleString()} calls`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                    unit=" pts"
                 />
             }
         />
