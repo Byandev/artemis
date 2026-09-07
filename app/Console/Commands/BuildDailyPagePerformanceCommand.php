@@ -28,6 +28,9 @@ use Modules\Pancake\Models\Order;
  */
 class BuildDailyPagePerformanceCommand extends Command
 {
+    /** The trailing window behind rts_rate_30d. Mirrors the ROAS tracker's. */
+    private const RTS_WINDOW_DAYS = 30;
+
     protected $signature = 'build-page-daily-performance
         {--date= : Build a single date (YYYY-MM-DD)}
         {--days=3 : Trailing window ending today when no --date (default 3)}';
@@ -169,6 +172,31 @@ class BuildDailyPagePerformanceCommand extends Command
 
         $rts_rate = $overall_returning ? $overall_returning / ($overall_returning + $delivered_amount) * 100 : 0;
 
+        // The same blend over the 30 days ending on this one, which is what the
+        // ROAS tracker's margin estimate discounts the day's revenue by.
+        //
+        // The 29 days behind come from the stored rows; today's own figures are
+        // added here rather than read back, because this row has not been
+        // written yet and reading it would use the previous run's numbers.
+        $window = DB::table('page_daily_records')
+            ->where('workspace_id', $workspace->id)
+            ->where('page_type', $page->getMorphClass())
+            ->where('page_id', $pageId)
+            ->whereBetween('date', [
+                Carbon::parse($date)->subDays(self::RTS_WINDOW_DAYS - 1)->toDateString(),
+                Carbon::parse($date)->subDay()->toDateString(),
+            ])
+            ->selectRaw('COALESCE(SUM(returning_amount), 0) as returning_sum, COALESCE(SUM(delivered_amount), 0) as delivered_sum')
+            ->first();
+
+        $window_returning = (float) ($window->returning_sum ?? 0) + (float) $returning_amount;
+        $window_moved = $window_returning + (float) ($window->delivered_sum ?? 0) + (float) $delivered_amount;
+
+        // Null, not zero: a window in which nothing moved has no rate to report,
+        // and the tracker falls back to its default rather than reading a page
+        // with no deliveries as one that never gets anything returned.
+        $rts_rate_30d = $window_moved > 0 ? $window_returning / $window_moved * 100 : null;
+
         PageDailyRecord::updateOrCreate(
             [
                 'workspace_id' => $workspace->id,
@@ -188,6 +216,7 @@ class BuildDailyPagePerformanceCommand extends Command
                 'returned_amount' => $returned_amount,
                 'returning_amount' => $returning_amount,
                 'rts_rate' => $rts_rate,
+                'rts_rate_30d' => $rts_rate_30d,
                 'ad_spent' => $ad_spent,
                 'ad_spend_budget' => $ad_spend_budget,
                 'ad_sales' => $ad_sales,

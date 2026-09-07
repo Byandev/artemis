@@ -59,8 +59,15 @@ class PageRoasTrackerController extends Controller
     /** The cut taken on what a page nets. */
     private const COMMISSION_RATE = 0.05;
 
-    /** The RTS a page is assumed to run at when last month can't say. */
+    /** The RTS a page is assumed to run at when its window can't say. */
     private const DEFAULT_RTS_RATE = 18.0;
+
+    /**
+     * How far back a day looks for the RTS it should expect. The window itself
+     * is blended and stored by `build-page-daily-performance` as rts_rate_30d;
+     * this is here so the two are named together when either changes.
+     */
+    private const RTS_WINDOW_DAYS = 30;
 
     /** What a day cell renders, read verbatim by PageRoasTally::stored(). */
     private const FIELDS = [
@@ -161,11 +168,7 @@ class PageRoasTrackerController extends Controller
 
         $base = $this->baseQuery($workspace, $user, $filters, $start, $end);
 
-        // The margin estimate discounts revenue by the RTS each page has been
-        // running at, measured over the month before the range in view.
-        $rtsRates = $this->assumedRtsRates($workspace, $start);
-
-        [$pages, $overall] = $this->build($base, $dates, $rtsRates);
+        [$pages, $overall] = $this->build($base, $dates);
 
         return Inertia::render('workspaces/sales-marketing/page-roas-tracker/index', [
             'workspace' => $workspace,
@@ -193,9 +196,9 @@ class PageRoasTrackerController extends Controller
      * @param  list<string>  $dates
      * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>|null}
      */
-    private function build(Builder $base, array $dates, array $rtsRates): array
+    private function build(Builder $base, array $dates): array
     {
-        $factor = $this->rtsFactor($rtsRates);
+        $factor = $this->rtsFactor();
 
         $records = (clone $base)
             ->selectRaw(implode(', ', [
@@ -206,6 +209,7 @@ class PageRoasTrackerController extends Controller
                     fn (string $e) => $e,
                     fn (string $sql, string $name) => "{$sql} AS {$name}",
                 ),
+                $this->rtsSelect($factor, fn (string $e) => $e).' AS est_rts',
             ]))
             ->get();
 
@@ -244,9 +248,9 @@ class PageRoasTrackerController extends Controller
             $pages[] = [
                 'page_id' => $pageId,
                 'name' => $names[$key] ?? ('Page '.$pageId),
-                // What the margin estimate assumed for this page, so the figure
-                // can be read rather than taken on faith.
-                'assumed_rts' => round($rtsRates[(int) $pageId] ?? self::DEFAULT_RTS_RATE, 2),
+                // The RTS the estimate actually applied across the range —
+                // sales-weighted over the days, since each of them used its own.
+                'assumed_rts' => $this->cell($totals)['est_rts'] ?? self::DEFAULT_RTS_RATE,
                 'days' => $days,
                 'total' => $this->cell($totals),
                 'average' => $this->cell($totals, 'avg_'),
@@ -323,6 +327,8 @@ class PageRoasTrackerController extends Controller
             'rts_rate' => $ratio('rts_rate'),
             // Spend as a percentage of budget: 100 is on plan.
             'budget_pace' => $ratio('budget_pace'),
+            // The RTS the margin estimate discounted this cell's revenue by.
+            'est_rts' => $ratio('est_rts'),
 
             // The estimated margin and its parts. All amounts, so the Average
             // row divides them like any other.
@@ -367,7 +373,12 @@ class PageRoasTrackerController extends Controller
         // it produced — which is what lets one definition serve all three rows.
         $sum = fn (string $e) => "SUM({$e})";
 
-        $total = [...$total, ...$this->estimateSelects($factor, $sum, fn ($sql, $n) => "{$sql} AS {$n}")];
+        $total = [
+            ...$total,
+            ...$this->estimateSelects($factor, $sum, fn ($sql, $n) => "{$sql} AS {$n}"),
+            // A ratio, so it is selected once and both summary rows read it.
+            $this->rtsSelect($factor, $sum).' AS est_rts',
+        ];
         $average = [...$average, ...$this->estimateSelects($factor, $sum, fn ($sql, $n) => "({$sql}) / {$dayCount} AS avg_{$n}")];
 
         return implode(', ', [...$total, ...$average]);
@@ -385,9 +396,10 @@ class PageRoasTrackerController extends Controller
      * every parcel — a parcel that comes back was still shipped — and running
      * costs are carried only by the orders that land.
      *
-     * $sum wraps the base-column expressions rather than the finished figures so
-     * that the one non-linear step, the commission, can put the summing inside
-     * itself. Everything else is linear, so where it goes makes no difference.
+     * Every figure here is linear in the stored columns, so it makes no
+     * difference whether $sum wraps the parts or the whole — which is what lets
+     * one definition serve the day cells, the Total row and the Average row, and
+     * what makes a Total the true sum of the days beneath it.
      *
      * @param  callable(string): string  $sum
      * @return array<string, string> name => SQL
@@ -416,14 +428,31 @@ class PageRoasTrackerController extends Controller
             'est_gross_profit' => $sum($gross),
             'est_opex_share' => $sum($opex),
             'est_net_profit' => $sum($net),
-            // The one figure that is not a running total of the days beneath it.
-            // Commission is settled on what a period nets, so the summing goes
-            // inside the floor: a losing Tuesday eats into Monday's earnings,
-            // and a range that nets a loss earns nothing rather than owing it
-            // back. Summing floored daily commissions would pay out on the good
-            // days and quietly ignore the bad ones.
-            'est_commission' => 'GREATEST('.$sum($net).', 0) * '.self::COMMISSION_RATE,
+            // A flat cut of the net, sign and all: a losing day shows what it
+            // costs rather than reading as nothing earned. Floored at zero it
+            // would have been the one figure that didn't add up from the days
+            // beneath a Total row; taken straight it is linear like the rest,
+            // so every grain agrees.
+            'est_commission' => '('.$sum($net).') * '.self::COMMISSION_RATE,
         ];
+    }
+
+    /**
+     * The RTS the estimate actually applied, as a percentage.
+     *
+     * Read back out of the arithmetic rather than reported from the window, so
+     * it is right at every grain: each day discounted by its own rate, so a
+     * Total row's figure is the sales-weighted blend of the days it covers and
+     * the All Pages group's is the blend across the pages. No single stored rate
+     * could say that.
+     *
+     * @param  callable(string): string  $sum
+     */
+    private function rtsSelect(string $factor, callable $sum): string
+    {
+        $sales = 'COALESCE(sales, 0)';
+
+        return '(1 - '.$sum("{$sales} * {$factor}").' / NULLIF('.$sum($sales).', 0)) * 100';
     }
 
     /**
@@ -445,68 +474,21 @@ class PageRoasTrackerController extends Controller
     }
 
     /**
-     * The share of revenue a page is assumed to actually collect, as SQL.
+     * The share of revenue a page-day is expected to actually collect, as SQL.
      *
-     * A CASE over page_id rather than one blended rate, because the All Pages
-     * roll-up has to be the sum of each page discounted by its own — there is no
-     * single rate that would give the same answer. Pages last month says nothing
-     * about fall through to the default.
+     * Reads `rts_rate_30d` — the page's RTS over the 30 days ending on that day,
+     * blended and stored by the builder. Rolling rather than one rate for the
+     * whole view: a range spanning months would otherwise be priced off a single
+     * stale month, and the rate would jump at a calendar boundary for no reason
+     * the page would recognise.
      *
-     * @param  array<int, float>  $rates  page id => RTS percentage
+     * A day whose window held no delivery activity falls back to the default
+     * rather than being called a 0% RTS day, and the floor keeps a broken
+     * measurement from handing the estimate negative revenue.
      */
-    private function rtsFactor(array $rates): string
+    private function rtsFactor(): string
     {
-        $default = $this->factorFor(self::DEFAULT_RTS_RATE);
-        $cases = '';
-
-        foreach ($rates as $pageId => $rate) {
-            $cases .= ' WHEN '.(int) $pageId.' THEN '.$this->factorFor($rate);
-        }
-
-        return $cases === '' ? "({$default})" : "(CASE page_id{$cases} ELSE {$default} END)";
-    }
-
-    /**
-     * One page's RTS percentage as the fraction of revenue left over.
-     *
-     * Clamped to 0–1: a rate outside 0–100% is a broken measurement, and letting
-     * it through would hand the estimate negative revenue.
-     */
-    private function factorFor(float $rate): string
-    {
-        return (string) round(max(0.0, min(1.0, 1 - ($rate / 100))), 6);
-    }
-
-    /**
-     * Each page's RTS over the calendar month before the range in view, as a
-     * percentage — the rate the margin estimate discounts its revenue by.
-     *
-     * Blended over the month (what went back over what moved) rather than
-     * averaged from the daily rates, for the same reason the Total row blends:
-     * a day with two parcels shouldn't weigh as much as one with two hundred.
-     *
-     * A page that moved nothing last month is absent, and falls back to the
-     * default rather than being called a 0% page.
-     *
-     * @return array<int, float>
-     */
-    private function assumedRtsRates(Workspace $workspace, string $start): array
-    {
-        $month = Carbon::parse($start)->subMonthNoOverflow();
-
-        return DB::table('page_daily_records')
-            ->where('workspace_id', $workspace->id)
-            ->where('page_type', Page::class)
-            ->whereBetween('date', [
-                $month->copy()->startOfMonth()->toDateString(),
-                $month->copy()->endOfMonth()->toDateString(),
-            ])
-            ->groupBy('page_id')
-            ->selectRaw('page_id, SUM(returning_amount) / NULLIF(SUM(returning_amount) + SUM(delivered_amount), 0) * 100 AS rts_rate')
-            ->get()
-            ->filter(fn ($row) => $row->rts_rate !== null)
-            ->mapWithKeys(fn ($row) => [(int) $row->page_id => (float) $row->rts_rate])
-            ->all();
+        return '(GREATEST(0, 1 - COALESCE(rts_rate_30d, '.self::DEFAULT_RTS_RATE.') / 100))';
     }
 
     /**

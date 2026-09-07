@@ -323,7 +323,7 @@ it('sends every metric so the column toggle needs no round trip', function () {
                 'orders', 'item_quantity', 'order_cogs',
                 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
                 'ad_cpp', 'cpp',
-                'ad_spend_budget', 'budget_variance', 'budget_pace',
+                'ad_spend_budget', 'budget_variance', 'budget_pace', 'est_rts',
                 'delivered_amount', 'returning_amount',
                 'roas', 'ad_roas', 'rts_rate',
                 'est_delivered_amount', 'est_cod_fee', 'est_cod_fee_vat',
@@ -371,9 +371,8 @@ it('estimates the margin from the default RTS when last month says nothing', fun
         ->and($day['est_commission'])->toBe(84.29);
 });
 
-it('settles the commission on what the range nets, not day by day', function () {
-    // A day up ₱1,000 and a day down ₱1,000 of net, near enough: same sales, but
-    // the second day's ad spend swallows it.
+it('shows the commission a losing day costs rather than hiding it at zero', function () {
+    // Same sales both days, but the second day's ad spend swallows the margin.
     record(['date' => '2026-08-01', 'orders' => 10, 'sales' => 10000, 'ad_spent' => 2000]);
     record(['date' => '2026-08-02', 'orders' => 10, 'sales' => 10000, 'ad_spent' => 9000]);
 
@@ -382,26 +381,25 @@ it('settles the commission on what the range nets, not day by day', function () 
     $first = $page['days']['2026-08-01'];
     $second = $page['days']['2026-08-02'];
 
-    // The losing day earns nothing rather than owing commission back.
     expect($second['est_net_profit'])->toBeLessThan(0)
-        ->and($second['est_commission'])->toBe(0.0);
+        ->and($second['est_commission'])->toBeLessThan(0)
+        ->and($second['est_commission'])->toBe(round($second['est_net_profit'] * 0.05, 2));
 
-    // The range nets the two together, so the Total row's commission is 5% of
-    // that — less than the winning day's own commission, and not its sum.
-    $rangeNet = $page['total']['est_net_profit'];
-
-    expect($rangeNet)->toBe(round($first['est_net_profit'] + $second['est_net_profit'], 2))
-        ->and($page['total']['est_commission'])->toBe(round(max($rangeNet, 0) * 0.05, 2))
-        ->and($page['total']['est_commission'])->toBeLessThan($first['est_commission']);
+    // Taken straight, it adds up: the Total is the two days together.
+    expect($page['total']['est_commission'])->toBe(
+        round($first['est_commission'] + $second['est_commission'], 2)
+    );
 });
 
-it('earns no commission on a range that nets a loss', function () {
+it('carries a negative commission on a range that nets a loss', function () {
     record(['date' => '2026-08-01', 'orders' => 5, 'sales' => 1000, 'ad_spent' => 9000]);
 
     $page = trackerPage('2026-08-01', '2026-08-01');
 
-    expect($page['total']['est_net_profit'])->toBeLessThan(0)
-        ->and($page['total']['est_commission'])->toBe(0.0);
+    $net = $page['total']['est_net_profit'];
+
+    expect($net)->toBeLessThan(0)
+        ->and($page['total']['est_commission'])->toBe(round($net * 0.05, 2));
 });
 
 it('takes opex off the gross to reach the net', function () {
@@ -414,26 +412,41 @@ it('takes opex off the gross to reach the net', function () {
     );
 });
 
-it('discounts revenue by the page own RTS from the month before', function () {
-    // August's history: ₱300 back against ₱700 delivered — a 30% RTS.
-    record(['date' => '2026-08-15', 'returning_amount' => 300, 'delivered_amount' => 700]);
-
-    // September, the month being looked at.
-    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000, 'order_cogs' => 0]);
+it('discounts revenue by the stored trailing RTS of the day', function () {
+    // The builder blends the 30 days behind each day into rts_rate_30d; the
+    // tracker's job is to price the day off it.
+    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 30]);
 
     $page = trackerPage('2026-09-01', '2026-09-01');
 
     expect($page['assumed_rts'])->toBe(30.0)
+        ->and($page['days']['2026-09-01']['est_rts'])->toBe(30.0)
         // 70% of ₱1,000, not the 82% the default would have given.
         ->and($page['days']['2026-09-01']['est_delivered_amount'])->toBe(700.0);
 });
 
-it('falls back to 18% for a page that moved nothing last month', function () {
+it('lets two days in one view be priced off their own stored rates', function () {
+    record(['date' => '2026-09-10', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 10]);
+    record(['date' => '2026-09-26', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 100]);
+
+    $page = trackerPage('2026-09-10', '2026-09-26');
+
+    expect($page['days']['2026-09-10']['est_rts'])->toBe(10.0)
+        ->and($page['days']['2026-09-26']['est_rts'])->toBe(100.0)
+        ->and($page['days']['2026-09-26']['est_delivered_amount'])->toBe(0.0);
+
+    // The range's rate is the sales-weighted blend of the days, not either one.
+    expect($page['total']['est_rts'])->toBe(55.0);
+});
+
+it('falls back to 18% for a day the builder could not rate', function () {
+    // No rts_rate_30d — the day's window held nothing that moved.
     record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000]);
 
     $page = trackerPage('2026-09-01', '2026-09-01');
 
     expect($page['assumed_rts'])->toBe(18.0)
+        ->and($page['days']['2026-09-01']['est_rts'])->toBe(18.0)
         ->and($page['days']['2026-09-01']['est_delivered_amount'])->toBe(820.0);
 });
 
@@ -453,7 +466,7 @@ it('sums the estimate over the range and halves it on the Average row', function
         );
 });
 
-it('rolls the estimate up across pages, each on its own RTS', function () {
+it('rolls the estimate up across pages, each on its own rate', function () {
     $second = Page::factory()->create(['workspace_id' => $this->workspace->id]);
 
     $row = fn (array $attrs) => PageDailyRecord::create(array_merge([
@@ -463,12 +476,9 @@ it('rolls the estimate up across pages, each on its own RTS', function () {
         'page_id' => $second->getKey(),
     ], $attrs));
 
-    // Last month: the first page ran 30% RTS, the second 10%.
-    record(['date' => '2026-08-15', 'returning_amount' => 300, 'delivered_amount' => 700]);
-    $row(['date' => '2026-08-15', 'returning_amount' => 100, 'delivered_amount' => 900]);
-
-    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000]);
-    $row(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000]);
+    // The first page is rated at 30% RTS, the second at 10%.
+    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 30]);
+    $row(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000, 'rts_rate_30d' => 10]);
 
     $response = test()->get(route(
         'workspaces.sales-marketing.page-roas-tracker',

@@ -43,6 +43,8 @@ interface Metrics {
 
     /* The estimated margin and the costs it takes off. Amounts, so they sum
        across pages and divide on the Average row like any other. */
+    /** The RTS the estimate discounted this cell's revenue by. */
+    est_rts: number | null;
     est_delivered_amount: number;
     est_cod_fee: number;
     est_cod_fee_vat: number;
@@ -51,8 +53,7 @@ interface Metrics {
     est_gross_profit: number;
     est_opex_share: number;
     est_net_profit: number;
-    /** 5% of what the row nets. Settled per period, so it does not add up from
-        the days beneath a Total row. */
+    /** 5% of what the row nets, sign and all — a losing row owes a cut back. */
     est_commission: number;
 }
 
@@ -61,7 +62,7 @@ type MetricKey = keyof Metrics;
 interface PageSeries {
     page_id: number | string;
     name: string;
-    /** The RTS % the margin estimate discounted this page's revenue by. */
+    /** The RTS the estimate applied across the range, sales-weighted. */
     assumed_rts: number;
     days: Record<string, Metrics>;
     total: Metrics;
@@ -316,6 +317,15 @@ const COLUMNS: MetricColumn[] = [
     },
 
     {
+        id: 'est_rts',
+        label: 'Est. RTS applied (trailing 30d)',
+        head: 'Est. RTS',
+        group: 'Estimated margin',
+        format: 'percent',
+        tone: rtsTone,
+        defaultVisible: false,
+    },
+    {
         id: 'est_delivered_amount',
         label: 'Est. Delivered (sales less RTS)',
         head: 'Est. Del.',
@@ -384,7 +394,10 @@ const COLUMNS: MetricColumn[] = [
         label: 'Est. Commission (5% of net)',
         head: 'Comm.',
         group: 'Estimated margin',
-        format: 'peso',
+        // Signed, because a losing row owes a negative cut rather than nothing —
+        // and toned off the net it tracks, whose sign it always shares.
+        format: 'signed',
+        tone: (_, m) => marginTone(m?.est_net_profit ?? null, m),
         defaultVisible: false,
     },
 
@@ -532,8 +545,9 @@ export default function PageRoasTrackerIndex({
                             stated. The RTS is per page — hover a page header for
                             the one it used. */}
                         <p className="mt-1 font-mono text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
-                            Est. margin: sales less RTS, COD 2.75% + 12% VAT,
-                            COGS less RTS, {PESO}67 a parcel, less ad spend
+                            Est. margin: sales less each day&rsquo;s
+                            trailing-30d RTS, COD 2.75% + 12% VAT, COGS less
+                            RTS, {PESO}67 a parcel, less ad spend
                             <span className="mx-2 text-gray-300 dark:text-gray-600">
                                 /
                             </span>
@@ -541,7 +555,7 @@ export default function PageRoasTrackerIndex({
                             <span className="mx-2 text-gray-300 dark:text-gray-600">
                                 /
                             </span>
-                            commission: 5% of net, per period
+                            commission: 5% of net
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -622,7 +636,7 @@ export default function PageRoasTrackerIndex({
                                                     groupStart,
                                                     'sticky top-0 z-30 max-w-[22rem] truncate bg-stone-100 text-left text-[12px] font-semibold text-gray-800 dark:bg-zinc-800 dark:text-gray-100',
                                                 )}
-                                                title={`${page.name} — margin estimated at ${page.assumed_rts.toFixed(1)}% RTS (last month)`}
+                                                title={`${page.name} — margin estimated at ${page.assumed_rts.toFixed(1)}% RTS across this range (each day uses its own trailing 30 days)`}
                                             >
                                                 <span className="flex items-center gap-2">
                                                     <span className="h-3 w-[3px] shrink-0 rounded-full bg-brand-500" />
