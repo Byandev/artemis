@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use App\Models\PageDailyRecord;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
@@ -17,6 +18,8 @@ use Modules\Pancake\Models\Order;
  *                 attributed via ad set → meta_page_id → page.
  *   - Pancake POS: orders + delivered/returned/returning (count + amount), via
  *                 page_id.
+ *   - Budget:     the page's planned daily ad spend, so a day carries what it
+ *                 was measured against alongside what it actually spent.
  *
  * Only non-Gencys-partner workspaces (they default to the Artemis source).
  * Writes to the unified page_daily_records table (source=artemis, page=Page).
@@ -94,6 +97,22 @@ class BuildDailyPagePerformanceCommand extends Command
         $ad_purchases = (int) ($ads->purchases_sum ?? 0);
         $ad_sales = (float) ($ads->purchase_value_sum ?? 0);
 
+        // What the page was budgeted for that day: its latest budget recorded on
+        // or before $date, since a budget carries forward until it's changed.
+        // Snapshotted here rather than joined at read time so a budget edited
+        // next week doesn't rewrite what last week was judged against.
+        //
+        // Null when the page has no budget on record yet — a page nobody has
+        // budgeted is not a page budgeted at zero, and can be neither under nor
+        // over it.
+        $ad_spend_budget = PageDailyBudgetRecord::where('workspace_id', $workspace->id)
+            ->where('page_id', $pageId)
+            ->where('date', '<=', $date)
+            ->orderByDesc('date')
+            ->value('budget');
+
+        $ad_spend_budget = $ad_spend_budget === null ? null : (float) $ad_spend_budget;
+
         $roas = $ad_spent > 0 ? $sales / $ad_spent : 0;
         $ad_roas = $ad_spent > 0 ? $ad_sales / $ad_spent : 0;
 
@@ -150,6 +169,7 @@ class BuildDailyPagePerformanceCommand extends Command
                 'returning_amount' => $returning_amount,
                 'rts_rate' => $rts_rate,
                 'ad_spent' => $ad_spent,
+                'ad_spend_budget' => $ad_spend_budget,
                 'ad_sales' => $ad_sales,
                 'ad_purchases' => $ad_purchases,
                 'roas' => $roas,

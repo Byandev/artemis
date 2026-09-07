@@ -21,6 +21,12 @@ interface Metrics {
     orders: number;
     sales: number;
     ad_spent: number;
+    /** Planned daily spend. Null when the page has no budget on record. */
+    ad_spend_budget: number | null;
+    /** Spend minus budget: positive is overspend, negative is underspend. */
+    budget_variance: number | null;
+    /** Spend as a percentage of budget — 100 is exactly on plan. */
+    budget_pace: number | null;
     ad_sales: number;
     ad_purchases: number;
     delivered_amount: number;
@@ -86,6 +92,12 @@ const format: Record<string, (n: number | null) => string> = {
     int: (n) => (n === null ? EMPTY : n.toLocaleString()),
     amount: (n) => (n === null ? EMPTY : whole(n)),
     peso: (n) => (n === null ? EMPTY : PESO + whole(n)),
+    // A gap against plan reads as a direction first: the sign says over or under
+    // before the eye gets to the digits.
+    signed: (n) =>
+        n === null
+            ? EMPTY
+            : (n > 0 ? '+' : n < 0 ? '\u2212' : '') + PESO + whole(Math.abs(n)),
     ratio: (n) => (n === null ? EMPTY : n.toFixed(2)),
     percent: (n) => (n === null ? EMPTY : `${n.toFixed(1)}%`),
 };
@@ -114,6 +126,28 @@ const roasTone = (n: number | null): Tone =>
 const rtsTone = (n: number | null): Tone =>
     n === null ? 'muted' : n <= 25 ? 'good' : n <= 35 ? 'warn' : 'bad';
 
+/**
+ * Budget pace, as a percentage of plan. Off-plan in either direction is what
+ * matters: a page 40% under budget has left the plan as far behind as one 40%
+ * over it, and both want explaining. Within 10% is on plan, within 25% drifting.
+ */
+const paceTone = (n: number | null): Tone =>
+    n === null
+        ? 'muted'
+        : Math.abs(n - 100) <= 10
+          ? 'good'
+          : Math.abs(n - 100) <= 25
+            ? 'warn'
+            : 'bad';
+
+/**
+ * The variance says the same thing in pesos, so it takes the same tone — but
+ * only the pace knows how far off the plan ₱2,000 actually is, so it reads that
+ * off the row rather than off its own figure.
+ */
+const varianceTone = (_: number | null, m: Metrics): Tone =>
+    paceTone(m?.budget_pace ?? null);
+
 /* ── Columns ─────────────────────────────────────────────────────────────── */
 
 interface MetricColumn extends ColumnOption {
@@ -121,13 +155,18 @@ interface MetricColumn extends ColumnOption {
     /** Header text — shorter than the label the dropdown uses. */
     head: string;
     format: keyof typeof format;
-    tone?: (n: number | null) => Tone;
+    /** Gets the whole row too, for a figure judged against a sibling metric. */
+    tone?: (n: number | null, m: Metrics) => Tone;
 }
 
 /**
- * The four the tracker has always shown stay on by default; everything the
- * daily builder gained later is opt-in, so the table does not get wider for
- * people who never asked for it.
+ * The core four the tracker has always shown stay on, joined by the budget and
+ * the gap against it — spend is only readable next to what it was meant to be.
+ * Everything else the daily builder gained is opt-in, so the table does not get
+ * wider for people who never asked for it.
+ *
+ * Declaration order is column order, so the budget pair sits between Ad Spent
+ * and ROAS rather than trailing the group it belongs to.
  */
 const COLUMNS: MetricColumn[] = [
     {
@@ -150,6 +189,30 @@ const COLUMNS: MetricColumn[] = [
         head: 'Ad Spent',
         group: 'Core',
         format: 'peso',
+    },
+    {
+        id: 'ad_spend_budget',
+        label: 'Ad Spend Budget',
+        head: 'Budget',
+        group: 'Budget',
+        format: 'peso',
+    },
+    {
+        id: 'budget_variance',
+        label: 'Variance (spend \u2212 budget)',
+        head: 'Var',
+        group: 'Budget',
+        format: 'signed',
+        tone: varianceTone,
+    },
+    {
+        id: 'budget_pace',
+        label: 'Pace (spend \u00f7 budget)',
+        head: 'Pace',
+        group: 'Budget',
+        format: 'percent',
+        tone: paceTone,
+        defaultVisible: false,
     },
     {
         id: 'roas',
@@ -251,12 +314,12 @@ function readCell(m: Metrics, col: MetricColumn) {
         title:
             raw === null
                 ? undefined
-                : col.format === 'peso'
+                : col.format === 'peso' || col.format === 'signed'
                   ? PESO + exact(raw)
                   : col.format === 'amount'
                     ? exact(raw)
                     : undefined,
-        tone: col.tone?.(raw),
+        tone: col.tone?.(raw, m),
         // A zero carries no signal in a grid this dense — keep it, but let the
         // eye slide over it so the real figures are what stand out.
         blank: raw === null || raw === 0,

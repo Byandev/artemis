@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Page;
+use App\Models\PageDailyBudgetRecord;
 use App\Models\PageDailyRecord;
 use App\Models\Shop;
 use App\Models\Workspace;
@@ -87,4 +88,55 @@ test('re-running a date updates the row rather than stacking duplicates', functi
 
     expect(PageDailyRecord::where('page_id', $page->id)->count())->toBe(1)
         ->and((float) PageDailyRecord::where('page_id', $page->id)->value('sales'))->toBe(500.0);
+});
+
+test('it snapshots the budget the page was on that day', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+
+    // A budget set once, then raised a week later. A budget carries forward
+    // until it is changed, so the day in between is measured against the first.
+    PageDailyBudgetRecord::create([
+        'workspace_id' => $workspace->id,
+        'page_id' => $page->id,
+        'date' => '2026-03-01',
+        'budget' => 1000,
+    ]);
+    PageDailyBudgetRecord::create([
+        'workspace_id' => $workspace->id,
+        'page_id' => $page->id,
+        'date' => '2026-03-08',
+        'budget' => 2500,
+    ]);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-05'])->assertSuccessful();
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $budgetOn = fn (string $date) => PageDailyRecord::where('page_id', $page->id)
+        ->where('date', $date)
+        ->value('ad_spend_budget');
+
+    expect((float) $budgetOn('2026-03-05'))->toBe(1000.0)
+        ->and((float) $budgetOn('2026-03-10'))->toBe(2500.0);
+});
+
+test('it leaves the budget null for a day before the page had one', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+    buildPagePerfOrder($workspace, $page, '2026-03-10', 900);
+
+    PageDailyBudgetRecord::create([
+        'workspace_id' => $workspace->id,
+        'page_id' => $page->id,
+        'date' => '2026-03-20',
+        'budget' => 1000,
+    ]);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    // Nothing was planned yet, so the day has nothing to be under or over —
+    // which is not the same as having been planned at zero.
+    expect(PageDailyRecord::where('page_id', $page->id)->value('ad_spend_budget'))->toBeNull();
 });

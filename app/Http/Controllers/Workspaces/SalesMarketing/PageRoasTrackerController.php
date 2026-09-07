@@ -23,12 +23,13 @@ use Inertia\Response;
  * dates down the side, one metric column group per page, then an All Pages
  * group, each with Total and Average rows.
  *
- * Day cells are stored rows read verbatim; only the summary rows and the All
+ * Day cells are stored rows read verbatim — bar the budget comparison, which is
+ * arithmetic on two of the row's own columns; only the summary rows and the All
  * Pages group combine anything, and all of that lives in PageRoasTally.
  *
  * Every metric is always sent; which of them are shown is a client-side column
- * toggle (Orders/Sales/Ad Spend/ROAS by default), so switching a column on is
- * instant rather than a round trip.
+ * toggle (Orders/Sales/Ad Spend/Budget/Var/ROAS by default), so switching a
+ * column on is instant rather than a round trip.
  */
 class PageRoasTrackerController extends Controller
 {
@@ -37,9 +38,25 @@ class PageRoasTrackerController extends Controller
     /** What a day cell renders, read verbatim by PageRoasTally::stored(). */
     private const FIELDS = [
         'page_type', 'page_id', 'date',
-        'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
+        'orders', 'sales', 'ad_spent', 'ad_spend_budget', 'ad_sales', 'ad_purchases',
         'delivered_amount', 'returning_amount',
         'roas', 'ad_roas', 'ad_cpp', 'cpp', 'rts_rate',
+    ];
+
+    /**
+     * The budget comparison, per day — the one thing the day grain derives.
+     *
+     * It is arithmetic on two columns of the same row rather than a figure of
+     * its own, so it is worked out here instead of stored: a spend and a budget
+     * that disagree with their own variance is a drift the table cannot have.
+     *
+     * A null budget stays null all the way through (NULL - x and x / NULL are
+     * both NULL), so a page nobody budgeted reads as "no variance", not as a
+     * page that overspent its entire spend.
+     */
+    private const DAY_DERIVED = [
+        'ad_spent - ad_spend_budget AS budget_variance',
+        'ad_spent / NULLIF(ad_spend_budget, 0) * 100 AS budget_pace',
     ];
 
     /**
@@ -62,6 +79,7 @@ class PageRoasTrackerController extends Controller
         'SUM(orders) AS orders',
         'SUM(sales) AS sales',
         'SUM(ad_spent) AS ad_spent',
+        'SUM(ad_spend_budget) AS ad_spend_budget',
         'SUM(ad_sales) AS ad_sales',
         'SUM(ad_purchases) AS ad_purchases',
         'SUM(delivered_amount) AS delivered_amount',
@@ -71,12 +89,26 @@ class PageRoasTrackerController extends Controller
         'SUM(ad_spent) / NULLIF(SUM(ad_purchases), 0) AS ad_cpp',
         'SUM(ad_spent) / NULLIF(SUM(orders), 0) AS cpp',
         'SUM(returning_amount) / NULLIF(SUM(returning_amount) + SUM(delivered_amount), 0) * 100 AS rts_rate',
+        // Spent against budgeted, over the whole range — the pace is a ratio
+        // like the rest, so it blends rather than averaging the daily ones.
+        'SUM(ad_spent) / NULLIF(SUM(ad_spend_budget), 0) * 100 AS budget_pace',
     ];
 
     /** The amounts, which the Average row divides. Ratios never divide. */
     private const AMOUNTS = [
-        'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
+        'orders', 'sales', 'ad_spent', 'ad_spend_budget', 'ad_sales', 'ad_purchases',
         'delivered_amount', 'returning_amount',
+    ];
+
+    /**
+     * Amounts that are a difference between sums rather than a column of their
+     * own, keyed by the SQL that produces them.
+     *
+     * Pesos, not a ratio, so the Average row divides them like any other amount
+     * — a month ₱30,000 over budget is ₱1,000 over per day.
+     */
+    private const DERIVED_AMOUNTS = [
+        'budget_variance' => 'SUM(ad_spent) - SUM(ad_spend_budget)',
     ];
 
     public function index(Request $request, Workspace $workspace): Response
@@ -128,7 +160,9 @@ class PageRoasTrackerController extends Controller
      */
     private function build(Builder $base, array $dates): array
     {
-        $records = (clone $base)->select(self::FIELDS)->get();
+        $records = (clone $base)
+            ->selectRaw(implode(', ', [...self::FIELDS, ...self::DAY_DERIVED]))
+            ->get();
 
         $names = $this->resolvePageNames($records);
         $dayCount = max(count($dates), 1);
@@ -205,6 +239,13 @@ class PageRoasTrackerController extends Controller
     {
         $amount = fn (string $field) => round((float) ($row->{$prefix.$field} ?? 0), 2);
 
+        // An amount that means nothing when it was never recorded. A page with
+        // no budget on file is not a page budgeted at zero, so it stays blank
+        // rather than reading as "₱0 planned, every peso an overspend".
+        $optional = fn (string $field) => ($row->{$prefix.$field} ?? null) === null
+            ? null
+            : round((float) $row->{$prefix.$field}, 2);
+
         // A ratio with no denominator stays null — "no cost per purchase" is not
         // the same figure as "a cost of zero".
         $ratio = fn (string $field) => ($row->{$field} ?? null) === null
@@ -215,6 +256,9 @@ class PageRoasTrackerController extends Controller
             'orders' => (int) round((float) ($row->{$prefix.'orders'} ?? 0)),
             'sales' => $amount('sales'),
             'ad_spent' => $amount('ad_spent'),
+            'ad_spend_budget' => $optional('ad_spend_budget'),
+            // Spend minus budget: positive is over, negative is under.
+            'budget_variance' => $optional('budget_variance'),
             'ad_sales' => $amount('ad_sales'),
             // A count, like orders — Meta's purchases, the denominator of ad_cpp.
             'ad_purchases' => (int) round((float) ($row->{$prefix.'ad_purchases'} ?? 0)),
@@ -225,6 +269,8 @@ class PageRoasTrackerController extends Controller
             'ad_cpp' => $ratio('ad_cpp'),
             'cpp' => $ratio('cpp'),
             'rts_rate' => $ratio('rts_rate'),
+            // Spend as a percentage of budget: 100 is on plan.
+            'budget_pace' => $ratio('budget_pace'),
         ];
     }
 
@@ -238,12 +284,21 @@ class PageRoasTrackerController extends Controller
      */
     private function aggregates(int $dayCount): string
     {
+        $total = self::AGGREGATES;
+
         $average = array_map(
             fn (string $field) => "SUM({$field}) / {$dayCount} AS avg_{$field}",
             self::AMOUNTS,
         );
 
-        return implode(', ', [...self::AGGREGATES, ...$average]);
+        // A derived amount has no column to SUM, so both rows are spelled out
+        // from the one expression rather than repeating it.
+        foreach (self::DERIVED_AMOUNTS as $field => $expression) {
+            $total[] = "{$expression} AS {$field}";
+            $average[] = "({$expression}) / {$dayCount} AS avg_{$field}";
+        }
+
+        return implode(', ', [...$total, ...$average]);
     }
 
     /**

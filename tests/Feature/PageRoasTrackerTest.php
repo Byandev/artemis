@@ -31,7 +31,7 @@ function record(array $attrs): void
 function trackerPage(string $start, string $end): array
 {
     $response = test()->get(route(
-        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        'workspaces.sales-marketing.page-roas-tracker',
         [test()->workspace, 'start' => $start, 'end' => $end],
     ));
 
@@ -200,7 +200,7 @@ it('rolls every visible page into one all-pages group', function () {
         'returning_amount' => 500, 'delivered_amount' => 500]);
 
     $response = test()->get(route(
-        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        'workspaces.sales-marketing.page-roas-tracker',
         [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
     ));
 
@@ -225,27 +225,104 @@ it('rolls every visible page into one all-pages group', function () {
 
 it('sends no all-pages group when nothing is in view', function () {
     $response = test()->get(route(
-        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        'workspaces.sales-marketing.page-roas-tracker',
         [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
     ));
 
     expect($response->viewData('page')['props']['overall'])->toBeNull();
 });
 
+it('reads the budget gap off the day it was measured against', function () {
+    // Under on the first day, over on the second.
+    record(['date' => '2026-08-01', 'ad_spent' => 800, 'ad_spend_budget' => 1000]);
+    record(['date' => '2026-08-02', 'ad_spent' => 1400, 'ad_spend_budget' => 1000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    expect($page['days']['2026-08-01']['ad_spend_budget'])->toBe(1000.0)
+        ->and($page['days']['2026-08-01']['budget_variance'])->toBe(-200.0)
+        ->and($page['days']['2026-08-01']['budget_pace'])->toBe(80.0);
+
+    expect($page['days']['2026-08-02']['budget_variance'])->toBe(400.0)
+        ->and($page['days']['2026-08-02']['budget_pace'])->toBe(140.0);
+});
+
+it('sums the budget over the range and compares it against the summed spend', function () {
+    record(['date' => '2026-08-01', 'ad_spent' => 800, 'ad_spend_budget' => 1000]);
+    record(['date' => '2026-08-02', 'ad_spent' => 1400, 'ad_spend_budget' => 1000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    // ₱2,200 spent against ₱2,000 planned — ₱200 over, at 110% of plan. The two
+    // days pull opposite ways, so a mean of the daily paces (110%) only agrees
+    // here by coincidence; the ₱200 is what the range actually says.
+    expect($page['total']['ad_spend_budget'])->toBe(2000.0)
+        ->and($page['total']['budget_variance'])->toBe(200.0)
+        ->and($page['total']['budget_pace'])->toBe(110.0);
+
+    // The variance is an amount, so the Average row divides it; the pace is a
+    // ratio, so it stays the range's.
+    expect($page['average']['ad_spend_budget'])->toBe(1000.0)
+        ->and($page['average']['budget_variance'])->toBe(100.0)
+        ->and($page['average']['budget_pace'])->toBe(110.0);
+});
+
+it('leaves a page with no budget on record blank rather than calling it overspent', function () {
+    // Spend, but nobody ever budgeted the page.
+    record(['date' => '2026-08-01', 'ad_spent' => 500]);
+
+    $page = trackerPage('2026-08-01', '2026-08-01');
+
+    expect($page['days']['2026-08-01']['ad_spend_budget'])->toBeNull()
+        ->and($page['days']['2026-08-01']['budget_variance'])->toBeNull()
+        ->and($page['days']['2026-08-01']['budget_pace'])->toBeNull()
+        ->and($page['total']['budget_variance'])->toBeNull()
+        ->and($page['total']['budget_pace'])->toBeNull();
+});
+
+it('blends the budget across pages in the all-pages group', function () {
+    $second = Page::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    record(['date' => '2026-08-01', 'ad_spent' => 800, 'ad_spend_budget' => 1000]);
+
+    PageDailyRecord::create([
+        'workspace_id' => $this->workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => $second->getMorphClass(),
+        'page_id' => $second->getKey(),
+        'date' => '2026-08-01',
+        'ad_spent' => 1400,
+        'ad_spend_budget' => 1000,
+    ]);
+
+    $response = test()->get(route(
+        'workspaces.sales-marketing.page-roas-tracker',
+        [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
+    ));
+
+    $overall = $response->viewData('page')['props']['overall'];
+
+    // One page under, one over — the group is ₱200 over ₱2,000 planned.
+    expect($overall['days']['2026-08-01']['ad_spend_budget'])->toBe(2000.0)
+        ->and($overall['days']['2026-08-01']['budget_variance'])->toBe(200.0)
+        ->and($overall['days']['2026-08-01']['budget_pace'])->toBe(110.0);
+});
+
 it('sends every metric so the column toggle needs no round trip', function () {
     record(['date' => '2026-08-01', 'orders' => 1, 'sales' => 10, 'ad_spent' => 5]);
 
     $response = $this->get(route(
-        'workspaces.sales-marketing.dashboard.page-roas-tracker',
+        'workspaces.sales-marketing.page-roas-tracker',
         [$this->workspace, 'start' => '2026-08-01', 'end' => '2026-08-01'],
     ));
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->component('workspaces/page-roas-tracker/index')
+        ->component('workspaces/sales-marketing/page-roas-tracker/index')
         ->has('pages.0.days.2026-08-01', fn (Assert $day) => $day
             ->hasAll([
                 'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
                 'ad_cpp', 'cpp',
+                'ad_spend_budget', 'budget_variance', 'budget_pace',
                 'delivered_amount', 'returning_amount',
                 'roas', 'ad_roas', 'rts_rate',
             ])

@@ -33,6 +33,9 @@ class PageDailyRecord extends Model
         'returning_amount' => 'decimal:2',
         'rts_rate' => 'decimal:2',
         'ad_spent' => 'decimal:2',
+        // The planned daily spend for the page, snapshotted from
+        // page_daily_budget_records — null when the page had none on record.
+        'ad_spend_budget' => 'decimal:2',
         'ad_sales' => 'decimal:2',
         'ad_purchases' => 'integer',
         'roas' => 'decimal:2',
