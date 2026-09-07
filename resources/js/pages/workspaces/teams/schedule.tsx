@@ -287,7 +287,18 @@ export default function TeamSchedule({
             if (bypassGuard.current) return;
 
             const visit = event.detail.visit;
-            if (visit.method !== 'get') return;
+
+            // Only real page navigations count — let form submits, link
+            // prefetches, background reloads and partial refreshes through.
+            if (
+                visit.method !== 'get' ||
+                visit.prefetch ||
+                visit.async ||
+                visit.only.length > 0 ||
+                visit.except.length > 0 ||
+                visit.url.href === window.location.href
+            )
+                return;
 
             const { url, data, replace, preserveScroll, preserveState } = visit;
             setPendingNav(() => () => {
