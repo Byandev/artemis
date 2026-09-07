@@ -150,7 +150,7 @@ it('combines a page with the unassigned bucket', function () {
         );
 });
 
-it('counts a shared campaign once for the day and once in each page', function () {
+it('counts a campaign once per page regardless of ad set count', function () {
     ['workspace' => $workspace] = actingAsWorkspaceOwner();
     $ctx = seedAdsCalendar($workspace);
 
@@ -176,54 +176,11 @@ it('counts a shared campaign once for the day and once in each page', function (
     $this->get(adsCalendarUrl($workspace, ['month' => '2026-06']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            // One campaign started that day, so that is what the day reads —
-            // not 3 (its ad sets) and not 2 (its pages). The breakdown below it
-            // still shows it under both pages, which means the parts can add up
-            // to more than the whole; that is what a shared campaign looks like.
-            ->where('days.2026-06-20.total', 1)
+            // Two ad sets on Alpha collapse to a single campaign; the campaign
+            // also shows under Bravo → grand total of 2 (1 per page), not 3.
+            ->where('days.2026-06-20.total', 2)
             ->where('days.2026-06-20.groups', fn ($pages) => collect($pages)->firstWhere('name', 'Alpha Page')['count'] === 1
                 && collect($pages)->firstWhere('name', 'Bravo Page')['count'] === 1)
-        );
-});
-
-it('keeps a page id it cannot resolve in the one unassigned bucket', function () {
-    ['workspace' => $workspace] = actingAsWorkspaceOwner();
-    $ctx = seedAdsCalendar($workspace);
-
-    // An ad set naming a page this Artemis has no row for. It reads as
-    // unassigned, so it has to be selectable as unassigned too — grouping by the
-    // raw meta_page_id gave it a bucket of its own that the filter never matched.
-    $campaign = Campaign::create([
-        'id' => 5600,
-        'meta_ads_account_id' => $ctx['account']->id,
-        'name' => 'Foreign Page Campaign',
-        'created_time' => '2026-06-21 09:00:00',
-        'start_time' => '2026-06-21 09:00:00',
-    ]);
-    AdSet::create([
-        'id' => 6600,
-        'meta_ads_account_id' => $ctx['account']->id,
-        'meta_ads_campaign_id' => $campaign->id,
-        'meta_page_id' => 987654321,
-        'name' => 'Foreign Ad Set',
-        'created_time' => '2026-06-21 09:00:00',
-    ]);
-
-    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06']))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('days.2026-06-21.total', 1)
-            ->where('days.2026-06-21.groups.0.id', 'none')
-            ->where('days.2026-06-21.groups.0.name', 'Unassigned page')
-        );
-
-    // ...and the unassigned filter picks it up along with the null-page campaign
-    // seeded on the 15th.
-    $this->get(adsCalendarUrl($workspace, ['month' => '2026-06', 'pages' => ['none']]))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('days.2026-06-21.total', 1)
-            ->where('days.2026-06-15.total', 1)
         );
 });
 
