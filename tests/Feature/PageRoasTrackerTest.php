@@ -328,6 +328,7 @@ it('sends every metric so the column toggle needs no round trip', function () {
                 'roas', 'ad_roas', 'rts_rate',
                 'est_delivered_amount', 'est_cod_fee', 'est_cod_fee_vat',
                 'est_cogs', 'est_shipping_fee', 'est_gross_profit',
+                'est_opex_share', 'est_net_profit', 'est_commission',
             ])
         )
     );
@@ -362,6 +363,55 @@ it('estimates the margin from the default RTS when last month says nothing', fun
 
     // 8200 - 2000 ad spend - 225.50 - 27.06 - 3280 - 670.
     expect($day['est_gross_profit'])->toBe(1997.44);
+
+    // Opex rides on the orders that land: 10 x 82% x ₱38.
+    expect($day['est_opex_share'])->toBe(311.6)
+        ->and($day['est_net_profit'])->toBe(1685.84)
+        // 5% of what is left.
+        ->and($day['est_commission'])->toBe(84.29);
+});
+
+it('settles the commission on what the range nets, not day by day', function () {
+    // A day up ₱1,000 and a day down ₱1,000 of net, near enough: same sales, but
+    // the second day's ad spend swallows it.
+    record(['date' => '2026-08-01', 'orders' => 10, 'sales' => 10000, 'ad_spent' => 2000]);
+    record(['date' => '2026-08-02', 'orders' => 10, 'sales' => 10000, 'ad_spent' => 9000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    $first = $page['days']['2026-08-01'];
+    $second = $page['days']['2026-08-02'];
+
+    // The losing day earns nothing rather than owing commission back.
+    expect($second['est_net_profit'])->toBeLessThan(0)
+        ->and($second['est_commission'])->toBe(0.0);
+
+    // The range nets the two together, so the Total row's commission is 5% of
+    // that — less than the winning day's own commission, and not its sum.
+    $rangeNet = $page['total']['est_net_profit'];
+
+    expect($rangeNet)->toBe(round($first['est_net_profit'] + $second['est_net_profit'], 2))
+        ->and($page['total']['est_commission'])->toBe(round(max($rangeNet, 0) * 0.05, 2))
+        ->and($page['total']['est_commission'])->toBeLessThan($first['est_commission']);
+});
+
+it('earns no commission on a range that nets a loss', function () {
+    record(['date' => '2026-08-01', 'orders' => 5, 'sales' => 1000, 'ad_spent' => 9000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-01');
+
+    expect($page['total']['est_net_profit'])->toBeLessThan(0)
+        ->and($page['total']['est_commission'])->toBe(0.0);
+});
+
+it('takes opex off the gross to reach the net', function () {
+    record(['date' => '2026-08-01', 'orders' => 20, 'sales' => 20000, 'ad_spent' => 1000]);
+
+    $day = trackerPage('2026-08-01', '2026-08-01')['days']['2026-08-01'];
+
+    expect($day['est_net_profit'])->toBe(
+        round($day['est_gross_profit'] - $day['est_opex_share'], 2)
+    );
 });
 
 it('discounts revenue by the page own RTS from the month before', function () {

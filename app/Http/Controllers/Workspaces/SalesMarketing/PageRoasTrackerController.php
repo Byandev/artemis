@@ -53,6 +53,12 @@ class PageRoasTrackerController extends Controller
     /** Freight per parcel. A flat figure — the tracker has no per-order fee. */
     private const SHIPPING_FEE = 67;
 
+    /** Running costs carried by each order that actually lands. */
+    private const OPEX_PER_DELIVERED_ORDER = 38;
+
+    /** The cut taken on what a page nets. */
+    private const COMMISSION_RATE = 0.05;
+
     /** The RTS a page is assumed to run at when last month can't say. */
     private const DEFAULT_RTS_RATE = 18.0;
 
@@ -195,7 +201,11 @@ class PageRoasTrackerController extends Controller
             ->selectRaw(implode(', ', [
                 ...self::FIELDS,
                 ...self::DAY_DERIVED,
-                ...$this->estimateSelects($factor, fn (string $e, string $name) => "{$e} AS {$name}"),
+                ...$this->estimateSelects(
+                    $factor,
+                    fn (string $e) => $e,
+                    fn (string $sql, string $name) => "{$sql} AS {$name}",
+                ),
             ]))
             ->get();
 
@@ -322,6 +332,9 @@ class PageRoasTrackerController extends Controller
             'est_cogs' => $amount('est_cogs'),
             'est_shipping_fee' => $amount('est_shipping_fee'),
             'est_gross_profit' => $amount('est_gross_profit'),
+            'est_opex_share' => $amount('est_opex_share'),
+            'est_net_profit' => $amount('est_net_profit'),
+            'est_commission' => $amount('est_commission'),
         ];
     }
 
@@ -352,27 +365,34 @@ class PageRoasTrackerController extends Controller
         // Every estimate is linear in the stored columns, so summing the
         // expression over the range gives the same answer as adding up the days
         // it produced — which is what lets one definition serve all three rows.
-        $total = [...$total, ...$this->estimateSelects($factor, fn ($e, $n) => "SUM({$e}) AS {$n}")];
-        $average = [...$average, ...$this->estimateSelects($factor, fn ($e, $n) => "SUM({$e}) / {$dayCount} AS avg_{$n}")];
+        $sum = fn (string $e) => "SUM({$e})";
+
+        $total = [...$total, ...$this->estimateSelects($factor, $sum, fn ($sql, $n) => "{$sql} AS {$n}")];
+        $average = [...$average, ...$this->estimateSelects($factor, $sum, fn ($sql, $n) => "({$sql}) / {$dayCount} AS avg_{$n}")];
 
         return implode(', ', [...$total, ...$average]);
     }
 
     /**
-     * The estimated margin and the costs it takes off, as SQL over the stored
-     * columns — one definition, wrapped by $shape into whichever grain is being
-     * selected.
+     * The estimated margin and every cost it takes off, as SQL over the stored
+     * columns at whichever grain $sum implies — identity for a day cell, SUM()
+     * for a summary row.
      *
      * The chain is the pancake income statement's, worked page-day by page-day:
      * revenue is discounted by the page's RTS (what actually gets collected),
      * the courier's COD fee and its VAT come off that, cost of goods is
-     * discounted the same way (returned stock comes back), and freight is
-     * charged on every parcel — a parcel that comes back was still shipped.
+     * discounted the same way (returned stock comes back), freight is charged on
+     * every parcel — a parcel that comes back was still shipped — and running
+     * costs are carried only by the orders that land.
      *
-     * @param  callable(string, string): string  $shape  (expression, name) => select
-     * @return list<string>
+     * $sum wraps the base-column expressions rather than the finished figures so
+     * that the one non-linear step, the commission, can put the summing inside
+     * itself. Everything else is linear, so where it goes makes no difference.
+     *
+     * @param  callable(string): string  $sum
+     * @return array<string, string> name => SQL
      */
-    private function estimateSelects(string $factor, callable $shape): array
+    private function estimates(string $factor, callable $sum): array
     {
         $delivered = "COALESCE(sales, 0) * {$factor}";
         $cod = "({$delivered}) * ".self::COD_FEE_RATE;
@@ -380,19 +400,48 @@ class PageRoasTrackerController extends Controller
         $cogs = "COALESCE(order_cogs, 0) * {$factor}";
         $shipping = 'COALESCE(orders, 0) * '.self::SHIPPING_FEE;
 
-        $estimates = [
-            'est_delivered_amount' => $delivered,
-            'est_cod_fee' => $cod,
-            'est_cod_fee_vat' => $vat,
-            'est_cogs' => $cogs,
-            'est_shipping_fee' => $shipping,
-            'est_gross_profit' => "({$delivered}) - COALESCE(ad_spent, 0) - ({$cod}) - ({$vat}) - ({$cogs}) - ({$shipping})",
-        ];
+        // Opex rides on the orders that land, so it takes the same RTS discount
+        // the revenue does — unlike freight, which every parcel incurs.
+        $opex = "COALESCE(orders, 0) * {$factor} * ".self::OPEX_PER_DELIVERED_ORDER;
 
-        return array_values(array_map(
-            fn (string $name) => $shape($estimates[$name], $name),
-            array_keys($estimates),
-        ));
+        $gross = "({$delivered}) - COALESCE(ad_spent, 0) - ({$cod}) - ({$vat}) - ({$cogs}) - ({$shipping})";
+        $net = "({$gross}) - ({$opex})";
+
+        return [
+            'est_delivered_amount' => $sum($delivered),
+            'est_cod_fee' => $sum($cod),
+            'est_cod_fee_vat' => $sum($vat),
+            'est_cogs' => $sum($cogs),
+            'est_shipping_fee' => $sum($shipping),
+            'est_gross_profit' => $sum($gross),
+            'est_opex_share' => $sum($opex),
+            'est_net_profit' => $sum($net),
+            // The one figure that is not a running total of the days beneath it.
+            // Commission is settled on what a period nets, so the summing goes
+            // inside the floor: a losing Tuesday eats into Monday's earnings,
+            // and a range that nets a loss earns nothing rather than owing it
+            // back. Summing floored daily commissions would pay out on the good
+            // days and quietly ignore the bad ones.
+            'est_commission' => 'GREATEST('.$sum($net).', 0) * '.self::COMMISSION_RATE,
+        ];
+    }
+
+    /**
+     * The estimates as select fragments.
+     *
+     * @param  callable(string): string  $sum
+     * @param  callable(string, string): string  $alias  (sql, name) => select
+     * @return list<string>
+     */
+    private function estimateSelects(string $factor, callable $sum, callable $alias): array
+    {
+        $selects = [];
+
+        foreach ($this->estimates($factor, $sum) as $name => $sql) {
+            $selects[] = $alias($sql, $name);
+        }
+
+        return $selects;
     }
 
     /**

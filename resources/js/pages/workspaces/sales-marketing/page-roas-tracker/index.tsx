@@ -49,6 +49,11 @@ interface Metrics {
     est_cogs: number;
     est_shipping_fee: number;
     est_gross_profit: number;
+    est_opex_share: number;
+    est_net_profit: number;
+    /** 5% of what the row nets. Settled per period, so it does not add up from
+        the days beneath a Total row. */
+    est_commission: number;
 }
 
 type MetricKey = keyof Metrics;
@@ -164,8 +169,8 @@ const varianceTone = (_: number | null, m: Metrics): Tone =>
     paceTone(m?.budget_pace ?? null);
 
 /**
- * The estimated margin, judged against the revenue it came out of rather than
- * on its own: ₱500 of profit is a good day on ₱3,000 of sales and a bad one on
+ * An estimated profit, gross or net, judged against the revenue it came out of
+ * rather than on its own: ₱500 is a good day on ₱3,000 of sales and a bad one on
  * ₱50,000. A loss is a loss at any size.
  */
 const marginTone = (n: number | null, m: Metrics): Tone => {
@@ -311,14 +316,6 @@ const COLUMNS: MetricColumn[] = [
     },
 
     {
-        id: 'est_gross_profit',
-        label: 'Est. Gross Profit',
-        head: 'Est. GP',
-        group: 'Estimated margin',
-        format: 'signed',
-        tone: marginTone,
-    },
-    {
         id: 'est_delivered_amount',
         label: 'Est. Delivered (sales less RTS)',
         head: 'Est. Del.',
@@ -354,6 +351,38 @@ const COLUMNS: MetricColumn[] = [
         id: 'est_shipping_fee',
         label: 'Est. Shipping (\u20b167 an order)',
         head: 'Ship',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_gross_profit',
+        label: 'Est. Gross Profit',
+        head: 'Est. GP',
+        group: 'Estimated margin',
+        format: 'signed',
+        tone: marginTone,
+    },
+    {
+        id: 'est_opex_share',
+        label: 'Est. Opex Share (\u20b138 a delivered order)',
+        head: 'Opex',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_net_profit',
+        label: 'Est. Net Profit (gross less opex)',
+        head: 'Est. NP',
+        group: 'Estimated margin',
+        format: 'signed',
+        tone: marginTone,
+    },
+    {
+        id: 'est_commission',
+        label: 'Est. Commission (5% of net)',
+        head: 'Comm.',
         group: 'Estimated margin',
         format: 'peso',
         defaultVisible: false,
@@ -505,6 +534,14 @@ export default function PageRoasTrackerIndex({
                         <p className="mt-1 font-mono text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
                             Est. margin: sales less RTS, COD 2.75% + 12% VAT,
                             COGS less RTS, {PESO}67 a parcel, less ad spend
+                            <span className="mx-2 text-gray-300 dark:text-gray-600">
+                                /
+                            </span>
+                            net: less {PESO}38 an order delivered
+                            <span className="mx-2 text-gray-300 dark:text-gray-600">
+                                /
+                            </span>
+                            commission: 5% of net, per period
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
