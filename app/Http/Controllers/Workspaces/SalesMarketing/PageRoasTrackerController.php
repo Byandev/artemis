@@ -30,15 +30,37 @@ use Inertia\Response;
  * Every metric is always sent; which of them are shown is a client-side column
  * toggle (Orders/Sales/Ad Spend/Budget/Var/ROAS by default), so switching a
  * column on is instant rather than a round trip.
+ *
+ * On top of the recorded figures it carries an estimated margin — see
+ * estimateSelects(). It is an envelope calculation, not the income statement:
+ * flat courier rates and a flat freight cost, against each page's recent RTS.
  */
 class PageRoasTrackerController extends Controller
 {
     use AuthorizesRequests;
 
+    /**
+     * The assumptions behind the estimated margin.
+     *
+     * They mirror the pancake side of the income statement rather than reading
+     * from it: this is a back-of-envelope figure on a tracker, and it should not
+     * move because the finance module changed its mind mid-month.
+     */
+    private const COD_FEE_RATE = 0.0275;
+
+    private const VAT_RATE = 0.12;
+
+    /** Freight per parcel. A flat figure — the tracker has no per-order fee. */
+    private const SHIPPING_FEE = 67;
+
+    /** The RTS a page is assumed to run at when last month can't say. */
+    private const DEFAULT_RTS_RATE = 18.0;
+
     /** What a day cell renders, read verbatim by PageRoasTally::stored(). */
     private const FIELDS = [
         'page_type', 'page_id', 'date',
-        'orders', 'sales', 'ad_spent', 'ad_spend_budget', 'ad_sales', 'ad_purchases',
+        'orders', 'item_quantity', 'order_cogs',
+        'sales', 'ad_spent', 'ad_spend_budget', 'ad_sales', 'ad_purchases',
         'delivered_amount', 'returning_amount',
         'roas', 'ad_roas', 'ad_cpp', 'cpp', 'rts_rate',
     ];
@@ -77,6 +99,8 @@ class PageRoasTrackerController extends Controller
      */
     private const AGGREGATES = [
         'SUM(orders) AS orders',
+        'SUM(item_quantity) AS item_quantity',
+        'SUM(order_cogs) AS order_cogs',
         'SUM(sales) AS sales',
         'SUM(ad_spent) AS ad_spent',
         'SUM(ad_spend_budget) AS ad_spend_budget',
@@ -96,7 +120,8 @@ class PageRoasTrackerController extends Controller
 
     /** The amounts, which the Average row divides. Ratios never divide. */
     private const AMOUNTS = [
-        'orders', 'sales', 'ad_spent', 'ad_spend_budget', 'ad_sales', 'ad_purchases',
+        'orders', 'item_quantity', 'order_cogs',
+        'sales', 'ad_spent', 'ad_spend_budget', 'ad_sales', 'ad_purchases',
         'delivered_amount', 'returning_amount',
     ];
 
@@ -130,7 +155,11 @@ class PageRoasTrackerController extends Controller
 
         $base = $this->baseQuery($workspace, $user, $filters, $start, $end);
 
-        [$pages, $overall] = $this->build($base, $dates);
+        // The margin estimate discounts revenue by the RTS each page has been
+        // running at, measured over the month before the range in view.
+        $rtsRates = $this->assumedRtsRates($workspace, $start);
+
+        [$pages, $overall] = $this->build($base, $dates, $rtsRates);
 
         return Inertia::render('workspaces/sales-marketing/page-roas-tracker/index', [
             'workspace' => $workspace,
@@ -158,15 +187,21 @@ class PageRoasTrackerController extends Controller
      * @param  list<string>  $dates
      * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>|null}
      */
-    private function build(Builder $base, array $dates): array
+    private function build(Builder $base, array $dates, array $rtsRates): array
     {
+        $factor = $this->rtsFactor($rtsRates);
+
         $records = (clone $base)
-            ->selectRaw(implode(', ', [...self::FIELDS, ...self::DAY_DERIVED]))
+            ->selectRaw(implode(', ', [
+                ...self::FIELDS,
+                ...self::DAY_DERIVED,
+                ...$this->estimateSelects($factor, fn (string $e, string $name) => "{$e} AS {$name}"),
+            ]))
             ->get();
 
         $names = $this->resolvePageNames($records);
         $dayCount = max(count($dates), 1);
-        $aggregates = $this->aggregates($dayCount);
+        $aggregates = $this->aggregates($dayCount, $factor);
 
         $perPage = (clone $base)
             ->selectRaw("page_type, page_id, {$aggregates}")
@@ -199,6 +234,9 @@ class PageRoasTrackerController extends Controller
             $pages[] = [
                 'page_id' => $pageId,
                 'name' => $names[$key] ?? ('Page '.$pageId),
+                // What the margin estimate assumed for this page, so the figure
+                // can be read rather than taken on faith.
+                'assumed_rts' => round($rtsRates[(int) $pageId] ?? self::DEFAULT_RTS_RATE, 2),
                 'days' => $days,
                 'total' => $this->cell($totals),
                 'average' => $this->cell($totals, 'avg_'),
@@ -254,6 +292,10 @@ class PageRoasTrackerController extends Controller
 
         return [
             'orders' => (int) round((float) ($row->{$prefix.'orders'} ?? 0)),
+            // Units, like orders — a count, not an amount.
+            'item_quantity' => (int) round((float) ($row->{$prefix.'item_quantity'} ?? 0)),
+            // What the day's goods cost. Null when none of its lines were costed.
+            'order_cogs' => $optional('order_cogs'),
             'sales' => $amount('sales'),
             'ad_spent' => $amount('ad_spent'),
             'ad_spend_budget' => $optional('ad_spend_budget'),
@@ -271,6 +313,15 @@ class PageRoasTrackerController extends Controller
             'rts_rate' => $ratio('rts_rate'),
             // Spend as a percentage of budget: 100 is on plan.
             'budget_pace' => $ratio('budget_pace'),
+
+            // The estimated margin and its parts. All amounts, so the Average
+            // row divides them like any other.
+            'est_delivered_amount' => $amount('est_delivered_amount'),
+            'est_cod_fee' => $amount('est_cod_fee'),
+            'est_cod_fee_vat' => $amount('est_cod_fee_vat'),
+            'est_cogs' => $amount('est_cogs'),
+            'est_shipping_fee' => $amount('est_shipping_fee'),
+            'est_gross_profit' => $amount('est_gross_profit'),
         ];
     }
 
@@ -282,7 +333,7 @@ class PageRoasTrackerController extends Controller
      * with no rows still count — an average over a week is over seven days
      * whether or not the builder wrote all seven.
      */
-    private function aggregates(int $dayCount): string
+    private function aggregates(int $dayCount, string $factor): string
     {
         $total = self::AGGREGATES;
 
@@ -298,7 +349,115 @@ class PageRoasTrackerController extends Controller
             $average[] = "({$expression}) / {$dayCount} AS avg_{$field}";
         }
 
+        // Every estimate is linear in the stored columns, so summing the
+        // expression over the range gives the same answer as adding up the days
+        // it produced — which is what lets one definition serve all three rows.
+        $total = [...$total, ...$this->estimateSelects($factor, fn ($e, $n) => "SUM({$e}) AS {$n}")];
+        $average = [...$average, ...$this->estimateSelects($factor, fn ($e, $n) => "SUM({$e}) / {$dayCount} AS avg_{$n}")];
+
         return implode(', ', [...$total, ...$average]);
+    }
+
+    /**
+     * The estimated margin and the costs it takes off, as SQL over the stored
+     * columns — one definition, wrapped by $shape into whichever grain is being
+     * selected.
+     *
+     * The chain is the pancake income statement's, worked page-day by page-day:
+     * revenue is discounted by the page's RTS (what actually gets collected),
+     * the courier's COD fee and its VAT come off that, cost of goods is
+     * discounted the same way (returned stock comes back), and freight is
+     * charged on every parcel — a parcel that comes back was still shipped.
+     *
+     * @param  callable(string, string): string  $shape  (expression, name) => select
+     * @return list<string>
+     */
+    private function estimateSelects(string $factor, callable $shape): array
+    {
+        $delivered = "COALESCE(sales, 0) * {$factor}";
+        $cod = "({$delivered}) * ".self::COD_FEE_RATE;
+        $vat = "({$cod}) * ".self::VAT_RATE;
+        $cogs = "COALESCE(order_cogs, 0) * {$factor}";
+        $shipping = 'COALESCE(orders, 0) * '.self::SHIPPING_FEE;
+
+        $estimates = [
+            'est_delivered_amount' => $delivered,
+            'est_cod_fee' => $cod,
+            'est_cod_fee_vat' => $vat,
+            'est_cogs' => $cogs,
+            'est_shipping_fee' => $shipping,
+            'est_gross_profit' => "({$delivered}) - COALESCE(ad_spent, 0) - ({$cod}) - ({$vat}) - ({$cogs}) - ({$shipping})",
+        ];
+
+        return array_values(array_map(
+            fn (string $name) => $shape($estimates[$name], $name),
+            array_keys($estimates),
+        ));
+    }
+
+    /**
+     * The share of revenue a page is assumed to actually collect, as SQL.
+     *
+     * A CASE over page_id rather than one blended rate, because the All Pages
+     * roll-up has to be the sum of each page discounted by its own — there is no
+     * single rate that would give the same answer. Pages last month says nothing
+     * about fall through to the default.
+     *
+     * @param  array<int, float>  $rates  page id => RTS percentage
+     */
+    private function rtsFactor(array $rates): string
+    {
+        $default = $this->factorFor(self::DEFAULT_RTS_RATE);
+        $cases = '';
+
+        foreach ($rates as $pageId => $rate) {
+            $cases .= ' WHEN '.(int) $pageId.' THEN '.$this->factorFor($rate);
+        }
+
+        return $cases === '' ? "({$default})" : "(CASE page_id{$cases} ELSE {$default} END)";
+    }
+
+    /**
+     * One page's RTS percentage as the fraction of revenue left over.
+     *
+     * Clamped to 0–1: a rate outside 0–100% is a broken measurement, and letting
+     * it through would hand the estimate negative revenue.
+     */
+    private function factorFor(float $rate): string
+    {
+        return (string) round(max(0.0, min(1.0, 1 - ($rate / 100))), 6);
+    }
+
+    /**
+     * Each page's RTS over the calendar month before the range in view, as a
+     * percentage — the rate the margin estimate discounts its revenue by.
+     *
+     * Blended over the month (what went back over what moved) rather than
+     * averaged from the daily rates, for the same reason the Total row blends:
+     * a day with two parcels shouldn't weigh as much as one with two hundred.
+     *
+     * A page that moved nothing last month is absent, and falls back to the
+     * default rather than being called a 0% page.
+     *
+     * @return array<int, float>
+     */
+    private function assumedRtsRates(Workspace $workspace, string $start): array
+    {
+        $month = Carbon::parse($start)->subMonthNoOverflow();
+
+        return DB::table('page_daily_records')
+            ->where('workspace_id', $workspace->id)
+            ->where('page_type', Page::class)
+            ->whereBetween('date', [
+                $month->copy()->startOfMonth()->toDateString(),
+                $month->copy()->endOfMonth()->toDateString(),
+            ])
+            ->groupBy('page_id')
+            ->selectRaw('page_id, SUM(returning_amount) / NULLIF(SUM(returning_amount) + SUM(delivered_amount), 0) * 100 AS rts_rate')
+            ->get()
+            ->filter(fn ($row) => $row->rts_rate !== null)
+            ->mapWithKeys(fn ($row) => [(int) $row->page_id => (float) $row->rts_rate])
+            ->all();
     }
 
     /**

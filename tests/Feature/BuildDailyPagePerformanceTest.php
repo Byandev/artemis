@@ -6,7 +6,8 @@ use App\Models\PageDailyRecord;
 use App\Models\Shop;
 use App\Models\Workspace;
 use Illuminate\Support\Str;
-use Modules\Pancake\Models\Order;
+use Modules\Pancake\Models\Order as PancakeOrder;
+use Modules\Pancake\Models\OrderItem;
 
 /**
  * The per-page half of the nightly performance build. It is what the Sales &
@@ -24,7 +25,7 @@ function buildPagePerfPage(Workspace $workspace): Page
 /** A confirmed order on a page, at the amount the day should sum to. */
 function buildPagePerfOrder(Workspace $workspace, Page $page, string $date, float $amount): void
 {
-    Order::create([
+    PancakeOrder::create([
         'workspace_id' => $workspace->id,
         'shop_id' => $page->shop_id,
         'page_id' => $page->id,
@@ -139,4 +140,57 @@ test('it leaves the budget null for a day before the page had one', function () 
     // Nothing was planned yet, so the day has nothing to be under or over —
     // which is not the same as having been planned at zero.
     expect(PageDailyRecord::where('page_id', $page->id)->value('ad_spend_budget'))->toBeNull();
+});
+
+test('it opens the day up to units sold and what the goods cost', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+    buildPagePerfOrder($workspace, $page, '2026-03-10', 900);
+
+    $order = PancakeOrder::where('page_id', $page->id)->firstOrFail();
+
+    $line = fn (int $quantity, ?float $cogs) => OrderItem::create([
+        'order_id' => $order->id,
+        'pancake_id' => (string) Str::uuid(),
+        'pancake_order_id' => $order->order_number,
+        'quantity' => $quantity,
+        'cogs' => $cogs,
+    ]);
+
+    $line(2, 300);
+    // An un-costed line still sold units, and adds nothing to the cost.
+    $line(3, null);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $row = PageDailyRecord::where('page_id', $page->id)->where('date', '2026-03-10')->first();
+
+    expect((int) $row->item_quantity)->toBe(5)
+        ->and((float) $row->order_cogs)->toBe(300.0);
+});
+
+test('it leaves the cost null on a day whose lines carry none', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $page = buildPagePerfPage($workspace);
+    buildPagePerfOrder($workspace, $page, '2026-03-10', 900);
+
+    $order = PancakeOrder::where('page_id', $page->id)->firstOrFail();
+
+    OrderItem::create([
+        'order_id' => $order->id,
+        'pancake_id' => (string) Str::uuid(),
+        'pancake_order_id' => $order->order_number,
+        'quantity' => 4,
+        'cogs' => null,
+    ]);
+
+    $this->artisan('build-page-daily-performance', ['--date' => '2026-03-10'])->assertSuccessful();
+
+    $row = PageDailyRecord::where('page_id', $page->id)->where('date', '2026-03-10')->first();
+
+    // Units are a count and read as 4; the cost is "nothing recorded", not zero.
+    expect((int) $row->item_quantity)->toBe(4)
+        ->and($row->order_cogs)->toBeNull();
 });

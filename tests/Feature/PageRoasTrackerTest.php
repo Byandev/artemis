@@ -320,12 +320,137 @@ it('sends every metric so the column toggle needs no round trip', function () {
         ->component('workspaces/sales-marketing/page-roas-tracker/index')
         ->has('pages.0.days.2026-08-01', fn (Assert $day) => $day
             ->hasAll([
-                'orders', 'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
+                'orders', 'item_quantity', 'order_cogs',
+                'sales', 'ad_spent', 'ad_sales', 'ad_purchases',
                 'ad_cpp', 'cpp',
                 'ad_spend_budget', 'budget_variance', 'budget_pace',
                 'delivered_amount', 'returning_amount',
                 'roas', 'ad_roas', 'rts_rate',
+                'est_delivered_amount', 'est_cod_fee', 'est_cod_fee_vat',
+                'est_cogs', 'est_shipping_fee', 'est_gross_profit',
             ])
         )
     );
+});
+
+/*
+ * ── The estimated margin ────────────────────────────────────────────────────
+ *
+ * Revenue is discounted by the RTS the page ran at last month (18% when last
+ * month can't say), the courier's cut comes off that, cost of goods is
+ * discounted the same way, and freight is charged on every parcel.
+ */
+
+it('estimates the margin from the default RTS when last month says nothing', function () {
+    record([
+        'date' => '2026-08-01',
+        'orders' => 10, 'item_quantity' => 12, 'order_cogs' => 4000,
+        'sales' => 10000, 'ad_spent' => 2000,
+    ]);
+
+    $day = trackerPage('2026-08-01', '2026-08-01')['days']['2026-08-01'];
+
+    // 18% assumed, so 82% of ₱10,000 is collected.
+    expect($day['est_delivered_amount'])->toBe(8200.0)
+        // 2.75% of that, then 12% VAT on the fee.
+        ->and($day['est_cod_fee'])->toBe(225.5)
+        ->and($day['est_cod_fee_vat'])->toBe(27.06)
+        // Returned stock comes back, so the goods cost 82% too.
+        ->and($day['est_cogs'])->toBe(3280.0)
+        // ₱67 a parcel on all ten, including the ones that will come back.
+        ->and($day['est_shipping_fee'])->toBe(670.0);
+
+    // 8200 - 2000 ad spend - 225.50 - 27.06 - 3280 - 670.
+    expect($day['est_gross_profit'])->toBe(1997.44);
+});
+
+it('discounts revenue by the page own RTS from the month before', function () {
+    // August's history: ₱300 back against ₱700 delivered — a 30% RTS.
+    record(['date' => '2026-08-15', 'returning_amount' => 300, 'delivered_amount' => 700]);
+
+    // September, the month being looked at.
+    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000, 'order_cogs' => 0]);
+
+    $page = trackerPage('2026-09-01', '2026-09-01');
+
+    expect($page['assumed_rts'])->toBe(30.0)
+        // 70% of ₱1,000, not the 82% the default would have given.
+        ->and($page['days']['2026-09-01']['est_delivered_amount'])->toBe(700.0);
+});
+
+it('falls back to 18% for a page that moved nothing last month', function () {
+    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000]);
+
+    $page = trackerPage('2026-09-01', '2026-09-01');
+
+    expect($page['assumed_rts'])->toBe(18.0)
+        ->and($page['days']['2026-09-01']['est_delivered_amount'])->toBe(820.0);
+});
+
+it('sums the estimate over the range and halves it on the Average row', function () {
+    record(['date' => '2026-08-01', 'orders' => 5, 'sales' => 10000, 'order_cogs' => 4000, 'ad_spent' => 1000]);
+    record(['date' => '2026-08-02', 'orders' => 5, 'sales' => 10000, 'order_cogs' => 4000, 'ad_spent' => 1000]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    // Every estimate is linear in the stored columns, so the range is the sum of
+    // the days and the Average is that over the two of them.
+    expect($page['total']['est_delivered_amount'])->toBe(16400.0)
+        ->and($page['average']['est_delivered_amount'])->toBe(8200.0)
+        ->and($page['total']['est_shipping_fee'])->toBe(670.0)
+        ->and($page['total']['est_gross_profit'])->toBe(
+            round($page['days']['2026-08-01']['est_gross_profit'] * 2, 2)
+        );
+});
+
+it('rolls the estimate up across pages, each on its own RTS', function () {
+    $second = Page::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $row = fn (array $attrs) => PageDailyRecord::create(array_merge([
+        'workspace_id' => $this->workspace->id,
+        'source' => PageDailyRecord::SOURCE_ARTEMIS,
+        'page_type' => $second->getMorphClass(),
+        'page_id' => $second->getKey(),
+    ], $attrs));
+
+    // Last month: the first page ran 30% RTS, the second 10%.
+    record(['date' => '2026-08-15', 'returning_amount' => 300, 'delivered_amount' => 700]);
+    $row(['date' => '2026-08-15', 'returning_amount' => 100, 'delivered_amount' => 900]);
+
+    record(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000]);
+    $row(['date' => '2026-09-01', 'orders' => 1, 'sales' => 1000]);
+
+    $response = test()->get(route(
+        'workspaces.sales-marketing.page-roas-tracker',
+        [$this->workspace, 'start' => '2026-09-01', 'end' => '2026-09-01'],
+    ));
+
+    $overall = $response->viewData('page')['props']['overall'];
+
+    // ₱700 + ₱900 — each page on its own rate. No single blended rate on the
+    // combined ₱2,000 would give this.
+    expect($overall['days']['2026-09-01']['est_delivered_amount'])->toBe(1600.0);
+});
+
+it('treats an uncosted day as no goods cost rather than refusing to estimate', function () {
+    record(['date' => '2026-08-01', 'orders' => 1, 'sales' => 1000]);
+
+    $day = trackerPage('2026-08-01', '2026-08-01')['days']['2026-08-01'];
+
+    // The column itself stays null — nothing was recorded — but the estimate has
+    // to produce a number, so it charges no goods rather than collapsing.
+    expect($day['order_cogs'])->toBeNull()
+        ->and($day['est_cogs'])->toBe(0.0)
+        ->and($day['est_delivered_amount'])->toBe(820.0);
+});
+
+it('carries the units the day sold', function () {
+    record(['date' => '2026-08-01', 'orders' => 3, 'item_quantity' => 7]);
+    record(['date' => '2026-08-02', 'orders' => 2, 'item_quantity' => 5]);
+
+    $page = trackerPage('2026-08-01', '2026-08-02');
+
+    expect($page['days']['2026-08-01']['item_quantity'])->toBe(7)
+        ->and($page['total']['item_quantity'])->toBe(12)
+        ->and($page['average']['item_quantity'])->toBe(6);
 });

@@ -19,6 +19,10 @@ import DateOption = flatpickr.Options.DateOption;
 
 interface Metrics {
     orders: number;
+    /** Units on the day's orders — a count, like orders. */
+    item_quantity: number;
+    /** What the day's goods cost. Null when none of its lines were costed. */
+    order_cogs: number | null;
     sales: number;
     ad_spent: number;
     /** Planned daily spend. Null when the page has no budget on record. */
@@ -36,6 +40,15 @@ interface Metrics {
     rts_rate: number | null;
     ad_cpp: number | null;
     cpp: number | null;
+
+    /* The estimated margin and the costs it takes off. Amounts, so they sum
+       across pages and divide on the Average row like any other. */
+    est_delivered_amount: number;
+    est_cod_fee: number;
+    est_cod_fee_vat: number;
+    est_cogs: number;
+    est_shipping_fee: number;
+    est_gross_profit: number;
 }
 
 type MetricKey = keyof Metrics;
@@ -43,6 +56,8 @@ type MetricKey = keyof Metrics;
 interface PageSeries {
     page_id: number | string;
     name: string;
+    /** The RTS % the margin estimate discounted this page's revenue by. */
+    assumed_rts: number;
     days: Record<string, Metrics>;
     total: Metrics;
     average: Metrics;
@@ -148,6 +163,22 @@ const paceTone = (n: number | null): Tone =>
 const varianceTone = (_: number | null, m: Metrics): Tone =>
     paceTone(m?.budget_pace ?? null);
 
+/**
+ * The estimated margin, judged against the revenue it came out of rather than
+ * on its own: ₱500 of profit is a good day on ₱3,000 of sales and a bad one on
+ * ₱50,000. A loss is a loss at any size.
+ */
+const marginTone = (n: number | null, m: Metrics): Tone => {
+    const sales = m?.sales ?? 0;
+
+    if (n === null || sales <= 0) return 'muted';
+    if (n < 0) return 'bad';
+
+    const margin = (n / sales) * 100;
+
+    return margin >= 20 ? 'good' : margin >= 10 ? 'warn' : 'bad';
+};
+
 /* ── Columns ─────────────────────────────────────────────────────────────── */
 
 interface MetricColumn extends ColumnOption {
@@ -177,9 +208,23 @@ const COLUMNS: MetricColumn[] = [
         format: 'int',
     },
     {
+        id: 'item_quantity',
+        label: 'Item Quantities',
+        head: 'Units',
+        group: 'Core',
+        format: 'int',
+    },
+    {
         id: 'sales',
         label: 'Sales',
         head: 'Sales',
+        group: 'Core',
+        format: 'peso',
+    },
+    {
+        id: 'order_cogs',
+        label: 'Order COGS',
+        head: 'COGS',
         group: 'Core',
         format: 'peso',
     },
@@ -261,6 +306,55 @@ const COLUMNS: MetricColumn[] = [
         label: 'CPP (spend / orders)',
         head: 'CPP',
         group: 'Meta Ads',
+        format: 'peso',
+        defaultVisible: false,
+    },
+
+    {
+        id: 'est_gross_profit',
+        label: 'Est. Gross Profit',
+        head: 'Est. GP',
+        group: 'Estimated margin',
+        format: 'signed',
+        tone: marginTone,
+    },
+    {
+        id: 'est_delivered_amount',
+        label: 'Est. Delivered (sales less RTS)',
+        head: 'Est. Del.',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cod_fee',
+        label: 'Est. COD Fee (2.75%)',
+        head: 'COD',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cod_fee_vat',
+        label: 'Est. COD Fee VAT (12%)',
+        head: 'COD VAT',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_cogs',
+        label: 'Est. COGS (less RTS)',
+        head: 'Est. COGS',
+        group: 'Estimated margin',
+        format: 'peso',
+        defaultVisible: false,
+    },
+    {
+        id: 'est_shipping_fee',
+        label: 'Est. Shipping (\u20b167 an order)',
+        head: 'Ship',
+        group: 'Estimated margin',
         format: 'peso',
         defaultVisible: false,
     },
@@ -405,6 +499,13 @@ export default function PageRoasTrackerIndex({
                             </span>
                             {pages.length} page{pages.length === 1 ? '' : 's'}
                         </p>
+                        {/* The estimate is only readable if its assumptions are
+                            stated. The RTS is per page — hover a page header for
+                            the one it used. */}
+                        <p className="mt-1 font-mono text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
+                            Est. margin: sales less RTS, COD 2.75% + 12% VAT,
+                            COGS less RTS, {PESO}67 a parcel, less ad spend
+                        </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <ColumnsDropdown
@@ -484,7 +585,7 @@ export default function PageRoasTrackerIndex({
                                                     groupStart,
                                                     'sticky top-0 z-30 max-w-[22rem] truncate bg-stone-100 text-left text-[12px] font-semibold text-gray-800 dark:bg-zinc-800 dark:text-gray-100',
                                                 )}
-                                                title={page.name}
+                                                title={`${page.name} — margin estimated at ${page.assumed_rts.toFixed(1)}% RTS (last month)`}
                                             >
                                                 <span className="flex items-center gap-2">
                                                     <span className="h-3 w-[3px] shrink-0 rounded-full bg-brand-500" />

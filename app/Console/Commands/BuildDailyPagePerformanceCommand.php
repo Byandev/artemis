@@ -8,6 +8,7 @@ use App\Models\PageDailyRecord;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Modules\MetaAds\Models\Insight;
 use Modules\Pancake\Models\Order;
 
@@ -16,8 +17,8 @@ use Modules\Pancake\Models\Order;
  * combining:
  *   - Meta Ads:   ad spend + purchases (count) + purchase value (= ad_sales),
  *                 attributed via ad set → meta_page_id → page.
- *   - Pancake POS: orders + delivered/returned/returning (count + amount), via
- *                 page_id.
+ *   - Pancake POS: orders + units + cost of goods + delivered/returned/returning
+ *                 (count + amount), via page_id.
  *   - Budget:     the page's planned daily ad spend, so a day carries what it
  *                 was measured against alongside what it actually spent.
  *
@@ -82,6 +83,23 @@ class BuildDailyPagePerformanceCommand extends Command
             ->whereDate('confirmed_at', $date)
             ->whereNotIn('pancake_orders.status', [6, 7])
             ->count('*');
+
+        // The same orders, opened up to their lines: how many units they sold and
+        // what those goods cost. One pass, since both come off the same join.
+        //
+        // The cost stays null when no line carries one — a day nobody has costed
+        // is not a day whose goods were free — while the quantity is a plain
+        // count and reads as 0.
+        $items = DB::table('pancake_order_items as poi')
+            ->join('pancake_orders as po', 'po.id', '=', 'poi.order_id')
+            ->where('po.page_id', $pageId)
+            ->whereDate('po.confirmed_at', $date)
+            ->whereNotIn('po.status', [6, 7])
+            ->selectRaw('COALESCE(SUM(poi.quantity), 0) as quantity_sum, SUM(poi.cogs) as cogs_sum')
+            ->first();
+
+        $item_quantity = (int) ($items->quantity_sum ?? 0);
+        $order_cogs = ($items->cogs_sum ?? null) === null ? null : (float) $items->cogs_sum;
 
         // One pass over the insights — spend, purchases and purchase value all
         // come from the same rows. Aliased away from the column names so the
@@ -161,6 +179,8 @@ class BuildDailyPagePerformanceCommand extends Command
             ],
             [
                 'orders' => $orders,
+                'item_quantity' => $item_quantity,
+                'order_cogs' => $order_cogs,
                 'sales' => $sales,
                 'delivered' => $delivered,
                 'delivered_amount' => $delivered_amount,
