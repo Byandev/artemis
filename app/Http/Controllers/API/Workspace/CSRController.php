@@ -13,7 +13,6 @@ use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -698,15 +697,6 @@ class CSRController extends Controller
     private const VERIFICATION_RTS_THRESHOLD = 0.55;
 
     /**
-     * How little a CSR may have settled and still be ranked on their return
-     * rate, as a share of what the average contender settled.
-     *
-     * Guards the Lowest RTS leader against a rate built on nothing. See
-     * rtsLeaderAmong().
-     */
-    private const LEADER_MIN_SETTLED_SHARE_OF_AVERAGE = 0.2;
-
-    /**
      * Orders confirmed in a range that are worth a verification call.
      *
      * Two reasons qualify, and they cannot overlap: the customer's number has
@@ -980,9 +970,12 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        // Off the same rollup, so this is the RTS Rate column: money back over
-        // money settled, counted on the day it settled. Replaces a scan of the
-        // workspace's whole order history; an uncovered range has nobody to rank.
+        // Who is in the running and what their rate reads are two questions.
+        // A CSR earns a place by having at least one shop-day that saw both a
+        // return and a delivery — half a parcel's story is no evidence of a
+        // rate. The rate itself is then read off everything they settled in
+        // the range, delivery-only days included, which is the arithmetic and
+        // the row set of the RTS Rate column in the table below.
         $perCsr = $this->scopeToVisibleShops(
             DB::table('pancake_user_pos_daily_reports as r')
                 ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
@@ -992,17 +985,20 @@ class CSRController extends Controller
             'r.shop_id',
         )
             ->groupBy('pu.id', 'pu.name')
-            // `_amount` suffixes on purpose: an alias of `delivered` shadows
+            // Suffixed aliases on purpose: an alias of `delivered` shadows
             // r.delivered in the ORDER BY, which ONLY_FULL_GROUP_BY rejects.
             ->selectRaw('
                 pu.name as name,
                 COALESCE(SUM(r.returning), 0) as returned_amount,
                 COALESCE(SUM(r.delivered), 0) as delivered_amount,
-                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders
+                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders,
+                SUM(CASE WHEN r.returning > 0 AND r.delivered > 0 THEN 1 ELSE 0 END) as qualifying_days
             ')
-            // Eligibility is money settled, as on the RTS card. Parcels all
-            // worth zero have no rate to rank, so they are out rather than last.
-            ->havingRaw('returned_amount + delivered_amount > 0')
+            // The qualifying day is the entry ticket, not the figure: one of
+            // them puts the CSR in the ranking, and the sums above then speak
+            // for the whole range. It also keeps both sums off zero, so the
+            // rate below always has something to divide.
+            ->havingRaw('qualifying_days > 0')
             ->orderByRaw('returned_amount / (returned_amount + delivered_amount) ASC')
             // Ties are common at a clean 0%; break them on the money settled.
             // Not on settled_orders: those counts read zero on every rollup row
@@ -1011,57 +1007,34 @@ class CSRController extends Controller
             ->orderByRaw('returned_amount + delivered_amount DESC')
             ->get();
 
-        $leader = $this->rtsLeaderAmong($perCsr);
+        // Money back over money settled, to the decimal the card prints. The
+        // qualifying day above keeps the divisor off zero.
+        $rate = fn ($row) => round(
+            (float) $row->returned_amount
+                / ((float) $row->returned_amount + (float) $row->delivered_amount)
+                * 100,
+            1,
+        );
+
+        // Every rate on the board prints as 0.0% — returns too small against the
+        // deliveries beside them to show at one decimal. Nothing separates the
+        // CSRs and the winner would be whoever the tiebreak reached first, so
+        // the card says nobody to rank instead of picking one of them.
+        $leader = $perCsr->max($rate) > 0 ? $perCsr->first() : null;
 
         if ($leader === null) {
             return response()->json(['leader' => null]);
         }
 
-        $returned = (float) $leader->returned_amount;
-        $delivered = (float) $leader->delivered_amount;
-        $settled = $returned + $delivered;
-
         return response()->json([
             'leader' => [
                 'name' => $leader->name,
-                'value' => round($returned / $settled * 100, 1),
-                'returned' => $returned,
-                'delivered' => $delivered,
+                'value' => $rate($leader),
+                'returned' => (float) $leader->returned_amount,
+                'delivered' => (float) $leader->delivered_amount,
                 'orders' => (int) $leader->settled_orders,
             ],
         ]);
-    }
-
-    /**
-     * The lowest return rate worth crowning, out of the CSRs who settled anything.
-     *
-     * Rate alone hands the card to whoever settled least: one small parcel that
-     * happened not to come back is a clean 0%, and it outranks a CSR running
-     * real volume at 30%. That is arithmetic, not a result, so a contender has
-     * to have carried a fair share of the field's parcels before their rate is
-     * read as an achievement.
-     *
-     * The floor is a share of what the average contender settled rather than a
-     * peso figure, so it means the same thing in a workspace of five CSRs and
-     * one of fifty. Someone always clears it — the largest contender is at or
-     * above the average by definition — so a real 0% over real volume still
-     * wins, which is the point of keeping this a floor rather than a ban on
-     * zero.
-     *
-     * @param  Collection<int, object>  $contenders  Ordered best rate first.
-     */
-    private function rtsLeaderAmong(Collection $contenders): ?object
-    {
-        if ($contenders->isEmpty()) {
-            return null;
-        }
-
-        $settled = fn ($row) => (float) $row->returned_amount + (float) $row->delivered_amount;
-
-        $floor = $contenders->avg($settled) * self::LEADER_MIN_SETTLED_SHARE_OF_AVERAGE;
-
-        return $contenders->first(fn ($row) => $settled($row) >= $floor)
-            ?? $contenders->first();
     }
 
     public function analyticsLeaderRmoCalled(Request $request, Workspace $workspace)
