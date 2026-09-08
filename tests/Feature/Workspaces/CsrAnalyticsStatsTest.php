@@ -1666,24 +1666,29 @@ function csrRtsLeader($owner, Workspace $workspace, string $from, string $to)
 }
 
 /** A parcel credited to $csr that arrived. */
-function deliveredBy(Workspace $workspace, PancakeUser $csr, string $at, float $amount): void
+function deliveredBy(Workspace $workspace, PancakeUser $csr, string $at, float $amount, ?Shop $shop = null): void
 {
     Order::factory()->forWorkspace($workspace)->create([
         'status' => 3,
         'final_amount' => $amount,
         'delivered_at' => $at,
         'confirmed_by' => $csr->id,
+        // The rollup rates one shop-day at a time, so parcels meant to make a
+        // rate together have to share a shop. Left out, the factory gives this
+        // order a shop of its own and a rollup row of its own with it.
+        ...($shop ? ['shop_id' => $shop->id] : []),
     ]);
 }
 
 /** A parcel credited to $csr that turned back. */
-function returnedBy(Workspace $workspace, PancakeUser $csr, string $at, float $amount): void
+function returnedBy(Workspace $workspace, PancakeUser $csr, string $at, float $amount, ?Shop $shop = null): void
 {
     Order::factory()->forWorkspace($workspace)->create([
         'status' => 4,
         'final_amount' => $amount,
         'returning_at' => $at,
         'confirmed_by' => $csr->id,
+        ...($shop ? ['shop_id' => $shop->id] : []),
     ]);
 }
 
@@ -1693,13 +1698,15 @@ test('the RTS leader is the CSR with the lowest return rate', function () {
     $best = PancakeUser::create(['name' => 'Mariel Bautista']);
     $worst = PancakeUser::create(['name' => 'Someone Else']);
 
-    // Best: 200 returned of 1000 settled = 20%.
-    deliveredBy($workspace, $best, '2026-08-02 10:00:00', 800);
-    returnedBy($workspace, $best, '2026-08-03 10:00:00', 200);
+    $shop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+
+    // Best: 200 returned of 1000 settled in one shop on one day = 20%.
+    deliveredBy($workspace, $best, '2026-08-02 10:00:00', 800, $shop);
+    returnedBy($workspace, $best, '2026-08-02 11:00:00', 200, $shop);
 
     // Worst: 600 of 1000 = 60%.
-    deliveredBy($workspace, $worst, '2026-08-02 10:00:00', 400);
-    returnedBy($workspace, $worst, '2026-08-03 10:00:00', 600);
+    deliveredBy($workspace, $worst, '2026-08-02 10:00:00', 400, $shop);
+    returnedBy($workspace, $worst, '2026-08-02 11:00:00', 600, $shop);
 
     csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
@@ -1716,8 +1723,10 @@ test('a CSR with nothing settled is not eligible', function () {
     $active = PancakeUser::create(['name' => 'Mariel Bautista']);
     $idle = PancakeUser::create(['name' => 'Idle CSR']);
 
-    deliveredBy($workspace, $active, '2026-08-02 10:00:00', 900);
-    returnedBy($workspace, $active, '2026-08-03 10:00:00', 100);
+    $shop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+
+    deliveredBy($workspace, $active, '2026-08-02 10:00:00', 900, $shop);
+    returnedBy($workspace, $active, '2026-08-02 11:00:00', 100, $shop);
 
     // Confirmed an order, but nothing of theirs settled in the range. A zero
     // rate here would be an absence, not an achievement.
@@ -1732,10 +1741,12 @@ test('settlements outside the range do not count', function () {
 
     $csr = PancakeUser::create(['name' => 'Mariel Bautista']);
 
-    deliveredBy($workspace, $csr, '2026-08-02 10:00:00', 500);
-    returnedBy($workspace, $csr, '2026-08-03 10:00:00', 500);
+    $shop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+
+    deliveredBy($workspace, $csr, '2026-08-02 10:00:00', 500, $shop);
+    returnedBy($workspace, $csr, '2026-08-02 11:00:00', 500, $shop);
     // Later, so it must not drag the rate up.
-    returnedBy($workspace, $csr, '2026-08-09 10:00:00', 9000);
+    returnedBy($workspace, $csr, '2026-08-09 10:00:00', 9000, $shop);
 
     csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('leader.value', 50);
@@ -1772,9 +1783,11 @@ test('a CSR with a real rate wins over one who settled nothing of value', functi
     $real = PancakeUser::create(['name' => 'Mariel Bautista']);
     $zeroValue = PancakeUser::create(['name' => 'Zero Value CSR']);
 
-    // 100 of 1000 settled = 10%.
-    deliveredBy($workspace, $real, '2026-08-02 10:00:00', 900);
-    returnedBy($workspace, $real, '2026-08-03 10:00:00', 100);
+    $shop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+
+    // 100 of 1000 settled in one shop on one day = 10%.
+    deliveredBy($workspace, $real, '2026-08-02 10:00:00', 900, $shop);
+    returnedBy($workspace, $real, '2026-08-02 11:00:00', 100, $shop);
 
     // Settled, but worth nothing — no rate, so not in the running at all.
     deliveredBy($workspace, $zeroValue, '2026-08-02 10:00:00', 0);
@@ -1782,6 +1795,124 @@ test('a CSR with a real rate wins over one who settled nothing of value', functi
     csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('leader.name', 'Mariel Bautista')
         ->assertJsonPath('leader.value', 10);
+});
+
+test('a delivery and its return in separate shop-days make no rate', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Mariel Bautista']);
+
+    // 200 back out of 1000 settled, but the rollup files these in a row each —
+    // different day, different shop. One row only delivered and the other only
+    // returned, so neither day saw both sides and the CSR has nothing left to
+    // be ranked on. The table below still reads them together, at 20%.
+    deliveredBy($workspace, $csr, '2026-08-02 10:00:00', 800);
+    returnedBy($workspace, $csr, '2026-08-03 10:00:00', 200);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('leader', null);
+});
+
+test('a delivery-only day counts towards the rate of a CSR who qualified', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Mariel Bautista']);
+    $shop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+
+    // The 2nd saw both sides, so the CSR is in the running.
+    deliveredBy($workspace, $csr, '2026-08-02 10:00:00', 50000, $shop);
+    returnedBy($workspace, $csr, '2026-08-02 11:00:00', 10000, $shop);
+
+    // The 3rd only delivered. It does not qualify anybody on its own, but the
+    // rate is read off the whole range once they are in, so this clean day
+    // still counts — 10,000 back out of 100,000, not out of 60,000.
+    deliveredBy($workspace, $csr, '2026-08-03 10:00:00', 40000, $shop);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('leader.value', 10)
+        ->assertJsonPath('leader.returned', 10000)
+        ->assertJsonPath('leader.delivered', 90000);
+});
+
+test('a CSR who never had a return cannot lead', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $perfect = PancakeUser::create(['name' => 'Spotless CSR']);
+    $other = PancakeUser::create(['name' => 'Mariel Bautista']);
+
+    $otherShop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+
+    // 90,000 delivered and nothing back. No day of theirs saw both sides, so
+    // there is no rate to read and they are out of the ranking entirely — the
+    // card cannot tell a spotless record apart from one whose returns have
+    // simply not landed yet.
+    deliveredBy($workspace, $perfect, '2026-08-02 10:00:00', 90000);
+
+    deliveredBy($workspace, $other, '2026-08-02 10:00:00', 70000, $otherShop);
+    returnedBy($workspace, $other, '2026-08-02 11:00:00', 30000, $otherShop);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('leader.name', 'Mariel Bautista')
+        ->assertJsonPath('leader.value', 30);
+});
+
+test('a tie at the top breaks on money settled, not the parcel counts', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $bigger = PancakeUser::create(['name' => 'Mariel Bautista']);
+    $smaller = PancakeUser::create(['name' => 'Smaller CSR']);
+
+    $bigShop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+    $smallShop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+
+    // Both at 25%, over 80,000 and 60,000. The counts behind those amounts read
+    // zero on rollup rows written before the 2026_09_03 migration, so the tie
+    // has to break on the money or it does not break at all.
+    deliveredBy($workspace, $bigger, '2026-08-02 10:00:00', 60000, $bigShop);
+    returnedBy($workspace, $bigger, '2026-08-02 11:00:00', 20000, $bigShop);
+
+    deliveredBy($workspace, $smaller, '2026-08-02 10:00:00', 45000, $smallShop);
+    returnedBy($workspace, $smaller, '2026-08-02 11:00:00', 15000, $smallShop);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('leader.name', 'Mariel Bautista')
+        ->assertJsonPath('leader.value', 25)
+        ->assertJsonPath('leader.delivered', 60000);
+});
+
+test('a return too small to print at one decimal leaves nobody to rank', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Mariel Bautista']);
+    $shop = Shop::factory()->create(['workspace_id' => $workspace->id]);
+
+    // Both sides are there, so the day is a contender — but 1 against 1,000,000
+    // is 0.0001%, and the card prints one decimal. The whole board reads 0.0%,
+    // which separates nobody.
+    deliveredBy($workspace, $csr, '2026-08-02 10:00:00', 1000000, $shop);
+    returnedBy($workspace, $csr, '2026-08-02 11:00:00', 1, $shop);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('leader', null);
+});
+
+test('a board where nobody returned anything has nobody to rank', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $one = PancakeUser::create(['name' => 'Mariel Bautista']);
+    $other = PancakeUser::create(['name' => 'Someone Else']);
+
+    // Every rate on the board is 0, so the leader would be whoever the tiebreak
+    // reached first. That is not a ranking — the card stays empty.
+    deliveredBy($workspace, $one, '2026-08-02 10:00:00', 80000);
+    deliveredBy($workspace, $other, '2026-08-02 10:00:00', 60000);
+
+    csrRtsLeader($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('leader', null);
 });
 
 function csrRmoCalledLeader($owner, Workspace $workspace, string $from, string $to)

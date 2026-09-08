@@ -45,6 +45,7 @@ import CsrDailyCallOutcomesTable, {
 import CsrDailyEffortChart, {
     type DailyEffortResponse,
 } from '@/components/csr/CsrDailyEffortChart';
+import CsrSyncButton from '@/components/csr/CsrSyncButton';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
@@ -79,6 +80,11 @@ interface CsrRecord {
 interface Props {
     workspace: Workspace;
     records: PaginatedData<CsrRecord>;
+    /**
+     * Whether the manual rollup trigger is offered. False in production, where
+     * the nightly schedule is the only thing that rebuilds these records.
+     */
+    canRunSync?: boolean;
     query?: {
         sort?: string | null;
         from?: string | null;
@@ -171,7 +177,12 @@ const STICKY_HEADER_CELL =
 const SCROLL_BODY =
     '[&_.custom-scrollbar]:max-h-[32rem] [&_.custom-scrollbar]:overflow-y-auto';
 
-export default function Analytics({ workspace, records, query }: Props) {
+export default function Analytics({
+    workspace,
+    records,
+    query,
+    canRunSync = false,
+}: Props) {
     const today = new Date();
     const currentType = query?.type === 'erp' ? 'erp' : 'pos';
     const currentSort = query?.sort ?? '-total_sales';
@@ -555,6 +566,9 @@ export default function Analytics({ workspace, records, query }: Props) {
                         })}
                     </div>
                     */}
+                    {canRunSync && (
+                        <CsrSyncButton workspaceSlug={workspace.slug} />
+                    )}
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"

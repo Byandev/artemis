@@ -13,6 +13,7 @@ use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -27,6 +28,16 @@ class CSRController extends Controller
         'csr_name', 'total_orders', 'total_sales',
         'delivered', 'returning_count', 'rts_rate',
         'total_called', 'total_call_time',
+    ];
+
+    /**
+     * The two nightly CSR rollups the analytics page reads — the same commands
+     * routes/console.php schedules at 03:00 and 04:15. The button runs both at
+     * once; the schedule stays as it is.
+     */
+    private const SYNC_COMMANDS = [
+        'sync:csr-daily-records',
+        'sync:csr-daily-call-records',
     ];
 
     private function isPos(Request $request): bool
@@ -970,9 +981,12 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        // Off the same rollup, so this is the RTS Rate column: money back over
-        // money settled, counted on the day it settled. Replaces a scan of the
-        // workspace's whole order history; an uncovered range has nobody to rank.
+        // Who is in the running and what their rate reads are two questions.
+        // A CSR earns a place by having at least one shop-day that saw both a
+        // return and a delivery — half a parcel's story is no evidence of a
+        // rate. The rate itself is then read off everything they settled in
+        // the range, delivery-only days included, which is the arithmetic and
+        // the row set of the RTS Rate column in the table below.
         $perCsr = $this->scopeToVisibleShops(
             DB::table('pancake_user_pos_daily_reports as r')
                 ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
@@ -982,37 +996,54 @@ class CSRController extends Controller
             'r.shop_id',
         )
             ->groupBy('pu.id', 'pu.name')
-            // `_amount` suffixes on purpose: an alias of `delivered` shadows
+            // Suffixed aliases on purpose: an alias of `delivered` shadows
             // r.delivered in the ORDER BY, which ONLY_FULL_GROUP_BY rejects.
             ->selectRaw('
                 pu.name as name,
                 COALESCE(SUM(r.returning), 0) as returned_amount,
                 COALESCE(SUM(r.delivered), 0) as delivered_amount,
-                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders
+                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders,
+                SUM(CASE WHEN r.returning > 0 AND r.delivered > 0 THEN 1 ELSE 0 END) as qualifying_days
             ')
-            // Eligibility is money settled, as on the RTS card. Parcels all
-            // worth zero have no rate to rank, so they are out rather than last.
-            ->havingRaw('returned_amount + delivered_amount > 0')
+            // The qualifying day is the entry ticket, not the figure: one of
+            // them puts the CSR in the ranking, and the sums above then speak
+            // for the whole range. It also keeps both sums off zero, so the
+            // rate below always has something to divide.
+            ->havingRaw('qualifying_days > 0')
             ->orderByRaw('returned_amount / (returned_amount + delivered_amount) ASC')
-            // Ties are common at a clean 0%; break them on volume.
-            ->orderByDesc('settled_orders')
-            ->first();
+            // Ties are common at a clean 0%; break them on the money settled.
+            // Not on settled_orders: those counts read zero on every rollup row
+            // written before the 2026_09_03 migration added them, so until a
+            // `sync:csr-daily-records` backfill lands they break nothing.
+            ->orderByRaw('returned_amount + delivered_amount DESC')
+            ->get();
 
-        if ($perCsr === null) {
+        // Money back over money settled, to the decimal the card prints. The
+        // qualifying day above keeps the divisor off zero.
+        $rate = fn ($row) => round(
+            (float) $row->returned_amount
+                / ((float) $row->returned_amount + (float) $row->delivered_amount)
+                * 100,
+            1,
+        );
+
+        // Every rate on the board prints as 0.0% — returns too small against the
+        // deliveries beside them to show at one decimal. Nothing separates the
+        // CSRs and the winner would be whoever the tiebreak reached first, so
+        // the card says nobody to rank instead of picking one of them.
+        $leader = $perCsr->max($rate) > 0 ? $perCsr->first() : null;
+
+        if ($leader === null) {
             return response()->json(['leader' => null]);
         }
 
-        $returned = (float) $perCsr->returned_amount;
-        $delivered = (float) $perCsr->delivered_amount;
-        $settled = $returned + $delivered;
-
         return response()->json([
             'leader' => [
-                'name' => $perCsr->name,
-                'value' => round($returned / $settled * 100, 1),
-                'returned' => $returned,
-                'delivered' => $delivered,
-                'orders' => (int) $perCsr->settled_orders,
+                'name' => $leader->name,
+                'value' => $rate($leader),
+                'returned' => (float) $leader->returned_amount,
+                'delivered' => (float) $leader->delivered_amount,
+                'orders' => (int) $leader->settled_orders,
             ],
         ]);
     }
@@ -1394,5 +1425,47 @@ class CSRController extends Controller
                 'color_slot' => $slots[$row['id']] % 8,
             ])->all(),
         ])->all();
+    }
+
+    /**
+     * Run both CSR rollups now, for today and yesterday only, scoped to this
+     * workspace. Local and the test server only.
+     *
+     * The commands only queue the aggregation jobs, so this returns as soon as
+     * they are dispatched — the figures move once the queue drains. Passing
+     * --date per day rather than --days is what keeps today in the window: the
+     * commands' own backfill starts at yesterday and works backwards.
+     */
+    public function runSync(Request $request, Workspace $workspace)
+    {
+        // Local and the test server only. Production keeps to the schedule, and
+        // hiding the button there is not on its own a guard.
+        abort_if(app()->environment('production'), 403, 'Manual CSR sync is disabled in production.');
+
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        $dates = [
+            CarbonImmutable::today()->toDateString(),
+            CarbonImmutable::yesterday()->toDateString(),
+        ];
+
+        $output = [];
+
+        foreach (self::SYNC_COMMANDS as $command) {
+            foreach ($dates as $date) {
+                Artisan::call($command, [
+                    '--workspace' => $workspace->slug,
+                    '--date' => $date,
+                ]);
+
+                $output[] = trim(Artisan::output());
+            }
+        }
+
+        return response()->json([
+            'commands' => self::SYNC_COMMANDS,
+            'dates' => $dates,
+            'output' => $output,
+        ]);
     }
 }

@@ -69,6 +69,13 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-daily-effort', [CSRController::class, 'analyticsDailyEffort']);
         // The same days as numbers: where every call ended up, and the day's hit rate.
         Route::get('/csrs/stats/analytics-daily-call-outcomes', [CSRController::class, 'analyticsDailyCallOutcomes']);
+
+        // Kick the nightly CSR rollups by hand. Everything on the analytics
+        // page is built by them, so a gap is closed by re-running one instead
+        // of waiting for the schedule. Throttled — each run fans out jobs.
+        Route::post('/csrs/sync', [CSRController::class, 'runSync'])
+            ->middleware('throttle:6,1')
+            ->name('csrs.sync');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');
