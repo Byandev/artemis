@@ -6,6 +6,7 @@ import {
     Minus,
     PhoneCall,
     PhoneForwarded,
+    PhoneIncoming,
     PhoneOutgoing,
     RotateCcw,
     ShieldAlert,
@@ -40,6 +41,11 @@ export interface RtsStat extends StatPayload {
 
 export interface RmoCalledStat extends StatPayload {
     value: number;
+}
+
+export interface TotalRmoCalledStat extends StatPayload {
+    value: number;
+    seconds: number;
 }
 
 export interface RmoTimeStat extends StatPayload {
@@ -303,6 +309,36 @@ export function RmoCalledStatCard({
                     ? `call${stat.value === 1 ? '' : 's'} placed in the range`
                     : ''
             }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function TotalRmoCalledStatCard({
+    stat,
+    loading,
+}: {
+    stat: TotalRmoCalledStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Called"
+            icon={PhoneIncoming}
+            loading={loading || stat === null}
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The time behind them, since RMO has no card of its own for it —
+            // unlike the verification pair beside this one.
+            footnote={stat ? `${duration(stat.seconds)} on the phone` : ''}
             trend={
                 <Trend
                     change={stat?.change ?? null}

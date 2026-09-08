@@ -250,7 +250,7 @@ test('the endpoint needs the CSR analytics permission', function () {
     $outsider = User::factory()->create();
     $workspace->users()->attach($outsider->id);
 
-    foreach (['analytics-sales', 'analytics-rts', 'analytics-rmo-called', 'analytics-rmo-time', 'analytics-calls-placed', 'analytics-real-conversations', 'analytics-reach-rate', 'analytics-longest-call', 'analytics-leader-sales', 'analytics-leader-rts', 'analytics-leader-rmo-called', 'analytics-leader-rmo-duration'] as $stat) {
+    foreach (['analytics-sales', 'analytics-rts', 'analytics-rmo-called', 'analytics-total-rmo-called', 'analytics-rmo-time', 'analytics-calls-placed', 'analytics-real-conversations', 'analytics-reach-rate', 'analytics-longest-call', 'analytics-leader-sales', 'analytics-leader-rts', 'analytics-leader-rmo-called', 'analytics-leader-rmo-duration'] as $stat) {
         $this->actingAs($outsider)
             ->getJson("/api/workspaces/{$workspace->slug}/csrs/stats/{$stat}?from=2026-08-01&to=2026-08-05")
             ->assertForbidden();
@@ -493,6 +493,104 @@ test('another workspace\'s calls are not in the RMO called total', function () {
     placedCall($other, '2026-08-02');
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0);
+});
+
+function csrTotalRmoCalledStat($owner, Workspace $workspace, string $from, string $to)
+{
+    return csrStat($owner, $workspace, 'analytics-total-rmo-called', $from, $to);
+}
+
+test('RMO called counts the calls stamped to a delivery', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 120);
+    rmoCall($workspace, '2026-08-03', 60);
+    // Outside the range on purpose.
+    rmoCall($workspace, '2026-08-09', 9999);
+
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 2)
+        ->assertJsonPath('seconds', 180);
+});
+
+test('a verification call is not an RMO call', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 120);
+    // An order with no delivery behind it goes in the verification columns.
+    verificationCall($workspace, '2026-08-02', 600);
+
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('seconds', 120);
+});
+
+test('the two halves add up to the total called', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 120);
+    rmoCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-02', 60);
+
+    // RMO and verification are the whole of it, so the Total Called card above
+    // is always these two summed — pinned so the split cannot drift.
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 2);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1);
+
+    csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 3);
+});
+
+test('a call against no order is in no report row, RMO included', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-08-02', 120);
+    rmoCall($workspace, '2026-08-02', 600, matched: false);
+
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1);
+});
+
+test('the RMO call count change is relative, as a count rather than a rate', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    rmoCall($workspace, '2026-07-28', 60);
+    rmoCall($workspace, '2026-07-29', 60);
+
+    rmoCall($workspace, '2026-08-02', 60);
+    rmoCall($workspace, '2026-08-02', 60);
+    rmoCall($workspace, '2026-08-03', 60);
+
+    // 2 to 3 calls is +50%.
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 3)
+        ->assertJsonPath('previous_value', 2)
+        ->assertJsonPath('change', 50);
+});
+
+test('a range with no RMO calls reads zero', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    verificationCall($workspace, '2026-08-02', 60);
+
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('seconds', 0)
+        ->assertJsonPath('change', null);
+});
+
+test('another workspace\'s RMO calls are not counted', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+    ['workspace' => $other] = makeWorkspaceWithOwner();
+
+    rmoCall($other, '2026-08-02', 120);
+
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 0);
 });
 

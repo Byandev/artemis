@@ -19,6 +19,7 @@ import {
     RmoTimeStatCard,
     RtsStatCard,
     SalesStatCard,
+    TotalRmoCalledStatCard,
     type CallsPlacedStat,
     type LongestCallStat,
     type ReachRateStat,
@@ -27,6 +28,7 @@ import {
     type RmoTimeStat,
     type RtsStat,
     type SalesStat,
+    type TotalRmoCalledStat,
 } from '@/components/csr/CsrAnalyticsStatCards';
 import CsrComparisonPanel, {
     type ComparisonResponse,
@@ -259,6 +261,13 @@ export default function Analytics({ workspace, records, query }: Props) {
         fromStr,
         toStr,
     );
+    const [totalRmoCalledStat, totalRmoCalledLoading] =
+        useAnalyticsStat<TotalRmoCalledStat>(
+            workspace.slug,
+            'analytics-total-rmo-called',
+            fromStr,
+            toStr,
+        );
     const [rmoTimeStat, rmoTimeLoading] = useAnalyticsStat<RmoTimeStat>(
         workspace.slug,
         'analytics-rmo-time',
@@ -570,6 +579,10 @@ export default function Analytics({ workspace, records, query }: Props) {
                     <LongestCallStatCard
                         stat={longestCallStat}
                         loading={longestCallLoading}
+                    />
+                    <TotalRmoCalledStatCard
+                        stat={totalRmoCalledStat}
+                        loading={totalRmoCalledLoading}
                     />
                 </div>
 

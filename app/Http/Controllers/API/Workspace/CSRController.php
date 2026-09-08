@@ -283,6 +283,29 @@ class CSRController extends Controller
         ]);
     }
 
+    public function analyticsTotalRmoCalled(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCalledTotals($workspace, $from, $to);
+        $previous = $this->rmoCalledTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['calls'],
+            // The talk time behind them; RMO has no card of its own for it.
+            'seconds' => $current['seconds'],
+            'previous_value' => $previous['calls'],
+            // Relative, unlike the rate cards: this is a count.
+            'change' => $previous['calls'] > 0
+                ? round(($current['calls'] - $previous['calls']) / $previous['calls'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
     public function analyticsRmoTime(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
@@ -631,6 +654,32 @@ class CSRController extends Controller
             'no_report' => $noReport,
             'high_rts' => $highRts,
             'needs_verification' => $noReport + $highRts,
+        ];
+    }
+
+    /**
+     * RMO calls over a range — the call report's own `total_rmo_called`, and
+     * the time spent on them.
+     *
+     * The other side of the split from verificationTotals(): a call stamped to
+     * a delivery, so the CSR was chasing a parcel rather than confirming an
+     * order. Together the two make up `total_called`. The rollup is nightly, so
+     * a range the sync has not reached is zero on both.
+     *
+     * @return array{calls: int, seconds: int}
+     */
+    private function rmoCalledTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_rmo_called), 0)    as calls,
+                COALESCE(SUM(total_rmo_call_time), 0) as seconds
+            ')
+            ->first();
+
+        return [
+            'calls' => (int) ($row->calls ?? 0),
+            'seconds' => (int) ($row->seconds ?? 0),
         ];
     }
 
