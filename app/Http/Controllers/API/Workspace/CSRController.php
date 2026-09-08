@@ -360,6 +360,39 @@ class CSRController extends Controller
         ]);
     }
 
+    public function analyticsRmoHitRate(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoRealTotals($workspace, $from, $to);
+        $previous = $this->rmoRealTotals($workspace, $previousFrom, $previousTo);
+
+        // Undefined rather than zero with nothing placed: 0% reads as "everyone
+        // hung up", which is not "nobody called" — the same distinction
+        // RmoDailyStats::derivedCallStats() makes for the RMO management card.
+        $rate = $current['calls'] > 0
+            ? round($current['real'] / $current['calls'] * 100, 1)
+            : null;
+        $previousRate = $previous['calls'] > 0
+            ? round($previous['real'] / $previous['calls'] * 100, 1)
+            : null;
+
+        return response()->json([
+            'value' => $rate,
+            'conversations' => $current['real'],
+            'calls' => $current['calls'],
+            'previous_value' => $previousRate,
+            // Percentage points, like the other rate cards: 40% to 45% is "+5 pts".
+            'change' => $rate !== null && $previousRate !== null
+                ? round($rate - $previousRate, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
     public function analyticsRmoTime(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
