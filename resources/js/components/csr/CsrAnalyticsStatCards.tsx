@@ -2,6 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
     ArrowDown,
     ArrowUp,
+    Headset,
     Hourglass,
     MessagesSquare,
     Minus,
@@ -53,6 +54,14 @@ export interface RmoCallTimeStat extends StatPayload {
     value: number;
     calls: number;
     average_seconds: number | null;
+}
+
+export interface RmoRealConversationsStat extends StatPayload {
+    value: number;
+    /** RMO calls placed — what the conversations are read against. */
+    calls: number;
+    /** Conversations over calls, as a percentage; null with no calls. */
+    rate: number | null;
 }
 
 export interface RmoTimeStat extends StatPayload {
@@ -382,6 +391,40 @@ export function RmoCallTimeStatCard({
                 !stat || stat.average_seconds === null
                     ? 'No RMO calls in this period'
                     : `avg ${perCall(stat.average_seconds)} per call`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RmoRealConversationsStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoRealConversationsStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Real Conversation"
+            icon={Headset}
+            loading={loading || stat === null}
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The share it came out of: the count alone cannot tell a good day
+            // on few calls from a poor one on many.
+            footnote={
+                !stat || stat.rate === null
+                    ? 'No RMO calls in this period'
+                    : `${stat.rate.toFixed(1)}% of ${stat.calls.toLocaleString()} RMO calls`
             }
             trend={
                 <Trend

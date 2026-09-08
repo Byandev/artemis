@@ -49,6 +49,7 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-rmo-called', [CSRController::class, 'analyticsRmoCalled']);
         Route::get('/csrs/stats/analytics-total-rmo-called', [CSRController::class, 'analyticsTotalRmoCalled']);
         Route::get('/csrs/stats/analytics-rmo-call-time', [CSRController::class, 'analyticsRmoCallTime']);
+        Route::get('/csrs/stats/analytics-rmo-real-conversations', [CSRController::class, 'analyticsRmoRealConversations']);
         Route::get('/csrs/stats/analytics-rmo-time', [CSRController::class, 'analyticsRmoTime']);
         Route::get('/csrs/stats/analytics-calls-placed', [CSRController::class, 'analyticsCallsPlaced']);
         Route::get('/csrs/stats/analytics-real-conversations', [CSRController::class, 'analyticsRealConversations']);
