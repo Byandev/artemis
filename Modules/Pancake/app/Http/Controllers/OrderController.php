@@ -73,6 +73,78 @@ class OrderController extends Controller
     }
 
     /**
+     * Single-number comparisons on the customer's return rate, mapped to SQL.
+     *
+     * An allowlist because the chosen key is interpolated into the comparison;
+     * the request names a key, never an operator. `between` is absent because it
+     * reads a second number and is built by hand below.
+     */
+    public const RTS_OPERATORS = [
+        'gt' => '>',
+        'lt' => '<',
+        'eq' => '=',
+    ];
+
+    /** Every comparison the page may offer, in the order it lists them. */
+    public const RTS_COMPARISONS = ['gt', 'lt', 'eq', 'between'];
+
+    /**
+     * Narrow by the customer's return report — the same rate the Customer RTS
+     * column shows.
+     *
+     * `no_report` is the orders whose phone number has nothing behind it, which
+     * is exactly where the rate comes back NULL. `has_report` is the rest, and
+     * may carry a comparison against the number(s) typed beside the operator.
+     *
+     * Compared as a whole percent, because that is what the badge shows: a row
+     * reading 30% should answer a "= 30" rather than nothing at all.
+     */
+    private function applyReport($query, string $report, Request $request)
+    {
+        $rate = CustomerRtsRisk::rateSql();
+
+        if ($report === 'no_report') {
+            return $query->whereRaw("{$rate} IS NULL");
+        }
+
+        $query->whereRaw("{$rate} IS NOT NULL");
+
+        $operator = (string) $request->input('filter.rts_op');
+        $value = $request->input('filter.rts_value');
+
+        // Half a comparison narrows nothing — the report filter still stands.
+        if (! is_numeric($value)) {
+            return $query;
+        }
+
+        $percent = "ROUND({$rate} * 100)";
+
+        if ($operator === 'between') {
+            $upper = $request->input('filter.rts_value2');
+
+            if (! is_numeric($upper)) {
+                return $query;
+            }
+
+            // Ordered here rather than trusting the boxes: a range typed high
+            // then low is still the range the user meant, and BETWEEN would
+            // otherwise quietly match nothing.
+            return $query->whereRaw("{$percent} BETWEEN ? AND ?", [
+                min((float) $value, (float) $upper),
+                max((float) $value, (float) $upper),
+            ]);
+        }
+
+        $sql = self::RTS_OPERATORS[$operator] ?? null;
+
+        if ($sql === null) {
+            return $query;
+        }
+
+        return $query->whereRaw("{$percent} {$sql} ?", [(float) $value]);
+    }
+
+    /**
      * Limit to orders delivered by a given rider. Mirrors RtsRiderQuery: the rider
      * is the rider_name on the latest "On Delivery" parcel journey for the order,
      * so this matches exactly the set counted in the RTS "By Rider" breakdown.
@@ -123,6 +195,12 @@ class OrderController extends Controller
                     'pancake_orders.status_name',
                     is_array($v) ? $v : explode(',', $v),
                 )),
+                AllowedFilter::callback('report', fn ($q, $v) => $this->applyReport($q, (string) $v, $request)),
+                // Read by applyReport() off the request rather than filtering on
+                // their own — declared so Spatie doesn't reject the request.
+                AllowedFilter::callback('rts_op', fn () => null),
+                AllowedFilter::callback('rts_value', fn () => null),
+                AllowedFilter::callback('rts_value2', fn () => null),
             ])
             ->allowedSorts(['order_number', 'total_amount', 'inserted_at', 'updated_at', 'confirmed_at', 'status_name', 'cx_rts_rate'])
             ->defaultSort('-inserted_at')
@@ -146,6 +224,7 @@ class OrderController extends Controller
             ->when(($filter['date_from'] ?? null), fn ($q, $v) => $q->whereDate($dateColumn, '>=', $v))
             ->when(($filter['date_to'] ?? null), fn ($q, $v) => $q->whereDate($dateColumn, '<=', $v))
             ->when(($filter['rider'] ?? null), fn ($q, $v) => $this->applyRider($q, (string) $v))
+            ->when(($filter['report'] ?? null), fn ($q, $v) => $this->applyReport($q, (string) $v, $request))
             ->selectRaw('status_name, COUNT(*) as total')
             ->groupBy('status_name')
             ->pluck('total', 'status_name');
@@ -157,6 +236,7 @@ class OrderController extends Controller
             'totalCount' => (int) $statusCounts->sum(),
             'shippingFeeImport' => ShippingFeeImportStatus::get($workspace->id),
             'dateFields' => self::DATE_FIELDS,
+            'rtsOperators' => self::RTS_COMPARISONS,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),

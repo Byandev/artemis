@@ -6,6 +6,14 @@ import {
 } from '@/components/ui/columns-dropdown';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
@@ -80,6 +88,9 @@ interface Props {
     /** Date columns the range filter may point at, straight from the backend
      *  allowlist so the dropdown can't offer one the server would ignore. */
     dateFields: string[];
+    /** Comparisons the customer-RTS filter accepts, from the same allowlist the
+     *  server compares on. */
+    rtsOperators: string[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -91,6 +102,10 @@ interface Props {
             date_to?: string;
             date_type?: string;
             rider?: string;
+            report?: string;
+            rts_op?: string;
+            rts_value?: string;
+            rts_value2?: string;
         };
     };
 }
@@ -133,18 +148,44 @@ const prettyDate = (iso: string | null) => {
 
 // Labels for the date columns the range filter can point at. Keys match
 // OrderController::DATE_FIELDS; the backend decides which are offered.
+//
+// No "date" in any of them — the chip they sit in is already labelled Date, and
+// the repetition only cost the dropdown the width to read them in.
 const DATE_FIELD_LABELS: Record<string, string> = {
-    inserted_at: 'Created date (Pancake)',
-    confirmed_at: 'Confirmed date',
-    created_at: 'Synced date',
-    shipped_at: 'Shipped date',
-    delivered_at: 'Delivered date',
-    returning_at: 'Returning date',
-    returned_at: 'Returned date',
-    updated_at: 'Status updated date',
+    inserted_at: 'Created (Pancake)',
+    confirmed_at: 'Confirmed',
+    created_at: 'Synced',
+    shipped_at: 'Shipped',
+    delivered_at: 'Delivered',
+    returning_at: 'Returning',
+    returned_at: 'Returned',
+    updated_at: 'Status updated',
 };
 
 const DEFAULT_DATE_FIELD = 'inserted_at';
+
+// Whether the customer has a return history at all — the first question the
+// Customer RTS filter asks, and the only one unless the answer is "with".
+//
+// `any` rather than '' because Radix rejects an empty SelectItem value; it is
+// the resting state, so the filter narrows nothing until it is moved off.
+const RTS_REPORT_LABELS: Record<string, string> = {
+    any: 'any',
+    has_report: 'with history',
+    no_report: 'no history',
+};
+
+// How a history's rate is compared. Keys match OrderController::RTS_COMPARISONS,
+// which is also where the offered list comes from.
+const RTS_COMPARISON_LABELS: Record<string, string> = {
+    gt: 'greater than',
+    lt: 'less than',
+    eq: 'equal to',
+    between: 'between',
+};
+
+const DEFAULT_RTS_REPORT = 'any';
+const DEFAULT_RTS_COMPARISON = 'gt';
 
 // One object rather than a run of same-typed positional arguments — every filter
 // here is a string, so a transposed pair would not be a type error.
@@ -155,6 +196,14 @@ interface FilterState {
     dateTo: string;
     dateType: string;
     rider: string;
+    /** '' when the Customer RTS chip isn't on the bar; otherwise a key of
+     *  RTS_REPORT_LABELS. */
+    report: string;
+    rtsOp: string;
+    /** The rate to compare against, as a whole percent. */
+    rtsValue: string;
+    /** The upper bound, for `between` only. */
+    rtsValue2: string;
 }
 
 // How the customer's return history reads on a row. The bands themselves are
@@ -215,6 +264,7 @@ export default function PancakeOrdersIndex({
     totalCount,
     shippingFeeImport,
     dateFields,
+    rtsOperators,
     query,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/pancake/orders`;
@@ -232,6 +282,18 @@ export default function PancakeOrdersIndex({
     const [dateTo, setDateTo] = useState<string>(query?.filter?.date_to ?? '');
     const [dateType, setDateType] = useState<string>(
         query?.filter?.date_type ?? DEFAULT_DATE_FIELD,
+    );
+    const [report, setReport] = useState<string>(
+        query?.filter?.report ?? DEFAULT_RTS_REPORT,
+    );
+    const [rtsOp, setRtsOp] = useState<string>(
+        query?.filter?.rts_op ?? DEFAULT_RTS_COMPARISON,
+    );
+    const [rtsValue, setRtsValue] = useState<string>(
+        query?.filter?.rts_value ?? '',
+    );
+    const [rtsValue2, setRtsValue2] = useState<string>(
+        query?.filter?.rts_value2 ?? '',
     );
 
     const canImportFees = usePermission(PERMISSIONS.ImportOrderShippingFees);
@@ -317,12 +379,16 @@ export default function PancakeOrdersIndex({
         });
     };
 
+    // Memoised on the dates themselves: DatePicker rebuilds flatpickr whenever
+    // this prop's identity changes, so a fresh array each render would tear the
+    // calendar down mid-interaction — but a stale one would show a range the
+    // filter no longer holds after the chip is removed and added again.
     const defaultDate = useMemo(
         () =>
             dateFrom && dateTo
                 ? ([dateFrom, dateTo] as never as DateOption)
                 : undefined,
-        [],
+        [dateFrom, dateTo],
     );
 
     const buildFilter = (f: FilterState) => ({
@@ -336,6 +402,19 @@ export default function PancakeOrdersIndex({
                 ? f.dateType
                 : undefined,
         rider: f.rider || undefined,
+        report: f.report === DEFAULT_RTS_REPORT ? undefined : f.report,
+        // A comparison only counts once there is a number in the box; until then
+        // the chip is asking about the history alone.
+        ...(f.report === 'has_report' && f.rtsValue !== ''
+            ? {
+                  rts_op: f.rtsOp,
+                  rts_value: f.rtsValue,
+                  rts_value2:
+                      f.rtsOp === 'between' && f.rtsValue2 !== ''
+                          ? f.rtsValue2
+                          : undefined,
+              }
+            : {}),
     });
 
     const currentFilter = (): FilterState => ({
@@ -345,6 +424,10 @@ export default function PancakeOrdersIndex({
         dateTo,
         dateType,
         rider,
+        report,
+        rtsOp,
+        rtsValue,
+        rtsValue2,
     });
 
     const reload = useCallback(
@@ -376,7 +459,41 @@ export default function PancakeOrdersIndex({
         }
         reload(currentFilter());
         return () => reload.cancel();
-    }, [search, status, dateFrom, dateTo, dateType, rider]);
+    }, [
+        search,
+        status,
+        dateFrom,
+        dateTo,
+        dateType,
+        rider,
+        report,
+        rtsOp,
+        rtsValue,
+        rtsValue2,
+    ]);
+
+    // The two standing filters are always on the bar, so their presence says
+    // nothing — only a value moved off its resting state is actually narrowing.
+    const isFiltered =
+        !!search ||
+        !!status ||
+        !!dateFrom ||
+        !!dateTo ||
+        !!rider ||
+        report !== DEFAULT_RTS_REPORT;
+
+    const clearFilters = () => {
+        setSearch('');
+        setStatus('');
+        setRider('');
+        setDateFrom('');
+        setDateTo('');
+        setDateType(DEFAULT_DATE_FIELD);
+        setReport(DEFAULT_RTS_REPORT);
+        setRtsOp(DEFAULT_RTS_COMPARISON);
+        setRtsValue('');
+        setRtsValue2('');
+    };
 
     const { visibility: columnVisibility, setVisibility: setColumnVisibility } =
         useColumnVisibility(COLUMN_OPTIONS, COLUMNS_STORAGE_KEY);
@@ -726,8 +843,9 @@ export default function PancakeOrdersIndex({
                     ))}
                 </div>
 
-                {/* Filters */}
-                <div className="mb-3 flex flex-col items-stretch gap-2 md:flex-row md:items-center">
+                {/* Filters: search, the two standing filters, then anything
+                    arrived at from elsewhere in the app. */}
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                     <div className="relative w-full max-w-xs">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
@@ -737,61 +855,45 @@ export default function PancakeOrdersIndex({
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <select
-                        value={dateType}
-                        onChange={(e) => setDateType(e.target.value)}
-                        title="Which date the range filters on"
-                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2 font-mono! text-[12px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100"
-                    >
-                        {dateFields.map((field) => (
-                            <option key={field} value={field}>
-                                {DATE_FIELD_LABELS[field] ?? field}
-                            </option>
-                        ))}
-                    </select>
-                    <DatePicker
-                        id="pancake-orders-date-range"
-                        mode="range"
-                        placeholder={`Filter by ${(
-                            DATE_FIELD_LABELS[dateType] ?? dateType
-                        ).toLowerCase()}`}
-                        defaultDate={defaultDate}
-                        onChange={(dates) => {
-                            if (dates.length === 2) {
-                                setDateFrom(
-                                    moment(dates[0]).format('YYYY-MM-DD'),
-                                );
-                                setDateTo(
-                                    moment(dates[1]).format('YYYY-MM-DD'),
-                                );
-                            } else if (dates.length === 0) {
-                                setDateFrom('');
-                                setDateTo('');
-                            }
+
+                    <DateFilterChip
+                        field={dateType}
+                        fields={dateFields}
+                        range={defaultDate}
+                        onFieldChange={setDateType}
+                        onRangeChange={(from, to) => {
+                            setDateFrom(from);
+                            setDateTo(to);
                         }}
                     />
+
+                    <CustomerRtsFilterChip
+                        report={report}
+                        op={rtsOp}
+                        value={rtsValue}
+                        value2={rtsValue2}
+                        comparisons={rtsOperators}
+                        onReportChange={setReport}
+                        onOpChange={setRtsOp}
+                        onValueChange={setRtsValue}
+                        onValue2Change={setRtsValue2}
+                    />
+
                     {rider && (
-                        <span className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-emerald-300 bg-emerald-50 px-3 font-mono! text-[12px]! text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-400">
-                            Rider: {rider}
-                            <button
-                                onClick={() => setRider('')}
-                                className="rounded-full p-0.5 hover:bg-emerald-100 dark:hover:bg-emerald-500/20"
-                                title="Remove rider filter"
-                            >
-                                <X className="h-3 w-3" />
-                            </button>
-                        </span>
+                        <FilterChip
+                            label="Rider"
+                            onRemove={() => setRider('')}
+                            removeTitle="Remove rider filter"
+                        >
+                            <span className="text-xs text-gray-700 dark:text-gray-200">
+                                {rider}
+                            </span>
+                        </FilterChip>
                     )}
-                    {(search || status || dateFrom || dateTo || rider) && (
+
+                    {isFiltered && (
                         <button
-                            onClick={() => {
-                                setSearch('');
-                                setStatus('');
-                                setRider('');
-                                setDateFrom('');
-                                setDateTo('');
-                                setDateType(DEFAULT_DATE_FIELD);
-                            }}
+                            onClick={clearFilters}
                             className="flex h-9 items-center gap-1 rounded-[10px] border border-black/10 bg-white px-3 font-mono! text-[12px]! text-gray-700 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300"
                         >
                             <X className="h-3.5 w-3.5" />
@@ -840,6 +942,192 @@ export default function PancakeOrdersIndex({
                 </div>
             </div>
         </AppLayout>
+    );
+}
+
+/**
+ * One filter: its own tray, holding the field name and whatever controls the
+ * field needs. The fill is what separates it from the filter beside it and from
+ * the search box, so each reads as a question of its own.
+ *
+ * The X is only for a filter that can actually come off the bar. The two
+ * standing ones have no "off" — their own resting value is what stops them
+ * narrowing — so an X there would promise something it can't do.
+ */
+function FilterChip({
+    label,
+    children,
+    onRemove,
+    removeTitle,
+}: {
+    label: string;
+    children: React.ReactNode;
+    onRemove?: () => void;
+    removeTitle?: string;
+}) {
+    return (
+        <div className="flex items-center gap-1.5 rounded-[10px] bg-stone-100 px-2 py-1 dark:bg-zinc-800/60">
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {label}
+            </span>
+            {children}
+            {onRemove && (
+                <button
+                    type="button"
+                    onClick={onRemove}
+                    title={removeTitle ?? `Remove ${label} filter`}
+                    className="rounded p-1 text-gray-400 hover:text-red-500"
+                >
+                    <X className="h-3.5 w-3.5" />
+                </button>
+            )}
+        </div>
+    );
+}
+
+/**
+ * A date range and the column it applies to.
+ *
+ * Which date sits beside the picker rather than anywhere else: moving a range
+ * from the confirmed date to the delivered one is a change to the filter you are
+ * already looking at, so both halves of that question belong together.
+ */
+function DateFilterChip({
+    field,
+    fields,
+    range,
+    onFieldChange,
+    onRangeChange,
+}: {
+    field: string;
+    /** The columns the server will filter on, from its own allowlist. */
+    fields: string[];
+    range?: DateOption;
+    onFieldChange: (field: string) => void;
+    onRangeChange: (from: string, to: string) => void;
+}) {
+    return (
+        <FilterChip label="Date">
+            <Select value={field} onValueChange={onFieldChange}>
+                <SelectTrigger className="h-7 w-[135px] text-xs">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {fields.map((f) => (
+                        <SelectItem key={f} value={f}>
+                            {DATE_FIELD_LABELS[f] ?? f}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <DatePicker
+                id="pancake-orders-date-range"
+                mode="range"
+                compact
+                placeholder="Pick a range"
+                defaultDate={range}
+                onChange={(dates) => {
+                    if (dates.length === 2) {
+                        onRangeChange(
+                            moment(dates[0]).format('YYYY-MM-DD'),
+                            moment(dates[1]).format('YYYY-MM-DD'),
+                        );
+                    } else if (dates.length === 0) {
+                        onRangeChange('', '');
+                    }
+                }}
+            />
+        </FilterChip>
+    );
+}
+
+/**
+ * The customer's return history: first whether they have one, then — only for
+ * those who do — how its rate compares to the percentage(s) typed beside it.
+ *
+ * The comparison is hidden for "no history" because there is no rate to compare;
+ * offering one there would be a control that answers nothing.
+ */
+function CustomerRtsFilterChip({
+    report,
+    op,
+    value,
+    value2,
+    comparisons,
+    onReportChange,
+    onOpChange,
+    onValueChange,
+    onValue2Change,
+}: {
+    report: string;
+    op: string;
+    value: string;
+    value2: string;
+    /** The comparisons the server accepts, straight from its own list. */
+    comparisons: string[];
+    onReportChange: (report: string) => void;
+    onOpChange: (op: string) => void;
+    onValueChange: (value: string) => void;
+    onValue2Change: (value: string) => void;
+}) {
+    return (
+        <FilterChip label="Customer RTS">
+            <Select value={report} onValueChange={onReportChange}>
+                <SelectTrigger className="h-7 w-[110px] text-xs">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {Object.entries(RTS_REPORT_LABELS).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>
+                            {label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
+            {report === 'has_report' && (
+                <>
+                    <Select value={op} onValueChange={onOpChange}>
+                        <SelectTrigger className="h-7 w-[125px] text-xs">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {comparisons.map((c) => (
+                                <SelectItem key={c} value={c}>
+                                    {RTS_COMPARISON_LABELS[c] ?? c}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={value}
+                        onChange={(e) => onValueChange(e.target.value)}
+                        placeholder="any"
+                        className="h-7 w-[70px] text-xs"
+                    />
+                    {op === 'between' && (
+                        <>
+                            <span className="text-xs text-gray-400">and</span>
+                            <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={value2}
+                                onChange={(e) => onValue2Change(e.target.value)}
+                                placeholder="100"
+                                className="h-7 w-[70px] text-xs"
+                            />
+                        </>
+                    )}
+                    {/* Beside the boxes rather than inside them — a number
+                        input's spinners already own that corner. */}
+                    <span className="text-xs text-gray-400">%</span>
+                </>
+            )}
+        </FilterChip>
     );
 }
 

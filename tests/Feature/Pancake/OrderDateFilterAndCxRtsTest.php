@@ -158,3 +158,119 @@ it('sorts on the customer return rate', function () {
 
     expect(collect($sorted)->pluck('order_number')->take(2)->all())->toBe(['HIGH', 'LOW']);
 });
+
+it('splits the list by whether the customer number has a report behind it', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $reported = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'WITH']);
+    Order::factory()->forWorkspace($workspace)->create(['order_number' => 'NONE']);
+
+    phoneReport($reported, fail: 3, success: 7);
+
+    $numbers = fn (string $report) => collect(orderRows($workspace, ['report' => $report]))
+        ->pluck('order_number')->all();
+
+    expect($numbers('has_report'))->toBe(['WITH'])
+        // The same set the row badges call "No report" — an unknown customer,
+        // not a clean one.
+        ->and($numbers('no_report'))->toBe(['NONE']);
+});
+
+it('compares the return rate against the percentage typed beside the operator', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $low = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'LOW']);
+    $medium = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'MED']);
+    $high = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'HIGH']);
+    Order::factory()->forWorkspace($workspace)->create(['order_number' => 'NONE']);
+
+    phoneReport($low, fail: 1, success: 9);      // 10%
+    phoneReport($medium, fail: 3, success: 7);   // 30%
+    phoneReport($high, fail: 7, success: 3);     // 70%
+
+    $numbers = fn (string $operator, string $value) => collect(orderRows($workspace, [
+        'report' => 'has_report',
+        'rts_op' => $operator,
+        'rts_value' => $value,
+    ]))->pluck('order_number')->sort()->values()->all();
+
+    expect($numbers('gt', '30'))->toBe(['HIGH'])
+        ->and($numbers('lt', '30'))->toBe(['LOW'])
+        // The rate is compared as a whole percent, so "= 30" catches the row
+        // whose badge reads 30% rather than nothing at all.
+        ->and($numbers('eq', '30'))->toBe(['MED']);
+});
+
+it('keeps every reported order when the comparison is incomplete or unknown', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $order = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'WITH']);
+    phoneReport($order, fail: 3, success: 7);
+
+    // A blank box, and an operator that isn't on the allowlist, both narrow
+    // nothing rather than dropping the report filter or reaching the SQL.
+    expect(orderRows($workspace, ['report' => 'has_report', 'rts_op' => 'gt', 'rts_value' => '']))->toHaveCount(1)
+        ->and(orderRows($workspace, ['report' => 'has_report', 'rts_op' => 'DROP', 'rts_value' => '30']))->toHaveCount(1);
+});
+
+it('narrows the status tab counts on the report filter too', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $reported = Order::factory()->forWorkspace($workspace)->create(['status_name' => 'delivered']);
+    Order::factory()->forWorkspace($workspace)->create(['status_name' => 'returned']);
+
+    phoneReport($reported, fail: 7, success: 3);
+
+    $counts = fn (array $filter) => ordersPage($workspace, $filter)->assertOk()
+        ->viewData('page')['props']['statusCounts'];
+
+    expect($counts(['report' => 'has_report']))->toBe(['delivered' => 1])
+        ->and($counts(['report' => 'no_report']))->toBe(['returned' => 1])
+        ->and($counts(['report' => 'has_report', 'rts_op' => 'lt', 'rts_value' => '50']))->toBe([]);
+});
+
+it('reads a between comparison as a band, whichever way round it is typed', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $low = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'LOW']);
+    $medium = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'MED']);
+    $high = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'HIGH']);
+
+    phoneReport($low, fail: 1, success: 9);      // 10%
+    phoneReport($medium, fail: 3, success: 7);   // 30%
+    phoneReport($high, fail: 7, success: 3);     // 70%
+
+    $numbers = fn (string $from, string $to) => collect(orderRows($workspace, [
+        'report' => 'has_report',
+        'rts_op' => 'between',
+        'rts_value' => $from,
+        'rts_value2' => $to,
+    ]))->pluck('order_number')->sort()->values()->all();
+
+    expect($numbers('20', '50'))->toBe(['MED'])
+        // Typed high-then-low is still the band the user meant; BETWEEN taken
+        // literally would match nothing at all.
+        ->and($numbers('50', '20'))->toBe(['MED'])
+        // Inclusive at both ends, the way the boxes read.
+        ->and($numbers('10', '30'))->toBe(['LOW', 'MED']);
+});
+
+it('ignores a between comparison that is missing its upper bound', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $order = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'WITH']);
+    phoneReport($order, fail: 7, success: 3);
+
+    // Half a band narrows nothing rather than guessing an end for it.
+    expect(orderRows($workspace, [
+        'report' => 'has_report',
+        'rts_op' => 'between',
+        'rts_value' => '20',
+    ]))->toHaveCount(1);
+});
