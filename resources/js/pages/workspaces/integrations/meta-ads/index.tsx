@@ -65,14 +65,15 @@ import {
 import { InlineOwner, OwnerOption } from '../components/inline-owner';
 import {
     ColumnVisibilityMenu,
+    GridFilter,
     INSIGHTS_OPTIONS,
     InsightFilterBuilder,
     InsightsMetrics,
-    MetricFilter,
     StatusLabel,
     buildInsightsColumns,
-    deserializeMetricFilters,
+    deserializeGridFilters,
     formatBudget,
+    serializeDateFilters,
     serializeMetricFilters,
     useColumnPresets,
 } from './_shared';
@@ -166,6 +167,7 @@ interface Props {
         until?: string;
         filter?: { search?: string };
         metricFilters?: unknown[];
+        dateFilters?: unknown[];
     };
 }
 
@@ -1246,8 +1248,10 @@ export default function MetaAdsManager({
     const [selected, setSelected] = useState<string[]>(selectedAccounts);
     const [range, setRange] = useState(dateRange);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() =>
-        deserializeMetricFilters(query?.metricFilters),
+    // Metric and date filters share one list and one dropdown — they differ
+    // only in which query param carries them to the server.
+    const [filters, setFilters] = useState<GridFilter[]>(() =>
+        deserializeGridFilters(query?.metricFilters, query?.dateFilters),
     );
     // Creator filter: '' (all), 'unassigned', or a member id as string.
     const [creatorFilter, setCreatorFilter] = useState<string>('');
@@ -1297,8 +1301,10 @@ export default function MetaAdsManager({
         qs.set('until', range.until);
         if (sort) qs.set('sort', sort);
         if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
-        const mf = serializeMetricFilters(metricFilters);
+        const mf = serializeMetricFilters(filters);
         if (mf) qs.set('metric_filters', mf);
+        const df = serializeDateFilters(filters);
+        if (df) qs.set('date_filters', df);
         // Creator filter is ad-level only.
         if (groupBy === 'ad' && creatorFilter) {
             qs.set('creator_id', creatorFilter);
@@ -1336,7 +1342,7 @@ export default function MetaAdsManager({
         sort,
         page,
         perPage,
-        metricFilters,
+        filters,
         creatorFilter,
         debouncedSearch,
         accounts.length,
@@ -1363,8 +1369,8 @@ export default function MetaAdsManager({
         setRange({ since, until });
         setPage(1);
     };
-    const onMetricFilters = (next: MetricFilter[]) => {
-        setMetricFilters(next);
+    const onFilters = (next: GridFilter[]) => {
+        setFilters(next);
         setPage(1);
     };
     const onSearch = (v: string) => {
@@ -1464,8 +1470,9 @@ export default function MetaAdsManager({
                             </Select>
                         )}
                         <InsightFilterBuilder
-                            filters={metricFilters}
-                            onChange={onMetricFilters}
+                            filters={filters}
+                            onChange={onFilters}
+                            groupBy={groupBy}
                         />
                     </div>
                 </div>
