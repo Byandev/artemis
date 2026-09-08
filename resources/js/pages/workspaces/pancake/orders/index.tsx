@@ -52,6 +52,11 @@ interface Order {
     shipping_address: ShippingAddress | null;
     items: OrderItem[];
     tags: OrderTag[];
+    /** The customer's own return rate, as a fraction. Null when their number
+     *  has no phone-number report behind it. */
+    cx_rts_rate: string | number | null;
+    /** That rate banded — see Modules\Pancake\Support\CustomerRtsRisk. */
+    cx_rts_level: 'no_report' | 'low' | 'medium' | 'high';
 }
 
 interface ShippingFeeImport {
@@ -72,6 +77,9 @@ interface Props {
     statusCounts: Record<string, number>;
     totalCount: number;
     shippingFeeImport?: ShippingFeeImport | null;
+    /** Date columns the range filter may point at, straight from the backend
+     *  allowlist so the dropdown can't offer one the server would ignore. */
+    dateFields: string[];
     query?: {
         sort?: string | null;
         perPage?: number | string;
@@ -81,6 +89,7 @@ interface Props {
             status?: string;
             date_from?: string;
             date_to?: string;
+            date_type?: string;
             rider?: string;
         };
     };
@@ -122,6 +131,53 @@ const prettyDate = (iso: string | null) => {
     return m.isValid() ? m.format('DD MMM, h:mm a') : '—';
 };
 
+// Labels for the date columns the range filter can point at. Keys match
+// OrderController::DATE_FIELDS; the backend decides which are offered.
+const DATE_FIELD_LABELS: Record<string, string> = {
+    inserted_at: 'Created date (Pancake)',
+    confirmed_at: 'Confirmed date',
+    created_at: 'Synced date',
+    shipped_at: 'Shipped date',
+    delivered_at: 'Delivered date',
+    returning_at: 'Returning date',
+    returned_at: 'Returned date',
+    updated_at: 'Status updated date',
+};
+
+const DEFAULT_DATE_FIELD = 'inserted_at';
+
+// One object rather than a run of same-typed positional arguments — every filter
+// here is a string, so a transposed pair would not be a type error.
+interface FilterState {
+    search: string;
+    status: string;
+    dateFrom: string;
+    dateTo: string;
+    dateType: string;
+    rider: string;
+}
+
+// How the customer's return history reads on a row. The bands themselves are
+// server-side (Modules\Pancake\Support\CustomerRtsRisk); this is only their look.
+const CX_RTS_STYLES: Record<string, { label: string; pill: string }> = {
+    low: {
+        label: 'Low risk',
+        pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400',
+    },
+    medium: {
+        label: 'Medium risk',
+        pill: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400',
+    },
+    high: {
+        label: 'High risk',
+        pill: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+    },
+    no_report: {
+        label: 'No report',
+        pill: 'bg-stone-100 text-gray-500 dark:bg-zinc-800 dark:text-gray-400',
+    },
+};
+
 // Column ids double as the sort keys sent to the backend, so they must match the
 // accessorKeys the server sorts on. `required` columns can't be hidden.
 const COLUMN_OPTIONS: ColumnOption[] = [
@@ -132,6 +188,7 @@ const COLUMN_OPTIONS: ColumnOption[] = [
     { id: 'tracking_code', label: 'Tracking code' },
     { id: 'total_amount', label: 'Total amount' },
     { id: 'products', label: 'Products' },
+    { id: 'cx_rts_rate', label: 'Customer RTS' },
     { id: 'inserted_at', label: 'Created at' },
     { id: 'updated_at', label: 'Status updated at' },
     { id: 'status_name', label: 'Status' },
@@ -157,6 +214,7 @@ export default function PancakeOrdersIndex({
     statusCounts,
     totalCount,
     shippingFeeImport,
+    dateFields,
     query,
 }: Props) {
     const baseUrl = `/workspaces/${workspace.slug}/pancake/orders`;
@@ -172,6 +230,9 @@ export default function PancakeOrdersIndex({
         query?.filter?.date_from ?? '',
     );
     const [dateTo, setDateTo] = useState<string>(query?.filter?.date_to ?? '');
+    const [dateType, setDateType] = useState<string>(
+        query?.filter?.date_type ?? DEFAULT_DATE_FIELD,
+    );
 
     const canImportFees = usePermission(PERMISSIONS.ImportOrderShippingFees);
     const { flash } = usePage().props as {
@@ -264,27 +325,35 @@ export default function PancakeOrdersIndex({
         [],
     );
 
-    const buildFilter = (
-        s: string,
-        st: string,
-        df: string,
-        dt: string,
-        r: string,
-    ) => ({
-        search: s || undefined,
-        status: st || undefined,
-        date_from: df || undefined,
-        date_to: dt || undefined,
-        rider: r || undefined,
+    const buildFilter = (f: FilterState) => ({
+        search: f.search || undefined,
+        status: f.status || undefined,
+        date_from: f.dateFrom || undefined,
+        date_to: f.dateTo || undefined,
+        // Only worth sending alongside a range; on its own it narrows nothing.
+        date_type:
+            (f.dateFrom || f.dateTo) && f.dateType !== DEFAULT_DATE_FIELD
+                ? f.dateType
+                : undefined,
+        rider: f.rider || undefined,
+    });
+
+    const currentFilter = (): FilterState => ({
+        search,
+        status,
+        dateFrom,
+        dateTo,
+        dateType,
+        rider,
     });
 
     const reload = useCallback(
-        debounce((s: string, st: string, df: string, dt: string, r: string) => {
+        debounce((f: FilterState) => {
             router.get(
                 baseUrl,
                 {
                     sort: query?.sort,
-                    filter: buildFilter(s, st, df, dt, r),
+                    filter: buildFilter(f),
                     page: 1,
                     per_page: query?.perPage ?? orders.per_page,
                 },
@@ -305,9 +374,9 @@ export default function PancakeOrdersIndex({
             initialMount.current = false;
             return;
         }
-        reload(search, status, dateFrom, dateTo, rider);
+        reload(currentFilter());
         return () => reload.cancel();
-    }, [search, status, dateFrom, dateTo, rider]);
+    }, [search, status, dateFrom, dateTo, dateType, rider]);
 
     const { visibility: columnVisibility, setVisibility: setColumnVisibility } =
         useColumnVisibility(COLUMN_OPTIONS, COLUMNS_STORAGE_KEY);
@@ -454,6 +523,35 @@ export default function PancakeOrdersIndex({
                         title={label}
                     >
                         {label}
+                    </span>
+                );
+            },
+        },
+        {
+            accessorKey: 'cx_rts_rate',
+            id: 'cx_rts_rate',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Customer RTS" />
+            ),
+            cell: ({ row }) => {
+                const style =
+                    CX_RTS_STYLES[row.original.cx_rts_level] ??
+                    CX_RTS_STYLES.no_report;
+                const rate = row.original.cx_rts_rate;
+
+                return (
+                    <span className="flex items-center gap-1.5">
+                        <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${style.pill}`}
+                        >
+                            {style.label}
+                        </span>
+                        {rate !== null && (
+                            <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                                {Math.round(Number(rate) * 100)}%
+                            </span>
+                        )}
                     </span>
                 );
             },
@@ -639,10 +737,24 @@ export default function PancakeOrdersIndex({
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
+                    <select
+                        value={dateType}
+                        onChange={(e) => setDateType(e.target.value)}
+                        title="Which date the range filters on"
+                        className="h-9 rounded-[10px] border border-black/6 bg-stone-100 px-2 font-mono! text-[12px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100"
+                    >
+                        {dateFields.map((field) => (
+                            <option key={field} value={field}>
+                                {DATE_FIELD_LABELS[field] ?? field}
+                            </option>
+                        ))}
+                    </select>
                     <DatePicker
                         id="pancake-orders-date-range"
                         mode="range"
-                        placeholder="Filter by created date"
+                        placeholder={`Filter by ${(
+                            DATE_FIELD_LABELS[dateType] ?? dateType
+                        ).toLowerCase()}`}
                         defaultDate={defaultDate}
                         onChange={(dates) => {
                             if (dates.length === 2) {
@@ -678,6 +790,7 @@ export default function PancakeOrdersIndex({
                                 setRider('');
                                 setDateFrom('');
                                 setDateTo('');
+                                setDateType(DEFAULT_DATE_FIELD);
                             }}
                             className="flex h-9 items-center gap-1 rounded-[10px] border border-black/10 bg-white px-3 font-mono! text-[12px]! text-gray-700 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300"
                         >
@@ -709,13 +822,7 @@ export default function PancakeOrdersIndex({
                                 baseUrl,
                                 {
                                     sort: params?.sort,
-                                    filter: buildFilter(
-                                        search,
-                                        status,
-                                        dateFrom,
-                                        dateTo,
-                                        rider,
-                                    ),
+                                    filter: buildFilter(currentFilter()),
                                     page: params?.page ?? 1,
                                     per_page:
                                         params?.per_page ??
