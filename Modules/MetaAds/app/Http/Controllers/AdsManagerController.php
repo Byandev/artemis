@@ -151,6 +151,16 @@ class AdsManagerController extends Controller
                     fn ($sets) => $sets->whereIn('meta_page_id', $this->ownedPageIds($scopeValue)),
                 )
             ),
+            // The goal lives on the ad set, so a row's ads are those whose set
+            // carries it. "0" is the bucket for ad sets with no goal.
+            'optimization_goal' => fn ($q) => $q->whereIn(
+                'meta_ads_ads.meta_ads_set_id',
+                AdSet::query()->select('id')->when(
+                    $scopeValue === '' || $scopeValue === '0',
+                    fn ($sets) => $sets->whereNull('optimization_goal'),
+                    fn ($sets) => $sets->where('optimization_goal', $scopeValue),
+                )
+            ),
             default => abort(400, 'Unsupported scope_by'),
         };
     }
@@ -261,6 +271,13 @@ class AdsManagerController extends Controller
     private const PAGE_OWNER_LABEL_SQL = "COALESCE(users.name, 'Unassigned owner')";
 
     /**
+     * Group name for the optimization-goal breakdown. The raw Meta enum is kept
+     * verbatim (that's how the creative drawer already shows it); ad sets Meta
+     * reported no goal for share one bucket instead of showing as blank rows.
+     */
+    private const OPTIMIZATION_GOAL_LABEL_SQL = "COALESCE(meta_ads_sets.optimization_goal, 'Unassigned goal')";
+
+    /**
      * Returns Meta's signed ad-preview iframe src for a single ad. The raw video
      * source is permission-restricted, so this iframe is how video creatives are
      * watched (it also renders image ads). The `d=` token is short-lived, so we
@@ -361,7 +378,7 @@ class AdsManagerController extends Controller
      * Allowed group-by dimensions. Keys are the public `group_by` values; the
      * default is `ad_name`.
      */
-    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type', 'page', 'page_owner'];
+    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type', 'page', 'page_owner', 'optimization_goal'];
 
     private function resolveGroupBy(Request $request): string
     {
@@ -596,6 +613,29 @@ class AdsManagerController extends Controller
                 'groupBy' => ['users.id', 'users.name'],
                 // Searches real owner names; the unassigned bucket has none.
                 'search' => 'users.name',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
+            ],
+            // Buckets ads by the optimization goal of the ad set they run under
+            // (MESSAGING_PURCHASE_CONVERSION, CONVERSATIONS, VALUE, ...).
+            // Ad-grained like `page`: the goal lives on meta_ads_sets, so the
+            // ad set is joined and the metrics stay summed over ads.
+            'optimization_goal' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_sets', 'meta_ads_sets.id', '=', 'meta_ads_ads.meta_ads_set_id'),
+                'selects' => [
+                    // '0', not null, so the unassigned row survives the string
+                    // cast and can be passed back as a scope value. No real Meta
+                    // goal is '0', so the sentinel can't collide with one.
+                    DB::raw("COALESCE(meta_ads_sets.optimization_goal, '0') AS id"),
+                    DB::raw(self::OPTIMIZATION_GOAL_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => ['meta_ads_sets.optimization_goal'],
+                // Searches real goals; the unassigned bucket has none.
+                'search' => 'meta_ads_sets.optimization_goal',
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
         };
@@ -1093,7 +1133,7 @@ class AdsManagerController extends Controller
             return match ($groupBy) {
                 'campaign' => 'meta_ads_campaigns.created_time',
                 'ad_set' => 'meta_ads_sets.created_time',
-                'ad', 'ad_name', 'ad_type', 'page', 'page_owner' => 'meta_ads_ads.created_time',
+                'ad', 'ad_name', 'ad_type', 'page', 'page_owner', 'optimization_goal' => 'meta_ads_ads.created_time',
                 default => null,
             };
         }
@@ -1102,7 +1142,7 @@ class AdsManagerController extends Controller
             'campaign' => 'meta_ads_campaigns.start_time',
             // The page breakdowns already join the ad set, so they read the
             // column directly instead of the subquery fallback below.
-            'ad_set', 'page', 'page_owner' => 'meta_ads_sets.start_time',
+            'ad_set', 'page', 'page_owner', 'optimization_goal' => 'meta_ads_sets.start_time',
             default => null,
         };
     }

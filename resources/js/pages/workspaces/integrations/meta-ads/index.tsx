@@ -47,6 +47,7 @@ import {
     Megaphone,
     Play,
     Search,
+    Target,
     Type,
     UserPlus,
     UserRound,
@@ -88,20 +89,57 @@ type GroupBy =
     | 'ad_set'
     | 'account'
     | 'page'
-    | 'page_owner';
+    | 'page_owner'
+    | 'optimization_goal';
 
 const GROUP_BY_OPTIONS: {
     value: GroupBy;
     label: string;
     icon: LucideIcon;
 }[] = [
-    { value: 'ad_name', label: 'Ad Name', icon: Type },
-    { value: 'ad', label: 'Ad Id', icon: ImageIcon },
-    { value: 'campaign', label: 'Campaign', icon: Megaphone },
-    { value: 'ad_set', label: 'Ad Set', icon: Layers },
-    { value: 'account', label: 'Ad Account', icon: Wallet },
-    { value: 'page', label: 'Page', icon: Flag },
-    { value: 'page_owner', label: 'Page Owner', icon: UserRound },
+    {
+        value: 'ad_name',
+        label: 'Ad Name',
+        icon: Type,
+        hint: 'Ads sharing a name, collapsed',
+    },
+    { value: 'ad', label: 'Ad Id', icon: ImageIcon, hint: 'One row per ad' },
+    {
+        value: 'campaign',
+        label: 'Campaign',
+        icon: Megaphone,
+        hint: 'Rolled up per campaign',
+    },
+    {
+        value: 'ad_set',
+        label: 'Ad Set',
+        icon: Layers,
+        hint: 'Rolled up per ad set',
+    },
+    {
+        value: 'account',
+        label: 'Ad Account',
+        icon: Wallet,
+        hint: 'Rolled up per ad account',
+    },
+    {
+        value: 'page',
+        label: 'Page',
+        icon: Flag,
+        hint: 'The page the ad set promotes',
+    },
+    {
+        value: 'page_owner',
+        label: 'Page Owner',
+        icon: UserRound,
+        hint: 'Who owns that page',
+    },
+    {
+        value: 'optimization_goal',
+        label: 'Optimization Goal',
+        icon: Target,
+        hint: "The ad set's optimization goal",
+    },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -113,6 +151,7 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
     account: false,
     page: false,
     page_owner: false,
+    optimization_goal: false,
 };
 
 interface Row extends InsightsMetrics {
