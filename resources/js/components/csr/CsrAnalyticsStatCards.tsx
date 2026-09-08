@@ -4,14 +4,21 @@ import {
     ArrowUp,
     MessagesSquare,
     Minus,
-    Percent,
     PhoneCall,
     PhoneForwarded,
     PhoneOutgoing,
     RotateCcw,
+    ShieldAlert,
     Timer,
     Wallet,
 } from 'lucide-react';
+
+/**
+ * The customer return rate at or above which an order is flagged for a
+ * verification call. Mirrors CSRController::VERIFICATION_RTS_THRESHOLD — shown
+ * in the footnote so the card says what "needs verification" means.
+ */
+const RTS_THRESHOLD = 55;
 
 /** Fields every analytics stat endpoint answers with. */
 interface StatPayload {
@@ -52,8 +59,12 @@ export interface RealConversationsStat extends StatPayload {
 }
 
 export interface ReachRateStat extends StatPayload {
-    real: number;
-    placed: number;
+    value: number;
+    /** Orders whose customer number has no report behind it at all. */
+    no_report: number;
+    /** Orders whose customer is returning parcels at or above the threshold. */
+    high_rts: number;
+    orders: number;
 }
 
 export interface LongestCallStat extends StatPayload {
@@ -412,17 +423,16 @@ export function ReachRateStatCard({
 }) {
     return (
         <StatCard
-            title="Reach Rate"
-            icon={Percent}
+            title="Total Order needs Verification"
+            icon={ShieldAlert}
             loading={loading || stat === null}
-            // Null with no attempts at all — a dash, not 0%, which would read as
-            // "rang all day and reached nobody" rather than "nobody rang".
-            value={
-                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
-            }
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The two reasons split out: a card that only says "66" leaves you
+            // unable to tell a batch of unknown numbers from a batch of known
+            // bad ones, which are different problems.
             footnote={
                 stat
-                    ? `${stat.real.toLocaleString()} of ${stat.placed.toLocaleString()} calls reached someone`
+                    ? `${stat.no_report.toLocaleString()} no report · ${stat.high_rts.toLocaleString()} at ${RTS_THRESHOLD}%+ RTS`
                     : ''
             }
             trend={
@@ -433,7 +443,6 @@ export function ReachRateStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
-                    unit=" pts"
                 />
             }
         />
