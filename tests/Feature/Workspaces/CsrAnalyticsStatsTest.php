@@ -4,9 +4,9 @@ use App\Jobs\SyncCsrDailyRecord;
 use App\Models\CallLog;
 use App\Models\Order;
 use App\Models\PancakeUserPosDailyReport;
+use App\Models\Shop;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Support\RmoDailyStats;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\OrderForDelivery;
@@ -96,6 +96,13 @@ function csrStats($owner, Workspace $workspace, string $from, string $to)
 
 function csrRtsStat($owner, Workspace $workspace, string $from, string $to)
 {
+    // Same rollup as the Sales card, over the range and the stretch before it.
+    $start = CarbonImmutable::parse($from);
+    syncPosRollup(
+        $start->subDays($start->diffInDays(CarbonImmutable::parse($to)) + 1)->toDateString(),
+        $to,
+    );
+
     return csrStat($owner, $workspace, 'analytics-rts', $from, $to);
 }
 
@@ -251,8 +258,22 @@ test('the endpoint needs the CSR analytics permission', function () {
 });
 
 /**
- * A parcel that came back, counted by RtsRate's numerator: `returning_at` set,
- * and not a cancelled status.
+ * The one shop the RTS tests' parcels go through.
+ *
+ * The rollup writes a row — and an rts_rate — per CSR, per shop, per day, so
+ * parcels that are meant to share a rate have to share a shop.
+ */
+function salesShop(Workspace $workspace): Shop
+{
+    return Shop::firstOrCreate(
+        ['workspace_id' => $workspace->id, 'name' => 'Sales Shop'],
+    );
+}
+
+/**
+ * A parcel that came back — the rollup's `returning` money, and the numerator
+ * behind its stored rts_rate. Credited to a CSR, since the rollup is keyed by
+ * who confirmed it.
  */
 function returningOrder(Workspace $workspace, string $returningAt, float $amount): Order
 {
@@ -260,29 +281,62 @@ function returningOrder(Workspace $workspace, string $returningAt, float $amount
         'status' => 4,
         'final_amount' => $amount,
         'returning_at' => $returningAt,
+        'confirmed_by' => salesCsr()->id,
+        'shop_id' => salesShop($workspace)->id,
     ]);
 }
 
-/** A parcel that arrived — RtsRate's denominator, with the returning amount. */
+/** A parcel that arrived — the rest of that day's denominator. */
 function deliveredOrder(Workspace $workspace, string $deliveredAt, float $amount): Order
 {
     return Order::factory()->forWorkspace($workspace)->create([
         'status' => 3,
         'final_amount' => $amount,
         'delivered_at' => $deliveredAt,
+        'confirmed_by' => salesCsr()->id,
+        'shop_id' => salesShop($workspace)->id,
     ]);
 }
 
-test('the RTS rate is returning over returning plus delivered, as on the dashboard', function () {
+test('the RTS rate is the rollup\'s own rts_rate column', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
+    // One CSR, one shop, one day — so the range is a single rollup row, and
+    // the card is that row's stored rate: 2000 / (2000 + 8000) = 20%.
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
-    deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
 
-    // 2000 / (2000 + 8000) = 20%
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 20)
         ->assertJsonPath('returning_amount', 2000);
+});
+
+test('a range of several rows is the mean of their rates, not the rate of the whole', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Aug 2 returned everything it settled and Aug 3 returned none of it, so
+    // the two stored rates are 100 and 0 and the card reads 50 — the money
+    // says 2000 of 10000, which is 20. Reading the column means the days
+    // count equally, however much each settled.
+    returningOrder($workspace, '2026-08-02 10:00:00', 2000);
+    deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
+
+    csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 50);
+});
+
+test('a day that settled nothing has no rate to average in', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    returningOrder($workspace, '2026-08-02 10:00:00', 2000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
+
+    // Confirmed on the 3rd but still in transit: the row is there with a
+    // stored rts_rate of 0, and letting that in would halve the card to 10%.
+    csrSale($workspace, '2026-08-03 09:00:00', 5000);
+
+    csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 20);
 });
 
 test('the RTS change is reported in percentage points, not a relative move', function () {
@@ -290,10 +344,10 @@ test('the RTS change is reported in percentage points, not a relative move', fun
 
     // Previous period: 10%. Current: 20%. That is +10 points, not +100%.
     returningOrder($workspace, '2026-07-28 10:00:00', 1000);
-    deliveredOrder($workspace, '2026-07-29 10:00:00', 9000);
+    deliveredOrder($workspace, '2026-07-28 14:00:00', 9000);
 
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
-    deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
 
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 20)
@@ -306,7 +360,7 @@ test('a range where nothing settled has no rate rather than a perfect one', func
 
     // Sales happened, but nothing was delivered or returned yet. A 0% RTS here
     // would read as a flawless period rather than an unfinished one.
-    confirmedOrder($workspace, '2026-08-02 10:00:00', 5000);
+    csrSale($workspace, '2026-08-02 10:00:00', 5000);
 
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', null)
@@ -317,7 +371,7 @@ test('an empty previous period leaves the RTS comparison undefined', function ()
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
-    deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
+    deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
 
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 20)
@@ -330,105 +384,116 @@ function csrRmoStat($owner, Workspace $workspace, string $from, string $to)
     return csrStat($owner, $workspace, 'analytics-rmo-called', $from, $to);
 }
 
-/** The CSR every assigned delivery in these tests belongs to. */
+/** The CSR every call in these tests belongs to. */
 function rmoAssignee(): PancakeUser
 {
     return PancakeUser::firstOrCreate(['name' => 'RMO CSR']);
 }
 
-/** An RMO delivery row. Pass $assigned false for one nobody owns. */
-function rmoDelivery(Workspace $workspace, string $date, string $status, bool $assigned = true): void
+/**
+ * A call the nightly report counts in `total_called`.
+ *
+ * Every call against an order is one, so `$rmo` false gives an order
+ * verification call rather than RMO work — the column counts both. A call
+ * against no order at all is in no row, and cannot be counted.
+ */
+function placedCall(Workspace $workspace, string $date, bool $rmo = true): void
 {
-    $order = Order::factory()->forWorkspace($workspace)->create();
-
-    OrderForDelivery::create([
-        'order_id' => $order->id,
-        'page_id' => $order->page_id,
-        'shop_id' => $order->shop_id,
+    CallLog::factory()->create([
         'workspace_id' => $workspace->id,
-        'status' => $status,
-        'parcel_status' => 'on delivery',
-        'customer_name' => 'Cx',
-        'customer_phone' => '09170000001',
-        'rider_name' => 'Rider',
-        'rider_phone' => '09180000001',
-        'assignee_id' => $assigned ? rmoAssignee()->id : null,
-        'delivery_date' => $date,
+        'user_id' => rmoAssignee()->id,
+        'phone_number' => '09170000001',
+        'call_date' => $date,
+        'duration' => 60,
+        'order_id' => Order::factory()->forWorkspace($workspace)->create()->id,
+        'order_for_delivery_id' => $rmo ? 1 : null,
     ]);
 }
 
-test('RMO called % is the called share of the assigned deliveries', function () {
+test('RMO called is the calls placed across the range', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // Three assigned, two off PENDING.
-    rmoDelivery($workspace, '2026-08-02', 'CALLED');
-    rmoDelivery($workspace, '2026-08-03', 'ANSWERED');
-    rmoDelivery($workspace, '2026-08-03', 'PENDING');
+    placedCall($workspace, '2026-08-02');
+    placedCall($workspace, '2026-08-03');
+    // Outside the range on purpose.
+    placedCall($workspace, '2026-08-09');
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('called', 2)
-        ->assertJsonPath('assigned', 3)
-        ->assertJsonPath('value', 66.67);
+        ->assertJsonPath('value', 2);
 });
 
-test('unassigned deliveries are not counted against the rate', function () {
+test('a verification call counts too — total_called is every call on an order', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoDelivery($workspace, '2026-08-02', 'CALLED');
-    // Nobody's to call, so it must not drag the rate down.
-    rmoDelivery($workspace, '2026-08-02', 'PENDING', assigned: false);
+    placedCall($workspace, '2026-08-02');
+    placedCall($workspace, '2026-08-02', rmo: false);
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('assigned', 1)
-        ->assertJsonPath('value', 100);
+        ->assertJsonPath('value', 2);
 });
 
-test('deliveries outside the range are left out', function () {
+test('a call against no order is in no report row', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoDelivery($workspace, '2026-08-02', 'CALLED');
-    rmoDelivery($workspace, '2026-08-09', 'PENDING');
+    placedCall($workspace, '2026-08-02');
+
+    CallLog::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => rmoAssignee()->id,
+        'call_date' => '2026-08-02',
+        'duration' => 60,
+        'order_id' => null,
+    ]);
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('assigned', 1)
-        ->assertJsonPath('called', 1);
+        ->assertJsonPath('value', 1);
 });
 
-test('the RMO change is reported in percentage points', function () {
+test('the RMO called change is relative, as a count rather than a rate', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // Previous period: 1 of 2 called = 50%. Current: 2 of 2 = 100%. +50 pts.
-    rmoDelivery($workspace, '2026-07-28', 'CALLED');
-    rmoDelivery($workspace, '2026-07-28', 'PENDING');
+    // Two in the previous period, three in this one: +50%.
+    placedCall($workspace, '2026-07-28');
+    placedCall($workspace, '2026-07-29');
 
-    rmoDelivery($workspace, '2026-08-02', 'CALLED');
-    rmoDelivery($workspace, '2026-08-03', 'CALLED');
+    placedCall($workspace, '2026-08-02');
+    placedCall($workspace, '2026-08-03');
+    placedCall($workspace, '2026-08-03');
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 100)
-        ->assertJsonPath('previous_value', 50)
+        ->assertJsonPath('value', 3)
+        ->assertJsonPath('previous_value', 2)
         ->assertJsonPath('change', 50);
 });
 
-test('a range with nothing assigned has no rate rather than zero', function () {
+test('a previous period with no calls has no percentage rather than zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // 0% would read as "nobody rang anyone" rather than "nothing to ring".
+    placedCall($workspace, '2026-08-02');
+
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', null)
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('previous_value', 0)
         ->assertJsonPath('change', null);
 });
 
-test('another workspace\'s deliveries are not counted', function () {
+test('a range with no calls reads zero', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('change', null);
+});
+
+test('another workspace\'s calls are not in the RMO called total', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
     ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    rmoDelivery($other, '2026-08-02', 'CALLED');
+    placedCall($other, '2026-08-02');
 
     csrRmoStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('assigned', 0)
-        ->assertJsonPath('value', null);
+        ->assertJsonPath('value', 0);
 });
 
 function csrRmoTimeStat($owner, Workspace $workspace, string $from, string $to)
@@ -437,10 +502,11 @@ function csrRmoTimeStat($owner, Workspace $workspace, string $from, string $to)
 }
 
 /**
- * A logged call of $seconds on $date.
+ * A logged RMO call of $seconds on $date.
  *
- * Carries an order_id by default — that is what marks it as an RMO call. Pass
- * $matched false for one that reached a number belonging to no delivery.
+ * Carries both an order and a delivery stamp by default. Pass $matched false
+ * for one that reached a number belonging to no order at all — the nightly
+ * report has no row for it, so no card can count it.
  */
 function rmoCall(Workspace $workspace, string $date, int $seconds, bool $matched = true): void
 {
@@ -459,7 +525,22 @@ function rmoCall(Workspace $workspace, string $date, int $seconds, bool $matched
     ]);
 }
 
-test('RMO total time is the talk time across the range\'s RMO calls', function () {
+test('the total called time is every call\'s duration, verification included', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // The card reads total_call_time and total_called, so a verification call
+    // — an order with no delivery stamp — is in both, unlike the narrower
+    // total_rmo_* pair the calls-placed card beside it reads.
+    rmoCall($workspace, '2026-08-02', 120);
+    placedCall($workspace, '2026-08-02', rmo: false);
+
+    csrRmoTimeStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 180)
+        ->assertJsonPath('calls', 2)
+        ->assertJsonPath('average_seconds', 90);
+});
+
+test('the total called time is the talk time across the range\'s calls', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     rmoCall($workspace, '2026-08-02', 120);
@@ -538,42 +619,72 @@ function csrCallsPlacedStat($owner, Workspace $workspace, string $from, string $
     return csrStat($owner, $workspace, 'analytics-calls-placed', $from, $to);
 }
 
-test('calls placed counts every call against an order, however short', function () {
+/**
+ * A verification call of $seconds on $date.
+ *
+ * An order with no delivery behind it — the CSR ringing to confirm the order
+ * rather than to chase a parcel. That is the split the nightly report makes on
+ * order_for_delivery_id, and total_verification_called is its count.
+ */
+function verificationCall(Workspace $workspace, string $date, int $seconds): void
+{
+    CallLog::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => rmoAssignee()->id,
+        'phone_number' => '09170000001',
+        'call_date' => $date,
+        'duration' => $seconds,
+        'order_id' => Order::factory()->forWorkspace($workspace)->create()->id,
+        'order_for_delivery_id' => null,
+    ]);
+}
+
+test('total verification called counts the calls with no delivery behind them', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 5);
-    // A one-second call still counts as placed — the CSR rang and was answered.
-    rmoCall($workspace, '2026-08-02', 1);
-    // Zero seconds never joined: it rang out or the line was busy.
-    rmoCall($workspace, '2026-08-03', 0);
+    verificationCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-02', 5);
+    // A one-second call still counts: the CSR rang and was answered.
+    verificationCall($workspace, '2026-08-03', 1);
+    // Outside the range on purpose.
+    verificationCall($workspace, '2026-08-09', 99);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('value', 4)
-        ->assertJsonPath('connected', 3);
+        ->assertJsonPath('value', 3);
 });
 
-test('a call matched to no order is not a call placed', function () {
+test('an RMO call is not a verification call', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-02', 30);
+    // Stamped to a delivery, so the report files it under the RMO columns.
+    rmoCall($workspace, '2026-08-02', 60);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1);
+});
+
+test('a call against no order is in no report row, verification included', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    verificationCall($workspace, '2026-08-02', 30);
+    // No order at all: the nightly report joins on it, so this is in no row.
     rmoCall($workspace, '2026-08-02', 60, matched: false);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1)
-        ->assertJsonPath('connected', 1);
+        ->assertJsonPath('value', 1);
 });
 
-test('the calls placed change is relative', function () {
+test('the verification called change is relative, as a count rather than a rate', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-07-28', 30);
-    rmoCall($workspace, '2026-07-29', 30);
+    verificationCall($workspace, '2026-07-28', 30);
+    verificationCall($workspace, '2026-07-29', 30);
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-03', 30);
+    verificationCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-02', 30);
+    verificationCall($workspace, '2026-08-03', 30);
 
     // 2 to 3 calls is +50%.
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
@@ -582,38 +693,24 @@ test('the calls placed change is relative', function () {
         ->assertJsonPath('change', 50);
 });
 
-test('a one-second call counts as both placed and connected', function () {
+test('a range with no verification calls reads zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 1);
+    rmoCall($workspace, '2026-08-02', 60);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1)
-        ->assertJsonPath('connected', 1)
+        ->assertJsonPath('value', 0)
         ->assertJsonPath('change', null);
 });
 
-test('a call that never joined is placed but not connected', function () {
+test('another workspace\'s verification calls are not counted', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+    ['workspace' => $other] = makeWorkspaceWithOwner();
 
-    rmoCall($workspace, '2026-08-02', 0);
+    verificationCall($other, '2026-08-02', 30);
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1)
-        ->assertJsonPath('connected', 0);
-});
-
-test('connected here is looser than the RMO page\'s threshold', function () {
-    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
-
-    // The RMO page counts a call as connected only past its threshold. This
-    // card counts any talk time at all, so the two differ on purpose — pinned
-    // here so the divergence stays deliberate rather than becoming a surprise.
-    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1);
-
-    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('connected', 1)
-        ->assertJsonPath('value', 1);
+        ->assertJsonPath('value', 0);
 });
 
 function csrRealConversationsStat($owner, Workspace $workspace, string $from, string $to)
@@ -621,64 +718,77 @@ function csrRealConversationsStat($owner, Workspace $workspace, string $from, st
     return csrStat($owner, $workspace, 'analytics-real-conversations', $from, $to);
 }
 
-test('real conversations counts only calls at or over the threshold', function () {
+test('the verification call time is the talk time across those calls', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    $threshold = RmoDailyStats::CONNECTED_CALL_MIN_SECONDS;
-
-    rmoCall($workspace, '2026-08-02', $threshold * 6);
-    rmoCall($workspace, '2026-08-02', $threshold);
-    // A hello and a hang-up is not a conversation.
-    rmoCall($workspace, '2026-08-02', $threshold - 1);
-    rmoCall($workspace, '2026-08-03', 1);
-    rmoCall($workspace, '2026-08-03', 0);
+    verificationCall($workspace, '2026-08-02', 120);
+    verificationCall($workspace, '2026-08-03', 60);
+    // Outside the range on purpose.
+    verificationCall($workspace, '2026-08-09', 9999);
 
     csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('value', 2)
-        ->assertJsonPath('placed', 5)
-        ->assertJsonPath('share', 40);
-
-    // The same ratio is the Reach Rate card's headline.
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 40);
+        ->assertJsonPath('value', 180)
+        ->assertJsonPath('calls', 2)
+        ->assertJsonPath('average_seconds', 90);
 });
 
-test('the three call figures narrow in turn', function () {
+test('RMO talk time is not verification talk time', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 2);
-    rmoCall($workspace, '2026-08-02', 0);
-
-    // Placed counts every attempt, connected any talk time, real 5s+.
-    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 3)
-        ->assertJsonPath('connected', 2);
+    verificationCall($workspace, '2026-08-02', 30);
+    // Stamped to a delivery, so its seconds land in the RMO columns instead.
+    rmoCall($workspace, '2026-08-02', 600);
 
     csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1);
+        ->assertJsonPath('value', 30)
+        ->assertJsonPath('calls', 1);
 });
 
-test('a call matched to no order is not a real conversation', function () {
+test('the average counts every call, the unanswered ones included', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-02', 60, matched: false);
+    verificationCall($workspace, '2026-08-02', 100);
+    verificationCall($workspace, '2026-08-02', 50);
+    verificationCall($workspace, '2026-08-02', 0);
 
+    // 150 seconds over 3 calls — the one that never joined is still an attempt.
     csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 1)
-        ->assertJsonPath('placed', 1);
+        ->assertJsonPath('calls', 3)
+        ->assertJsonPath('average_seconds', 50);
 });
 
-test('a range with no calls placed has no share', function () {
+test('the verification time change is relative, not in points', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    verificationCall($workspace, '2026-07-28', 100);
+    verificationCall($workspace, '2026-08-02', 150);
+
+    // A duration is a magnitude, so +50% is the readable form.
+    csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 150)
+        ->assertJsonPath('previous_value', 100)
+        ->assertJsonPath('change', 50);
+});
+
+test('a range with no verification calls has no average and no comparison', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 0)
-        ->assertJsonPath('placed', 0)
-        ->assertJsonPath('share', null)
+        ->assertJsonPath('calls', 0)
+        ->assertJsonPath('average_seconds', null)
         ->assertJsonPath('change', null);
+});
+
+test('another workspace\'s verification talk time is not counted', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+    ['workspace' => $other] = makeWorkspaceWithOwner();
+
+    verificationCall($other, '2026-08-02', 300);
+
+    csrRealConversationsStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0);
 });
 
 function csrReachRateStat($owner, Workspace $workspace, string $from, string $to)
@@ -686,45 +796,149 @@ function csrReachRateStat($owner, Workspace $workspace, string $from, string $to
     return csrStat($owner, $workspace, 'analytics-reach-rate', $from, $to);
 }
 
-test('reach rate is real conversations over calls placed', function () {
+/**
+ * An order confirmed on $on whose customer number carries the given report.
+ *
+ * Pass null for $fail to leave the number unreported — the "nothing is known
+ * about this customer" half of the card. The rate the card reads is
+ * order_fail / (order_fail + order_success) off the `latest` row.
+ */
+function orderNeedingCheck(Workspace $workspace, string $on, ?int $fail, int $success = 0): Order
+{
+    $order = Order::factory()->forWorkspace($workspace)->create([
+        'status' => 1,
+        'confirmed_at' => $on,
+        'confirmed_by' => salesCsr()->id,
+    ]);
+
+    if ($fail === null) {
+        return $order;
+    }
+
+    foreach (['latest', 'initial'] as $type) {
+        DB::table('pancake_order_phone_number_reports')->insert([
+            'order_id' => $order->id,
+            'phone_number' => '09170000001',
+            'order_fail' => $fail,
+            'order_success' => $success,
+            'warning' => 0,
+            'type' => $type,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    return $order;
+}
+
+test('an order needs verification when the number has no report at all', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // 1 of 4 attempts reached the threshold — 25%.
-    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS * 10);
-    rmoCall($workspace, '2026-08-02', RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1);
-    rmoCall($workspace, '2026-08-02', 1);
-    rmoCall($workspace, '2026-08-03', 0);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+    // A customer who takes delivery: 1 of 10 back is 10%.
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 1, success: 9);
 
     csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('value', 25)
-        ->assertJsonPath('real', 1)
-        ->assertJsonPath('placed', 4);
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('no_report', 1)
+        ->assertJsonPath('high_rts', 0)
+        ->assertJsonPath('orders', 2);
 });
 
-test('the reach rate change is in percentage points', function () {
+test('an order needs verification at or above the 55% threshold', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // Previous: 1 of 2 = 50%. Current: 2 of 2 = 100%. +50 pts.
-    rmoCall($workspace, '2026-07-28', 30);
-    rmoCall($workspace, '2026-07-28', 1);
-
-    rmoCall($workspace, '2026-08-02', 30);
-    rmoCall($workspace, '2026-08-03', 30);
+    // Exactly 55% counts — the threshold is inclusive.
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: 55, success: 45);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 6, success: 4);
+    // 54% is under it, however close.
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 54, success: 46);
 
     csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 100)
-        ->assertJsonPath('previous_value', 50)
+        ->assertJsonPath('value', 2)
+        ->assertJsonPath('high_rts', 2)
+        ->assertJsonPath('no_report', 0)
+        ->assertJsonPath('orders', 3);
+});
+
+test('a report of nothing at all is unreported rather than a clean record', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Zero fails and zero successes divides by nothing, so the rate is null —
+    // the same "nothing known" as having no row, not a 0% record.
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 0, success: 0);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('no_report', 1);
+});
+
+test('orders confirmed outside the range are not counted', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-09 10:00:00', fail: null);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('orders', 1);
+});
+
+test('an order that was never confirmed is not counted', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+
+    // No confirmed_at, so it has no day to fall in — verification is what
+    // happens after a CSR confirms.
+    Order::factory()->forWorkspace($workspace)->create([
+        'status' => 1,
+        'confirmed_at' => null,
+    ]);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('orders', 1);
+});
+
+test('the verification backlog change is relative, as a count of orders', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    orderNeedingCheck($workspace, '2026-07-28 10:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-07-29 10:00:00', fail: null);
+
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 8, success: 2);
+    orderNeedingCheck($workspace, '2026-08-03 10:00:00', fail: null);
+
+    // 2 to 3 is +50%.
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 3)
+        ->assertJsonPath('previous_value', 2)
         ->assertJsonPath('change', 50);
 });
 
-test('a range with no attempts has no reach rate rather than zero', function () {
+test('a range where every customer has a clean record reads zero', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // 0% would read as "rang all day and reached nobody".
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 0, success: 10);
+
     csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', null)
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('orders', 1)
         ->assertJsonPath('change', null);
+});
+
+test('another workspace\'s orders are not in the verification backlog', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+    ['workspace' => $other] = makeWorkspaceWithOwner();
+
+    orderNeedingCheck($other, '2026-08-02 10:00:00', fail: null);
+
+    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('orders', 0);
 });
 
 function csrLongestCallStat($owner, Workspace $workspace, string $from, string $to)

@@ -4,14 +4,21 @@ import {
     ArrowUp,
     MessagesSquare,
     Minus,
-    Percent,
     PhoneCall,
     PhoneForwarded,
     PhoneOutgoing,
     RotateCcw,
+    ShieldAlert,
     Timer,
     Wallet,
 } from 'lucide-react';
+
+/**
+ * The customer return rate at or above which an order is flagged for a
+ * verification call. Mirrors CSRController::VERIFICATION_RTS_THRESHOLD — shown
+ * in the footnote so the card says what "needs verification" means.
+ */
+const RTS_THRESHOLD = 55;
 
 /** Fields every analytics stat endpoint answers with. */
 interface StatPayload {
@@ -32,8 +39,7 @@ export interface RtsStat extends StatPayload {
 }
 
 export interface RmoCalledStat extends StatPayload {
-    called: number;
-    assigned: number;
+    value: number;
 }
 
 export interface RmoTimeStat extends StatPayload {
@@ -44,19 +50,21 @@ export interface RmoTimeStat extends StatPayload {
 
 export interface CallsPlacedStat extends StatPayload {
     value: number;
-    connected: number;
 }
 
 export interface RealConversationsStat extends StatPayload {
     value: number;
-    placed: number;
-    /** Share of the attempts that became a conversation, or null with none. */
-    share: number | null;
+    calls: number;
+    average_seconds: number | null;
 }
 
 export interface ReachRateStat extends StatPayload {
-    real: number;
-    placed: number;
+    value: number;
+    /** Orders whose customer number has no report behind it at all. */
+    no_report: number;
+    /** Orders whose customer is returning parcels at or above the threshold. */
+    high_rts: number;
+    orders: number;
 }
 
 export interface LongestCallStat extends StatPayload {
@@ -285,18 +293,13 @@ export function RmoCalledStatCard({
 }) {
     return (
         <StatCard
-            title="RMO Called %"
+            title="Total Called"
             icon={PhoneCall}
             loading={loading || stat === null}
-            // Null when nothing was assigned in the range — a dash, not 0%,
-            // which would read as "nobody rang anyone" rather than "there was
-            // nothing to ring".
-            value={
-                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
-            }
+            value={stat ? stat.value.toLocaleString() : ''}
             footnote={
                 stat
-                    ? `${stat.called.toLocaleString()} of ${stat.assigned.toLocaleString()} assigned`
+                    ? `call${stat.value === 1 ? '' : 's'} placed in the range`
                     : ''
             }
             trend={
@@ -307,7 +310,6 @@ export function RmoCalledStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
-                    unit=" pts"
                 />
             }
         />
@@ -323,7 +325,7 @@ export function RmoTimeStatCard({
 }) {
     return (
         <StatCard
-            title="RMO Total Time"
+            title="Total Called Time"
             icon={Timer}
             loading={loading || stat === null}
             value={stat ? duration(stat.value) : ''}
@@ -355,15 +357,16 @@ export function CallsPlacedStatCard({
 }) {
     return (
         <StatCard
-            title="Calls Placed"
+            title="Total Verification Called"
             icon={PhoneOutgoing}
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
-            // The connected count is worth carrying: the gap between the two
-            // is the calls that rang and got nothing, which is the context the
-            // headline number is missing on its own.
+            // The time behind these is the card beside this one, so the
+            // footnote names the unit rather than restating that figure.
             footnote={
-                stat ? `${stat.connected.toLocaleString()} connected` : ''
+                stat
+                    ? `verification call${stat.value === 1 ? '' : 's'} in the range`
+                    : ''
             }
             trend={
                 <Trend
@@ -388,16 +391,14 @@ export function RealConversationsStatCard({
 }) {
     return (
         <StatCard
-            title="Real Conversations"
+            title="Total Verification Call Time"
             icon={MessagesSquare}
             loading={loading || stat === null}
-            value={stat ? stat.value.toLocaleString() : ''}
-            // The share of attempts this represents is the Reach Rate card, so
-            // the footnote gives the denominator without restating the rate.
+            value={stat ? duration(stat.value) : ''}
             footnote={
-                !stat || stat.share === null
-                    ? 'No calls placed in this period'
-                    : `of ${stat.placed.toLocaleString()} placed`
+                !stat || stat.average_seconds === null
+                    ? 'No verification calls in this period'
+                    : `avg ${perCall(stat.average_seconds)} per call`
             }
             trend={
                 <Trend
@@ -422,17 +423,16 @@ export function ReachRateStatCard({
 }) {
     return (
         <StatCard
-            title="Reach Rate"
-            icon={Percent}
+            title="Total Order needs Verification"
+            icon={ShieldAlert}
             loading={loading || stat === null}
-            // Null with no attempts at all — a dash, not 0%, which would read as
-            // "rang all day and reached nobody" rather than "nobody rang".
-            value={
-                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
-            }
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The two reasons split out: a card that only says "66" leaves you
+            // unable to tell a batch of unknown numbers from a batch of known
+            // bad ones, which are different problems.
             footnote={
                 stat
-                    ? `${stat.real.toLocaleString()} of ${stat.placed.toLocaleString()} calls reached someone`
+                    ? `${stat.no_report.toLocaleString()} no report · ${stat.high_rts.toLocaleString()} at ${RTS_THRESHOLD}%+ RTS`
                     : ''
             }
             trend={
@@ -443,7 +443,6 @@ export function ReachRateStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
-                    unit=" pts"
                 />
             }
         />
