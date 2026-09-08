@@ -47,19 +47,19 @@ class OrderController extends Controller
      * An allowlist because the chosen key goes straight into a whereDate(); the
      * request never names a column, it names one of these keys.
      *
-     * inserted_at is Pancake's own creation time and stays the default — it is
-     * what the list has always filtered and sorted on. created_at is this app's
-     * row, i.e. when the sync first saw the order, which is a different question.
+     * Every one of them is a Pancake lifecycle stamp, inserted_at being the
+     * default — it is what the list has always filtered and sorted on. This
+     * app's own created_at / updated_at are deliberately absent: they record
+     * when the sync last touched our row, which is a question about the sync
+     * rather than about the order.
      */
     public const DATE_FIELDS = [
         'inserted_at',
         'confirmed_at',
-        'created_at',
         'shipped_at',
         'delivered_at',
         'returning_at',
         'returned_at',
-        'updated_at',
     ];
 
     /** The column the date range applies to, falling back to Pancake's insert time. */
@@ -156,6 +156,45 @@ class OrderController extends Controller
         });
     }
 
+    /**
+     * The filter set the list runs under, shared with the tab counts below so a
+     * filter added here cannot silently miss one of them.
+     *
+     * The counts pass `withStatus: false`: status is still declared — Spatie
+     * rejects a filter it was not told about, and the request carries one
+     * whenever a tab is open — but does nothing, so each tab shows its own
+     * total instead of the count of the tab already open.
+     *
+     * @return array<int, AllowedFilter>
+     */
+    private function allowedFilters(Request $request, string $dateColumn, bool $withStatus = true): array
+    {
+        return [
+            AllowedFilter::callback('search', fn ($q, $v) => $this->applySearch($q, $v)),
+            AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate($dateColumn, '>=', $v)),
+            AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate($dateColumn, '<=', $v)),
+            // Consumed by dateColumn() above rather than as a filter of its own —
+            // declared so Spatie doesn't reject the request for carrying it.
+            AllowedFilter::callback('date_type', fn () => null),
+            // Read the raw request value, not Spatie's — it splits on commas,
+            // which would break rider names that legitimately contain one.
+            AllowedFilter::callback('rider', fn ($q) => $this->applyRider($q, (string) $request->input('filter.rider'))),
+            // Accepts one status or a comma-separated list (e.g. returning,returned).
+            AllowedFilter::callback('status', $withStatus
+                ? fn ($q, $v) => $q->whereIn(
+                    'pancake_orders.status_name',
+                    is_array($v) ? $v : explode(',', $v),
+                )
+                : fn () => null),
+            AllowedFilter::callback('report', fn ($q, $v) => $this->applyReport($q, (string) $v, $request)),
+            // Read by applyReport() off the request rather than filtering on
+            // their own — declared so Spatie doesn't reject the request.
+            AllowedFilter::callback('rts_op', fn () => null),
+            AllowedFilter::callback('rts_value', fn () => null),
+            AllowedFilter::callback('rts_value2', fn () => null),
+        ];
+    }
+
     public function index(Request $request, Workspace $workspace)
     {
         $this->guard($request, $workspace);
@@ -180,28 +219,7 @@ class OrderController extends Controller
             // would otherwise drop the table's own columns from the select.
             ->select('pancake_orders.*')
             ->selectRaw(CustomerRtsRisk::rateSql().' as cx_rts_rate')
-            ->allowedFilters([
-                AllowedFilter::callback('search', fn ($q, $v) => $this->applySearch($q, $v)),
-                AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate($dateColumn, '>=', $v)),
-                AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate($dateColumn, '<=', $v)),
-                // Consumed by dateColumn() above rather than as a filter of its own —
-                // declared so Spatie doesn't reject the request for carrying it.
-                AllowedFilter::callback('date_type', fn () => null),
-                // Read the raw request value, not Spatie's — it splits on commas,
-                // which would break rider names that legitimately contain one.
-                AllowedFilter::callback('rider', fn ($q) => $this->applyRider($q, (string) $request->input('filter.rider'))),
-                // Accepts one status or a comma-separated list (e.g. returning,returned).
-                AllowedFilter::callback('status', fn ($q, $v) => $q->whereIn(
-                    'pancake_orders.status_name',
-                    is_array($v) ? $v : explode(',', $v),
-                )),
-                AllowedFilter::callback('report', fn ($q, $v) => $this->applyReport($q, (string) $v, $request)),
-                // Read by applyReport() off the request rather than filtering on
-                // their own — declared so Spatie doesn't reject the request.
-                AllowedFilter::callback('rts_op', fn () => null),
-                AllowedFilter::callback('rts_value', fn () => null),
-                AllowedFilter::callback('rts_value2', fn () => null),
-            ])
+            ->allowedFilters($this->allowedFilters($request, $dateColumn))
             ->allowedSorts(['order_number', 'total_amount', 'inserted_at', 'updated_at', 'confirmed_at', 'status_name', 'cx_rts_rate'])
             ->defaultSort('-inserted_at')
             ->paginate((int) $request->input('per_page', 50))
@@ -215,16 +233,11 @@ class OrderController extends Controller
             CustomerRtsRisk::level($order->cx_rts_rate === null ? null : (float) $order->cx_rts_rate),
         ));
 
-        // Per-status counts for the tab bar: search/date applied directly (not via
-        // QueryBuilder, which would reject the `status` filter the request carries),
-        // and status itself is intentionally ignored so each tab shows its total.
-        $filter = (array) $request->input('filter', []);
-        $statusCounts = (clone $base)
-            ->when(($filter['search'] ?? null), fn ($q, $v) => $this->applySearch($q, $v))
-            ->when(($filter['date_from'] ?? null), fn ($q, $v) => $q->whereDate($dateColumn, '>=', $v))
-            ->when(($filter['date_to'] ?? null), fn ($q, $v) => $q->whereDate($dateColumn, '<=', $v))
-            ->when(($filter['rider'] ?? null), fn ($q, $v) => $this->applyRider($q, (string) $v))
-            ->when(($filter['report'] ?? null), fn ($q, $v) => $this->applyReport($q, (string) $v, $request))
+        // Per-status counts for the tab bar, run through the same filter set as
+        // the rows so a tab cannot promise rows that aren't there once it is
+        // clicked. Status alone is ignored, so each tab shows its own total.
+        $statusCounts = QueryBuilder::for(clone $base)
+            ->allowedFilters($this->allowedFilters($request, $dateColumn, withStatus: false))
             ->selectRaw('status_name, COUNT(*) as total')
             ->groupBy('status_name')
             ->pluck('total', 'status_name');

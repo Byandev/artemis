@@ -154,12 +154,10 @@ const prettyDate = (iso: string | null) => {
 const DATE_FIELD_LABELS: Record<string, string> = {
     inserted_at: 'Created (Pancake)',
     confirmed_at: 'Confirmed',
-    created_at: 'Synced',
     shipped_at: 'Shipped',
     delivered_at: 'Delivered',
     returning_at: 'Returning',
     returned_at: 'Returned',
-    updated_at: 'Status updated',
 };
 
 const DEFAULT_DATE_FIELD = 'inserted_at';
@@ -280,9 +278,16 @@ export default function PancakeOrdersIndex({
         query?.filter?.date_from ?? '',
     );
     const [dateTo, setDateTo] = useState<string>(query?.filter?.date_to ?? '');
-    const [dateType, setDateType] = useState<string>(
-        query?.filter?.date_type ?? DEFAULT_DATE_FIELD,
-    );
+    // A link can still carry a field the server has since stopped offering (it
+    // then filters on the default). Resolve to the default here too, or the
+    // chip would read blank while a range was quietly applied to another column.
+    const [dateType, setDateType] = useState<string>(() => {
+        const requested = query?.filter?.date_type;
+
+        return requested && dateFields.includes(requested)
+            ? requested
+            : DEFAULT_DATE_FIELD;
+    });
     const [report, setReport] = useState<string>(
         query?.filter?.report ?? DEFAULT_RTS_REPORT,
     );

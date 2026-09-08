@@ -274,3 +274,74 @@ it('ignores a between comparison that is missing its upper bound', function () {
         'rts_value' => '20',
     ]))->toHaveCount(1);
 });
+
+it('no longer offers this app own row stamps as date fields', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $fields = ordersPage($workspace)->assertOk()
+        ->viewData('page')['props']['dateFields'];
+
+    // created_at / updated_at say when the sync last touched our row, which is
+    // a question about the sync rather than about the order.
+    expect($fields)->not->toContain('created_at')
+        ->and($fields)->not->toContain('updated_at')
+        ->and($fields)->toContain('inserted_at');
+});
+
+it('falls back to the insert date when asked for a stamp it no longer offers', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    // Inserted in July on Pancake's side; synced into our table today.
+    Order::factory()->forWorkspace($workspace)->create([
+        'inserted_at' => '2026-07-01 09:00:00',
+        'created_at' => now(),
+    ]);
+
+    // Honouring created_at would put the order outside July and return nothing;
+    // dropped from the allowlist, the range falls back to inserted_at.
+    $rows = orderRows($workspace, [
+        'date_from' => '2026-07-01',
+        'date_to' => '2026-07-31',
+        'date_type' => 'created_at',
+    ]);
+
+    expect($rows)->toHaveCount(1);
+});
+
+it('counts every status tab while one of them is open', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    Order::factory()->forWorkspace($workspace)->create(['status_name' => 'delivered']);
+    Order::factory()->forWorkspace($workspace)->create(['status_name' => 'returned']);
+
+    $page = ordersPage($workspace, ['status' => 'delivered'])->assertOk()
+        ->viewData('page')['props'];
+
+    // The counts run through the same Spatie filter set as the rows, so the
+    // request's `status` has to be declared there — but ignored, or the tab bar
+    // would only ever show a number on the tab already open.
+    expect($page['orders']['data'])->toHaveCount(1)
+        ->and($page['statusCounts'])->toBe(['delivered' => 1, 'returned' => 1]);
+});
+
+it('narrows the tab counts on the search box as well as the rows', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    Order::factory()->forWorkspace($workspace)->create([
+        'order_number' => 'KEEP-1',
+        'status_name' => 'delivered',
+    ]);
+    Order::factory()->forWorkspace($workspace)->create([
+        'order_number' => 'DROP-1',
+        'status_name' => 'returned',
+    ]);
+
+    $counts = ordersPage($workspace, ['search' => 'KEEP'])->assertOk()
+        ->viewData('page')['props']['statusCounts'];
+
+    expect($counts)->toBe(['delivered' => 1]);
+});
