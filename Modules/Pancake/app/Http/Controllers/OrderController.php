@@ -10,6 +10,12 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Modules\Pancake\Filters\CustomerRtsReportFilter;
+use Modules\Pancake\Filters\IgnoredFilter;
+use Modules\Pancake\Filters\OrderDateFilter;
+use Modules\Pancake\Filters\OrderRiderFilter;
+use Modules\Pancake\Filters\OrderSearchFilter;
+use Modules\Pancake\Filters\OrderStatusFilter;
 use Modules\Pancake\Jobs\ImportOrderShippingFees;
 use Modules\Pancake\Models\Order;
 use Modules\Pancake\Support\CustomerRtsRisk;
@@ -26,19 +32,6 @@ class OrderController extends Controller
         if (! $request->user()->isMemberOf($workspace)) {
             abort(403, 'You do not have access to this workspace.');
         }
-    }
-
-    /** Search across order number, tracking code, and the shipping address. */
-    private function applySearch($query, string $value)
-    {
-        return $query->where(function ($q) use ($value) {
-            $q->where('pancake_orders.order_number', 'like', "%{$value}%")
-                ->orWhere('pancake_orders.tracking_code', 'like', "%{$value}%")
-                ->orWhereHas('shippingAddress', fn ($sa) => $sa
-                    ->where('full_name', 'like', "%{$value}%")
-                    ->orWhere('phone_number', 'like', "%{$value}%")
-                    ->orWhere('full_address', 'like', "%{$value}%"));
-        });
     }
 
     /**
@@ -73,125 +66,45 @@ class OrderController extends Controller
     }
 
     /**
-     * Single-number comparisons on the customer's return rate, mapped to SQL.
-     *
-     * An allowlist because the chosen key is interpolated into the comparison;
-     * the request names a key, never an operator. `between` is absent because it
-     * reads a second number and is built by hand below.
+     * Every comparison the page may offer, in the order it lists them. The SQL
+     * behind each one lives on CustomerRtsReportFilter::OPERATORS; `between`
+     * takes a second number and is built by hand there.
      */
-    public const RTS_OPERATORS = [
-        'gt' => '>',
-        'lt' => '<',
-        'eq' => '=',
-    ];
-
-    /** Every comparison the page may offer, in the order it lists them. */
     public const RTS_COMPARISONS = ['gt', 'lt', 'eq', 'between'];
-
-    /**
-     * Narrow by the customer's return report — the same rate the Customer RTS
-     * column shows.
-     *
-     * `no_report` is the orders whose phone number has nothing behind it, which
-     * is exactly where the rate comes back NULL. `has_report` is the rest, and
-     * may carry a comparison against the number(s) typed beside the operator.
-     *
-     * Compared as a whole percent, because that is what the badge shows: a row
-     * reading 30% should answer a "= 30" rather than nothing at all.
-     */
-    private function applyReport($query, string $report, Request $request)
-    {
-        $rate = CustomerRtsRisk::rateSql();
-
-        if ($report === 'no_report') {
-            return $query->whereRaw("{$rate} IS NULL");
-        }
-
-        $query->whereRaw("{$rate} IS NOT NULL");
-
-        $operator = (string) $request->input('filter.rts_op');
-        $value = $request->input('filter.rts_value');
-
-        // Half a comparison narrows nothing — the report filter still stands.
-        if (! is_numeric($value)) {
-            return $query;
-        }
-
-        $percent = "ROUND({$rate} * 100)";
-
-        if ($operator === 'between') {
-            $upper = $request->input('filter.rts_value2');
-
-            if (! is_numeric($upper)) {
-                return $query;
-            }
-
-            // Ordered here rather than trusting the boxes: a range typed high
-            // then low is still the range the user meant, and BETWEEN would
-            // otherwise quietly match nothing.
-            return $query->whereRaw("{$percent} BETWEEN ? AND ?", [
-                min((float) $value, (float) $upper),
-                max((float) $value, (float) $upper),
-            ]);
-        }
-
-        $sql = self::RTS_OPERATORS[$operator] ?? null;
-
-        if ($sql === null) {
-            return $query;
-        }
-
-        return $query->whereRaw("{$percent} {$sql} ?", [(float) $value]);
-    }
-
-    /**
-     * Limit to orders delivered by a given rider. Mirrors RtsRiderQuery: the rider
-     * is the rider_name on the latest "On Delivery" parcel journey for the order,
-     * so this matches exactly the set counted in the RTS "By Rider" breakdown.
-     */
-    private function applyRider($query, string $rider)
-    {
-        return $query->whereHas('parcelJourneys', function ($q) use ($rider) {
-            $q->where('rider_name', $rider);
-        });
-    }
 
     /**
      * The filter set the list runs under, shared with the tab counts below so a
      * filter added here cannot silently miss one of them.
      *
-     * The counts pass `withStatus: false`: status is still declared — Spatie
-     * rejects a filter it was not told about, and the request carries one
-     * whenever a tab is open — but does nothing, so each tab shows its own
-     * total instead of the count of the tab already open.
+     * Each entry is a Spatie filter class from Modules\Pancake\Filters, so the
+     * rule itself is testable on its own and this method stays a list of what
+     * the page may be narrowed by. The three that read another parameter —
+     * `date_type` picks the column, `rts_*` carry the comparison — are declared
+     * as IgnoredFilter so Spatie accepts them without applying them twice.
+     *
+     * The counts pass `withStatus: false`, which swaps the status rule for the
+     * same no-op, so each tab shows its own total instead of the count of the
+     * tab already open.
      *
      * @return array<int, AllowedFilter>
      */
     private function allowedFilters(Request $request, string $dateColumn, bool $withStatus = true): array
     {
         return [
-            AllowedFilter::callback('search', fn ($q, $v) => $this->applySearch($q, $v)),
-            AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate($dateColumn, '>=', $v)),
-            AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate($dateColumn, '<=', $v)),
-            // Consumed by dateColumn() above rather than as a filter of its own —
-            // declared so Spatie doesn't reject the request for carrying it.
-            AllowedFilter::callback('date_type', fn () => null),
-            // Read the raw request value, not Spatie's — it splits on commas,
-            // which would break rider names that legitimately contain one.
-            AllowedFilter::callback('rider', fn ($q) => $this->applyRider($q, (string) $request->input('filter.rider'))),
-            // Accepts one status or a comma-separated list (e.g. returning,returned).
-            AllowedFilter::callback('status', $withStatus
-                ? fn ($q, $v) => $q->whereIn(
-                    'pancake_orders.status_name',
-                    is_array($v) ? $v : explode(',', $v),
-                )
-                : fn () => null),
-            AllowedFilter::callback('report', fn ($q, $v) => $this->applyReport($q, (string) $v, $request)),
-            // Read by applyReport() off the request rather than filtering on
-            // their own — declared so Spatie doesn't reject the request.
-            AllowedFilter::callback('rts_op', fn () => null),
-            AllowedFilter::callback('rts_value', fn () => null),
-            AllowedFilter::callback('rts_value2', fn () => null),
+            AllowedFilter::custom('search', new OrderSearchFilter),
+            AllowedFilter::custom('date_from', new OrderDateFilter($dateColumn, '>=')),
+            AllowedFilter::custom('date_to', new OrderDateFilter($dateColumn, '<=')),
+            AllowedFilter::custom('date_type', new IgnoredFilter),
+            AllowedFilter::custom('rider', new OrderRiderFilter),
+            AllowedFilter::custom('status', $withStatus ? new OrderStatusFilter : new IgnoredFilter),
+            AllowedFilter::custom('report', new CustomerRtsReportFilter(
+                (string) $request->input('filter.rts_op'),
+                $request->input('filter.rts_value'),
+                $request->input('filter.rts_value2'),
+            )),
+            AllowedFilter::custom('rts_op', new IgnoredFilter),
+            AllowedFilter::custom('rts_value', new IgnoredFilter),
+            AllowedFilter::custom('rts_value2', new IgnoredFilter),
         ];
     }
 

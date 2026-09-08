@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Order;
+use App\Models\ParcelJourney;
+use App\Models\ShippingAddress;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Support\CustomerRtsRisk;
@@ -344,4 +346,67 @@ it('narrows the tab counts on the search box as well as the rows', function () {
         ->viewData('page')['props']['statusCounts'];
 
     expect($counts)->toBe(['delivered' => 1]);
+});
+
+it('searches on a phrase containing a comma', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $match = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'KEEP-1']);
+    Order::factory()->forWorkspace($workspace)->create(['order_number' => 'DROP-1']);
+
+    ShippingAddress::create([
+        'order_id' => $match->id,
+        'full_name' => 'Juan Dela Cruz',
+        'phone_number' => '09170000001',
+        'full_address' => '12 Mabini St, Makati',
+    ]);
+
+    // Spatie splits a filter value on commas before the filter ever sees it, so
+    // an address typed whole arrives as ['12 Mabini St', ' Makati'] and has to
+    // be put back together to match anything.
+    $rows = orderRows($workspace, ['search' => '12 Mabini St, Makati']);
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['order_number'])->toBe('KEEP-1');
+});
+
+it('matches a rider whose name contains a comma', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    $match = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'KEEP-1']);
+    $other = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'DROP-1']);
+
+    ParcelJourney::create([
+        'order_id' => $match->id,
+        'status' => 'On Delivery',
+        'rider_name' => 'Dela Cruz, Juan',
+        'rider_mobile' => '09170000001',
+        'note' => '',
+    ]);
+    ParcelJourney::create([
+        'order_id' => $other->id,
+        'status' => 'On Delivery',
+        'rider_name' => 'Santos, Pedro',
+        'rider_mobile' => '09170000002',
+        'note' => '',
+    ]);
+
+    $rows = orderRows($workspace, ['rider' => 'Dela Cruz, Juan']);
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['order_number'])->toBe('KEEP-1');
+});
+
+it('accepts a comma-separated list of statuses', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $this->actingAs($owner);
+
+    Order::factory()->forWorkspace($workspace)->create(['status_name' => 'returning']);
+    Order::factory()->forWorkspace($workspace)->create(['status_name' => 'returned']);
+    Order::factory()->forWorkspace($workspace)->create(['status_name' => 'delivered']);
+
+    // How the RTS pages link into the list.
+    expect(orderRows($workspace, ['status' => 'returning,returned']))->toHaveCount(2);
 });
