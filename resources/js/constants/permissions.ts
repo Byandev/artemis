@@ -57,6 +57,7 @@ export const PERMISSIONS = {
 
     // RTS
     ViewRtsAnalytics: 'View RTS Analytics',
+    ViewCallLogs: 'View Call Logs',
     ViewRtsAiChat: 'View RTS AI Chat',
     ViewRmoManagement: 'View RMO Management',
     ManageRmoSettings: 'Manage RMO Settings',

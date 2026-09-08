@@ -58,6 +58,7 @@ enum Permission: string
 
     // RTS
     case ViewRtsAnalytics = 'View RTS Analytics';
+    case ViewCallLogs = 'View Call Logs';
     case ViewRtsAiChat = 'View RTS AI Chat';
     case ViewRmoManagement = 'View RMO Management';
     case ManageRmoSettings = 'Manage RMO Settings';
@@ -252,6 +253,7 @@ enum Permission: string
             self::DeleteDepartments => 'Departments',
 
             self::ViewRtsAnalytics,
+            self::ViewCallLogs,
             self::ViewRtsAiChat,
             self::ViewRmoManagement,
             self::ManageRmoSettings,
