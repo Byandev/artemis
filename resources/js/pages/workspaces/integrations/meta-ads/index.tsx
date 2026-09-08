@@ -41,6 +41,7 @@ import {
     ChevronDown,
     Download,
     Flag,
+    Goal,
     Image as ImageIcon,
     Layers,
     LayoutGrid,
@@ -72,6 +73,7 @@ import {
     InsightFilterBuilder,
     InsightsMetrics,
     MetricFilter,
+    ObjectiveOption,
     StatusLabel,
     buildInsightsColumns,
     deserializeMetricFilters,
@@ -91,7 +93,8 @@ type GroupBy =
     | 'account'
     | 'page'
     | 'page_owner'
-    | 'optimization_goal';
+    | 'optimization_goal'
+    | 'campaign_objective';
 
 const GROUP_BY_OPTIONS: {
     value: GroupBy;
@@ -142,6 +145,12 @@ const GROUP_BY_OPTIONS: {
         icon: Target,
         hint: "The ad set's optimization goal",
     },
+    {
+        value: 'campaign_objective',
+        label: 'Campaign Objective',
+        icon: Goal,
+        hint: "The campaign's objective",
+    },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -154,6 +163,7 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
     page: false,
     page_owner: false,
     optimization_goal: false,
+    campaign_objective: false,
 };
 
 interface Row extends InsightsMetrics {
@@ -198,6 +208,8 @@ interface Props {
     accounts: AccountOption[];
     members: OwnerOption[];
     selectedAccounts: string[];
+    /** Campaign objectives available to the Filters builder's value picker. */
+    objectives?: ObjectiveOption[];
     dateRange: { since: string; until: string };
     query?: {
         sort?: string | null;
@@ -1550,6 +1562,7 @@ export default function MetaAdsManager({
     accounts,
     members,
     selectedAccounts,
+    objectives = [],
     dateRange,
     query,
 }: Props) {
@@ -1805,6 +1818,7 @@ export default function MetaAdsManager({
                         <InsightFilterBuilder
                             filters={metricFilters}
                             onChange={onMetricFilters}
+                            objectives={objectives}
                         />
                     </div>
                 </div>

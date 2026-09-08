@@ -61,6 +61,7 @@ class AdsManagerController extends Controller
                 'metricFilters' => $this->parseMetricFilters($request),
                 'startTime' => $this->startTimeFilter($request),
             ],
+            'objectives' => $this->availableObjectives($allAccountIds),
         ]);
     }
 
@@ -80,6 +81,7 @@ class AdsManagerController extends Controller
         $accountIds = $this->resolveSelectedAccounts($request, $allAccountIds);
         $metricFilters = $this->parseMetricFilters($request);
         $dateFilters = $this->parseDateFilters($request);
+        $objectives = $this->parseObjectiveFilters($request);
 
         $scopeBy = (string) $request->query('scope_by', '');
         $scopeValue = (string) $request->query('scope', '');
@@ -109,7 +111,7 @@ class AdsManagerController extends Controller
             $scope = null;
         }
 
-        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter, $dateFilters);
+        $rows = $this->aggregate($request, $accountIds, $since, $until, $groupBy, $metricFilters, $scope, $creatorFilter, $dateFilters, $objectives);
 
         return response()->json(['rows' => $rows]);
     }
@@ -159,6 +161,17 @@ class AdsManagerController extends Controller
                     $scopeValue === '' || $scopeValue === '0',
                     fn ($sets) => $sets->whereNull('optimization_goal'),
                     fn ($sets) => $sets->where('optimization_goal', $scopeValue),
+                )
+            ),
+            // The objective lives on the campaign, which ads reference directly,
+            // so this is one hop rather than the ad-set chain above. "0" is the
+            // bucket for campaigns Meta reported no objective for.
+            'campaign_objective' => fn ($q) => $q->whereIn(
+                'meta_ads_ads.meta_ads_campaign_id',
+                Campaign::query()->select('id')->when(
+                    $scopeValue === '' || $scopeValue === '0',
+                    fn ($campaigns) => $campaigns->whereNull('objective'),
+                    fn ($campaigns) => $campaigns->where('objective', $scopeValue),
                 )
             ),
             default => abort(400, 'Unsupported scope_by'),
@@ -283,6 +296,14 @@ class AdsManagerController extends Controller
     private const OPTIMIZATION_GOAL_LABEL_SQL = "COALESCE(meta_ads_sets.optimization_goal, 'Unassigned goal')";
 
     /**
+     * Group name for the campaign-objective breakdown. Same treatment as the
+     * optimization goal: Meta's raw enum verbatim (OUTCOME_SALES,
+     * OUTCOME_ENGAGEMENT, ...), with campaigns Meta reported no objective for
+     * sharing one bucket instead of showing as blank rows.
+     */
+    private const CAMPAIGN_OBJECTIVE_LABEL_SQL = "COALESCE(meta_ads_campaigns.objective, 'Unassigned objective')";
+
+    /**
      * Returns Meta's signed ad-preview iframe src for a single ad. The raw video
      * source is permission-restricted, so this iframe is how video creatives are
      * watched (it also renders image ads). The `d=` token is short-lived, so we
@@ -383,7 +404,10 @@ class AdsManagerController extends Controller
      * Allowed group-by dimensions. Keys are the public `group_by` values; the
      * default is `ad_name`.
      */
-    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type', 'page', 'page_owner', 'optimization_goal'];
+    /** Filter-builder field id for the campaign-objective dimension row. */
+    private const OBJECTIVE_FILTER_FIELD = 'campaign_objective';
+
+    private const GROUP_BY_KEYS = ['ad_name', 'ad', 'campaign', 'ad_set', 'account', 'ad_type', 'page', 'page_owner', 'optimization_goal', 'campaign_objective'];
 
     private function resolveGroupBy(Request $request): string
     {
@@ -643,6 +667,30 @@ class AdsManagerController extends Controller
                 'search' => 'meta_ads_sets.optimization_goal',
                 'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
             ],
+            // Buckets ads by the objective of the campaign they run under
+            // (OUTCOME_SALES, OUTCOME_ENGAGEMENT, ...). Ad-grained like
+            // `optimization_goal`, but the objective lives on the campaign and
+            // ads carry meta_ads_campaign_id directly, so this joins campaigns
+            // in one hop rather than going through the ad set.
+            'campaign_objective' => [
+                'model' => Ad::class,
+                'insightKey' => 'meta_ads_ad_id',
+                'joinOn' => 'meta_ads_ads.id',
+                'accountColumn' => 'meta_ads_ads.meta_ads_account_id',
+                'join' => fn ($q) => $q
+                    ->leftJoin('meta_ads_campaigns', 'meta_ads_campaigns.id', '=', 'meta_ads_ads.meta_ads_campaign_id'),
+                'selects' => [
+                    // '0', not null, so the unassigned row survives the string
+                    // cast and can be passed back as a scope value. No real Meta
+                    // objective is '0', so the sentinel can't collide with one.
+                    DB::raw("COALESCE(meta_ads_campaigns.objective, '0') AS id"),
+                    DB::raw(self::CAMPAIGN_OBJECTIVE_LABEL_SQL.' AS name'),
+                ],
+                'groupBy' => ['meta_ads_campaigns.objective'],
+                // Searches real objectives; the unassigned bucket has none.
+                'search' => 'meta_ads_campaigns.objective',
+                'adsCountExpr' => 'COUNT(DISTINCT meta_ads_ads.id)',
+            ],
         };
     }
 
@@ -659,11 +707,11 @@ class AdsManagerController extends Controller
             ->select('pages.id');
     }
 
-    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null, array $dateFilters = []): array
+    private function aggregate(Request $request, $accountIds, string $since, string $until, string $groupBy, array $metricFilters = [], ?callable $scope = null, ?string $creatorFilter = null, array $dateFilters = [], array $objectives = []): array
     {
         $config = $this->groupByConfig($groupBy);
 
-        $insights = $this->insightsSubquery($config['insightKey'], $since, $until);
+        $insights = $this->insightsSubquery($config['insightKey'], $since, $until, $objectives);
 
         $base = $config['model']::query();
 
@@ -686,6 +734,10 @@ class AdsManagerController extends Controller
 
         // Row-level lifecycle dates — a WHERE, so it runs before aggregation.
         $this->applyDateFilters($base, $dateFilters, $groupBy);
+
+        // Campaign objective — narrows which rows survive; the insights
+        // subquery above already narrowed what they're allowed to sum.
+        $this->applyObjectiveFilter($base, $config, $objectives);
 
         // Number of ads in each group — shown for every dimension except `ad`
         // (where each row is already a single ad). `ad_name` counts distinct ads
@@ -1158,13 +1210,14 @@ class AdsManagerController extends Controller
             return match ($groupBy) {
                 'campaign' => 'meta_ads_campaigns.created_time',
                 'ad_set' => 'meta_ads_sets.created_time',
-                'ad', 'ad_name', 'ad_type', 'page', 'page_owner', 'optimization_goal' => 'meta_ads_ads.created_time',
+                'ad', 'ad_name', 'ad_type', 'page', 'page_owner', 'optimization_goal', 'campaign_objective' => 'meta_ads_ads.created_time',
                 default => null,
             };
         }
 
         return match ($groupBy) {
-            'campaign' => 'meta_ads_campaigns.start_time',
+            // campaign_objective joins the campaign too, so it reads the same column.
+            'campaign', 'campaign_objective' => 'meta_ads_campaigns.start_time',
             // The page breakdowns already join the ad set, so they read the
             // column directly instead of the subquery fallback below.
             'ad_set', 'page', 'page_owner', 'optimization_goal' => 'meta_ads_sets.start_time',
@@ -1337,7 +1390,7 @@ class AdsManagerController extends Controller
      * account id) for the date range. LEFT JOINed onto the entity base as `i`,
      * so entities with no insights in the window simply get NULL → 0 metrics.
      */
-    private function insightsSubquery(string $keyColumn, string $since, string $until)
+    private function insightsSubquery(string $keyColumn, string $since, string $until, array $objectives = [])
     {
         $selects = [$keyColumn];
         foreach (self::INSIGHTS_METRICS as $col) {
@@ -1346,8 +1399,146 @@ class AdsManagerController extends Controller
 
         return DB::table('meta_ads_insights')
             ->whereBetween('date', [$since, $until])
+            // Insight rows carry their campaign, so the objective filter is
+            // applied here too, not just to the grouped entity. Without this an
+            // account row would keep summing spend from campaigns the filter
+            // excluded, and report a total the filter says you're not looking at.
+            ->tap(fn ($q) => $this->constrainByObjectives($q, 'meta_ads_campaign_id', $objectives))
             ->select($selects)
             ->groupBy($keyColumn);
+    }
+
+    /**
+     * Campaigns carrying one objective. The "0" sentinel is the unassigned
+     * bucket the campaign_objective breakdown emits, so it maps back to
+     * campaigns Meta reported no objective for.
+     */
+    private function campaignIdsForObjective(string $objective)
+    {
+        return Campaign::query()
+            ->select('id')
+            ->when(
+                $objective === '0',
+                fn ($q) => $q->whereNull('objective'),
+                fn ($q) => $q->where('objective', $objective),
+            );
+    }
+
+    /**
+     * Applies each objective row to a query, on the column that reaches the
+     * campaign from that table. "is" keeps matching campaigns, "is not" drops
+     * them; several rows AND together, as everywhere else in the builder.
+     */
+    private function constrainByObjectives($query, string $campaignColumn, array $filters): void
+    {
+        foreach ($filters as $f) {
+            $ids = $this->campaignIdsForObjective($f['value']);
+
+            $f['op'] === 'is_not'
+                ? $query->whereNotIn($campaignColumn, $ids)
+                : $query->whereIn($campaignColumn, $ids);
+        }
+    }
+
+    /**
+     * Narrows a breakdown to ads/campaigns carrying the selected objectives.
+     * Applied per base model, since each grouping reaches the campaign from a
+     * different table — mirroring how dateFilterColumn resolves per grouping.
+     */
+    private function applyObjectiveFilter($query, array $config, array $objectives): void
+    {
+        if ($objectives === []) {
+            return;
+        }
+
+        $column = match ($config['model']) {
+            Ad::class => 'meta_ads_ads.meta_ads_campaign_id',
+            AdSet::class => 'meta_ads_sets.meta_ads_campaign_id',
+            Campaign::class => 'meta_ads_campaigns.id',
+            default => null,
+        };
+
+        if ($column !== null) {
+            $this->constrainByObjectives($query, $column, $objectives);
+
+            return;
+        }
+
+        // An account has no objective of its own, so it is kept when it ran at
+        // least one campaign the rows allow. Its metrics are already limited to
+        // those campaigns by the insights subquery.
+        if ($config['model'] === AdAccount::class) {
+            $query->whereIn('meta_ads_accounts.id', function ($sub) use ($objectives) {
+                $sub->select('meta_ads_account_id')->from('meta_ads_campaigns');
+                $this->constrainByObjectives($sub, 'id', $objectives);
+            });
+        }
+    }
+
+    /**
+     * Campaign-objective rows from the filter builder. They ride in the same
+     * `metric_filters` payload as the numeric filters but are dimensions, not
+     * aggregates, so they become WHERE clauses here instead of the HAVING
+     * clauses parseMetricFilters() builds — which ignores them, since
+     * metricSqlExpression() has no expression for the field.
+     *
+     * @return array<int, array{op: string, value: string}>
+     */
+    private function parseObjectiveFilters(Request $request): array
+    {
+        $raw = $request->query('metric_filters');
+        if (! $raw) {
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 5, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $filters = [];
+        foreach ($decoded as $f) {
+            if (($f['field'] ?? null) !== self::OBJECTIVE_FILTER_FIELD) {
+                continue;
+            }
+
+            $value = $f['value'] ?? null;
+            $op = $f['op'] ?? 'is';
+
+            if (! is_string($value) || $value === '' || ! in_array($op, ['is', 'is_not'], true)) {
+                continue;
+            }
+
+            $filters[] = ['op' => $op, 'value' => $value];
+        }
+
+        return $filters;
+    }
+
+    /**
+     * Distinct campaign objectives across the workspace's accounts, for the
+     * filter picker. Campaigns with none collapse to the same "0" sentinel the
+     * breakdown uses, so picker and grid agree on the unassigned bucket.
+     */
+    private function availableObjectives($accountIds): array
+    {
+        return Campaign::query()
+            ->whereIn('meta_ads_account_id', $accountIds)
+            ->select('objective')
+            ->distinct()
+            ->orderByRaw('objective IS NULL, objective')
+            ->pluck('objective')
+            ->map(fn ($o) => [
+                'value' => $o ?? '0',
+                'label' => $o ?? 'Unassigned objective',
+            ])
+            ->values()
+            ->all();
     }
 
     /**

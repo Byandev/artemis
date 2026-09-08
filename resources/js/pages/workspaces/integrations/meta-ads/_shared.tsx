@@ -1826,7 +1826,35 @@ export function ColumnVisibilityMenu({
 
 /* ───────────────────── Insight filters ──────────────────── */
 
-export type MetricFilterOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'range';
+export type MetricFilterOp =
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'eq'
+    | 'range'
+    | 'is'
+    | 'is_not';
+
+/** A campaign objective offered as a filter value. */
+export interface ObjectiveOption {
+    value: string;
+    label: string;
+}
+
+/**
+ * Filter fields that are dimensions rather than metrics: they filter rows
+ * (WHERE) instead of aggregates (HAVING), so they take is / is-not and pick a
+ * value from a list rather than typing a number.
+ */
+export const OBJECTIVE_FIELD = 'campaign_objective';
+
+const DIMENSION_OP_LABELS: Record<string, string> = {
+    is: 'is',
+    is_not: 'is not',
+};
+
+const isObjectiveField = (field: string) => field === OBJECTIVE_FIELD;
 
 export interface MetricFilter {
     id: string; // client-only key for React
@@ -1845,7 +1873,14 @@ const OP_LABELS: Record<MetricFilterOp, string> = {
     range: '↔ Between',
 };
 
-const FILTERABLE_METRICS = METRIC_SPECS;
+const FILTERABLE_METRICS: MetricSpec[] = [
+    {
+        id: OBJECTIVE_FIELD,
+        label: 'Campaign Objective',
+        category: 'Dimensions',
+    } as MetricSpec,
+    ...METRIC_SPECS,
+];
 
 export function serializeMetricFilters(
     filters: MetricFilter[],
@@ -1987,7 +2022,8 @@ interface InsightFilterBuilderProps {
 export function InsightFilterBuilder({
     filters,
     onChange,
-}: InsightFilterBuilderProps) {
+    objectives = [],
+}: InsightFilterBuilderProps & { objectives?: ObjectiveOption[] }) {
     const [open, setOpen] = useState(false);
     const [draft, setDraft] = useState<MetricFilter[]>(filters);
 
@@ -2073,7 +2109,23 @@ export function InsightFilterBuilder({
                             <MetricCombobox
                                 value={f.field}
                                 onValueChange={(v) =>
-                                    update(f.id, { field: v })
+                                    update(f.id, {
+                                        field: v,
+                                        // Ops don't carry across the
+                                        // dimension/metric divide, so reset to
+                                        // each side's default and drop a value
+                                        // the new field can't interpret.
+                                        ...(isObjectiveField(v) !==
+                                        isObjectiveField(f.field)
+                                            ? {
+                                                  op: isObjectiveField(v)
+                                                      ? ('is' as const)
+                                                      : ('gt' as const),
+                                                  value: '',
+                                                  value2: '',
+                                              }
+                                            : {}),
+                                    })
                                 }
                                 grouped={grouped}
                             />
@@ -2090,10 +2142,11 @@ export function InsightFilterBuilder({
                                 </SelectTrigger>
                                 <SelectContent className="font-mono text-[11px]">
                                     {(
-                                        Object.entries(OP_LABELS) as [
-                                            MetricFilterOp,
-                                            string,
-                                        ][]
+                                        Object.entries(
+                                            f.field === OBJECTIVE_FIELD
+                                                ? DIMENSION_OP_LABELS
+                                                : OP_LABELS,
+                                        ) as [MetricFilterOp, string][]
                                     ).map(([op, label]) => (
                                         <SelectItem key={op} value={op}>
                                             {label}
@@ -2103,7 +2156,28 @@ export function InsightFilterBuilder({
                             </Select>
 
                             {/* Value(s) */}
-                            {f.op === 'range' ? (
+                            {f.field === OBJECTIVE_FIELD ? (
+                                <Select
+                                    value={f.value}
+                                    onValueChange={(v) =>
+                                        update(f.id, { value: v })
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 w-44 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                        <SelectValue placeholder="Objective" />
+                                    </SelectTrigger>
+                                    <SelectContent className="font-mono text-[11px]">
+                                        {objectives.map((o) => (
+                                            <SelectItem
+                                                key={o.value}
+                                                value={o.value}
+                                            >
+                                                {o.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : f.op === 'range' ? (
                                 <div className="flex items-center gap-1">
                                     <input
                                         type="number"
