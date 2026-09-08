@@ -2,6 +2,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
     ArrowDown,
     ArrowUp,
+    Hourglass,
     MessagesSquare,
     Minus,
     PhoneCall,
@@ -46,6 +47,12 @@ export interface RmoCalledStat extends StatPayload {
 export interface TotalRmoCalledStat extends StatPayload {
     value: number;
     seconds: number;
+}
+
+export interface RmoCallTimeStat extends StatPayload {
+    value: number;
+    calls: number;
+    average_seconds: number | null;
 }
 
 export interface RmoTimeStat extends StatPayload {
@@ -336,9 +343,46 @@ export function TotalRmoCalledStatCard({
             icon={PhoneIncoming}
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
-            // The time behind them, since RMO has no card of its own for it —
-            // unlike the verification pair beside this one.
-            footnote={stat ? `${duration(stat.seconds)} on the phone` : ''}
+            // The time behind these is the card beside this one, so the
+            // footnote names the unit rather than restating that figure — the
+            // same split the verification pair already makes.
+            footnote={
+                stat
+                    ? `RMO call${stat.value === 1 ? '' : 's'} in the range`
+                    : ''
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RmoCallTimeStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoCallTimeStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Call Time"
+            icon={Hourglass}
+            loading={loading || stat === null}
+            value={stat ? duration(stat.value) : ''}
+            footnote={
+                !stat || stat.average_seconds === null
+                    ? 'No RMO calls in this period'
+                    : `avg ${perCall(stat.average_seconds)} per call`
+            }
             trend={
                 <Trend
                     change={stat?.change ?? null}
