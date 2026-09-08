@@ -48,6 +48,7 @@ import {
     Megaphone,
     Play,
     Search,
+    Target,
     Type,
     UserPlus,
     UserRound,
@@ -89,7 +90,8 @@ type GroupBy =
     | 'ad_set'
     | 'account'
     | 'page'
-    | 'page_owner';
+    | 'page_owner'
+    | 'optimization_goal';
 
 const GROUP_BY_OPTIONS: {
     value: GroupBy;
@@ -134,6 +136,12 @@ const GROUP_BY_OPTIONS: {
         icon: UserRound,
         hint: 'Who owns that page',
     },
+    {
+        value: 'optimization_goal',
+        label: 'Optimization Goal',
+        icon: Target,
+        hint: "The ad set's optimization goal",
+    },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -145,6 +153,7 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
     account: false,
     page: false,
     page_owner: false,
+    optimization_goal: false,
 };
 
 interface Row extends InsightsMetrics {
