@@ -2,13 +2,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
     ArrowDown,
     ArrowUp,
+    Headset,
+    Hourglass,
     MessagesSquare,
     Minus,
     PhoneCall,
     PhoneForwarded,
+    PhoneIncoming,
     PhoneOutgoing,
     RotateCcw,
     ShieldAlert,
+    Target,
     Timer,
     Wallet,
 } from 'lucide-react';
@@ -42,6 +46,32 @@ export interface RmoCalledStat extends StatPayload {
     value: number;
 }
 
+export interface TotalRmoCalledStat extends StatPayload {
+    value: number;
+    seconds: number;
+}
+
+export interface RmoCallTimeStat extends StatPayload {
+    value: number;
+    calls: number;
+    average_seconds: number | null;
+}
+
+export interface RmoRealConversationsStat extends StatPayload {
+    value: number;
+    /** RMO calls placed — what the conversations are read against. */
+    calls: number;
+    /** Conversations over calls, as a percentage; null with no calls. */
+    rate: number | null;
+}
+
+export interface RmoHitRateStat extends StatPayload {
+    /** Null when no RMO call was placed — no rate, rather than a rate of none. */
+    value: number | null;
+    conversations: number;
+    calls: number;
+}
+
 export interface RmoTimeStat extends StatPayload {
     value: number;
     calls: number;
@@ -68,9 +98,10 @@ export interface ReachRateStat extends StatPayload {
 }
 
 export interface LongestCallStat extends StatPayload {
-    value: number;
-    /** The day it happened, or null when no calls were placed. */
-    call_date: string | null;
+    /** Null when the range needed no verification at all. */
+    value: number | null;
+    calls: number;
+    needs_verification: number;
 }
 
 /** Seconds as `502h 32m` / `12m 05s` / `45s`, dropping units that read as zero. */
@@ -316,6 +347,145 @@ export function RmoCalledStatCard({
     );
 }
 
+export function TotalRmoCalledStatCard({
+    stat,
+    loading,
+}: {
+    stat: TotalRmoCalledStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Called"
+            icon={PhoneIncoming}
+            loading={loading || stat === null}
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The time behind these is the card beside this one, so the
+            // footnote names the unit rather than restating that figure — the
+            // same split the verification pair already makes.
+            footnote={
+                stat
+                    ? `RMO call${stat.value === 1 ? '' : 's'} in the range`
+                    : ''
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RmoCallTimeStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoCallTimeStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Call Time"
+            icon={Hourglass}
+            loading={loading || stat === null}
+            value={stat ? duration(stat.value) : ''}
+            footnote={
+                !stat || stat.average_seconds === null
+                    ? 'No RMO calls in this period'
+                    : `avg ${perCall(stat.average_seconds)} per call`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RmoRealConversationsStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoRealConversationsStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Real Conversation"
+            icon={Headset}
+            loading={loading || stat === null}
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The pool it came out of. The share itself is the Hit Rate card
+            // beside this one, so the footnote does not restate it.
+            footnote={
+                !stat || stat.rate === null
+                    ? 'No RMO calls in this period'
+                    : `of ${stat.calls.toLocaleString()} RMO call${stat.calls === 1 ? '' : 's'} placed`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RmoHitRateStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoHitRateStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="Hit Rate"
+            icon={Target}
+            loading={loading || stat === null}
+            // A dash, not 0%, when nothing was placed — there is no rate to
+            // report rather than a rate of nothing.
+            value={
+                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
+            }
+            // The division itself, so the figure can be read against its volume.
+            footnote={
+                !stat || stat.value === null
+                    ? 'No RMO calls in this period'
+                    : `${stat.conversations.toLocaleString()} conversations of ${stat.calls.toLocaleString()} calls`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                    unit=" pts"
+                />
+            }
+        />
+    );
+}
+
 export function RmoTimeStatCard({
     stat,
     loading,
@@ -458,16 +628,20 @@ export function LongestCallStatCard({
 }) {
     return (
         <StatCard
-            title="Longest Call"
+            title="Total Verified Orders"
             icon={PhoneForwarded}
             loading={loading || stat === null}
-            value={stat ? duration(stat.value) : ''}
-            // Which day it landed on, since a single outlier is worth being able
-            // to go and look at rather than just wonder about.
+            // A dash, not 0%, when nothing needed verifying — there is no rate
+            // to report rather than a rate of nothing.
+            value={
+                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
+            }
+            // The division itself, since the figure can pass 100% and the two
+            // counts are the only thing that explains how.
             footnote={
-                !stat || stat.call_date === null
-                    ? 'No calls in this period'
-                    : `on ${stat.call_date}`
+                !stat || stat.value === null
+                    ? 'Nothing needed verifying in this period'
+                    : `${stat.calls.toLocaleString()} calls of ${stat.needs_verification.toLocaleString()} orders`
             }
             trend={
                 <Trend
@@ -477,6 +651,7 @@ export function LongestCallStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
+                    unit=" pts"
                 />
             }
         />

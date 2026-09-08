@@ -15,18 +15,26 @@ import {
     LongestCallStatCard,
     ReachRateStatCard,
     RealConversationsStatCard,
+    RmoCallTimeStatCard,
     RmoCalledStatCard,
+    RmoHitRateStatCard,
+    RmoRealConversationsStatCard,
     RmoTimeStatCard,
     RtsStatCard,
     SalesStatCard,
+    TotalRmoCalledStatCard,
     type CallsPlacedStat,
     type LongestCallStat,
     type ReachRateStat,
     type RealConversationsStat,
+    type RmoCallTimeStat,
     type RmoCalledStat,
+    type RmoHitRateStat,
+    type RmoRealConversationsStat,
     type RmoTimeStat,
     type RtsStat,
     type SalesStat,
+    type TotalRmoCalledStat,
 } from '@/components/csr/CsrAnalyticsStatCards';
 import CsrComparisonPanel, {
     type ComparisonResponse,
@@ -259,6 +267,34 @@ export default function Analytics({ workspace, records, query }: Props) {
         fromStr,
         toStr,
     );
+    const [totalRmoCalledStat, totalRmoCalledLoading] =
+        useAnalyticsStat<TotalRmoCalledStat>(
+            workspace.slug,
+            'analytics-total-rmo-called',
+            fromStr,
+            toStr,
+        );
+    const [rmoCallTimeStat, rmoCallTimeLoading] =
+        useAnalyticsStat<RmoCallTimeStat>(
+            workspace.slug,
+            'analytics-rmo-call-time',
+            fromStr,
+            toStr,
+        );
+    const [rmoRealStat, rmoRealLoading] =
+        useAnalyticsStat<RmoRealConversationsStat>(
+            workspace.slug,
+            'analytics-rmo-real-conversations',
+            fromStr,
+            toStr,
+        );
+    const [rmoHitRateStat, rmoHitRateLoading] =
+        useAnalyticsStat<RmoHitRateStat>(
+            workspace.slug,
+            'analytics-rmo-hit-rate',
+            fromStr,
+            toStr,
+        );
     const [rmoTimeStat, rmoTimeLoading] = useAnalyticsStat<RmoTimeStat>(
         workspace.slug,
         'analytics-rmo-time',
@@ -570,6 +606,22 @@ export default function Analytics({ workspace, records, query }: Props) {
                     <LongestCallStatCard
                         stat={longestCallStat}
                         loading={longestCallLoading}
+                    />
+                    <TotalRmoCalledStatCard
+                        stat={totalRmoCalledStat}
+                        loading={totalRmoCalledLoading}
+                    />
+                    <RmoCallTimeStatCard
+                        stat={rmoCallTimeStat}
+                        loading={rmoCallTimeLoading}
+                    />
+                    <RmoRealConversationsStatCard
+                        stat={rmoRealStat}
+                        loading={rmoRealLoading}
+                    />
+                    <RmoHitRateStatCard
+                        stat={rmoHitRateStat}
+                        loading={rmoHitRateLoading}
                     />
                 </div>
 

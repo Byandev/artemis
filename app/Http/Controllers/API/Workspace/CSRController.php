@@ -283,6 +283,116 @@ class CSRController extends Controller
         ]);
     }
 
+    public function analyticsTotalRmoCalled(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCalledTotals($workspace, $from, $to);
+        $previous = $this->rmoCalledTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['calls'],
+            // The talk time behind them; RMO has no card of its own for it.
+            'seconds' => $current['seconds'],
+            'previous_value' => $previous['calls'],
+            // Relative, unlike the rate cards: this is a count.
+            'change' => $previous['calls'] > 0
+                ? round(($current['calls'] - $previous['calls']) / $previous['calls'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsRmoCallTime(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCalledTotals($workspace, $from, $to);
+        $previous = $this->rmoCalledTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['seconds'],
+            'calls' => $current['calls'],
+            // Talk time over the RMO calls behind it, which is the card beside
+            // this one; null with none to divide by.
+            'average_seconds' => $current['calls'] > 0
+                ? round($current['seconds'] / $current['calls'], 1)
+                : null,
+            'previous_value' => $previous['seconds'],
+            // Relative, like the other time cards: a duration is a magnitude.
+            'change' => $previous['seconds'] > 0
+                ? round(($current['seconds'] - $previous['seconds']) / $previous['seconds'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsRmoRealConversations(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoRealTotals($workspace, $from, $to);
+        $previous = $this->rmoRealTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['real'],
+            'calls' => $current['calls'],
+            // The share of RMO calls that got past the threshold; null with no
+            // calls to divide by.
+            'rate' => $current['calls'] > 0
+                ? round($current['real'] / $current['calls'] * 100, 1)
+                : null,
+            'previous_value' => $previous['real'],
+            // Relative, like the other counts: this is not a rate.
+            'change' => $previous['real'] > 0
+                ? round(($current['real'] - $previous['real']) / $previous['real'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsRmoHitRate(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoRealTotals($workspace, $from, $to);
+        $previous = $this->rmoRealTotals($workspace, $previousFrom, $previousTo);
+
+        // Undefined rather than zero with nothing placed: 0% reads as "everyone
+        // hung up", which is not "nobody called" — the same distinction
+        // RmoDailyStats::derivedCallStats() makes for the RMO management card.
+        $rate = $current['calls'] > 0
+            ? round($current['real'] / $current['calls'] * 100, 1)
+            : null;
+        $previousRate = $previous['calls'] > 0
+            ? round($previous['real'] / $previous['calls'] * 100, 1)
+            : null;
+
+        return response()->json([
+            'value' => $rate,
+            'conversations' => $current['real'],
+            'calls' => $current['calls'],
+            'previous_value' => $previousRate,
+            // Percentage points, like the other rate cards: 40% to 45% is "+5 pts".
+            'change' => $rate !== null && $previousRate !== null
+                ? round($rate - $previousRate, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
     public function analyticsRmoTime(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
@@ -390,24 +500,18 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
-
-        // The day it happened, for the footnote — a second tiny query because
-        // MAX() gives the length, not the row it came from.
-        $longestDate = $current['longest'] > 0
-            ? $this->callReport($workspace, $from, $to)
-                ->orderByDesc('longest_rmo_call_time')
-                ->value('date')
-            : null;
+        $current = $this->verifiedCoverage($workspace, $from, $to);
+        $previous = $this->verifiedCoverage($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            'value' => $current['longest'],
-            'call_date' => $longestDate ? substr((string) $longestDate, 0, 10) : null,
-            'previous_value' => $previous['longest'],
-            // Relative: a duration is a magnitude, not a rate.
-            'change' => $previous['longest'] > 0
-                ? round(($current['longest'] - $previous['longest']) / $previous['longest'] * 100, 1)
+            'value' => $current['rate'],
+            // Both sides of the division, so the card can show its own working.
+            'calls' => $current['calls'],
+            'needs_verification' => $current['needs_verification'],
+            'previous_value' => $previous['rate'],
+            // Percentage points, as on the other rate cards.
+            'change' => $current['rate'] !== null && $previous['rate'] !== null
+                ? round($current['rate'] - $previous['rate'], 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -544,6 +648,37 @@ class CSRController extends Controller
      * @return array{seconds: int, calls: int, connected: int, real: int, longest: int}
      */
     /**
+     * How much of the range's verification work actually got done.
+     *
+     * Verification calls placed over the orders that needed one — the two cards
+     * beside this one, divided. Null rather than zero with nothing to verify: a
+     * 0% would read as "nobody rang" instead of "there was nothing to ring".
+     *
+     * It can pass 100%. The numerator counts calls and the denominator counts
+     * orders, so a customer rung twice, or a CSR checking an order that was
+     * never flagged, both push it over — which is a real signal about the
+     * range, not an error to clamp away.
+     *
+     * The two sides are also counted on different days: a call belongs to the
+     * day it was placed, an order to the day it was confirmed. Over a range of
+     * any length that washes out, but a single-day range can read oddly when
+     * the calls chase the day before's orders.
+     *
+     * @return array{rate: float|null, calls: int, needs_verification: int}
+     */
+    private function verifiedCoverage(Workspace $workspace, string $from, string $to): array
+    {
+        $calls = $this->verificationTotals($workspace, $from, $to)['calls'];
+        $needed = $this->verificationBacklog($workspace, $from, $to)['needs_verification'];
+
+        return [
+            'rate' => $needed > 0 ? round($calls / $needed * 100, 1) : null,
+            'calls' => $calls,
+            'needs_verification' => $needed,
+        ];
+    }
+
+    /**
      * The customer's own return rate for an order, or NULL when the number has
      * no report behind it.
      *
@@ -610,6 +745,59 @@ class CSRController extends Controller
     }
 
     /**
+     * RMO calls over a range — the call report's own `total_rmo_called`, and
+     * the time spent on them.
+     *
+     * The other side of the split from verificationTotals(): a call stamped to
+     * a delivery, so the CSR was chasing a parcel rather than confirming an
+     * order. Together the two make up `total_called`. The rollup is nightly, so
+     * a range the sync has not reached is zero on both.
+     *
+     * @return array{calls: int, seconds: int}
+     */
+    private function rmoCalledTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_rmo_called), 0)    as calls,
+                COALESCE(SUM(total_rmo_call_time), 0) as seconds
+            ')
+            ->first();
+
+        return [
+            'calls' => (int) ($row->calls ?? 0),
+            'seconds' => (int) ($row->seconds ?? 0),
+        ];
+    }
+
+    /**
+     * RMO calls that turned into a conversation over a range — the call
+     * report's own `total_rmo_real_called`, and the RMO calls behind them.
+     *
+     * A real conversation is an RMO call that lasted past
+     * RmoDailyStats::CONNECTED_CALL_MIN_SECONDS; under that it is a hello and a
+     * hang-up, which is the cut SyncCsrDailyCallRecord makes. The call count
+     * comes back with it because it is what the figure is read against. The
+     * rollup is nightly, so a range the sync has not reached is zero on both.
+     *
+     * @return array{real: int, calls: int}
+     */
+    private function rmoRealTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
+                COALESCE(SUM(total_rmo_called), 0)      as calls
+            ')
+            ->first();
+
+        return [
+            'real' => (int) ($row->real_conversations ?? 0),
+            'calls' => (int) ($row->calls ?? 0),
+        ];
+    }
+
+    /**
      * Order-verification calls over a range — the call report's own
      * `total_verification_called`, and the time spent on them.
      *
@@ -633,25 +821,6 @@ class CSRController extends Controller
         return [
             'calls' => (int) ($row->calls ?? 0),
             'seconds' => (int) ($row->seconds ?? 0),
-        ];
-    }
-
-    private function rmoCallTotals(Workspace $workspace, string $from, string $to): array
-    {
-        $row = $this->callReport($workspace, $from, $to)
-            ->selectRaw('
-                COALESCE(SUM(total_rmo_called), 0) as calls,
-                COALESCE(SUM(total_rmo_call_time), 0) as seconds,
-                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
-                COALESCE(MAX(longest_rmo_call_time), 0) as longest
-            ')
-            ->first();
-
-        return [
-            'seconds' => (int) ($row->seconds ?? 0),
-            'calls' => (int) ($row->calls ?? 0),
-            'real' => (int) ($row->real_conversations ?? 0),
-            'longest' => (int) ($row->longest ?? 0),
         ];
     }
 
