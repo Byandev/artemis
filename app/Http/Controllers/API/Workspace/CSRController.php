@@ -13,6 +13,7 @@ use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -27,6 +28,16 @@ class CSRController extends Controller
         'csr_name', 'total_orders', 'total_sales',
         'delivered', 'returning_count', 'rts_rate',
         'total_called', 'total_call_time',
+    ];
+
+    /**
+     * The two nightly CSR rollups the analytics page reads — the same commands
+     * routes/console.php schedules at 03:00 and 04:15. The button runs both at
+     * once; the schedule stays as it is.
+     */
+    private const SYNC_COMMANDS = [
+        'sync:csr-daily-records',
+        'sync:csr-daily-call-records',
     ];
 
     private function isPos(Request $request): bool
@@ -1414,5 +1425,47 @@ class CSRController extends Controller
                 'color_slot' => $slots[$row['id']] % 8,
             ])->all(),
         ])->all();
+    }
+
+    /**
+     * Run both CSR rollups now, for today and yesterday only, scoped to this
+     * workspace. Local and the test server only.
+     *
+     * The commands only queue the aggregation jobs, so this returns as soon as
+     * they are dispatched — the figures move once the queue drains. Passing
+     * --date per day rather than --days is what keeps today in the window: the
+     * commands' own backfill starts at yesterday and works backwards.
+     */
+    public function runSync(Request $request, Workspace $workspace)
+    {
+        // Local and the test server only. Production keeps to the schedule, and
+        // hiding the button there is not on its own a guard.
+        abort_if(app()->environment('production'), 403, 'Manual CSR sync is disabled in production.');
+
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        $dates = [
+            CarbonImmutable::today()->toDateString(),
+            CarbonImmutable::yesterday()->toDateString(),
+        ];
+
+        $output = [];
+
+        foreach (self::SYNC_COMMANDS as $command) {
+            foreach ($dates as $date) {
+                Artisan::call($command, [
+                    '--workspace' => $workspace->slug,
+                    '--date' => $date,
+                ]);
+
+                $output[] = trim(Artisan::output());
+            }
+        }
+
+        return response()->json([
+            'commands' => self::SYNC_COMMANDS,
+            'dates' => $dates,
+            'output' => $output,
+        ]);
     }
 }

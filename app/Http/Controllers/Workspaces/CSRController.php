@@ -240,6 +240,10 @@ class CSRController extends Controller
         return Inertia::render('workspaces/csr/analytics', [
             'workspace' => $workspace,
             'records' => $records,
+            // The manual rollup trigger is a test-server convenience — production
+            // keeps to the nightly schedule, so the button is not rendered there.
+            // CSRController@runSync refuses the call on the same terms.
+            'canRunSync' => ! app()->environment('production'),
             'query' => [
                 'from' => $from,
                 'to' => $to,
