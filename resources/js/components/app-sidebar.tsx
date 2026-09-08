@@ -44,6 +44,7 @@ import {
     Megaphone,
     MessageSquare,
     Package,
+    PhoneCall,
     PieChart,
     ReceiptText,
     RotateCcw,
@@ -231,6 +232,12 @@ export function AppSidebar() {
             href: `/workspaces/${slug}/pancake/orders`,
             icon: ShoppingCart,
             permission: PERMISSIONS.ViewOrders,
+        },
+        {
+            title: 'Call Logs',
+            href: `/workspaces/${slug}/rts/call-logs`,
+            icon: PhoneCall,
+            permission: PERMISSIONS.ViewCallLogs,
         },
         ...(currentWorkspace.products_module_enabled
             ? [

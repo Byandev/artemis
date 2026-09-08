@@ -23,6 +23,7 @@ use App\Http\Controllers\Workspaces\ProductController;
 use App\Http\Controllers\Workspaces\RoleController;
 use App\Http\Controllers\Workspaces\RolePermissionController;
 use App\Http\Controllers\Workspaces\RTS\AnalyticController;
+use App\Http\Controllers\Workspaces\RTS\CallLogController;
 use App\Http\Controllers\Workspaces\RTS\ForDeliveryController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationController;
 use App\Http\Controllers\Workspaces\RTS\ParcelUpdateNotificationTemplateController;
@@ -292,6 +293,7 @@ Route::middleware(['auth'])->group(function () {
         return redirect()->route('workspaces.rts.analytics', $workspace);
     })->name('workspaces.rts');
     Route::get('/workspaces/{workspace}/rts/analytics', [AnalyticController::class, 'index'])->name('workspaces.rts.analytics');
+    Route::get('/workspaces/{workspace}/rts/call-logs', [CallLogController::class, 'index'])->name('workspaces.rts.call-logs');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/order-item', [AnalyticController::class, 'groupByOrderItem'])->name('workspaces.rts.analytics.group-by-order-item');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/price', [AnalyticController::class, 'groupByPrice'])->name('workspaces.rts.analytics.group-by-price');
     Route::get('/workspaces/{workspace}/rts/analytics/group-by/cx-rts', [AnalyticController::class, 'groupByCxRts'])->name('workspaces.rts.analytics.group-by-cx-rts');
