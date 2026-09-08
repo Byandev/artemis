@@ -71,12 +71,6 @@ Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapp
 // so an account discovered here is already in the table when insights run.
 Schedule::command('metaads:sync-ad-accounts')->hourly()->withoutOverlapping();
 
-// Ad accounts Meta no longer reports as Active (disabled, unsettled, closed).
-// Checked hourly; posts only for workspaces whose configured send time matches
-// the current hour. Send times are whole hours only, so an hourly run always
-// lands on the match. Runs at :05, after the sync above has refreshed statuses.
-Schedule::command('metaads:report-inactive-accounts')->hourlyAt(5)->withoutOverlapping();
-
 // Who has access to each ad account (Business Manager People list). Access
 // changes are rare and the call is one request per account — daily is plenty.
 Schedule::command('metaads:sync-ad-account-people')->dailyAt('02:00')->withoutOverlapping();

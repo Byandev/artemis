@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Log;
 use Modules\MetaAds\Exceptions\MetaGraphException;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\SyncRun;
+use Modules\MetaAds\Support\SyncErrorNotifier;
 use Throwable;
 
 trait HandlesMetaSyncErrors
@@ -70,7 +71,12 @@ trait HandlesMetaSyncErrors
 
         Log::error('Meta sync job failed with unrecoverable error', $context);
 
-        $run->fail($e);
+        // Record Meta's own identifiers alongside the failure: the digest
+        // command reports from SyncRun, so anything not stored here is lost by
+        // the time the report is built.
+        $run->fail($e, $this->metaErrorMeta($e, $attempts));
+
+        $this->notifySyncError($e);
 
         throw $e;
     }
@@ -87,8 +93,47 @@ trait HandlesMetaSyncErrors
         Log::error('Meta sync job permanently failed after exhausting all retries', $context);
 
         if (! empty($this->syncRunId)) {
-            SyncRun::find($this->syncRunId)?->fail($e);
+            SyncRun::find($this->syncRunId)?->fail(
+                $e,
+                $this->metaErrorMeta($e, $this->attempts()) + ['permanently_failed' => true],
+            );
         }
+
+        $this->notifySyncError($e);
+    }
+
+    /**
+     * Tell Discord this ad account's sync stopped. Called only from the two
+     * terminal paths — a released, retrying job has not failed yet.
+     */
+    protected function notifySyncError(Throwable $e): void
+    {
+        app(SyncErrorNotifier::class)->notify(
+            $this->adAccount ?? null,
+            $e,
+            static::class,
+        );
+    }
+
+    /**
+     * Meta's error identifiers, stored on the SyncRun so the digest can report
+     * them without re-deriving anything from the log.
+     *
+     * @return array<string, mixed>
+     */
+    private function metaErrorMeta(Throwable $e, int $attempts): array
+    {
+        $meta = ['job' => static::class, 'attempt' => $attempts];
+
+        if ($e instanceof MetaGraphException) {
+            $meta['error_code'] = $e->errorCode;
+            $meta['error_subcode'] = $e->errorSubcode;
+            $meta['error_type'] = $e->errorType;
+            $meta['fbtrace_id'] = $e->fbtraceId;
+            $meta['http_status'] = $e->httpStatus;
+        }
+
+        return $meta;
     }
 
     protected function resolveLastSuccessAt(string $entityType): ?int
