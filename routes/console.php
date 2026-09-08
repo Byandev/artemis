@@ -44,7 +44,6 @@ Schedule::command('sync:csr-daily-call-records')->dailyAt('04:15');
 
 Schedule::command('sync:shop-rts-snapshot')->dailyAt('02:30')->withoutOverlapping();
 
-
 // Pull RMO statuses in line with the courier's parcel status for workspaces
 // that opted in. Runs once at midnight, which lands on the default two-day
 // window (today + yesterday) just as the day rolls over — so the day that has
@@ -66,9 +65,17 @@ Schedule::command('inventory:report-deliveries')->hourly()->withoutOverlapping()
 Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapping();
 
 // ── MetaAds ─────────────────────────────────────────────────────────────
-// Ad accounts rarely change; a light refresh every 30 min keeps new accounts
-// and status changes visible.
-// Schedule::command('metaads:sync-ad-accounts')->everyThirtyMinutes()->withoutOverlapping();
+// Ad accounts rarely change, but a new account (or a status flip to disabled)
+// should not wait a day to show up. One Graph call per connected MetaUser, so
+// hourly is cheap. Runs at the top of the hour, ahead of the :30 insights sync,
+// so an account discovered here is already in the table when insights run.
+Schedule::command('metaads:sync-ad-accounts')->hourly()->withoutOverlapping();
+
+// Ad accounts Meta no longer reports as Active (disabled, unsettled, closed).
+// Checked hourly; posts only for workspaces whose configured send time matches
+// the current hour. Send times are whole hours only, so an hourly run always
+// lands on the match. Runs at :05, after the sync above has refreshed statuses.
+Schedule::command('metaads:report-inactive-accounts')->hourlyAt(5)->withoutOverlapping();
 
 // Who has access to each ad account (Business Manager People list). Access
 // changes are rare and the call is one request per account — daily is plenty.

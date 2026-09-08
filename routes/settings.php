@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Modules\Billing\Http\Controllers\Settings\BillingSettingsController;
 use Modules\Inventory\Http\Controllers\Settings\NotificationSettingsController;
+use Modules\MetaAds\Http\Controllers\Settings\NotificationSettingsController as MetaAdsNotificationSettingsController;
 
 Route::middleware('auth')->group(function () {
     Route::redirect('/settings', '/settings/profile');
@@ -53,6 +54,11 @@ Route::middleware('auth')->group(function () {
         ->name('notifications.edit');
     Route::put('/workspaces/{workspace}/settings/notifications', [NotificationSettingsController::class, 'update'])
         ->name('notifications.update');
+
+    Route::get('/workspaces/{workspace}/settings/meta-ads-notifications', [MetaAdsNotificationSettingsController::class, 'edit'])
+        ->name('meta-ads-notifications.edit');
+    Route::put('/workspaces/{workspace}/settings/meta-ads-notifications', [MetaAdsNotificationSettingsController::class, 'update'])
+        ->name('meta-ads-notifications.update');
 
     // RMO management settings — the "edit previous days" switch.
     Route::get('/workspaces/{workspace}/settings/rmo', [RmoSettingController::class, 'edit'])

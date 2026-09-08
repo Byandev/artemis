@@ -20,6 +20,7 @@ use Modules\Inventory\Models\InventoryItem;
 use Modules\Inventory\Models\InventoryNotificationSetting;
 use Modules\Inventory\Models\InventoryTransaction;
 use Modules\Inventory\Models\PurchasedOrder;
+use Modules\MetaAds\Models\NotificationSetting as MetaAdsNotificationSetting;
 use Modules\MetaAds\Models\User as MetaUser;
 
 class Workspace extends Model
@@ -578,6 +579,11 @@ class Workspace extends Model
     public function inventoryNotificationSetting(): HasOne
     {
         return $this->hasOne(InventoryNotificationSetting::class);
+    }
+
+    public function metaAdsNotificationSetting(): HasOne
+    {
+        return $this->hasOne(MetaAdsNotificationSetting::class);
     }
 
     /**

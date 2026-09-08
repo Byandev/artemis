@@ -2,6 +2,7 @@ import Heading from '@/components/heading';
 import { PERMISSIONS } from '@/constants/permissions';
 import { usePermission } from '@/hooks/use-permission';
 import { cn } from '@/lib/utils';
+import { edit as editMetaAdsNotifications } from '@/routes/meta-ads-notifications';
 import { edit as editPassword } from '@/routes/password';
 import { edit } from '@/routes/profile';
 import { Workspace } from '@/types/models/Workspace';
@@ -10,6 +11,7 @@ import {
     Bell,
     CalendarClock,
     KeyRound,
+    Megaphone,
     ReceiptText,
     Server,
     User,
@@ -87,6 +89,13 @@ export default function SettingsLayout({
                         title: 'Discord Notifications',
                         href: `/workspaces/${workspace.slug}/settings/notifications`,
                         icon: Bell,
+                    },
+                    {
+                        title: 'Meta Ads Notifications',
+                        href: editMetaAdsNotifications({
+                            workspace: workspace.slug,
+                        }),
+                        icon: Megaphone,
                     },
                 ],
             });
