@@ -68,6 +68,7 @@ return [
     'discord' => [
         'webhook_url' => env('DISCORD_WEBHOOK_URL'),
         'inventory_webhook_url' => env('INVENTORY_DISCORD_WEBHOOK_URL'),
+        'meta_ads_webhook_url' => env('META_ADS_DISCORD_WEBHOOK_URL'),
     ],
 
     // SMS providers for parcel-journey notifications. Credentials are stored
