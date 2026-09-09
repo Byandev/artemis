@@ -72,6 +72,7 @@ Schedule::command('inventory:report-late-deliveries')->hourly()->withoutOverlapp
 
 // Who has access to each ad account (Business Manager People list). Access
 // changes are rare and the call is one request per account — daily is plenty.
+Schedule::command('metaads:sync-ad-accounts')->hourly()->withoutOverlapping();
 Schedule::command('metaads:sync-ad-account-people')->dailyAt('02:00')->withoutOverlapping();
 
 // Entity tree (campaigns → ad sets → ads → creatives) changes when advertisers
