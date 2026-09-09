@@ -2,299 +2,438 @@
 
 use App\Jobs\BackfillCallLogPersonasForDay;
 use App\Models\CallLog;
-use App\Models\Order;
+use App\Models\Order as AppOrder;
+use App\Models\Page;
 use App\Models\ShippingAddress;
+use App\Models\Workspace;
 use App\Support\CallLogPersona;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
-use Modules\Pancake\Models\OrderForDelivery;
 
 /**
- * The backfill that stamps calls the sync could not.
+ * Re-running the persona match over calls that synced before the data they
+ * match against had landed.
  *
- * Two rules: the number was on a delivery loaded that day, or it was the phone
- * on an order confirmed that day. Deliveries land after the call is placed and
- * old rows predate the stamp entirely, which is why this runs after the fact.
+ * The rules are the sync's own, in the sync's own order — a delivery loaded that
+ * day first, and only what is left over offered to the orders confirmed that day
+ * — so a row this fills in is indistinguishable from one stamped at sync time.
+ *
+ * The command only picks the workspace-days worth doing and hands them to the
+ * queue; the matching is the job's, so that is where it is tested.
  */
-const BACKFILL_DATE = '2026-07-20';
-
-function confirmedOrder($workspace, string $phone, string $confirmedAt): Order
+function backfillOrder(Workspace $workspace, mixed $confirmedAt = null, ?string $phone = null): AppOrder
 {
-    $order = Order::factory()->forWorkspace($workspace)->create(['confirmed_at' => $confirmedAt]);
+    $page = Page::factory()->forWorkspace($workspace)->create();
 
-    ShippingAddress::factory()->create(['order_id' => $order->id, 'phone_number' => $phone]);
+    $order = AppOrder::factory()->forPage($page)->create(['confirmed_at' => $confirmedAt]);
+
+    if ($phone !== null) {
+        ShippingAddress::factory()->create([
+            'order_id' => $order->id,
+            'phone_number' => $phone,
+        ]);
+    }
 
     return $order;
 }
 
-function unstampedCall($workspace, string $phone, array $overrides = []): CallLog
+function backfillDelivery(Workspace $workspace, AppOrder $order, mixed $date, array $attributes = []): int
+{
+    return DB::table('pancake_order_for_delivery')->insertGetId([
+        'order_id' => $order->id,
+        'shop_id' => 1,
+        'workspace_id' => $workspace->id,
+        'status' => 'delivered',
+        'rider_name' => 'Rider',
+        'rider_phone' => '09990000000',
+        'delivery_date' => Carbon::parse($date)->toDateString(),
+        'created_at' => now(),
+        'updated_at' => now(),
+        ...$attributes,
+    ]);
+}
+
+function backfillCall(Workspace $workspace, string $phone, mixed $date, array $attributes = []): CallLog
 {
     return CallLog::factory()->create([
         'workspace_id' => $workspace->id,
         'phone_number' => $phone,
-        'call_date' => BACKFILL_DATE,
-        'persona' => null,
+        'call_date' => Carbon::parse($date)->toDateString(),
         'order_id' => null,
         'order_for_delivery_id' => null,
-        ...$overrides,
+        'persona' => null,
+        ...$attributes,
     ]);
 }
 
-test('a call to a customer on the day their order was confirmed is stamped verification', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+function backfillDay(Workspace $workspace, string $date = '2026-09-02', string $rule = 'all', bool $dryRun = false): array
+{
+    return (new BackfillCallLogPersonasForDay($workspace->id, $date, $rule, $dryRun))->handle();
+}
 
-    $order = confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
+it('stamps a call to a number on that day\'s delivery as a customer call', function () {
+    $workspace = Workspace::factory()->create();
+    $order = backfillOrder($workspace);
+    $delivery = backfillDelivery($workspace, $order, '2026-09-02', ['customer_phone' => '09171234567']);
 
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])
-        ->assertSuccessful();
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
 
-    $call->refresh();
+    expect(backfillDay($workspace))->toMatchArray(['customer' => 1, 'rider' => 0, 'verification' => 0]);
 
-    expect($call->persona)->toBe(CallLogPersona::VERIFICATION)
-        ->and((int) $call->order_id)->toBe($order->id)
-        // No delivery was involved, so there is no delivery row to point at.
-        ->and($call->order_for_delivery_id)->toBeNull();
+    expect($call->refresh())
+        ->persona->toBe(CallLogPersona::CUSTOMER)
+        ->order_id->toBe($order->id)
+        ->order_for_delivery_id->toBe($delivery);
 });
 
-test('the phone is matched however either side spells it', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+it('stamps a call to the rider on that day\'s delivery as a rider call', function () {
+    $workspace = Workspace::factory()->create();
+    $order = backfillOrder($workspace);
+    $delivery = backfillDelivery($workspace, $order, '2026-09-02', [
+        'customer_phone' => '09171234567',
+        'rider_phone' => '09181112222',
+    ]);
 
-    // Pancake keeps this one international; the handset reported it local.
-    $order = confirmedOrder($workspace, '+639170000001', BACKFILL_DATE.' 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
+    $call = backfillCall($workspace, '09181112222', '2026-09-02');
 
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])->assertSuccessful();
+    backfillDay($workspace);
 
-    expect((int) $call->refresh()->order_id)->toBe($order->id);
+    expect($call->refresh())
+        ->persona->toBe(CallLogPersona::RIDER)
+        ->order_id->toBe($order->id)
+        ->order_for_delivery_id->toBe($delivery);
 });
 
-test('an order confirmed on another day is not a verification match', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+it('calls a number that is both a customer and a rider that day a customer call', function () {
+    $workspace = Workspace::factory()->create();
 
-    confirmedOrder($workspace, '09170000001', '2026-07-19 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
+    $riderOrder = backfillOrder($workspace);
+    backfillDelivery($workspace, $riderOrder, '2026-09-02', ['rider_phone' => '09171234567']);
 
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])->assertSuccessful();
+    $customerOrder = backfillOrder($workspace);
+    $customerDelivery = backfillDelivery($workspace, $customerOrder, '2026-09-02', [
+        'customer_phone' => '09171234567',
+        'rider_phone' => '09990000001',
+    ]);
 
-    $call->refresh();
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
 
-    expect($call->persona)->toBeNull()
-        ->and($call->order_id)->toBeNull();
+    backfillDay($workspace);
+
+    expect($call->refresh())
+        ->persona->toBe(CallLogPersona::CUSTOMER)
+        ->order_for_delivery_id->toBe($customerDelivery);
 });
 
-test('an order confirmed in another workspace is not a match', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['workspace' => $other] = makeWorkspaceWithOwner();
+it('stamps a call to an order confirmed that day, spelled either way, as verification', function () {
+    $workspace = Workspace::factory()->create();
 
-    confirmedOrder($other, '09170000001', BACKFILL_DATE.' 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
+    // Pancake was given the international spelling; the handset reported the
+    // local one. Both have to land on the same key.
+    $order = backfillOrder($workspace, Carbon::parse('2026-09-02 14:05'), '+639171234567');
 
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])->assertSuccessful();
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    backfillDay($workspace);
+
+    expect($call->refresh())
+        ->persona->toBe(CallLogPersona::VERIFICATION)
+        ->order_id->toBe($order->id)
+        ->order_for_delivery_id->toBeNull();
+});
+
+it('prefers the delivery in front of it over an order confirmed the same day', function () {
+    $workspace = Workspace::factory()->create();
+
+    // Confirmed and loaded for delivery on the same day: both rules would match,
+    // and the delivery is what the call was actually about.
+    $order = backfillOrder($workspace, Carbon::parse('2026-09-02 09:00'), '09171234567');
+    $delivery = backfillDelivery($workspace, $order, '2026-09-02', ['customer_phone' => '09171234567']);
+
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    expect(backfillDay($workspace))->toMatchArray(['customer' => 1, 'verification' => 0]);
+
+    expect($call->refresh())
+        ->persona->toBe(CallLogPersona::CUSTOMER)
+        ->order_for_delivery_id->toBe($delivery);
+});
+
+it('gives a number confirmed on two orders that day to the earliest confirmation', function () {
+    $workspace = Workspace::factory()->create();
+
+    $earliest = backfillOrder($workspace, Carbon::parse('2026-09-02 08:00'), '09171234567');
+    backfillOrder($workspace, Carbon::parse('2026-09-02 16:00'), '09171234567');
+
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    backfillDay($workspace);
+
+    expect($call->refresh()->order_id)->toBe($earliest->id);
+});
+
+it('never matches a call to another workspace\'s delivery or order', function () {
+    $workspace = Workspace::factory()->create();
+    $other = Workspace::factory()->create();
+
+    // Same number, same day, everything — but all of it belongs to someone else.
+    $otherDelivery = backfillOrder($other);
+    backfillDelivery($other, $otherDelivery, '2026-09-02', ['customer_phone' => '09171234567']);
+    backfillOrder($other, Carbon::parse('2026-09-02 10:00'), '09171234567');
+
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    backfillDay($workspace);
+
+    expect($call->refresh())
+        ->persona->toBeNull()
+        ->order_id->toBeNull();
+});
+
+it('leaves a call on another day and a call already carrying a persona alone', function () {
+    $workspace = Workspace::factory()->create();
+    $order = backfillOrder($workspace);
+    backfillDelivery($workspace, $order, '2026-09-02', ['customer_phone' => '09171234567']);
+    backfillDelivery($workspace, $order, '2026-09-03', [
+        'customer_phone' => '09171234567',
+        'rider_phone' => '09990000009',
+    ]);
+
+    $wrongDay = backfillCall($workspace, '09171234567', '2026-09-03');
+    $alreadyStamped = backfillCall($workspace, '09171234567', '2026-09-02', [
+        'persona' => CallLogPersona::VERIFICATION,
+        'order_id' => $order->id,
+    ]);
+
+    backfillDay($workspace, '2026-09-02');
+
+    expect($wrongDay->refresh()->persona)->toBeNull();
+    expect($alreadyStamped->refresh())
+        ->persona->toBe(CallLogPersona::VERIFICATION)
+        ->order_for_delivery_id->toBeNull();
+});
+
+it('applies only the rule it is given', function () {
+    $workspace = Workspace::factory()->create();
+
+    $confirmed = backfillOrder($workspace, Carbon::parse('2026-09-02 10:00'), '09171234567');
+    $verificationCall = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    $delivered = backfillOrder($workspace);
+    backfillDelivery($workspace, $delivered, '2026-09-02', ['customer_phone' => '09180000000']);
+    $deliveryCall = backfillCall($workspace, '09180000000', '2026-09-02');
+
+    backfillDay($workspace, '2026-09-02', 'delivery');
+
+    expect($verificationCall->refresh()->persona)->toBeNull();
+    expect($deliveryCall->refresh()->persona)->toBe(CallLogPersona::CUSTOMER);
+
+    backfillDay($workspace, '2026-09-02', 'verification');
+
+    expect($verificationCall->refresh())
+        ->persona->toBe(CallLogPersona::VERIFICATION)
+        ->order_id->toBe($confirmed->id);
+});
+
+it('ignores a number too short to normalize rather than padding it into a match', function () {
+    $workspace = Workspace::factory()->create();
+
+    // Nine digits. Zero-padded to ten it would collide with a real subscriber,
+    // which is exactly what CallLogPersona::normalize returns null to prevent.
+    backfillOrder($workspace, Carbon::parse('2026-09-02 10:00'), '917123456');
+
+    $call = backfillCall($workspace, '917123456', '2026-09-02');
+
+    backfillDay($workspace);
 
     expect($call->refresh()->persona)->toBeNull();
 });
 
-test('the delivery rule wins when a number matches both', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+it('writes nothing on a dry run but still counts what it would have stamped', function () {
+    $workspace = Workspace::factory()->create();
+    $order = backfillOrder($workspace);
+    backfillDelivery($workspace, $order, '2026-09-02', ['customer_phone' => '09171234567']);
 
-    $order = confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 09:00:00');
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
 
-    $delivery = OrderForDelivery::create([
-        'order_id' => $order->id,
-        'page_id' => $order->page_id,
-        'shop_id' => $order->shop_id,
-        'workspace_id' => $workspace->id,
-        'status' => 'PENDING',
-        'parcel_status' => 'on delivery',
-        'customer_name' => 'Cx',
-        'customer_phone' => '09170000001',
-        'rider_name' => 'Rider',
-        'rider_phone' => '09180000001',
-        'delivery_date' => BACKFILL_DATE,
-    ]);
+    expect(backfillDay($workspace, '2026-09-02', 'all', dryRun: true))
+        ->toMatchArray(['customer' => 1]);
 
-    $call = unstampedCall($workspace, '09170000001');
-
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])->assertSuccessful();
-
-    $call->refresh();
-
-    expect($call->persona)->toBe(CallLogPersona::CUSTOMER)
-        ->and((int) $call->order_for_delivery_id)->toBe($delivery->id);
+    expect($call->refresh())
+        ->persona->toBeNull()
+        ->order_id->toBeNull();
 });
 
-test('a row already stamped customer gets its missing delivery id filled in', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+it('logs its totals, since a queued backfill has nowhere else to report', function () {
+    $workspace = Workspace::factory()->create();
+    $order = backfillOrder($workspace);
+    backfillDelivery($workspace, $order, '2026-09-02', ['customer_phone' => '09171234567']);
 
-    $order = Order::factory()->forWorkspace($workspace)->create(['confirmed_at' => null]);
+    backfillCall($workspace, '09171234567', '2026-09-02');
 
-    $delivery = OrderForDelivery::create([
-        'order_id' => $order->id,
-        'page_id' => $order->page_id,
-        'shop_id' => $order->shop_id,
-        'workspace_id' => $workspace->id,
-        'status' => 'PENDING',
-        'parcel_status' => 'on delivery',
-        'customer_name' => 'Cx',
-        'customer_phone' => '09170000001',
-        'rider_name' => 'Rider',
-        'rider_phone' => '09180000001',
-        'delivery_date' => BACKFILL_DATE,
-    ]);
+    Log::spy();
 
-    // Stamped back when the column did not exist yet.
-    $call = unstampedCall($workspace, '09170000001', [
-        'persona' => CallLogPersona::CUSTOMER,
-        'order_id' => $order->id,
-    ]);
+    backfillDay($workspace);
 
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])->assertSuccessful();
-
-    expect((int) $call->refresh()->order_for_delivery_id)->toBe($delivery->id);
+    Log::shouldHaveReceived('info')->once()->withArgs(
+        fn ($message, $context) => $message === 'Backfilled call log personas'
+            && $context['workspace_id'] === $workspace->id
+            && $context['date'] === '2026-09-02'
+            && $context['customer'] === 1
+    );
 });
 
-test('dry run writes nothing', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
-
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--dry-run' => true])
-        ->assertSuccessful();
-
-    expect($call->refresh()->persona)->toBeNull();
-});
-
-test('rule=delivery leaves verification matches alone', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
-
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--rule' => 'delivery'])
-        ->assertSuccessful();
-
-    expect($call->refresh()->persona)->toBeNull();
-});
-
-test('ties go to the earliest confirmation', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    $earlier = confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 08:00:00');
-    confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 15:00:00');
-
-    $call = unstampedCall($workspace, '09170000001');
-
-    $this->artisan('call-logs:backfill-personas', ['--date' => BACKFILL_DATE, '--sync' => true])->assertSuccessful();
-
-    expect((int) $call->refresh()->order_id)->toBe($earlier->id);
-});
-
-test('by default the work is queued, one job per workspace-day', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
-    unstampedCall($workspace, '09170000002', ['call_date' => '2026-07-21']);
-
+it('hands the queue one job per workspace-day that has work', function () {
     Queue::fake();
 
-    $this->artisan('call-logs:backfill-personas')->assertSuccessful();
+    $workspace = Workspace::factory()->create();
+    $other = Workspace::factory()->create();
 
-    Queue::assertPushedOn('analytics', BackfillCallLogPersonasForDay::class);
-    Queue::assertPushed(BackfillCallLogPersonasForDay::class, 2);
+    backfillCall($workspace, '09171234567', '2026-09-01');
+    backfillCall($workspace, '09171234567', '2026-09-02');
+    // A second call on a day already covered does not earn a second job.
+    backfillCall($workspace, '09180000000', '2026-09-02');
+    backfillCall($other, '09171234567', '2026-09-02');
+    // Already stamped, so its day is not work.
+    backfillCall($workspace, '09171234567', '2026-09-05', ['persona' => CallLogPersona::CUSTOMER]);
 
-    // Queued, so nothing is written by the command itself.
+    $this->artisan('call-logs:backfill-personas')
+        ->expectsOutputToContain('Queued 3 jobs')
+        ->assertSuccessful();
+
+    Queue::assertPushed(BackfillCallLogPersonasForDay::class, 3);
+
+    Queue::assertPushed(
+        BackfillCallLogPersonasForDay::class,
+        fn ($job) => $job->workspaceId === $workspace->id
+            && $job->date === '2026-09-02'
+            && $job->rule === 'all'
+            && $job->dryRun === false
+            && $job->queue === 'analytics'
+    );
+
+    Queue::assertNotPushed(
+        BackfillCallLogPersonasForDay::class,
+        fn ($job) => $job->date === '2026-09-05'
+    );
+});
+
+it('queues only the days inside the range it is given', function () {
+    Queue::fake();
+
+    $workspace = Workspace::factory()->create();
+
+    backfillCall($workspace, '09171234567', '2026-09-01');
+    backfillCall($workspace, '09171234567', '2026-09-02');
+    backfillCall($workspace, '09171234567', '2026-09-03');
+
+    $this->artisan('call-logs:backfill-personas', [
+        '--workspace' => $workspace->id,
+        '--since' => '2026-09-02',
+        '--until' => '2026-09-02',
+    ])->assertSuccessful();
+
+    Queue::assertPushed(BackfillCallLogPersonasForDay::class, 1);
+    Queue::assertPushed(
+        BackfillCallLogPersonasForDay::class,
+        fn ($job) => $job->date === '2026-09-02'
+    );
+});
+
+it('passes the chosen rule through to the jobs', function () {
+    Queue::fake();
+
+    $workspace = Workspace::factory()->create();
+    backfillCall($workspace, '09171234567', '2026-09-02');
+
+    $this->artisan('call-logs:backfill-personas', [
+        '--workspace' => $workspace->id,
+        '--date' => '2026-09-02',
+        '--rule' => 'verification',
+    ])->assertSuccessful();
+
+    Queue::assertPushed(
+        BackfillCallLogPersonasForDay::class,
+        fn ($job) => $job->rule === 'verification'
+    );
+});
+
+it('runs the days itself instead of queueing when told to', function () {
+    Queue::fake();
+
+    $workspace = Workspace::factory()->create();
+    $order = backfillOrder($workspace);
+    backfillDelivery($workspace, $order, '2026-09-02', ['customer_phone' => '09171234567']);
+
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    $this->artisan('call-logs:backfill-personas', [
+        '--workspace' => $workspace->id,
+        '--sync' => true,
+    ])->assertSuccessful();
+
+    Queue::assertNothingPushed();
+
+    expect($call->refresh()->persona)->toBe(CallLogPersona::CUSTOMER);
+});
+
+it('keeps a dry run out of the queue, since a worker has nowhere to report to', function () {
+    Queue::fake();
+
+    $workspace = Workspace::factory()->create();
+    $order = backfillOrder($workspace);
+    backfillDelivery($workspace, $order, '2026-09-02', ['customer_phone' => '09171234567']);
+
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    $this->artisan('call-logs:backfill-personas', [
+        '--workspace' => $workspace->id,
+        '--dry-run' => true,
+    ])->expectsOutputToContain('Dry run')->assertSuccessful();
+
+    Queue::assertNothingPushed();
+
     expect($call->refresh()->persona)->toBeNull();
 });
 
-test('a queued job stamps the day it was given', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+it('says so and queues nothing when every call in range is stamped', function () {
+    Queue::fake();
 
-    $order = confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
+    $workspace = Workspace::factory()->create();
+    backfillCall($workspace, '09171234567', '2026-09-02', ['persona' => CallLogPersona::CUSTOMER]);
 
-    (new BackfillCallLogPersonasForDay($workspace->id, BACKFILL_DATE))->handle();
+    $this->artisan('call-logs:backfill-personas', ['--workspace' => $workspace->id])
+        ->expectsOutputToContain('Nothing to backfill')
+        ->assertSuccessful();
 
-    $call->refresh();
-
-    expect($call->persona)->toBe(CallLogPersona::VERIFICATION)
-        ->and((int) $call->order_id)->toBe($order->id);
+    Queue::assertNothingPushed();
 });
 
-test('re-running a finished day writes nothing more', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+it('accepts a workspace slug and rejects an unknown one', function () {
+    Queue::fake();
 
-    confirmedOrder($workspace, '09170000001', BACKFILL_DATE.' 09:00:00');
-    $call = unstampedCall($workspace, '09170000001');
+    $workspace = Workspace::factory()->create();
+    backfillCall($workspace, '09171234567', '2026-09-02');
 
-    (new BackfillCallLogPersonasForDay($workspace->id, BACKFILL_DATE))->handle();
-    $stampedAt = $call->refresh()->updated_at;
+    $this->artisan('call-logs:backfill-personas', ['--workspace' => $workspace->slug])
+        ->assertSuccessful();
 
-    // The day is long past, so its verification stamp is settled and there is
-    // nothing left to select at all.
-    $totals = (new BackfillCallLogPersonasForDay($workspace->id, BACKFILL_DATE))->handle();
+    Queue::assertPushed(BackfillCallLogPersonasForDay::class, 1);
 
-    expect($totals['scanned'])->toBe(0)
-        ->and($call->refresh()->updated_at->eq($stampedAt))->toBeTrue();
+    $this->artisan('call-logs:backfill-personas', ['--workspace' => 'nope'])->assertFailed();
 });
 
-test('a delivery loaded after the sync takes back the verification stamp', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+it('refuses a rule it does not have and a range that runs backwards', function () {
+    Queue::fake();
 
-    // Today: the sync stamped verification because the delivery had not been
-    // loaded yet, and it was loaded an hour later.
-    $today = now()->toDateString();
+    $this->artisan('call-logs:backfill-personas', ['--rule' => 'sideways'])->assertFailed();
 
-    $order = confirmedOrder($workspace, '09170000001', $today.' 09:00:00');
+    $this->artisan('call-logs:backfill-personas', [
+        '--since' => '2026-09-05',
+        '--until' => '2026-09-01',
+    ])->assertFailed();
 
-    $call = unstampedCall($workspace, '09170000001', [
-        'call_date' => $today,
-        'persona' => CallLogPersona::VERIFICATION,
-        'order_id' => $order->id,
-    ]);
-
-    $delivery = OrderForDelivery::create([
-        'order_id' => $order->id,
-        'page_id' => $order->page_id,
-        'shop_id' => $order->shop_id,
-        'workspace_id' => $workspace->id,
-        'status' => 'PENDING',
-        'parcel_status' => 'on delivery',
-        'customer_name' => 'Cx',
-        'customer_phone' => '09170000001',
-        'rider_name' => 'Rider',
-        'rider_phone' => '09180000001',
-        'delivery_date' => $today,
-    ]);
-
-    (new BackfillCallLogPersonasForDay($workspace->id, $today))->handle();
-
-    $call->refresh();
-
-    expect($call->persona)->toBe(CallLogPersona::CUSTOMER)
-        ->and((int) $call->order_for_delivery_id)->toBe($delivery->id);
-});
-
-test('a verification stamp no delivery ever claimed is left as it is', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-
-    $today = now()->toDateString();
-    $order = confirmedOrder($workspace, '09170000001', $today.' 09:00:00');
-
-    $call = unstampedCall($workspace, '09170000001', [
-        'call_date' => $today,
-        'persona' => CallLogPersona::VERIFICATION,
-        'order_id' => $order->id,
-    ]);
-
-    $stampedAt = $call->refresh()->updated_at;
-
-    $totals = (new BackfillCallLogPersonasForDay($workspace->id, $today))->handle();
-
-    // Re-read in case a delivery had turned up, and written only if one had.
-    expect($totals['scanned'])->toBe(1)
-        ->and($totals['unchanged'])->toBe(1)
-        ->and($call->refresh()->persona)->toBe(CallLogPersona::VERIFICATION)
-        ->and($call->refresh()->updated_at->eq($stampedAt))->toBeTrue();
+    Queue::assertNothingPushed();
 });

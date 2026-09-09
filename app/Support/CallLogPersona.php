@@ -18,9 +18,10 @@ use Illuminate\Support\Facades\DB;
  * Such a number can still be a verification call — a CSR ringing a customer on
  * the day their order was confirmed, before it is ever loaded for delivery.
  * That match is resolveVerification(), tried at sync time on whatever the
- * delivery rule could not place, and replayed afterwards by the backfill
- * command: it reads pancake_orders, which lands on its own schedule, so a call
- * synced minutes after it was placed can still find nothing there yet.
+ * delivery rule could not place: it reads pancake_orders, which lands on its
+ * own schedule, so a call synced minutes after it was placed can still find
+ * nothing there yet. An order arriving afterwards claims the calls that were
+ * waiting for it from its own side, in LinkVerificationCallLogsAction.
  */
 class CallLogPersona
 {
@@ -158,8 +159,8 @@ class CallLogPersona
             $match = $resolved[$key][$row['phone_number']] ?? null;
 
             // Left null when neither rule matched. Often that is only a matter of
-            // timing — the delivery or the order lands later in the day — which is
-            // what the backfill command comes back for.
+            // timing — the delivery or the order lands later in the day, and an
+            // order landing later claims its own calls back.
             $row['persona'] = $match['persona'] ?? null;
             $row['order_id'] = $match['order_id'] ?? null;
             $row['order_for_delivery_id'] = $match['order_for_delivery_id'] ?? null;
@@ -179,8 +180,7 @@ class CallLogPersona
      *
      * Ties — the same number on two orders confirmed the same day — go to the
      * earliest confirmation. Nothing in the data says which of the two a call
-     * was about; earliest is deterministic rather than right, and the backfill
-     * command reports how often it had to choose.
+     * was about; earliest is deterministic rather than right.
      *
      * @param  list<string>  $phoneNumbers
      * @return array<string, array{persona: string, order_id: int, order_for_delivery_id: null}>
@@ -204,7 +204,7 @@ class CallLogPersona
 
         // A half-open range rather than whereDate: DATE(confirmed_at) hides the
         // column from idx_orders_workspace_confirmed_status, and this query is on
-        // the sync path now, not just the nightly backfill's.
+        // the sync path.
         $day = Carbon::parse($date)->startOfDay();
 
         $orders = DB::table('pancake_orders as o')
@@ -218,7 +218,6 @@ class CallLogPersona
             ->get(['o.id', 'sa.phone_number']);
 
         $resolved = [];
-        $ambiguous = [];
 
         foreach ($orders as $order) {
             $key = self::normalize($order->phone_number);
@@ -230,9 +229,7 @@ class CallLogPersona
             foreach ($byKey[$key] as $raw) {
                 if (isset($resolved[$raw])) {
                     // Ordered by confirmed_at, so the first one seen is the
-                    // earliest and keeps the row; count the rest as a tie.
-                    $ambiguous[$raw] = true;
-
+                    // earliest and keeps the row.
                     continue;
                 }
 
@@ -242,10 +239,6 @@ class CallLogPersona
                     'order_for_delivery_id' => null,
                 ];
             }
-        }
-
-        foreach (array_keys($ambiguous) as $raw) {
-            $resolved[$raw]['ambiguous'] = true;
         }
 
         return $resolved;
