@@ -75,9 +75,12 @@ interface RmoStatCardsProps {
     returning_count: number;
     problematic_count: number;
     /**
-     * Every call placed to a customer or rider on these orders — attempts, not
-     * orders, so it runs ahead of "Called". Only the public page reports the
-     * call-log figures; left out, the row is the original five cards.
+     * RMO calls only: the ones stamped as reaching the customer or the rider on
+     * a delivery loaded for this day. Attempts, not orders, so it runs ahead of
+     * "Called", and it is the sum of the two RMO tabs in the call-logs
+     * breakdown — verification calls and numbers no delivery matched are out.
+     * Only the public page reports the call-log figures; left out, the row is
+     * the original five cards.
      */
     total_call_logs_count?: number;
     /** Combined talk time of those calls, in seconds. */
@@ -159,7 +162,7 @@ export function RmoStatCards({
             {showCallLogs && (
                 <>
                     <StatCard
-                        title="Total Call Logs Synced"
+                        title="Total RMO Calls"
                         value={totalCalls}
                         loading={loading}
                         icon={PhoneCallIcon}

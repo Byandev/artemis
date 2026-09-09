@@ -19,6 +19,8 @@ use Modules\Pancake\Models\OrderForDelivery;
  * Everything here is workspace-wide: no page, shop, assignee or CSR filter.
  * The page narrows its own order figures when its filters are set; this is the
  * whole day, across all users, which is what the report is for.
+ *
+ * The call figures cover RMO calls only — see RMO_PERSONAS.
  */
 class RmoDailyStats
 {
@@ -30,6 +32,25 @@ class RmoDailyStats
      * the numerator.
      */
     public const CONNECTED_CALL_MIN_SECONDS = 3;
+
+    /**
+     * The personas that make a call an RMO call.
+     *
+     * The day's call figures are about the day's deliveries — the customer
+     * waiting for a parcel, and the rider carrying it. A call_logs row is one of
+     * those only once CallLogPersona has stamped it as such. Everything else in
+     * the table is a real call but not RMO work: an order-verification call, or
+     * a number that matched no delivery at all.
+     *
+     * Counting those too is what made these cards disagree with the breakdown
+     * modal, which splits the same day by the same personas — the total sat
+     * above the sum of its own parts.
+     *
+     * Rows that synced before their persona could be worked out carry null and
+     * stay out of these figures until `call-logs:backfill-personas` has run
+     * over the day.
+     */
+    public const RMO_PERSONAS = [CallLogPersona::CUSTOMER, CallLogPersona::RIDER];
 
     /**
      * @return array{
@@ -100,9 +121,9 @@ class RmoDailyStats
     /**
      * One call-log figure.
      *
-     * Straight off call_logs for the workspace and date. A day's calls are
-     * reported as a day's calls, so a workspace with no orders loaded yet still
-     * gets real numbers.
+     * Straight off call_logs for the workspace and date, narrowed to the RMO
+     * personas — a day's RMO calls are reported as a day's RMO calls, so a
+     * workspace with no orders loaded yet still gets real numbers.
      *
      * $aggregate is what to measure: COUNT(*), SUM(duration), or either of
      * those narrowed to connected calls. One figure, one query — the cards
@@ -128,7 +149,11 @@ class RmoDailyStats
         ?string $callerId = null,
     ): int {
         $query = CallLog::where('workspace_id', $workspace->id)
-            ->whereDate('call_date', $date);
+            ->whereDate('call_date', $date)
+            // RMO calls only — see RMO_PERSONAS. Reads off
+            // call_logs_ws_date_persona_idx, which is the same index the
+            // breakdown groups the day on.
+            ->whereIn('persona', self::RMO_PERSONAS);
 
         if ($callerId !== null && $callerId !== '') {
             $query->where('call_logs.user_id', $callerId);
