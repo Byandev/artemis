@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,9 +17,10 @@ use Illuminate\Support\Facades\DB;
  *
  * Such a number can still be a verification call — a CSR ringing a customer on
  * the day their order was confirmed, before it is ever loaded for delivery.
- * That match is resolveVerification(), run by the backfill command rather than
- * at sync time: it reads pancake_orders, which lands on its own schedule, so a
- * call synced minutes after it was placed would usually find nothing there yet.
+ * That match is resolveVerification(), tried at sync time on whatever the
+ * delivery rule could not place, and replayed afterwards by the backfill
+ * command: it reads pancake_orders, which lands on its own schedule, so a call
+ * synced minutes after it was placed can still find nothing there yet.
  */
 class CallLogPersona
 {
@@ -115,6 +117,10 @@ class CallLogPersona
      * Rows are grouped by date first: a single sync can span midnight, and a
      * number's persona is only meaningful against the day it was called on.
      *
+     * Both rules run, deliveries first: a number on that day's deliveries is
+     * RMO work — customer or rider — and only what is left over is offered to
+     * the verification rule, against the orders confirmed that same day.
+     *
      * @param  list<array<string, mixed>>  $rows  each with workspace_id, phone_number, call_date
      * @return list<array<string, mixed>>
      */
@@ -130,15 +136,30 @@ class CallLogPersona
 
         foreach ($lookups as $key => $phones) {
             [$workspaceId, $date] = explode('|', $key, 2);
-            $resolved[$key] = self::resolve((int) $workspaceId, $date, $phones);
+
+            $matches = self::resolve((int) $workspaceId, $date, $phones);
+
+            // Only the numbers no delivery accounted for are worth the second
+            // query, and a delivery match is never overwritten by one: a call to
+            // a customer whose order was confirmed and dispatched the same day
+            // is about the delivery in front of it.
+            $leftover = array_values(array_diff(
+                array_unique(array_filter($phones)),
+                array_keys($matches),
+            ));
+
+            $resolved[$key] = $leftover === []
+                ? $matches
+                : $matches + self::resolveVerification((int) $workspaceId, $date, $leftover);
         }
 
         return array_map(function (array $row) use ($resolved) {
             $key = $row['workspace_id'].'|'.$row['call_date'];
             $match = $resolved[$key][$row['phone_number']] ?? null;
 
-            // Left null when nothing matched: that is what an order-verification
-            // call looks like, not a gap to be guessed at.
+            // Left null when neither rule matched. Often that is only a matter of
+            // timing — the delivery or the order lands later in the day — which is
+            // what the backfill command comes back for.
             $row['persona'] = $match['persona'] ?? null;
             $row['order_id'] = $match['order_id'] ?? null;
             $row['order_for_delivery_id'] = $match['order_for_delivery_id'] ?? null;
@@ -181,10 +202,16 @@ class CallLogPersona
             return [];
         }
 
+        // A half-open range rather than whereDate: DATE(confirmed_at) hides the
+        // column from idx_orders_workspace_confirmed_status, and this query is on
+        // the sync path now, not just the nightly backfill's.
+        $day = Carbon::parse($date)->startOfDay();
+
         $orders = DB::table('pancake_orders as o')
             ->join('shipping_addresses as sa', 'sa.order_id', '=', 'o.id')
             ->where('o.workspace_id', $workspaceId)
-            ->whereDate('o.confirmed_at', $date)
+            ->where('o.confirmed_at', '>=', $day)
+            ->where('o.confirmed_at', '<', $day->copy()->addDay())
             ->whereNotNull('sa.phone_number')
             ->orderBy('o.confirmed_at')
             ->orderBy('o.id')

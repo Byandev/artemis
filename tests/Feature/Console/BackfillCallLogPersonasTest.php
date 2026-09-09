@@ -231,9 +231,70 @@ test('re-running a finished day writes nothing more', function () {
     (new BackfillCallLogPersonasForDay($workspace->id, BACKFILL_DATE))->handle();
     $stampedAt = $call->refresh()->updated_at;
 
-    // Nothing is left to select, so the second pass is a read and no more.
+    // The day is long past, so its verification stamp is settled and there is
+    // nothing left to select at all.
     $totals = (new BackfillCallLogPersonasForDay($workspace->id, BACKFILL_DATE))->handle();
 
     expect($totals['scanned'])->toBe(0)
+        ->and($call->refresh()->updated_at->eq($stampedAt))->toBeTrue();
+});
+
+test('a delivery loaded after the sync takes back the verification stamp', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    // Today: the sync stamped verification because the delivery had not been
+    // loaded yet, and it was loaded an hour later.
+    $today = now()->toDateString();
+
+    $order = confirmedOrder($workspace, '09170000001', $today.' 09:00:00');
+
+    $call = unstampedCall($workspace, '09170000001', [
+        'call_date' => $today,
+        'persona' => CallLogPersona::VERIFICATION,
+        'order_id' => $order->id,
+    ]);
+
+    $delivery = OrderForDelivery::create([
+        'order_id' => $order->id,
+        'page_id' => $order->page_id,
+        'shop_id' => $order->shop_id,
+        'workspace_id' => $workspace->id,
+        'status' => 'PENDING',
+        'parcel_status' => 'on delivery',
+        'customer_name' => 'Cx',
+        'customer_phone' => '09170000001',
+        'rider_name' => 'Rider',
+        'rider_phone' => '09180000001',
+        'delivery_date' => $today,
+    ]);
+
+    (new BackfillCallLogPersonasForDay($workspace->id, $today))->handle();
+
+    $call->refresh();
+
+    expect($call->persona)->toBe(CallLogPersona::CUSTOMER)
+        ->and((int) $call->order_for_delivery_id)->toBe($delivery->id);
+});
+
+test('a verification stamp no delivery ever claimed is left as it is', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $today = now()->toDateString();
+    $order = confirmedOrder($workspace, '09170000001', $today.' 09:00:00');
+
+    $call = unstampedCall($workspace, '09170000001', [
+        'call_date' => $today,
+        'persona' => CallLogPersona::VERIFICATION,
+        'order_id' => $order->id,
+    ]);
+
+    $stampedAt = $call->refresh()->updated_at;
+
+    $totals = (new BackfillCallLogPersonasForDay($workspace->id, $today))->handle();
+
+    // Re-read in case a delivery had turned up, and written only if one had.
+    expect($totals['scanned'])->toBe(1)
+        ->and($totals['unchanged'])->toBe(1)
+        ->and($call->refresh()->persona)->toBe(CallLogPersona::VERIFICATION)
         ->and($call->refresh()->updated_at->eq($stampedAt))->toBeTrue();
 });

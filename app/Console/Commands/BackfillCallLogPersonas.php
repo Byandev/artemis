@@ -17,16 +17,17 @@ use Illuminate\Support\Carbon;
  * one. This re-runs the match after the fact, when the orders and deliveries
  * it needs are actually in the table.
  *
- * Two rules, applied in that order:
+ * Two rules, applied in that order — the same two the sync applies:
  *
  *   delivery      — the number is on a delivery loaded for that day, as
- *                   customer_phone or rider_phone. The sync-time rule, replayed.
+ *                   customer_phone or rider_phone.
  *   verification  — the number is the shipping-address phone on an order the
- *                   workspace confirmed that same day. Not applied at sync time,
- *                   so this command is the only thing that stamps it.
+ *                   workspace confirmed that same day.
  *
  * Delivery wins where both would match: a call to a customer whose order was
  * confirmed and dispatched the same day is about the delivery in front of it.
+ * That is why a recent verification stamp is re-decided here rather than left
+ * standing — the sync could only see the deliveries loaded by the time it ran.
  *
  * The work itself goes to the queue, one job per workspace-day — a backfill
  * reaching back months is not something to hold a terminal open for. Use
@@ -123,7 +124,7 @@ class BackfillCallLogPersonas extends Command
             $rule,
         ));
 
-        $totals = ['scanned' => 0, 'delivery' => 0, 'verification' => 0, 'ambiguous' => 0, 'unmatched' => 0];
+        $totals = ['scanned' => 0, 'delivery' => 0, 'verification' => 0, 'ambiguous' => 0, 'unchanged' => 0, 'unmatched' => 0];
 
         $bar = $this->output->createProgressBar($days->count());
         $bar->start();
@@ -145,6 +146,7 @@ class BackfillCallLogPersonas extends Command
             ['Scanned', $totals['scanned']],
             ['Matched to a delivery', $totals['delivery']],
             ['Matched to a confirmed order', $totals['verification']],
+            ['Already stamped, unchanged', $totals['unchanged']],
             ['Still unmatched', $totals['unmatched']],
         ]);
 
