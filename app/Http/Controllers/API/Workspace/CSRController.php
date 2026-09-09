@@ -255,9 +255,9 @@ class CSRController extends Controller
         $current = $this->posTotals($workspace, $from, $to);
         $previous = $this->posTotals($workspace, $previousFrom, $previousTo);
 
-        // The rollup's stored rts_rate. Null, not zero, when nothing in the
-        // range settled: a 0% would read as a perfect period rather than an
-        // unfinished one.
+        // Returning over returning plus delivered, summed over the range. Null,
+        // not zero, when nothing in the range settled: a 0% would read as a
+        // perfect period rather than an unfinished one.
         $rate = $current['rts_rate'];
         $previousRate = $previous['rts_rate'];
 
@@ -1194,16 +1194,25 @@ class CSRController extends Controller
                 COALESCE(SUM(total_sales), 0)  as sales,
                 COALESCE(SUM(total_orders), 0) as orders,
                 COALESCE(SUM(`returning`), 0)  as returning_amount,
-                AVG(CASE WHEN `returning` + delivered > 0 THEN rts_rate END) as rts_rate
+                COALESCE(SUM(delivered), 0)    as delivered_amount
             ')
             ->first();
+
+        $returning = (float) ($row->returning_amount ?? 0);
+        $delivered = (float) ($row->delivered_amount ?? 0);
+        $settled = $returning + $delivered;
 
         return [
             'sales' => (float) ($row->sales ?? 0),
             'orders' => (int) ($row->orders ?? 0),
-            'returning' => (float) ($row->returning_amount ?? 0),
-            // Null, not zero: no settled row in the range is no rate at all.
-            'rts_rate' => ($row->rts_rate ?? null) === null ? null : (float) $row->rts_rate,
+            'returning' => $returning,
+            // Returning over everything settled across the whole range, not the
+            // average of the rollup's per-shop-per-day rates: a shop-day with
+            // two parcels weighed as much as one with two hundred. The same
+            // arithmetic the RTS Rate column, the leader card and the comparison
+            // tab already use. Null, not zero, when nothing settled in the
+            // range — a rate needs something to divide.
+            'rts_rate' => $settled > 0 ? $returning / $settled * 100 : null,
         ];
     }
 

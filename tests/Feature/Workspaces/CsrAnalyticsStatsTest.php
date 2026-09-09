@@ -261,8 +261,8 @@ test('the endpoint needs the CSR analytics permission', function () {
 /**
  * The one shop the RTS tests' parcels go through.
  *
- * The rollup writes a row — and an rts_rate — per CSR, per shop, per day, so
- * parcels that are meant to share a rate have to share a shop.
+ * The rollup writes a row per CSR, per shop, per day, so parcels that are meant
+ * to share a rate have to share a shop.
  */
 function salesShop(Workspace $workspace): Shop
 {
@@ -273,8 +273,7 @@ function salesShop(Workspace $workspace): Shop
 
 /**
  * A parcel that came back — the rollup's `returning` money, and the numerator
- * behind its stored rts_rate. Credited to a CSR, since the rollup is keyed by
- * who confirmed it.
+ * of the rate. Credited to a CSR, since the rollup is keyed by who confirmed it.
  */
 function returningOrder(Workspace $workspace, string $returningAt, float $amount): Order
 {
@@ -299,11 +298,10 @@ function deliveredOrder(Workspace $workspace, string $deliveredAt, float $amount
     ]);
 }
 
-test('the RTS rate is the rollup\'s own rts_rate column', function () {
+test('the RTS rate is returning over returning plus delivered', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // One CSR, one shop, one day — so the range is a single rollup row, and
-    // the card is that row's stored rate: 2000 / (2000 + 8000) = 20%.
+    // One CSR, one shop, one day: 2000 / (2000 + 8000) = 20%.
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
     deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
 
@@ -312,28 +310,28 @@ test('the RTS rate is the rollup\'s own rts_rate column', function () {
         ->assertJsonPath('returning_amount', 2000);
 });
 
-test('a range of several rows is the mean of their rates, not the rate of the whole', function () {
+test('a range of several rows is the rate of the whole, not the mean of their rates', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     // Aug 2 returned everything it settled and Aug 3 returned none of it, so
-    // the two stored rates are 100 and 0 and the card reads 50 — the money
-    // says 2000 of 10000, which is 20. Reading the column means the days
-    // count equally, however much each settled.
+    // the two stored rates are 100 and 0 — their mean would read 50. The money
+    // says 2000 of 10000, which is 20, and that is what the card reports: the
+    // days weigh by what they settled, not one row apiece.
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
     deliveredOrder($workspace, '2026-08-03 10:00:00', 8000);
 
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', 50);
+        ->assertJsonPath('value', 20);
 });
 
-test('a day that settled nothing has no rate to average in', function () {
+test('a day that settled nothing leaves the rate alone', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     returningOrder($workspace, '2026-08-02 10:00:00', 2000);
     deliveredOrder($workspace, '2026-08-02 14:00:00', 8000);
 
-    // Confirmed on the 3rd but still in transit: the row is there with a
-    // stored rts_rate of 0, and letting that in would halve the card to 10%.
+    // Confirmed on the 3rd but still in transit: the row is there, and adds
+    // nothing to either side of the division.
     csrSale($workspace, '2026-08-03 09:00:00', 5000);
 
     csrRtsStat($owner, $workspace, '2026-08-01', '2026-08-05')
