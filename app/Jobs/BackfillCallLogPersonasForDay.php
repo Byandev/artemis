@@ -20,8 +20,9 @@ use Illuminate\Support\Facades\Log;
  * holding a worker for the whole run. Split this way a failed day retries on
  * its own without redoing the rest, and the days spread across workers.
  *
- * Re-running a day is safe: only rows still missing something are selected, so
- * a second pass over a finished day is a read and nothing more.
+ * Re-running a day is safe: only rows with something still to decide are
+ * selected, and one that comes back with the stamp it already has is left
+ * alone, so a second pass over a finished day writes nothing.
  */
 class BackfillCallLogPersonasForDay implements ShouldQueue
 {
@@ -30,6 +31,9 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
     public int $timeout = 600;
 
     public int $tries = 3;
+
+    /** How far back a verification stamp is still open to being re-decided. */
+    public const VERIFICATION_RECHECK_DAYS = 7;
 
     /**
      * @param  string  $rule  all, delivery, or verification
@@ -45,16 +49,16 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
     ) {}
 
     /**
-     * @return array<string, int> scanned, delivery, verification, ambiguous, unmatched
+     * @return array<string, int> scanned, delivery, verification, ambiguous, unchanged, unmatched
      */
     public function handle(): array
     {
-        $totals = ['scanned' => 0, 'delivery' => 0, 'verification' => 0, 'ambiguous' => 0, 'unmatched' => 0];
+        $totals = ['scanned' => 0, 'delivery' => 0, 'verification' => 0, 'ambiguous' => 0, 'unchanged' => 0, 'unmatched' => 0];
 
         $calls = self::pending(CallLog::query())
             ->where('workspace_id', $this->workspaceId)
             ->whereDate('call_date', $this->date)
-            ->get(['id', 'phone_number', 'persona']);
+            ->get(['id', 'phone_number', 'persona', 'order_id', 'order_for_delivery_id']);
 
         $totals['scanned'] = $calls->count();
 
@@ -71,10 +75,11 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
         // Only numbers the delivery rule could not place are worth asking the
         // verification rule about, and a row already stamped customer or rider
         // is not up for reclassification — it is here for its missing
-        // order_for_delivery_id alone.
+        // order_for_delivery_id alone. A row stamped verification is asked
+        // again: it keeps that answer unless a delivery has since claimed it.
         $leftover = $this->rule === 'delivery'
             ? []
-            : $calls->filter(fn ($call) => $call->persona === null && ! isset($deliveryMatches[$call->phone_number]))
+            : $calls->filter(fn ($call) => self::openToVerification($call) && ! isset($deliveryMatches[$call->phone_number]))
                 ->pluck('phone_number')
                 ->filter()
                 ->unique()
@@ -91,10 +96,18 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
 
         foreach ($calls as $call) {
             $match = $deliveryMatches[$call->phone_number]
-                ?? ($call->persona === null ? ($verificationMatches[$call->phone_number] ?? null) : null);
+                ?? (self::openToVerification($call) ? ($verificationMatches[$call->phone_number] ?? null) : null);
 
             if ($match === null) {
                 $totals['unmatched']++;
+
+                continue;
+            }
+
+            // A verification row re-offered the same answer it already carries:
+            // selected only in case a delivery had turned up, and none had.
+            if (self::alreadyStamped($call, $match)) {
+                $totals['unchanged']++;
 
                 continue;
             }
@@ -146,17 +159,50 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
     /**
      * Calls with something still to stamp.
      *
-     * Two kinds qualify: one that was never matched at all, and one matched to a
-     * delivery back when order_for_delivery_id did not exist yet.
+     * Three kinds qualify: one that was never matched at all, one matched to a
+     * delivery back when order_for_delivery_id did not exist yet, and a recent
+     * one the sync could only call verification.
+     *
+     * That last kind is provisional rather than wrong. The sync stamps
+     * verification when the number was on no delivery loaded for that day yet —
+     * and a delivery loaded an hour later would have won. Once the day is a week
+     * behind, nothing more is going to land against it, so the window keeps a
+     * routine backfill from dragging every verification call ever stamped back
+     * through the queue.
      */
     public static function pending($query)
     {
         return $query->where(function ($q) {
             $q->whereNull('persona')
                 ->orWhere(function ($sub) {
+                    $sub->where('persona', CallLogPersona::VERIFICATION)
+                        ->whereDate('call_date', '>=', now()->subDays(self::VERIFICATION_RECHECK_DAYS)->toDateString());
+                })
+                ->orWhere(function ($sub) {
                     $sub->whereNull('order_for_delivery_id')
                         ->whereIn('persona', [CallLogPersona::CUSTOMER, CallLogPersona::RIDER]);
                 });
         });
+    }
+
+    /**
+     * Is this row's persona still the verification rule's to decide?
+     *
+     * Null because nothing has claimed it, verification because the sync's claim
+     * only stands until a delivery turns up.
+     */
+    private static function openToVerification($call): bool
+    {
+        return $call->persona === null || $call->persona === CallLogPersona::VERIFICATION;
+    }
+
+    /**
+     * Does the row already carry exactly what the match would write?
+     */
+    private static function alreadyStamped($call, array $match): bool
+    {
+        return $call->persona === $match['persona']
+            && (int) $call->order_id === (int) $match['order_id']
+            && (int) $call->order_for_delivery_id === (int) $match['order_for_delivery_id'];
     }
 }
