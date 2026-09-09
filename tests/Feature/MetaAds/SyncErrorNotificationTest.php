@@ -9,9 +9,10 @@ use Modules\MetaAds\Models\SyncRun;
 use Modules\MetaAds\Models\User as MetaUser;
 
 /**
- * The sync itself posts to Discord when it gives up on an ad account — no
- * schedule, no digest. These run the real job against a faked Graph error, so
- * they cover the wiring as well as the message.
+ * The sync posts to Discord itself when it gives up on an ad account. The
+ * channel is read by clients, so these assert plain language and the absence of
+ * anything technical, as well as the wiring — the real job runs against a faked
+ * Graph error.
  */
 const HOOK = 'https://discord.com/api/webhooks/888/sync-errors';
 
@@ -20,16 +21,25 @@ beforeEach(function () {
     Cache::flush();
 });
 
-function failingSyncAccount(?int $status = 1): AdAccount
+/** A Facebook account owning ad accounts with the given statuses. */
+function fbAccountWith(array $accounts): array
 {
-    $metaUser = MetaUser::create(['id' => 7401, 'name' => 'Token Owner', 'access_token' => 'tok']);
-    $account = AdAccount::create(['id' => 555000333, 'name' => 'Shanna Mae', 'account_status' => $status]);
-    $metaUser->adAccounts()->attach($account->id);
+    $metaUser = MetaUser::create(['id' => 7501, 'name' => 'Bryan M', 'access_token' => 'tok']);
+    $made = [];
 
-    return $account;
+    foreach ($accounts as $i => [$name, $status]) {
+        $account = AdAccount::create([
+            'id' => 555000400 + $i,
+            'name' => $name,
+            'account_status' => $status,
+        ]);
+        $metaUser->adAccounts()->attach($account->id);
+        $made[] = $account;
+    }
+
+    return $made;
 }
 
-/** Meta returns $code; Discord accepts the post. */
 function fakeGraph(int $code, string $message = 'Boom', int $status = 400): void
 {
     Http::fake([
@@ -63,98 +73,98 @@ function runFailingSync(AdAccount $account): void
     try {
         (new SyncInsights($account, '2026-06-07'))->handle();
     } catch (Throwable) {
-        // The job rethrows by design; the notification is what we're asserting.
+        // The job rethrows by design; the notification is what we assert.
     }
 }
 
-it('posts to Discord while syncing when an ad account errors', function () {
-    fakeGraph(190, 'Error validating access token: Session has expired.');
-
-    runFailingSync(failingSyncAccount());
-
-    $embeds = postedEmbeds();
-
-    expect($embeds)->toHaveCount(1);
-
-    $embed = $embeds[0];
-    $fields = collect($embed['fields'])->keyBy('name');
-
-    expect($embed['title'])->toBe('🔴 Token expired — Shanna Mae')
-        // The body says what to do, not what the exception said.
-        ->and($embed['description'])->toContain('Reconnect')
-        ->and($embed['color'])->toBe(0xED4245)
-        ->and($fields['Ad account']['value'])->toContain('555000333')
-        ->and($fields['Ad account']['value'])->toContain('adsmanager.facebook.com')
-        ->and($fields['Sync']['value'])->toBe('SyncInsights')
-        ->and($fields['Meta says']['value'])->toContain('Session has expired')
-        ->and($fields['Reference']['value'])->toContain('code 190')
-        ->and($fields['Reference']['value'])->toContain('TraceMe123');
-});
-
-// An unsettled or grace-period account is usually the real cause, so it is
-// flagged rather than left for someone to go and look up.
-it('flags a non-active account status', function (?int $status, string $label) {
+it('names the Facebook account and lists its problem ad accounts', function () {
     fakeGraph(190);
+    [$failed] = fbAccountWith([
+        ['Shanna Mae', 1],      // active, but this is the one that failed
+        ['Andree Boston', 2],   // disabled
+        ['Igie Almazora', 3],   // unsettled
+        ['Healthy Co', 1],      // active and fine — must not be listed
+    ]);
 
-    runFailingSync(failingSyncAccount($status));
-
-    expect(collect(postedEmbeds()[0]['fields'])->firstWhere('name', 'Status')['value'])
-        ->toBe("⚠️ {$label}");
-})->with([
-    'unsettled' => [3, 'Unsettled'],
-    'in grace period' => [9, 'In Grace Period'],
-    'never reported' => [null, 'Unknown'],
-]);
-
-// Unsettled billing is the cause; the token error is a symptom of it, so the
-// account status leads the headline rather than the error code.
-it('leads with the account status when it outranks the error code', function () {
-    fakeGraph(190);
-
-    runFailingSync(failingSyncAccount(3));
+    runFailingSync($failed);
 
     $embed = postedEmbeds()[0];
 
-    expect($embed['title'])->toBe('🔴 Unsettled — Shanna Mae')
-        ->and($embed['description'])->toContain('Settle it in Ads Manager');
+    expect($embed['title'])->toBe('⚠️ Meta Ads needs your attention')
+        ->and($embed['description'])->toContain('Bryan M');
+
+    $list = $embed['fields'][0];
+
+    expect($list['name'])->toBe('3 ad accounts affected')
+        // The id travels with each account so a client can quote it to Meta.
+        ->and($list['value'])->toContain('`555000401`')
+        ->and($list['value'])->toContain('Andree Boston')
+        ->toContain('Igie Almazora')
+        ->toContain('Shanna Mae')
+        ->not->toContain('Healthy Co');
 });
 
-it('maps known Meta codes to a plain-language headline', function (int $code, string $headline) {
-    fakeGraph($code);
+// The channel is read by clients: an error code or a job name is noise they
+// cannot act on, and it must not leak into the post.
+it('shows Meta\'s own status wording, with nothing technical', function () {
+    fakeGraph(190, 'Error validating access token: Session has expired.');
+    [$failed] = fbAccountWith([['Unsettled Co', 3]]);
 
-    runFailingSync(failingSyncAccount(1));
+    runFailingSync($failed);
 
-    expect(postedEmbeds()[0]['title'])->toBe("🔴 {$headline} — Shanna Mae");
+    $embed = postedEmbeds()[0];
+    $text = json_encode($embed);
+
+    expect($embed['fields'][0]['value'])->toContain('Unsettled')
+        ->and($text)->not->toContain('190')
+        ->not->toContain('OAuthException')
+        ->not->toContain('TraceMe123')
+        ->not->toContain('SyncInsights')
+        ->not->toContain('access token');
+});
+
+// Same wording as the ad-accounts table in the dashboard, so the channel and
+// the UI never disagree about what an account's state is called.
+it('shows the status Meta reports for each account', function (int $status, string $label) {
+    fakeGraph(190);
+    [$failed] = fbAccountWith([['Problem Co', $status]]);
+
+    runFailingSync($failed);
+
+    expect(postedEmbeds()[0]['fields'][0]['value'])->toContain($label);
 })->with([
-    'token' => [190, 'Token expired'],
-    'permission' => [200, 'Permission denied'],
-    'missing object' => [803, 'Object not found'],
+    'disabled' => [2, 'Disabled'],
+    'unsettled' => [3, 'Unsettled'],
+    'grace period' => [9, 'In Grace Period'],
+    'risk review' => [7, 'Pending Risk Review'],
+    'closed' => [101, 'Closed'],
 ]);
 
-// An unmapped code must still produce a usable post, not a blank headline.
-it('falls back to a generic headline for an unknown code', function () {
-    fakeGraph(999999);
-
-    runFailingSync(failingSyncAccount(1));
-
-    expect(postedEmbeds()[0]['title'])->toBe('🔴 Sync failed — Shanna Mae');
-});
-
-it('does not flag an active account', function () {
+// Meta may still call the account active while its sync is broken; an alert
+// listing no accounts would leave the reader with nothing to act on.
+it('still names the failed account when Meta calls it active', function () {
     fakeGraph(190);
+    [$failed] = fbAccountWith([['All Good Co', 1]]);
 
-    runFailingSync(failingSyncAccount(1));
+    runFailingSync($failed);
 
-    expect(collect(postedEmbeds()[0]['fields'])->firstWhere('name', 'Status')['value'])
-        ->toBe('Active');
+    $list = postedEmbeds()[0]['fields'][0];
+
+    // "Active" would read as nonsense on an alert, so this one case says what
+    // actually happened rather than echoing the status.
+    expect($list['name'])->toBe('1 ad account affected')
+        ->and($list['value'])->toContain('All Good Co')
+        ->toContain('Sync error')
+        ->not->toContain('Active');
 });
 
 // Rate-limited and transient errors release the job for a retry — nothing has
-// failed yet, so the channel stays quiet.
+// failed yet, so the client channel stays quiet.
 it('stays quiet while the job is still going to retry', function (int $code) {
     fakeGraph($code, 'Please retry');
+    [$failed] = fbAccountWith([['Retrying Co', 1]]);
 
-    (new SyncInsights(failingSyncAccount(), '2026-06-07'))->handle();
+    (new SyncInsights($failed, '2026-06-07'))->handle();
 
     expect(postedEmbeds())->toBeEmpty();
 })->with([
@@ -162,36 +172,40 @@ it('stays quiet while the job is still going to retry', function (int $code) {
     'transient' => 1,
 ]);
 
-// One expired token fails every job under it; without this the channel would
-// get dozens of identical posts from a single outage.
-it('reports an account once, then mutes it briefly', function () {
+// One expired token fails every job under the same Facebook account; without
+// this a single outage would arrive as dozens of identical posts.
+it('reports a Facebook account once, then mutes it briefly', function () {
     fakeGraph(190);
-    $account = failingSyncAccount();
+    [$first, $second] = fbAccountWith([['One', 2], ['Two', 3]]);
 
-    runFailingSync($account);
-    runFailingSync($account);
-    runFailingSync($account);
+    runFailingSync($first);
+    runFailingSync($second);
+    runFailingSync($first);
 
     expect(postedEmbeds())->toHaveCount(1);
 });
 
-it('still records the failure on the sync run', function () {
+it('still records the technical failure on the sync run', function () {
     fakeGraph(190, 'Session has expired.');
+    [$failed] = fbAccountWith([['Shanna Mae', 1]]);
 
-    runFailingSync(failingSyncAccount());
+    runFailingSync($failed);
 
     $run = SyncRun::latest('id')->first();
 
+    // Plain language for the client, full detail for whoever debugs it.
     expect($run->status)->toBe(SyncRun::STATUS_FAILED)
-        ->and(((array) $run->meta)['error_code'])->toBe(190);
+        ->and(((array) $run->meta)['error_code'])->toBe(190)
+        ->and($run->error_message)->toContain('Session has expired');
 });
 
 it('sends nothing when no webhook is configured', function () {
     config()->set('services.discord.meta_ads_webhook_url', null);
     config()->set('services.discord.webhook_url', null);
     fakeGraph(190);
+    [$failed] = fbAccountWith([['Nobody Listening', 2]]);
 
-    runFailingSync(failingSyncAccount());
+    runFailingSync($failed);
 
     expect(postedEmbeds())->toBeEmpty();
 });
@@ -202,7 +216,39 @@ it('swallows a webhook failure instead of throwing', function () {
         'graph.facebook.com/*' => Http::response(['error' => ['message' => 'Boom', 'code' => 190]], 400),
         HOOK => fn () => throw new RuntimeException('Discord unreachable'),
     ]);
+    [$failed] = fbAccountWith([['Shanna Mae', 2]]);
 
-    expect(fn () => (new SyncInsights(failingSyncAccount(), '2026-06-07'))->handle())
+    expect(fn () => (new SyncInsights($failed, '2026-06-07'))->handle())
         ->toThrow(MetaGraphException::class);
+});
+
+// Discord drops the whole post if a field runs past 1024 characters.
+it('caps a long list and says how many it left out', function () {
+    fakeGraph(190);
+    $accounts = [];
+    foreach (range(1, 14) as $i) {
+        $accounts[] = ["Ad Account Number {$i}", 3];
+    }
+    $made = fbAccountWith($accounts);
+
+    runFailingSync($made[0]);
+
+    $value = postedEmbeds()[0]['fields'][0]['value'];
+
+    expect(mb_strlen($value))->toBeLessThanOrEqual(1024)
+        ->and($value)->toContain('more');
+});
+
+// The id is what a client pastes into a Meta support ticket, so it rides with
+// every account — bare, in backticks, with no act_ prefix to strip off.
+it('shows the ad account id beside each name', function () {
+    fakeGraph(190);
+    [$failed] = fbAccountWith([['Andree Boston', 2]]);
+
+    runFailingSync($failed);
+
+    $value = postedEmbeds()[0]['fields'][0]['value'];
+
+    expect($value)->toContain('**Andree Boston** · `555000400`')
+        ->not->toContain('act_555000400');
 });
