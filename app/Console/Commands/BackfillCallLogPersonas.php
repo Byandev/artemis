@@ -22,8 +22,8 @@ use Illuminate\Support\Carbon;
  *   delivery      — the number is on a delivery loaded for that day, as
  *                   customer_phone or rider_phone. The sync-time rule, replayed.
  *   verification  — the number is the shipping-address phone on an order the
- *                   workspace confirmed that same day. Not applied at sync time,
- *                   so this command is the only thing that stamps it.
+ *                   workspace confirmed that same day. The sync applies this one
+ *                   too, so what turns up here is what confirmed late.
  *
  * Delivery wins where both would match: a call to a customer whose order was
  * confirmed and dispatched the same day is about the delivery in front of it.

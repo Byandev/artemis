@@ -16,9 +16,11 @@ use Illuminate\Support\Facades\DB;
  *
  * Such a number can still be a verification call — a CSR ringing a customer on
  * the day their order was confirmed, before it is ever loaded for delivery.
- * That match is resolveVerification(), run by the backfill command rather than
- * at sync time: it reads pancake_orders, which lands on its own schedule, so a
- * call synced minutes after it was placed would usually find nothing there yet.
+ * That match is resolveVerification(), run here too on whatever the delivery
+ * rule could not place. It reads pancake_orders, which lands on its own
+ * schedule, so a call synced minutes after it was placed can still find nothing
+ * there; the backfill command re-runs both rules over a past day to pick up
+ * what arrived late.
  */
 class CallLogPersona
 {
@@ -115,6 +117,10 @@ class CallLogPersona
      * Rows are grouped by date first: a single sync can span midnight, and a
      * number's persona is only meaningful against the day it was called on.
      *
+     * Both rules run, delivery first: a call to a customer whose order was
+     * confirmed and dispatched the same day is about the delivery in front of
+     * it, not the confirmation behind it.
+     *
      * @param  list<array<string, mixed>>  $rows  each with workspace_id, phone_number, call_date
      * @return list<array<string, mixed>>
      */
@@ -130,15 +136,26 @@ class CallLogPersona
 
         foreach ($lookups as $key => $phones) {
             [$workspaceId, $date] = explode('|', $key, 2);
-            $resolved[$key] = self::resolve((int) $workspaceId, $date, $phones);
+
+            $matches = self::resolve((int) $workspaceId, $date, $phones);
+
+            // Whatever no delivery accounts for gets a second pass: a number on
+            // an order this workspace confirmed the same day is a verification
+            // call, whatever hour of that day either of them happened at.
+            $leftover = array_values(array_diff($phones, array_keys($matches)));
+
+            $resolved[$key] = $leftover === []
+                ? $matches
+                : $matches + self::resolveVerification((int) $workspaceId, $date, $leftover);
         }
 
         return array_map(function (array $row) use ($resolved) {
             $key = $row['workspace_id'].'|'.$row['call_date'];
             $match = $resolved[$key][$row['phone_number']] ?? null;
 
-            // Left null when nothing matched: that is what an order-verification
-            // call looks like, not a gap to be guessed at.
+            // Left null when neither rule matched: the number was on no
+            // delivery loaded that day and no order confirmed that day. The
+            // backfill has another go once the late arrivals are in.
             $row['persona'] = $match['persona'] ?? null;
             $row['order_id'] = $match['order_id'] ?? null;
             $row['order_for_delivery_id'] = $match['order_for_delivery_id'] ?? null;
@@ -159,7 +176,7 @@ class CallLogPersona
      * Ties — the same number on two orders confirmed the same day — go to the
      * earliest confirmation. Nothing in the data says which of the two a call
      * was about; earliest is deterministic rather than right, and the backfill
-     * command reports how often it had to choose.
+     * command reports how often it had to choose (a sync has nowhere to say so).
      *
      * @param  list<string>  $phoneNumbers
      * @return array<string, array{persona: string, order_id: int, order_for_delivery_id: null}>

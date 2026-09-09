@@ -146,8 +146,12 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
     /**
      * Calls with something still to stamp.
      *
-     * Two kinds qualify: one that was never matched at all, and one matched to a
-     * delivery back when order_for_delivery_id did not exist yet.
+     * Three kinds qualify: one that was never matched at all, one matched to a
+     * delivery back when order_for_delivery_id did not exist yet, and one the
+     * sync called verification whose number is on a delivery for that day after
+     * all — the delivery had not been pulled in when the call synced. Delivery
+     * outranks verification, and a stamped row is out of this set otherwise, so
+     * that last case is spelled out rather than left to a null persona.
      */
     public static function pending($query)
     {
@@ -156,6 +160,18 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
                 ->orWhere(function ($sub) {
                     $sub->whereNull('order_for_delivery_id')
                         ->whereIn('persona', [CallLogPersona::CUSTOMER, CallLogPersona::RIDER]);
+                })
+                ->orWhere(function ($sub) {
+                    $sub->where('persona', CallLogPersona::VERIFICATION)
+                        ->whereExists(function ($exists) {
+                            $exists->from('pancake_order_for_delivery as d')
+                                ->whereColumn('d.workspace_id', 'call_logs.workspace_id')
+                                ->whereColumn('d.delivery_date', 'call_logs.call_date')
+                                ->where(function ($phone) {
+                                    $phone->whereColumn('d.customer_phone', 'call_logs.phone_number')
+                                        ->orWhereColumn('d.rider_phone', 'call_logs.phone_number');
+                                });
+                        });
                 });
         });
     }

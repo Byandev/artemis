@@ -48,8 +48,10 @@ class CallLogV2Controller extends Controller
         }, $request->input('call_logs'));
 
         // Match each number against that day's deliveries to work out whether
-        // it was the customer or the rider, and which order. The payload is
-        // unchanged — the app still posts only a number and a timestamp.
+        // it was the customer or the rider, and — for the numbers no delivery
+        // accounts for — against that day's confirmed orders, which makes it a
+        // verification call. The payload is unchanged; the app still posts only
+        // a number and a timestamp.
         $rows = CallLogPersona::stamp($rows);
 
         $inserted = 0;
