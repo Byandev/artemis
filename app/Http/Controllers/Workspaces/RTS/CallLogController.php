@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 /**
@@ -24,7 +25,8 @@ use Spatie\QueryBuilder\QueryBuilder;
  * Callers are named a page at a time rather than joined — `user_id` and
  * `assignee_user_id` point into two different tables (Pancake users and system
  * users) depending on which build of the app sent the row, so there is no single
- * join that names them all. That is also why "User" is not a sortable column.
+ * join that names them all. Sorting by "User" therefore orders on a pair of
+ * subqueries rather than a joined column; see the `called_by` sort below.
  */
 class CallLogController extends Controller
 {
@@ -56,12 +58,33 @@ class CallLogController extends Controller
                     : $query->where('persona', $value)),
                 AllowedFilter::exact('type'),
             ])
-            ->allowedSorts(['call_date', 'duration', 'persona', 'type', 'phone_number'])
+            ->allowedSorts([
+                'call_date',
+                'duration',
+                'persona',
+                'type',
+                'phone_number',
+                // The caller's name lives in whichever of the two user tables the
+                // syncing app knew about, so it is looked up per row rather than
+                // joined: a join would need both tables, and both carry `id` and
+                // `name` columns that would collide with the ones already being
+                // selected and ordered on here.
+                AllowedSort::callback('called_by', function ($query, bool $descending) {
+                    // COALESCE in the same order CallLogCallers resolves the name,
+                    // so the column sorts on the name it actually shows.
+                    $query->orderByRaw(
+                        'COALESCE('
+                        .'(select name from users where users.id = call_logs.assignee_user_id), '
+                        .'(select name from pancake_users where pancake_users.id = call_logs.user_id)'
+                        .') '.($descending ? 'desc' : 'asc')
+                    );
+                }),
+            ])
             // call_time is a time, not a timestamp, so the day has to lead the sort;
             // id breaks ties within a second so paging can't repeat or skip a row.
             ->defaultSort('-call_date')
-            ->orderByDesc('call_time')
-            ->orderByDesc('id')
+            ->orderByDesc('call_logs.call_time')
+            ->orderByDesc('call_logs.id')
             ->with('order:id,order_number')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();

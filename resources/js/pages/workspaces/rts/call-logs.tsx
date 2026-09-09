@@ -188,19 +188,28 @@ export default function CallLogs({ workspace, logs, personas, query }: Props) {
                 ),
             },
             {
-                id: 'called_by',
-                enableSorting: false,
-                header: () => (
-                    <div className="font-mono text-[10px] tracking-wider text-gray-300 uppercase dark:text-gray-600">
-                        User
-                    </div>
+                accessorKey: 'called_by',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="User" />
                 ),
                 cell: ({ row }) => (
-                    <div className="flex h-10 flex-col justify-center">
+                    <div className="flex h-10 items-center">
                         <span className="text-[12px] text-gray-700 dark:text-gray-300">
                             {row.original.called_by ?? '—'}
                         </span>
-                        <span className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'phone_number',
+                enableSorting: true,
+                header: ({ column }) => (
+                    <SortableHeader column={column} title="Phone" />
+                ),
+                cell: ({ row }) => (
+                    <div className="flex h-10 items-center">
+                        <span className="font-mono text-[12px] text-gray-600 dark:text-gray-300">
                             {row.original.phone_number}
                         </span>
                     </div>

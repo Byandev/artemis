@@ -3,6 +3,7 @@
 use App\Enums\Permission;
 use App\Models\CallLog;
 use App\Models\Order;
+use App\Models\User as SystemUser;
 use App\Support\CallLogPersona;
 use Modules\Pancake\Models\User as PancakeUser;
 
@@ -144,4 +145,27 @@ it('leads with the most recent call, day then time', function () {
 
     expect(collect($rows)->pluck('phone_number')->all())
         ->toBe(['09170000003', '09170000002', '09170000001']);
+});
+
+it('sorts on the caller, whichever user table the name came from', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    // The two ids point into two different tables, so a sort that read only one
+    // of them would group the calls by which build of the app synced them
+    // rather than by the name the column actually shows.
+    $system = SystemUser::factory()->create(['name' => 'Ana Reyes']);
+    $pancake = PancakeUser::create(['name' => 'Mia Santos']);
+
+    logCall($workspace, ['assignee_user_id' => $system->id]);
+    logCall($workspace, ['user_id' => $pancake->id]);
+
+    $sorted = fn (string $sort) => collect(
+        $this->actingAs($owner)
+            ->get(route('workspaces.rts.call-logs', ['workspace' => $workspace, 'sort' => $sort]))
+            ->assertOk()
+            ->viewData('page')['props']['logs']['data']
+    )->pluck('called_by')->all();
+
+    expect($sorted('called_by'))->toBe(['Ana Reyes', 'Mia Santos'])
+        ->and($sorted('-called_by'))->toBe(['Mia Santos', 'Ana Reyes']);
 });
