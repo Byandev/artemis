@@ -48,7 +48,7 @@ class TriggerFetchShopOrders extends Command
                     1,
                     Carbon::parse($shop->orders_last_synced_at)->subDays(1)->unix(),
                     Carbon::now()->unix(),
-                    $shipped,
+                    false,
                 ))->onQueue('pancake');
             });
 
