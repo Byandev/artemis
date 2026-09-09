@@ -529,10 +529,17 @@ class CSRController extends Controller
     }
 
     /**
-     * Calls placed against real conversations, one point per day.
+     * Calls placed against real conversations, one point per day, split by the
+     * kind of call.
      *
      * Same source and rules as the call cards, so a day here agrees with the
      * card above it. Every day in the range is returned, zeros included.
+     *
+     * Both kinds of call come back on every day: `calls`/`real` are the RMO
+     * ones the cards report, `verification_calls`/`verification_real` the
+     * order-verification ones beside them. The chart draws either the pair
+     * stacked or the RMO half alone, and switching between the two is a
+     * client-side filter — one request answers both.
      */
     public function analyticsDailyEffort(Request $request, Workspace $workspace)
     {
@@ -545,7 +552,9 @@ class CSRController extends Controller
             ->selectRaw('
                 date,
                 COALESCE(SUM(total_rmo_called), 0) as calls,
-                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations
+                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
+                COALESCE(SUM(total_verification_called), 0) as verification_calls,
+                COALESCE(SUM(total_verification_real_called), 0) as verification_real
             ')
             ->get()
             // date comes back with or without a time part depending on the
@@ -564,6 +573,8 @@ class CSRController extends Controller
                 'date' => $date,
                 'calls' => (int) ($row->calls ?? 0),
                 'real' => (int) ($row->real_conversations ?? 0),
+                'verification_calls' => (int) ($row->verification_calls ?? 0),
+                'verification_real' => (int) ($row->verification_real ?? 0),
             ];
 
             $cursor = $cursor->addDay();
@@ -575,6 +586,8 @@ class CSRController extends Controller
             'totals' => [
                 'calls' => array_sum(array_column($days, 'calls')),
                 'real' => array_sum(array_column($days, 'real')),
+                'verification_calls' => array_sum(array_column($days, 'verification_calls')),
+                'verification_real' => array_sum(array_column($days, 'verification_real')),
             ],
         ]);
     }

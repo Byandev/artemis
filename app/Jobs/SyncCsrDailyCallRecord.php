@@ -66,6 +66,7 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                     'total_verification_called' => (int) ($call?->total_verification_called ?? 0),
                     'total_verification_call_time' => (int) ($call?->total_verification_call_time ?? 0),
+                    'total_verification_real_called' => (int) ($call?->total_verification_real_called ?? 0),
 
                     'total_rmo_assigned_count' => (int) ($delivery?->total_rmo_assigned_count ?? 0),
                     'total_rmo_confirmed_count' => (int) ($delivery?->total_rmo_confirmed_count ?? 0),
@@ -138,7 +139,8 @@ class SyncCsrDailyCallRecord implements ShouldQueue
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.persona = ? THEN cl.duration ELSE 0 END) AS total_rmo_rider_call_time,
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN 1 ELSE 0 END) AS total_verification_called,
-                SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN cl.duration ELSE 0 END) AS total_verification_call_time
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN cl.duration ELSE 0 END) AS total_verification_call_time,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL AND cl.duration >= 3 THEN 1 ELSE 0 END) AS total_verification_real_called
             ', [
                 CallLogPersona::CUSTOMER,
                 CallLogPersona::CUSTOMER,
