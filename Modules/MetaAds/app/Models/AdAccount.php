@@ -63,6 +63,35 @@ class AdAccount extends Model
     }
 
     /**
+     * Every token that can speak for this account, in preference order: the
+     * system user (when the account is flagged for it), then each linked Meta
+     * user. Keyed by a stable ref so callers can remember which one worked.
+     *
+     * graphClient() deliberately returns one token, which is what the sync jobs
+     * want. Ad previews don't: Meta renders them with the permissions of
+     * whoever signs the request, so a user with ads access but no role on the
+     * page that owns the post gets "Story Unavailable" where a colleague with
+     * that role gets the real ad. Callers that render need to try more than the
+     * first token. See Services\AdPreviewResolver.
+     *
+     * @return array<string, MetaGraphClient>
+     */
+    public function graphClients(): array
+    {
+        $clients = [];
+
+        if ($this->uses_system_user && ($token = config('metaads.system_user_token'))) {
+            $clients['system'] = new MetaGraphClient($token);
+        }
+
+        foreach ($this->metaUsers as $metaUser) {
+            $clients[(string) $metaUser->id] = $metaUser->graphClient();
+        }
+
+        return $clients;
+    }
+
+    /**
      * The app user who owns this ad account. Nullable.
      */
     public function owner(): BelongsTo
