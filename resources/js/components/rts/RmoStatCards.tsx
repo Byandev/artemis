@@ -83,15 +83,17 @@ interface RmoStatCardsProps {
      * the original five cards.
      */
     total_call_logs_count?: number;
-    /** Combined talk time of those calls, in seconds. */
+    /** Combined talk time of those RMO calls, in seconds. */
     total_call_duration?: number;
-    /** How many of them lasted long enough to count as answered. */
+    /** How many of those RMO calls lasted long enough to count as answered. */
     connected_call_logs_count?: number;
     /**
-     * Talk time per connected call, in seconds, and the share of attempts that
-     * connected. Both are computed server-side — see RmoDailyStats — so the page
-     * and the daily report can't disagree on what they mean, and both are null
-     * rather than zero when nobody has called yet.
+     * Talk time per connected RMO call, in seconds, and the share of RMO
+     * attempts that connected. Both are arithmetic over the three figures
+     * above, so they inherit the same customer/rider narrowing rather than
+     * needing their own. Both are computed server-side — see RmoDailyStats — so
+     * the page and the daily report can't disagree on what they mean, and both
+     * are null rather than zero when nobody has called yet.
      *
      * These travel with the three counts above: a caller that supplies those
      * supplies these.
@@ -168,7 +170,7 @@ export function RmoStatCards({
                         icon={PhoneCallIcon}
                     />
                     <StatCard
-                        title="Total Call Duration"
+                        title="Total RMO Call Duration"
                         value={total_call_duration ?? 0}
                         valueLabel={formatCallDuration(
                             total_call_duration ?? 0,
@@ -177,13 +179,13 @@ export function RmoStatCards({
                         icon={TimerIcon}
                     />
                     <StatCard
-                        title="Connected Calls (5s+)"
+                        title="Connected RMO Calls (3s+)"
                         value={connectedCalls}
                         loading={loading}
                         icon={PhoneCallIcon}
                     />
                     <StatCard
-                        title="Avg Call Duration"
+                        title="Avg RMO Call Duration"
                         value={avg_call_duration ?? 0}
                         valueLabel={
                             avg_call_duration === null
@@ -196,7 +198,7 @@ export function RmoStatCards({
                         icon={ClockIcon}
                     />
                     <StatCard
-                        title="Hit Rate"
+                        title="RMO Hit Rate"
                         value={hit_rate ?? 0}
                         valueLabel={
                             hit_rate === null ? '—' : hit_rate.toFixed(1) + '%'
