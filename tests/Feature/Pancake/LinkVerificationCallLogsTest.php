@@ -16,7 +16,7 @@ use Modules\Pancake\Models\Order;
  * verify an order, the call syncs first, and CallLogPersona finds no order to
  * match it to — so the row lands unmatched. When the order itself arrives it
  * runs the same rule backwards and picks those calls up, rather than leaving
- * them for the nightly backfill.
+ * them unmatched.
  *
  * Today's confirmations only, so the dates here are all relative to now rather
  * than written out: a fixed date would stop being today tomorrow.
@@ -121,7 +121,7 @@ it('does nothing when the shipping address has no number to match on', function 
     expect($call->refresh())->order_id->toBeNull();
 });
 
-it('leaves an order confirmed on an earlier day to the backfill', function () {
+it('ignores an order confirmed on an earlier day', function () {
     $workspace = Workspace::factory()->create();
 
     // Same customer, same number, and a call sitting unmatched on the day it

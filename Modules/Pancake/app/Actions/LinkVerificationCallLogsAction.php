@@ -14,9 +14,8 @@ use Modules\Pancake\Models\Order;
  * App\Support\CallLogPersona makes this same match the other way round — a call
  * arrives and looks for an order confirmed that day — and it can only find what
  * pancake_orders already holds. The two feeds land on their own schedules, so a
- * verification call synced before its order is stamped unmatched and stays that
- * way until the nightly backfill comes past. Running it from the order's side
- * closes that gap on the spot.
+ * verification call synced before its order is stamped unmatched and would stay
+ * that way. Running the match from the order's side closes that gap on the spot.
  *
  * Deliberately narrow: only calls carrying no order at all are claimed, only on
  * the day the order was confirmed, and only to the number on its shipping
@@ -27,7 +26,7 @@ use Modules\Pancake\Models\Order;
  * closes is a same-day one — a call synced in the hours before its order — and
  * every order Pancake hands back re-syncs on the half hour, so without that
  * bound this would re-ask the same question of every order ever confirmed, on
- * every cycle. Anything older is the nightly backfill's to settle.
+ * every cycle. Anything older stays as the sync left it.
  */
 class LinkVerificationCallLogsAction
 {
