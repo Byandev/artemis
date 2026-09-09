@@ -35,9 +35,10 @@ interface CallLogRow {
     /** Who the call reached. Null when the number matched nothing that day,
      *  which is an answer rather than a gap — see App\Support\CallLogPersona. */
     persona: string | null;
-    /** The Pancake order the call was matched to. Null when it matched none,
-     *  and when the order has since gone from the synced table. */
-    order_number: string | null;
+    /** The Pancake order the call was matched to, by `pancake_orders.id`. Null
+     *  when it matched none, and when the order has since gone from the synced
+     *  table. */
+    order_id: number | null;
 }
 
 /**
@@ -65,12 +66,14 @@ const PERSONA_CONFIG: Record<string, { label: string; pill: string }> = {
 };
 
 /**
- * Where a call's order opens: the Pancake order list, searched down to the one
- * order. There is no per-order page to link to, and that list's search matches
- * on order_number, so that is what the link carries.
+ * Where a call's order opens: the Pancake order list, narrowed to the one
+ * order. There is no per-order page to link to, so the link carries
+ * `pancake_orders.id` as the list's exact `order_id` filter rather than as a
+ * search — search is a `like` across order number, phone and address, which for
+ * a short run of digits answers with every order that merely contains it.
  */
-const orderUrl = (workspaceSlug: string, orderNumber: string) =>
-    `/workspaces/${workspaceSlug}/pancake/orders?filter[search]=${encodeURIComponent(orderNumber)}`;
+const orderUrl = (workspaceSlug: string, orderId: number) =>
+    `/workspaces/${workspaceSlug}/pancake/orders?filter[order_id]=${encodeURIComponent(orderId)}`;
 
 interface Props {
     workspace: Workspace;
@@ -274,17 +277,17 @@ export default function CallLogs({ workspace, logs, personas, query }: Props) {
                 ),
                 cell: ({ row }) => (
                     <div className="flex h-10 items-center">
-                        {row.original.order_number ? (
+                        {row.original.order_id ? (
                             <a
                                 href={orderUrl(
                                     workspace.slug,
-                                    row.original.order_number,
+                                    row.original.order_id,
                                 )}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="font-mono text-[11px] text-emerald-600 hover:underline dark:text-emerald-400"
                             >
-                                {row.original.order_number}
+                                {row.original.order_id}
                             </a>
                         ) : (
                             <span className="text-[11px] text-gray-400 dark:text-gray-500">
@@ -313,7 +316,7 @@ export default function CallLogs({ workspace, logs, personas, query }: Props) {
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Search by phone or order number..."
+                            placeholder="Search by phone or order ID..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="h-9 w-full rounded-[10px] border border-black/6 bg-stone-100 pl-8 font-mono! text-[12px]! text-gray-800 outline-none focus:ring-2 focus:ring-emerald-500/15 dark:border-white/6 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400"

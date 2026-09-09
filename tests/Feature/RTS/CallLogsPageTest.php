@@ -44,7 +44,9 @@ it('lists the workspace calls with the caller, persona and order on each row', f
         'persona' => 'customer',
         'type' => 'outgoing',
         'duration' => 72,
-        'order_number' => 'ORD-42',
+        // The order is carried as pancake_orders.id: that is what the Order
+        // column shows and what its link filters the Orders list by.
+        'order_id' => $order->id,
     ]);
 });
 
@@ -80,10 +82,15 @@ it('narrows to one persona, and to the calls that matched nothing', function () 
         ->and(collect($filtered('unmatched'))->pluck('phone_number')->all())->toBe(['09170000003']);
 });
 
-it('searches on the phone number and on the order number behind the call', function () {
+it('searches on the phone number and on the id of the order behind the call', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    $order = Order::factory()->forWorkspace($workspace)->create(['order_number' => 'ORD-99']);
+    // A fixed id, well clear of the digits in either phone number, so the two
+    // halves of the search can be told apart.
+    $order = Order::factory()->forWorkspace($workspace)->create([
+        'id' => 987654,
+        'order_number' => 'ORD-99',
+    ]);
 
     logCall($workspace, ['phone_number' => '09170000001', 'order_id' => $order->id]);
     logCall($workspace, ['phone_number' => '09180000002']);
@@ -95,8 +102,11 @@ it('searches on the phone number and on the order number behind the call', funct
             ->viewData('page')['props']['logs']['data']
     )->pluck('phone_number')->all();
 
-    expect($search('ORD-99'))->toBe(['09170000001'])
-        ->and($search('0918'))->toBe(['09180000002']);
+    expect($search('987654'))->toBe(['09170000001'])
+        ->and($search('0918'))->toBe(['09180000002'])
+        // The order number is not what the page shows any more, so it is not
+        // what the box searches on either.
+        ->and($search('ORD-99'))->toBe([]);
 });
 
 it('keeps the day the calls were placed on', function () {
