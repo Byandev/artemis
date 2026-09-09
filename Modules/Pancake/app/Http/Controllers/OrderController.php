@@ -13,7 +13,7 @@ use Inertia\Inertia;
 use Modules\Pancake\Filters\CustomerRtsReportFilter;
 use Modules\Pancake\Filters\IgnoredFilter;
 use Modules\Pancake\Filters\OrderDateFilter;
-use Modules\Pancake\Filters\OrderNumberFilter;
+use Modules\Pancake\Filters\OrderIdFilter;
 use Modules\Pancake\Filters\OrderRiderFilter;
 use Modules\Pancake\Filters\OrderSearchFilter;
 use Modules\Pancake\Filters\OrderStatusFilter;
@@ -93,7 +93,7 @@ class OrderController extends Controller
     {
         return [
             AllowedFilter::custom('search', new OrderSearchFilter),
-            AllowedFilter::custom('order_number', new OrderNumberFilter),
+            AllowedFilter::custom('order_id', new OrderIdFilter),
             AllowedFilter::custom('date_from', new OrderDateFilter($dateColumn, '>=')),
             AllowedFilter::custom('date_to', new OrderDateFilter($dateColumn, '<=')),
             AllowedFilter::custom('date_type', new IgnoredFilter),
