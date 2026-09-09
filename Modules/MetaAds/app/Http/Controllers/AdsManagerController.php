@@ -216,6 +216,12 @@ class AdsManagerController extends Controller
 
         ($this->scopeFor($scopeBy, $scopeValue))($query);
 
+        // Campaign objective — the grid row this chart was opened from is under
+        // the same filter, so the line has to cover the same ads rather than the
+        // whole group. Insights carry their campaign, but the query is already
+        // joined to the ads table, so it constrains on the ad's campaign.
+        $this->constrainByObjectives($query, 'meta_ads_ads.meta_ads_campaign_id', $this->parseObjectiveFilters($request));
+
         // Same creator filter the grid is under, so the chart matches the row.
         $creatorFilter = (string) $request->query('creator_id', '');
         $this->applyCreatorFilter($query, $creatorFilter === '' ? null : $creatorFilter);

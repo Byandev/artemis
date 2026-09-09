@@ -1301,6 +1301,11 @@ export default function MetaAdsManager({
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() =>
         deserializeMetricFilters(query?.metricFilters),
     );
+    // Serialized once so the grid fetch and the row chart send the same filters.
+    const serializedFilters = useMemo(
+        () => serializeMetricFilters(metricFilters),
+        [metricFilters],
+    );
     // Creator filter: '' (all), 'unassigned', or a member id as string.
     const [creatorFilter, setCreatorFilter] = useState<string>('');
     const [sort, setSort] = useState<string | null>(query?.sort ?? null);
@@ -1349,8 +1354,7 @@ export default function MetaAdsManager({
         qs.set('until', range.until);
         if (sort) qs.set('sort', sort);
         if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
-        const mf = serializeMetricFilters(metricFilters);
-        if (mf) qs.set('metric_filters', mf);
+        if (serializedFilters) qs.set('metric_filters', serializedFilters);
         // Creator filter is ad-level only.
         if (groupBy === 'ad' && creatorFilter) {
             qs.set('creator_id', creatorFilter);
@@ -1388,7 +1392,7 @@ export default function MetaAdsManager({
         sort,
         page,
         perPage,
-        metricFilters,
+        serializedFilters,
         creatorFilter,
         debouncedSearch,
         accounts.length,
@@ -1582,6 +1586,7 @@ export default function MetaAdsManager({
                 selectedAccounts={selected}
                 accountsTotal={accounts.length}
                 groupLabel={groupLabel}
+                metricFilters={serializedFilters}
                 onClose={() => setTimelineTarget(null)}
             />
 
