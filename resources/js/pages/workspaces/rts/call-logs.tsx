@@ -65,12 +65,14 @@ const PERSONA_CONFIG: Record<string, { label: string; pill: string }> = {
 };
 
 /**
- * Where a call's order opens: the Pancake order list, searched down to the one
- * order. There is no per-order page to link to, and that list's search matches
- * on order_number, so that is what the link carries.
+ * Where a call's order opens: the Pancake order list, narrowed to the one
+ * order. There is no per-order page to link to, so the link carries the order
+ * number as the list's exact `order_number` filter rather than as a search —
+ * search is a `like` across order number, phone and address, which for a short
+ * run of digits answers with every order that merely contains it.
  */
 const orderUrl = (workspaceSlug: string, orderNumber: string) =>
-    `/workspaces/${workspaceSlug}/pancake/orders?filter[search]=${encodeURIComponent(orderNumber)}`;
+    `/workspaces/${workspaceSlug}/pancake/orders?filter[order_number]=${encodeURIComponent(orderNumber)}`;
 
 interface Props {
     workspace: Workspace;

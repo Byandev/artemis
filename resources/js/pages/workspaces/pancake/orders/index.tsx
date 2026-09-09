@@ -97,6 +97,7 @@ interface Props {
         page?: number | string;
         filter?: {
             search?: string;
+            order_number?: string;
             status?: string;
             date_from?: string;
             date_to?: string;
@@ -189,6 +190,9 @@ const DEFAULT_RTS_COMPARISON = 'gt';
 // here is a string, so a transposed pair would not be a type error.
 interface FilterState {
     search: string;
+    /** One exact order number, set only by a link that arrived here already
+     *  knowing which order it meant. Never typed — the search box is for that. */
+    orderNumber: string;
     status: string;
     dateFrom: string;
     dateTo: string;
@@ -272,6 +276,9 @@ export default function PancakeOrdersIndex({
     );
 
     const [search, setSearch] = useState(query?.filter?.search ?? '');
+    const [orderNumber, setOrderNumber] = useState(
+        query?.filter?.order_number ?? '',
+    );
     const [status, setStatus] = useState<string>(query?.filter?.status ?? '');
     const [rider, setRider] = useState<string>(query?.filter?.rider ?? '');
     const [dateFrom, setDateFrom] = useState<string>(
@@ -398,6 +405,7 @@ export default function PancakeOrdersIndex({
 
     const buildFilter = (f: FilterState) => ({
         search: f.search || undefined,
+        order_number: f.orderNumber || undefined,
         status: f.status || undefined,
         date_from: f.dateFrom || undefined,
         date_to: f.dateTo || undefined,
@@ -424,6 +432,7 @@ export default function PancakeOrdersIndex({
 
     const currentFilter = (): FilterState => ({
         search,
+        orderNumber,
         status,
         dateFrom,
         dateTo,
@@ -466,6 +475,7 @@ export default function PancakeOrdersIndex({
         return () => reload.cancel();
     }, [
         search,
+        orderNumber,
         status,
         dateFrom,
         dateTo,
@@ -481,6 +491,7 @@ export default function PancakeOrdersIndex({
     // nothing — only a value moved off its resting state is actually narrowing.
     const isFiltered =
         !!search ||
+        !!orderNumber ||
         !!status ||
         !!dateFrom ||
         !!dateTo ||
@@ -489,6 +500,7 @@ export default function PancakeOrdersIndex({
 
     const clearFilters = () => {
         setSearch('');
+        setOrderNumber('');
         setStatus('');
         setRider('');
         setDateFrom('');
@@ -883,6 +895,18 @@ export default function PancakeOrdersIndex({
                         onValueChange={setRtsValue}
                         onValue2Change={setRtsValue2}
                     />
+
+                    {orderNumber && (
+                        <FilterChip
+                            label="Order #"
+                            onRemove={() => setOrderNumber('')}
+                            removeTitle="Remove order number filter"
+                        >
+                            <span className="text-xs text-gray-700 dark:text-gray-200">
+                                {orderNumber}
+                            </span>
+                        </FilterChip>
+                    )}
 
                     {rider && (
                         <FilterChip
