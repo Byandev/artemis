@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\PancakeUserDailyCallReport;
 use App\Models\Shop;
 use App\Support\CallLogPersona;
+use App\Support\RmoDailyStats;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User as PancakeUser;
 
@@ -123,6 +124,22 @@ test('a call about an order but no delivery is verification, not RMO', function 
         // The two together are the CSR's whole day on that shop.
         ->and((int) $row->total_called)->toBe(2)
         ->and((int) $row->total_call_time)->toBe(150);
+});
+
+test('a verification call that lasted is counted as a real conversation', function () {
+    $order = callOrder();
+
+    csrCall($order, CallLogPersona::CUSTOMER, 90, '10:00:00', delivery: null);
+    csrCall($order, CallLogPersona::CUSTOMER, RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1, '11:00:00', delivery: null);
+
+    (new SyncCsrDailyCallRecord('2026-08-02'))->handle();
+
+    $row = callReport();
+
+    // The same five-second cut the RMO side makes, so the two can be drawn on
+    // one axis without meaning different things by "real".
+    expect((int) $row->total_verification_called)->toBe(2)
+        ->and((int) $row->total_verification_real_called)->toBe(1);
 });
 
 test('a verification call is not counted against either persona', function () {

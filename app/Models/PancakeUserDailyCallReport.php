@@ -28,6 +28,7 @@ class PancakeUserDailyCallReport extends Model
         'total_rmo_confirmed_count',
         'total_verification_called',
         'total_verification_call_time',
+        'total_verification_real_called',
     ];
 
     protected $casts = [
