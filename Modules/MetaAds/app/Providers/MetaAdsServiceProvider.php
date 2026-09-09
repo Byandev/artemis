@@ -6,7 +6,6 @@ use Illuminate\Console\Scheduling\Schedule;
 use Modules\MetaAds\Console\Commands\CaptureBudgetSnapshotsCommand;
 use Modules\MetaAds\Console\Commands\DiscoverSystemAccountsCommand;
 use Modules\MetaAds\Console\Commands\EvaluateOptimizationRulesCommand;
-use Modules\MetaAds\Console\Commands\ReportInactiveAdAccountsToDiscordCommand;
 use Modules\MetaAds\Console\Commands\ReportPageBudgetsToDiscordCommand;
 use Modules\MetaAds\Console\Commands\ReportTeamBudgetsToDiscordCommand;
 use Modules\MetaAds\Console\Commands\ReportUserBudgetsToDiscordCommand;
@@ -52,7 +51,6 @@ class MetaAdsServiceProvider extends ModuleServiceProvider
         ReportPageBudgetsToDiscordCommand::class,
         ReportUserBudgetsToDiscordCommand::class,
         ReportTeamBudgetsToDiscordCommand::class,
-        ReportInactiveAdAccountsToDiscordCommand::class,
     ];
 
     /**
