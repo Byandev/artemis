@@ -4,6 +4,7 @@ use App\Models\CallLog;
 use App\Models\Order;
 use App\Models\Page;
 use App\Models\User;
+use App\Support\CallLogPersona;
 use App\Support\RmoDailyStats;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User as PancakeUser;
@@ -17,6 +18,11 @@ use Modules\Pancake\Models\User as PancakeUser;
  * that is what "my call logs" means. Cutting them by the assignee's *orders*
  * instead still looks unfiltered in practice: a CSR spends the day ringing
  * numbers that are not on the orders assigned to them.
+ *
+ * They also count RMO calls only: the rows CallLogPersona stamped as reaching a
+ * customer or a rider on one of the day's deliveries. A verification call or an
+ * unmatched number is a real call but not RMO work, and counting it left the
+ * total sitting above the sum of the breakdown modal's own two RMO tabs.
  */
 const STAT_DATE = '2026-07-21';
 
@@ -41,7 +47,13 @@ function statRow($workspace, $assigneeId, string $customerPhone, ?string $confer
     ]);
 }
 
-function statCall(string $phone, $workspace, $callerId, int $duration): CallLog
+/**
+ * One call. Stamped as an RMO call to a customer by default — that is what the
+ * sync does for a number on one of the day's deliveries, and what the cards
+ * count. Pass a persona (or null, for a number nothing matched) to make a call
+ * the cards should leave out.
+ */
+function statCall(string $phone, $workspace, $callerId, int $duration, ?string $persona = CallLogPersona::CUSTOMER): CallLog
 {
     return CallLog::factory()->create([
         'workspace_id' => $workspace->id,
@@ -49,6 +61,7 @@ function statCall(string $phone, $workspace, $callerId, int $duration): CallLog
         'phone_number' => $phone,
         'call_date' => STAT_DATE,
         'duration' => $duration,
+        'persona' => $persona,
     ]);
 }
 
@@ -133,8 +146,39 @@ test('a call counts for whoever placed it, not whoever owns the order', function
         ]);
 });
 
-test('a CSR call to a number with no order at all still counts as theirs', function () {
-    statCall('09990000000', $this->workspace, $this->csrA->id, 30);
+test('a call that matched no delivery is left out of the figures', function () {
+    // A number nothing on the day's deliveries carries: still the CSR's call,
+    // but not RMO work, so it must not move the RMO cards.
+    statCall('09990000000', $this->workspace, $this->csrA->id, 30, null);
+
+    rmoStats([
+        'delivery_date' => STAT_DATE,
+        'caller_id' => $this->csrA->id,
+    ], $this->workspace)
+        ->assertJson([
+            'total_call_logs_count' => 2,
+            'total_call_duration' => 62,
+        ]);
+});
+
+test('a verification call is left out of the figures too', function () {
+    // Placed the day the order was confirmed, before it was ever loaded for
+    // delivery. The breakdown modal keeps it out of both RMO tabs, so the cards
+    // that sit above the modal keep it out as well.
+    statCall('09170000003', $this->workspace, $this->csrA->id, 45, CallLogPersona::VERIFICATION);
+
+    rmoStats([
+        'delivery_date' => STAT_DATE,
+        'caller_id' => $this->csrA->id,
+    ], $this->workspace)
+        ->assertJson([
+            'total_call_logs_count' => 2,
+            'total_call_duration' => 62,
+        ]);
+});
+
+test('a rider call counts alongside the customer calls', function () {
+    statCall('09180000001', $this->workspace, $this->csrA->id, 20, CallLogPersona::RIDER);
 
     rmoStats([
         'delivery_date' => STAT_DATE,
@@ -142,7 +186,8 @@ test('a CSR call to a number with no order at all still counts as theirs', funct
     ], $this->workspace)
         ->assertJson([
             'total_call_logs_count' => 3,
-            'total_call_duration' => 92,
+            'total_call_duration' => 82,
+            'connected_call_logs_count' => 2,
         ]);
 });
 
