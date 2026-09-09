@@ -39,18 +39,12 @@ class CallLogController extends Controller
 
         $logs = QueryBuilder::for(CallLog::where('call_logs.workspace_id', $workspace->id))
             ->allowedFilters([
-                // Phone number or order id — the two things someone arrives at
-                // this page holding, and the two the table itself shows. The id
-                // is matched whole: it is the order's primary key, so a `like`
-                // on a short run of digits would answer with unrelated orders.
+                // Phone number or order number — the two things someone arrives
+                // at this page holding.
                 AllowedFilter::callback('search', function ($query, $value) {
                     $query->where(function ($q) use ($value) {
                         $q->where('phone_number', 'like', "%{$value}%")
-                            // Through the relation, not call_logs.order_id: a call
-                            // can point at an order that has since gone from the
-                            // synced table, and the Order column shows those as
-                            // unmatched, so searching must not find them either.
-                            ->orWhereHas('order', fn ($o) => $o->whereKey($value));
+                            ->orWhereHas('order', fn ($o) => $o->where('order_number', 'like', "%{$value}%"));
                     });
                 }),
                 AllowedFilter::callback('start_date', fn ($query, $value) => $query->whereDate('call_date', '>=', $value)),
@@ -68,7 +62,7 @@ class CallLogController extends Controller
             ->defaultSort('-call_date')
             ->orderByDesc('call_time')
             ->orderByDesc('id')
-            ->with('order:id')
+            ->with('order:id,order_number')
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
 
@@ -78,9 +72,9 @@ class CallLogController extends Controller
                     'id', 'phone_number', 'type', 'duration', 'call_date', 'call_time', 'persona', 'called_by',
                 ]),
                 // Read off the relation rather than the column: a call can carry an
-                // order_id whose row has since gone from the synced table, and an
-                // id with nothing behind it is not something to link to.
-                'order_id' => $log->order?->id,
+                // order_id whose row has since gone from the synced table, and a
+                // number with nothing behind it is not something to link to.
+                'order_number' => $log->order?->order_number,
             ])
         );
 
