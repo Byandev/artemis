@@ -9,19 +9,21 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import HeatMapCanvas from './HeatMapCanvas';
 import {
     BORDER_COLOR,
-    HEAT_METRICS,
+    CSR_GROUPS,
+    HEAT_MODES,
     NO_DATA_COLOR,
     buildScale,
-    type HeatMetric,
+    peso,
+    type Bucket,
+    type CsrGroup,
+    type CsrGroupKey,
+    type HeatMode,
 } from './color-scale';
 import { loadPhGeoJson, type PhGeoJson } from './ph-geo';
 import type { HeatGroupBy, HeatMapResponse, HeatRow } from './types';
 import { useIsDark } from './use-is-dark';
 
 const DEFAULT_CENTER: [number, number] = [121.75, 13];
-
-/** Provinces below this many delivered/returned orders read as noise on a rate map. */
-const MIN_ORDER_OPTIONS = [1, 5, 10, 25];
 
 interface Props {
     workspaceSlug: string;
@@ -32,8 +34,12 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
     const isDark = useIsDark();
 
     const [groupBy, setGroupBy] = useState<HeatGroupBy>('province');
-    const [metric, setMetric] = useState<HeatMetric>('returning_count');
-    const [minOrders, setMinOrders] = useState(5);
+    const [selectedMode, setSelectedMode] = useState<HeatMode>('rts-orders');
+
+    // The CSR groups rank each province against the others, which needs a field of
+    // them — across five island groups "high volume" means nothing. Region view
+    // therefore always shades on rate, and the toggle says why.
+    const mode: HeatMode = groupBy === 'region' ? 'rts' : selectedMode;
 
     const [geoData, setGeoData] = useState<PhGeoJson | null>(null);
     const [geoError, setGeoError] = useState<string | null>(null);
@@ -88,24 +94,21 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
         fetchData();
     }, [fetchData]);
 
-    const rows = useMemo(
-        () => (response?.rows ?? []).filter((row) => row.orders >= minOrders),
-        [response, minOrders],
-    );
+    const rows = useMemo(() => response?.rows ?? [], [response]);
 
-    const metricConfig = useMemo(
-        () => HEAT_METRICS.find((m) => m.key === metric) ?? HEAT_METRICS[0],
-        [metric],
+    const modeConfig = useMemo(
+        () => HEAT_MODES.find((m) => m.key === mode) ?? HEAT_MODES[0],
+        [mode],
     );
 
     const scale = useMemo(
         () =>
             buildScale(
-                rows.map((row) => row[metric]),
-                metricConfig.kind,
+                rows.map((row) => row.orders),
+                mode,
                 isDark,
             ),
-        [rows, metric, metricConfig.kind, isDark],
+        [rows, mode, isDark],
     );
 
     // One entry per polygon: a province contributes its own, a region contributes
@@ -117,14 +120,34 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
     }, [rows]);
 
     const colorFor = useCallback(
-        (row: HeatRow) => scale.colorFor(row[metric]),
-        [scale, metric],
+        (row: HeatRow) => scale.colorFor(row.rts_rate_percentage, row.orders),
+        [scale],
     );
 
+    // Plain RTS ranks on the rate alone; the CSR view lists every area under its
+    // group instead, so an agent can look up where an order is going.
     const ranked = useMemo(
-        () => [...rows].sort((a, b) => b[metric] - a[metric]).slice(0, 12),
-        [rows, metric],
+        () =>
+            [...rows]
+                .sort((a, b) => b.rts_rate_percentage - a.rts_rate_percentage)
+                .slice(0, 12),
+        [rows],
     );
+
+    const grouped = useMemo(() => {
+        const buckets = new Map<CsrGroupKey, HeatRow[]>(
+            CSR_GROUPS.map((group) => [group.key, [] as HeatRow[]]),
+        );
+
+        rows.forEach((row) => {
+            const key = scale.groupFor(row.rts_rate_percentage, row.orders);
+            if (key) buckets.get(key)?.push(row);
+        });
+
+        buckets.forEach((list) => list.sort((a, b) => b.orders - a.orders));
+
+        return buckets;
+    }, [rows, scale]);
 
     // Stable so HeatMapCanvas never re-renders its ~1,650 paths on hover.
     const handleEnter = useCallback(
@@ -159,9 +182,20 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
     const totals = response?.totals;
     const busy = loading || (!geoData && !geoError);
 
+    const hoverGroup = useMemo(() => {
+        if (!hover) return null;
+
+        const key = scale.groupFor(
+            hover.row.rts_rate_percentage,
+            hover.row.orders,
+        );
+
+        return CSR_GROUPS.find((group) => group.key === key) ?? null;
+    }, [hover, scale]);
+
     /**
-     * A blank map has three quite different causes, and "no results" tells the
-     * reader nothing about which one they hit.
+     * A blank map means either "nothing here ever" or "nothing here yet", and
+     * "no results" leaves the reader unable to tell which.
      */
     const emptyMessage = useMemo(() => {
         const available = response?.available;
@@ -170,18 +204,8 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
             return 'This workspace has no delivered or returned orders yet';
         }
 
-        if ((response?.rows.length ?? 0) > 0) {
-            return `No ${groupBy} reached ${minOrders} orders in this range — lower "Min orders" to see the rest`;
-        }
-
         return `No RTS data between ${day(queryParams.startDate)} and ${day(queryParams.endDate)}. This workspace has data from ${day(available.first)} to ${day(available.last)}.`;
-    }, [
-        response,
-        groupBy,
-        minOrders,
-        queryParams.startDate,
-        queryParams.endDate,
-    ]);
+    }, [response, queryParams.startDate, queryParams.endDate]);
 
     return (
         <div className="rounded-2xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -192,7 +216,7 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
                             RTS Heat Map
                         </h2>
                         <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
-                            {metricConfig.short} by{' '}
+                            {modeConfig.short} by{' '}
                             {groupBy === 'region' ? 'island group' : 'province'}
                         </p>
                     </div>
@@ -209,29 +233,15 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
                         onChange={(v) => setGroupBy(v as HeatGroupBy)}
                     />
                     <Segmented
-                        options={HEAT_METRICS.map((m) => ({
+                        options={HEAT_MODES.map((m) => ({
                             value: m.key,
                             label: m.label,
                         }))}
-                        value={metric}
-                        onChange={(v) => setMetric(v as HeatMetric)}
+                        value={mode}
+                        onChange={(v) => setSelectedMode(v as HeatMode)}
+                        disabled={groupBy === 'region'}
+                        disabledHint="CSR groups compare provinces against each other — switch to Province to use them"
                     />
-                    <label className="flex items-center gap-2 text-[12px] text-gray-400 dark:text-gray-500">
-                        Min orders
-                        <select
-                            value={minOrders}
-                            onChange={(e) =>
-                                setMinOrders(Number(e.target.value))
-                            }
-                            className="h-8 rounded-lg border border-black/8 bg-stone-50 px-2 text-[12px] text-gray-700 outline-none focus:border-black/20 dark:border-white/8 dark:bg-white/3 dark:text-gray-300 dark:focus:border-white/20"
-                        >
-                            {MIN_ORDER_OPTIONS.map((n) => (
-                                <option key={n} value={n}>
-                                    {n === 1 ? 'All' : `≥ ${n}`}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
                 </div>
 
                 {totals && (
@@ -317,47 +327,91 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
 
                             <Legend
                                 buckets={scale.buckets}
+                                groups={scale.groups}
                                 isDark={isDark}
-                                unit={
-                                    metricConfig.kind === 'percent'
-                                        ? 'RTS rate · by value'
-                                        : metricConfig.label
-                                }
                             />
                         </>
                     )}
                 </div>
 
                 <div className="p-4">
-                    <h3 className="mb-3 text-[12px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                        {groupBy === 'region' ? 'Regions' : 'Top provinces'}
-                    </h3>
+                    {mode === 'rts-orders' ? (
+                        <>
+                            <h3 className="mb-1 text-[12px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                                CSR monitoring groups
+                            </h3>
+                            <p className="mb-3 text-[11px] text-gray-400 dark:text-gray-600">
+                                High volume is {scale.highVolumeFrom}+ orders in
+                                this range.
+                            </p>
 
-                    {ranked.length === 0 ? (
-                        <p className="text-[12px] text-gray-400">No data</p>
+                            {rows.length === 0 ? (
+                                <p className="text-[12px] text-gray-400">
+                                    No data
+                                </p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {CSR_GROUPS.map((group) => (
+                                        <GroupPanel
+                                            key={group.key}
+                                            group={group}
+                                            rows={grouped.get(group.key) ?? []}
+                                            nameOf={nameOf}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     ) : (
-                        <ol className="space-y-1">
-                            {ranked.map((row, index) => (
-                                <li
-                                    key={row.region ?? row.gids[0]}
-                                    className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-white/5"
-                                >
-                                    <span className="w-4 shrink-0 text-right text-[11px] text-gray-300 dark:text-gray-600">
-                                        {index + 1}
-                                    </span>
-                                    <span
-                                        className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                                        style={{ background: colorFor(row) }}
-                                    />
-                                    <span className="min-w-0 flex-1 truncate text-[12px] text-gray-700 dark:text-gray-300">
-                                        {nameOf(row)}
-                                    </span>
-                                    <span className="shrink-0 font-mono text-[12px] font-medium text-gray-900 tabular-nums dark:text-gray-100">
-                                        {metricConfig.format(row[metric])}
-                                    </span>
-                                </li>
-                            ))}
-                        </ol>
+                        <>
+                            <h3 className="mb-3 text-[12px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+                                {groupBy === 'region'
+                                    ? 'Regions'
+                                    : 'Top provinces'}
+                                <span className="ml-1 font-normal normal-case">
+                                    (by rate)
+                                </span>
+                            </h3>
+
+                            {ranked.length === 0 ? (
+                                <p className="text-[12px] text-gray-400">
+                                    No data
+                                </p>
+                            ) : (
+                                <ol className="space-y-1">
+                                    {ranked.map((row, index) => (
+                                        <li
+                                            key={row.region ?? row.gids[0]}
+                                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-white/5"
+                                        >
+                                            <span className="w-4 shrink-0 text-right text-[11px] text-gray-300 dark:text-gray-600">
+                                                {index + 1}
+                                            </span>
+                                            <span
+                                                className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                                                style={{
+                                                    background: colorFor(row),
+                                                }}
+                                            />
+                                            <span className="min-w-0 flex-1 truncate text-[12px] text-gray-700 dark:text-gray-300">
+                                                {nameOf(row)}
+                                                <span className="text-gray-400 dark:text-gray-600">
+                                                    {' '}
+                                                    ·{' '}
+                                                    {row.orders.toLocaleString()}
+                                                </span>
+                                            </span>
+                                            <span className="shrink-0 font-mono text-[12px] font-medium text-gray-900 tabular-nums dark:text-gray-100">
+                                                {row.rts_rate_percentage.toFixed(
+                                                    1,
+                                                )}
+                                                %
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ol>
+                            )}
+                        </>
                     )}
 
                     {!!totals?.unmapped_areas && (
@@ -410,13 +464,27 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
                             value={`${hover.row.rts_rate_percentage}% by value`}
                         />
                     </dl>
+                    {hoverGroup && (
+                        <div
+                            className="mt-2 border-t border-black/8 pt-1.5 dark:border-white/10"
+                            style={{ maxWidth: '13rem' }}
+                        >
+                            <p
+                                className="text-[11px] font-semibold"
+                                style={{ color: hoverGroup.color }}
+                            >
+                                {hoverGroup.label}
+                            </p>
+                            <p className="text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+                                {hoverGroup.strategy}
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
     );
 }
-
-const peso = (value: number) => `₱${Math.round(value).toLocaleString()}`;
 
 /** "12 Aug 2026" — readable in an empty-state sentence. */
 const day = (iso: string) =>
@@ -468,18 +536,26 @@ const Segmented = ({
     options,
     value,
     onChange,
+    disabled = false,
+    disabledHint,
 }: {
     options: { value: string; label: string }[];
     value: string;
     onChange: (value: string) => void;
+    disabled?: boolean;
+    disabledHint?: string;
 }) => (
-    <div className="flex overflow-hidden rounded-lg border border-black/8 text-[12px] font-medium dark:border-white/8">
+    <div
+        className={`flex overflow-hidden rounded-lg border border-black/8 text-[12px] font-medium dark:border-white/8 ${disabled ? 'opacity-50' : ''}`}
+        title={disabled ? disabledHint : undefined}
+    >
         {options.map((option, index) => (
             <button
                 key={option.value}
                 type="button"
+                disabled={disabled}
                 onClick={() => onChange(option.value)}
-                className={`px-3 py-1.5 transition-colors ${index > 0 ? 'border-l border-black/8 dark:border-white/8' : ''} ${
+                className={`px-3 py-1.5 transition-colors ${index > 0 ? 'border-l border-black/8 dark:border-white/8' : ''} ${disabled ? 'cursor-not-allowed' : ''} ${
                     option.value === value
                         ? 'bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-gray-100'
                         : 'text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300'
@@ -491,34 +567,94 @@ const Segmented = ({
     </div>
 );
 
+/**
+ * Two ramps when volume is in play: hue says how bad the RTS rate is, strength
+ * says how many orders stand behind it. Splitting them keeps the legend readable
+ * where a full bivariate grid would not fit in the corner.
+ */
+/** One CSR group and the areas that fall in it, as the monitoring sheet lists them. */
+const GroupPanel = ({
+    group,
+    rows,
+    nameOf,
+}: {
+    group: CsrGroup;
+    rows: HeatRow[];
+    nameOf: (row: HeatRow) => string;
+}) => (
+    <div>
+        <div className="flex items-center gap-2">
+            <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ background: group.color }}
+            />
+            <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                {group.label}
+            </span>
+            <span className="ml-auto font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-600">
+                {rows.length}
+            </span>
+        </div>
+        <p className="mt-0.5 mb-1 pl-[18px] text-[10px] leading-snug text-gray-400 dark:text-gray-600">
+            {group.strategy}
+        </p>
+        {rows.length === 0 ? (
+            <p className="pl-[18px] text-[11px] text-gray-300 dark:text-gray-700">
+                None
+            </p>
+        ) : (
+            <ul className="pl-[18px] text-[11px] text-gray-600 dark:text-gray-400">
+                {rows.map((row) => (
+                    <li
+                        key={row.region ?? row.gids[0]}
+                        className="flex items-baseline gap-2 py-px"
+                    >
+                        <span className="min-w-0 flex-1 truncate">
+                            {nameOf(row)}
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-600">
+                            {row.rts_rate_percentage.toFixed(0)}% ·{' '}
+                            {row.orders.toLocaleString()}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        )}
+    </div>
+);
+
+/**
+ * The rate ramp is a scale, so it reads as a column of bands. The CSR groups are
+ * categories with an action attached, so they read as a key.
+ */
 const Legend = ({
     buckets,
+    groups,
     isDark,
-    unit,
 }: {
-    buckets: { color: string; label: string }[];
+    buckets: Bucket[] | null;
+    groups: CsrGroup[] | null;
     isDark: boolean;
-    unit: string;
 }) => (
     <div className="absolute bottom-5 left-5 rounded-lg border border-black/8 bg-white/90 px-3 py-2 backdrop-blur dark:border-white/8 dark:bg-zinc-800/90">
         <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-            {unit}
+            {groups ? 'CSR group' : 'RTS rate · by value'}
         </p>
         <div className="space-y-1">
-            {buckets.map((bucket) => (
-                <div key={bucket.label} className="flex items-center gap-2">
+            {(groups ?? buckets ?? []).map((entry) => (
+                <div key={entry.label} className="flex items-center gap-2">
                     <span
-                        className="h-3 w-3 rounded-sm"
-                        style={{ background: bucket.color }}
+                        className="h-3 w-3 shrink-0 rounded-sm"
+                        style={{ background: entry.color }}
                     />
                     <span className="font-mono text-[10px] text-gray-600 tabular-nums dark:text-gray-400">
-                        {bucket.label}
+                        {entry.label}
                     </span>
                 </div>
             ))}
             <div className="flex items-center gap-2 border-t border-black/6 pt-1 dark:border-white/6">
                 <span
-                    className="h-3 w-3 rounded-sm"
+                    className="h-3 w-3 shrink-0 rounded-sm"
                     style={{
                         background: isDark
                             ? NO_DATA_COLOR.dark
@@ -527,7 +663,7 @@ const Legend = ({
                     }}
                 />
                 <span className="font-mono text-[10px] text-gray-500 dark:text-gray-500">
-                    No data
+                    {groups ? 'Not in priority set' : 'No data'}
                 </span>
             </div>
         </div>
