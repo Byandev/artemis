@@ -616,10 +616,10 @@ class CSRController extends Controller
      * stamped on each call.
      *
      * Every day in the range comes back with its own round of the clock rather
-     * than the range being flattened into one: an hour of a Tuesday and the
-     * same hour of a Saturday are different things, and averaging them hides
-     * the day that went wrong. The chart shows one day at a time and steps
-     * between them, which costs no request — the range arrives whole.
+     * than the range arriving pre-flattened: the chart adds the days together
+     * for its default view, but an hour of a Tuesday and the same hour of a
+     * Saturday are still different things, and keeping the days apart here is
+     * what lets it open a single one without another request.
      *
      * The rules are the sync's own, so a day here adds up to the day above it:
      * an order beside the call is what names the shop, a delivery stamp is what
@@ -712,75 +712,6 @@ class CSRController extends Controller
             'verification_calls' => array_sum(array_column($rows, 'verification_calls')),
             'verification_real' => array_sum(array_column($rows, 'verification_real')),
         ];
-    }
-
-    /**
-     * Where each day's calls ended up — the table under the effort chart.
-     *
-     * Three buckets narrowing in turn: no_answer never joined, answered picked
-     * up, conversations lasted past the five-second threshold. So calls =
-     * no_answer + answered, and conversations is a cut of answered. `hit_rate`
-     * is conversations over every attempt — the reach rate card, per day.
-     */
-    public function analyticsDailyCallOutcomes(Request $request, Workspace $workspace)
-    {
-        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
-
-        [$from, $to] = $this->range($request);
-
-        $rows = $this->callReport($workspace, $from, $to)
-            ->groupBy('date')
-            ->selectRaw('
-                date,
-                COALESCE(SUM(total_rmo_called), 0) as calls,
-                COALESCE(SUM(total_rmo_connected_called), 0) as answered,
-                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations
-            ')
-            ->get()
-            // date comes back with or without a time part depending on the
-            // driver — key on the first ten characters.
-            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
-
-        $days = [];
-        $cursor = CarbonImmutable::parse($from);
-        $end = CarbonImmutable::parse($to);
-
-        while ($cursor->lessThanOrEqualTo($end)) {
-            $date = $cursor->toDateString();
-            $row = $rows->get($date);
-
-            $calls = (int) ($row->calls ?? 0);
-            $answered = (int) ($row->answered ?? 0);
-            $real = (int) ($row->real_conversations ?? 0);
-
-            // Every day gets a row, quiet ones included.
-            $days[] = [
-                'date' => $date,
-                'calls' => $calls,
-                'no_answer' => $calls - $answered,
-                'answered' => $answered,
-                'conversations' => $real,
-                'hit_rate' => $calls > 0 ? round($real / $calls * 100, 1) : null,
-            ];
-
-            $cursor = $cursor->addDay();
-        }
-
-        $calls = array_sum(array_column($days, 'calls'));
-        $conversations = array_sum(array_column($days, 'conversations'));
-
-        return response()->json([
-            'range' => ['from' => $from, 'to' => $to],
-            'days' => $days,
-            'totals' => [
-                'calls' => $calls,
-                'no_answer' => array_sum(array_column($days, 'no_answer')),
-                'answered' => array_sum(array_column($days, 'answered')),
-                'conversations' => $conversations,
-                // The period's own rate, not the mean of the daily ones.
-                'hit_rate' => $calls > 0 ? round($conversations / $calls * 100, 1) : null,
-            ],
-        ]);
     }
 
     /**

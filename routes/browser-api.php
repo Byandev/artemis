@@ -71,7 +71,6 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         // itself — the daily rollup has no hour to group by.
         Route::get('/csrs/stats/analytics-hourly-effort', [CSRController::class, 'analyticsHourlyEffort']);
         // The same days as numbers: where every call ended up, and the day's hit rate.
-        Route::get('/csrs/stats/analytics-daily-call-outcomes', [CSRController::class, 'analyticsDailyCallOutcomes']);
 
         // Kick the nightly CSR rollups by hand. Everything on the analytics
         // page is built by them, so a gap is closed by re-running one instead

@@ -1,8 +1,12 @@
 import { Skeleton } from '@/components/ui/skeleton';
+import { ChartColumn, Table2 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 /** Which calls the chart is drawing — both kinds, or either on its own. */
 export type Scope = 'all' | 'rmo' | 'verification';
+
+/** Whether the section draws its buckets or lists them as figures. */
+export type View = 'chart' | 'table';
 
 /**
  * One slot on the axis: the four counts, and the two names put on them.
@@ -17,6 +21,11 @@ export interface EffortBucket {
     label: string;
     /** What the tooltip prints above the figures; there is room for the long form. */
     tooltip: string;
+    /**
+     * What the table prints in the first cell. A row has room the axis does not,
+     * so "9:00 AM – 9:59 AM" can replace "9a". Falls back to `label`.
+     */
+    rowLabel?: string;
     /** Every RMO call placed, however short. */
     calls: number;
     /** The subset that lasted long enough to be a conversation. */
@@ -37,6 +46,8 @@ const SCOPES: {
     key: Scope;
     label: string;
     blurb: string;
+    /** The same, for the table — it has no bars and no colour to explain. */
+    tableBlurb: string;
     /** What the empty state says was not placed. */
     noun: string;
 }[] = [
@@ -44,20 +55,39 @@ const SCOPES: {
         key: 'all',
         label: 'All calls',
         blurb: 'The pale bar is every call placed; the solid bar beside it is the ones that became a conversation. Blue is chasing a parcel, green is confirming an order. Where the two are furthest apart, effort is being spent without return.',
+        tableBlurb:
+            'Every call placed beside the ones that became a conversation, split into chasing a parcel (RMO) and confirming an order (verification). Reached is conversations over calls placed.',
         noun: 'calls',
     },
     {
         key: 'rmo',
         label: 'RMO only',
         blurb: 'The pale bar is the RMO calls placed; the solid bar beside it is the ones that became a conversation. Where the two are furthest apart, effort is being spent without return.',
+        tableBlurb:
+            'The RMO calls placed beside the ones that became a conversation. Reached is conversations over calls placed.',
         noun: 'RMO calls',
     },
     {
         key: 'verification',
         label: 'Verification only',
         blurb: 'The pale bar is the order-verification calls placed; the solid bar beside it is the ones that became a conversation. Where the two are furthest apart, effort is being spent without return.',
+        tableBlurb:
+            'The order-verification calls placed beside the ones that became a conversation. Reached is conversations over calls placed.',
         noun: 'order-verification calls',
     },
+];
+
+/**
+ * Draw the buckets, or list them.
+ *
+ * The chart answers "where is the gap widest" at a glance; the table answers
+ * "by how much, on which row" — and it is what a screen reader, a copy-paste
+ * and a colourblind reader get out of the section. Same numbers either way, so
+ * flipping costs no request.
+ */
+const VIEWS: { key: View; label: string; icon: typeof ChartColumn }[] = [
+    { key: 'chart', label: 'Graph', icon: ChartColumn },
+    { key: 'table', label: 'Table', icon: Table2 },
 ];
 
 /**
@@ -122,6 +152,8 @@ interface EffortColumnData {
     key: string;
     label: string;
     tooltip: string;
+    /** The long form, for a table row. */
+    rowLabel: string;
     rmoCalls: number;
     verificationCalls: number;
     /** The two together — what the effort stack measures. */
@@ -142,6 +174,7 @@ function toColumn(bucket: EffortBucket, scope: Scope): EffortColumnData {
         key: bucket.key,
         label: bucket.label,
         tooltip: bucket.tooltip,
+        rowLabel: bucket.rowLabel ?? bucket.label,
         rmoCalls,
         verificationCalls,
         placed: rmoCalls + verificationCalls,
@@ -175,8 +208,7 @@ export default function CsrEffortChart({
     eyebrow,
     heading,
     note,
-    control,
-    emptySubject = 'in the selected period',
+    rowHeading,
     buckets,
     loading,
     columnWidth = 52,
@@ -188,10 +220,8 @@ export default function CsrEffortChart({
     heading: string;
     /** An extra sentence under the blurb, where the cut needs explaining. */
     note?: string;
-    /** A control of the chart's own, beside the heading — a day picker, say. */
-    control?: ReactNode;
-    /** How the empty state names what it was looking at: "on Fri, Aug 14". */
-    emptySubject?: string;
+    /** What a row of the table stands for — heads its first column. */
+    rowHeading: string;
     buckets: EffortBucket[];
     loading: boolean;
     /** Slot width. Narrower where there are more of them to fit. */
@@ -200,6 +230,7 @@ export default function CsrEffortChart({
     skeletonBars?: number[];
 }) {
     const [scope, setScope] = useState<Scope>('all');
+    const [view, setView] = useState<View>('chart');
 
     const columns = buckets.map((bucket) => toColumn(bucket, scope));
     const hasCalls = columns.some((column) => column.placed > 0);
@@ -218,98 +249,158 @@ export default function CsrEffortChart({
                     {eyebrow}
                 </h2>
 
-                <div className="flex items-center gap-0.5 self-start rounded-[10px] bg-stone-100 p-0.5 dark:bg-zinc-800">
-                    {SCOPES.map((option) => (
-                        <button
-                            key={option.key}
-                            type="button"
-                            disabled={loading}
-                            onClick={() => setScope(option.key)}
-                            className={
-                                option.key === scope
-                                    ? 'rounded-lg bg-white px-3 py-1.5 text-[12px] font-medium text-emerald-700 shadow-sm disabled:opacity-70 dark:bg-zinc-900 dark:text-emerald-400'
-                                    : 'cursor-pointer rounded-lg px-3 py-1.5 text-[12px] text-gray-500 hover:text-gray-800 disabled:cursor-default dark:text-gray-400 dark:hover:text-gray-200'
-                            }
-                        >
-                            {option.label}
-                        </button>
-                    ))}
+                {/* Two groups: which calls, then how to read them. They wrap
+                    rather than squeeze when the row runs out of width. */}
+                <div className="flex flex-wrap items-center gap-2">
+                    <TabGroup>
+                        {SCOPES.map((option) => (
+                            <TabButton
+                                key={option.key}
+                                active={option.key === scope}
+                                disabled={loading}
+                                onClick={() => setScope(option.key)}
+                            >
+                                {option.label}
+                            </TabButton>
+                        ))}
+                    </TabGroup>
+
+                    <TabGroup>
+                        {VIEWS.map((option) => (
+                            <TabButton
+                                key={option.key}
+                                active={option.key === view}
+                                disabled={loading}
+                                onClick={() => setView(option.key)}
+                            >
+                                <option.icon className="h-3.5 w-3.5" />
+                                {option.label}
+                            </TabButton>
+                        ))}
+                    </TabGroup>
                 </div>
             </div>
 
             <div className="rounded-[14px] border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
-                            {heading}
-                        </h3>
-                        <p className="mt-1 max-w-xl text-[13px] text-gray-500 dark:text-gray-400">
-                            {copy.blurb}
-                            {note ? ` ${note}` : ''}
-                        </p>
+                <div>
+                    <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100">
+                        {heading}
+                    </h3>
+                    <p className="mt-1 max-w-xl text-[13px] text-gray-500 dark:text-gray-400">
+                        {view === 'chart' ? copy.blurb : copy.tableBlurb}
+                        {note ? ` ${note}` : ''}
+                    </p>
+                </div>
+
+                {/* The legend names bar fills, so it belongs to the chart —
+                    the table heads its own columns instead. */}
+                {view === 'chart' && (
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                        {showsRmo && (
+                            <>
+                                <LegendItem
+                                    swatch={RMO_PLACED}
+                                    label={
+                                        qualify
+                                            ? 'RMO calls placed'
+                                            : 'Calls placed'
+                                    }
+                                />
+                                <LegendItem
+                                    swatch={RMO_REAL}
+                                    label={
+                                        qualify
+                                            ? 'RMO conversations'
+                                            : 'Real conversations'
+                                    }
+                                />
+                            </>
+                        )}
+                        {showsVerification && (
+                            <>
+                                <LegendItem
+                                    swatch={VERIFICATION_PLACED}
+                                    label={
+                                        qualify
+                                            ? 'Verification calls placed'
+                                            : 'Calls placed'
+                                    }
+                                />
+                                <LegendItem
+                                    swatch={VERIFICATION_REAL}
+                                    label={
+                                        qualify
+                                            ? 'Verification conversations'
+                                            : 'Real conversations'
+                                    }
+                                />
+                            </>
+                        )}
                     </div>
-
-                    {control && <div className="shrink-0">{control}</div>}
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                    {showsRmo && (
-                        <>
-                            <LegendItem
-                                swatch={RMO_PLACED}
-                                label={
-                                    qualify
-                                        ? 'RMO calls placed'
-                                        : 'Calls placed'
-                                }
-                            />
-                            <LegendItem
-                                swatch={RMO_REAL}
-                                label={
-                                    qualify
-                                        ? 'RMO conversations'
-                                        : 'Real conversations'
-                                }
-                            />
-                        </>
-                    )}
-                    {showsVerification && (
-                        <>
-                            <LegendItem
-                                swatch={VERIFICATION_PLACED}
-                                label={
-                                    qualify
-                                        ? 'Verification calls placed'
-                                        : 'Calls placed'
-                                }
-                            />
-                            <LegendItem
-                                swatch={VERIFICATION_REAL}
-                                label={
-                                    qualify
-                                        ? 'Verification conversations'
-                                        : 'Real conversations'
-                                }
-                            />
-                        </>
-                    )}
-                </div>
+                )}
 
                 {loading ? (
-                    <EffortSkeleton bars={skeletonBars} />
+                    view === 'chart' ? (
+                        <EffortSkeleton bars={skeletonBars} />
+                    ) : (
+                        <TableSkeleton rows={skeletonBars.length} />
+                    )
                 ) : !hasCalls ? (
                     <p className="py-14 text-center text-[12px] text-gray-400 dark:text-gray-500">
-                        No {copy.noun} were placed {emptySubject}.
+                        No {copy.noun} were placed in the selected period.
                     </p>
-                ) : (
+                ) : view === 'chart' ? (
                     <EffortPlot
                         columns={columns}
                         scope={scope}
                         columnWidth={columnWidth}
                     />
+                ) : (
+                    <EffortTable
+                        columns={columns}
+                        scope={scope}
+                        rowHeading={rowHeading}
+                    />
                 )}
             </div>
         </div>
+    );
+}
+
+/** The pill the tabs sit in — one per group of them. */
+function TabGroup({ children }: { children: ReactNode }) {
+    return (
+        <div className="flex items-center gap-0.5 self-start rounded-[10px] bg-stone-100 p-0.5 dark:bg-zinc-800">
+            {children}
+        </div>
+    );
+}
+
+function TabButton({
+    active,
+    disabled,
+    onClick,
+    children,
+}: {
+    active: boolean;
+    disabled: boolean;
+    onClick: () => void;
+    children: ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            aria-pressed={active}
+            disabled={disabled}
+            onClick={onClick}
+            className={
+                active
+                    ? 'inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[12px] font-medium text-emerald-700 shadow-sm disabled:opacity-70 dark:bg-zinc-900 dark:text-emerald-400'
+                    : 'inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] text-gray-500 hover:text-gray-800 disabled:cursor-default dark:text-gray-400 dark:hover:text-gray-200'
+            }
+        >
+            {children}
+        </button>
     );
 }
 
@@ -533,6 +624,244 @@ function EffortSkeleton({ bars }: { bars: number[] }) {
                     </div>
                 ))}
             </div>
+        </div>
+    );
+}
+
+/**
+ * The same columns as figures.
+ *
+ * The scope filter applies here as it does to the bars, so a narrowed table is
+ * a plain calls-and-conversations pair; the all-calls table carries the RMO and
+ * verification split alongside the totals, because that split is what the two
+ * stacked bars are saying.
+ *
+ * Quiet rows are listed rather than dropped — that a Sunday, or the small hours,
+ * carried nothing is worth reading — so the rows scroll inside the card with the
+ * header pinned above them and the period's totals pinned below.
+ */
+function EffortTable({
+    columns,
+    scope,
+    rowHeading,
+}: {
+    columns: EffortColumnData[];
+    scope: Scope;
+    rowHeading: string;
+}) {
+    const split = scope === 'all';
+
+    const totals = columns.reduce(
+        (sum, column) => ({
+            rmoCalls: sum.rmoCalls + column.rmoCalls,
+            rmoReal: sum.rmoReal + column.rmoReal,
+            verificationCalls: sum.verificationCalls + column.verificationCalls,
+            verificationReal: sum.verificationReal + column.verificationReal,
+            placed: sum.placed + column.placed,
+            real: sum.real + column.real,
+        }),
+        {
+            rmoCalls: 0,
+            rmoReal: 0,
+            verificationCalls: 0,
+            verificationReal: 0,
+            placed: 0,
+            real: 0,
+        },
+    );
+
+    // The single-kind tables wear that kind's hues, so a column means the same
+    // thing it meant on the bar it replaces.
+    const placedSwatch =
+        scope === 'verification' ? VERIFICATION_PLACED : RMO_PLACED;
+    const realSwatch = scope === 'verification' ? VERIFICATION_REAL : RMO_REAL;
+
+    return (
+        <div className="mt-4 max-h-96 overflow-auto rounded-[14px] border border-black/6 dark:border-white/6">
+            <table className="w-full border-collapse">
+                {/* The rule under the pinned header is a shadow rather than a
+                    border: a collapsed border does not travel with a sticky
+                    row, and the header would scroll into the figures. */}
+                <thead className="sticky top-0 z-10 bg-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] dark:bg-zinc-900 dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]">
+                    <tr>
+                        <Th align="left">{rowHeading}</Th>
+                        {split ? (
+                            <>
+                                <Th swatch={RMO_PLACED}>RMO placed</Th>
+                                <Th swatch={RMO_REAL}>RMO conversations</Th>
+                                <Th swatch={VERIFICATION_PLACED}>
+                                    Verification placed
+                                </Th>
+                                <Th swatch={VERIFICATION_REAL}>
+                                    Verification conversations
+                                </Th>
+                                <Th>Total placed</Th>
+                                <Th>Total conversations</Th>
+                            </>
+                        ) : (
+                            <>
+                                <Th swatch={placedSwatch}>Calls placed</Th>
+                                <Th swatch={realSwatch}>Conversations</Th>
+                            </>
+                        )}
+                        <Th>Reached</Th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {columns.map((column) => (
+                        <tr
+                            key={column.key}
+                            className="border-b border-black/5 last:border-0 dark:border-white/5"
+                        >
+                            <td className="px-4 py-3 text-left font-mono text-[12px] whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                {column.rowLabel}
+                            </td>
+                            {split ? (
+                                <>
+                                    <Td>{column.rmoCalls}</Td>
+                                    <Td>{column.rmoReal}</Td>
+                                    <Td>{column.verificationCalls}</Td>
+                                    <Td>{column.verificationReal}</Td>
+                                    <Td strong>{column.placed}</Td>
+                                    <Td strong>{column.real}</Td>
+                                </>
+                            ) : (
+                                <>
+                                    <Td>{column.placed}</Td>
+                                    <Td>{column.real}</Td>
+                                </>
+                            )}
+                            <Reached
+                                placed={column.placed}
+                                real={column.real}
+                            />
+                        </tr>
+                    ))}
+                </tbody>
+
+                {/* Pinned to the foot of the scroller: however far down a month
+                    the reader is, the period's own figures stay in view. */}
+                <tfoot className="sticky bottom-0 bg-stone-50 shadow-[inset_0_1px_0_rgba(0,0,0,0.06)] dark:bg-zinc-800/60 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                    <tr>
+                        <td className="px-4 py-3 text-left font-mono text-[10px] tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
+                            Total
+                        </td>
+                        {split ? (
+                            <>
+                                <Td strong>{totals.rmoCalls}</Td>
+                                <Td strong>{totals.rmoReal}</Td>
+                                <Td strong>{totals.verificationCalls}</Td>
+                                <Td strong>{totals.verificationReal}</Td>
+                                <Td strong>{totals.placed}</Td>
+                                <Td strong>{totals.real}</Td>
+                            </>
+                        ) : (
+                            <>
+                                <Td strong>{totals.placed}</Td>
+                                <Td strong>{totals.real}</Td>
+                            </>
+                        )}
+                        <Reached placed={totals.placed} real={totals.real} />
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    );
+}
+
+function Th({
+    children,
+    align = 'right',
+    swatch,
+}: {
+    children: ReactNode;
+    align?: 'left' | 'right';
+    /** The fill this column stands for on the chart, where it has one. */
+    swatch?: string;
+}) {
+    return (
+        <th
+            className={`px-4 py-3 font-mono text-[10px] font-normal tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500 ${
+                align === 'left' ? 'text-left' : 'text-right'
+            }`}
+        >
+            <span
+                className={`flex items-center gap-1.5 whitespace-nowrap ${
+                    align === 'left' ? 'justify-start' : 'justify-end'
+                }`}
+            >
+                {swatch && (
+                    <span
+                        className={`h-2 w-2 shrink-0 rounded-[2px] ${swatch}`}
+                        aria-hidden
+                    />
+                )}
+                {children}
+            </span>
+        </th>
+    );
+}
+
+/** A count. Zero goes pale, so the rows that carried work are the ones that read. */
+function Td({ children, strong }: { children: number; strong?: boolean }) {
+    const weight = strong
+        ? 'font-semibold text-gray-900 dark:text-gray-100'
+        : 'text-gray-700 dark:text-gray-300';
+
+    return (
+        <td
+            className={`px-4 py-3 text-right font-mono text-[12px] tabular-nums ${
+                children === 0
+                    ? 'font-normal text-gray-300 dark:text-gray-600'
+                    : weight
+            }`}
+        >
+            {children.toLocaleString()}
+        </td>
+    );
+}
+
+/** What the effort bought, as a percentage. Nothing placed, nothing to divide. */
+function Reached({ placed, real }: { placed: number; real: number }) {
+    return (
+        <td className="px-4 py-3 text-right font-mono text-[12px] font-semibold text-gray-900 tabular-nums dark:text-gray-100">
+            {placed === 0 ? (
+                <span className="font-normal text-gray-300 dark:text-gray-600">
+                    —
+                </span>
+            ) : (
+                <>
+                    {((real / placed) * 100).toFixed(1)}
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                        %
+                    </span>
+                </>
+            )}
+        </td>
+    );
+}
+
+/**
+ * The placeholder is a hint, not a measurement: a full round of the clock would
+ * be two dozen grey rows, so it stops at the height a reader takes in at once.
+ */
+function TableSkeleton({ rows }: { rows: number }) {
+    return (
+        <div className="mt-4 overflow-hidden rounded-[14px] border border-black/6 dark:border-white/6">
+            {Array.from({ length: Math.min(rows, 8) }).map((_, i) => (
+                <div
+                    key={i}
+                    className="flex items-center gap-4 border-b border-black/5 px-4 py-3 last:border-0 dark:border-white/5"
+                >
+                    <Skeleton className="h-3 w-16" />
+                    <div className="ml-auto flex items-center gap-4">
+                        <Skeleton className="h-3 w-10" />
+                        <Skeleton className="h-3 w-10" />
+                        <Skeleton className="h-3 w-12" />
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }

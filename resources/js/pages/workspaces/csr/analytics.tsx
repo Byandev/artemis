@@ -40,9 +40,6 @@ import CsrComparisonPanel, {
     type ComparisonMetricOption,
     type ComparisonResponse,
 } from '@/components/csr/CsrComparisonPanel';
-import CsrDailyCallOutcomesTable, {
-    type DailyCallOutcomesResponse,
-} from '@/components/csr/CsrDailyCallOutcomesTable';
 import CsrDailyEffortChart, {
     type DailyEffortResponse,
 } from '@/components/csr/CsrDailyEffortChart';
@@ -563,16 +560,6 @@ export default function Analytics({
             toStr,
         );
 
-    // The same days as numbers, under the chart. Its own request: the table
-    // answers a different question and carries columns the chart never draws.
-    const [callOutcomes, callOutcomesLoading] =
-        useAnalyticsStat<DailyCallOutcomesResponse>(
-            workspace.slug,
-            'analytics-daily-call-outcomes',
-            fromStr,
-            toStr,
-        );
-
     // Debounced search — skip the initial mount so we don't refetch on load.
     const isFirstRender = useRef(true);
     useEffect(() => {
@@ -858,11 +845,6 @@ export default function Analytics({
                 <CsrHourlyEffortChart
                     data={hourlyEffort}
                     loading={hourlyEffortLoading}
-                />
-
-                <CsrDailyCallOutcomesTable
-                    data={callOutcomes}
-                    loading={callOutcomesLoading}
                 />
 
                 {/* The same header row the sections above use: the section's

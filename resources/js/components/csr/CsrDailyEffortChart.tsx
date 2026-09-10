@@ -61,6 +61,7 @@ export default function CsrDailyEffortChart({
         <CsrEffortChart
             eyebrow="Effort against results · Daily"
             heading="Effort against results, day by day"
+            rowHeading="Day"
             buckets={buckets}
             loading={loading}
         />
