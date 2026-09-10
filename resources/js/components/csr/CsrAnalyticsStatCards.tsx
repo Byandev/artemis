@@ -7,11 +7,11 @@ import {
     MessagesSquare,
     Minus,
     PhoneCall,
-    PhoneForwarded,
     PhoneIncoming,
     PhoneOutgoing,
     RotateCcw,
     ShieldAlert,
+    ShieldCheck,
     Target,
     Timer,
     Wallet,
@@ -97,10 +97,14 @@ export interface ReachRateStat extends StatPayload {
     orders: number;
 }
 
-export interface LongestCallStat extends StatPayload {
+export interface VerifiedOrdersStat extends StatPayload {
     /** Null when the range needed no verification at all. */
     value: number | null;
+    /** Orders verified — the numerator, counted by order rather than by call. */
+    orders: number;
+    /** Calls it took to get through them — an order rung three times is three. */
     calls: number;
+    /** The backlog it is read against — the Reach Rate card's figure. */
     needs_verification: number;
 }
 
@@ -619,29 +623,42 @@ export function ReachRateStatCard({
     );
 }
 
-export function LongestCallStatCard({
+/**
+ * How much of the range's verification backlog got verified.
+ *
+ * Orders verified over the "Total Order needs Verification" card beside it,
+ * with both counts and the calls behind them in the footnote. Orders on both
+ * sides of the division, not calls: three calls at one order cover one order,
+ * and counting the calls read a two-order backlog rung three times as 150%.
+ *
+ * It can still pass 100% — a CSR ringing an order nothing flagged, or one
+ * chased across two days, which the nightly rollup counts on each of them.
+ * Real signal about the range rather than an error to clamp away.
+ */
+export function VerifiedOrdersStatCard({
     stat,
     loading,
 }: {
-    stat: LongestCallStat | null;
+    stat: VerifiedOrdersStat | null;
     loading: boolean;
 }) {
     return (
         <StatCard
             title="Total Verified Orders"
-            icon={PhoneForwarded}
+            icon={ShieldCheck}
             loading={loading || stat === null}
             // A dash, not 0%, when nothing needed verifying — there is no rate
             // to report rather than a rate of nothing.
             value={
                 !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
             }
-            // The division itself, since the figure can pass 100% and the two
-            // counts are the only thing that explains how.
+            // The division itself, and the calls it took: orders over orders,
+            // not calls over orders — an order rung three times covers one, and
+            // counting the calls put a two-order backlog at 150%.
             footnote={
                 !stat || stat.value === null
                     ? 'Nothing needed verifying in this period'
-                    : `${stat.calls.toLocaleString()} calls of ${stat.needs_verification.toLocaleString()} orders`
+                    : `${stat.orders.toLocaleString()} of ${stat.needs_verification.toLocaleString()} needing verification · ${stat.calls.toLocaleString()} calls`
             }
             trend={
                 <Trend

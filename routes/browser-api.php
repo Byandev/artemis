@@ -55,7 +55,7 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-calls-placed', [CSRController::class, 'analyticsCallsPlaced']);
         Route::get('/csrs/stats/analytics-real-conversations', [CSRController::class, 'analyticsRealConversations']);
         Route::get('/csrs/stats/analytics-reach-rate', [CSRController::class, 'analyticsReachRate']);
-        Route::get('/csrs/stats/analytics-longest-call', [CSRController::class, 'analyticsLongestCall']);
+        Route::get('/csrs/stats/analytics-verified-orders', [CSRController::class, 'analyticsVerifiedOrders']);
         // Leaders for the period — who came top, same source as the cards above.
         Route::get('/csrs/stats/analytics-leader-sales', [CSRController::class, 'analyticsLeaderSales']);
         Route::get('/csrs/stats/analytics-leader-rts', [CSRController::class, 'analyticsLeaderRts']);

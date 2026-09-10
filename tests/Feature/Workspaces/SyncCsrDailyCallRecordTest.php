@@ -142,6 +142,37 @@ test('a verification call that lasted is counted as a real conversation', functi
         ->and((int) $row->total_verification_real_called)->toBe(1);
 });
 
+test('an order rung more than once is one verified order, not three', function () {
+    $order = callOrder();
+
+    // The calls and the orders are counted separately on purpose: read against
+    // the orders that needed verifying, only the distinct count is a coverage
+    // figure — the calls put two orders rung three times between them at 150%.
+    csrCall($order, CallLogPersona::CUSTOMER, 60, '10:00:00', delivery: null);
+    csrCall($order, CallLogPersona::CUSTOMER, 30, '11:00:00', delivery: null);
+    csrCall($order, CallLogPersona::CUSTOMER, 45, '12:00:00', delivery: null);
+    csrCall(callOrder(), CallLogPersona::CUSTOMER, 20, '13:00:00', delivery: null);
+
+    (new SyncCsrDailyCallRecord('2026-08-02'))->handle();
+
+    $row = callReport();
+
+    expect((int) $row->total_verification_called)->toBe(4)
+        ->and((int) $row->total_verified_orders)->toBe(2);
+});
+
+test('an order rung about a delivery is not a verified order', function () {
+    $order = callOrder();
+
+    // Stamped to a delivery, so it is RMO work — the CSR chasing the parcel
+    // rather than confirming the order.
+    csrCall($order, CallLogPersona::CUSTOMER, 60, '10:00:00');
+
+    (new SyncCsrDailyCallRecord('2026-08-02'))->handle();
+
+    expect((int) callReport()->total_verified_orders)->toBe(0);
+});
+
 test('a verification call is not counted against either persona', function () {
     $order = callOrder();
 

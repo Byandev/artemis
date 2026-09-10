@@ -296,6 +296,19 @@ class CsrComparisonMetrics
             'format' => 'number',
             'higher_is_better' => true,
         ],
+        [
+            // The same work as "Verification calls" counted by order rather
+            // than by call: an order rung three times is three there and one
+            // here.
+            'key' => 'total_verified_orders',
+            'label' => 'Total verified orders',
+            'group' => 'Calls',
+            'source' => 'call',
+            'column' => 'total_verified_orders',
+            'aggregate' => 'SUM',
+            'format' => 'number',
+            'higher_is_better' => true,
+        ],
     ];
 
     /** @return array<int, array<string, mixed>> */

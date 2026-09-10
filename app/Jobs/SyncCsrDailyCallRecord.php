@@ -67,6 +67,7 @@ class SyncCsrDailyCallRecord implements ShouldQueue
                     'total_verification_called' => (int) ($call?->total_verification_called ?? 0),
                     'total_verification_call_time' => (int) ($call?->total_verification_call_time ?? 0),
                     'total_verification_real_called' => (int) ($call?->total_verification_real_called ?? 0),
+                    'total_verified_orders' => (int) ($call?->total_verified_orders ?? 0),
 
                     'total_rmo_assigned_count' => (int) ($delivery?->total_rmo_assigned_count ?? 0),
                     'total_rmo_confirmed_count' => (int) ($delivery?->total_rmo_confirmed_count ?? 0),
@@ -107,6 +108,14 @@ class SyncCsrDailyCallRecord implements ShouldQueue
      * when it does not. The order beside it is what places it in a shop, so a
      * call matched to neither is not counted here at all — there is no row to
      * put it in.
+     *
+     * The verification half is counted twice over, and deliberately:
+     * `total_verification_called` is the calls placed, `total_verified_orders`
+     * the distinct orders behind them. An order rung three times is three and
+     * one. Read against the orders that needed verifying, only the second is a
+     * coverage figure — the first passes 100% on repeat calls alone. The
+     * distinct is taken within the row, so an order chased across two days is
+     * one on each and two in a range that sums them.
      */
     private function callTotals()
     {
@@ -140,7 +149,8 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN 1 ELSE 0 END) AS total_verification_called,
                 SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN cl.duration ELSE 0 END) AS total_verification_call_time,
-                SUM(CASE WHEN cl.order_for_delivery_id IS NULL AND cl.duration >= 3 THEN 1 ELSE 0 END) AS total_verification_real_called
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL AND cl.duration >= 3 THEN 1 ELSE 0 END) AS total_verification_real_called,
+                COUNT(DISTINCT CASE WHEN cl.order_for_delivery_id IS NULL THEN cl.order_id END) AS total_verified_orders
             ', [
                 CallLogPersona::CUSTOMER,
                 CallLogPersona::CUSTOMER,
