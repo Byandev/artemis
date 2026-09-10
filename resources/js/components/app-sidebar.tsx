@@ -40,6 +40,7 @@ import {
     LayoutDashboard,
     LifeBuoy,
     ListChecks,
+    Map,
     MapPin,
     Megaphone,
     MessageSquare,
@@ -458,6 +459,12 @@ export function AppSidebar() {
                     title: 'Analytics',
                     href: `/workspaces/${slug}/rts/analytics`,
                     icon: BarChart2,
+                    permission: PERMISSIONS.ViewRtsAnalytics,
+                },
+                {
+                    title: 'Heat Map',
+                    href: `/workspaces/${slug}/rts/heat-map`,
+                    icon: Map,
                     permission: PERMISSIONS.ViewRtsAnalytics,
                 },
                 {
