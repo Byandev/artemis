@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\PancakeUserDailyCallReport;
 use App\Models\Shop;
 use App\Support\CallLogPersona;
+use App\Support\RmoDailyStats;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User as PancakeUser;
 
@@ -97,6 +98,25 @@ test('the customer and rider calls are split, and add up to the RMO figures', fu
         ->and((int) $row->total_rmo_call_time)->toBe(180);
 });
 
+test('the RMO orders count the deliveries, however often each was rung', function () {
+    $order = callOrder();
+
+    // One parcel rung twice — the customer, then the rider — and a second rung
+    // once. Three calls, two deliveries.
+    csrCall($order, CallLogPersona::CUSTOMER, 100, '10:00:00', delivery: 1);
+    csrCall($order, CallLogPersona::RIDER, 50, '10:30:00', delivery: 1);
+    csrCall($order, CallLogPersona::CUSTOMER, 30, '11:00:00', delivery: 2);
+    // No delivery on it, so nothing to count: this is verification work.
+    csrCall($order, CallLogPersona::CUSTOMER, 40, '12:00:00', delivery: null);
+
+    (new SyncCsrDailyCallRecord('2026-08-02'))->handle();
+
+    $row = callReport();
+
+    expect((int) $row->total_rmo_called)->toBe(3)
+        ->and((int) $row->total_rmo_orders)->toBe(2);
+});
+
 test('a call about no order is not recorded at all', function () {
     csrCall(null);
 
@@ -123,6 +143,53 @@ test('a call about an order but no delivery is verification, not RMO', function 
         // The two together are the CSR's whole day on that shop.
         ->and((int) $row->total_called)->toBe(2)
         ->and((int) $row->total_call_time)->toBe(150);
+});
+
+test('a verification call that lasted is counted as a real conversation', function () {
+    $order = callOrder();
+
+    csrCall($order, CallLogPersona::CUSTOMER, 90, '10:00:00', delivery: null);
+    csrCall($order, CallLogPersona::CUSTOMER, RmoDailyStats::CONNECTED_CALL_MIN_SECONDS - 1, '11:00:00', delivery: null);
+
+    (new SyncCsrDailyCallRecord('2026-08-02'))->handle();
+
+    $row = callReport();
+
+    // The same five-second cut the RMO side makes, so the two can be drawn on
+    // one axis without meaning different things by "real".
+    expect((int) $row->total_verification_called)->toBe(2)
+        ->and((int) $row->total_verification_real_called)->toBe(1);
+});
+
+test('an order rung more than once is one verified order, not three', function () {
+    $order = callOrder();
+
+    // The calls and the orders are counted separately on purpose: read against
+    // the orders that needed verifying, only the distinct count is a coverage
+    // figure — the calls put two orders rung three times between them at 150%.
+    csrCall($order, CallLogPersona::CUSTOMER, 60, '10:00:00', delivery: null);
+    csrCall($order, CallLogPersona::CUSTOMER, 30, '11:00:00', delivery: null);
+    csrCall($order, CallLogPersona::CUSTOMER, 45, '12:00:00', delivery: null);
+    csrCall(callOrder(), CallLogPersona::CUSTOMER, 20, '13:00:00', delivery: null);
+
+    (new SyncCsrDailyCallRecord('2026-08-02'))->handle();
+
+    $row = callReport();
+
+    expect((int) $row->total_verification_called)->toBe(4)
+        ->and((int) $row->total_verified_orders)->toBe(2);
+});
+
+test('an order rung about a delivery is not a verified order', function () {
+    $order = callOrder();
+
+    // Stamped to a delivery, so it is RMO work — the CSR chasing the parcel
+    // rather than confirming the order.
+    csrCall($order, CallLogPersona::CUSTOMER, 60, '10:00:00');
+
+    (new SyncCsrDailyCallRecord('2026-08-02'))->handle();
+
+    expect((int) callReport()->total_verified_orders)->toBe(0);
 });
 
 test('a verification call is not counted against either persona', function () {

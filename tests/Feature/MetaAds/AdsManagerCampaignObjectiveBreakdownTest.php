@@ -207,6 +207,39 @@ it('filters the campaign-objective breakdown by started date through the campaig
     expect($kept)->toHaveCount(1);
 });
 
+// Ad-grained like every other breakdown that isn't the campaign itself, so
+// created_date reads the ad's own column rather than the campaign's.
+it('filters the campaign-objective breakdown by created date through the ad', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    seedCampaignObjectiveBreakdown($workspace, [['objective' => 'OUTCOME_SALES', 'spend' => 100]]);
+    Ad::query()->update(['created_time' => Carbon::today()->subDays(3)]);
+
+    // Ads were created 3 days ago, so an "after yesterday" filter excludes them.
+    $excluded = $this->getJson(objectiveDataUrl($workspace, [
+        'group_by' => 'campaign_objective',
+        'date_filters' => json_encode([[
+            'field' => 'created_date',
+            'op' => 'after',
+            'value' => Carbon::yesterday()->toDateString(),
+        ]]),
+    ]))->assertOk()->json('rows.data');
+
+    expect($excluded)->toBeEmpty();
+
+    // ...while a "before yesterday" filter keeps them.
+    $kept = $this->getJson(objectiveDataUrl($workspace, [
+        'group_by' => 'campaign_objective',
+        'date_filters' => json_encode([[
+            'field' => 'created_date',
+            'op' => 'before',
+            'value' => Carbon::yesterday()->toDateString(),
+        ]]),
+    ]))->assertOk()->json('rows.data');
+
+    expect($kept)->toHaveCount(1);
+});
+
 // ── Objective filter (independent of grouping) ──────────────────────────────
 
 it('filters any breakdown to the selected campaign objectives', function (string $groupBy) {

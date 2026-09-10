@@ -125,8 +125,8 @@ test('the comparison panel lists only the picked team’s CSRs', function () {
     ['team' => $team] = teamWithCsrDay($this->workspace, 'Angeline Mercado', 6000, 120);
     teamWithCsrDay($this->workspace, 'Someone Else', 4000, 60);
 
-    $sales = collect(teamStat($this->owner, $this->workspace, 'analytics-comparison', $team->id)->json('metrics'))
-        ->firstWhere('key', 'sales');
+    $sales = teamStat($this->owner, $this->workspace, 'analytics-comparison', $team->id)
+        ->json('metric');
 
     expect(collect($sales['rows'])->pluck('name')->all())->toBe(['Angeline Mercado']);
 });

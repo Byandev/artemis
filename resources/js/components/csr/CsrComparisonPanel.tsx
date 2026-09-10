@@ -1,3 +1,12 @@
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export interface ComparisonRow {
@@ -9,14 +18,23 @@ export interface ComparisonRow {
     previous_value: number | null;
     /** Percent, or percentage points for the metrics that are already rates. */
     change: number | null;
-    /** Fixed per CSR across all four metrics — see BAR_COLORS. */
+    /** Fixed per CSR across every metric — see BAR_COLORS. */
     color_slot: number;
 }
 
-export interface ComparisonMetric {
+/**
+ * One entry of the panel's dropdown, shipped with the page so the selector is
+ * populated before the figures arrive rather than filling in behind them.
+ */
+export interface ComparisonMetricOption {
     key: string;
     label: string;
-    format: 'currency' | 'percent' | 'duration';
+    /** The heading it sits under — the rollup the column comes from. */
+    group: string;
+}
+
+export interface ComparisonMetric extends ComparisonMetricOption {
+    format: 'currency' | 'number' | 'percent' | 'duration';
     delta_unit: string;
     higher_is_better: boolean;
     /** Mean over everyone who qualified, not just the listed rows. */
@@ -25,10 +43,15 @@ export interface ComparisonMetric {
     rows: ComparisonRow[];
 }
 
+/**
+ * What one request answers: the metric it was asked for, and nothing else. The
+ * endpoint scans that metric's columns alone, so a dropdown of two dozen costs
+ * no more than the four tabs did.
+ */
 export interface ComparisonResponse {
     range: { from: string; to: string };
     previous_period: { from: string; to: string };
-    metrics: ComparisonMetric[];
+    metric: ComparisonMetric;
 }
 
 /**
@@ -70,9 +93,14 @@ const duration = (seconds: number) => {
     return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
 };
 
+/** A plain count: grouped, and to a decimal only where one is there. */
+const count = (n: number) =>
+    n.toLocaleString('en-US', { maximumFractionDigits: 1 });
+
 function formatValue(value: number, format: ComparisonMetric['format']) {
     if (format === 'currency') return peso(value);
     if (format === 'duration') return duration(value);
+    if (format === 'number') return count(value);
     return `${value.toFixed(1)}%`;
 }
 
@@ -89,50 +117,69 @@ function formatRange({ from, to }: { from: string; to: string }) {
 }
 
 /**
- * The tabs before the response lands, in the order the endpoint returns them.
- * Keyed the same so the tab restored from the URL is already highlighted while
- * the skeleton is up, rather than snapping across once the metrics arrive.
+ * The dropdown's entries, in the order they were given, split into the runs
+ * that share a heading. A reduce rather than a group-by so the headings keep
+ * the catalogue's order instead of an object's key order.
  */
-const PLACEHOLDER_TABS = [
-    { key: 'sales', label: 'Sales' },
-    { key: 'rts', label: 'RTS' },
-    { key: 'rmo_called', label: 'RMO called' },
-    { key: 'call_time', label: 'Call time' },
-];
+function groupOptions(options: ComparisonMetricOption[]) {
+    return options.reduce<{ group: string; items: ComparisonMetricOption[] }[]>(
+        (groups, option) => {
+            const open = groups[groups.length - 1];
+
+            if (open && open.group === option.group) open.items.push(option);
+            else groups.push({ group: option.group, items: [option] });
+
+            return groups;
+        },
+        [],
+    );
+}
 
 /**
- * Where a CSR sits against everyone else, on the metric you pick.
+ * Where a CSR sits against everyone else, on the figure you pick.
  *
  * The leader cards above name one winner each; this is the field behind them.
  * Three things are on every row: the bar's length (this period), a tick (the
  * same CSR last period) and the dashed line the whole panel shares (the
- * period's average across every CSR who qualified, not just the eight shown —
- * a top eight measured against its own mean would put half of them above
+ * period's average across every CSR who qualified, not just the ones listed —
+ * a top few measured against their own mean would put half of them above
  * average by construction).
  *
- * All four metrics arrive in one response, so the tabs are instant and cost
- * nothing.
+ * Every figure the two rollups carry is in the dropdown, too many to sit on
+ * one row as tabs. Picking one fetches that one: the page sends the metric it
+ * is showing, and the endpoint reads only the columns behind it.
  *
- * The selected tab is owned by the page and lives in the URL, so a reload, a
- * date change or a shared link comes back on the metric that was being read.
+ * The selection is owned by the page and lives in the URL, so a reload, a date
+ * change or a shared link comes back on the metric that was being read.
  */
 export default function CsrComparisonPanel({
     data,
     loading,
     metricKey,
+    options = [],
     onMetricChange,
 }: {
     data: ComparisonResponse | null;
     loading: boolean;
     metricKey: string;
+    /**
+     * What the dropdown lists. Comes from the page, so it is already filled in
+     * while the figures are still loading; the metric in hand stands in on its
+     * own if the page shipped none.
+     */
+    options?: ComparisonMetricOption[];
     onMetricChange: (key: string) => void;
 }) {
-    const metrics = data?.metrics ?? [];
+    // The response carries the one metric it was asked for; the dropdown is
+    // filled from the page, so it is complete before any of them has landed.
+    const metric = data?.metric ?? null;
+    const choices: ComparisonMetricOption[] =
+        options.length > 0 ? options : metric ? [metric] : [];
     // A key that names no metric — an old link, a hand-edited URL — reads as
-    // the first tab rather than an empty panel.
-    const metric =
-        metrics.find((m) => m.key === metricKey) ?? metrics[0] ?? null;
-    const activeKey = metric?.key ?? metricKey;
+    // the first entry rather than an empty panel.
+    const activeKey = choices.some((choice) => choice.key === metricKey)
+        ? metricKey
+        : (choices[0]?.key ?? metricKey);
 
     return (
         <div className="mb-4">
@@ -141,25 +188,34 @@ export default function CsrComparisonPanel({
                     CSR comparison
                 </h2>
 
-                <div className="flex items-center gap-0.5 self-start rounded-[10px] bg-stone-100 p-0.5 dark:bg-zinc-800">
-                    {(metrics.length === 0 ? PLACEHOLDER_TABS : metrics).map(
-                        (tab) => (
-                            <button
-                                key={tab.key}
-                                type="button"
-                                disabled={loading}
-                                onClick={() => onMetricChange(tab.key)}
-                                className={
-                                    tab.key === activeKey
-                                        ? 'rounded-lg bg-white px-3 py-1.5 text-[12px] font-medium text-emerald-700 shadow-sm disabled:opacity-70 dark:bg-zinc-900 dark:text-emerald-400'
-                                        : 'cursor-pointer rounded-lg px-3 py-1.5 text-[12px] text-gray-500 hover:text-gray-800 disabled:cursor-default dark:text-gray-400 dark:hover:text-gray-200'
-                                }
-                            >
-                                {tab.label}
-                            </button>
-                        ),
-                    )}
-                </div>
+                {/* Enabled while the figures load: the whole response is one
+                    request, so a pick made now is the one the skeleton
+                    resolves into rather than a second fetch. */}
+                <Select value={activeKey} onValueChange={onMetricChange}>
+                    <SelectTrigger
+                        aria-label="Comparison metric"
+                        className="w-full self-start sm:w-60"
+                    >
+                        <SelectValue placeholder="Pick a metric" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {groupOptions(choices).map((group) => (
+                            <SelectGroup key={group.group}>
+                                <SelectLabel className="font-mono text-[10px] font-medium tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
+                                    {group.group}
+                                </SelectLabel>
+                                {group.items.map((option) => (
+                                    <SelectItem
+                                        key={option.key}
+                                        value={option.key}
+                                    >
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectGroup>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
 
             <div className="rounded-[14px] border border-black/6 bg-white p-4 dark:border-white/6 dark:bg-zinc-900">

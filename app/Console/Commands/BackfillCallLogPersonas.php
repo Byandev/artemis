@@ -3,52 +3,42 @@
 namespace App\Console\Commands;
 
 use App\Jobs\BackfillCallLogPersonasForDay;
-use App\Models\CallLog;
 use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Fills in the persona, order and delivery a call log was never stamped with.
  *
- * Stamping happens at sync time, against data that may not have arrived yet:
- * a call synced before that day's deliveries land matches nothing and stays
- * null, and rows that predate a stamp being added at all have no way to earn
- * one. This re-runs the match after the fact, when the orders and deliveries
- * it needs are actually in the table.
+ * Stamping happens at sync time, against data that may not have arrived yet: a
+ * call synced before that day's deliveries land matches nothing and stays null,
+ * and rows that predate the columns existing at all never had a chance to earn
+ * one. This re-runs the same match after the fact, when the orders and
+ * deliveries it needs are actually in the table.
  *
- * Two rules, applied in that order:
- *
- *   delivery      — the number is on a delivery loaded for that day, as
- *                   customer_phone or rider_phone. The sync-time rule, replayed.
- *   verification  — the number is the shipping-address phone on an order the
- *                   workspace confirmed that same day. Not applied at sync time,
- *                   so this command is the only thing that stamps it.
- *
- * Delivery wins where both would match: a call to a customer whose order was
- * confirmed and dispatched the same day is about the delivery in front of it.
- *
- * The work itself goes to the queue, one job per workspace-day — a backfill
- * reaching back months is not something to hold a terminal open for. Use
- * --dry-run to see the numbers first, or --sync for a range small enough to
- * wait on.
+ * The matching itself lives in BackfillCallLogPersonasForDay, which this hands
+ * the queue one job per workspace-day — a backfill reaching back months is not
+ * something to hold a terminal open for. Use --dry-run to see the numbers first,
+ * or --sync for a range small enough to wait on.
  */
 class BackfillCallLogPersonas extends Command
 {
     protected $signature = 'call-logs:backfill-personas
+        {--workspace= : Limit to one workspace id or slug. Defaults to every workspace with unstamped calls.}
         {--date= : Single day to backfill (YYYY-MM-DD).}
         {--since= : Start of a date range (YYYY-MM-DD). Defaults to the earliest unstamped call.}
-        {--until= : End of a date range (YYYY-MM-DD). Defaults to today.}
-        {--workspace= : Limit to one workspace id or slug.}
-        {--rule=all : Which rule to apply — all, delivery, or verification.}
+        {--until= : End of a date range (YYYY-MM-DD). Defaults to the latest.}
+        {--rule=all : Which rules to apply — all, delivery, or verification.}
         {--sync : Run here and now instead of queueing, and report the totals.}
-        {--dry-run : Report what would be stamped without writing anything. Implies --sync.}';
+        {--dry-run : Report what would be stamped without keeping any of it. Implies --sync.}';
 
     protected $description = 'Backfill persona, order_id and order_for_delivery_id on call logs that synced before the data they match against.';
 
     public function handle(): int
     {
-        $rule = $this->option('rule');
+        $rule = (string) $this->option('rule');
 
         if (! in_array($rule, ['all', 'delivery', 'verification'], true)) {
             $this->error("--rule must be one of: all, delivery, verification. Got '{$rule}'.");
@@ -67,7 +57,10 @@ class BackfillCallLogPersonas extends Command
         $workspaceId = null;
 
         if ($option = $this->option('workspace')) {
-            $workspace = Workspace::where('id', $option)->orWhere('slug', $option)->first();
+            $workspace = Workspace::query()
+                ->where('id', $option)
+                ->orWhere('slug', $option)
+                ->first();
 
             if (! $workspace) {
                 $this->error("No workspace matches '{$option}'.");
@@ -81,7 +74,7 @@ class BackfillCallLogPersonas extends Command
         $days = $this->daysWithWork($workspaceId, $since, $until);
 
         if ($days->isEmpty()) {
-            $this->info('Nothing to backfill — every call log in range is already stamped.');
+            $this->info('Nothing to backfill — every call log in range already carries a persona.');
 
             return self::SUCCESS;
         }
@@ -91,11 +84,14 @@ class BackfillCallLogPersonas extends Command
         // A dry run has nothing to hand a worker: its whole output is the count
         // it would have written, which a queued job could only put in a log.
         return $dryRun || $this->option('sync')
-            ? $this->runHere($days, $rule, $dryRun)
+            ? $this->runHere($days, $rule, $dryRun, $workspaceId, $since, $until)
             : $this->queue($days, $rule);
     }
 
-    private function queue($days, string $rule): int
+    /**
+     * @param  Collection<int, object>  $days
+     */
+    private function queue(Collection $days, string $rule): int
     {
         foreach ($days as $day) {
             BackfillCallLogPersonasForDay::dispatch((int) $day->workspace_id, $this->dayOf($day), $rule)
@@ -113,17 +109,20 @@ class BackfillCallLogPersonas extends Command
         return self::SUCCESS;
     }
 
-    private function runHere($days, string $rule, bool $dryRun): int
+    /**
+     * @param  Collection<int, object>  $days
+     */
+    private function runHere(Collection $days, string $rule, bool $dryRun, ?int $workspaceId, ?string $since, ?string $until): int
     {
         $this->info(sprintf(
             '%s %d workspace-day%s with unstamped calls (rule: %s).',
-            $dryRun ? 'Would scan' : 'Scanning',
+            $dryRun ? 'Would stamp' : 'Stamping',
             $days->count(),
             $days->count() === 1 ? '' : 's',
             $rule,
         ));
 
-        $totals = ['scanned' => 0, 'delivery' => 0, 'verification' => 0, 'ambiguous' => 0, 'unmatched' => 0];
+        $totals = ['customer' => 0, 'rider' => 0, 'verification' => 0];
 
         $bar = $this->output->createProgressBar($days->count());
         $bar->start();
@@ -141,53 +140,75 @@ class BackfillCallLogPersonas extends Command
         $bar->finish();
         $this->newLine(2);
 
-        $this->table(['', 'Calls'], [
-            ['Scanned', $totals['scanned']],
-            ['Matched to a delivery', $totals['delivery']],
-            ['Matched to a confirmed order', $totals['verification']],
-            ['Still unmatched', $totals['unmatched']],
+        $stamped = array_sum($totals);
+
+        $this->table(['Persona', 'Calls'], [
+            ['customer', $totals['customer']],
+            ['rider', $totals['rider']],
+            ['verification', $totals['verification']],
+            ['<options=bold>total</>', "<options=bold>{$stamped}</>"],
         ]);
 
-        if ($totals['ambiguous'] > 0) {
-            $this->warn(sprintf(
-                '%d verification match%s had more than one order confirmed that day for the same number; the earliest confirmation was used.',
-                $totals['ambiguous'],
-                $totals['ambiguous'] === 1 ? '' : 'es',
-            ));
-        }
+        $left = $this->remaining($workspaceId, $since, $until);
+
+        $this->line(sprintf(
+            '<fg=gray>Still unmatched: %d call%s in range.</>',
+            $left,
+            $left === 1 ? '' : 's',
+        ));
 
         if ($dryRun) {
-            $this->comment('Dry run — nothing was written.');
+            $this->comment('Dry run — the updates were rolled back, nothing was kept.');
         }
 
         return self::SUCCESS;
     }
 
     /**
-     * The day as Y-m-d.
+     * The (workspace, date) pairs that have anything left to stamp.
      *
-     * call_date is cast to a date on the model, so casting it to a string hands
-     * back a midnight time along with it — which then rides into the job payload
-     * and the log line it writes.
+     * Reads off call_logs_ws_date_persona_idx, so it stays cheap even when the
+     * range is left open and the whole table is in scope.
+     *
+     * @return Collection<int, object>
      */
-    private function dayOf($row): string
+    private function daysWithWork(?int $workspaceId, ?string $since, ?string $until): Collection
     {
-        return Carbon::parse($row->call_date)->toDateString();
+        return DB::table('call_logs')
+            ->whereNull('persona')
+            ->when($workspaceId, fn ($q) => $q->where('workspace_id', $workspaceId))
+            ->when($since, fn ($q) => $q->where('call_date', '>=', $since))
+            ->when($until, fn ($q) => $q->where('call_date', '<=', $until))
+            ->select('workspace_id', 'call_date')
+            ->groupBy('workspace_id', 'call_date')
+            ->orderBy('workspace_id')
+            ->orderBy('call_date')
+            ->get();
     }
 
     /**
-     * The (workspace, date) pairs that have anything left to stamp.
+     * Calls in range still carrying no persona.
      */
-    private function daysWithWork(?int $workspaceId, ?string $since, ?string $until)
+    private function remaining(?int $workspaceId, ?string $since, ?string $until): int
     {
-        return BackfillCallLogPersonasForDay::pending(CallLog::query())
+        return DB::table('call_logs')
+            ->whereNull('persona')
             ->when($workspaceId, fn ($q) => $q->where('workspace_id', $workspaceId))
-            ->when($since, fn ($q) => $q->whereDate('call_date', '>=', $since))
-            ->when($until, fn ($q) => $q->whereDate('call_date', '<=', $until))
-            ->select('workspace_id', 'call_date')
-            ->groupBy('workspace_id', 'call_date')
-            ->orderBy('call_date')
-            ->get();
+            ->when($since, fn ($q) => $q->where('call_date', '>=', $since))
+            ->when($until, fn ($q) => $q->where('call_date', '<=', $until))
+            ->count();
+    }
+
+    /**
+     * The day as Y-m-d.
+     *
+     * call_date comes back from the query builder as whatever the driver hands
+     * over — a datetime string on MySQL — and both the job payload and the log
+     * line it writes want the date on its own.
+     */
+    private function dayOf(object $row): string
+    {
+        return Carbon::parse($row->call_date)->toDateString();
     }
 
     /**

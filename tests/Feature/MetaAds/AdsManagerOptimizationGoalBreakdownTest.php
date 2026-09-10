@@ -177,3 +177,36 @@ it('filters the optimization-goal breakdown by started date through the ad set',
 
     expect($data)->toBeEmpty();
 });
+
+// The goal lives on the ad set, but the breakdown groups ads, so created_date
+// reads the ad's own column rather than the ad set's.
+it('filters the optimization-goal breakdown by created date through the ad', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    seedOptimizationGoalBreakdown($workspace, [['goal' => 'VALUE', 'spend' => 100]]);
+    Ad::query()->update(['created_time' => Carbon::today()->subDays(3)]);
+
+    // Ads were created 3 days ago, so an "after yesterday" filter excludes them.
+    $excluded = $this->getJson(goalDataUrl($workspace, [
+        'group_by' => 'optimization_goal',
+        'date_filters' => json_encode([[
+            'field' => 'created_date',
+            'op' => 'after',
+            'value' => Carbon::yesterday()->toDateString(),
+        ]]),
+    ]))->assertOk()->json('rows.data');
+
+    expect($excluded)->toBeEmpty();
+
+    // ...while a "before yesterday" filter keeps them.
+    $kept = $this->getJson(goalDataUrl($workspace, [
+        'group_by' => 'optimization_goal',
+        'date_filters' => json_encode([[
+            'field' => 'created_date',
+            'op' => 'before',
+            'value' => Carbon::yesterday()->toDateString(),
+        ]]),
+    ]))->assertOk()->json('rows.data');
+
+    expect($kept)->toHaveCount(1);
+});

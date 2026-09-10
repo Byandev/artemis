@@ -85,8 +85,21 @@ class SyncCsrDailyRecord implements ShouldQueue
                     // on the rate but qualifies on the count.
                     'returning_count' => (int) $row->returning_count,
                     'delivered_count' => (int) $row->delivered_count,
+                    // The day's return rate for this CSR and shop, stored so
+                    // the analytics card can read it rather than rebuild it.
+                    // Nothing settled is 0 here — the readers gate on the
+                    // amounts, which tell "no returns" from "no parcels yet".
+                    'rts_rate' => $this->rtsRate((float) $row->returning, (float) $row->delivered),
                 ]
             );
         }
+    }
+
+    /** Money back over money settled, as a percentage to two decimals. */
+    private function rtsRate(float $returning, float $delivered): float
+    {
+        $settled = $returning + $delivered;
+
+        return $settled > 0 ? round($returning / $settled * 100, 2) : 0.0;
     }
 }

@@ -12,6 +12,10 @@ Schedule::command('subscriptions:send-due-reminders')->dailyAt('08:00')->without
 Schedule::command('build-advertiser-daily-performance --days=3')->dailyAt('01:00')->withoutOverlapping();
 // Same Pancake/Meta data, aggregated per page instead of per advertiser.
 Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->withoutOverlapping();
+// Destination rollup behind the RTS heat map. A 7-day window, because an order's
+// delivered/returning timestamp can land well after it was placed and a status
+// correction moves it between days.
+Schedule::command('build-order-location-daily-records --days=7')->dailyAt('01:30')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
