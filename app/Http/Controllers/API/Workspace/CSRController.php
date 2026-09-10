@@ -8,6 +8,7 @@ use App\Models\PancakeUserDailyCallReport;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\Workspace;
+use App\Support\CsrComparisonMetrics;
 use App\Support\RmoDailyStats;
 use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
@@ -1235,13 +1236,19 @@ class CSRController extends Controller
      |--------------------------------------------------------------------------
      |
      | The field behind the leaders: every CSR on one axis, against the period's
-     | average and their own previous figure. One endpoint for all four metrics —
-     | they come from two rollup scans that each already carry both of theirs, so
-     | a request per tab would run the same two queries twice over.
+     | average and their own previous figure. One endpoint, asked for the one
+     | metric the panel is showing — `?metric=` — so the scan reads that
+     | metric's columns off one rollup instead of every column of both.
+     |
+     | What can be asked for is CsrComparisonMetrics: every figure column of the
+     | two rollups, plus the two rates that cannot be summed out of them.
      */
 
-    /** How many CSRs a metric lists. Matches the eight-slot chart palette. */
+    /** How many CSRs a metric lists. */
     private const COMPARISON_ROWS = 100;
+
+    /** Chart hues available per CSR — see the panel's BAR_COLORS. */
+    private const COMPARISON_COLOURS = 8;
 
     public function analyticsComparison(Request $request, Workspace $workspace)
     {
@@ -1250,34 +1257,27 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $csrs = $this->comparisonOrderFigures($workspace, $from, $to, $previousFrom, $previousTo);
-        $rmo = $this->comparisonRmoFigures($workspace, $from, $to, $previousFrom, $previousTo);
+        // The figure the panel is showing. An unknown key — an old link, a
+        // hand-edited URL — reads as total sales rather than as an error, the
+        // same fallback the page itself applies.
+        $metric = CsrComparisonMetrics::find(
+            CsrComparisonMetrics::resolveKey($request->input('metric')),
+        );
 
-        $metrics = [
-            $this->comparisonMetric('sales', 'Sales', 'currency', '%', true, $csrs,
-                fn ($r) => $r->sales > 0 ? (float) $r->sales : null,
-                fn ($r) => $r->previous_sales > 0 ? (float) $r->previous_sales : null,
-            ),
-            $this->comparisonMetric('rts', 'RTS', 'percent', ' pts', false, $csrs,
-                // Eligibility is one settled parcel counted, as on the RTS leader.
-                fn ($r) => $r->returned_amount + $r->delivered_amount > 0 ? $this->rate($r->returned_amount, $r->returned_amount + $r->delivered_amount) : null,
-                fn ($r) => $r->previous_returned_amount + $r->previous_delivered_amount > 0 ? $this->rate($r->previous_returned_amount, $r->previous_returned_amount + $r->previous_delivered_amount) : null,
-            ),
-            $this->comparisonMetric('rmo_called', 'RMO called', 'percent', ' pts', true, $rmo,
-                // Nothing confirmed is no rate at all, not a zero one.
-                fn ($r) => $r->confirmed > 0 ? $this->rate($r->called, $r->confirmed) : null,
-                fn ($r) => $r->previous_confirmed > 0 ? $this->rate($r->previous_called, $r->previous_confirmed) : null,
-            ),
-            $this->comparisonMetric('call_time', 'Call time', 'duration', '%', true, $rmo,
-                fn ($r) => $r->seconds > 0 ? (float) $r->seconds : null,
-                fn ($r) => $r->previous_seconds > 0 ? (float) $r->previous_seconds : null,
-            ),
-        ];
+        $rows = $this->comparisonFigures(
+            $workspace,
+            CsrComparisonMetrics::table($metric['source']),
+            CsrComparisonMetrics::columnsFor($metric),
+            $from,
+            $to,
+            $previousFrom,
+            $previousTo,
+        );
 
         return response()->json([
             'range' => ['from' => $from, 'to' => $to],
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
-            'metrics' => $this->withColourSlots($metrics),
+            'metric' => $this->comparisonMetric($metric, $rows),
         ]);
     }
 
@@ -1288,47 +1288,39 @@ class CSRController extends Controller
     }
 
     /**
-     * Sales and RTS per CSR, both periods, in one scan.
+     * One metric's figures, per CSR, for both periods in one scan.
      *
-     * Off the same rollup as the leader cards, so the field and the winner agree.
-     * The periods are contiguous, so one indexed range covers both and the
-     * conditional sums split them apart; an uncovered range is empty here.
+     * Off the same rollups as the leader cards, so the field and the winner
+     * agree. The periods are contiguous, so one indexed range covers both and
+     * the conditional aggregates split them apart; an uncovered range is empty.
+     *
+     * Column names and aggregates are interpolated into the SQL, so they come
+     * from the metric catalogue's literals and never from the request.
+     *
+     * @param  array<string, string>  $columns  `column => aggregate`
      */
-    private function comparisonOrderFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
-    {
-        return $this->scopeToVisibleShops(
-            DB::table('pancake_user_pos_daily_reports as r')
-                ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
-                ->where('r.workspace_id', $workspace->id)
-                ->whereBetween('r.date', [$previousFrom, $to]),
-            $workspace,
-            'r.shop_id',
-        )
-            ->groupBy('pu.id', 'pu.name')
-            ->selectRaw('
-                pu.id as id,
-                pu.name as name,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_sales END), 0) as sales,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.returning END), 0) as returned_amount,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as delivered_amount,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_sales END), 0) as previous_sales,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.returning END), 0) as previous_returned_amount,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as previous_delivered_amount
-            ', [
-                $from, $to, $from, $to, $from, $to,
-                $previousFrom, $previousTo, $previousFrom, $previousTo, $previousFrom, $previousTo,
-            ])
-            ->get();
-    }
+    private function comparisonFigures(
+        Workspace $workspace,
+        string $table,
+        array $columns,
+        string $from,
+        string $to,
+        string $previousFrom,
+        string $previousTo,
+    ) {
+        $selects = ['pu.id as id', 'pu.name as name'];
+        $bindings = [];
+        $periods = ['current' => [$from, $to], 'previous' => [$previousFrom, $previousTo]];
 
-    /**
-     * RMO % and talk time per CSR, both periods, off the call report — the same
-     * rows the CSR table and the two RMO leaders read.
-     */
-    private function comparisonRmoFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
-    {
+        foreach ($columns as $column => $aggregate) {
+            foreach ($periods as $period => [$start, $end]) {
+                $selects[] = "COALESCE({$aggregate}(CASE WHEN r.date BETWEEN ? AND ? THEN r.`{$column}` END), 0) as {$period}_{$column}";
+                array_push($bindings, $start, $end);
+            }
+        }
+
         return $this->scopeToVisibleShops(
-            DB::table('pancake_user_daily_call_reports as r')
+            DB::table("{$table} as r")
                 ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
                 ->where('r.workspace_id', $workspace->id)
                 ->whereBetween('r.date', [$previousFrom, $to]),
@@ -1336,69 +1328,79 @@ class CSRController extends Controller
             'r.shop_id',
         )
             ->groupBy('pu.id', 'pu.name')
-            ->selectRaw('
-                pu.id as id,
-                pu.name as name,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_assigned_count END), 0) as called,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_confirmed_count END), 0) as confirmed,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_call_time END), 0) as seconds,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_assigned_count END), 0) as previous_called,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_confirmed_count END), 0) as previous_confirmed,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_call_time END), 0) as previous_seconds
-            ', [
-                $from, $to, $from, $to, $from, $to,
-                $previousFrom, $previousTo, $previousFrom, $previousTo, $previousFrom, $previousTo,
-            ])
+            ->selectRaw(implode(', ', $selects), $bindings)
             ->get();
     }
 
     /**
      * One metric block: the CSRs who qualify, ranked, with the period's average.
-     * That average is over everyone who qualified, not the listed rows — a top
-     * eight measured against its own mean is half above average by construction.
+     * That average is over everyone who qualified, not the listed rows — a
+     * truncated field measured against its own mean is half above average by
+     * construction.
+     *
+     * @param  array<string, mixed>  $metric  One entry of the metric catalogue.
      */
-    private function comparisonMetric(
-        string $key,
-        string $label,
-        string $format,
-        string $deltaUnit,
-        bool $higherIsBetter,
-        $rows,
-        callable $value,
-        callable $previousValue,
-    ): array {
+    private function comparisonMetric(array $metric, $rows): array
+    {
         $eligible = $rows
             ->map(fn ($row) => [
                 // pancake_users.id is a UUID — casting it to an int lands every
                 // CSR on 0, quietly merging them.
                 'id' => (string) $row->id,
                 'name' => $row->name,
-                'value' => $value($row),
-                'previous_value' => $previousValue($row),
+                'value' => $this->comparisonValue($metric, $row, 'current'),
+                'previous_value' => $this->comparisonValue($metric, $row, 'previous'),
             ])
             ->filter(fn ($row) => $row['value'] !== null)
             ->values();
 
-        $ranked = ($higherIsBetter
+        $ranked = ($metric['higher_is_better']
             ? $eligible->sortByDesc('value')
             : $eligible->sortBy('value')
         )->values();
 
         return [
-            'key' => $key,
-            'label' => $label,
-            'format' => $format,
-            // Percentage points for the metrics that are already rates, as on
-            // the stat cards above.
-            'delta_unit' => $deltaUnit,
-            'higher_is_better' => $higherIsBetter,
+            'key' => $metric['key'],
+            'label' => $metric['label'],
+            // The heading this metric sits under in the panel's selector.
+            'group' => $metric['group'],
+            'format' => $metric['format'],
+            'delta_unit' => $metric['delta_unit'],
+            'higher_is_better' => $metric['higher_is_better'],
             'average' => $eligible->isNotEmpty() ? round($eligible->avg('value'), 2) : null,
             'total' => $eligible->count(),
             'rows' => $ranked->take(self::COMPARISON_ROWS)->map(fn ($row) => [
                 ...$row,
-                'change' => $this->comparisonChange($row['value'], $row['previous_value'], $deltaUnit),
+                'change' => $this->comparisonChange($row['value'], $row['previous_value'], $metric['delta_unit']),
+                'color_slot' => $this->comparisonColourSlot($row['id']),
             ])->all(),
         ];
+    }
+
+    /**
+     * One CSR's figure for a metric in one of the two periods, or null when the
+     * period gives them nothing to plot — no sales, no parcel settled, no call.
+     *
+     * Null rather than zero: it keeps them off the axis and out of the average,
+     * which is what "the average of the CSRs who did this" has to mean. A rate
+     * with nothing under the line is no rate at all, not a zero one.
+     */
+    private function comparisonValue(array $metric, $row, string $period): ?float
+    {
+        if (isset($metric['column'])) {
+            $value = (float) $row->{"{$period}_{$metric['column']}"};
+
+            return $value > 0 ? $value : null;
+        }
+
+        $whole = array_sum(array_map(
+            fn (string $column) => (float) $row->{"{$period}_{$column}"},
+            $metric['rate']['whole'],
+        ));
+
+        return $whole > 0
+            ? $this->rate((float) $row->{"{$period}_{$metric['rate']['part']}"}, $whole)
+            : null;
     }
 
     /**
@@ -1419,34 +1421,14 @@ class CSRController extends Controller
     }
 
     /**
-     * A fixed chart colour per CSR across all four metrics, keyed to the person
-     * rather than their rank, so flipping tabs moves the bars without repainting
-     * them. Past eight CSRs the slots wrap; the name label carries identity.
+     * A fixed chart colour per CSR, taken from who they are rather than where
+     * they rank, so changing the metric moves the bars without repainting them
+     * — the request that draws the next metric never sees the last one's
+     * ordering. Past eight CSRs the slots wrap; the name carries identity.
      */
-    private function withColourSlots(array $metrics): array
+    private function comparisonColourSlot(string $id): int
     {
-        $order = collect($metrics)
-            ->firstWhere('key', 'sales')['rows'] ?? [];
-
-        $slots = collect($order)->pluck('id')->all();
-
-        foreach ($metrics as $metric) {
-            foreach ($metric['rows'] as $row) {
-                if (! in_array($row['id'], $slots, true)) {
-                    $slots[] = $row['id'];
-                }
-            }
-        }
-
-        $slots = array_flip($slots);
-
-        return collect($metrics)->map(fn ($metric) => [
-            ...$metric,
-            'rows' => collect($metric['rows'])->map(fn ($row) => [
-                ...$row,
-                'color_slot' => $slots[$row['id']] % 8,
-            ])->all(),
-        ])->all();
+        return crc32($id) % self::COMPARISON_COLOURS;
     }
 
     /**

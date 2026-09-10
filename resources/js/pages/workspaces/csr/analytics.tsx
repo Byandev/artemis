@@ -37,6 +37,7 @@ import {
     type TotalRmoCalledStat,
 } from '@/components/csr/CsrAnalyticsStatCards';
 import CsrComparisonPanel, {
+    type ComparisonMetricOption,
     type ComparisonResponse,
 } from '@/components/csr/CsrComparisonPanel';
 import CsrDailyCallOutcomesTable, {
@@ -113,6 +114,8 @@ interface Props {
      * the nightly schedule is the only thing that rebuilds these records.
      */
     canRunSync?: boolean;
+    /** Everything the CSR comparison dropdown lists, in the order it lists it. */
+    comparisonMetrics?: ComparisonMetricOption[];
     query?: {
         sort?: string | null;
         from?: string | null;
@@ -121,7 +124,7 @@ interface Props {
         per_page?: number | string;
         type?: 'erp' | 'pos' | null;
         search?: string | null;
-        /** Which CSR comparison tab to open on — one of the metric keys. */
+        /** Which CSR comparison metric to open on — one of the metric keys. */
         comparison?: string | null;
     };
 }
@@ -152,15 +155,25 @@ function useAnalyticsStat<T>(
     stat: string,
     from: string,
     to: string,
+    /** Anything else the endpoint needs — the comparison's metric, say. */
+    extra?: Record<string, string>,
 ): [T | null, boolean] {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
+    // The effect compares its dependencies by identity, and an object literal
+    // is a new one on every render; the serialised form is what actually says
+    // whether the request has changed.
+    const extraKey = JSON.stringify(extra ?? {});
 
     useEffect(() => {
         const controller = new AbortController();
         setLoading(true);
 
-        const params = new URLSearchParams({ from, to });
+        const params = new URLSearchParams({
+            from,
+            to,
+            ...(JSON.parse(extraKey) as Record<string, string>),
+        });
 
         fetch(
             `/api/workspaces/${workspaceSlug}/csrs/stats/${stat}?${params.toString()}`,
@@ -185,7 +198,7 @@ function useAnalyticsStat<T>(
             });
 
         return () => controller.abort();
-    }, [workspaceSlug, stat, from, to]);
+    }, [workspaceSlug, stat, from, to, extraKey]);
 
     return [data, loading];
 }
@@ -334,6 +347,7 @@ export default function Analytics({
     records,
     query,
     canRunSync = false,
+    comparisonMetrics = [],
 }: Props) {
     const today = new Date();
     const currentType = query?.type === 'erp' ? 'erp' : 'pos';
@@ -343,8 +357,11 @@ export default function Analytics({
         to: query?.to ? parseISO(query.to) : today,
     };
     const [searchInput, setSearchInput] = useState(query?.search ?? '');
+    // The controller resolves the URL's key (and the four the panel used to
+    // tab between) against the metric catalogue, so this only stands in when
+    // the page is rendered without it.
     const [comparisonTab, setComparisonTab] = useState(
-        query?.comparison ?? 'sales',
+        query?.comparison ?? 'total_sales',
     );
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
@@ -375,11 +392,12 @@ export default function Analytics({
             },
         );
 
-    // Picking a comparison tab is a read of data already in hand, so it writes
-    // the URL in place instead of making a visit — a reload or a shared link
-    // then opens on the same metric. Inertia's own history entry is stamped
-    // with the new URL too, so coming back through the browser's history
-    // restores the tab rather than the one the entry was created with.
+    // Picking a comparison metric refetches that metric alone; the page itself
+    // does not move, so it writes the URL in place instead of making a visit —
+    // a reload or a shared link then opens on the same metric. Inertia's own
+    // history entry is stamped with the new URL too, so coming back through the
+    // browser's history restores the metric rather than the one the entry was
+    // created with.
     const selectComparisonTab = (key: string) => {
         setComparisonTab(key);
 
@@ -505,14 +523,16 @@ export default function Analytics({
         LeaderResponse<RmoDurationLeader>
     >(workspace.slug, 'analytics-leader-rmo-duration', fromStr, toStr);
 
-    // The field behind the leaders. One request for all four metrics — they
-    // come from the same two scans, so a call per tab would repeat the work.
+    // The field behind the leaders, for the one metric being read. The metric
+    // goes to the endpoint rather than the whole catalogue coming back, so the
+    // scan is over that column alone — picking another fetches that one.
     const [comparison, comparisonLoading] =
         useAnalyticsStat<ComparisonResponse>(
             workspace.slug,
             'analytics-comparison',
             fromStr,
             toStr,
+            { metric: comparisonTab },
         );
 
     // The two call cards' totals, spread across the days that made them.
@@ -804,6 +824,7 @@ export default function Analytics({
                     data={comparison}
                     loading={comparisonLoading}
                     metricKey={comparisonTab}
+                    options={comparisonMetrics}
                     onMetricChange={selectComparisonTab}
                 />
 
