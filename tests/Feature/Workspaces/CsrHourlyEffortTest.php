@@ -14,10 +14,10 @@ use Modules\Pancake\Models\User as PancakeUser;
 /**
  * Effort against results, hour by hour — the chart under the daily one.
  *
- * The same calls the daily chart draws, each day opened up into its own round
- * of the clock. The days are kept apart rather than flattened into one
- * twenty-four hour profile: the same hour of a Tuesday and of a Saturday are
- * different things, and the chart steps between days instead of averaging them.
+ * The same calls the daily chart draws, folded into one round of the clock for
+ * the whole range: every day's 9am added into a single 9am. The fold is the
+ * endpoint's own GROUP BY HOUR, so twenty-four rows come back however long the
+ * range is, and narrowing to a single day is the date range doing it.
  *
  * It reads the call log direct rather than the nightly rollup, which keeps no
  * hour — so no sync runs in these tests, and a range the rollup has never
@@ -70,16 +70,10 @@ function hourlyCall(
     ]);
 }
 
-/** One day of the response, by date. */
-function hourlyDay($response, string $date): array
+/** The range's 24 hours, keyed by the hour itself. */
+function hoursOf($response): Collection
 {
-    return collect($response->assertOk()->json('days'))->firstWhere('date', $date);
-}
-
-/** One day's 24 hours, keyed by the hour itself. */
-function hoursOf($response, string $date = '2026-08-14'): Collection
-{
-    return collect(hourlyDay($response, $date)['hours'])->keyBy('hour');
+    return collect($response->assertOk()->json('hours'))->keyBy('hour');
 }
 
 test('each hour carries the calls placed and the ones that became conversations', function () {
@@ -96,63 +90,47 @@ test('each hour carries the calls placed and the ones that became conversations'
     expect($hours[14])->toMatchArray(['calls' => 1, 'real' => 1]);
 });
 
-test('every day in the range comes back with every hour of its clock', function () {
+test('the range comes back as one round of the clock, however long it is', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     hourlyCall($workspace, '2026-08-14', '09:05:00', 90);
 
     $response = hourlyEffort($owner, $workspace)->assertOk();
 
-    // Three days asked for, three days back — the quiet ones included, so the
-    // picker can step onto a day nobody worked instead of skipping it.
-    expect($response->json('days'))->toHaveCount(3);
-    expect($response->json('days.1.date'))->toBe('2026-08-15');
-    expect($response->json('days.1.hours'))->toHaveCount(24);
-    expect($response->json('days.1.totals'))->toMatchArray([
-        'total_calls' => 0,
-        'calls' => 0,
-        'real' => 0,
-        'verification_calls' => 0,
-        'verification_real' => 0,
-    ]);
-    expect($response->json('days.0.hours.0'))->toMatchArray([
+    // Three days asked for, twenty-four rows back — the grouping is the hour
+    // alone, so the response is the same size whatever the range.
+    expect($response->json('hours'))->toHaveCount(24);
+    expect($response->json('hours.0'))->toMatchArray([
         'hour' => 0,
         'total_calls' => 0,
         'calls' => 0,
         'real' => 0,
     ]);
-    expect($response->json('days.0.hours.23.hour'))->toBe(23);
+    expect($response->json('hours.23.hour'))->toBe(23);
 });
 
-test('the same hour on different days stays on its own day', function () {
+test('the same hour on different days is added into the one bar', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
     hourlyCall($workspace, '2026-08-14', '09:15:00', 120);
     hourlyCall($workspace, '2026-08-15', '09:45:00', 120);
     hourlyCall($workspace, '2026-08-15', '09:50:00', 120);
 
-    $response = hourlyEffort($owner, $workspace);
-
-    // The whole point of keeping the days apart: 9am on the Friday is one call
-    // and 9am on the Saturday is two, not one bar of three.
-    expect(hoursOf($response, '2026-08-14')[9])->toMatchArray(['calls' => 1]);
-    expect(hoursOf($response, '2026-08-15')[9])->toMatchArray(['calls' => 2]);
-    expect(hoursOf($response, '2026-08-16')[9])->toMatchArray(['calls' => 0]);
+    // A week of mornings, not one Tuesday's: the Friday's 9am and the
+    // Saturday's two make a single bar of three.
+    expect(hoursOf(hourlyEffort($owner, $workspace))[9])
+        ->toMatchArray(['calls' => 3, 'real' => 3]);
 });
 
-test('each day carries its own totals for the picker to read', function () {
+test('the response says how many days were folded into each hour', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
 
-    hourlyCall($workspace, '2026-08-14', '09:15:00', 120);
-    hourlyCall($workspace, '2026-08-14', '13:15:00', 0);
-    hourlyCall($workspace, '2026-08-16', '17:15:00', 30, rmo: false);
+    // The bars carry no dates once they are added up, so the count comes back
+    // beside them — an hour reading 40 over three days is not 40 in a day.
+    expect(hourlyEffort($owner, $workspace)->assertOk()->json('day_count'))->toBe(3);
 
-    $response = hourlyEffort($owner, $workspace);
-
-    expect(hourlyDay($response, '2026-08-14')['totals'])
-        ->toMatchArray(['calls' => 2, 'real' => 1]);
-    expect(hourlyDay($response, '2026-08-16')['totals'])
-        ->toMatchArray(['verification_calls' => 1, 'verification_real' => 1]);
+    expect(hourlyEffort($owner, $workspace, '2026-08-14', '2026-08-14')
+        ->assertOk()->json('day_count'))->toBe(1);
 });
 
 test('a call outside the range is not counted', function () {

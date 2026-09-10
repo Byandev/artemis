@@ -17,26 +17,19 @@ export interface HourlyEffortHour {
     verification_real: number;
 }
 
-export interface HourlyEffortTotals {
-    total_calls: number;
-    calls: number;
-    real: number;
-    verification_calls: number;
-    verification_real: number;
-}
-
-export interface HourlyEffortDay {
-    /** `YYYY-MM-DD`. Every day in the range is present, quiet ones included. */
-    date: string;
-    hours: HourlyEffortHour[];
-    /** The day's own figures, as the endpoint sends them. */
-    totals: HourlyEffortTotals;
-}
-
 export interface HourlyEffortResponse {
     range: { from: string; to: string };
-    days: HourlyEffortDay[];
-    totals: HourlyEffortTotals;
+    /** How many days went into each hour — what the tooltip says it added up. */
+    day_count: number;
+    /** One round of the clock for the whole range, folded by the endpoint. */
+    hours: HourlyEffortHour[];
+    totals: {
+        total_calls: number;
+        calls: number;
+        real: number;
+        verification_calls: number;
+        verification_real: number;
+    };
 }
 
 /**
@@ -59,43 +52,6 @@ const hourTooltip = (hour: number, dayCount: number) =>
     `${hourRange(hour)} · ${dayCount} ${dayCount === 1 ? 'day' : 'days'}`;
 
 /**
- * One round of the clock for the whole range: every day's 9am added into a
- * single 9am.
- *
- * A week of mornings says more about the shape of the working day than any one
- * morning does — one quiet Sunday cannot pull an hour down on its own, and an
- * hour nobody ever works reads as empty across the board rather than as one
- * day's gap. Every day arrives with all 24 of its hours, zeros included, so
- * this is a sum down the columns and nothing else.
- */
-function rangeHours(days: HourlyEffortDay[]): HourlyEffortHour[] {
-    const clock: HourlyEffortHour[] = Array.from({ length: 24 }, (_, hour) => ({
-        hour,
-        total_calls: 0,
-        calls: 0,
-        real: 0,
-        verification_calls: 0,
-        verification_real: 0,
-    }));
-
-    for (const day of days) {
-        for (const hour of day.hours) {
-            const slot = clock[hour.hour];
-
-            if (!slot) continue;
-
-            slot.total_calls += hour.total_calls;
-            slot.calls += hour.calls;
-            slot.real += hour.real;
-            slot.verification_calls += hour.verification_calls;
-            slot.verification_real += hour.verification_real;
-        }
-    }
-
-    return clock;
-}
-
-/**
  * Effort against results, hour by hour.
  *
  * The chart above this one spreads the period's calls across its days; this
@@ -108,6 +64,9 @@ function rangeHours(days: HourlyEffortDay[]): HourlyEffortHour[] {
  * to answer it. The date range at the top of the page is what narrows this — to
  * read a single day, pick that day up there and the clock follows.
  *
+ * The fold is the endpoint's own GROUP BY, so what arrives is already the
+ * twenty-four bars drawn here however long the range is.
+ *
  * It is read off the call log rather than the nightly rollup, which keeps no
  * hour: a day the rollup has not reached yet still draws.
  */
@@ -118,12 +77,12 @@ export default function CsrHourlyEffortChart({
     data: HourlyEffortResponse | null;
     loading: boolean;
 }) {
-    const days = data?.days ?? [];
+    const dayCount = data?.day_count ?? 0;
 
-    const buckets: EffortBucket[] = rangeHours(days).map((hour) => ({
+    const buckets: EffortBucket[] = (data?.hours ?? []).map((hour) => ({
         key: String(hour.hour),
         label: hourLabel(hour.hour),
-        tooltip: hourTooltip(hour.hour, days.length),
+        tooltip: hourTooltip(hour.hour, dayCount),
         // The axis has room for "9a" and no more; a row has room to say it in
         // full, and the heading above already says which days these are.
         rowLabel: hourRange(hour.hour),

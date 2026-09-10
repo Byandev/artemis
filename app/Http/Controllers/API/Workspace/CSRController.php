@@ -617,14 +617,16 @@ class CSRController extends Controller
      * back to the call log that rollup is built from and groups by the hour
      * stamped on each call.
      *
-     * Every day in the range comes back with its own round of the clock rather
-     * than the range arriving pre-flattened: the chart adds the days together
-     * for its default view, but an hour of a Tuesday and the same hour of a
-     * Saturday are still different things, and keeping the days apart here is
-     * what lets it open a single one without another request.
+     * The hour alone, not the day and the hour: the range arrives folded into
+     * one round of the clock, every day's 9am added into a single 9am. That is
+     * the question the hour is asked — when in the day the work lands — and one
+     * Tuesday is too small a sample to answer it. Narrowing to a single day is
+     * the date range at the top of the page, which this reads like any other
+     * card. Folding in SQL rather than after the fact also keeps the response
+     * at twenty-four rows however long the range is.
      *
-     * The rules are the sync's own, so a day here adds up to the day above it:
-     * an order beside the call is what names the shop, a delivery stamp is what
+     * The rules are the sync's own, so this adds up to the chart above it: an
+     * order beside the call is what names the shop, a delivery stamp is what
      * makes it RMO work rather than order verification, and a conversation is a
      * call that lasted past RmoDailyStats::CONNECTED_CALL_MIN_SECONDS. Reading
      * the log direct does mean this chart covers today, where the daily one is
@@ -634,8 +636,8 @@ class CSRController extends Controller
      * the rollup's `total_called` counts a day — the figure the all-calls view
      * draws, rather than the two kinds added up.
      *
-     * Every day in the range is returned, and every one of its 24 hours, zeros
-     * included.
+     * All twenty-four hours come back, zeros included, beside the count of days
+     * that were folded into them.
      */
     public function analyticsHourlyEffort(Request $request, Workspace $workspace)
     {
@@ -646,9 +648,8 @@ class CSRController extends Controller
         $real = RmoDailyStats::CONNECTED_CALL_MIN_SECONDS;
 
         $rows = $this->callLogs($workspace, $from, $to)
-            ->groupByRaw('cl.call_date, HOUR(cl.call_time)')
+            ->groupByRaw('HOUR(cl.call_time)')
             ->selectRaw("
-                cl.call_date as date,
                 HOUR(cl.call_time) as hour,
 
                 COUNT(*) as total_calls,
@@ -660,50 +661,32 @@ class CSRController extends Controller
                 SUM(CASE WHEN cl.order_for_delivery_id IS NULL AND cl.duration >= {$real} THEN 1 ELSE 0 END) as verification_real
             ")
             ->get()
-            // date comes back with or without a time part depending on the
-            // driver — key on the first ten characters.
-            ->groupBy(fn ($row) => substr((string) $row->date, 0, 10));
+            ->keyBy(fn ($row) => (int) $row->hour);
 
-        $days = [];
-        $cursor = CarbonImmutable::parse($from);
-        $end = CarbonImmutable::parse($to);
+        $hours = [];
 
-        while ($cursor->lessThanOrEqualTo($end)) {
-            $date = $cursor->toDateString();
-            $byHour = ($rows->get($date) ?? collect())->keyBy(fn ($row) => (int) $row->hour);
+        for ($hour = 0; $hour < 24; $hour++) {
+            $row = $rows->get($hour);
 
-            $hours = [];
-
-            for ($hour = 0; $hour < 24; $hour++) {
-                $row = $byHour->get($hour);
-
-                $hours[] = [
-                    'hour' => $hour,
-                    'total_calls' => (int) ($row->total_calls ?? 0),
-                    'calls' => (int) ($row->calls ?? 0),
-                    'real' => (int) ($row->real_conversations ?? 0),
-                    'verification_calls' => (int) ($row->verification_calls ?? 0),
-                    'verification_real' => (int) ($row->verification_real ?? 0),
-                ];
-            }
-
-            $days[] = [
-                'date' => $date,
-                'hours' => $hours,
-                // The day's own figures, so the picker can open on a day that
-                // has something to show without adding up 24 hours to find out.
-                'totals' => $this->sumEffort($hours),
+            $hours[] = [
+                'hour' => $hour,
+                'total_calls' => (int) ($row->total_calls ?? 0),
+                'calls' => (int) ($row->calls ?? 0),
+                'real' => (int) ($row->real_conversations ?? 0),
+                'verification_calls' => (int) ($row->verification_calls ?? 0),
+                'verification_real' => (int) ($row->verification_real ?? 0),
             ];
-
-            $cursor = $cursor->addDay();
         }
 
         return response()->json([
             'range' => ['from' => $from, 'to' => $to],
-            'days' => $days,
+            // How many days went into each bar. The chart says so — an hour
+            // reading 40 over a week is a different figure from 40 in a day.
+            'day_count' => (int) CarbonImmutable::parse($from)->diffInDays(CarbonImmutable::parse($to)) + 1,
+            'hours' => $hours,
             // The range as a whole, which is the daily chart's totals over the
             // same range — only the grouping differs, never the counting.
-            'totals' => $this->sumEffort(array_merge(...array_column($days, 'hours'))),
+            'totals' => $this->sumEffort($hours),
         ]);
     }
 
