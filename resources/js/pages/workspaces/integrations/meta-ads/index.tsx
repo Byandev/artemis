@@ -40,6 +40,7 @@ import {
     ChevronDown,
     Download,
     Flag,
+    Goal,
     Image as ImageIcon,
     Layers,
     LayoutGrid,
@@ -70,6 +71,7 @@ import {
     INSIGHTS_OPTIONS,
     InsightFilterBuilder,
     InsightsMetrics,
+    ObjectiveOption,
     StatusLabel,
     buildInsightsColumns,
     deserializeGridFilters,
@@ -90,12 +92,14 @@ type GroupBy =
     | 'account'
     | 'page'
     | 'page_owner'
-    | 'optimization_goal';
+    | 'optimization_goal'
+    | 'campaign_objective';
 
 const GROUP_BY_OPTIONS: {
     value: GroupBy;
     label: string;
     icon: LucideIcon;
+    hint?: string;
 }[] = [
     {
         value: 'ad_name',
@@ -140,6 +144,12 @@ const GROUP_BY_OPTIONS: {
         icon: Target,
         hint: "The ad set's optimization goal",
     },
+    {
+        value: 'campaign_objective',
+        label: 'Campaign Objective',
+        icon: Goal,
+        hint: "The campaign's objective",
+    },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -152,6 +162,7 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
     page: false,
     page_owner: false,
     optimization_goal: false,
+    campaign_objective: false,
 };
 
 interface Row extends InsightsMetrics {
@@ -196,6 +207,8 @@ interface Props {
     accounts: AccountOption[];
     members: OwnerOption[];
     selectedAccounts: string[];
+    /** Campaign objectives available to the Filters builder's value picker. */
+    objectives?: ObjectiveOption[];
     dateRange: { since: string; until: string };
     query?: {
         sort?: string | null;
@@ -1276,6 +1289,7 @@ export default function MetaAdsManager({
     accounts,
     members,
     selectedAccounts,
+    objectives = [],
     dateRange,
     query,
 }: Props) {
@@ -1512,6 +1526,7 @@ export default function MetaAdsManager({
                             filters={filters}
                             onChange={onFilters}
                             groupBy={groupBy}
+                            objectives={objectives}
                         />
                     </div>
                 </div>

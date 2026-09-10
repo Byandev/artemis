@@ -1827,7 +1827,13 @@ export function ColumnVisibilityMenu({
 
 /* ───────────────────── Insight filters ──────────────────── */
 
-type MetricFilterOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'range';
+/** Comparisons against a number — the metric side of the builder. */
+type NumericFilterOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'range';
+
+/** Comparisons against a value picked from a list — the dimension side. */
+type DimensionFilterOp = 'is' | 'is_not';
+
+export type MetricFilterOp = NumericFilterOp | DimensionFilterOp;
 
 type DateFilterOp = 'on' | 'before' | 'after' | 'between';
 
@@ -1851,6 +1857,25 @@ const DATE_FIELD_LABELS: Record<DateFilterField, string> = {
 };
 
 /** One row of the filter dropdown — numeric or date, told apart by its field. */
+export interface ObjectiveOption {
+    value: string;
+    label: string;
+}
+
+/**
+ * Filter fields that are dimensions rather than metrics: they filter rows
+ * (WHERE) instead of aggregates (HAVING), so they take is / is-not and pick a
+ * value from a list rather than typing a number.
+ */
+export const OBJECTIVE_FIELD = 'campaign_objective';
+
+const DIMENSION_OP_LABELS: Record<DimensionFilterOp, string> = {
+    is: 'is',
+    is_not: 'is not',
+};
+
+const isObjectiveField = (field: string) => field === OBJECTIVE_FIELD;
+
 export interface GridFilter {
     id: string; // client-only key for React
     field: string;
@@ -1868,6 +1893,10 @@ const isDateField = (field: string): field is DateFilterField =>
  * their own — the server reaches one through the owning ad set — and accounts
  * carry neither date, so a filter offered there would be silently dropped.
  * Custom breakdowns aggregate ads, so they follow the ad-grained rules.
+ *
+ * The goal and objective breakdowns are ad-grained too, and each already joins
+ * the table its start date lives on — the ad set for `optimization_goal`, the
+ * campaign for `campaign_objective` — so both dates work there.
  */
 const DATE_FIELD_BREAKDOWNS: Record<DateFilterField, string[]> = {
     created_date: [
@@ -1878,6 +1907,8 @@ const DATE_FIELD_BREAKDOWNS: Record<DateFilterField, string[]> = {
         'campaign',
         'page',
         'page_owner',
+        'optimization_goal',
+        'campaign_objective',
     ],
     started_date: [
         'ad',
@@ -1887,6 +1918,8 @@ const DATE_FIELD_BREAKDOWNS: Record<DateFilterField, string[]> = {
         'campaign',
         'page',
         'page_owner',
+        'optimization_goal',
+        'campaign_objective',
     ],
 };
 
@@ -1898,7 +1931,7 @@ const dateFilterSupported = (
     groupBy.startsWith('custom:') ||
     DATE_FIELD_BREAKDOWNS[field].includes(groupBy);
 
-const OP_LABELS: Record<MetricFilterOp, string> = {
+const OP_LABELS: Record<NumericFilterOp, string> = {
     gt: '> Greater than',
     gte: '≥ Greater than or equal',
     lt: '< Less than',
@@ -1917,7 +1950,35 @@ const DATE_OP_LABELS: Record<DateFilterOp, string> = {
 /** Both operators that take a second value, in one place. */
 const isRangeOp = (op: FilterOp) => op === 'range' || op === 'between';
 
-const FILTERABLE_METRICS = METRIC_SPECS;
+/**
+ * Which of the three row shapes a field builds: a lifecycle date, a dimension
+ * picked from a list, or a metric compared to a number. Each has its own
+ * operators and its own value control, so crossing between them resets both.
+ */
+const fieldKind = (field: string): 'date' | 'dimension' | 'metric' =>
+    isDateField(field)
+        ? 'date'
+        : isObjectiveField(field)
+          ? 'dimension'
+          : 'metric';
+
+const DEFAULT_OP_BY_KIND = {
+    date: 'on',
+    dimension: 'is',
+    metric: 'gt',
+} as const;
+
+const defaultOpFor = (field: string): FilterOp =>
+    DEFAULT_OP_BY_KIND[fieldKind(field)];
+
+const FILTERABLE_METRICS: MetricSpec[] = [
+    {
+        id: OBJECTIVE_FIELD,
+        label: 'Campaign Objective',
+        category: 'Dimensions',
+    } as MetricSpec,
+    ...METRIC_SPECS,
+];
 
 /** A row the server can act on — an unfinished one is simply not sent. */
 const isComplete = (f: GridFilter): boolean =>
@@ -2098,12 +2159,15 @@ interface InsightFilterBuilderProps {
     onChange: (filters: GridFilter[]) => void;
     /** The current breakdown — decides which date fields it can answer. */
     groupBy: string;
+    /** Campaign objectives the value picker offers for the dimension row. */
+    objectives?: ObjectiveOption[];
 }
 
 export function InsightFilterBuilder({
     filters,
     onChange,
     groupBy,
+    objectives = [],
 }: InsightFilterBuilderProps) {
     const [open, setOpen] = useState(false);
     const [draft, setDraft] = useState<GridFilter[]>(filters);
@@ -2122,18 +2186,19 @@ export function InsightFilterBuilder({
     const add = () => setDraft((prev) => [...prev, newFilter()]);
 
     /**
-     * A date row and a numeric row share nothing but the field, so crossing
-     * between them starts the operator and values over — carrying "> 500" onto
-     * a date, or a date onto a number, only builds a filter the server drops.
+     * A date row, a dimension row and a numeric row share nothing but the
+     * field, so crossing between them starts the operator and values over —
+     * carrying "> 500" onto a date or an objective only builds a filter the
+     * server drops.
      */
     const changeField = (f: GridFilter, field: string) =>
         update(
             f.id,
-            isDateField(field) === isDateField(f.field)
+            fieldKind(field) === fieldKind(f.field)
                 ? { field }
                 : {
                       field,
-                      op: isDateField(field) ? 'on' : 'gt',
+                      op: defaultOpFor(field),
                       value: '',
                       value2: '',
                   },
@@ -2213,6 +2278,7 @@ export function InsightFilterBuilder({
                 <div className="space-y-2">
                     {draft.map((f) => {
                         const isDate = isDateField(f.field);
+                        const isObjective = isObjectiveField(f.field);
                         // The server drops a date the breakdown cannot answer,
                         // so say so rather than leaving the row looking applied.
                         // Re-tested through the guard rather than `isDate`, so
@@ -2254,7 +2320,11 @@ export function InsightFilterBuilder({
                                     </SelectTrigger>
                                     <SelectContent className="font-mono text-[11px]">
                                         {Object.entries(
-                                            isDate ? DATE_OP_LABELS : OP_LABELS,
+                                            isDate
+                                                ? DATE_OP_LABELS
+                                                : isObjective
+                                                  ? DIMENSION_OP_LABELS
+                                                  : OP_LABELS,
                                         ).map(([op, label]) => (
                                             <SelectItem key={op} value={op}>
                                                 {label}
@@ -2264,7 +2334,28 @@ export function InsightFilterBuilder({
                                 </Select>
 
                                 {/* Value(s) */}
-                                {isRangeOp(f.op) ? (
+                                {isObjective ? (
+                                    <Select
+                                        value={f.value}
+                                        onValueChange={(v) =>
+                                            update(f.id, { value: v })
+                                        }
+                                    >
+                                        <SelectTrigger className="h-8 w-44 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                            <SelectValue placeholder="Objective" />
+                                        </SelectTrigger>
+                                        <SelectContent className="font-mono text-[11px]">
+                                            {objectives.map((o) => (
+                                                <SelectItem
+                                                    key={o.value}
+                                                    value={o.value}
+                                                >
+                                                    {o.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : isRangeOp(f.op) ? (
                                     <div className="flex items-center gap-1">
                                         <input
                                             type={isDate ? 'date' : 'number'}
