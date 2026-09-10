@@ -32,6 +32,36 @@ return [
         'min_interval_seconds' => (int) env('META_ADS_MIN_INTERVAL', 6),
     ],
 
+    // Creative preview (the drawer iframe). Meta returns an iframe even for a
+    // format the creative can't render in — the failure only appears as a
+    // "Story Unavailable" page inside the frame, which the browser can't
+    // report back to us. See Services\AdPreviewResolver.
+    'preview' => [
+        // Fetch the frame server-side and check it actually rendered. Turn off
+        // to go straight back to "ask Meta once, show whatever comes back".
+        'validate' => (bool) env('META_ADS_PREVIEW_VALIDATE', true),
+        'validate_timeout' => (int) env('META_ADS_PREVIEW_VALIDATE_TIMEOUT', 8),
+
+        // Extra formats tried when the requested one doesn't render. Each costs
+        // one more Graph call (which pays the pacing sleep above), so keep it
+        // small — the winning format is cached per ad afterwards.
+        'fallback_attempts' => (int) env('META_ADS_PREVIEW_FALLBACKS', 2),
+
+        // When no format renders under the account's primary token, how many of
+        // its other linked tokens to retry with. Meta scopes preview rendering
+        // to whoever signs the request, so a colleague (or the BM system user)
+        // with a role on the owning page can see an ad the primary token can't.
+        'alternate_tokens' => (int) env('META_ADS_PREVIEW_ALTERNATE_TOKENS', 2),
+
+        // How long the resolved format is remembered per ad. Only the format is
+        // cached, never the src — the `d=` token in it is short-lived.
+        'format_ttl' => (int) env('META_ADS_PREVIEW_FORMAT_TTL', 21600),
+
+        // Shorter TTL for "nothing renders", so an ad that becomes previewable
+        // again (a re-published post, a fixed page role) recovers on its own.
+        'unavailable_ttl' => (int) env('META_ADS_PREVIEW_UNAVAILABLE_TTL', 900),
+    ],
+
     // Ad-account People list (metaads:sync-ad-account-people).
     'people' => [
         // Meta exposes no "restricted" flag on assigned_users, but profiles that

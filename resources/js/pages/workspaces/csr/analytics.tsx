@@ -12,7 +12,6 @@ import {
 } from '@/components/csr/CsrAnalyticsLeaderCards';
 import {
     CallsPlacedStatCard,
-    LongestCallStatCard,
     ReachRateStatCard,
     RealConversationsStatCard,
     RmoCallTimeStatCard,
@@ -23,8 +22,8 @@ import {
     RtsStatCard,
     SalesStatCard,
     TotalRmoCalledStatCard,
+    VerifiedOrdersStatCard,
     type CallsPlacedStat,
-    type LongestCallStat,
     type ReachRateStat,
     type RealConversationsStat,
     type RmoCallTimeStat,
@@ -35,6 +34,7 @@ import {
     type RtsStat,
     type SalesStat,
     type TotalRmoCalledStat,
+    type VerifiedOrdersStat,
 } from '@/components/csr/CsrAnalyticsStatCards';
 import CsrComparisonPanel, {
     type ComparisonMetricOption,
@@ -105,6 +105,7 @@ interface CsrRecord {
     total_verification_called: number;
     total_verification_call_time: number;
     total_verification_real_called: number;
+    total_verified_orders: number;
     total_all_called: number;
     total_all_call_time: number;
 }
@@ -335,6 +336,11 @@ const COLUMN_OPTIONS: ColumnOption[] = [
         label: 'Verification Real Conversations',
         group: 'Call report',
     },
+    {
+        id: 'total_verified_orders',
+        label: 'Total Verified Orders',
+        group: 'Call report',
+    },
     { id: 'total_all_called', label: 'Total Called', group: 'Call report' },
     {
         id: 'total_all_call_time',
@@ -505,10 +511,10 @@ export default function Analytics({
         fromStr,
         toStr,
     );
-    const [longestCallStat, longestCallLoading] =
-        useAnalyticsStat<LongestCallStat>(
+    const [verifiedOrdersStat, verifiedOrdersLoading] =
+        useAnalyticsStat<VerifiedOrdersStat>(
             workspace.slug,
-            'analytics-longest-call',
+            'analytics-verified-orders',
             fromStr,
             toStr,
         );
@@ -677,6 +683,9 @@ export default function Analytics({
                 'total_verification_real_called',
                 'Verification Real Conversations',
             ),
+            // The same verification work counted by order rather than by call:
+            // an order rung three times is three above and one here.
+            countColumn('total_verified_orders', 'Total Verified Orders'),
             // The report's own totals: RMO work and verification added
             // together, which is every call the CSR placed.
             countColumn('total_all_called', 'Total Called'),
@@ -788,9 +797,9 @@ export default function Analytics({
                         stat={reachRateStat}
                         loading={reachRateLoading}
                     />
-                    <LongestCallStatCard
-                        stat={longestCallStat}
-                        loading={longestCallLoading}
+                    <VerifiedOrdersStatCard
+                        stat={verifiedOrdersStat}
+                        loading={verifiedOrdersLoading}
                     />
                     <TotalRmoCalledStatCard
                         stat={totalRmoCalledStat}

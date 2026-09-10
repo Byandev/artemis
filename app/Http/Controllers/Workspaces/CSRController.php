@@ -186,7 +186,8 @@ class CSRController extends Controller
                 SUM(total_rmo_rider_call_time)      as total_rmo_rider_call_time,
                 SUM(total_verification_called)      as total_verification_called,
                 SUM(total_verification_call_time)   as total_verification_call_time,
-                SUM(total_verification_real_called) as total_verification_real_called
+                SUM(total_verification_real_called) as total_verification_real_called,
+                SUM(total_verified_orders)          as total_verified_orders
             ');
 
         $base = PancakeUser::query()
@@ -233,6 +234,7 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_verification_called, 0)      as total_verification_called')
             ->selectRaw('COALESCE(rmo.total_verification_call_time, 0)   as total_verification_call_time')
             ->selectRaw('COALESCE(rmo.total_verification_real_called, 0) as total_verification_real_called')
+            ->selectRaw('COALESCE(rmo.total_verified_orders, 0)          as total_verified_orders')
             ->selectRaw('
                 CASE
                     WHEN (COALESCE(dr.total_returning, 0) + COALESCE(dr.total_delivered, 0)) > 0
@@ -283,6 +285,7 @@ class CSRController extends Controller
                 'total_verification_called',
                 'total_verification_call_time',
                 'total_verification_real_called',
+                'total_verified_orders',
             ])
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {

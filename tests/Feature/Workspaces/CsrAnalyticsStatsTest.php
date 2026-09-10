@@ -251,7 +251,7 @@ test('the endpoint needs the CSR analytics permission', function () {
     $outsider = User::factory()->create();
     $workspace->users()->attach($outsider->id);
 
-    foreach (['analytics-sales', 'analytics-rts', 'analytics-rmo-called', 'analytics-total-rmo-called', 'analytics-rmo-call-time', 'analytics-rmo-real-conversations', 'analytics-rmo-hit-rate', 'analytics-rmo-time', 'analytics-calls-placed', 'analytics-real-conversations', 'analytics-reach-rate', 'analytics-longest-call', 'analytics-leader-sales', 'analytics-leader-rts', 'analytics-leader-rmo-called', 'analytics-leader-rmo-duration'] as $stat) {
+    foreach (['analytics-sales', 'analytics-rts', 'analytics-rmo-called', 'analytics-total-rmo-called', 'analytics-rmo-call-time', 'analytics-rmo-real-conversations', 'analytics-rmo-hit-rate', 'analytics-rmo-time', 'analytics-calls-placed', 'analytics-real-conversations', 'analytics-reach-rate', 'analytics-verified-orders', 'analytics-leader-sales', 'analytics-leader-rts', 'analytics-leader-rmo-called', 'analytics-leader-rmo-duration'] as $stat) {
         $this->actingAs($outsider)
             ->getJson("/api/workspaces/{$workspace->slug}/csrs/stats/{$stat}?from=2026-08-01&to=2026-08-05")
             ->assertForbidden();
@@ -1002,8 +1002,12 @@ function csrCallsPlacedStat($owner, Workspace $workspace, string $from, string $
  * An order with no delivery behind it — the CSR ringing to confirm the order
  * rather than to chase a parcel. That is the split the nightly report makes on
  * order_for_delivery_id, and total_verification_called is its count.
+ *
+ * $order rings one that has already been rung, which is the case that separates
+ * the calls placed from the orders they got through; left out, every call is
+ * about an order of its own.
  */
-function verificationCall(Workspace $workspace, string $date, int $seconds): void
+function verificationCall(Workspace $workspace, string $date, int $seconds, ?Order $order = null): void
 {
     CallLog::factory()->create([
         'workspace_id' => $workspace->id,
@@ -1011,7 +1015,7 @@ function verificationCall(Workspace $workspace, string $date, int $seconds): voi
         'phone_number' => '09170000001',
         'call_date' => $date,
         'duration' => $seconds,
-        'order_id' => Order::factory()->forWorkspace($workspace)->create()->id,
+        'order_id' => ($order ?? Order::factory()->forWorkspace($workspace)->create())->id,
         'order_for_delivery_id' => null,
     ]);
 }
@@ -1318,12 +1322,63 @@ test('another workspace\'s orders are not in the verification backlog', function
         ->assertJsonPath('orders', 0);
 });
 
-function csrLongestCallStat($owner, Workspace $workspace, string $from, string $to)
+function csrVerifiedOrdersStat($owner, Workspace $workspace, string $from, string $to)
 {
-    return csrStat($owner, $workspace, 'analytics-longest-call', $from, $to);
+    return csrStat($owner, $workspace, 'analytics-verified-orders', $from, $to);
 }
 
-test('total verified orders is the verification calls over the orders needing one', function () {
+test('total verified orders counts the orders rung, not the calls it took', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $chased = Order::factory()->forWorkspace($workspace)->create();
+
+    // One order rung three times, and a second rung once: two orders verified
+    // off four calls. Counting the calls is what put a two-order backlog at
+    // 150% verified.
+    verificationCall($workspace, '2026-08-02', 60, $chased);
+    verificationCall($workspace, '2026-08-02', 30, $chased);
+    verificationCall($workspace, '2026-08-02', 45, $chased);
+    verificationCall($workspace, '2026-08-02', 20);
+
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('orders', 2)
+        ->assertJsonPath('calls', 4);
+});
+
+test('an order chased across two days counts on each of them', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $chased = Order::factory()->forWorkspace($workspace)->create();
+
+    // The distinct is taken within a CSR's day on a shop, which is the row the
+    // rollup writes; a range adds those rows up. Much narrower than counting
+    // every call, but not a workspace-wide distinct.
+    verificationCall($workspace, '2026-08-02', 60, $chased);
+    verificationCall($workspace, '2026-08-02', 30, $chased);
+    verificationCall($workspace, '2026-08-03', 45, $chased);
+
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('orders', 2)
+        ->assertJsonPath('calls', 3);
+});
+
+test('a backlog nobody rang reads zero rather than no rate', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Flagged and never rung: 0% is the honest figure here, unlike a period
+    // with nothing flagged at all.
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('orders', 0)
+        ->assertJsonPath('calls', 0)
+        ->assertJsonPath('needs_verification', 2);
+});
+
+test('verified orders % is the orders verified over the orders needing one', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     // Four orders confirmed, two of them needing a call.
@@ -1335,25 +1390,48 @@ test('total verified orders is the verification calls over the orders needing on
     // One of the two got rung.
     verificationCall($workspace, '2026-08-02', 60);
 
-    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
         ->assertJsonPath('value', 50)
+        ->assertJsonPath('orders', 1)
         ->assertJsonPath('calls', 1)
         ->assertJsonPath('needs_verification', 2);
 });
 
-test('the rate passes 100% when more calls were placed than orders needed', function () {
+test('ringing one order three times does not verify it three times over', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Two orders needing a call, one of them rung three times. Dividing the
+    // calls by the backlog read 150%; dividing the orders reads the half of it
+    // that actually got done.
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+
+    $chased = Order::factory()->forWorkspace($workspace)->create();
+    verificationCall($workspace, '2026-08-02', 60, $chased);
+    verificationCall($workspace, '2026-08-02', 30, $chased);
+    verificationCall($workspace, '2026-08-02', 45, $chased);
+
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 50)
+        ->assertJsonPath('orders', 1)
+        ->assertJsonPath('calls', 3)
+        ->assertJsonPath('needs_verification', 2);
+});
+
+test('the rate passes 100% when more orders were verified than needed it', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: null);
 
-    // The same customer rung twice, or a CSR checking an order nothing flagged.
-    // Clamping this to 100% would hide that the range was over-called.
+    // Three different orders rung against a backlog of one: CSRs checking
+    // orders nothing flagged. Clamping this to 100% would hide that the range
+    // was over-called — unlike a repeat call, which is no longer counted twice.
     verificationCall($workspace, '2026-08-02', 60);
     verificationCall($workspace, '2026-08-02', 30);
     verificationCall($workspace, '2026-08-03', 45);
 
-    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 300);
 });
 
@@ -1367,9 +1445,9 @@ test('an RMO call does not count as a verification', function () {
     // Stamped to a delivery, so the report files it under the RMO columns.
     rmoCall($workspace, '2026-08-02', 600);
 
-    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 50)
-        ->assertJsonPath('calls', 1);
+        ->assertJsonPath('orders', 1);
 });
 
 test('the verified change is reported in percentage points', function () {
@@ -1385,7 +1463,7 @@ test('the verified change is reported in percentage points', function () {
     verificationCall($workspace, '2026-08-02', 60);
     verificationCall($workspace, '2026-08-03', 60);
 
-    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 100)
         ->assertJsonPath('previous_value', 50)
         ->assertJsonPath('change', 50);
@@ -1398,7 +1476,7 @@ test('a range where nothing needed verifying has no rate rather than zero', func
     // here would read as a period the CSRs ignored.
     orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: 0, success: 10);
 
-    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', null)
         ->assertJsonPath('needs_verification', 0)
         ->assertJsonPath('change', null);
@@ -1410,9 +1488,9 @@ test('calls with nothing to verify against leave the rate undefined', function (
     // Calls but no orders at all: there is no denominator to divide by.
     verificationCall($workspace, '2026-08-02', 60);
 
-    csrLongestCallStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', null)
-        ->assertJsonPath('calls', 1);
+        ->assertJsonPath('orders', 1);
 });
 
 /**
