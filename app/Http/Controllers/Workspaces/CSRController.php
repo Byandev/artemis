@@ -132,6 +132,8 @@ class CSRController extends Controller
         $drClass = $isErp ? PancakeUserErpDailyReport::class : PancakeUserPosDailyReport::class;
 
         // Per-CSR sales/delivery rollup for the selected period (POS or ERP).
+        // Every column the report carries is summed, not only the ones the
+        // table used to show.
         $drSummary = $drClass::query()
             ->where('workspace_id', $workspace->id)
             ->whereBetween('date', [$from, $to])
@@ -142,7 +144,13 @@ class CSRController extends Controller
                 SUM(total_sales)    as total_sales,
                 SUM(delivered)      as total_delivered,
                 SUM(`returning`)    as total_returning
-            ');
+            ')
+            // The parcel counts behind those two money figures. Only the POS
+            // rollup carries them, so the ERP side reads zero rather than
+            // dropping the columns and changing the table's shape mid-toggle.
+            ->selectRaw($isErp
+                ? '0 as total_delivered_count, 0 as total_returning_count'
+                : 'SUM(delivered_count) as total_delivered_count, SUM(returning_count) as total_returning_count');
 
         // RMO calling activity is tracked separately from the sales reports.
         // The call report, summed back over the shops it splits a CSR's day into.
@@ -159,6 +167,25 @@ class CSRController extends Controller
                 SUM(total_rmo_call_time)       as total_call_time,
                 SUM(total_rmo_called)          as total_rmo_call_attempts,
                 SUM(total_rmo_confirmed_count) as total_confirmed
+            ')
+            // The rest of the call report. The table's own `total_called` and
+            // `total_call_time` — every call placed, RMO and verification alike
+            // — are qualified because the aliases above have taken those two
+            // names. The longest call is a max, so a range takes the max of the
+            // days' maxes rather than adding them up.
+            ->selectRaw('
+                SUM(pancake_user_daily_call_reports.total_called)    as total_all_called,
+                SUM(pancake_user_daily_call_reports.total_call_time) as total_all_call_time,
+                SUM(total_rmo_connected_called)     as total_rmo_connected_called,
+                SUM(total_rmo_real_called)          as total_rmo_real_called,
+                MAX(longest_rmo_call_time)          as longest_rmo_call_time,
+                SUM(total_rmo_customer_called)      as total_rmo_customer_called,
+                SUM(total_rmo_customer_call_time)   as total_rmo_customer_call_time,
+                SUM(total_rmo_rider_called)         as total_rmo_rider_called,
+                SUM(total_rmo_rider_call_time)      as total_rmo_rider_call_time,
+                SUM(total_verification_called)      as total_verification_called,
+                SUM(total_verification_call_time)   as total_verification_call_time,
+                SUM(total_verification_real_called) as total_verification_real_called
             ');
 
         $base = PancakeUser::query()
@@ -191,6 +218,20 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
             ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
             ->selectRaw('COALESCE(rmo.total_confirmed, 0)          as total_confirmed')
+            ->selectRaw('COALESCE(dr.total_delivered_count, 0)     as total_delivered_count')
+            ->selectRaw('COALESCE(dr.total_returning_count, 0)     as total_returning_count')
+            ->selectRaw('COALESCE(rmo.total_all_called, 0)         as total_all_called')
+            ->selectRaw('COALESCE(rmo.total_all_call_time, 0)      as total_all_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_connected_called, 0)     as total_rmo_connected_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_real_called, 0)          as total_rmo_real_called')
+            ->selectRaw('COALESCE(rmo.longest_rmo_call_time, 0)          as longest_rmo_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_customer_called, 0)      as total_rmo_customer_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_customer_call_time, 0)   as total_rmo_customer_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_rider_called, 0)         as total_rmo_rider_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_rider_call_time, 0)      as total_rmo_rider_call_time')
+            ->selectRaw('COALESCE(rmo.total_verification_called, 0)      as total_verification_called')
+            ->selectRaw('COALESCE(rmo.total_verification_call_time, 0)   as total_verification_call_time')
+            ->selectRaw('COALESCE(rmo.total_verification_real_called, 0) as total_verification_real_called')
             ->selectRaw('
                 CASE
                     WHEN (COALESCE(dr.total_returning, 0) + COALESCE(dr.total_delivered, 0)) > 0
@@ -227,6 +268,20 @@ class CSRController extends Controller
                 'total_confirmed',
                 'rts_rate',
                 'rmo_percentage',
+                'total_delivered_count',
+                'total_returning_count',
+                'total_all_called',
+                'total_all_call_time',
+                'total_rmo_connected_called',
+                'total_rmo_real_called',
+                'longest_rmo_call_time',
+                'total_rmo_customer_called',
+                'total_rmo_customer_call_time',
+                'total_rmo_rider_called',
+                'total_rmo_rider_call_time',
+                'total_verification_called',
+                'total_verification_call_time',
+                'total_verification_real_called',
             ])
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
