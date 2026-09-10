@@ -240,18 +240,19 @@ test('a CSR who did nothing this period is left out of that metric', function ()
     expect(collect($rows)->pluck('name')->all())->toBe(['Angeline Mercado']);
 });
 
-test('the panel lists the field and says how many qualified', function () {
-    foreach (range(1, 10) as $i) {
+test('every CSR with a figure is listed, however long the roster', function () {
+    foreach (range(1, 120) as $i) {
         cmpSale($this->workspace, cmpCsr("CSR {$i}"), '2026-08-16 09:00:00', $i * 100);
     }
 
     $sales = metricBlock(comparison($this->owner, $this->workspace));
 
-    expect($sales['rows'])->toHaveCount(10);
-    expect($sales['total'])->toBe(10);
-    // The average is over everyone who qualified, not only the rows listed —
-    // otherwise half a truncated field is above average by construction.
-    expect($sales['average'])->toEqual(550);
+    // The whole field, not a top few — a CSR with figures is never missing from
+    // the chart their figures belong on.
+    expect($sales['rows'])->toHaveCount(120);
+    expect($sales['total'])->toBe(120);
+    expect($sales['average'])->toEqual(6050);
+    expect($sales['rows'][0]['value'])->toEqual(12000);
 });
 
 /**

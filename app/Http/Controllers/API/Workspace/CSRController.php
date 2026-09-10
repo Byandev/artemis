@@ -1244,9 +1244,6 @@ class CSRController extends Controller
      | two rollups, plus the two rates that cannot be summed out of them.
      */
 
-    /** How many CSRs a metric lists. */
-    private const COMPARISON_ROWS = 100;
-
     /** Chart hues available per CSR — see the panel's BAR_COLORS. */
     private const COMPARISON_COLOURS = 8;
 
@@ -1333,10 +1330,11 @@ class CSRController extends Controller
     }
 
     /**
-     * One metric block: the CSRs who qualify, ranked, with the period's average.
-     * That average is over everyone who qualified, not the listed rows — a
-     * truncated field measured against its own mean is half above average by
-     * construction.
+     * One metric block: every CSR who qualifies, ranked, with the period's
+     * average. Not a top few — the whole field is listed, so a CSR with figures
+     * is never missing from the chart their figures belong on; the panel scrolls
+     * a long roster rather than cutting it off. `total` is that count, which the
+     * average is taken over.
      *
      * @param  array<string, mixed>  $metric  One entry of the metric catalogue.
      */
@@ -1369,7 +1367,7 @@ class CSRController extends Controller
             'higher_is_better' => $metric['higher_is_better'],
             'average' => $eligible->isNotEmpty() ? round($eligible->avg('value'), 2) : null,
             'total' => $eligible->count(),
-            'rows' => $ranked->take(self::COMPARISON_ROWS)->map(fn ($row) => [
+            'rows' => $ranked->map(fn ($row) => [
                 ...$row,
                 'change' => $this->comparisonChange($row['value'], $row['previous_value'], $metric['delta_unit']),
                 'color_slot' => $this->comparisonColourSlot($row['id']),
