@@ -771,7 +771,7 @@ Route::prefix('/workspaces/{workspace:slug}')->group(function () {
 });
 
 // Admin Routes //
-Route::middleware(['auth', 'verified', 'admin'])
+Route::middleware(['auth', 'admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

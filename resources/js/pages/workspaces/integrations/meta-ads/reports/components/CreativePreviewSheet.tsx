@@ -4,9 +4,14 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { Loader2 } from 'lucide-react';
+import { ExternalLink, ImageOff, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { type AdDetail, adDetailUrl, type ReportRow } from '../types';
+import {
+    type AdDetail,
+    adDetailUrl,
+    PREVIEW_FORMAT_LABELS,
+    type ReportRow,
+} from '../types';
 
 /** Right-side drawer with Meta's signed creative preview + dimensions. */
 export function CreativePreviewSheet({
@@ -46,9 +51,18 @@ export function CreativePreviewSheet({
         };
     }, [ad?.id, slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const src = detail?.preview?.src ?? null;
+    const preview = detail?.preview ?? null;
+    const src = preview?.src ?? null;
     const dim = detail?.dimensions;
     const showSpinner = loading || (!!src && !iframeLoaded);
+
+    // Meta will happily return a frame for a placement the creative can't
+    // render in, so the server falls back to other formats and tells us which
+    // one it settled on. Say so when it isn't the one we asked for.
+    const substituted =
+        !!preview?.format &&
+        preview.format !== preview.requested_format &&
+        PREVIEW_FORMAT_LABELS[preview.format];
 
     return (
         <Sheet open={!!ad} onOpenChange={(o) => !o && onClose()}>
@@ -87,16 +101,26 @@ export function CreativePreviewSheet({
                                     </div>
                                 ) : (
                                     !src && (
-                                        <div className="absolute inset-0 flex items-center justify-center px-6">
-                                            <p className="text-center font-mono text-xs text-gray-400 dark:text-gray-500">
-                                                Preview unavailable for this ad.
-                                            </p>
-                                        </div>
+                                        <PreviewFallback
+                                            preview={preview}
+                                            adName={ad?.name}
+                                        />
                                     )
                                 )}
                             </div>
                         </div>
                     </div>
+
+                    {substituted && (
+                        <p className="mt-2 text-center text-[11px] text-gray-400 dark:text-gray-500">
+                            Showing the {substituted.toLowerCase()} placement —
+                            this ad has no{' '}
+                            {PREVIEW_FORMAT_LABELS[
+                                preview!.requested_format
+                            ].toLowerCase()}{' '}
+                            preview.
+                        </p>
+                    )}
 
                     <p className="mt-5 mb-1 text-[10px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
                         Dimensions
@@ -118,6 +142,109 @@ export function CreativePreviewSheet({
                 </div>
             </SheetContent>
         </Sheet>
+    );
+}
+
+/**
+ * Shown in the phone frame when Meta renders nothing. The synced creative
+ * thumbnail and copy are usually enough to recognise the ad; the links are the
+ * ways to go and look at the real thing when they aren't.
+ */
+function PreviewFallback({
+    preview,
+    adName,
+}: {
+    preview: AdDetail['preview'] | null;
+    adName?: string | null;
+}) {
+    const fallback = preview?.fallback;
+    const image = fallback?.image_url ?? null;
+
+    const explanation =
+        preview?.reason === 'story_unavailable'
+            ? 'Meta can’t render this ad — the post behind it was most likely deleted.'
+            : 'Meta returned no preview for this ad.';
+
+    return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 overflow-y-auto px-5 py-6 text-center">
+            {image ? (
+                <img
+                    src={image}
+                    alt={adName ?? 'Creative thumbnail'}
+                    className="max-h-40 rounded-md object-contain"
+                />
+            ) : (
+                <ImageOff className="h-7 w-7 text-gray-300 dark:text-gray-600" />
+            )}
+
+            {fallback?.title && (
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                    {fallback.title}
+                </p>
+            )}
+            {fallback?.body && (
+                <p className="line-clamp-2 text-[11px] text-gray-500 dark:text-gray-400">
+                    {fallback.body}
+                </p>
+            )}
+
+            <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                {explanation}
+            </p>
+
+            <div className="mt-1 flex w-full flex-col items-center gap-1.5">
+                {fallback?.instagram_url && (
+                    <FallbackLink href={fallback.instagram_url}>
+                        View the Instagram post
+                    </FallbackLink>
+                )}
+                {fallback?.ads_library_url && (
+                    <FallbackLink
+                        href={fallback.ads_library_url}
+                        // Meta's Library IDs aren't the ad ids we hold, so this
+                        // lands on the page's ads — pre-filtered by this ad's
+                        // copy — rather than on this exact one.
+                        note="This page’s ads, matched on the copy above"
+                    >
+                        Find it in the Ads Library
+                    </FallbackLink>
+                )}
+                {fallback?.ads_manager_url && (
+                    <FallbackLink href={fallback.ads_manager_url}>
+                        Open in Ads Manager
+                    </FallbackLink>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function FallbackLink({
+    href,
+    note,
+    children,
+}: {
+    href: string;
+    note?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <span className="flex flex-col items-center gap-0.5">
+            <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline dark:text-blue-400"
+            >
+                {children}
+                <ExternalLink className="h-3 w-3" />
+            </a>
+            {note && (
+                <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                    {note}
+                </span>
+            )}
+        </span>
     );
 }
 
