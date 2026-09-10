@@ -98,6 +98,7 @@ const GROUP_BY_OPTIONS: {
     value: GroupBy;
     label: string;
     icon: LucideIcon;
+    hint: string
 }[] = [
     {
         value: 'ad_name',
