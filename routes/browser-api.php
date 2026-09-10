@@ -47,11 +47,15 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-sales', [CSRController::class, 'analyticsSales']);
         Route::get('/csrs/stats/analytics-rts', [CSRController::class, 'analyticsRts']);
         Route::get('/csrs/stats/analytics-rmo-called', [CSRController::class, 'analyticsRmoCalled']);
+        Route::get('/csrs/stats/analytics-total-rmo-called', [CSRController::class, 'analyticsTotalRmoCalled']);
+        Route::get('/csrs/stats/analytics-rmo-call-time', [CSRController::class, 'analyticsRmoCallTime']);
+        Route::get('/csrs/stats/analytics-rmo-real-conversations', [CSRController::class, 'analyticsRmoRealConversations']);
+        Route::get('/csrs/stats/analytics-rmo-hit-rate', [CSRController::class, 'analyticsRmoHitRate']);
         Route::get('/csrs/stats/analytics-rmo-time', [CSRController::class, 'analyticsRmoTime']);
         Route::get('/csrs/stats/analytics-calls-placed', [CSRController::class, 'analyticsCallsPlaced']);
         Route::get('/csrs/stats/analytics-real-conversations', [CSRController::class, 'analyticsRealConversations']);
         Route::get('/csrs/stats/analytics-reach-rate', [CSRController::class, 'analyticsReachRate']);
-        Route::get('/csrs/stats/analytics-longest-call', [CSRController::class, 'analyticsLongestCall']);
+        Route::get('/csrs/stats/analytics-verified-orders', [CSRController::class, 'analyticsVerifiedOrders']);
         // Leaders for the period — who came top, same source as the cards above.
         Route::get('/csrs/stats/analytics-leader-sales', [CSRController::class, 'analyticsLeaderSales']);
         Route::get('/csrs/stats/analytics-leader-rts', [CSRController::class, 'analyticsLeaderRts']);
@@ -63,8 +67,17 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         // Effort against results, day by day: calls placed beside the ones that
         // turned into a conversation.
         Route::get('/csrs/stats/analytics-daily-effort', [CSRController::class, 'analyticsDailyEffort']);
+        // The same effort and results by hour of day, read off the call log
+        // itself — the daily rollup has no hour to group by.
+        Route::get('/csrs/stats/analytics-hourly-effort', [CSRController::class, 'analyticsHourlyEffort']);
         // The same days as numbers: where every call ended up, and the day's hit rate.
-        Route::get('/csrs/stats/analytics-daily-call-outcomes', [CSRController::class, 'analyticsDailyCallOutcomes']);
+
+        // Kick the nightly CSR rollups by hand. Everything on the analytics
+        // page is built by them, so a gap is closed by re-running one instead
+        // of waiting for the schedule. Throttled — each run fans out jobs.
+        Route::post('/csrs/sync', [CSRController::class, 'runSync'])
+            ->middleware('throttle:6,1')
+            ->name('csrs.sync');
         Route::get('/teams', [TeamController::class, 'index'])->name('teams.index');
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/shops', [ShopController::class, 'index'])->name('shops.index');

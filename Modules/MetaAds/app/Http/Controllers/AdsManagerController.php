@@ -61,7 +61,7 @@ class AdsManagerController extends Controller
                 'perPage' => $request->input('per_page', $request->input('perPage')),
                 'filter' => $request->input('filter', []),
                 'metricFilters' => $this->parseMetricFilters($request),
-                'startTime' => $this->startTimeFilter($request),
+                'dateFilters' => $this->parseDateFilters($request),
             ],
             'objectives' => $this->availableObjectives($allAccountIds),
         ]);

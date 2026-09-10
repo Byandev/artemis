@@ -10,8 +10,16 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Modules\Pancake\Filters\CustomerRtsReportFilter;
+use Modules\Pancake\Filters\IgnoredFilter;
+use Modules\Pancake\Filters\OrderDateFilter;
+use Modules\Pancake\Filters\OrderIdFilter;
+use Modules\Pancake\Filters\OrderRiderFilter;
+use Modules\Pancake\Filters\OrderSearchFilter;
+use Modules\Pancake\Filters\OrderStatusFilter;
 use Modules\Pancake\Jobs\ImportOrderShippingFees;
 use Modules\Pancake\Models\Order;
+use Modules\Pancake\Support\CustomerRtsRisk;
 use Modules\Pancake\Support\ShippingFeeImportStatus;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -27,29 +35,79 @@ class OrderController extends Controller
         }
     }
 
-    /** Search across order number, tracking code, and the shipping address. */
-    private function applySearch($query, string $value)
+    /**
+     * Date columns the range filter may be pointed at.
+     *
+     * An allowlist because the chosen key goes straight into a whereDate(); the
+     * request never names a column, it names one of these keys.
+     *
+     * Every one of them is a Pancake lifecycle stamp, inserted_at being the
+     * default — it is what the list has always filtered and sorted on. This
+     * app's own created_at / updated_at are deliberately absent: they record
+     * when the sync last touched our row, which is a question about the sync
+     * rather than about the order.
+     */
+    public const DATE_FIELDS = [
+        'inserted_at',
+        'confirmed_at',
+        'shipped_at',
+        'delivered_at',
+        'returning_at',
+        'returned_at',
+    ];
+
+    /** The column the date range applies to, falling back to Pancake's insert time. */
+    private function dateColumn(Request $request): string
     {
-        return $query->where(function ($q) use ($value) {
-            $q->where('pancake_orders.order_number', 'like', "%{$value}%")
-                ->orWhere('pancake_orders.tracking_code', 'like', "%{$value}%")
-                ->orWhereHas('shippingAddress', fn ($sa) => $sa
-                    ->where('full_name', 'like', "%{$value}%")
-                    ->orWhere('phone_number', 'like', "%{$value}%")
-                    ->orWhere('full_address', 'like', "%{$value}%"));
-        });
+        $type = (string) $request->input('filter.date_type');
+
+        return in_array($type, self::DATE_FIELDS, true)
+            ? 'pancake_orders.'.$type
+            : 'pancake_orders.inserted_at';
     }
 
     /**
-     * Limit to orders delivered by a given rider. Mirrors RtsRiderQuery: the rider
-     * is the rider_name on the latest "On Delivery" parcel journey for the order,
-     * so this matches exactly the set counted in the RTS "By Rider" breakdown.
+     * Every comparison the page may offer, in the order it lists them. The SQL
+     * behind each one lives on CustomerRtsReportFilter::OPERATORS; `between`
+     * takes a second number and is built by hand there.
      */
-    private function applyRider($query, string $rider)
+    public const RTS_COMPARISONS = ['gt', 'lt', 'eq', 'between'];
+
+    /**
+     * The filter set the list runs under, shared with the tab counts below so a
+     * filter added here cannot silently miss one of them.
+     *
+     * Each entry is a Spatie filter class from Modules\Pancake\Filters, so the
+     * rule itself is testable on its own and this method stays a list of what
+     * the page may be narrowed by. The three that read another parameter —
+     * `date_type` picks the column, `rts_*` carry the comparison — are declared
+     * as IgnoredFilter so Spatie accepts them without applying them twice.
+     *
+     * The counts pass `withStatus: false`, which swaps the status rule for the
+     * same no-op, so each tab shows its own total instead of the count of the
+     * tab already open.
+     *
+     * @return array<int, AllowedFilter>
+     */
+    private function allowedFilters(Request $request, string $dateColumn, bool $withStatus = true): array
     {
-        return $query->whereHas('parcelJourneys', function ($q) use ($rider) {
-            $q->where('rider_name', $rider);
-        });
+        return [
+            AllowedFilter::custom('search', new OrderSearchFilter),
+            AllowedFilter::custom('order_id', new OrderIdFilter),
+            AllowedFilter::custom('date_from', new OrderDateFilter($dateColumn, '>=')),
+            AllowedFilter::custom('date_to', new OrderDateFilter($dateColumn, '<=')),
+            AllowedFilter::custom('date_type', new IgnoredFilter),
+            AllowedFilter::custom('rider', new OrderRiderFilter),
+            AllowedFilter::custom('status', $withStatus ? new OrderStatusFilter : new IgnoredFilter),
+            AllowedFilter::custom('report', new CustomerRtsReportFilter(
+                (string) $request->input('filter.rts_op'),
+                $request->input('filter.rts_value'),
+                $request->input('filter.rts_value2'),
+            )),
+            AllowedFilter::custom('rts_op', new IgnoredFilter),
+            AllowedFilter::custom('rts_value', new IgnoredFilter),
+            AllowedFilter::custom('rts_value2', new IgnoredFilter),
+        ];
     }
 
     public function index(Request $request, Workspace $workspace)
@@ -64,39 +122,37 @@ class OrderController extends Controller
                 fn ($q) => $q->visibleTo($request->user(), $workspace),
             );
 
+        $dateColumn = $this->dateColumn($request);
+
         $orders = QueryBuilder::for(clone $base)
             ->with([
                 'shippingAddress:id,order_id,full_name,phone_number,full_address',
                 'items:id,order_id,name,quantity',
                 'tags:id,order_id,name',
             ])
-            ->allowedFilters([
-                AllowedFilter::callback('search', fn ($q, $v) => $this->applySearch($q, $v)),
-                AllowedFilter::callback('date_from', fn ($q, $v) => $q->whereDate('pancake_orders.inserted_at', '>=', $v)),
-                AllowedFilter::callback('date_to', fn ($q, $v) => $q->whereDate('pancake_orders.inserted_at', '<=', $v)),
-                // Read the raw request value, not Spatie's — it splits on commas,
-                // which would break rider names that legitimately contain one.
-                AllowedFilter::callback('rider', fn ($q) => $this->applyRider($q, (string) $request->input('filter.rider'))),
-                // Accepts one status or a comma-separated list (e.g. returning,returned).
-                AllowedFilter::callback('status', fn ($q, $v) => $q->whereIn(
-                    'pancake_orders.status_name',
-                    is_array($v) ? $v : explode(',', $v),
-                )),
-            ])
-            ->allowedSorts(['order_number', 'total_amount', 'inserted_at', 'updated_at', 'confirmed_at', 'status_name'])
+            // Explicit, because selecting the customer's return rate alongside
+            // would otherwise drop the table's own columns from the select.
+            ->select('pancake_orders.*')
+            ->selectRaw(CustomerRtsRisk::rateSql().' as cx_rts_rate')
+            ->allowedFilters($this->allowedFilters($request, $dateColumn))
+            ->allowedSorts(['order_number', 'total_amount', 'inserted_at', 'updated_at', 'confirmed_at', 'status_name', 'cx_rts_rate'])
             ->defaultSort('-inserted_at')
             ->paginate((int) $request->input('per_page', 50))
             ->withQueryString();
 
-        // Per-status counts for the tab bar: search/date applied directly (not via
-        // QueryBuilder, which would reject the `status` filter the request carries),
-        // and status itself is intentionally ignored so each tab shows its total.
-        $filter = (array) $request->input('filter', []);
-        $statusCounts = (clone $base)
-            ->when(($filter['search'] ?? null), fn ($q, $v) => $this->applySearch($q, $v))
-            ->when(($filter['date_from'] ?? null), fn ($q, $v) => $q->whereDate('pancake_orders.inserted_at', '>=', $v))
-            ->when(($filter['date_to'] ?? null), fn ($q, $v) => $q->whereDate('pancake_orders.inserted_at', '<=', $v))
-            ->when(($filter['rider'] ?? null), fn ($q, $v) => $this->applyRider($q, (string) $v))
+        // Banded here rather than in the select so the thresholds live in one
+        // readable place; the rate itself still comes from the query, so sorting
+        // on the column and reading the badge agree.
+        $orders->getCollection()->each(fn (Order $order) => $order->setAttribute(
+            'cx_rts_level',
+            CustomerRtsRisk::level($order->cx_rts_rate === null ? null : (float) $order->cx_rts_rate),
+        ));
+
+        // Per-status counts for the tab bar, run through the same filter set as
+        // the rows so a tab cannot promise rows that aren't there once it is
+        // clicked. Status alone is ignored, so each tab shows its own total.
+        $statusCounts = QueryBuilder::for(clone $base)
+            ->allowedFilters($this->allowedFilters($request, $dateColumn, withStatus: false))
             ->selectRaw('status_name, COUNT(*) as total')
             ->groupBy('status_name')
             ->pluck('total', 'status_name');
@@ -107,6 +163,8 @@ class OrderController extends Controller
             'statusCounts' => $statusCounts,
             'totalCount' => (int) $statusCounts->sum(),
             'shippingFeeImport' => ShippingFeeImportStatus::get($workspace->id),
+            'dateFields' => self::DATE_FIELDS,
+            'rtsOperators' => self::RTS_COMPARISONS,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),

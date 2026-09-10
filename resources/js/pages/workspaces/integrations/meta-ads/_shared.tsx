@@ -31,9 +31,10 @@ import {
     GripVertical,
     Plus,
     Search,
+    TriangleAlert,
     X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export function StatusToggle({
     status,
@@ -1826,17 +1827,36 @@ export function ColumnVisibilityMenu({
 
 /* ───────────────────── Insight filters ──────────────────── */
 
-export type MetricFilterOp =
-    | 'gt'
-    | 'gte'
-    | 'lt'
-    | 'lte'
-    | 'eq'
-    | 'range'
-    | 'is'
-    | 'is_not';
+/** Comparisons against a number — the metric side of the builder. */
+type NumericFilterOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'range';
 
-/** A campaign objective offered as a filter value. */
+/** Comparisons against a value picked from a list — the dimension side. */
+type DimensionFilterOp = 'is' | 'is_not';
+
+export type MetricFilterOp = NumericFilterOp | DimensionFilterOp;
+
+type DateFilterOp = 'on' | 'before' | 'after' | 'between';
+
+type FilterOp = MetricFilterOp | DateFilterOp;
+
+/**
+ * The lifecycle dates a row can be filtered on. A metric filter tests what a
+ * row's insights add up to over the reporting window; these decide which rows
+ * exist at all, by the entity's own created / start date. The server answers
+ * them from a separate `date_filters` param, but they share this dropdown
+ * because from the reader's side it is the same question — "only show me rows
+ * where …".
+ */
+const DATE_FILTER_FIELDS = ['created_date', 'started_date'] as const;
+
+type DateFilterField = (typeof DATE_FILTER_FIELDS)[number];
+
+const DATE_FIELD_LABELS: Record<DateFilterField, string> = {
+    created_date: 'Created Date',
+    started_date: 'Start Date',
+};
+
+/** One row of the filter dropdown — numeric or date, told apart by its field. */
 export interface ObjectiveOption {
     value: string;
     label: string;
@@ -1849,22 +1869,69 @@ export interface ObjectiveOption {
  */
 export const OBJECTIVE_FIELD = 'campaign_objective';
 
-const DIMENSION_OP_LABELS: Record<string, string> = {
+const DIMENSION_OP_LABELS: Record<DimensionFilterOp, string> = {
     is: 'is',
     is_not: 'is not',
 };
 
 const isObjectiveField = (field: string) => field === OBJECTIVE_FIELD;
 
-export interface MetricFilter {
+export interface GridFilter {
     id: string; // client-only key for React
     field: string;
-    op: MetricFilterOp;
+    op: FilterOp;
     value: string;
-    value2: string; // only used when op === 'range'
+    /** Upper bound, only used when op is 'range' (metric) or 'between' (date). */
+    value2: string;
 }
 
-const OP_LABELS: Record<MetricFilterOp, string> = {
+const isDateField = (field: string): field is DateFilterField =>
+    (DATE_FILTER_FIELDS as readonly string[]).includes(field);
+
+/**
+ * Which breakdowns can answer each date filter. Ads carry no start time of
+ * their own — the server reaches one through the owning ad set — and accounts
+ * carry neither date, so a filter offered there would be silently dropped.
+ * Custom breakdowns aggregate ads, so they follow the ad-grained rules.
+ *
+ * The goal and objective breakdowns are ad-grained too, and each already joins
+ * the table its start date lives on — the ad set for `optimization_goal`, the
+ * campaign for `campaign_objective` — so both dates work there.
+ */
+const DATE_FIELD_BREAKDOWNS: Record<DateFilterField, string[]> = {
+    created_date: [
+        'ad',
+        'ad_name',
+        'ad_type',
+        'ad_set',
+        'campaign',
+        'page',
+        'page_owner',
+        'optimization_goal',
+        'campaign_objective',
+    ],
+    started_date: [
+        'ad',
+        'ad_name',
+        'ad_type',
+        'ad_set',
+        'campaign',
+        'page',
+        'page_owner',
+        'optimization_goal',
+        'campaign_objective',
+    ],
+};
+
+/** Whether the current breakdown has the date a filter asks about. */
+const dateFilterSupported = (
+    field: DateFilterField,
+    groupBy: string,
+): boolean =>
+    groupBy.startsWith('custom:') ||
+    DATE_FIELD_BREAKDOWNS[field].includes(groupBy);
+
+const OP_LABELS: Record<NumericFilterOp, string> = {
     gt: '> Greater than',
     gte: '≥ Greater than or equal',
     lt: '< Less than',
@@ -1872,6 +1939,37 @@ const OP_LABELS: Record<MetricFilterOp, string> = {
     eq: '= Equal',
     range: '↔ Between',
 };
+
+const DATE_OP_LABELS: Record<DateFilterOp, string> = {
+    on: '= On',
+    before: '< Before',
+    after: '> After',
+    between: '↔ Between',
+};
+
+/** Both operators that take a second value, in one place. */
+const isRangeOp = (op: FilterOp) => op === 'range' || op === 'between';
+
+/**
+ * Which of the three row shapes a field builds: a lifecycle date, a dimension
+ * picked from a list, or a metric compared to a number. Each has its own
+ * operators and its own value control, so crossing between them resets both.
+ */
+const fieldKind = (field: string): 'date' | 'dimension' | 'metric' =>
+    isDateField(field)
+        ? 'date'
+        : isObjectiveField(field)
+          ? 'dimension'
+          : 'metric';
+
+const DEFAULT_OP_BY_KIND = {
+    date: 'on',
+    dimension: 'is',
+    metric: 'gt',
+} as const;
+
+const defaultOpFor = (field: string): FilterOp =>
+    DEFAULT_OP_BY_KIND[fieldKind(field)];
 
 const FILTERABLE_METRICS: MetricSpec[] = [
     {
@@ -1882,32 +1980,61 @@ const FILTERABLE_METRICS: MetricSpec[] = [
     ...METRIC_SPECS,
 ];
 
-export function serializeMetricFilters(
-    filters: MetricFilter[],
-): string | undefined {
-    const clean = filters
-        .filter((f) => f.field && f.op && f.value !== '')
-        .filter((f) => f.op !== 'range' || f.value2 !== '')
-        .map(({ field, op, value, value2 }) =>
-            op === 'range'
-                ? { field, op, value, value2 }
-                : { field, op, value },
-        );
-    return clean.length ? JSON.stringify(clean) : undefined;
-}
+/** A row the server can act on — an unfinished one is simply not sent. */
+const isComplete = (f: GridFilter): boolean =>
+    !!f.field &&
+    !!f.op &&
+    f.value !== '' &&
+    (!isRangeOp(f.op) || f.value2 !== '');
 
-export function deserializeMetricFilters(raw: unknown): MetricFilter[] {
+/** How many filters are actually in force, for the trigger's badge. */
+const activeFilterCount = (filters: GridFilter[]): number =>
+    filters.filter(isComplete).length;
+
+const serialize = (
+    filters: GridFilter[],
+    dates: boolean,
+): string | undefined => {
+    const clean = filters
+        .filter((f) => isDateField(f.field) === dates && isComplete(f))
+        .map(({ field, op, value, value2 }) =>
+            isRangeOp(op) ? { field, op, value, value2 } : { field, op, value },
+        );
+
+    return clean.length ? JSON.stringify(clean) : undefined;
+};
+
+export const serializeMetricFilters = (filters: GridFilter[]) =>
+    serialize(filters, false);
+
+export const serializeDateFilters = (filters: GridFilter[]) =>
+    serialize(filters, true);
+
+const toRows = (raw: unknown, fallbackOp: FilterOp): GridFilter[] => {
     if (!Array.isArray(raw) || raw.length === 0) return [];
+
     return raw.map((f: Record<string, string>) => ({
         id: crypto.randomUUID(),
         field: f.field ?? '',
-        op: (f.op as MetricFilterOp) ?? 'gt',
+        op: (f.op as FilterOp) ?? fallbackOp,
         value: String(f.value ?? ''),
         value2: String(f.value2 ?? ''),
     }));
+};
+
+/**
+ * The two server params come back as one list, dates first — they narrow the
+ * row set before any metric is summed, so that is the order the dropdown reads
+ * in as well.
+ */
+export function deserializeGridFilters(
+    metricRaw: unknown,
+    dateRaw: unknown,
+): GridFilter[] {
+    return [...toRows(dateRaw, 'on'), ...toRows(metricRaw, 'gt')];
 }
 
-function newFilter(): MetricFilter {
+function newFilter(): GridFilter {
     return {
         id: crypto.randomUUID(),
         field: 'spend',
@@ -1917,17 +2044,24 @@ function newFilter(): MetricFilter {
     };
 }
 
-interface MetricComboboxProps {
-    value: string;
-    onValueChange: (v: string) => void;
-    grouped: { category: string; specs: typeof FILTERABLE_METRICS }[];
+/** A pickable field, flattened from either a metric spec or a date field. */
+interface FieldOption {
+    id: string;
+    label: string;
 }
 
-function MetricCombobox({
-    value,
-    onValueChange,
-    grouped,
-}: MetricComboboxProps) {
+interface FieldGroup {
+    category: string;
+    fields: FieldOption[];
+}
+
+interface FieldComboboxProps {
+    value: string;
+    onValueChange: (v: string) => void;
+    grouped: FieldGroup[];
+}
+
+function FieldCombobox({ value, onValueChange, grouped }: FieldComboboxProps) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
 
@@ -1939,14 +2073,17 @@ function MetricCombobox({
     const filtered = grouped
         .map((g) => ({
             ...g,
-            specs: g.specs.filter(
-                (s) => !q || s.label.toLowerCase().includes(q),
+            fields: g.fields.filter(
+                (f) => !q || f.label.toLowerCase().includes(q),
             ),
         }))
-        .filter((g) => g.specs.length > 0);
+        .filter((g) => g.fields.length > 0);
 
+    // A date row can outlive the breakdown that offered it, so fall back to the
+    // date labels rather than showing the reader a bare field id.
     const selectedLabel =
-        FILTERABLE_METRICS.find((s) => s.id === value)?.label ?? value;
+        grouped.flatMap((g) => g.fields).find((f) => f.id === value)?.label ??
+        (isDateField(value) ? DATE_FIELD_LABELS[value] : value);
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -1969,7 +2106,7 @@ function MetricCombobox({
                         <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3 w-3 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                             type="text"
-                            placeholder="Search metric..."
+                            placeholder="Search field..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             autoFocus
@@ -1982,7 +2119,7 @@ function MetricCombobox({
                 <div className="max-h-64 overflow-y-auto">
                     {filtered.length === 0 && (
                         <p className="py-4 text-center text-[11px] text-gray-400 dark:text-gray-500">
-                            No metrics match.
+                            No fields match.
                         </p>
                     )}
                     {filtered.map((g) => (
@@ -1990,18 +2127,18 @@ function MetricCombobox({
                             <div className="px-2 pt-2 pb-1 text-[9px] tracking-wider text-emerald-600 uppercase dark:text-emerald-400">
                                 {g.category}
                             </div>
-                            {g.specs.map((s) => (
+                            {g.fields.map((f) => (
                                 <button
-                                    key={s.id}
+                                    key={f.id}
                                     type="button"
                                     onClick={() => {
-                                        onValueChange(s.id);
+                                        onValueChange(f.id);
                                         setOpen(false);
                                     }}
                                     className="flex w-full items-center justify-between px-2 py-1.5 text-left text-[11px] text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
                                 >
-                                    {s.label}
-                                    {s.id === value && (
+                                    {f.label}
+                                    {f.id === value && (
                                         <Check className="h-3 w-3 text-emerald-500" />
                                     )}
                                 </button>
@@ -2014,31 +2151,58 @@ function MetricCombobox({
     );
 }
 
+const VALUE_INPUT_CLS =
+    'h-8 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800';
+
 interface InsightFilterBuilderProps {
-    filters: MetricFilter[];
-    onChange: (filters: MetricFilter[]) => void;
+    filters: GridFilter[];
+    onChange: (filters: GridFilter[]) => void;
+    /** The current breakdown — decides which date fields it can answer. */
+    groupBy: string;
+    /** Campaign objectives the value picker offers for the dimension row. */
+    objectives?: ObjectiveOption[];
 }
 
 export function InsightFilterBuilder({
     filters,
     onChange,
+    groupBy,
     objectives = [],
-}: InsightFilterBuilderProps & { objectives?: ObjectiveOption[] }) {
+}: InsightFilterBuilderProps) {
     const [open, setOpen] = useState(false);
-    const [draft, setDraft] = useState<MetricFilter[]>(filters);
+    const [draft, setDraft] = useState<GridFilter[]>(filters);
 
     // Sync draft from committed filters whenever the dropdown opens.
     useEffect(() => {
         if (open) setDraft(filters);
     }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const update = (id: string, patch: Partial<MetricFilter>) =>
+    const update = (id: string, patch: Partial<GridFilter>) =>
         setDraft((prev) =>
             prev.map((f) => (f.id === id ? { ...f, ...patch } : f)),
         );
     const remove = (id: string) =>
         setDraft((prev) => prev.filter((f) => f.id !== id));
     const add = () => setDraft((prev) => [...prev, newFilter()]);
+
+    /**
+     * A date row, a dimension row and a numeric row share nothing but the
+     * field, so crossing between them starts the operator and values over —
+     * carrying "> 500" onto a date or an objective only builds a filter the
+     * server drops.
+     */
+    const changeField = (f: GridFilter, field: string) =>
+        update(
+            f.id,
+            fieldKind(field) === fieldKind(f.field)
+                ? { field }
+                : {
+                      field,
+                      op: defaultOpFor(field),
+                      value: '',
+                      value2: '',
+                  },
+        );
 
     const apply = () => {
         onChange(draft);
@@ -2049,22 +2213,31 @@ export function InsightFilterBuilder({
         setOpen(false);
     };
 
-    const grouped: { category: string; specs: typeof FILTERABLE_METRICS }[] =
-        [];
-    for (const spec of FILTERABLE_METRICS) {
-        const cat = spec.category;
-        const g = grouped.find((x) => x.category === cat);
-        if (g) g.specs.push(spec);
-        else grouped.push({ category: cat, specs: [spec] });
-    }
+    // Dates lead the list: they cut the row set down before a single metric is
+    // summed, and there are only two of them.
+    const grouped = useMemo(() => {
+        const dates = DATE_FILTER_FIELDS.filter((field) =>
+            dateFilterSupported(field, groupBy),
+        ).map((field) => ({ id: field, label: DATE_FIELD_LABELS[field] }));
 
-    const activeCount = filters.filter(
-        (f) =>
-            f.field &&
-            f.op &&
-            f.value !== '' &&
-            (f.op !== 'range' || f.value2 !== ''),
-    ).length;
+        const out: FieldGroup[] = dates.length
+            ? [{ category: 'Dates', fields: dates }]
+            : [];
+
+        for (const spec of FILTERABLE_METRICS) {
+            const g = out.find((x) => x.category === spec.category);
+            if (g) g.fields.push({ id: spec.id, label: spec.label });
+            else
+                out.push({
+                    category: spec.category,
+                    fields: [{ id: spec.id, label: spec.label }],
+                });
+        }
+
+        return out;
+    }, [groupBy]);
+
+    const activeCount = activeFilterCount(filters);
 
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -2089,11 +2262,11 @@ export function InsightFilterBuilder({
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="end"
-                className="w-[520px] p-3 font-mono text-[12px]"
+                className="w-[560px] p-3 font-mono text-[12px]"
                 onCloseAutoFocus={(e) => e.preventDefault()}
             >
                 <DropdownMenuLabel className="mb-2 font-mono text-[10px] tracking-wider text-gray-400 uppercase">
-                    Metric Filters
+                    Filters
                 </DropdownMenuLabel>
 
                 {draft.length === 0 && (
@@ -2103,128 +2276,151 @@ export function InsightFilterBuilder({
                 )}
 
                 <div className="space-y-2">
-                    {draft.map((f) => (
-                        <div key={f.id} className="flex items-center gap-1.5">
-                            {/* Field */}
-                            <MetricCombobox
-                                value={f.field}
-                                onValueChange={(v) =>
-                                    update(f.id, {
-                                        field: v,
-                                        // Ops don't carry across the
-                                        // dimension/metric divide, so reset to
-                                        // each side's default and drop a value
-                                        // the new field can't interpret.
-                                        ...(isObjectiveField(v) !==
-                                        isObjectiveField(f.field)
-                                            ? {
-                                                  op: isObjectiveField(v)
-                                                      ? ('is' as const)
-                                                      : ('gt' as const),
-                                                  value: '',
-                                                  value2: '',
-                                              }
-                                            : {}),
-                                    })
-                                }
-                                grouped={grouped}
-                            />
+                    {draft.map((f) => {
+                        const isDate = isDateField(f.field);
+                        const isObjective = isObjectiveField(f.field);
+                        // The server drops a date the breakdown cannot answer,
+                        // so say so rather than leaving the row looking applied.
+                        // Re-tested through the guard rather than `isDate`, so
+                        // the field narrows to a date field for the lookup.
+                        const unsupported =
+                            isDateField(f.field) &&
+                            !dateFilterSupported(f.field, groupBy);
 
-                            {/* Operator */}
-                            <Select
-                                value={f.op}
-                                onValueChange={(v) =>
-                                    update(f.id, { op: v as MetricFilterOp })
-                                }
+                        return (
+                            <div
+                                key={f.id}
+                                className="flex items-center gap-1.5"
                             >
-                                <SelectTrigger className="h-8 w-44 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="font-mono text-[11px]">
-                                    {(
-                                        Object.entries(
-                                            f.field === OBJECTIVE_FIELD
-                                                ? DIMENSION_OP_LABELS
-                                                : OP_LABELS,
-                                        ) as [MetricFilterOp, string][]
-                                    ).map(([op, label]) => (
-                                        <SelectItem key={op} value={op}>
-                                            {label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                {/* Field */}
+                                <FieldCombobox
+                                    value={f.field}
+                                    onValueChange={(v) => changeField(f, v)}
+                                    grouped={grouped}
+                                />
 
-                            {/* Value(s) */}
-                            {f.field === OBJECTIVE_FIELD ? (
+                                {unsupported && (
+                                    <span
+                                        className="flex items-center text-amber-500"
+                                        title="This breakdown has no such date — the filter is ignored."
+                                    >
+                                        <TriangleAlert className="h-3.5 w-3.5" />
+                                    </span>
+                                )}
+
+                                {/* Operator */}
                                 <Select
-                                    value={f.value}
+                                    value={f.op}
                                     onValueChange={(v) =>
-                                        update(f.id, { value: v })
+                                        update(f.id, { op: v as FilterOp })
                                     }
                                 >
-                                    <SelectTrigger className="h-8 w-44 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
-                                        <SelectValue placeholder="Objective" />
+                                    <SelectTrigger className="h-8 w-40 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                        <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="font-mono text-[11px]">
-                                        {objectives.map((o) => (
-                                            <SelectItem
-                                                key={o.value}
-                                                value={o.value}
-                                            >
-                                                {o.label}
+                                        {Object.entries(
+                                            isDate
+                                                ? DATE_OP_LABELS
+                                                : isObjective
+                                                  ? DIMENSION_OP_LABELS
+                                                  : OP_LABELS,
+                                        ).map(([op, label]) => (
+                                            <SelectItem key={op} value={op}>
+                                                {label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                            ) : f.op === 'range' ? (
-                                <div className="flex items-center gap-1">
+
+                                {/* Value(s) */}
+                                {isObjective ? (
+                                    <Select
+                                        value={f.value}
+                                        onValueChange={(v) =>
+                                            update(f.id, { value: v })
+                                        }
+                                    >
+                                        <SelectTrigger className="h-8 w-44 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono! text-[11px]! dark:border-white/6 dark:bg-zinc-800">
+                                            <SelectValue placeholder="Objective" />
+                                        </SelectTrigger>
+                                        <SelectContent className="font-mono text-[11px]">
+                                            {objectives.map((o) => (
+                                                <SelectItem
+                                                    key={o.value}
+                                                    value={o.value}
+                                                >
+                                                    {o.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : isRangeOp(f.op) ? (
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type={isDate ? 'date' : 'number'}
+                                            placeholder={
+                                                isDate ? undefined : 'Min'
+                                            }
+                                            value={f.value}
+                                            onChange={(e) =>
+                                                update(f.id, {
+                                                    value: e.target.value,
+                                                })
+                                            }
+                                            className={clsx(
+                                                VALUE_INPUT_CLS,
+                                                isDate ? 'w-[112px]' : 'w-20',
+                                            )}
+                                        />
+                                        <span className="text-gray-400">–</span>
+                                        <input
+                                            type={isDate ? 'date' : 'number'}
+                                            placeholder={
+                                                isDate ? undefined : 'Max'
+                                            }
+                                            value={f.value2}
+                                            onChange={(e) =>
+                                                update(f.id, {
+                                                    value2: e.target.value,
+                                                })
+                                            }
+                                            className={clsx(
+                                                VALUE_INPUT_CLS,
+                                                isDate ? 'w-[112px]' : 'w-20',
+                                            )}
+                                        />
+                                    </div>
+                                ) : (
                                     <input
-                                        type="number"
-                                        placeholder="Min"
+                                        type={isDate ? 'date' : 'number'}
+                                        placeholder={
+                                            isDate ? undefined : 'Value'
+                                        }
                                         value={f.value}
                                         onChange={(e) =>
                                             update(f.id, {
                                                 value: e.target.value,
                                             })
                                         }
-                                        className="h-8 w-20 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
+                                        className={clsx(
+                                            VALUE_INPUT_CLS,
+                                            isDate ? 'w-[138px]' : 'w-24',
+                                        )}
                                     />
-                                    <span className="text-gray-400">–</span>
-                                    <input
-                                        type="number"
-                                        placeholder="Max"
-                                        value={f.value2}
-                                        onChange={(e) =>
-                                            update(f.id, {
-                                                value2: e.target.value,
-                                            })
-                                        }
-                                        className="h-8 w-20 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
-                                    />
-                                </div>
-                            ) : (
-                                <input
-                                    type="number"
-                                    placeholder="Value"
-                                    value={f.value}
-                                    onChange={(e) =>
-                                        update(f.id, { value: e.target.value })
-                                    }
-                                    className="h-8 w-24 rounded-lg border border-black/6 bg-stone-50 px-2 font-mono text-[11px] outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 dark:border-white/6 dark:bg-zinc-800"
-                                />
-                            )}
+                                )}
 
-                            {/* Remove */}
-                            <button
-                                type="button"
-                                onClick={() => remove(f.id)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
-                            >
-                                <X className="h-3.5 w-3.5" />
-                            </button>
-                        </div>
-                    ))}
+                                {/* Remove */}
+                                <button
+                                    type="button"
+                                    onClick={() => remove(f.id)}
+                                    className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10"
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                        );
+                    })}
                 </div>
 
                 <DropdownMenuSeparator className="my-2" />

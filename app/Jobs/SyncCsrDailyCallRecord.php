@@ -56,6 +56,7 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                     'total_rmo_called' => (int) ($call?->total_rmo_called ?? 0),
                     'total_rmo_call_time' => (int) ($call?->total_rmo_call_time ?? 0),
+                    'total_rmo_orders' => (int) ($call?->total_rmo_orders ?? 0),
                     'total_rmo_connected_called' => (int) ($call?->total_rmo_connected_called ?? 0),
                     'total_rmo_real_called' => (int) ($call?->total_rmo_real_called ?? 0),
                     'longest_rmo_call_time' => (int) ($call?->longest_rmo_call_time ?? 0),
@@ -66,6 +67,8 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                     'total_verification_called' => (int) ($call?->total_verification_called ?? 0),
                     'total_verification_call_time' => (int) ($call?->total_verification_call_time ?? 0),
+                    'total_verification_real_called' => (int) ($call?->total_verification_real_called ?? 0),
+                    'total_verified_orders' => (int) ($call?->total_verified_orders ?? 0),
 
                     'total_rmo_assigned_count' => (int) ($delivery?->total_rmo_assigned_count ?? 0),
                     'total_rmo_confirmed_count' => (int) ($delivery?->total_rmo_confirmed_count ?? 0),
@@ -106,6 +109,21 @@ class SyncCsrDailyCallRecord implements ShouldQueue
      * when it does not. The order beside it is what places it in a shop, so a
      * call matched to neither is not counted here at all — there is no row to
      * put it in.
+     *
+     * Both halves are counted twice over, and deliberately: once by call and
+     * once by the thing the calls were about. RMO rings the same parcel more
+     * than once by design — customer, then rider, then customer again — so
+     * `total_rmo_called` is the ringing and `total_rmo_orders` the deliveries
+     * it got through. NULL is not counted by COUNT(DISTINCT), so that column
+     * needs no CASE: a verification call has no delivery id to count.
+     *
+     * The verification half splits the same way:
+     * `total_verification_called` is the calls placed, `total_verified_orders`
+     * the distinct orders behind them. An order rung three times is three and
+     * one. Read against the orders that needed verifying, only the second is a
+     * coverage figure — the first passes 100% on repeat calls alone. The
+     * distinct is taken within the row, so an order chased across two days is
+     * one on each and two in a range that sums them.
      */
     private function callTotals()
     {
@@ -127,6 +145,7 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN 1 ELSE 0 END) AS total_rmo_called,
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN cl.duration ELSE 0 END) AS total_rmo_call_time,
+                COUNT(DISTINCT cl.order_for_delivery_id) AS total_rmo_orders,
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration > 0 THEN 1 ELSE 0 END) AS total_rmo_connected_called,
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 ELSE 0 END) AS total_rmo_real_called,
@@ -138,7 +157,9 @@ class SyncCsrDailyCallRecord implements ShouldQueue
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.persona = ? THEN cl.duration ELSE 0 END) AS total_rmo_rider_call_time,
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN 1 ELSE 0 END) AS total_verification_called,
-                SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN cl.duration ELSE 0 END) AS total_verification_call_time
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN cl.duration ELSE 0 END) AS total_verification_call_time,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL AND cl.duration >= 3 THEN 1 ELSE 0 END) AS total_verification_real_called,
+                COUNT(DISTINCT CASE WHEN cl.order_for_delivery_id IS NULL THEN cl.order_id END) AS total_verified_orders
             ', [
                 CallLogPersona::CUSTOMER,
                 CallLogPersona::CUSTOMER,
