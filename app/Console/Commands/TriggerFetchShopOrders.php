@@ -33,7 +33,7 @@ class TriggerFetchShopOrders extends Command
 
         // At the scheduled hours it pulls shipped orders; --shipped forces it on.
         $shipped = $this->option('shipped')
-            || in_array((int) now()->format('G'), [9, 10, 11, 12, 13, 15, 17, 19, 21, 23], true);
+            || in_array((int) now()->format('G'), [9, 12, 15, 18, 21], true);
 
         Shop::whereNotNull('orders_last_synced_at')
             ->whereNotNull('pos_token')
@@ -46,9 +46,9 @@ class TriggerFetchShopOrders extends Command
                 dispatch(new FetchShopOrders(
                     $shop,
                     1,
-                    Carbon::parse($shop->orders_last_synced_at)->subDays(3)->unix(),
+                    Carbon::parse($shop->orders_last_synced_at)->subDays(1)->unix(),
                     Carbon::now()->unix(),
-                    $shipped,
+                    false,
                 ))->onQueue('pancake');
             });
 

@@ -99,7 +99,7 @@ const GROUP_BY_OPTIONS: {
     value: GroupBy;
     label: string;
     icon: LucideIcon;
-    hint?: string;
+    hint: string;
 }[] = [
     {
         value: 'ad_name',
@@ -1306,6 +1306,17 @@ export default function MetaAdsManager({
     const [filters, setFilters] = useState<GridFilter[]>(() =>
         deserializeGridFilters(query?.metricFilters, query?.dateFilters),
     );
+    // Serialized once so the grid fetch and the row chart send the same
+    // filters, and so the fetch effect depends on the strings rather than on a
+    // list identity that changes on every render.
+    const serializedMetricFilters = useMemo(
+        () => serializeMetricFilters(filters),
+        [filters],
+    );
+    const serializedDateFilters = useMemo(
+        () => serializeDateFilters(filters),
+        [filters],
+    );
     // Creator filter: '' (all), 'unassigned', or a member id as string.
     const [creatorFilter, setCreatorFilter] = useState<string>('');
     const [sort, setSort] = useState<string | null>(query?.sort ?? null);
@@ -1354,10 +1365,12 @@ export default function MetaAdsManager({
         qs.set('until', range.until);
         if (sort) qs.set('sort', sort);
         if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
-        const mf = serializeMetricFilters(filters);
-        if (mf) qs.set('metric_filters', mf);
-        const df = serializeDateFilters(filters);
-        if (df) qs.set('date_filters', df);
+        if (serializedMetricFilters) {
+            qs.set('metric_filters', serializedMetricFilters);
+        }
+        if (serializedDateFilters) {
+            qs.set('date_filters', serializedDateFilters);
+        }
         // Creator filter is ad-level only.
         if (groupBy === 'ad' && creatorFilter) {
             qs.set('creator_id', creatorFilter);
@@ -1395,7 +1408,8 @@ export default function MetaAdsManager({
         sort,
         page,
         perPage,
-        filters,
+        serializedMetricFilters,
+        serializedDateFilters,
         creatorFilter,
         debouncedSearch,
         accounts.length,
@@ -1590,6 +1604,7 @@ export default function MetaAdsManager({
                 selectedAccounts={selected}
                 accountsTotal={accounts.length}
                 groupLabel={groupLabel}
+                metricFilters={serializedMetricFilters}
                 onClose={() => setTimelineTarget(null)}
             />
 
