@@ -505,7 +505,19 @@ class CSRController extends Controller
         ]);
     }
 
-    public function analyticsLongestCall(Request $request, Workspace $workspace)
+    /**
+     * How much of the range's verification backlog got verified.
+     *
+     * Orders verified over "Total Order needs Verification" — orders on both
+     * sides, so three calls at one order cover one order rather than three.
+     * Counting the calls instead is what read a two-order backlog rung three
+     * times as 150%.
+     *
+     * The counts behind the rate come back with it: the orders verified, the
+     * backlog they are read against, and the calls it took to get through them
+     * — an order rung three times is three calls and one order.
+     */
+    public function analyticsVerifiedOrders(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
 
@@ -517,7 +529,9 @@ class CSRController extends Controller
 
         return response()->json([
             'value' => $current['rate'],
-            // Both sides of the division, so the card can show its own working.
+            // Both sides of the division, so the card can show its own working,
+            // and the calls behind the orders — the effort against the coverage.
+            'orders' => $current['orders'],
             'calls' => $current['calls'],
             'needs_verification' => $current['needs_verification'],
             'previous_value' => $previous['rate'],
@@ -675,30 +689,36 @@ class CSRController extends Controller
     /**
      * How much of the range's verification work actually got done.
      *
-     * Verification calls placed over the orders that needed one — the two cards
-     * beside this one, divided. Null rather than zero with nothing to verify: a
-     * 0% would read as "nobody rang" instead of "there was nothing to ring".
+     * Orders verified over the orders that needed one — the two cards beside
+     * this one, divided. Null rather than zero with nothing to verify: a 0%
+     * would read as "nobody rang" instead of "there was nothing to ring".
      *
-     * It can pass 100%. The numerator counts calls and the denominator counts
-     * orders, so a customer rung twice, or a CSR checking an order that was
-     * never flagged, both push it over — which is a real signal about the
-     * range, not an error to clamp away.
+     * Orders on both sides of the division, not calls: an order rung three
+     * times covers one order, and counting the three would put two orders rung
+     * between them at 150% verified. The calls come back beside the rate all
+     * the same, as the effort behind the coverage.
+     *
+     * It can still pass 100%, for two reasons that are real signal rather than
+     * arithmetic. A CSR can ring an order nothing flagged, and the distinct is
+     * only taken within a CSR's day on a shop — an order chased across two days
+     * counts on each of them.
      *
      * The two sides are also counted on different days: a call belongs to the
      * day it was placed, an order to the day it was confirmed. Over a range of
      * any length that washes out, but a single-day range can read oddly when
      * the calls chase the day before's orders.
      *
-     * @return array{rate: float|null, calls: int, needs_verification: int}
+     * @return array{rate: float|null, orders: int, calls: int, needs_verification: int}
      */
     private function verifiedCoverage(Workspace $workspace, string $from, string $to): array
     {
-        $calls = $this->verificationTotals($workspace, $from, $to)['calls'];
+        $verification = $this->verificationTotals($workspace, $from, $to);
         $needed = $this->verificationBacklog($workspace, $from, $to)['needs_verification'];
 
         return [
-            'rate' => $needed > 0 ? round($calls / $needed * 100, 1) : null,
-            'calls' => $calls,
+            'rate' => $needed > 0 ? round($verification['orders'] / $needed * 100, 1) : null,
+            'orders' => $verification['orders'],
+            'calls' => $verification['calls'],
             'needs_verification' => $needed,
         ];
     }
@@ -832,20 +852,26 @@ class CSRController extends Controller
      * `order_for_delivery_id`. The rollup is nightly, so a range the sync has
      * not reached is zero on both.
      *
-     * @return array{calls: int, seconds: int}
+     * `orders` is the same work counted by order rather than by call — the
+     * rollup's own `total_verified_orders`, distinct within a CSR's day on a
+     * shop. An order rung three times is three calls and one order.
+     *
+     * @return array{calls: int, seconds: int, orders: int}
      */
     private function verificationTotals(Workspace $workspace, string $from, string $to): array
     {
         $row = $this->callReport($workspace, $from, $to)
             ->selectRaw('
                 COALESCE(SUM(total_verification_called), 0)    as calls,
-                COALESCE(SUM(total_verification_call_time), 0) as seconds
+                COALESCE(SUM(total_verification_call_time), 0) as seconds,
+                COALESCE(SUM(total_verified_orders), 0)        as orders
             ')
             ->first();
 
         return [
             'calls' => (int) ($row->calls ?? 0),
             'seconds' => (int) ($row->seconds ?? 0),
+            'orders' => (int) ($row->orders ?? 0),
         ];
     }
 
