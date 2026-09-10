@@ -74,6 +74,8 @@ interface Workspace {
     ad_spend_goals_module_enabled: boolean;
     billing_module_enabled: boolean;
     courses_module_enabled: boolean;
+    discord_notifications_module_enabled: boolean;
+    erp_integration_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -100,6 +102,8 @@ const MODULE_FIELDS: Array<{
         | 'ad_spend_goals_module_enabled'
         | 'billing_module_enabled'
         | 'courses_module_enabled'
+        | 'discord_notifications_module_enabled'
+        | 'erp_integration_module_enabled'
     >;
     label: string;
     description: string;
@@ -204,6 +208,16 @@ const MODULE_FIELDS: Array<{
         label: 'Courses',
         description: 'Training courses and learning material',
     },
+    {
+        key: 'discord_notifications_module_enabled',
+        label: 'Discord Notifications',
+        description: 'Discord webhook settings for scheduled reports',
+    },
+    {
+        key: 'erp_integration_module_enabled',
+        label: 'ERP Integration',
+        description: 'ERP credentials used by the automation pipeline',
+    },
 ];
 
 type ModuleKey = (typeof MODULE_FIELDS)[number]['key'];
@@ -257,6 +271,14 @@ const MODULE_GROUPS: {
         title: 'Learning',
         description: 'Training material for workspace members',
         keys: ['courses_module_enabled'],
+    },
+    {
+        title: 'Integrations & Notifications',
+        description: 'Workspace settings for outbound alerts and ERP sync',
+        keys: [
+            'discord_notifications_module_enabled',
+            'erp_integration_module_enabled',
+        ],
     },
     {
         title: 'Public Pages',
@@ -999,6 +1021,10 @@ function ModulesModal({
         ad_spend_goals_module_enabled: workspace.ad_spend_goals_module_enabled,
         billing_module_enabled: workspace.billing_module_enabled,
         courses_module_enabled: workspace.courses_module_enabled,
+        discord_notifications_module_enabled:
+            workspace.discord_notifications_module_enabled,
+        erp_integration_module_enabled:
+            workspace.erp_integration_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

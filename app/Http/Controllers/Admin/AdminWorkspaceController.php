@@ -184,6 +184,8 @@ class AdminWorkspaceController extends Controller
             'ad_spend_goals_module_enabled' => 'required|boolean',
             'billing_module_enabled' => 'required|boolean',
             'courses_module_enabled' => 'required|boolean',
+            'discord_notifications_module_enabled' => 'required|boolean',
+            'erp_integration_module_enabled' => 'required|boolean',
         ]);
 
         $workspace->update($validated);

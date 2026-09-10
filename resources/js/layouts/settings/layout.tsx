@@ -68,18 +68,23 @@ export default function SettingsLayout({
     // Automation Configuration is workspace-scoped (each workspace integrates
     // with its own external ERP), so only surface it inside a workspace.
     if (workspace) {
-        groups.push({
-            label: 'Automation Configuration',
-            items: [
-                {
-                    title: 'ERP Credentials',
-                    href: `/workspaces/${workspace.slug}/settings/erp-credentials`,
-                    icon: Server,
-                },
-            ],
-        });
+        if (workspace.erp_integration_module_enabled) {
+            groups.push({
+                label: 'Automation Configuration',
+                items: [
+                    {
+                        title: 'ERP Credentials',
+                        href: `/workspaces/${workspace.slug}/settings/erp-credentials`,
+                        icon: Server,
+                    },
+                ],
+            });
+        }
 
-        if (canManageDiscordNotifications) {
+        if (
+            workspace.discord_notifications_module_enabled &&
+            canManageDiscordNotifications
+        ) {
             groups.push({
                 label: 'Notifications',
                 items: [
