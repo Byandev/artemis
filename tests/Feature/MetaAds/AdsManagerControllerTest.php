@@ -201,12 +201,182 @@ it('returns the meta ad-preview iframe src for an ad', function () {
                 'body' => '<iframe src="https://business.facebook.com/preview?d=TOKEN&amp;t=1" width="320" height="570"></iframe>',
             ]],
         ], 200),
+        // The frame itself is fetched server-side to confirm it rendered.
+        'business.facebook.com/*' => Http::response('<div>the ad</div>', 200),
     ]);
 
     $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 1002]))
         ->assertOk()
         // &amp; is decoded back to & for a usable src.
-        ->assertJson(['src' => 'https://business.facebook.com/preview?d=TOKEN&t=1']);
+        ->assertJson(['src' => 'https://business.facebook.com/preview?d=TOKEN&t=1'])
+        ->assertJsonPath('format', 'MOBILE_FEED_STANDARD')
+        ->assertJsonPath('reason', null);
+});
+
+it('falls back to another ad format when meta renders "Story Unavailable"', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    Http::fake([
+        // Meta hands back a frame for every format; only the URL differs.
+        'graph.facebook.com/*' => function ($request) {
+            $format = $request->data()['ad_format'] ?? 'unknown';
+
+            return Http::response([
+                'data' => [['body' => '<iframe src="https://business.facebook.com/p?f='.$format.'"></iframe>']],
+            ], 200);
+        },
+        // The feed frame is the "Story Unavailable" interstitial; Instagram renders.
+        // (Matches the frame URL's `?f=`, not the Graph call's `ad_format=`.)
+        '*f=MOBILE_FEED_STANDARD*' => Http::response(
+            '<html><body><h2>Story Unavailable</h2><p>The story in this ad is unavailable.</p></body></html>',
+            200,
+        ),
+        'business.facebook.com/*' => Http::response('<div>the ad</div>', 200),
+    ]);
+
+    $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->assertJsonPath('format', 'INSTAGRAM_STANDARD')
+        ->assertJsonPath('requested_format', 'MOBILE_FEED_STANDARD')
+        ->assertJsonPath('src', 'https://business.facebook.com/p?f=INSTAGRAM_STANDARD')
+        ->assertJsonPath('reason', null);
+});
+
+it('retries through the account\'s other linked tokens before giving up', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace); // meta user 9001 (token "test-token") owns account 101
+
+    // A second person connected to the same ad account. Meta renders previews
+    // with the signer's permissions, so this one having a role on the owning
+    // page is what makes the ad previewable at all.
+    $second = MetaUser::create(['id' => 9002, 'name' => 'Page Admin', 'access_token' => 'second-token']);
+    $second->workspaces()->attach($workspace->id);
+    $second->adAccounts()->attach(101);
+
+    Http::fake([
+        // Echo the signing token back in the frame URL so the stubs below can
+        // tell the two apart.
+        'graph.facebook.com/*' => function ($request) {
+            $token = str_replace('Bearer ', '', $request->header('Authorization')[0] ?? '');
+
+            return Http::response([
+                'data' => [['body' => '<iframe src="https://business.facebook.com/p?tok='.$token.'"></iframe>']],
+            ], 200);
+        },
+        // The original token has no page role: every format is unavailable to it.
+        '*tok=test-token*' => Http::response('<h2>Story Unavailable</h2>', 200),
+        '*tok=second-token*' => Http::response('<div>the ad</div>', 200),
+    ]);
+
+    $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->assertJsonPath('src', 'https://business.facebook.com/p?tok=second-token')
+        ->assertJsonPath('reason', null);
+});
+
+it('reports story_unavailable when no ad format renders', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    Http::fake([
+        'graph.facebook.com/*' => Http::response([
+            'data' => [['body' => '<iframe src="https://business.facebook.com/p?d=TOK"></iframe>']],
+        ], 200),
+        'business.facebook.com/*' => Http::response(
+            '<html><body><h2>Story Unavailable</h2></body></html>',
+            200,
+        ),
+    ]);
+
+    $this->getJson(route('workspaces.metaads.ads-manager.preview', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->assertJsonPath('src', null)
+        ->assertJsonPath('format', null)
+        ->assertJsonPath('reason', 'story_unavailable');
+});
+
+it('keeps returning ad detail when the preview call fails outright', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    Http::fake([
+        'graph.facebook.com/*' => Http::response(['error' => ['message' => 'Unsupported get request', 'code' => 100]], 400),
+    ]);
+
+    $this->getJson(route('workspaces.metaads.ads-manager.detail', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->assertJsonPath('dimensions.ad_name', 'Shared Creative')
+        ->assertJsonPath('preview.src', null)
+        ->assertJsonPath('preview.reason', 'no_preview')
+        ->assertJsonPath('preview.fallback.ads_manager_url', 'https://adsmanager.facebook.com/adsmanager/manage/ads?act=101&selected_ad_ids=1002');
+});
+
+it('offers ads library and instagram links when the preview cannot be rendered', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    // Ad 1002's creative, carrying the page it ran under and its IG permalink.
+    $creative = Creative::create([
+        'id' => 7001,
+        'meta_ads_account_id' => 101,
+        'meta_page_id' => 555000111,
+        'title' => 'Headline',
+        'body' => 'Ad copy',
+        'thumbnail_url' => 'https://scontent.example/thumb.jpg',
+        'instagram_permalink_url' => 'https://www.instagram.com/p/ABC123/',
+    ]);
+    Ad::where('id', 1002)->update(['meta_ads_creative_id' => $creative->id]);
+
+    Http::fake([
+        'graph.facebook.com/*' => Http::response([
+            'data' => [['body' => '<iframe src="https://business.facebook.com/p?d=TOK"></iframe>']],
+        ], 200),
+        'business.facebook.com/*' => Http::response('<h2>Story Unavailable</h2>', 200),
+    ]);
+
+    $response = $this->getJson(route('workspaces.metaads.ads-manager.detail', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->assertJsonPath('preview.src', null)
+        ->assertJsonPath('preview.reason', 'story_unavailable')
+        ->assertJsonPath('preview.fallback.image_url', 'https://scontent.example/thumb.jpg')
+        ->assertJsonPath('preview.fallback.instagram_url', 'https://www.instagram.com/p/ABC123/');
+
+    // Scoped to the page, since Meta's Library IDs aren't the ad ids we hold,
+    // and pre-filtered by the ad's own copy so a busy page isn't a haystack.
+    $library = $response->json('preview.fallback.ads_library_url');
+    expect($library)->toContain('facebook.com/ads/library/')
+        ->toContain('view_all_page_id=555000111')
+        ->toContain('search_type=page')
+        ->toContain('active_status=all')   // stopped ads are listed too
+        ->toContain('q=Ad+copy');
+});
+
+it('keeps the ads library keyword short enough not to over-constrain', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    seedAdsManager($workspace);
+
+    $creative = Creative::create([
+        'id' => 7002,
+        'meta_ads_account_id' => 101,
+        'meta_page_id' => 555000222,
+        'body' => "Ten  words   of\nprimary text here that should get cut off well before the end",
+    ]);
+    Ad::where('id', 1002)->update(['meta_ads_creative_id' => $creative->id]);
+
+    Http::fake([
+        'graph.facebook.com/*' => Http::response(['data' => [['body' => '<iframe src="https://business.facebook.com/p?d=T"></iframe>']]], 200),
+        'business.facebook.com/*' => Http::response('<h2>Story Unavailable</h2>', 200),
+    ]);
+
+    $library = $this->getJson(route('workspaces.metaads.ads-manager.detail', ['workspace' => $workspace, 'ad' => 1002]))
+        ->assertOk()
+        ->json('preview.fallback.ads_library_url');
+
+    // Six words, whitespace collapsed — the library matches keywords unordered,
+    // so the whole body would land on an empty result page.
+    expect($library)->toContain('q=Ten+words+of+primary+text+here')
+        ->not->toContain('cut+off');
 });
 
 it('does not expose ad previews for ads outside the workspace accounts', function () {
@@ -231,6 +401,7 @@ it('returns ad detail (dimensions + preview) for the drawer', function () {
                 'body' => '<iframe src="https://business.facebook.com/p?d=TOK"></iframe>',
             ]],
         ], 200),
+        'business.facebook.com/*' => Http::response('<div>the ad</div>', 200),
     ]);
 
     $this->getJson(route('workspaces.metaads.ads-manager.detail', ['workspace' => $workspace, 'ad' => 1002]))

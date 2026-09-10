@@ -40,6 +40,7 @@ import {
     ChevronDown,
     Download,
     Flag,
+    Goal,
     Image as ImageIcon,
     Layers,
     LayoutGrid,
@@ -47,6 +48,7 @@ import {
     Megaphone,
     Play,
     Search,
+    Target,
     Type,
     UserPlus,
     UserRound,
@@ -69,6 +71,7 @@ import {
     InsightFilterBuilder,
     InsightsMetrics,
     MetricFilter,
+    ObjectiveOption,
     StatusLabel,
     buildInsightsColumns,
     deserializeMetricFilters,
@@ -87,20 +90,64 @@ type GroupBy =
     | 'ad_set'
     | 'account'
     | 'page'
-    | 'page_owner';
+    | 'page_owner'
+    | 'optimization_goal'
+    | 'campaign_objective';
 
 const GROUP_BY_OPTIONS: {
     value: GroupBy;
     label: string;
     icon: LucideIcon;
 }[] = [
-    { value: 'ad_name', label: 'Ad Name', icon: Type },
-    { value: 'ad', label: 'Ad Id', icon: ImageIcon },
-    { value: 'campaign', label: 'Campaign', icon: Megaphone },
-    { value: 'ad_set', label: 'Ad Set', icon: Layers },
-    { value: 'account', label: 'Ad Account', icon: Wallet },
-    { value: 'page', label: 'Page', icon: Flag },
-    { value: 'page_owner', label: 'Page Owner', icon: UserRound },
+    {
+        value: 'ad_name',
+        label: 'Ad Name',
+        icon: Type,
+        hint: 'Ads sharing a name, collapsed',
+    },
+    { value: 'ad', label: 'Ad Id', icon: ImageIcon, hint: 'One row per ad' },
+    {
+        value: 'campaign',
+        label: 'Campaign',
+        icon: Megaphone,
+        hint: 'Rolled up per campaign',
+    },
+    {
+        value: 'ad_set',
+        label: 'Ad Set',
+        icon: Layers,
+        hint: 'Rolled up per ad set',
+    },
+    {
+        value: 'account',
+        label: 'Ad Account',
+        icon: Wallet,
+        hint: 'Rolled up per ad account',
+    },
+    {
+        value: 'page',
+        label: 'Page',
+        icon: Flag,
+        hint: 'The page the ad set promotes',
+    },
+    {
+        value: 'page_owner',
+        label: 'Page Owner',
+        icon: UserRound,
+        hint: 'Who owns that page',
+    },
+    {
+        value: 'optimization_goal',
+        label: 'Optimization Goal',
+        icon: Target,
+        hint: "The ad set's optimization goal",
+    },
+    {
+        value: 'campaign_objective',
+        label: 'Campaign Objective',
+        icon: Goal,
+        hint: "The campaign's objective",
+    },
 ];
 
 /** Whether the grouped dimension carries a per-row status + (for ads) a thumbnail. */
@@ -112,6 +159,8 @@ const HAS_STATUS: Record<GroupBy, boolean> = {
     account: false,
     page: false,
     page_owner: false,
+    optimization_goal: false,
+    campaign_objective: false,
 };
 
 interface Row extends InsightsMetrics {
@@ -156,6 +205,8 @@ interface Props {
     accounts: AccountOption[];
     members: OwnerOption[];
     selectedAccounts: string[];
+    /** Campaign objectives available to the Filters builder's value picker. */
+    objectives?: ObjectiveOption[];
     dateRange: { since: string; until: string };
     query?: {
         sort?: string | null;
@@ -1235,6 +1286,7 @@ export default function MetaAdsManager({
     accounts,
     members,
     selectedAccounts,
+    objectives = [],
     dateRange,
     query,
 }: Props) {
@@ -1248,6 +1300,11 @@ export default function MetaAdsManager({
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
     const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() =>
         deserializeMetricFilters(query?.metricFilters),
+    );
+    // Serialized once so the grid fetch and the row chart send the same filters.
+    const serializedFilters = useMemo(
+        () => serializeMetricFilters(metricFilters),
+        [metricFilters],
     );
     // Creator filter: '' (all), 'unassigned', or a member id as string.
     const [creatorFilter, setCreatorFilter] = useState<string>('');
@@ -1297,8 +1354,7 @@ export default function MetaAdsManager({
         qs.set('until', range.until);
         if (sort) qs.set('sort', sort);
         if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
-        const mf = serializeMetricFilters(metricFilters);
-        if (mf) qs.set('metric_filters', mf);
+        if (serializedFilters) qs.set('metric_filters', serializedFilters);
         // Creator filter is ad-level only.
         if (groupBy === 'ad' && creatorFilter) {
             qs.set('creator_id', creatorFilter);
@@ -1336,7 +1392,7 @@ export default function MetaAdsManager({
         sort,
         page,
         perPage,
-        metricFilters,
+        serializedFilters,
         creatorFilter,
         debouncedSearch,
         accounts.length,
@@ -1466,6 +1522,7 @@ export default function MetaAdsManager({
                         <InsightFilterBuilder
                             filters={metricFilters}
                             onChange={onMetricFilters}
+                            objectives={objectives}
                         />
                     </div>
                 </div>
@@ -1529,6 +1586,7 @@ export default function MetaAdsManager({
                 selectedAccounts={selected}
                 accountsTotal={accounts.length}
                 groupLabel={groupLabel}
+                metricFilters={serializedFilters}
                 onClose={() => setTimelineTarget(null)}
             />
 
