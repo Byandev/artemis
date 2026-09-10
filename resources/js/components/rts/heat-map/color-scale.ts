@@ -120,16 +120,17 @@ export const CSR_GROUPS: CsrGroup[] = [
  * Rate bands are absolute, so a province keeps its group as the date range moves:
  * under 15% is low, 15–22% moderate, above 22% high.
  *
- * "High volume" cannot be absolute — a fortnight and a quarter are not comparable
- * in orders — so it is a percentile of the areas that have any orders at all,
- * floored so a quiet range cannot promote three orders to "high".
+ * "High volume" is relative — an area carrying 1.5× the average orders per area.
+ * That is deliberately not an absolute count: the average grows with the length of
+ * the range, so the same province reads the same whether you look at a fortnight or
+ * a quarter, which a fixed number cannot do.
  */
 export const CSR_THRESHOLDS = {
     /** Above this is high; 15–22 inclusive is moderate. */
     highRtsRate: 22,
     moderateRtsRate: 15,
-    highVolumePercentile: 0.75,
-    minimumHighVolume: 20,
+    /** Multiples of the average orders per area that count as high volume. */
+    highVolumeMultiplier: 1.5,
 };
 
 export const NO_DATA_COLOR = { light: '#d6d6d9', dark: '#4a4a52' };
@@ -149,8 +150,10 @@ export interface HeatScale {
     buckets: Bucket[] | null;
     /** The CSR groups — only in `rts-orders`. */
     groups: CsrGroup[] | null;
-    /** Orders at or above this count count as high volume; null in `rts`. */
+    /** Orders at or above this count as high volume; null in `rts`. */
     highVolumeFrom: number | null;
+    /** Mean orders per area with orders — what the threshold is a multiple of. */
+    averageOrders: number | null;
     colorFor: (ratePercentage: number, orders: number) => string;
     /** Which CSR group an area falls in; null in `rts`. */
     groupFor: (ratePercentage: number, orders: number) => CsrGroupKey | null;
@@ -178,6 +181,7 @@ export function buildScale(
             buckets,
             groups: null,
             highVolumeFrom: null,
+            averageOrders: null,
             groupFor: () => null,
             colorFor: (rate) => {
                 for (let i = buckets.length - 1; i >= 0; i--) {
@@ -188,7 +192,10 @@ export function buildScale(
         };
     }
 
-    const highVolumeFrom = highVolumeThreshold(orderCounts);
+    const averageOrders = averageOrdersPerArea(orderCounts);
+    const highVolumeFrom = Math.ceil(
+        averageOrders * CSR_THRESHOLDS.highVolumeMultiplier,
+    );
     const byKey = Object.fromEntries(CSR_GROUPS.map((g) => [g.key, g.color]));
     const noData = isDark ? NO_DATA_COLOR.dark : NO_DATA_COLOR.light;
 
@@ -215,6 +222,7 @@ export function buildScale(
         buckets: null,
         groups: CSR_GROUPS,
         highVolumeFrom,
+        averageOrders: Math.round(averageOrders),
         groupFor,
         colorFor: (rate, orders) => {
             const key = groupFor(rate, orders);
@@ -224,21 +232,18 @@ export function buildScale(
 }
 
 /**
- * The 75th percentile of areas that have orders, but never below the floor — in a
- * one-week range the top quarter of provinces might only have a handful of orders
- * each, which is not "high volume" in any useful sense.
+ * Mean orders across the areas that have any. Areas with none sit outside the set
+ * rather than dragging the average down — a province you did not ship to says
+ * nothing about what a normal province looks like.
  */
-function highVolumeThreshold(orderCounts: number[]): number {
-    const sorted = orderCounts.filter((v) => v > 0).sort((a, b) => a - b);
+function averageOrdersPerArea(orderCounts: number[]): number {
+    const active = orderCounts.filter((v) => v > 0);
 
-    if (sorted.length === 0) {
-        return CSR_THRESHOLDS.minimumHighVolume;
+    if (active.length === 0) {
+        return 0;
     }
 
-    const at = Math.floor(sorted.length * CSR_THRESHOLDS.highVolumePercentile);
-    const percentile = sorted[Math.min(at, sorted.length - 1)];
-
-    return Math.max(percentile, CSR_THRESHOLDS.minimumHighVolume);
+    return active.reduce((sum, value) => sum + value, 0) / active.length;
 }
 
 export const peso = (value: number) => `₱${Math.round(value).toLocaleString()}`;

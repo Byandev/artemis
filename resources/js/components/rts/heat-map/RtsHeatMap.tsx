@@ -324,7 +324,7 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
                                 title="CSR monitoring groups"
                                 note={
                                     scale.highVolumeFrom
-                                        ? `High volume = ${scale.highVolumeFrom}+ orders in this range`
+                                        ? `High volume = ${scale.highVolumeFrom}+ orders — 1.5× the ${scale.averageOrders}-order average`
                                         : undefined
                                 }
                             />
