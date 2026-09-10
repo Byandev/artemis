@@ -4,11 +4,10 @@ import {
     RtsEmptyState,
     buildBaseParams,
 } from '@/components/rts/rts-shared';
-import { Loader2, Minus, Plus, RotateCcw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import HeatMapCanvas from './HeatMapCanvas';
 import {
-    BORDER_COLOR,
     CSR_GROUPS,
     HEAT_MODES,
     NO_DATA_COLOR,
@@ -22,8 +21,6 @@ import {
 import { loadPhGeoJson, type PhGeoJson } from './ph-geo';
 import type { HeatGroupBy, HeatMapResponse, HeatRow } from './types';
 import { useIsDark } from './use-is-dark';
-
-const DEFAULT_CENTER: [number, number] = [121.75, 13];
 
 interface Props {
     workspaceSlug: string;
@@ -45,9 +42,6 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
     const [geoError, setGeoError] = useState<string | null>(null);
     const [response, setResponse] = useState<HeatMapResponse | null>(null);
     const [loading, setLoading] = useState(true);
-
-    const [zoom, setZoom] = useState(1);
-    const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
 
     const [hover, setHover] = useState<{
         row: HeatRow;
@@ -161,18 +155,6 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
         [],
     );
     const handleLeave = useCallback(() => setHover(null), []);
-    const handleMoveEnd = useCallback(
-        (position: { coordinates: [number, number]; zoom: number }) => {
-            setCenter(position.coordinates);
-            setZoom(position.zoom);
-        },
-        [],
-    );
-
-    const resetView = () => {
-        setCenter(DEFAULT_CENTER);
-        setZoom(1);
-    };
 
     const nameOf = (row: {
         region: string | null;
@@ -207,156 +189,156 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
         return `No RTS data between ${day(queryParams.startDate)} and ${day(queryParams.endDate)}. This workspace has data from ${day(available.first)} to ${day(available.last)}.`;
     }, [response, queryParams.startDate, queryParams.endDate]);
 
+    const rateTone = (rate: number) =>
+        rate > 22
+            ? 'text-red-600 dark:text-red-400'
+            : rate >= 15
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-emerald-600 dark:text-emerald-400';
+
     return (
-        <div className="rounded-2xl border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
-            <div className="flex flex-col gap-4 border-b border-black/6 px-5 py-4 dark:border-white/6">
-                <div className="flex items-start justify-between gap-3">
+        <section className="overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.06] dark:bg-zinc-900 dark:ring-white/[0.07]">
+            {/* Header ------------------------------------------------------ */}
+            <header className="flex flex-col gap-5 px-6 pt-5 pb-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0">
-                        <h2 className="text-[14px] font-semibold text-gray-900 dark:text-gray-100">
+                        <h2 className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-gray-50">
                             RTS Heat Map
                         </h2>
-                        <p className="mt-0.5 text-[12px] text-gray-400 dark:text-gray-500">
+                        <p className="mt-1 text-[12px] text-gray-500 dark:text-gray-400">
                             {modeConfig.short} by{' '}
                             {groupBy === 'region' ? 'island group' : 'province'}
                         </p>
                     </div>
-                    <RefreshButton onClick={fetchData} loading={loading} />
-                </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                    <Segmented
-                        options={[
-                            { value: 'region', label: 'Region' },
-                            { value: 'province', label: 'Province' },
-                        ]}
-                        value={groupBy}
-                        onChange={(v) => setGroupBy(v as HeatGroupBy)}
-                    />
-                    <Segmented
-                        options={HEAT_MODES.map((m) => ({
-                            value: m.key,
-                            label: m.label,
-                        }))}
-                        value={mode}
-                        onChange={(v) => setSelectedMode(v as HeatMode)}
-                        disabled={groupBy === 'region'}
-                        disabledHint="CSR groups compare provinces against each other — switch to Province to use them"
-                    />
-                </div>
-
-                {totals && (
-                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-gray-500 dark:text-gray-400">
-                        <Stat
-                            label="Orders"
-                            value={totals.orders.toLocaleString()}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Segmented
+                            options={[
+                                { value: 'region', label: 'Region' },
+                                { value: 'province', label: 'Province' },
+                            ]}
+                            value={groupBy}
+                            onChange={(v) => setGroupBy(v as HeatGroupBy)}
                         />
-                        <Stat label="Sales" value={peso(totals.sales)} />
-                        <Stat
-                            label="Returned"
-                            value={`${totals.returning_count.toLocaleString()} · ${peso(totals.returning_amount)}`}
+                        <Segmented
+                            options={HEAT_MODES.map((m) => ({
+                                value: m.key,
+                                label: m.label,
+                            }))}
+                            value={mode}
+                            onChange={(v) => setSelectedMode(v as HeatMode)}
+                            disabled={groupBy === 'region'}
+                            disabledHint="CSR groups compare provinces against each other — switch to Province to use them"
                         />
-                        <Stat
-                            label="RTS rate"
-                            value={`${totals.rts_rate_percentage}%`}
-                        />
-                        <Stat
-                            label="Areas plotted"
-                            value={`${rows.length.toLocaleString()} of ${(
-                                totals.mapped_areas + totals.unmapped_areas
-                            ).toLocaleString()}`}
-                        />
+                        <RefreshButton onClick={fetchData} loading={loading} />
                     </div>
-                )}
-            </div>
+                </div>
 
-            <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_260px]">
-                <div className="relative border-b border-black/6 p-3 lg:border-r lg:border-b-0 dark:border-white/6">
+                {/* Headline figures. The rate leads because it is the one number
+                    that is comparable between a big province and a small one. */}
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-black/[0.06] sm:grid-cols-4 dark:bg-white/[0.07]">
+                    <Kpi
+                        label="RTS rate"
+                        value={
+                            totals
+                                ? `${totals.rts_rate_percentage.toFixed(1)}%`
+                                : '—'
+                        }
+                        tone={
+                            totals
+                                ? rateTone(totals.rts_rate_percentage)
+                                : undefined
+                        }
+                        sub="of value shipped"
+                    />
+                    <Kpi
+                        label="Returned"
+                        value={
+                            totals
+                                ? totals.returning_count.toLocaleString()
+                                : '—'
+                        }
+                        sub={totals ? peso(totals.returning_amount) : undefined}
+                    />
+                    <Kpi
+                        label="Orders"
+                        value={totals ? totals.orders.toLocaleString() : '—'}
+                        sub={totals ? peso(totals.sales) : undefined}
+                    />
+                    <Kpi
+                        label={groupBy === 'region' ? 'Regions' : 'Provinces'}
+                        value={rows.length ? rows.length.toLocaleString() : '—'}
+                        sub={
+                            totals?.unmapped_areas
+                                ? `${totals.unmapped_areas} unplaced`
+                                : 'all placed'
+                        }
+                    />
+                </div>
+            </header>
+
+            {/* Map + panel -------------------------------------------------- */}
+            <div className="grid grid-cols-1 items-start border-t border-black/[0.06] lg:grid-cols-2 dark:border-white/[0.07]">
+                <div className="relative border-b border-black/[0.06] bg-gradient-to-b from-stone-50/80 to-white p-4 lg:sticky lg:top-4 lg:self-start lg:border-r lg:border-b-0 dark:border-white/[0.07] dark:from-zinc-950/40 dark:to-zinc-900">
                     {geoError ? (
-                        <RtsEmptyState message={geoError} height="h-[520px]" />
+                        <RtsEmptyState message={geoError} height="h-[540px]" />
                     ) : busy ? (
-                        <div className="flex h-[520px] flex-col items-center justify-center gap-3 text-[12px] text-gray-400">
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                            {geoData ? 'Loading RTS data…' : 'Loading map…'}
-                        </div>
+                        <MapSkeleton
+                            label={
+                                geoData ? 'Loading RTS data…' : 'Loading map…'
+                            }
+                        />
                     ) : rows.length === 0 ? (
                         <RtsEmptyState
                             message={emptyMessage}
-                            height="h-[520px]"
+                            height="h-[540px]"
                         />
                     ) : (
                         <>
-                            <div className="mx-auto max-h-[70vh] max-w-[560px]">
+                            <div className="mx-auto max-h-[72vh] max-w-[520px]">
                                 <HeatMapCanvas
                                     geoData={geoData as PhGeoJson}
                                     rowsByGid={rowsByGid}
                                     colorFor={colorFor}
                                     isDark={isDark}
-                                    zoom={zoom}
-                                    center={center}
-                                    onMoveEnd={handleMoveEnd}
                                     onEnter={handleEnter}
                                     onMove={handleMove}
                                     onLeave={handleLeave}
                                 />
                             </div>
 
-                            <div className="absolute top-5 right-5 flex flex-col gap-1">
-                                <ZoomButton
-                                    label="Zoom in"
-                                    onClick={() =>
-                                        setZoom((z) => Math.min(12, z * 1.5))
-                                    }
-                                >
-                                    <Plus className="h-3.5 w-3.5" />
-                                </ZoomButton>
-                                <ZoomButton
-                                    label="Zoom out"
-                                    onClick={() =>
-                                        setZoom((z) => Math.max(1, z / 1.5))
-                                    }
-                                >
-                                    <Minus className="h-3.5 w-3.5" />
-                                </ZoomButton>
-                                <ZoomButton
-                                    label="Reset view"
-                                    onClick={resetView}
-                                >
-                                    <RotateCcw className="h-3.5 w-3.5" />
-                                </ZoomButton>
-                            </div>
-
                             <Legend
                                 buckets={scale.buckets}
                                 groups={scale.groups}
+                                counts={grouped}
                                 isDark={isDark}
                             />
                         </>
                     )}
                 </div>
 
-                <div className="p-4">
+                <aside className="p-5">
                     {mode === 'rts-orders' ? (
                         <>
-                            <h3 className="mb-1 text-[12px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                                CSR monitoring groups
-                            </h3>
-                            <p className="mb-3 text-[11px] text-gray-400 dark:text-gray-600">
-                                High volume is {scale.highVolumeFrom}+ orders in
-                                this range.
-                            </p>
-
+                            <PanelHeading
+                                title="CSR monitoring groups"
+                                note={
+                                    scale.highVolumeFrom
+                                        ? `High volume = ${scale.highVolumeFrom}+ orders in this range`
+                                        : undefined
+                                }
+                            />
                             {rows.length === 0 ? (
-                                <p className="text-[12px] text-gray-400">
-                                    No data
-                                </p>
+                                <EmptyNote />
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     {CSR_GROUPS.map((group) => (
                                         <GroupPanel
                                             key={group.key}
                                             group={group}
                                             rows={grouped.get(group.key) ?? []}
                                             nameOf={nameOf}
+                                            rateTone={rateTone}
                                         />
                                     ))}
                                 </div>
@@ -364,44 +346,41 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
                         </>
                     ) : (
                         <>
-                            <h3 className="mb-3 text-[12px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
-                                {groupBy === 'region'
-                                    ? 'Regions'
-                                    : 'Top provinces'}
-                                <span className="ml-1 font-normal normal-case">
-                                    (by rate)
-                                </span>
-                            </h3>
-
+                            <PanelHeading
+                                title={
+                                    groupBy === 'region'
+                                        ? 'Regions'
+                                        : 'Highest RTS rate'
+                                }
+                                note="Ranked by rate"
+                            />
                             {ranked.length === 0 ? (
-                                <p className="text-[12px] text-gray-400">
-                                    No data
-                                </p>
+                                <EmptyNote />
                             ) : (
-                                <ol className="space-y-1">
+                                <ol className="-mx-2">
                                     {ranked.map((row, index) => (
                                         <li
                                             key={row.region ?? row.gids[0]}
-                                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-stone-50 dark:hover:bg-white/5"
+                                            className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                                         >
-                                            <span className="w-4 shrink-0 text-right text-[11px] text-gray-300 dark:text-gray-600">
+                                            <span className="w-4 shrink-0 text-right font-mono text-[10px] text-gray-300 tabular-nums dark:text-gray-600">
                                                 {index + 1}
                                             </span>
                                             <span
-                                                className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                                                className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/10"
                                                 style={{
                                                     background: colorFor(row),
                                                 }}
                                             />
                                             <span className="min-w-0 flex-1 truncate text-[12px] text-gray-700 dark:text-gray-300">
                                                 {nameOf(row)}
-                                                <span className="text-gray-400 dark:text-gray-600">
-                                                    {' '}
-                                                    ·{' '}
-                                                    {row.orders.toLocaleString()}
-                                                </span>
                                             </span>
-                                            <span className="shrink-0 font-mono text-[12px] font-medium text-gray-900 tabular-nums dark:text-gray-100">
+                                            <span className="shrink-0 font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-600">
+                                                {row.orders.toLocaleString()}
+                                            </span>
+                                            <span
+                                                className={`w-11 shrink-0 text-right font-mono text-[12px] font-semibold tabular-nums ${rateTone(row.rts_rate_percentage)}`}
+                                            >
                                                 {row.rts_rate_percentage.toFixed(
                                                     1,
                                                 )}
@@ -415,74 +394,30 @@ export default function RtsHeatMap({ workspaceSlug, queryParams }: Props) {
                     )}
 
                     {!!totals?.unmapped_areas && (
-                        <p className="mt-4 border-t border-black/6 pt-3 text-[11px] leading-relaxed text-gray-400 dark:border-white/6 dark:text-gray-600">
+                        <p className="mt-5 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-gray-400 dark:border-white/[0.07] dark:text-gray-500">
                             {totals.unmapped_areas.toLocaleString()}{' '}
                             {totals.unmapped_areas === 1 ? 'area' : 'areas'}{' '}
-                            could not be placed on the map — the address had no
-                            province recorded. Those orders still count towards
-                            the totals above, but are not shaded.
+                            could not be placed — no province on the address.
+                            Still counted above, not shaded.
                         </p>
                     )}
-                </div>
+                </aside>
             </div>
 
             {hover && (
-                <div
-                    className="pointer-events-none fixed z-50 rounded-lg border border-black/10 bg-white px-3 py-2 shadow-lg dark:border-white/10 dark:bg-zinc-800"
-                    style={{
-                        left: hover.x + 14,
-                        top: hover.y + 14,
-                        transform:
-                            hover.x > window.innerWidth - 220
-                                ? 'translateX(-100%) translateX(-28px)'
-                                : undefined,
-                    }}
-                >
-                    <p className="text-[12px] font-semibold text-gray-900 dark:text-gray-100">
-                        {nameOf(hover.row)}
-                    </p>
-                    {groupBy === 'province' && hover.row.province_id && (
-                        <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
-                            {hover.row.province_id}
-                        </p>
-                    )}
-                    <dl className="mt-1.5 grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 text-[11px]">
-                        <TooltipRow
-                            label="Orders"
-                            value={`${hover.row.orders.toLocaleString()} · ${peso(hover.row.sales)}`}
-                        />
-                        <TooltipRow
-                            label="Delivered"
-                            value={`${hover.row.delivered_count.toLocaleString()} · ${peso(hover.row.delivered_amount)}`}
-                        />
-                        <TooltipRow
-                            label="Returned"
-                            value={`${hover.row.returning_count.toLocaleString()} · ${peso(hover.row.returning_amount)}`}
-                        />
-                        <TooltipRow
-                            label="RTS rate"
-                            value={`${hover.row.rts_rate_percentage}% by value`}
-                        />
-                    </dl>
-                    {hoverGroup && (
-                        <div
-                            className="mt-2 border-t border-black/8 pt-1.5 dark:border-white/10"
-                            style={{ maxWidth: '13rem' }}
-                        >
-                            <p
-                                className="text-[11px] font-semibold"
-                                style={{ color: hoverGroup.color }}
-                            >
-                                {hoverGroup.label}
-                            </p>
-                            <p className="text-[10px] leading-snug text-gray-500 dark:text-gray-400">
-                                {hoverGroup.strategy}
-                            </p>
-                        </div>
-                    )}
-                </div>
+                <Tooltip
+                    row={hover.row}
+                    x={hover.x}
+                    y={hover.y}
+                    title={nameOf(hover.row)}
+                    subtitle={
+                        groupBy === 'province' ? hover.row.province_id : null
+                    }
+                    group={hoverGroup}
+                    rateTone={rateTone}
+                />
             )}
-        </div>
+        </section>
     );
 }
 
@@ -494,42 +429,215 @@ const day = (iso: string) =>
         year: 'numeric',
     });
 
-const Stat = ({ label, value }: { label: string; value: string }) => (
-    <span>
-        {label}{' '}
-        <span className="font-mono font-medium text-gray-900 tabular-nums dark:text-gray-100">
+/**
+ * A headline figure. The number carries the weight; the label and the supporting
+ * figure stay in muted ink so the eye lands on the value first.
+ */
+const Kpi = ({
+    label,
+    value,
+    sub,
+    tone,
+}: {
+    label: string;
+    value: string;
+    sub?: string;
+    tone?: string;
+}) => (
+    <div className="bg-white px-4 py-3 dark:bg-zinc-900">
+        <p className="text-[10px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500">
+            {label}
+        </p>
+        <p
+            className={`mt-1 font-mono text-[22px] leading-none font-semibold tracking-tight tabular-nums ${tone ?? 'text-gray-900 dark:text-gray-50'}`}
+        >
             {value}
-        </span>
-    </span>
+        </p>
+        {sub && (
+            <p className="mt-1.5 truncate font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-500">
+                {sub}
+            </p>
+        )}
+    </div>
+);
+
+const PanelHeading = ({ title, note }: { title: string; note?: string }) => (
+    <div className="mb-4">
+        <h3 className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+            {title}
+        </h3>
+        {note && (
+            <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-600">
+                {note}
+            </p>
+        )}
+    </div>
+);
+
+const EmptyNote = () => (
+    <p className="text-[12px] text-gray-400 dark:text-gray-600">No data</p>
+);
+
+/** Shimmer rather than a spinner: the shape of what is coming, not a wait cursor. */
+const MapSkeleton = ({ label }: { label: string }) => (
+    <div className="flex h-[540px] flex-col items-center justify-center gap-4">
+        <div className="h-56 w-36 animate-pulse rounded-[40%_60%_55%_45%/_45%_40%_60%_55%] bg-black/[0.06] dark:bg-white/[0.06]" />
+        <p className="flex items-center gap-2 text-[12px] text-gray-400 dark:text-gray-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {label}
+        </p>
+    </div>
+);
+
+/** One CSR group and the areas in it, as the monitoring sheet lists them. */
+const GroupPanel = ({
+    group,
+    rows,
+    nameOf,
+    rateTone,
+}: {
+    group: CsrGroup;
+    rows: HeatRow[];
+    nameOf: (row: HeatRow) => string;
+    rateTone: (rate: number) => string;
+}) => (
+    <div className="overflow-hidden rounded-xl ring-1 ring-black/[0.06] dark:ring-white/[0.07]">
+        <div
+            className="flex items-center gap-2 px-3 py-2"
+            style={{ background: `${group.color}14` }}
+        >
+            <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ background: group.color }}
+            />
+            <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-gray-800 dark:text-gray-200">
+                {group.label}
+            </span>
+            <span
+                className="shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums"
+                style={{ background: `${group.color}22`, color: group.color }}
+            >
+                {rows.length}
+            </span>
+        </div>
+        <p className="px-3 pt-2 text-[10px] leading-snug text-gray-400 dark:text-gray-500">
+            {group.strategy}
+        </p>
+        {rows.length === 0 ? (
+            <p className="px-3 py-2 text-[11px] text-gray-300 dark:text-gray-700">
+                None
+            </p>
+        ) : (
+            <ul className="px-1.5 py-1.5 sm:columns-2 sm:gap-x-2">
+                {rows.map((row) => (
+                    <li
+                        key={row.region ?? row.gids[0]}
+                        className="flex break-inside-avoid items-baseline gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                    >
+                        <span className="min-w-0 flex-1 truncate text-[11px] text-gray-600 dark:text-gray-400">
+                            {nameOf(row)}
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-600">
+                            {row.orders.toLocaleString()}
+                        </span>
+                        <span
+                            className={`w-9 shrink-0 text-right font-mono text-[10px] font-semibold tabular-nums ${rateTone(row.rts_rate_percentage)}`}
+                        >
+                            {row.rts_rate_percentage.toFixed(0)}%
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        )}
+    </div>
+);
+
+const Tooltip = ({
+    row,
+    x,
+    y,
+    title,
+    subtitle,
+    group,
+    rateTone,
+}: {
+    row: HeatRow;
+    x: number;
+    y: number;
+    title: string;
+    subtitle: string | null;
+    group: CsrGroup | null;
+    rateTone: (rate: number) => string;
+}) => (
+    <div
+        className="pointer-events-none fixed z-50 w-56 rounded-xl bg-white/95 p-3 shadow-xl ring-1 ring-black/10 backdrop-blur dark:bg-zinc-800/95 dark:ring-white/10"
+        style={{
+            left: x + 16,
+            top: y + 16,
+            transform:
+                x > window.innerWidth - 260
+                    ? 'translateX(-100%) translateX(-32px)'
+                    : undefined,
+        }}
+    >
+        <div className="flex items-baseline justify-between gap-2">
+            <p className="min-w-0 truncate text-[12px] font-semibold text-gray-900 dark:text-gray-50">
+                {title}
+            </p>
+            <span
+                className={`shrink-0 font-mono text-[13px] font-semibold tabular-nums ${rateTone(row.rts_rate_percentage)}`}
+            >
+                {row.rts_rate_percentage.toFixed(1)}%
+            </span>
+        </div>
+        {subtitle && (
+            <p className="font-mono text-[10px] text-gray-400 dark:text-gray-500">
+                {subtitle}
+            </p>
+        )}
+
+        <dl className="mt-2 space-y-1 border-t border-black/[0.06] pt-2 text-[11px] dark:border-white/10">
+            <TooltipRow
+                label="Orders"
+                value={`${row.orders.toLocaleString()} · ${peso(row.sales)}`}
+            />
+            <TooltipRow
+                label="Delivered"
+                value={`${row.delivered_count.toLocaleString()} · ${peso(row.delivered_amount)}`}
+            />
+            <TooltipRow
+                label="Returned"
+                value={`${row.returning_count.toLocaleString()} · ${peso(row.returning_amount)}`}
+            />
+        </dl>
+
+        {group && (
+            <div className="mt-2 border-t border-black/[0.06] pt-2 dark:border-white/10">
+                <p
+                    className="flex items-center gap-1.5 text-[11px] font-semibold"
+                    style={{ color: group.color }}
+                >
+                    <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: group.color }}
+                    />
+                    {group.label}
+                </p>
+                <p className="mt-0.5 text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+                    {group.strategy}
+                </p>
+            </div>
+        )}
+    </div>
 );
 
 const TooltipRow = ({ label, value }: { label: string; value: string }) => (
-    <>
+    <div className="flex items-baseline justify-between gap-3">
         <dt className="text-gray-400 dark:text-gray-500">{label}</dt>
-        <dd className="text-right font-mono font-medium text-gray-900 tabular-nums dark:text-gray-100">
+        <dd className="font-mono text-gray-700 tabular-nums dark:text-gray-300">
             {value}
         </dd>
-    </>
-);
-
-const ZoomButton = ({
-    label,
-    onClick,
-    children,
-}: {
-    label: string;
-    onClick: () => void;
-    children: React.ReactNode;
-}) => (
-    <button
-        type="button"
-        onClick={onClick}
-        title={label}
-        aria-label={label}
-        className="flex h-7 w-7 items-center justify-center rounded-lg border border-black/8 bg-white/90 text-gray-500 backdrop-blur transition-colors hover:bg-white hover:text-gray-900 dark:border-white/8 dark:bg-zinc-800/90 dark:text-gray-400 dark:hover:bg-zinc-800 dark:hover:text-gray-100"
-    >
-        {children}
-    </button>
+    </div>
 );
 
 const Segmented = ({
@@ -546,19 +654,19 @@ const Segmented = ({
     disabledHint?: string;
 }) => (
     <div
-        className={`flex overflow-hidden rounded-lg border border-black/8 text-[12px] font-medium dark:border-white/8 ${disabled ? 'opacity-50' : ''}`}
+        className={`flex rounded-lg bg-black/[0.04] p-0.5 text-[12px] font-medium dark:bg-white/[0.06] ${disabled ? 'opacity-50' : ''}`}
         title={disabled ? disabledHint : undefined}
     >
-        {options.map((option, index) => (
+        {options.map((option) => (
             <button
                 key={option.value}
                 type="button"
                 disabled={disabled}
                 onClick={() => onChange(option.value)}
-                className={`px-3 py-1.5 transition-colors ${index > 0 ? 'border-l border-black/8 dark:border-white/8' : ''} ${disabled ? 'cursor-not-allowed' : ''} ${
+                className={`rounded-[6px] px-2.5 py-1 transition-all ${disabled ? 'cursor-not-allowed' : ''} ${
                     option.value === value
-                        ? 'bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-gray-100'
-                        : 'text-gray-400 hover:text-gray-700 dark:text-gray-500 dark:hover:text-gray-300'
+                        ? 'bg-white text-gray-900 shadow-sm dark:bg-zinc-700 dark:text-gray-50'
+                        : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
                 }`}
             >
                 {option.label}
@@ -568,104 +676,76 @@ const Segmented = ({
 );
 
 /**
- * Two ramps when volume is in play: hue says how bad the RTS rate is, strength
- * says how many orders stand behind it. Splitting them keeps the legend readable
- * where a full bivariate grid would not fit in the corner.
- */
-/** One CSR group and the areas that fall in it, as the monitoring sheet lists them. */
-const GroupPanel = ({
-    group,
-    rows,
-    nameOf,
-}: {
-    group: CsrGroup;
-    rows: HeatRow[];
-    nameOf: (row: HeatRow) => string;
-}) => (
-    <div>
-        <div className="flex items-center gap-2">
-            <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ background: group.color }}
-            />
-            <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
-                {group.label}
-            </span>
-            <span className="ml-auto font-mono text-[11px] text-gray-400 tabular-nums dark:text-gray-600">
-                {rows.length}
-            </span>
-        </div>
-        <p className="mt-0.5 mb-1 pl-[18px] text-[10px] leading-snug text-gray-400 dark:text-gray-600">
-            {group.strategy}
-        </p>
-        {rows.length === 0 ? (
-            <p className="pl-[18px] text-[11px] text-gray-300 dark:text-gray-700">
-                None
-            </p>
-        ) : (
-            <ul className="pl-[18px] text-[11px] text-gray-600 dark:text-gray-400">
-                {rows.map((row) => (
-                    <li
-                        key={row.region ?? row.gids[0]}
-                        className="flex items-baseline gap-2 py-px"
-                    >
-                        <span className="min-w-0 flex-1 truncate">
-                            {nameOf(row)}
-                        </span>
-                        <span className="shrink-0 font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-600">
-                            {row.rts_rate_percentage.toFixed(0)}% ·{' '}
-                            {row.orders.toLocaleString()}
-                        </span>
-                    </li>
-                ))}
-            </ul>
-        )}
-    </div>
-);
-
-/**
  * The rate ramp is a scale, so it reads as a column of bands. The CSR groups are
- * categories with an action attached, so they read as a key.
+ * categories with an action attached, so they read as a key with counts.
  */
 const Legend = ({
     buckets,
     groups,
+    counts,
     isDark,
 }: {
     buckets: Bucket[] | null;
     groups: CsrGroup[] | null;
+    counts: Map<CsrGroupKey, HeatRow[]>;
     isDark: boolean;
 }) => (
-    <div className="absolute bottom-5 left-5 rounded-lg border border-black/8 bg-white/90 px-3 py-2 backdrop-blur dark:border-white/8 dark:bg-zinc-800/90">
-        <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
+    <div className="absolute bottom-6 left-6 rounded-xl bg-white/85 p-3 shadow-lg ring-1 ring-black/[0.06] backdrop-blur-sm dark:bg-zinc-800/85 dark:ring-white/10">
+        <p className="mb-2 text-[10px] font-semibold tracking-wide text-gray-400 uppercase dark:text-gray-500">
             {groups ? 'CSR group' : 'RTS rate · by value'}
         </p>
-        <div className="space-y-1">
-            {(groups ?? buckets ?? []).map((entry) => (
-                <div key={entry.label} className="flex items-center gap-2">
-                    <span
-                        className="h-3 w-3 shrink-0 rounded-sm"
-                        style={{ background: entry.color }}
-                    />
-                    <span className="font-mono text-[10px] text-gray-600 tabular-nums dark:text-gray-400">
-                        {entry.label}
-                    </span>
+
+        {groups ? (
+            <div className="space-y-1.5">
+                {groups.map((group) => (
+                    <div key={group.key} className="flex items-center gap-2">
+                        <span
+                            className="h-3 w-3 shrink-0 rounded-[3px]"
+                            style={{ background: group.color }}
+                        />
+                        <span className="text-[10px] text-gray-600 dark:text-gray-400">
+                            {group.label}
+                        </span>
+                        <span className="ml-auto pl-2 font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-500">
+                            {counts.get(group.key)?.length ?? 0}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        ) : (
+            <div className="flex items-center gap-2">
+                <div className="flex overflow-hidden rounded-[3px]">
+                    {(buckets ?? []).map((bucket) => (
+                        <span
+                            key={bucket.label}
+                            className="h-3 w-6"
+                            style={{ background: bucket.color }}
+                            title={bucket.label}
+                        />
+                    ))}
                 </div>
-            ))}
-            <div className="flex items-center gap-2 border-t border-black/6 pt-1 dark:border-white/6">
+                <span className="font-mono text-[10px] text-gray-400 tabular-nums dark:text-gray-500">
+                    0 → 40%+
+                </span>
+            </div>
+        )}
+
+        {/* Only the rate scale calls out the grey. In the CSR view the four groups
+            are the whole key, and an area with no orders is simply not in it. */}
+        {!groups && (
+            <div className="mt-2 flex items-center gap-2 border-t border-black/[0.06] pt-2 dark:border-white/10">
                 <span
-                    className="h-3 w-3 shrink-0 rounded-sm"
+                    className="h-3 w-3 shrink-0 rounded-[3px]"
                     style={{
                         background: isDark
                             ? NO_DATA_COLOR.dark
                             : NO_DATA_COLOR.light,
-                        outline: `1px solid ${isDark ? BORDER_COLOR.dark : BORDER_COLOR.light}`,
                     }}
                 />
-                <span className="font-mono text-[10px] text-gray-500 dark:text-gray-500">
-                    {groups ? 'Not in priority set' : 'No data'}
+                <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                    No data
                 </span>
             </div>
-        </div>
+        )}
     </div>
 );

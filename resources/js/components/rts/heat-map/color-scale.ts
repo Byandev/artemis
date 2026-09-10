@@ -26,17 +26,44 @@ export const HEAT_MODES: HeatModeConfig[] = [
 /**
  * RTS rate has meaning independent of the data — 30% is bad whatever else is on
  * the map — so the bands are fixed rather than derived, and a province is the
- * same colour in June as in August.
+ * same colour in June as in August. The cuts match the CSR bands (15 / 22) so both
+ * modes tell one story.
  */
 const RATE_STOPS = [0, 10, 15, 22, 30, 40];
 
-const RATE_COLORS = [
-    '#15803d',
-    '#65a30d',
-    '#ca8a04',
-    '#ea580c',
-    '#dc2626',
-    '#991b1b',
+/**
+ * Green (low) through gold to red (high) — the traffic-light reading, kept because
+ * that is how the RTS bands are already spoken about.
+ *
+ * Structurally this is diverging, not sequential: gold is inherently lighter than
+ * either pole, so lightness peaks in the middle rather than climbing. That middle
+ * is the moderate 15–22% band, which makes it the right shape here — low and high
+ * are the two poles and moderate is the neutral ground between them.
+ *
+ * The trade-off is that green↔red is the pairing red-green colourblind readers
+ * cannot separate. Order is therefore never carried by hue alone: the legend runs
+ * in band order, the tooltip gives the exact rate, and the panel lists every area
+ * with its number.
+ *
+ * Dark mode is chosen against the dark surface — every step clears 3:1 there —
+ * rather than being an automatic flip of the light steps.
+ */
+const RATE_COLORS_LIGHT = [
+    '#18894a',
+    '#6fb551',
+    '#b3d162',
+    '#e6b944',
+    '#e07538',
+    '#c73529',
+];
+
+const RATE_COLORS_DARK = [
+    '#2f9e56',
+    '#7fbe57',
+    '#b6cf62',
+    '#e0c256',
+    '#e78a45',
+    '#d6453a',
 ];
 
 /* ------------------------------------------------------------------ *
@@ -54,29 +81,35 @@ export interface CsrGroup {
     strategy: string;
 }
 
+/**
+ * A status palette, not a categorical one: the four colours are the user's own CSR
+ * sheet and carry fixed meaning, so they stay put between light and dark. Validated
+ * for colourblind separation in both themes; the yellow sits below 3:1 on white by
+ * nature, which the always-present group labels and province lists relieve.
+ */
 export const CSR_GROUPS: CsrGroup[] = [
     {
         key: 'red',
         label: 'High RTS + High Volume',
-        color: '#d0342c',
+        color: '#bf2e26',
         strategy: 'Double confirm; ship only validated orders',
     },
     {
         key: 'orange',
         label: 'High RTS + Low Volume',
-        color: '#ef7d1a',
+        color: '#e07310',
         strategy: 'Strict validation, but low operational priority',
     },
     {
         key: 'yellow',
         label: 'High Volume + Moderate RTS',
-        color: '#f0c330',
+        color: '#f2c72c',
         strategy: 'Normal + strong address / COD confirmation',
     },
     {
         key: 'green',
         label: 'Low RTS',
-        color: '#57ab5a',
+        color: '#41904a',
         strategy: 'Standard processing / scale normally',
     },
 ];
@@ -99,8 +132,8 @@ export const CSR_THRESHOLDS = {
     minimumHighVolume: 20,
 };
 
-export const NO_DATA_COLOR = { light: '#dcdce1', dark: '#3f3f46' };
-export const BORDER_COLOR = { light: '#ffffff', dark: '#18181b' };
+export const NO_DATA_COLOR = { light: '#d6d6d9', dark: '#4a4a52' };
+export const BORDER_COLOR = { light: '#ffffff', dark: '#27272a' };
 
 export interface Bucket {
     /** Inclusive lower bound. */
@@ -129,10 +162,12 @@ export function buildScale(
     isDark: boolean,
 ): HeatScale {
     if (mode === 'rts') {
+        const ramp = isDark ? RATE_COLORS_DARK : RATE_COLORS_LIGHT;
+
         const buckets: Bucket[] = RATE_STOPS.map((from, i) => ({
             from,
             to: i < RATE_STOPS.length - 1 ? RATE_STOPS[i + 1] : null,
-            color: RATE_COLORS[i],
+            color: ramp[i],
             label:
                 i < RATE_STOPS.length - 1
                     ? `${from}–${RATE_STOPS[i + 1]}%`
