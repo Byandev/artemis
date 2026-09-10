@@ -8,11 +8,13 @@ use App\Models\PancakeUserDailyCallReport;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\Workspace;
+use App\Support\CsrComparisonMetrics;
 use App\Support\RmoDailyStats;
 use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -27,6 +29,16 @@ class CSRController extends Controller
         'csr_name', 'total_orders', 'total_sales',
         'delivered', 'returning_count', 'rts_rate',
         'total_called', 'total_call_time',
+    ];
+
+    /**
+     * The two nightly CSR rollups the analytics page reads — the same commands
+     * routes/console.php schedules at 03:00 and 04:15. The button runs both at
+     * once; the schedule stays as it is.
+     */
+    private const SYNC_COMMANDS = [
+        'sync:csr-daily-records',
+        'sync:csr-daily-call-records',
     ];
 
     private function isPos(Request $request): bool
@@ -203,10 +215,12 @@ class CSRController extends Controller
      | CSR Analytics stat cards
      |--------------------------------------------------------------------------
      |
-     | One endpoint per card, reading the workspace's orders through
-     | WorkspaceMetrics — the dashboard's own figures, so they hold for a range
-     | the nightly rollup has not reached. Each answers with `value`, the
-     | previous period's figure and the move between them.
+     | One endpoint per card. Sales and RTS read the nightly POS rollup — the
+     | same pancake_user_pos_daily_reports rows the leaders, the comparison and
+     | the table below them read, so the period's totals are the sum of the
+     | CSRs listed under them. The RMO cards read the call report and the
+     | delivery rows. Each answers with `value`, the previous period's figure
+     | and the move between them.
      */
 
     public function analyticsSales(Request $request, Workspace $workspace)
@@ -216,8 +230,8 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->orderTotals($workspace, $from, $to);
-        $previous = $this->orderTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->posTotals($workspace, $from, $to);
+        $previous = $this->posTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
             'value' => $current['sales'],
@@ -239,21 +253,22 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->orderTotals($workspace, $from, $to);
-        $previous = $this->orderTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->posTotals($workspace, $from, $to);
+        $previous = $this->posTotals($workspace, $previousFrom, $previousTo);
 
-        // No settled parcels means no rate. The metric coalesces that to 0,
-        // which reads as a perfect period; the volume tells them apart.
-        $settled = $current['returning'] + $current['delivered'];
-        $previousSettled = $previous['returning'] + $previous['delivered'];
+        // Returning over returning plus delivered, summed over the range. Null,
+        // not zero, when nothing in the range settled: a 0% would read as a
+        // perfect period rather than an unfinished one.
+        $rate = $current['rts_rate'];
+        $previousRate = $previous['rts_rate'];
 
         return response()->json([
-            'value' => $settled > 0 ? round($current['rts'] * 100, 2) : null,
+            'value' => $rate === null ? null : round($rate, 2),
             'returning_amount' => $current['returning'],
-            'previous_value' => $previousSettled > 0 ? round($previous['rts'] * 100, 2) : null,
+            'previous_value' => $previousRate === null ? null : round($previousRate, 2),
             // Percentage points, not a relative move: 12% to 15% is "+3 pts".
-            'change' => $settled > 0 && $previousSettled > 0
-                ? round(($current['rts'] - $previous['rts']) * 100, 1)
+            'change' => $rate !== null && $previousRate !== null
+                ? round($rate - $previousRate, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -266,23 +281,137 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoTotals($workspace, $from, $to);
-        $previous = $this->rmoTotals($workspace, $previousFrom, $previousTo);
-
-        $rate = fn (array $t) => $t['assigned'] > 0 ? $t['called'] / $t['assigned'] * 100 : null;
-
-        $currentRate = $rate($current);
-        $previousRate = $rate($previous);
+        $current = $this->callTotals($workspace, $from, $to)['calls'];
+        $previous = $this->callTotals($workspace, $previousFrom, $previousTo)['calls'];
 
         return response()->json([
-            // Null, not zero, with nothing assigned: 0% would read as "nobody rang".
-            'value' => $currentRate === null ? null : round($currentRate, 2),
-            'called' => $current['called'],
-            'assigned' => $current['assigned'],
-            'previous_value' => $previousRate === null ? null : round($previousRate, 2),
-            // Percentage points, as on the RTS card — this is a rate.
-            'change' => $currentRate !== null && $previousRate !== null
-                ? round($currentRate - $previousRate, 1)
+            'value' => $current,
+            'previous_value' => $previous,
+            // Relative, unlike the rate cards: this is a count.
+            'change' => $previous > 0
+                ? round(($current - $previous) / $previous * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    /**
+     * The range's RMO calls, and the deliveries behind them.
+     *
+     * The count is calls, because that is what the card is about — how much
+     * ringing the CSRs did. The orders come back beside it because the two are
+     * far apart and the gap is the point: RMO rings the same parcel more than
+     * once by design, so forty calls are commonly twenty parcels, and the card
+     * that showed only the forty read as forty deliveries chased.
+     */
+    public function analyticsTotalRmoCalled(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCalledTotals($workspace, $from, $to);
+        $previous = $this->rmoCalledTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['calls'],
+            // The talk time behind them; RMO has no card of its own for it.
+            'seconds' => $current['seconds'],
+            // The same calls counted by delivery — a parcel rung three times is
+            // three calls and one order.
+            'orders' => $current['orders'],
+            'previous_value' => $previous['calls'],
+            // Relative, unlike the rate cards: this is a count.
+            'change' => $previous['calls'] > 0
+                ? round(($current['calls'] - $previous['calls']) / $previous['calls'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsRmoCallTime(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoCalledTotals($workspace, $from, $to);
+        $previous = $this->rmoCalledTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['seconds'],
+            'calls' => $current['calls'],
+            // Talk time over the RMO calls behind it, which is the card beside
+            // this one; null with none to divide by.
+            'average_seconds' => $current['calls'] > 0
+                ? round($current['seconds'] / $current['calls'], 1)
+                : null,
+            'previous_value' => $previous['seconds'],
+            // Relative, like the other time cards: a duration is a magnitude.
+            'change' => $previous['seconds'] > 0
+                ? round(($current['seconds'] - $previous['seconds']) / $previous['seconds'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsRmoRealConversations(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoRealTotals($workspace, $from, $to);
+        $previous = $this->rmoRealTotals($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['real'],
+            'calls' => $current['calls'],
+            // The share of RMO calls that got past the threshold; null with no
+            // calls to divide by.
+            'rate' => $current['calls'] > 0
+                ? round($current['real'] / $current['calls'] * 100, 1)
+                : null,
+            'previous_value' => $previous['real'],
+            // Relative, like the other counts: this is not a rate.
+            'change' => $previous['real'] > 0
+                ? round(($current['real'] - $previous['real']) / $previous['real'] * 100, 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    public function analyticsRmoHitRate(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->rmoRealTotals($workspace, $from, $to);
+        $previous = $this->rmoRealTotals($workspace, $previousFrom, $previousTo);
+
+        // Undefined rather than zero with nothing placed: 0% reads as "everyone
+        // hung up", which is not "nobody called" — the same distinction
+        // RmoDailyStats::derivedCallStats() makes for the RMO management card.
+        $rate = $current['calls'] > 0
+            ? round($current['real'] / $current['calls'] * 100, 1)
+            : null;
+        $previousRate = $previous['calls'] > 0
+            ? round($previous['real'] / $previous['calls'] * 100, 1)
+            : null;
+
+        return response()->json([
+            'value' => $rate,
+            'conversations' => $current['real'],
+            'calls' => $current['calls'],
+            'previous_value' => $previousRate,
+            // Percentage points, like the other rate cards: 40% to 45% is "+5 pts".
+            'change' => $rate !== null && $previousRate !== null
+                ? round($rate - $previousRate, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -295,8 +424,8 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->callTotals($workspace, $from, $to);
+        $previous = $this->callTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
             'value' => $current['seconds'],
@@ -321,14 +450,11 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->verificationTotals($workspace, $from, $to);
+        $previous = $this->verificationTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            // Every call placed against an order, however short.
             'value' => $current['calls'],
-            // The subset that connected, so the card can say how many landed.
-            'connected' => $current['connected'],
             'previous_value' => $previous['calls'],
             // Relative, like the time card: a count is a magnitude, not a rate.
             'change' => $previous['calls'] > 0
@@ -345,20 +471,20 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
+        $current = $this->verificationTotals($workspace, $from, $to);
+        $previous = $this->verificationTotals($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            'value' => $current['real'],
-            'placed' => $current['calls'],
-            // What share of the attempts became a conversation — 40 of 60 and
-            // 40 of 4,000 are not the same day's work.
-            'share' => $current['calls'] > 0
-                ? round($current['real'] / $current['calls'] * 100, 1)
+            'value' => $current['seconds'],
+            'calls' => $current['calls'],
+            // Talk time over the calls behind it; null with none to divide by.
+            'average_seconds' => $current['calls'] > 0
+                ? round($current['seconds'] / $current['calls'], 1)
                 : null,
-            'previous_value' => $previous['real'],
-            'change' => $previous['real'] > 0
-                ? round(($current['real'] - $previous['real']) / $previous['real'] * 100, 1)
+            'previous_value' => $previous['seconds'],
+            // Relative, like the other time card: a duration is a magnitude.
+            'change' => $previous['seconds'] > 0
+                ? round(($current['seconds'] - $previous['seconds']) / $previous['seconds'] * 100, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
@@ -371,65 +497,81 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
-
-        // How often picking up the phone reached somebody: the conversations
-        // that lasted, over every attempt made.
-        $rate = fn (array $t) => $t['calls'] > 0 ? $t['real'] / $t['calls'] * 100 : null;
-
-        $currentRate = $rate($current);
-        $previousRate = $rate($previous);
+        $current = $this->verificationBacklog($workspace, $from, $to);
+        $previous = $this->verificationBacklog($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            // Null, not zero, with no attempts: 0% would read as "reached nobody".
-            'value' => $currentRate === null ? null : round($currentRate, 1),
-            'real' => $current['real'],
-            'placed' => $current['calls'],
-            'previous_value' => $previousRate === null ? null : round($previousRate, 1),
-            // Percentage points, as on the other rate cards.
-            'change' => $currentRate !== null && $previousRate !== null
-                ? round($currentRate - $previousRate, 1)
-                : null,
-            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
-        ]);
-    }
-
-    public function analyticsLongestCall(Request $request, Workspace $workspace)
-    {
-        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
-
-        [$from, $to] = $this->range($request);
-        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
-
-        $current = $this->rmoCallTotals($workspace, $from, $to);
-        $previous = $this->rmoCallTotals($workspace, $previousFrom, $previousTo);
-
-        // The day it happened, for the footnote — a second tiny query because
-        // MAX() gives the length, not the row it came from.
-        $longestDate = $current['longest'] > 0
-            ? $this->callReport($workspace, $from, $to)
-                ->orderByDesc('longest_rmo_call_time')
-                ->value('date')
-            : null;
-
-        return response()->json([
-            'value' => $current['longest'],
-            'call_date' => $longestDate ? substr((string) $longestDate, 0, 10) : null,
-            'previous_value' => $previous['longest'],
-            // Relative: a duration is a magnitude, not a rate.
-            'change' => $previous['longest'] > 0
-                ? round(($current['longest'] - $previous['longest']) / $previous['longest'] * 100, 1)
+            'value' => $current['needs_verification'],
+            // The two reasons, so the card can say which is driving it.
+            'no_report' => $current['no_report'],
+            'high_rts' => $current['high_rts'],
+            'orders' => $current['orders'],
+            'previous_value' => $previous['needs_verification'],
+            // Relative: this is a count of orders, not a rate.
+            'change' => $previous['needs_verification'] > 0
+                ? round((
+                    $current['needs_verification'] - $previous['needs_verification']
+                ) / $previous['needs_verification'] * 100, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
     }
 
     /**
-     * Calls placed against real conversations, one point per day.
+     * How much of the range's verification backlog got verified.
+     *
+     * Orders verified over "Total Order needs Verification" — orders on both
+     * sides, so three calls at one order cover one order rather than three.
+     * Counting the calls instead is what read a two-order backlog rung three
+     * times as 150%.
+     *
+     * The counts behind the rate come back with it: the orders verified, the
+     * backlog they are read against, and the calls it took to get through them
+     * — an order rung three times is three calls and one order.
+     */
+    public function analyticsVerifiedOrders(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+        [$previousFrom, $previousTo] = $this->previousRange($from, $to);
+
+        $current = $this->verifiedCoverage($workspace, $from, $to);
+        $previous = $this->verifiedCoverage($workspace, $previousFrom, $previousTo);
+
+        return response()->json([
+            'value' => $current['rate'],
+            // Both sides of the division, so the card can show its own working,
+            // and the calls behind the orders — the effort against the coverage.
+            'orders' => $current['orders'],
+            'calls' => $current['calls'],
+            'needs_verification' => $current['needs_verification'],
+            'previous_value' => $previous['rate'],
+            // Percentage points, as on the other rate cards.
+            'change' => $current['rate'] !== null && $previous['rate'] !== null
+                ? round($current['rate'] - $previous['rate'], 1)
+                : null,
+            'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
+        ]);
+    }
+
+    /**
+     * Calls placed against real conversations, one point per day, split by the
+     * kind of call.
      *
      * Same source and rules as the call cards, so a day here agrees with the
      * card above it. Every day in the range is returned, zeros included.
+     *
+     * Both kinds of call come back on every day: `calls`/`real` are the RMO
+     * ones the cards report, `verification_calls`/`verification_real` the
+     * order-verification ones beside them. The chart draws one kind or the
+     * other, and switching between them is a client-side filter — one request
+     * answers both.
+     *
+     * `total_calls` is the rollup's own `total_called` rather than those two
+     * added up. They agree by construction — every counted call is stamped to a
+     * delivery or it is not — but the all-calls view is the workspace's total as
+     * the rollup recorded it, not a sum this endpoint performed.
      */
     public function analyticsDailyEffort(Request $request, Workspace $workspace)
     {
@@ -441,8 +583,11 @@ class CSRController extends Controller
             ->groupBy('date')
             ->selectRaw('
                 date,
+                COALESCE(SUM(total_called), 0) as total_calls,
                 COALESCE(SUM(total_rmo_called), 0) as calls,
-                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations
+                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
+                COALESCE(SUM(total_verification_called), 0) as verification_calls,
+                COALESCE(SUM(total_verification_real_called), 0) as verification_real
             ')
             ->get()
             // date comes back with or without a time part depending on the
@@ -459,8 +604,11 @@ class CSRController extends Controller
 
             $days[] = [
                 'date' => $date,
+                'total_calls' => (int) ($row->total_calls ?? 0),
                 'calls' => (int) ($row->calls ?? 0),
                 'real' => (int) ($row->real_conversations ?? 0),
+                'verification_calls' => (int) ($row->verification_calls ?? 0),
+                'verification_real' => (int) ($row->verification_real ?? 0),
             ];
 
             $cursor = $cursor->addDay();
@@ -469,80 +617,106 @@ class CSRController extends Controller
         return response()->json([
             'range' => ['from' => $from, 'to' => $to],
             'days' => $days,
-            'totals' => [
-                'calls' => array_sum(array_column($days, 'calls')),
-                'real' => array_sum(array_column($days, 'real')),
-            ],
+            'totals' => $this->sumEffort($days),
         ]);
     }
 
     /**
-     * Where each day's calls ended up — the table under the effort chart.
+     * The same effort and results, laid across the hours of a day.
      *
-     * Three buckets narrowing in turn: no_answer never joined, answered picked
-     * up, conversations lasted past the five-second threshold. So calls =
-     * no_answer + answered, and conversations is a cut of answered. `hit_rate`
-     * is conversations over every attempt — the reach rate card, per day.
+     * The chart above this one reads the nightly rollup, which is keyed to a
+     * date and so cannot say when in the day the work happened. This one goes
+     * back to the call log that rollup is built from and groups by the hour
+     * stamped on each call.
+     *
+     * The hour alone, not the day and the hour: the range arrives folded into
+     * one round of the clock, every day's 9am added into a single 9am. That is
+     * the question the hour is asked — when in the day the work lands — and one
+     * Tuesday is too small a sample to answer it. Narrowing to a single day is
+     * the date range at the top of the page, which this reads like any other
+     * card. Folding in SQL rather than after the fact also keeps the response
+     * at twenty-four rows however long the range is.
+     *
+     * The rules are the sync's own, so this adds up to the chart above it: an
+     * order beside the call is what names the shop, a delivery stamp is what
+     * makes it RMO work rather than order verification, and a conversation is a
+     * call that lasted past RmoDailyStats::CONNECTED_CALL_MIN_SECONDS. Reading
+     * the log direct does mean this chart covers today, where the daily one is
+     * only as fresh as the last rollup.
+     *
+     * `total_calls` is every call the hour carried, counted off the log the way
+     * the rollup's `total_called` counts a day — the figure the all-calls view
+     * draws, rather than the two kinds added up.
+     *
+     * All twenty-four hours come back, zeros included, beside the count of days
+     * that were folded into them.
      */
-    public function analyticsDailyCallOutcomes(Request $request, Workspace $workspace)
+    public function analyticsHourlyEffort(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
 
         [$from, $to] = $this->range($request);
 
-        $rows = $this->callReport($workspace, $from, $to)
-            ->groupBy('date')
-            ->selectRaw('
-                date,
-                COALESCE(SUM(total_rmo_called), 0) as calls,
-                COALESCE(SUM(total_rmo_connected_called), 0) as answered,
-                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations
-            ')
+        $real = RmoDailyStats::CONNECTED_CALL_MIN_SECONDS;
+
+        $rows = $this->callLogs($workspace, $from, $to)
+            ->groupByRaw('HOUR(cl.call_time)')
+            ->selectRaw("
+                HOUR(cl.call_time) as hour,
+
+                COUNT(*) as total_calls,
+
+                SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN 1 ELSE 0 END) as calls,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration >= {$real} THEN 1 ELSE 0 END) as real_conversations,
+
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN 1 ELSE 0 END) as verification_calls,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL AND cl.duration >= {$real} THEN 1 ELSE 0 END) as verification_real
+            ")
             ->get()
-            // date comes back with or without a time part depending on the
-            // driver — key on the first ten characters.
-            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+            ->keyBy(fn ($row) => (int) $row->hour);
 
-        $days = [];
-        $cursor = CarbonImmutable::parse($from);
-        $end = CarbonImmutable::parse($to);
+        $hours = [];
 
-        while ($cursor->lessThanOrEqualTo($end)) {
-            $date = $cursor->toDateString();
-            $row = $rows->get($date);
+        for ($hour = 0; $hour < 24; $hour++) {
+            $row = $rows->get($hour);
 
-            $calls = (int) ($row->calls ?? 0);
-            $answered = (int) ($row->answered ?? 0);
-            $real = (int) ($row->real_conversations ?? 0);
-
-            // Every day gets a row, quiet ones included.
-            $days[] = [
-                'date' => $date,
-                'calls' => $calls,
-                'no_answer' => $calls - $answered,
-                'answered' => $answered,
-                'conversations' => $real,
-                'hit_rate' => $calls > 0 ? round($real / $calls * 100, 1) : null,
+            $hours[] = [
+                'hour' => $hour,
+                'total_calls' => (int) ($row->total_calls ?? 0),
+                'calls' => (int) ($row->calls ?? 0),
+                'real' => (int) ($row->real_conversations ?? 0),
+                'verification_calls' => (int) ($row->verification_calls ?? 0),
+                'verification_real' => (int) ($row->verification_real ?? 0),
             ];
-
-            $cursor = $cursor->addDay();
         }
-
-        $calls = array_sum(array_column($days, 'calls'));
-        $conversations = array_sum(array_column($days, 'conversations'));
 
         return response()->json([
             'range' => ['from' => $from, 'to' => $to],
-            'days' => $days,
-            'totals' => [
-                'calls' => $calls,
-                'no_answer' => array_sum(array_column($days, 'no_answer')),
-                'answered' => array_sum(array_column($days, 'answered')),
-                'conversations' => $conversations,
-                // The period's own rate, not the mean of the daily ones.
-                'hit_rate' => $calls > 0 ? round($conversations / $calls * 100, 1) : null,
-            ],
+            // How many days went into each bar. The chart says so — an hour
+            // reading 40 over a week is a different figure from 40 in a day.
+            'day_count' => (int) CarbonImmutable::parse($from)->diffInDays(CarbonImmutable::parse($to)) + 1,
+            'hours' => $hours,
+            // The range as a whole, which is the daily chart's totals over the
+            // same range — only the grouping differs, never the counting.
+            'totals' => $this->sumEffort($hours),
         ]);
+    }
+
+    /**
+     * The effort figures added up over whatever rows carry them.
+     *
+     * @param  array<int, array<string, int>>  $rows
+     * @return array{total_calls: int, calls: int, real: int, verification_calls: int, verification_real: int}
+     */
+    private function sumEffort(array $rows): array
+    {
+        return [
+            'total_calls' => array_sum(array_column($rows, 'total_calls')),
+            'calls' => array_sum(array_column($rows, 'calls')),
+            'real' => array_sum(array_column($rows, 'real')),
+            'verification_calls' => array_sum(array_column($rows, 'verification_calls')),
+            'verification_real' => array_sum(array_column($rows, 'verification_real')),
+        ];
     }
 
     /**
@@ -555,24 +729,225 @@ class CSRController extends Controller
      *
      * @return array{seconds: int, calls: int, connected: int, real: int, longest: int}
      */
-    private function rmoCallTotals(Workspace $workspace, string $from, string $to): array
+    /**
+     * How much of the range's verification work actually got done.
+     *
+     * Orders verified over the orders that needed one — the two cards beside
+     * this one, divided. Null rather than zero with nothing to verify: a 0%
+     * would read as "nobody rang" instead of "there was nothing to ring".
+     *
+     * Orders on both sides of the division, not calls: an order rung three
+     * times covers one order, and counting the three would put two orders rung
+     * between them at 150% verified. The calls come back beside the rate all
+     * the same, as the effort behind the coverage.
+     *
+     * It can still pass 100%, for two reasons that are real signal rather than
+     * arithmetic. A CSR can ring an order nothing flagged, and the distinct is
+     * only taken within a CSR's day on a shop — an order chased across two days
+     * counts on each of them.
+     *
+     * The two sides are also counted on different days: a call belongs to the
+     * day it was placed, an order to the day it was confirmed. Over a range of
+     * any length that washes out, but a single-day range can read oddly when
+     * the calls chase the day before's orders.
+     *
+     * @return array{rate: float|null, orders: int, calls: int, needs_verification: int}
+     */
+    private function verifiedCoverage(Workspace $workspace, string $from, string $to): array
+    {
+        $verification = $this->verificationTotals($workspace, $from, $to);
+        $needed = $this->verificationBacklog($workspace, $from, $to)['needs_verification'];
+
+        return [
+            'rate' => $needed > 0 ? round($verification['orders'] / $needed * 100, 1) : null,
+            'orders' => $verification['orders'],
+            'calls' => $verification['calls'],
+            'needs_verification' => $needed,
+        ];
+    }
+
+    /**
+     * The customer's own return rate for an order, or NULL when the number has
+     * no report behind it.
+     *
+     * The same expression CxRtsRateSort and RiskScoreSort rank on, so an order
+     * this card counts is one the RTS pages show at the same rate. `latest` is
+     * the report as it stands now; the `initial` row beside it is what the
+     * number looked like when the order came in.
+     */
+    private const CX_RTS_SQL = "(
+        SELECT SUM(r.order_fail) / NULLIF(SUM(r.order_fail) + SUM(r.order_success), 0)
+        FROM pancake_order_phone_number_reports r
+        WHERE r.order_id = po.id AND r.type = 'latest'
+    )";
+
+    /** At or above this customer return rate, an order is worth ringing first. */
+    private const VERIFICATION_RTS_THRESHOLD = 0.55;
+
+    /**
+     * Orders confirmed in a range that are worth a verification call.
+     *
+     * Two reasons qualify, and they cannot overlap: the customer's number has
+     * no report at all — nothing is known about them — or it has one and the
+     * return rate on it is at or above the threshold. Everything else is a
+     * customer with a record of taking delivery.
+     *
+     * Counted on `confirmed_at`, so the card is the work the range created:
+     * verification is what happens between a CSR confirming an order and the
+     * parcel going out. Orders never confirmed have no date to fall in and are
+     * out of it entirely.
+     *
+     * @return array{orders: int, no_report: int, high_rts: int, needs_verification: int}
+     */
+    private function verificationBacklog(Workspace $workspace, string $from, string $to): array
+    {
+        $orders = $this->scopeToVisibleShops(
+            DB::table('pancake_orders as po')
+                ->where('po.workspace_id', $workspace->id)
+                ->whereBetween(DB::raw('DATE(po.confirmed_at)'), [$from, $to])
+                ->selectRaw(self::CX_RTS_SQL.' as cx_rts'),
+            $workspace,
+            'po.shop_id',
+        );
+
+        // Wrapped rather than repeated in the SELECT: the rate is a correlated
+        // subquery, and both tests would run it once each per order.
+        $row = DB::query()
+            ->fromSub($orders, 'o')
+            ->selectRaw('
+                COUNT(*)                  as orders,
+                SUM(o.cx_rts IS NULL)     as no_report,
+                SUM(o.cx_rts >= ?)        as high_rts
+            ', [self::VERIFICATION_RTS_THRESHOLD])
+            ->first();
+
+        $noReport = (int) ($row->no_report ?? 0);
+        $highRts = (int) ($row->high_rts ?? 0);
+
+        return [
+            'orders' => (int) ($row->orders ?? 0),
+            'no_report' => $noReport,
+            'high_rts' => $highRts,
+            'needs_verification' => $noReport + $highRts,
+        ];
+    }
+
+    /**
+     * RMO calls over a range — the call report's own `total_rmo_called`, and
+     * the time spent on them.
+     *
+     * The other side of the split from verificationTotals(): a call stamped to
+     * a delivery, so the CSR was chasing a parcel rather than confirming an
+     * order. Together the two make up `total_called`. The rollup is nightly, so
+     * a range the sync has not reached is zero on both.
+     *
+     * `orders` is the same work counted by delivery rather than by call — the
+     * rollup's own `total_rmo_orders`, distinct within a CSR's day on a shop.
+     * RMO rings a parcel more than once by design, so forty calls are commonly
+     * twenty parcels.
+     *
+     * @return array{calls: int, seconds: int, orders: int}
+     */
+    private function rmoCalledTotals(Workspace $workspace, string $from, string $to): array
     {
         $row = $this->callReport($workspace, $from, $to)
             ->selectRaw('
-                COALESCE(SUM(total_rmo_called), 0) as calls,
+                COALESCE(SUM(total_rmo_called), 0)    as calls,
                 COALESCE(SUM(total_rmo_call_time), 0) as seconds,
-                COALESCE(SUM(total_rmo_connected_called), 0) as connected,
-                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
-                COALESCE(MAX(longest_rmo_call_time), 0) as longest
+                COALESCE(SUM(total_rmo_orders), 0)    as orders
             ')
             ->first();
 
         return [
-            'seconds' => (int) ($row->seconds ?? 0),
             'calls' => (int) ($row->calls ?? 0),
-            'connected' => (int) ($row->connected ?? 0),
+            'seconds' => (int) ($row->seconds ?? 0),
+            'orders' => (int) ($row->orders ?? 0),
+        ];
+    }
+
+    /**
+     * RMO calls that turned into a conversation over a range — the call
+     * report's own `total_rmo_real_called`, and the RMO calls behind them.
+     *
+     * A real conversation is an RMO call that lasted past
+     * RmoDailyStats::CONNECTED_CALL_MIN_SECONDS; under that it is a hello and a
+     * hang-up, which is the cut SyncCsrDailyCallRecord makes. The call count
+     * comes back with it because it is what the figure is read against. The
+     * rollup is nightly, so a range the sync has not reached is zero on both.
+     *
+     * @return array{real: int, calls: int}
+     */
+    private function rmoRealTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
+                COALESCE(SUM(total_rmo_called), 0)      as calls
+            ')
+            ->first();
+
+        return [
             'real' => (int) ($row->real_conversations ?? 0),
-            'longest' => (int) ($row->longest ?? 0),
+            'calls' => (int) ($row->calls ?? 0),
+        ];
+    }
+
+    /**
+     * Order-verification calls over a range — the call report's own
+     * `total_verification_called`, and the time spent on them.
+     *
+     * A verification call is one placed against an order with no delivery
+     * behind it: the CSR ringing to confirm the order rather than to chase the
+     * parcel, which is the split SyncCsrDailyCallRecord makes on
+     * `order_for_delivery_id`. The rollup is nightly, so a range the sync has
+     * not reached is zero on both.
+     *
+     * `orders` is the same work counted by order rather than by call — the
+     * rollup's own `total_verified_orders`, distinct within a CSR's day on a
+     * shop. An order rung three times is three calls and one order.
+     *
+     * @return array{calls: int, seconds: int, orders: int}
+     */
+    private function verificationTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_verification_called), 0)    as calls,
+                COALESCE(SUM(total_verification_call_time), 0) as seconds,
+                COALESCE(SUM(total_verified_orders), 0)        as orders
+            ')
+            ->first();
+
+        return [
+            'calls' => (int) ($row->calls ?? 0),
+            'seconds' => (int) ($row->seconds ?? 0),
+            'orders' => (int) ($row->orders ?? 0),
+        ];
+    }
+
+    /**
+     * Calls placed and time spent on them over a range — the call report's own
+     * `total_called` and `total_call_time`.
+     *
+     * Every call against an order, RMO work and order verification alike,
+     * which is what those two columns count; the `total_rmo_*` pair beside
+     * them is the narrower figure the other call cards read. The rollup is
+     * nightly, so a range the sync has not reached is zero on both.
+     *
+     * @return array{calls: int, seconds: int}
+     */
+    private function callTotals(Workspace $workspace, string $from, string $to): array
+    {
+        $row = $this->callReport($workspace, $from, $to)
+            ->selectRaw('
+                COALESCE(SUM(total_called), 0)    as calls,
+                COALESCE(SUM(total_call_time), 0) as seconds
+            ')
+            ->first();
+
+        return [
+            'calls' => (int) ($row->calls ?? 0),
+            'seconds' => (int) ($row->seconds ?? 0),
         ];
     }
 
@@ -589,6 +964,27 @@ class CSRController extends Controller
                 ->where('workspace_id', $workspace->id)
                 ->whereBetween('date', [$from, $to]),
             $workspace,
+        );
+    }
+
+    /**
+     * The raw call log over a range, narrowed to what the viewer may see.
+     *
+     * What the nightly rollup is built from, for the one chart that needs
+     * something the rollup threw away — the hour a call was placed. The order
+     * is joined for the same reason the sync joins it: it is what puts the call
+     * in a shop, which is both how the team filter bites and why a call
+     * matched to no order is not counted at all.
+     */
+    private function callLogs(Workspace $workspace, string $from, string $to)
+    {
+        return $this->scopeToVisibleShops(
+            DB::table('call_logs as cl')
+                ->join('pancake_orders as po', 'po.id', '=', 'cl.order_id')
+                ->where('cl.workspace_id', $workspace->id)
+                ->whereBetween('cl.call_date', [$from, $to]),
+            $workspace,
+            'po.shop_id',
         );
     }
 
@@ -622,36 +1018,6 @@ class CSRController extends Controller
     private function visibleShopIds(Workspace $workspace): ?array
     {
         return TeamVisibility::scopeShopIds(request()->user(), $workspace);
-    }
-
-    /**
-     * RMO deliveries assigned in a range, and how many were called.
-     *
-     * Straight off pancake_order_for_delivery, so the card is right for a range
-     * the sync has not covered. "Assigned" needs an assignee — an unassigned row
-     * was nobody's to call. "Called" is any status off PENDING, as the RMO page.
-     *
-     * @return array{assigned: int, called: int}
-     */
-    private function rmoTotals(Workspace $workspace, string $from, string $to): array
-    {
-        $row = $this->scopeToVisibleShops(
-            DB::table('pancake_order_for_delivery')
-                ->where('workspace_id', $workspace->id)
-                ->whereNotNull('assignee_id')
-                ->whereBetween('delivery_date', [$from, $to]),
-            $workspace,
-        )
-            ->selectRaw("
-                COUNT(*) as assigned,
-                SUM(CASE WHEN status != 'PENDING' THEN 1 ELSE 0 END) as called
-            ")
-            ->first();
-
-        return [
-            'assigned' => (int) ($row->assigned ?? 0),
-            'called' => (int) ($row->called ?? 0),
-        ];
     }
 
     /*
@@ -726,9 +1092,12 @@ class CSRController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        // Off the same rollup, so this is the RTS Rate column: money back over
-        // money settled, counted on the day it settled. Replaces a scan of the
-        // workspace's whole order history; an uncovered range has nobody to rank.
+        // Who is in the running and what their rate reads are two questions.
+        // A CSR earns a place by having at least one shop-day that saw both a
+        // return and a delivery — half a parcel's story is no evidence of a
+        // rate. The rate itself is then read off everything they settled in
+        // the range, delivery-only days included, which is the arithmetic and
+        // the row set of the RTS Rate column in the table below.
         $perCsr = $this->scopeToVisibleShops(
             DB::table('pancake_user_pos_daily_reports as r')
                 ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
@@ -738,37 +1107,54 @@ class CSRController extends Controller
             'r.shop_id',
         )
             ->groupBy('pu.id', 'pu.name')
-            // `_amount` suffixes on purpose: an alias of `delivered` shadows
+            // Suffixed aliases on purpose: an alias of `delivered` shadows
             // r.delivered in the ORDER BY, which ONLY_FULL_GROUP_BY rejects.
             ->selectRaw('
                 pu.name as name,
                 COALESCE(SUM(r.returning), 0) as returned_amount,
                 COALESCE(SUM(r.delivered), 0) as delivered_amount,
-                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders
+                COALESCE(SUM(r.returning_count + r.delivered_count), 0) as settled_orders,
+                SUM(CASE WHEN r.returning > 0 AND r.delivered > 0 THEN 1 ELSE 0 END) as qualifying_days
             ')
-            // Eligibility is money settled, as on the RTS card. Parcels all
-            // worth zero have no rate to rank, so they are out rather than last.
-            ->havingRaw('returned_amount + delivered_amount > 0')
+            // The qualifying day is the entry ticket, not the figure: one of
+            // them puts the CSR in the ranking, and the sums above then speak
+            // for the whole range. It also keeps both sums off zero, so the
+            // rate below always has something to divide.
+            ->havingRaw('qualifying_days > 0')
             ->orderByRaw('returned_amount / (returned_amount + delivered_amount) ASC')
-            // Ties are common at a clean 0%; break them on volume.
-            ->orderByDesc('settled_orders')
-            ->first();
+            // Ties are common at a clean 0%; break them on the money settled.
+            // Not on settled_orders: those counts read zero on every rollup row
+            // written before the 2026_09_03 migration added them, so until a
+            // `sync:csr-daily-records` backfill lands they break nothing.
+            ->orderByRaw('returned_amount + delivered_amount DESC')
+            ->get();
 
-        if ($perCsr === null) {
+        // Money back over money settled, to the decimal the card prints. The
+        // qualifying day above keeps the divisor off zero.
+        $rate = fn ($row) => round(
+            (float) $row->returned_amount
+                / ((float) $row->returned_amount + (float) $row->delivered_amount)
+                * 100,
+            1,
+        );
+
+        // Every rate on the board prints as 0.0% — returns too small against the
+        // deliveries beside them to show at one decimal. Nothing separates the
+        // CSRs and the winner would be whoever the tiebreak reached first, so
+        // the card says nobody to rank instead of picking one of them.
+        $leader = $perCsr->max($rate) > 0 ? $perCsr->first() : null;
+
+        if ($leader === null) {
             return response()->json(['leader' => null]);
         }
 
-        $returned = (float) $perCsr->returned_amount;
-        $delivered = (float) $perCsr->delivered_amount;
-        $settled = $returned + $delivered;
-
         return response()->json([
             'leader' => [
-                'name' => $perCsr->name,
-                'value' => round($returned / $settled * 100, 1),
-                'returned' => $returned,
-                'delivered' => $delivered,
-                'orders' => (int) $perCsr->settled_orders,
+                'name' => $leader->name,
+                'value' => $rate($leader),
+                'returned' => (float) $leader->returned_amount,
+                'delivered' => (float) $leader->delivered_amount,
+                'orders' => (int) $leader->settled_orders,
             ],
         ]);
     }
@@ -882,28 +1268,62 @@ class CSRController extends Controller
     }
 
     /**
-     * Every order figure the analytics cards need, over one date range.
+     * Everything the Sales and RTS cards need, over one date range, off the
+     * nightly POS rollup.
      *
-     * @return array{sales: float, orders: int, rts: float, returning: float, delivered: float}
+     * The cards are the sum of the CSR rows the page already shows: the
+     * leaders, the comparison and the breakdown table all read
+     * pancake_user_pos_daily_reports, so the totals at the top agree with the
+     * names under them. `returning` and `delivered` are money, as on the RTS
+     * leader — the parcel counts beside them are only backfilled from
+     * 2026-09-03 on, so a rate built from them would be wrong on older rows.
+     *
+     * `rts_rate` is the rollup's own column, averaged over the rows that
+     * actually settled something — a CSR-shop-day with no parcels yet has no
+     * rate to contribute, and letting its stored 0 in would read as a period
+     * with fewer returns than it had. The mean of the days is not the rate of
+     * the whole range, so this figure is a shade off the amount-weighted one
+     * the leader and the table compute from `returning` / `delivered`.
+     *
+     * The rollup is written nightly, so a range the sync has not reached reads
+     * as nothing rather than as the dashboard's order figures. Rows written
+     * before SyncCsrDailyRecord started storing the rate carry 0.00, and there
+     * is no telling those from a genuine 0% here — `sync:csr-daily-records
+     * --days=N` rewrites them.
+     *
+     * @return array{sales: float, orders: int, returning: float, rts_rate: float|null}
      */
-    private function orderTotals(Workspace $workspace, string $from, string $to): array
+    private function posTotals(Workspace $workspace, string $from, string $to): array
     {
-        // The metric layer narrows by shop ids rather than by a query, which is
-        // the same team filter the rollup-backed cards apply to their rows.
-        $shopIds = $this->visibleShopIds($workspace);
+        $row = $this->scopeToVisibleShops(
+            DB::table((new PancakeUserPosDailyReport)->getTable())
+                ->where('workspace_id', $workspace->id)
+                ->whereBetween('date', [$from, $to]),
+            $workspace,
+        )
+            ->selectRaw('
+                COALESCE(SUM(total_sales), 0)  as sales,
+                COALESCE(SUM(total_orders), 0) as orders,
+                COALESCE(SUM(`returning`), 0)  as returning_amount,
+                COALESCE(SUM(delivered), 0)    as delivered_amount
+            ')
+            ->first();
 
-        $metrics = $workspace->metrics(
-            ['start_date' => $from, 'end_date' => $to],
-            $shopIds === null ? [] : ['shop_ids' => $shopIds],
-        )->extract(['totalSales', 'totalOrders', 'rtsRate', 'returningAmount', 'deliveredAmount']);
+        $returning = (float) ($row->returning_amount ?? 0);
+        $delivered = (float) ($row->delivered_amount ?? 0);
+        $settled = $returning + $delivered;
 
         return [
-            'sales' => (float) $metrics['totalSales'],
-            'orders' => (int) $metrics['totalOrders'],
-            // A ratio, 0..1 — the card turns it into a percentage.
-            'rts' => (float) $metrics['rtsRate'],
-            'returning' => (float) $metrics['returningAmount'],
-            'delivered' => (float) $metrics['deliveredAmount'],
+            'sales' => (float) ($row->sales ?? 0),
+            'orders' => (int) ($row->orders ?? 0),
+            'returning' => $returning,
+            // Returning over everything settled across the whole range, not the
+            // average of the rollup's per-shop-per-day rates: a shop-day with
+            // two parcels weighed as much as one with two hundred. The same
+            // arithmetic the RTS Rate column, the leader card and the comparison
+            // tab already use. Null, not zero, when nothing settled in the
+            // range — a rate needs something to divide.
+            'rts_rate' => $settled > 0 ? $returning / $settled * 100 : null,
         ];
     }
 
@@ -913,13 +1333,16 @@ class CSRController extends Controller
      |--------------------------------------------------------------------------
      |
      | The field behind the leaders: every CSR on one axis, against the period's
-     | average and their own previous figure. One endpoint for all four metrics —
-     | they come from two rollup scans that each already carry both of theirs, so
-     | a request per tab would run the same two queries twice over.
+     | average and their own previous figure. One endpoint, asked for the one
+     | metric the panel is showing — `?metric=` — so the scan reads that
+     | metric's columns off one rollup instead of every column of both.
+     |
+     | What can be asked for is CsrComparisonMetrics: every figure column of the
+     | two rollups, plus the two rates that cannot be summed out of them.
      */
 
-    /** How many CSRs a metric lists. Matches the eight-slot chart palette. */
-    private const COMPARISON_ROWS = 100;
+    /** Chart hues available per CSR — see the panel's BAR_COLORS. */
+    private const COMPARISON_COLOURS = 8;
 
     public function analyticsComparison(Request $request, Workspace $workspace)
     {
@@ -928,34 +1351,27 @@ class CSRController extends Controller
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $csrs = $this->comparisonOrderFigures($workspace, $from, $to, $previousFrom, $previousTo);
-        $rmo = $this->comparisonRmoFigures($workspace, $from, $to, $previousFrom, $previousTo);
+        // The figure the panel is showing. An unknown key — an old link, a
+        // hand-edited URL — reads as total sales rather than as an error, the
+        // same fallback the page itself applies.
+        $metric = CsrComparisonMetrics::find(
+            CsrComparisonMetrics::resolveKey($request->input('metric')),
+        );
 
-        $metrics = [
-            $this->comparisonMetric('sales', 'Sales', 'currency', '%', true, $csrs,
-                fn ($r) => $r->sales > 0 ? (float) $r->sales : null,
-                fn ($r) => $r->previous_sales > 0 ? (float) $r->previous_sales : null,
-            ),
-            $this->comparisonMetric('rts', 'RTS', 'percent', ' pts', false, $csrs,
-                // Eligibility is one settled parcel counted, as on the RTS leader.
-                fn ($r) => $r->returned_amount + $r->delivered_amount > 0 ? $this->rate($r->returned_amount, $r->returned_amount + $r->delivered_amount) : null,
-                fn ($r) => $r->previous_returned_amount + $r->previous_delivered_amount > 0 ? $this->rate($r->previous_returned_amount, $r->previous_returned_amount + $r->previous_delivered_amount) : null,
-            ),
-            $this->comparisonMetric('rmo_called', 'RMO called', 'percent', ' pts', true, $rmo,
-                // Nothing confirmed is no rate at all, not a zero one.
-                fn ($r) => $r->confirmed > 0 ? $this->rate($r->called, $r->confirmed) : null,
-                fn ($r) => $r->previous_confirmed > 0 ? $this->rate($r->previous_called, $r->previous_confirmed) : null,
-            ),
-            $this->comparisonMetric('call_time', 'Call time', 'duration', '%', true, $rmo,
-                fn ($r) => $r->seconds > 0 ? (float) $r->seconds : null,
-                fn ($r) => $r->previous_seconds > 0 ? (float) $r->previous_seconds : null,
-            ),
-        ];
+        $rows = $this->comparisonFigures(
+            $workspace,
+            CsrComparisonMetrics::table($metric['source']),
+            CsrComparisonMetrics::columnsFor($metric),
+            $from,
+            $to,
+            $previousFrom,
+            $previousTo,
+        );
 
         return response()->json([
             'range' => ['from' => $from, 'to' => $to],
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
-            'metrics' => $this->withColourSlots($metrics),
+            'metric' => $this->comparisonMetric($metric, $rows),
         ]);
     }
 
@@ -966,16 +1382,39 @@ class CSRController extends Controller
     }
 
     /**
-     * Sales and RTS per CSR, both periods, in one scan.
+     * One metric's figures, per CSR, for both periods in one scan.
      *
-     * Off the same rollup as the leader cards, so the field and the winner agree.
-     * The periods are contiguous, so one indexed range covers both and the
-     * conditional sums split them apart; an uncovered range is empty here.
+     * Off the same rollups as the leader cards, so the field and the winner
+     * agree. The periods are contiguous, so one indexed range covers both and
+     * the conditional aggregates split them apart; an uncovered range is empty.
+     *
+     * Column names and aggregates are interpolated into the SQL, so they come
+     * from the metric catalogue's literals and never from the request.
+     *
+     * @param  array<string, string>  $columns  `column => aggregate`
      */
-    private function comparisonOrderFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
-    {
+    private function comparisonFigures(
+        Workspace $workspace,
+        string $table,
+        array $columns,
+        string $from,
+        string $to,
+        string $previousFrom,
+        string $previousTo,
+    ) {
+        $selects = ['pu.id as id', 'pu.name as name'];
+        $bindings = [];
+        $periods = ['current' => [$from, $to], 'previous' => [$previousFrom, $previousTo]];
+
+        foreach ($columns as $column => $aggregate) {
+            foreach ($periods as $period => [$start, $end]) {
+                $selects[] = "COALESCE({$aggregate}(CASE WHEN r.date BETWEEN ? AND ? THEN r.`{$column}` END), 0) as {$period}_{$column}";
+                array_push($bindings, $start, $end);
+            }
+        }
+
         return $this->scopeToVisibleShops(
-            DB::table('pancake_user_pos_daily_reports as r')
+            DB::table("{$table} as r")
                 ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
                 ->where('r.workspace_id', $workspace->id)
                 ->whereBetween('r.date', [$previousFrom, $to]),
@@ -983,100 +1422,92 @@ class CSRController extends Controller
             'r.shop_id',
         )
             ->groupBy('pu.id', 'pu.name')
-            ->selectRaw('
-                pu.id as id,
-                pu.name as name,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_sales END), 0) as sales,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.returning END), 0) as returned_amount,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as delivered_amount,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_sales END), 0) as previous_sales,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.returning END), 0) as previous_returned_amount,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.delivered END), 0) as previous_delivered_amount
-            ', [
-                $from, $to, $from, $to, $from, $to,
-                $previousFrom, $previousTo, $previousFrom, $previousTo, $previousFrom, $previousTo,
-            ])
+            ->selectRaw(implode(', ', $selects), $bindings)
             ->get();
     }
 
     /**
-     * RMO % and talk time per CSR, both periods, off the call report — the same
-     * rows the CSR table and the two RMO leaders read.
+     * One metric block: every CSR who qualifies, ranked, with the period's
+     * average. Not a top few — the whole field is listed, so a CSR with figures
+     * is never missing from the chart their figures belong on; the panel scrolls
+     * a long roster rather than cutting it off. `total` is that count, which the
+     * average is taken over.
+     *
+     * @param  array<string, mixed>  $metric  One entry of the metric catalogue.
      */
-    private function comparisonRmoFigures(Workspace $workspace, string $from, string $to, string $previousFrom, string $previousTo)
+    private function comparisonMetric(array $metric, $rows): array
     {
-        return $this->scopeToVisibleShops(
-            DB::table('pancake_user_daily_call_reports as r')
-                ->join('pancake_users as pu', 'pu.id', '=', 'r.pancake_user_id')
-                ->where('r.workspace_id', $workspace->id)
-                ->whereBetween('r.date', [$previousFrom, $to]),
-            $workspace,
-            'r.shop_id',
-        )
-            ->groupBy('pu.id', 'pu.name')
-            ->selectRaw('
-                pu.id as id,
-                pu.name as name,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_assigned_count END), 0) as called,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_confirmed_count END), 0) as confirmed,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_call_time END), 0) as seconds,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_assigned_count END), 0) as previous_called,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_confirmed_count END), 0) as previous_confirmed,
-                COALESCE(SUM(CASE WHEN r.date BETWEEN ? AND ? THEN r.total_rmo_call_time END), 0) as previous_seconds
-            ', [
-                $from, $to, $from, $to, $from, $to,
-                $previousFrom, $previousTo, $previousFrom, $previousTo, $previousFrom, $previousTo,
-            ])
-            ->get();
-    }
-
-    /**
-     * One metric block: the CSRs who qualify, ranked, with the period's average.
-     * That average is over everyone who qualified, not the listed rows — a top
-     * eight measured against its own mean is half above average by construction.
-     */
-    private function comparisonMetric(
-        string $key,
-        string $label,
-        string $format,
-        string $deltaUnit,
-        bool $higherIsBetter,
-        $rows,
-        callable $value,
-        callable $previousValue,
-    ): array {
         $eligible = $rows
             ->map(fn ($row) => [
                 // pancake_users.id is a UUID — casting it to an int lands every
                 // CSR on 0, quietly merging them.
                 'id' => (string) $row->id,
                 'name' => $row->name,
-                'value' => $value($row),
-                'previous_value' => $previousValue($row),
+                'value' => $this->comparisonValue($metric, $row, 'current'),
+                'previous_value' => $this->comparisonValue($metric, $row, 'previous'),
             ])
             ->filter(fn ($row) => $row['value'] !== null)
             ->values();
 
-        $ranked = ($higherIsBetter
+        $ranked = ($metric['higher_is_better']
             ? $eligible->sortByDesc('value')
             : $eligible->sortBy('value')
         )->values();
 
         return [
-            'key' => $key,
-            'label' => $label,
-            'format' => $format,
-            // Percentage points for the metrics that are already rates, as on
-            // the stat cards above.
-            'delta_unit' => $deltaUnit,
-            'higher_is_better' => $higherIsBetter,
+            'key' => $metric['key'],
+            'label' => $metric['label'],
+            // The heading this metric sits under in the panel's selector.
+            'group' => $metric['group'],
+            'format' => $metric['format'],
+            'delta_unit' => $metric['delta_unit'],
+            'higher_is_better' => $metric['higher_is_better'],
             'average' => $eligible->isNotEmpty() ? round($eligible->avg('value'), 2) : null,
             'total' => $eligible->count(),
-            'rows' => $ranked->take(self::COMPARISON_ROWS)->map(fn ($row) => [
+            'rows' => $ranked->map(fn ($row) => [
                 ...$row,
-                'change' => $this->comparisonChange($row['value'], $row['previous_value'], $deltaUnit),
+                'change' => $this->comparisonChange($row['value'], $row['previous_value'], $metric['delta_unit']),
+                'color_slot' => $this->comparisonColourSlot($row['id']),
             ])->all(),
         ];
+    }
+
+    /**
+     * One CSR's figure for a metric in one of the two periods, or null when the
+     * period gives them nothing to plot — no sales, no parcel settled, no call,
+     * or a rate that came out at zero because they did none of the work.
+     *
+     * Null rather than zero: it keeps them off the axis and out of the average,
+     * which is what "the average of the CSRs who did this" has to mean. A rate
+     * with nothing under the line is no rate at all, not a zero one.
+     *
+     * A rate of zero is dropped from the ranked period only. Most of the roster
+     * confirms RMO deliveries without ever calling one, and every one of them
+     * used to land at 0% — ranked below the CSRs doing the work and dragging the
+     * average line down with them. The period behind stays free to be zero, so
+     * a CSR who went 0% → 60% still reads as +60 pts rather than as nothing to
+     * compare against.
+     */
+    private function comparisonValue(array $metric, $row, string $period): ?float
+    {
+        if (isset($metric['column'])) {
+            $value = (float) $row->{"{$period}_{$metric['column']}"};
+
+            return $value > 0 ? $value : null;
+        }
+
+        $whole = array_sum(array_map(
+            fn (string $column) => (float) $row->{"{$period}_{$column}"},
+            $metric['rate']['whole'],
+        ));
+
+        if ($whole <= 0) {
+            return null;
+        }
+
+        $rate = $this->rate((float) $row->{"{$period}_{$metric['rate']['part']}"}, $whole);
+
+        return $period === 'current' && $rate === 0.0 ? null : $rate;
     }
 
     /**
@@ -1097,33 +1528,55 @@ class CSRController extends Controller
     }
 
     /**
-     * A fixed chart colour per CSR across all four metrics, keyed to the person
-     * rather than their rank, so flipping tabs moves the bars without repainting
-     * them. Past eight CSRs the slots wrap; the name label carries identity.
+     * A fixed chart colour per CSR, taken from who they are rather than where
+     * they rank, so changing the metric moves the bars without repainting them
+     * — the request that draws the next metric never sees the last one's
+     * ordering. Past eight CSRs the slots wrap; the name carries identity.
      */
-    private function withColourSlots(array $metrics): array
+    private function comparisonColourSlot(string $id): int
     {
-        $order = collect($metrics)
-            ->firstWhere('key', 'sales')['rows'] ?? [];
+        return crc32($id) % self::COMPARISON_COLOURS;
+    }
 
-        $slots = collect($order)->pluck('id')->all();
+    /**
+     * Run both CSR rollups now, for today and yesterday only, scoped to this
+     * workspace. Local and the test server only.
+     *
+     * The commands only queue the aggregation jobs, so this returns as soon as
+     * they are dispatched — the figures move once the queue drains. Passing
+     * --date per day rather than --days is what keeps today in the window: the
+     * commands' own backfill starts at yesterday and works backwards.
+     */
+    public function runSync(Request $request, Workspace $workspace)
+    {
+        // Local and the test server only. Production keeps to the schedule, and
+        // hiding the button there is not on its own a guard.
+        abort_if(app()->environment('production'), 403, 'Manual CSR sync is disabled in production.');
 
-        foreach ($metrics as $metric) {
-            foreach ($metric['rows'] as $row) {
-                if (! in_array($row['id'], $slots, true)) {
-                    $slots[] = $row['id'];
-                }
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        $dates = [
+            CarbonImmutable::today()->toDateString(),
+            CarbonImmutable::yesterday()->toDateString(),
+        ];
+
+        $output = [];
+
+        foreach (self::SYNC_COMMANDS as $command) {
+            foreach ($dates as $date) {
+                Artisan::call($command, [
+                    '--workspace' => $workspace->slug,
+                    '--date' => $date,
+                ]);
+
+                $output[] = trim(Artisan::output());
             }
         }
 
-        $slots = array_flip($slots);
-
-        return collect($metrics)->map(fn ($metric) => [
-            ...$metric,
-            'rows' => collect($metric['rows'])->map(fn ($row) => [
-                ...$row,
-                'color_slot' => $slots[$row['id']] % 8,
-            ])->all(),
-        ])->all();
+        return response()->json([
+            'commands' => self::SYNC_COMMANDS,
+            'dates' => $dates,
+            'output' => $output,
+        ]);
     }
 }

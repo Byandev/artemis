@@ -2,16 +2,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
     ArrowDown,
     ArrowUp,
+    Headset,
+    Hourglass,
     MessagesSquare,
     Minus,
-    Percent,
     PhoneCall,
-    PhoneForwarded,
+    PhoneIncoming,
     PhoneOutgoing,
     RotateCcw,
+    ShieldAlert,
+    ShieldCheck,
+    Target,
     Timer,
     Wallet,
 } from 'lucide-react';
+
+/**
+ * The customer return rate at or above which an order is flagged for a
+ * verification call. Mirrors CSRController::VERIFICATION_RTS_THRESHOLD — shown
+ * in the footnote so the card says what "needs verification" means.
+ */
+const RTS_THRESHOLD = 55;
 
 /** Fields every analytics stat endpoint answers with. */
 interface StatPayload {
@@ -32,8 +43,36 @@ export interface RtsStat extends StatPayload {
 }
 
 export interface RmoCalledStat extends StatPayload {
-    called: number;
-    assigned: number;
+    value: number;
+}
+
+export interface TotalRmoCalledStat extends StatPayload {
+    /** RMO calls placed — the ringing, not the parcels it got through. */
+    value: number;
+    seconds: number;
+    /** The deliveries behind those calls, counted once however often rung. */
+    orders: number;
+}
+
+export interface RmoCallTimeStat extends StatPayload {
+    value: number;
+    calls: number;
+    average_seconds: number | null;
+}
+
+export interface RmoRealConversationsStat extends StatPayload {
+    value: number;
+    /** RMO calls placed — what the conversations are read against. */
+    calls: number;
+    /** Conversations over calls, as a percentage; null with no calls. */
+    rate: number | null;
+}
+
+export interface RmoHitRateStat extends StatPayload {
+    /** Null when no RMO call was placed — no rate, rather than a rate of none. */
+    value: number | null;
+    conversations: number;
+    calls: number;
 }
 
 export interface RmoTimeStat extends StatPayload {
@@ -44,25 +83,32 @@ export interface RmoTimeStat extends StatPayload {
 
 export interface CallsPlacedStat extends StatPayload {
     value: number;
-    connected: number;
 }
 
 export interface RealConversationsStat extends StatPayload {
     value: number;
-    placed: number;
-    /** Share of the attempts that became a conversation, or null with none. */
-    share: number | null;
+    calls: number;
+    average_seconds: number | null;
 }
 
 export interface ReachRateStat extends StatPayload {
-    real: number;
-    placed: number;
+    value: number;
+    /** Orders whose customer number has no report behind it at all. */
+    no_report: number;
+    /** Orders whose customer is returning parcels at or above the threshold. */
+    high_rts: number;
+    orders: number;
 }
 
-export interface LongestCallStat extends StatPayload {
-    value: number;
-    /** The day it happened, or null when no calls were placed. */
-    call_date: string | null;
+export interface VerifiedOrdersStat extends StatPayload {
+    /** Null when the range needed no verification at all. */
+    value: number | null;
+    /** Orders verified — the numerator, counted by order rather than by call. */
+    orders: number;
+    /** Calls it took to get through them — an order rung three times is three. */
+    calls: number;
+    /** The backlog it is read against — the Reach Rate card's figure. */
+    needs_verification: number;
 }
 
 /** Seconds as `502h 32m` / `12m 05s` / `45s`, dropping units that read as zero. */
@@ -285,19 +331,171 @@ export function RmoCalledStatCard({
 }) {
     return (
         <StatCard
-            title="RMO Called %"
+            title="Total Called"
             icon={PhoneCall}
             loading={loading || stat === null}
-            // Null when nothing was assigned in the range — a dash, not 0%,
-            // which would read as "nobody rang anyone" rather than "there was
-            // nothing to ring".
+            value={stat ? stat.value.toLocaleString() : ''}
+            footnote={
+                stat
+                    ? `call${stat.value === 1 ? '' : 's'} placed in the range`
+                    : ''
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+/**
+ * RMO calls placed over the range, and the deliveries they were about.
+ *
+ * The two are far apart and the gap is the point: RMO rings the same parcel
+ * more than once by design — the customer, then the rider, then the customer
+ * again when nobody picked up — so forty calls are commonly twenty parcels.
+ * The headline stays the calls, since that is the effort the card measures;
+ * the footnote says how many deliveries that effort actually covered.
+ *
+ * Calls with no orders behind them is not a real reading — every RMO call is
+ * about a delivery — so it means the rollup has not been re-run since the
+ * column was added and the range is answering from rows that predate it. The
+ * footnote drops back to naming the unit rather than reporting a nought that
+ * would read as "rang forty times, reached nothing".
+ */
+export function TotalRmoCalledStatCard({
+    stat,
+    loading,
+}: {
+    stat: TotalRmoCalledStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Called"
+            icon={PhoneIncoming}
+            loading={loading || stat === null}
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The time behind these is the card beside this one, so the
+            // footnote spends itself on the figure nothing else on the page
+            // carries: the parcels the calls got through. Unless there are
+            // none to report against calls that happened, which is a rollup
+            // that has not caught up rather than a period that reached nobody.
+            footnote={
+                !stat
+                    ? ''
+                    : stat.orders === 0 && stat.value > 0
+                      ? `RMO call${stat.value === 1 ? '' : 's'} in the range`
+                      : `RMO call${stat.value === 1 ? '' : 's'} across ${stat.orders.toLocaleString()} order${stat.orders === 1 ? '' : 's'}`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RmoCallTimeStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoCallTimeStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Call Time"
+            icon={Hourglass}
+            loading={loading || stat === null}
+            value={stat ? duration(stat.value) : ''}
+            footnote={
+                !stat || stat.average_seconds === null
+                    ? 'No RMO calls in this period'
+                    : `avg ${perCall(stat.average_seconds)} per call`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RmoRealConversationsStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoRealConversationsStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="RMO Real Conversation"
+            icon={Headset}
+            loading={loading || stat === null}
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The pool it came out of. The share itself is the Hit Rate card
+            // beside this one, so the footnote does not restate it.
+            footnote={
+                !stat || stat.rate === null
+                    ? 'No RMO calls in this period'
+                    : `of ${stat.calls.toLocaleString()} RMO call${stat.calls === 1 ? '' : 's'} placed`
+            }
+            trend={
+                <Trend
+                    change={stat?.change ?? null}
+                    since={
+                        stat
+                            ? `${stat.previous_period.from} – ${stat.previous_period.to}`
+                            : ''
+                    }
+                />
+            }
+        />
+    );
+}
+
+export function RmoHitRateStatCard({
+    stat,
+    loading,
+}: {
+    stat: RmoHitRateStat | null;
+    loading: boolean;
+}) {
+    return (
+        <StatCard
+            title="Hit Rate"
+            icon={Target}
+            loading={loading || stat === null}
+            // A dash, not 0%, when nothing was placed — there is no rate to
+            // report rather than a rate of nothing.
             value={
                 !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
             }
+            // The division itself, so the figure can be read against its volume.
             footnote={
-                stat
-                    ? `${stat.called.toLocaleString()} of ${stat.assigned.toLocaleString()} assigned`
-                    : ''
+                !stat || stat.value === null
+                    ? 'No RMO calls in this period'
+                    : `${stat.conversations.toLocaleString()} conversations of ${stat.calls.toLocaleString()} calls`
             }
             trend={
                 <Trend
@@ -323,7 +521,7 @@ export function RmoTimeStatCard({
 }) {
     return (
         <StatCard
-            title="RMO Total Time"
+            title="Total Called Time"
             icon={Timer}
             loading={loading || stat === null}
             value={stat ? duration(stat.value) : ''}
@@ -355,15 +553,16 @@ export function CallsPlacedStatCard({
 }) {
     return (
         <StatCard
-            title="Calls Placed"
+            title="Total Verification Called"
             icon={PhoneOutgoing}
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
-            // The connected count is worth carrying: the gap between the two
-            // is the calls that rang and got nothing, which is the context the
-            // headline number is missing on its own.
+            // The time behind these is the card beside this one, so the
+            // footnote names the unit rather than restating that figure.
             footnote={
-                stat ? `${stat.connected.toLocaleString()} connected` : ''
+                stat
+                    ? `verification call${stat.value === 1 ? '' : 's'} in the range`
+                    : ''
             }
             trend={
                 <Trend
@@ -388,16 +587,14 @@ export function RealConversationsStatCard({
 }) {
     return (
         <StatCard
-            title="Real Conversations"
+            title="Total Verification Call Time"
             icon={MessagesSquare}
             loading={loading || stat === null}
-            value={stat ? stat.value.toLocaleString() : ''}
-            // The share of attempts this represents is the Reach Rate card, so
-            // the footnote gives the denominator without restating the rate.
+            value={stat ? duration(stat.value) : ''}
             footnote={
-                !stat || stat.share === null
-                    ? 'No calls placed in this period'
-                    : `of ${stat.placed.toLocaleString()} placed`
+                !stat || stat.average_seconds === null
+                    ? 'No verification calls in this period'
+                    : `avg ${perCall(stat.average_seconds)} per call`
             }
             trend={
                 <Trend
@@ -422,17 +619,16 @@ export function ReachRateStatCard({
 }) {
     return (
         <StatCard
-            title="Reach Rate"
-            icon={Percent}
+            title="Total Order needs Verification"
+            icon={ShieldAlert}
             loading={loading || stat === null}
-            // Null with no attempts at all — a dash, not 0%, which would read as
-            // "rang all day and reached nobody" rather than "nobody rang".
-            value={
-                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
-            }
+            value={stat ? stat.value.toLocaleString() : ''}
+            // The two reasons split out: a card that only says "66" leaves you
+            // unable to tell a batch of unknown numbers from a batch of known
+            // bad ones, which are different problems.
             footnote={
                 stat
-                    ? `${stat.real.toLocaleString()} of ${stat.placed.toLocaleString()} calls reached someone`
+                    ? `${stat.no_report.toLocaleString()} no report · ${stat.high_rts.toLocaleString()} at ${RTS_THRESHOLD}%+ RTS`
                     : ''
             }
             trend={
@@ -443,32 +639,48 @@ export function ReachRateStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
-                    unit=" pts"
                 />
             }
         />
     );
 }
 
-export function LongestCallStatCard({
+/**
+ * How much of the range's verification backlog got verified.
+ *
+ * Orders verified over the "Total Order needs Verification" card beside it,
+ * with both counts and the calls behind them in the footnote. Orders on both
+ * sides of the division, not calls: three calls at one order cover one order,
+ * and counting the calls read a two-order backlog rung three times as 150%.
+ *
+ * It can still pass 100% — a CSR ringing an order nothing flagged, or one
+ * chased across two days, which the nightly rollup counts on each of them.
+ * Real signal about the range rather than an error to clamp away.
+ */
+export function VerifiedOrdersStatCard({
     stat,
     loading,
 }: {
-    stat: LongestCallStat | null;
+    stat: VerifiedOrdersStat | null;
     loading: boolean;
 }) {
     return (
         <StatCard
-            title="Longest Call"
-            icon={PhoneForwarded}
+            title="Total Verified Orders"
+            icon={ShieldCheck}
             loading={loading || stat === null}
-            value={stat ? duration(stat.value) : ''}
-            // Which day it landed on, since a single outlier is worth being able
-            // to go and look at rather than just wonder about.
+            // A dash, not 0%, when nothing needed verifying — there is no rate
+            // to report rather than a rate of nothing.
+            value={
+                !stat || stat.value === null ? '—' : `${stat.value.toFixed(1)}%`
+            }
+            // The division itself, and the calls it took: orders over orders,
+            // not calls over orders — an order rung three times covers one, and
+            // counting the calls put a two-order backlog at 150%.
             footnote={
-                !stat || stat.call_date === null
-                    ? 'No calls in this period'
-                    : `on ${stat.call_date}`
+                !stat || stat.value === null
+                    ? 'Nothing needed verifying in this period'
+                    : `${stat.orders.toLocaleString()} of ${stat.needs_verification.toLocaleString()} needing verification · ${stat.calls.toLocaleString()} calls`
             }
             trend={
                 <Trend
@@ -478,6 +690,7 @@ export function LongestCallStatCard({
                             ? `${stat.previous_period.from} – ${stat.previous_period.to}`
                             : ''
                     }
+                    unit=" pts"
                 />
             }
         />

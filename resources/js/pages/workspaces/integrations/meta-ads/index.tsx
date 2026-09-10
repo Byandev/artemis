@@ -67,15 +67,16 @@ import {
 import { InlineOwner, OwnerOption } from '../components/inline-owner';
 import {
     ColumnVisibilityMenu,
+    GridFilter,
     INSIGHTS_OPTIONS,
     InsightFilterBuilder,
     InsightsMetrics,
-    MetricFilter,
     ObjectiveOption,
     StatusLabel,
     buildInsightsColumns,
-    deserializeMetricFilters,
+    deserializeGridFilters,
     formatBudget,
+    serializeDateFilters,
     serializeMetricFilters,
     useColumnPresets,
 } from './_shared';
@@ -98,7 +99,7 @@ const GROUP_BY_OPTIONS: {
     value: GroupBy;
     label: string;
     icon: LucideIcon;
-    hint: string
+    hint: string;
 }[] = [
     {
         value: 'ad_name',
@@ -218,6 +219,7 @@ interface Props {
         until?: string;
         filter?: { search?: string };
         metricFilters?: unknown[];
+        dateFilters?: unknown[];
     };
 }
 
@@ -1299,13 +1301,21 @@ export default function MetaAdsManager({
     const [selected, setSelected] = useState<string[]>(selectedAccounts);
     const [range, setRange] = useState(dateRange);
     const [searchValue, setSearchValue] = useState(query?.filter?.search ?? '');
-    const [metricFilters, setMetricFilters] = useState<MetricFilter[]>(() =>
-        deserializeMetricFilters(query?.metricFilters),
+    // Metric and date filters share one list and one dropdown — they differ
+    // only in which query param carries them to the server.
+    const [filters, setFilters] = useState<GridFilter[]>(() =>
+        deserializeGridFilters(query?.metricFilters, query?.dateFilters),
     );
-    // Serialized once so the grid fetch and the row chart send the same filters.
-    const serializedFilters = useMemo(
-        () => serializeMetricFilters(metricFilters),
-        [metricFilters],
+    // Serialized once so the grid fetch and the row chart send the same
+    // filters, and so the fetch effect depends on the strings rather than on a
+    // list identity that changes on every render.
+    const serializedMetricFilters = useMemo(
+        () => serializeMetricFilters(filters),
+        [filters],
+    );
+    const serializedDateFilters = useMemo(
+        () => serializeDateFilters(filters),
+        [filters],
     );
     // Creator filter: '' (all), 'unassigned', or a member id as string.
     const [creatorFilter, setCreatorFilter] = useState<string>('');
@@ -1355,7 +1365,12 @@ export default function MetaAdsManager({
         qs.set('until', range.until);
         if (sort) qs.set('sort', sort);
         if (debouncedSearch) qs.set('filter[search]', debouncedSearch);
-        if (serializedFilters) qs.set('metric_filters', serializedFilters);
+        if (serializedMetricFilters) {
+            qs.set('metric_filters', serializedMetricFilters);
+        }
+        if (serializedDateFilters) {
+            qs.set('date_filters', serializedDateFilters);
+        }
         // Creator filter is ad-level only.
         if (groupBy === 'ad' && creatorFilter) {
             qs.set('creator_id', creatorFilter);
@@ -1393,7 +1408,8 @@ export default function MetaAdsManager({
         sort,
         page,
         perPage,
-        serializedFilters,
+        serializedMetricFilters,
+        serializedDateFilters,
         creatorFilter,
         debouncedSearch,
         accounts.length,
@@ -1420,8 +1436,8 @@ export default function MetaAdsManager({
         setRange({ since, until });
         setPage(1);
     };
-    const onMetricFilters = (next: MetricFilter[]) => {
-        setMetricFilters(next);
+    const onFilters = (next: GridFilter[]) => {
+        setFilters(next);
         setPage(1);
     };
     const onSearch = (v: string) => {
@@ -1521,8 +1537,9 @@ export default function MetaAdsManager({
                             </Select>
                         )}
                         <InsightFilterBuilder
-                            filters={metricFilters}
-                            onChange={onMetricFilters}
+                            filters={filters}
+                            onChange={onFilters}
+                            groupBy={groupBy}
                             objectives={objectives}
                         />
                     </div>
@@ -1587,7 +1604,7 @@ export default function MetaAdsManager({
                 selectedAccounts={selected}
                 accountsTotal={accounts.length}
                 groupLabel={groupLabel}
-                metricFilters={serializedFilters}
+                metricFilters={serializedMetricFilters}
                 onClose={() => setTimelineTarget(null)}
             />
 

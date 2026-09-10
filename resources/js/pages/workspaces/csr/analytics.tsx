@@ -12,31 +12,46 @@ import {
 } from '@/components/csr/CsrAnalyticsLeaderCards';
 import {
     CallsPlacedStatCard,
-    LongestCallStatCard,
     ReachRateStatCard,
     RealConversationsStatCard,
+    RmoCallTimeStatCard,
     RmoCalledStatCard,
+    RmoHitRateStatCard,
+    RmoRealConversationsStatCard,
     RmoTimeStatCard,
     RtsStatCard,
     SalesStatCard,
+    TotalRmoCalledStatCard,
+    VerifiedOrdersStatCard,
     type CallsPlacedStat,
-    type LongestCallStat,
     type ReachRateStat,
     type RealConversationsStat,
+    type RmoCallTimeStat,
     type RmoCalledStat,
+    type RmoHitRateStat,
+    type RmoRealConversationsStat,
     type RmoTimeStat,
     type RtsStat,
     type SalesStat,
+    type TotalRmoCalledStat,
+    type VerifiedOrdersStat,
 } from '@/components/csr/CsrAnalyticsStatCards';
 import CsrComparisonPanel, {
+    type ComparisonMetricOption,
     type ComparisonResponse,
 } from '@/components/csr/CsrComparisonPanel';
-import CsrDailyCallOutcomesTable, {
-    type DailyCallOutcomesResponse,
-} from '@/components/csr/CsrDailyCallOutcomesTable';
 import CsrDailyEffortChart, {
     type DailyEffortResponse,
 } from '@/components/csr/CsrDailyEffortChart';
+import CsrHourlyEffortChart, {
+    type HourlyEffortResponse,
+} from '@/components/csr/CsrHourlyEffortChart';
+import CsrSyncButton from '@/components/csr/CsrSyncButton';
+import {
+    ColumnsDropdown,
+    useColumnVisibility,
+    type ColumnOption,
+} from '@/components/ui/columns-dropdown';
 import { DataTable, SortableHeader } from '@/components/ui/data-table';
 import DatePicker from '@/components/ui/date-picker';
 import AppLayout from '@/layouts/app-layout';
@@ -50,27 +65,59 @@ import { format, parseISO, subDays } from 'date-fns';
 import { omit } from 'lodash';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+/**
+ * One CSR's period, every column of both nightly rollups.
+ *
+ * The sales figures come from pancake_user_pos_daily_reports (or its ERP twin,
+ * which carries no parcel counts and so reads zero on them); the call figures
+ * from pancake_user_daily_call_reports. The names are the aliases the
+ * controller selects, not the raw column names — `total_called` is the RMO
+ * assignments and `total_all_called` is the report's own `total_called`.
+ */
 interface CsrRecord {
     id: number;
     name: string;
     pancake_user_id: string;
+    // pancake_user_pos_daily_reports
     total_orders: number;
     total_sales: number;
-    delivered: number;
-    returning_count: number;
-    rts_rate: number;
-    total_called: number;
-    total_call_time: number;
-    total_rmo_call_attempts: number;
-    total_confirmed: number;
-    rmo_percentage: number;
     total_delivered: number;
+    total_delivered_count: number;
     total_returning: number;
+    total_returning_count: number;
+    rts_rate: number;
+    // pancake_user_daily_call_reports
+    total_confirmed: number;
+    total_called: number;
+    total_rmo_call_attempts: number;
+    total_rmo_orders: number;
+    rmo_percentage: number;
+    total_call_time: number;
+    total_rmo_connected_called: number;
+    total_rmo_real_called: number;
+    longest_rmo_call_time: number;
+    total_rmo_customer_called: number;
+    total_rmo_customer_call_time: number;
+    total_rmo_rider_called: number;
+    total_rmo_rider_call_time: number;
+    total_verification_called: number;
+    total_verification_call_time: number;
+    total_verification_real_called: number;
+    total_verified_orders: number;
+    total_all_called: number;
+    total_all_call_time: number;
 }
 
 interface Props {
     workspace: Workspace;
     records: PaginatedData<CsrRecord>;
+    /**
+     * Whether the manual rollup trigger is offered. False in production, where
+     * the nightly schedule is the only thing that rebuilds these records.
+     */
+    canRunSync?: boolean;
+    /** Everything the CSR comparison dropdown lists, in the order it lists it. */
+    comparisonMetrics?: ComparisonMetricOption[];
     query?: {
         sort?: string | null;
         from?: string | null;
@@ -79,7 +126,7 @@ interface Props {
         per_page?: number | string;
         type?: 'erp' | 'pos' | null;
         search?: string | null;
-        /** Which CSR comparison tab to open on — one of the metric keys. */
+        /** Which CSR comparison metric to open on — one of the metric keys. */
         comparison?: string | null;
     };
 }
@@ -110,15 +157,25 @@ function useAnalyticsStat<T>(
     stat: string,
     from: string,
     to: string,
+    /** Anything else the endpoint needs — the comparison's metric, say. */
+    extra?: Record<string, string>,
 ): [T | null, boolean] {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
+    // The effect compares its dependencies by identity, and an object literal
+    // is a new one on every render; the serialised form is what actually says
+    // whether the request has changed.
+    const extraKey = JSON.stringify(extra ?? {});
 
     useEffect(() => {
         const controller = new AbortController();
         setLoading(true);
 
-        const params = new URLSearchParams({ from, to });
+        const params = new URLSearchParams({
+            from,
+            to,
+            ...(JSON.parse(extraKey) as Record<string, string>),
+        });
 
         fetch(
             `/api/workspaces/${workspaceSlug}/csrs/stats/${stat}?${params.toString()}`,
@@ -143,7 +200,7 @@ function useAnalyticsStat<T>(
             });
 
         return () => controller.abort();
-    }, [workspaceSlug, stat, from, to]);
+    }, [workspaceSlug, stat, from, to, extraKey]);
 
     return [data, loading];
 }
@@ -163,7 +220,147 @@ const STICKY_HEADER_CELL =
 const SCROLL_BODY =
     '[&_.custom-scrollbar]:max-h-[32rem] [&_.custom-scrollbar]:overflow-y-auto';
 
-export default function Analytics({ workspace, records, query }: Props) {
+// The breakdown carries every column of both nightly rollups, and all but a
+// handful are the same three shapes: a count, a peso figure, or a span of call
+// time. Building those from one place keeps two dozen columns readable and
+// stops a new one from being formatted differently by accident.
+const countColumn = (
+    accessorKey: keyof CsrRecord,
+    title: string,
+): ColumnDef<CsrRecord> => ({
+    accessorKey,
+    header: ({ column }) => <SortableHeader column={column} title={title} />,
+    cell: ({ row }) => Number(row.original[accessorKey]).toLocaleString(),
+});
+
+const moneyColumn = (
+    accessorKey: keyof CsrRecord,
+    title: string,
+): ColumnDef<CsrRecord> => ({
+    accessorKey,
+    header: ({ column }) => <SortableHeader column={column} title={title} />,
+    cell: ({ row }) => peso(Number(row.original[accessorKey])),
+});
+
+const durationColumn = (
+    accessorKey: keyof CsrRecord,
+    title: string,
+): ColumnDef<CsrRecord> => ({
+    accessorKey,
+    header: ({ column }) => <SortableHeader column={column} title={title} />,
+    cell: ({ row }) => formatCallTime(Number(row.original[accessorKey])),
+});
+
+// Which of those columns the reader wants on screen. The ids are the column
+// accessorKeys, which are also the sort keys the server takes, and the groups
+// are the two rollups the figures come from. Everything starts visible — the
+// table shows the whole report and the menu is how it's narrowed — and the
+// choice is remembered per browser under COLUMNS_STORAGE_KEY.
+const COLUMN_OPTIONS: ColumnOption[] = [
+    { id: 'name', label: 'CSR', required: true, group: 'CSR' },
+
+    { id: 'total_orders', label: 'Orders', group: 'Sales report' },
+    { id: 'total_sales', label: 'Sales', group: 'Sales report' },
+    { id: 'total_delivered', label: 'Delivered', group: 'Sales report' },
+    {
+        id: 'total_delivered_count',
+        label: 'Delivered Parcels',
+        group: 'Sales report',
+    },
+    { id: 'total_returning', label: 'Returning', group: 'Sales report' },
+    {
+        id: 'total_returning_count',
+        label: 'Returning Parcels',
+        group: 'Sales report',
+    },
+    { id: 'rts_rate', label: 'RTS Rate', group: 'Sales report' },
+
+    { id: 'total_confirmed', label: 'RMO Confirmed', group: 'Call report' },
+    { id: 'total_called', label: 'RMO Assigned', group: 'Call report' },
+    {
+        id: 'total_rmo_call_attempts',
+        label: 'RMO Called',
+        group: 'Call report',
+    },
+    {
+        id: 'total_rmo_orders',
+        label: 'RMO Orders Called',
+        group: 'Call report',
+    },
+    { id: 'rmo_percentage', label: 'RMO %', group: 'Call report' },
+    { id: 'total_call_time', label: 'RMO Call Time', group: 'Call report' },
+    {
+        id: 'total_rmo_connected_called',
+        label: 'RMO Answered',
+        group: 'Call report',
+    },
+    {
+        id: 'total_rmo_real_called',
+        label: 'RMO Real Conversations',
+        group: 'Call report',
+    },
+    {
+        id: 'longest_rmo_call_time',
+        label: 'Longest RMO Call',
+        group: 'Call report',
+    },
+    {
+        id: 'total_rmo_customer_called',
+        label: 'RMO Customer Called',
+        group: 'Call report',
+    },
+    {
+        id: 'total_rmo_customer_call_time',
+        label: 'RMO Customer Call Time',
+        group: 'Call report',
+    },
+    {
+        id: 'total_rmo_rider_called',
+        label: 'RMO Rider Called',
+        group: 'Call report',
+    },
+    {
+        id: 'total_rmo_rider_call_time',
+        label: 'RMO Rider Call Time',
+        group: 'Call report',
+    },
+    {
+        id: 'total_verification_called',
+        label: 'Verification Called',
+        group: 'Call report',
+    },
+    {
+        id: 'total_verification_call_time',
+        label: 'Verification Call Time',
+        group: 'Call report',
+    },
+    {
+        id: 'total_verification_real_called',
+        label: 'Verification Real Conversations',
+        group: 'Call report',
+    },
+    {
+        id: 'total_verified_orders',
+        label: 'Total Verified Orders',
+        group: 'Call report',
+    },
+    { id: 'total_all_called', label: 'Total Called', group: 'Call report' },
+    {
+        id: 'total_all_call_time',
+        label: 'Total Call Time',
+        group: 'Call report',
+    },
+];
+
+const COLUMNS_STORAGE_KEY = 'csr-analytics-cols';
+
+export default function Analytics({
+    workspace,
+    records,
+    query,
+    canRunSync = false,
+    comparisonMetrics = [],
+}: Props) {
     const today = new Date();
     const currentType = query?.type === 'erp' ? 'erp' : 'pos';
     const currentSort = query?.sort ?? '-total_sales';
@@ -172,8 +369,11 @@ export default function Analytics({ workspace, records, query }: Props) {
         to: query?.to ? parseISO(query.to) : today,
     };
     const [searchInput, setSearchInput] = useState(query?.search ?? '');
+    // The controller resolves the URL's key (and the four the panel used to
+    // tab between) against the metric catalogue, so this only stands in when
+    // the page is rendered without it.
     const [comparisonTab, setComparisonTab] = useState(
-        query?.comparison ?? 'sales',
+        query?.comparison ?? 'total_sales',
     );
 
     const fromStr = format(range.from, 'yyyy-MM-dd');
@@ -204,11 +404,12 @@ export default function Analytics({ workspace, records, query }: Props) {
             },
         );
 
-    // Picking a comparison tab is a read of data already in hand, so it writes
-    // the URL in place instead of making a visit — a reload or a shared link
-    // then opens on the same metric. Inertia's own history entry is stamped
-    // with the new URL too, so coming back through the browser's history
-    // restores the tab rather than the one the entry was created with.
+    // Picking a comparison metric refetches that metric alone; the page itself
+    // does not move, so it writes the URL in place instead of making a visit —
+    // a reload or a shared link then opens on the same metric. Inertia's own
+    // history entry is stamped with the new URL too, so coming back through the
+    // browser's history restores the metric rather than the one the entry was
+    // created with.
     const selectComparisonTab = (key: string) => {
         setComparisonTab(key);
 
@@ -236,9 +437,11 @@ export default function Analytics({ workspace, records, query }: Props) {
     // up the card beside it, and the table's sorting, paging and search never
     // touch either.
     //
-    // Not keyed on the POS/ERP switch: these read the workspace's orders, the
-    // source the main dashboard's total sales comes from, and an order has no
-    // POS/ERP side. That switch only picks the rollup the table is built from.
+    // Not keyed on the POS/ERP switch. Sales and RTS read the POS rollup, the
+    // same rows the leaders and the comparison below them read, so the totals
+    // and the names under them always agree; the RMO cards read the call
+    // report and the delivery rows, which have no POS/ERP side. That switch
+    // only picks the rollup the table is built from.
     const [salesStat, salesLoading] = useAnalyticsStat<SalesStat>(
         workspace.slug,
         'analytics-sales',
@@ -257,6 +460,34 @@ export default function Analytics({ workspace, records, query }: Props) {
         fromStr,
         toStr,
     );
+    const [totalRmoCalledStat, totalRmoCalledLoading] =
+        useAnalyticsStat<TotalRmoCalledStat>(
+            workspace.slug,
+            'analytics-total-rmo-called',
+            fromStr,
+            toStr,
+        );
+    const [rmoCallTimeStat, rmoCallTimeLoading] =
+        useAnalyticsStat<RmoCallTimeStat>(
+            workspace.slug,
+            'analytics-rmo-call-time',
+            fromStr,
+            toStr,
+        );
+    const [rmoRealStat, rmoRealLoading] =
+        useAnalyticsStat<RmoRealConversationsStat>(
+            workspace.slug,
+            'analytics-rmo-real-conversations',
+            fromStr,
+            toStr,
+        );
+    const [rmoHitRateStat, rmoHitRateLoading] =
+        useAnalyticsStat<RmoHitRateStat>(
+            workspace.slug,
+            'analytics-rmo-hit-rate',
+            fromStr,
+            toStr,
+        );
     const [rmoTimeStat, rmoTimeLoading] = useAnalyticsStat<RmoTimeStat>(
         workspace.slug,
         'analytics-rmo-time',
@@ -283,10 +514,10 @@ export default function Analytics({ workspace, records, query }: Props) {
         fromStr,
         toStr,
     );
-    const [longestCallStat, longestCallLoading] =
-        useAnalyticsStat<LongestCallStat>(
+    const [verifiedOrdersStat, verifiedOrdersLoading] =
+        useAnalyticsStat<VerifiedOrdersStat>(
             workspace.slug,
-            'analytics-longest-call',
+            'analytics-verified-orders',
             fromStr,
             toStr,
         );
@@ -304,14 +535,16 @@ export default function Analytics({ workspace, records, query }: Props) {
         LeaderResponse<RmoDurationLeader>
     >(workspace.slug, 'analytics-leader-rmo-duration', fromStr, toStr);
 
-    // The field behind the leaders. One request for all four metrics — they
-    // come from the same two scans, so a call per tab would repeat the work.
+    // The field behind the leaders, for the one metric being read. The metric
+    // goes to the endpoint rather than the whole catalogue coming back, so the
+    // scan is over that column alone — picking another fetches that one.
     const [comparison, comparisonLoading] =
         useAnalyticsStat<ComparisonResponse>(
             workspace.slug,
             'analytics-comparison',
             fromStr,
             toStr,
+            { metric: comparisonTab },
         );
 
     // The two call cards' totals, spread across the days that made them.
@@ -323,12 +556,12 @@ export default function Analytics({ workspace, records, query }: Props) {
             toStr,
         );
 
-    // The same days as numbers, under the chart. Its own request: the table
-    // answers a different question and carries columns the chart never draws.
-    const [callOutcomes, callOutcomesLoading] =
-        useAnalyticsStat<DailyCallOutcomesResponse>(
+    // The same calls folded into one round of the clock. Its own request, and
+    // its own source: the hour is on the call log, not on the nightly rollup.
+    const [hourlyEffort, hourlyEffortLoading] =
+        useAnalyticsStat<HourlyEffortResponse>(
             workspace.slug,
-            'analytics-daily-call-outcomes',
+            'analytics-hourly-effort',
             fromStr,
             toStr,
         );
@@ -355,6 +588,9 @@ export default function Analytics({ workspace, records, query }: Props) {
         [currentSort],
     );
 
+    const { visibility: columnVisibility, setVisibility: setColumnVisibility } =
+        useColumnVisibility(COLUMN_OPTIONS, COLUMNS_STORAGE_KEY);
+
     const baseColumns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
             {
@@ -366,12 +602,13 @@ export default function Analytics({ workspace, records, query }: Props) {
                 // name (e.g. assignees not yet pulled into pancake_users).
                 cell: ({ row }) => row.original.name,
                 size: 220,
-                // Eleven columns of figures are wider than any screen, and a
-                // row of numbers with the name scrolled off is unreadable — so
-                // the name column is pinned and the figures scroll past it. It
-                // repaints the surface (the body would otherwise show through)
-                // and carries the edge as an inset shadow rather than a border,
-                // which a collapsed table drops on a sticky cell.
+                // Two dozen columns of figures are far wider than any
+                // screen, and a row of numbers with the name scrolled off is
+                // unreadable — so the name column is pinned and the figures
+                // scroll past it. It repaints the surface (the body would
+                // otherwise show through) and carries the edge as an inset
+                // shadow rather than a border, which a collapsed table drops
+                // on a sticky cell.
                 meta: {
                     headerClassName:
                         'sticky left-0 z-30 bg-white dark:bg-zinc-900 shadow-[inset_-1px_-1px_0_rgba(0,0,0,0.06)] dark:shadow-[inset_-1px_-1px_0_rgba(255,255,255,0.06)]',
@@ -379,35 +616,16 @@ export default function Analytics({ workspace, records, query }: Props) {
                         'sticky left-0 z-10 bg-white dark:bg-zinc-900 shadow-[inset_-1px_0_0_rgba(0,0,0,0.06)] dark:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]',
                 },
             },
-            {
-                accessorKey: 'total_orders',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Orders" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.total_orders).toLocaleString(),
-            },
-            {
-                accessorKey: 'total_sales',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Sales" />
-                ),
-                cell: ({ row }) => peso(row.original.total_sales),
-            },
-            {
-                accessorKey: 'total_delivered',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Delivered" />
-                ),
-                cell: ({ row }) => peso(row.original.total_delivered),
-            },
-            {
-                accessorKey: 'total_returning',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="Returning" />
-                ),
-                cell: ({ row }) => peso(row.original.total_returning),
-            },
+            // pancake_user_pos_daily_reports — the sales side of the period.
+            // Delivered and Returning are money; the two Parcels columns beside
+            // them are the counts behind that money, which only the POS rollup
+            // carries (ERP reads zero).
+            countColumn('total_orders', 'Orders'),
+            moneyColumn('total_sales', 'Sales'),
+            moneyColumn('total_delivered', 'Delivered'),
+            countColumn('total_delivered_count', 'Delivered Parcels'),
+            moneyColumn('total_returning', 'Returning'),
+            countColumn('total_returning_count', 'Returning Parcels'),
             {
                 accessorKey: 'rts_rate',
                 header: ({ column }) => (
@@ -416,32 +634,13 @@ export default function Analytics({ workspace, records, query }: Props) {
                 cell: ({ row }) =>
                     `${Number(row.original.rts_rate).toFixed(2)}%`,
             },
-            {
-                accessorKey: 'total_confirmed',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Confirmed" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.total_confirmed).toLocaleString(),
-            },
-            {
-                accessorKey: 'total_called',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Assigned" />
-                ),
-                cell: ({ row }) =>
-                    Number(row.original.total_called).toLocaleString(),
-            },
-            {
-                accessorKey: 'total_rmo_call_attempts',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Called" />
-                ),
-                cell: ({ row }) =>
-                    Number(
-                        row.original.total_rmo_call_attempts,
-                    ).toLocaleString(),
-            },
+            // pancake_user_daily_call_reports — the calling side.
+            countColumn('total_confirmed', 'RMO Confirmed'),
+            countColumn('total_called', 'RMO Assigned'),
+            countColumn('total_rmo_call_attempts', 'RMO Called'),
+            // The same calls counted by delivery rather than by call: a parcel
+            // rung three times is three above and one here.
+            countColumn('total_rmo_orders', 'RMO Orders Called'),
             {
                 accessorKey: 'rmo_percentage',
                 header: ({ column }) => (
@@ -454,13 +653,39 @@ export default function Analytics({ workspace, records, query }: Props) {
                     return `${Number(row.original.rmo_percentage).toFixed(2)}%`;
                 },
             },
-            {
-                accessorKey: 'total_call_time',
-                header: ({ column }) => (
-                    <SortableHeader column={column} title="RMO Call Time" />
-                ),
-                cell: ({ row }) => formatCallTime(row.original.total_call_time),
-            },
+            durationColumn('total_call_time', 'RMO Call Time'),
+            // How far the RMO calls got: one that joined at all, and one that
+            // lasted past the shared five-second mark. Longest is a max over
+            // the range, not a sum.
+            countColumn('total_rmo_connected_called', 'RMO Answered'),
+            countColumn('total_rmo_real_called', 'RMO Real Conversations'),
+            durationColumn('longest_rmo_call_time', 'Longest RMO Call'),
+            // The same RMO calls split by who was on the other end.
+            countColumn('total_rmo_customer_called', 'RMO Customer Called'),
+            durationColumn(
+                'total_rmo_customer_call_time',
+                'RMO Customer Call Time',
+            ),
+            countColumn('total_rmo_rider_called', 'RMO Rider Called'),
+            durationColumn('total_rmo_rider_call_time', 'RMO Rider Call Time'),
+            // Calls against an order with no delivery behind it — confirming
+            // the order rather than chasing the parcel.
+            countColumn('total_verification_called', 'Verification Called'),
+            durationColumn(
+                'total_verification_call_time',
+                'Verification Call Time',
+            ),
+            countColumn(
+                'total_verification_real_called',
+                'Verification Real Conversations',
+            ),
+            // The same verification work counted by order rather than by call:
+            // an order rung three times is three above and one here.
+            countColumn('total_verified_orders', 'Total Verified Orders'),
+            // The report's own totals: RMO work and verification added
+            // together, which is every call the CSR placed.
+            countColumn('total_all_called', 'Total Called'),
+            durationColumn('total_all_call_time', 'Total Call Time'),
         ],
         [],
     );
@@ -517,6 +742,9 @@ export default function Analytics({ workspace, records, query }: Props) {
                         })}
                     </div>
                     */}
+                    {canRunSync && (
+                        <CsrSyncButton workspaceSlug={workspace.slug} />
+                    )}
                     <DatePicker
                         id="csr-analytics-date-range"
                         mode="range"
@@ -565,9 +793,25 @@ export default function Analytics({ workspace, records, query }: Props) {
                         stat={reachRateStat}
                         loading={reachRateLoading}
                     />
-                    <LongestCallStatCard
-                        stat={longestCallStat}
-                        loading={longestCallLoading}
+                    <VerifiedOrdersStatCard
+                        stat={verifiedOrdersStat}
+                        loading={verifiedOrdersLoading}
+                    />
+                    <TotalRmoCalledStatCard
+                        stat={totalRmoCalledStat}
+                        loading={totalRmoCalledLoading}
+                    />
+                    <RmoCallTimeStatCard
+                        stat={rmoCallTimeStat}
+                        loading={rmoCallTimeLoading}
+                    />
+                    <RmoRealConversationsStatCard
+                        stat={rmoRealStat}
+                        loading={rmoRealLoading}
+                    />
+                    <RmoHitRateStatCard
+                        stat={rmoHitRateStat}
+                        loading={rmoHitRateLoading}
                     />
                 </div>
 
@@ -598,6 +842,7 @@ export default function Analytics({ workspace, records, query }: Props) {
                     data={comparison}
                     loading={comparisonLoading}
                     metricKey={comparisonTab}
+                    options={comparisonMetrics}
                     onMetricChange={selectComparisonTab}
                 />
 
@@ -606,25 +851,37 @@ export default function Analytics({ workspace, records, query }: Props) {
                     loading={dailyEffortLoading}
                 />
 
-                <CsrDailyCallOutcomesTable
-                    data={callOutcomes}
-                    loading={callOutcomesLoading}
+                <CsrHourlyEffortChart
+                    data={hourlyEffort}
+                    loading={hourlyEffortLoading}
                 />
 
                 {/* The same header row the sections above use: the section's
-                    name on the left, its one control on the right. */}
+                    name on the left, its controls on the right. The search
+                    gives way when the row is narrow; the columns menu keeps its
+                    width, since a wrapped trigger label reads as broken. */}
                 <div className="mt-6 mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <h2 className="font-mono text-[10px] font-medium tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
                         CSR breakdown
                     </h2>
 
-                    <input
-                        type="text"
-                        placeholder="Search CSR..."
-                        value={searchInput}
-                        onChange={(e) => setSearchInput(e.target.value)}
-                        className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none sm:w-64 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
-                    />
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            placeholder="Search CSR..."
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            className="h-9 w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none sm:w-64 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
+                        />
+
+                        <div className="shrink-0">
+                            <ColumnsDropdown
+                                options={COLUMN_OPTIONS}
+                                visibility={columnVisibility}
+                                onChange={setColumnVisibility}
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div
@@ -639,6 +896,8 @@ export default function Analytics({ workspace, records, query }: Props) {
                         data={records.data ?? []}
                         initialSorting={initialSorting}
                         meta={omit(records, ['data'])}
+                        columnVisibility={columnVisibility}
+                        onColumnVisibilityChange={setColumnVisibility}
                         onFetch={(params) => {
                             const overrides: Record<
                                 string,

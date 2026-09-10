@@ -9,6 +9,7 @@ use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CsrComparisonMetrics;
 use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -22,6 +23,49 @@ use Spatie\QueryBuilder\QueryBuilder;
 class CSRController extends Controller
 {
     use AuthorizesRequests;
+
+    /**
+     * The figures that decide whether a CSR belongs in the breakdown at all,
+     * qualified by the joined subquery each comes from.
+     *
+     * A CSR is on the roster of the workspace's shops whether or not they
+     * worked in the range being read, and both rollups come in as left joins
+     * coalesced to zero — so anyone who did nothing used to fill a row of
+     * zeros, pushing the CSRs who did work down the table and onto page two.
+     * One figure moving is enough to be listed; none of them moving is not a
+     * row. A CSR with no rollup row at all reads NULL here, which is not `<> 0`
+     * either, so the same clause covers them.
+     *
+     * The two rates are deliberately absent: both are computed from amounts
+     * already on this list, so a CSR with a rate has the figures behind it too.
+     */
+    private const BREAKDOWN_FIGURES = [
+        'dr.total_orders',
+        'dr.total_sales',
+        'dr.total_delivered',
+        'dr.total_returning',
+        'dr.total_delivered_count',
+        'dr.total_returning_count',
+
+        'rmo.total_called',
+        'rmo.total_call_time',
+        'rmo.total_rmo_call_attempts',
+        'rmo.total_rmo_orders',
+        'rmo.total_confirmed',
+        'rmo.total_all_called',
+        'rmo.total_all_call_time',
+        'rmo.total_rmo_connected_called',
+        'rmo.total_rmo_real_called',
+        'rmo.longest_rmo_call_time',
+        'rmo.total_rmo_customer_called',
+        'rmo.total_rmo_customer_call_time',
+        'rmo.total_rmo_rider_called',
+        'rmo.total_rmo_rider_call_time',
+        'rmo.total_verification_called',
+        'rmo.total_verification_call_time',
+        'rmo.total_verification_real_called',
+        'rmo.total_verified_orders',
+    ];
 
     public function dashboard(Request $request, Workspace $workspace)
     {
@@ -109,17 +153,17 @@ class CSRController extends Controller
     }
 
     /**
-     * Which CSR comparison tab the page opens on.
+     * Which CSR comparison metric the page opens on.
      *
      * Kept in the URL rather than the browser so a reload, a shared link and
-     * the back button all land on the metric that was being read. Anything
-     * that isn't one of the endpoint's four keys falls back to sales.
+     * the back button all land on the metric that was being read. Anything the
+     * catalogue does not name falls back to total sales; the four keys the
+     * panel used to tab between resolve to what they now point at, so older
+     * links still open where they say.
      */
     private function comparisonTab(Request $request): string
     {
-        $tab = (string) $request->input('comparison', 'sales');
-
-        return in_array($tab, ['sales', 'rts', 'rmo_called', 'call_time'], true) ? $tab : 'sales';
+        return CsrComparisonMetrics::resolveKey($request->input('comparison'));
     }
 
     public function analytics(Request $request, Workspace $workspace)
@@ -132,6 +176,8 @@ class CSRController extends Controller
         $drClass = $isErp ? PancakeUserErpDailyReport::class : PancakeUserPosDailyReport::class;
 
         // Per-CSR sales/delivery rollup for the selected period (POS or ERP).
+        // Every column the report carries is summed, not only the ones the
+        // table used to show.
         $drSummary = $drClass::query()
             ->where('workspace_id', $workspace->id)
             ->whereBetween('date', [$from, $to])
@@ -142,7 +188,13 @@ class CSRController extends Controller
                 SUM(total_sales)    as total_sales,
                 SUM(delivered)      as total_delivered,
                 SUM(`returning`)    as total_returning
-            ');
+            ')
+            // The parcel counts behind those two money figures. Only the POS
+            // rollup carries them, so the ERP side reads zero rather than
+            // dropping the columns and changing the table's shape mid-toggle.
+            ->selectRaw($isErp
+                ? '0 as total_delivered_count, 0 as total_returning_count'
+                : 'SUM(delivered_count) as total_delivered_count, SUM(returning_count) as total_returning_count');
 
         // RMO calling activity is tracked separately from the sales reports.
         // The call report, summed back over the shops it splits a CSR's day into.
@@ -158,7 +210,28 @@ class CSRController extends Controller
                 SUM(total_rmo_assigned_count)  as total_called,
                 SUM(total_rmo_call_time)       as total_call_time,
                 SUM(total_rmo_called)          as total_rmo_call_attempts,
+                SUM(total_rmo_orders)          as total_rmo_orders,
                 SUM(total_rmo_confirmed_count) as total_confirmed
+            ')
+            // The rest of the call report. The table's own `total_called` and
+            // `total_call_time` — every call placed, RMO and verification alike
+            // — are qualified because the aliases above have taken those two
+            // names. The longest call is a max, so a range takes the max of the
+            // days' maxes rather than adding them up.
+            ->selectRaw('
+                SUM(pancake_user_daily_call_reports.total_called)    as total_all_called,
+                SUM(pancake_user_daily_call_reports.total_call_time) as total_all_call_time,
+                SUM(total_rmo_connected_called)     as total_rmo_connected_called,
+                SUM(total_rmo_real_called)          as total_rmo_real_called,
+                MAX(longest_rmo_call_time)          as longest_rmo_call_time,
+                SUM(total_rmo_customer_called)      as total_rmo_customer_called,
+                SUM(total_rmo_customer_call_time)   as total_rmo_customer_call_time,
+                SUM(total_rmo_rider_called)         as total_rmo_rider_called,
+                SUM(total_rmo_rider_call_time)      as total_rmo_rider_call_time,
+                SUM(total_verification_called)      as total_verification_called,
+                SUM(total_verification_call_time)   as total_verification_call_time,
+                SUM(total_verification_real_called) as total_verification_real_called,
+                SUM(total_verified_orders)          as total_verified_orders
             ');
 
         $base = PancakeUser::query()
@@ -190,7 +263,23 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_called, 0)             as total_called')
             ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
             ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
+            ->selectRaw('COALESCE(rmo.total_rmo_orders, 0)         as total_rmo_orders')
             ->selectRaw('COALESCE(rmo.total_confirmed, 0)          as total_confirmed')
+            ->selectRaw('COALESCE(dr.total_delivered_count, 0)     as total_delivered_count')
+            ->selectRaw('COALESCE(dr.total_returning_count, 0)     as total_returning_count')
+            ->selectRaw('COALESCE(rmo.total_all_called, 0)         as total_all_called')
+            ->selectRaw('COALESCE(rmo.total_all_call_time, 0)      as total_all_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_connected_called, 0)     as total_rmo_connected_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_real_called, 0)          as total_rmo_real_called')
+            ->selectRaw('COALESCE(rmo.longest_rmo_call_time, 0)          as longest_rmo_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_customer_called, 0)      as total_rmo_customer_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_customer_call_time, 0)   as total_rmo_customer_call_time')
+            ->selectRaw('COALESCE(rmo.total_rmo_rider_called, 0)         as total_rmo_rider_called')
+            ->selectRaw('COALESCE(rmo.total_rmo_rider_call_time, 0)      as total_rmo_rider_call_time')
+            ->selectRaw('COALESCE(rmo.total_verification_called, 0)      as total_verification_called')
+            ->selectRaw('COALESCE(rmo.total_verification_call_time, 0)   as total_verification_call_time')
+            ->selectRaw('COALESCE(rmo.total_verification_real_called, 0) as total_verification_real_called')
+            ->selectRaw('COALESCE(rmo.total_verified_orders, 0)          as total_verified_orders')
             ->selectRaw('
                 CASE
                     WHEN (COALESCE(dr.total_returning, 0) + COALESCE(dr.total_delivered, 0)) > 0
@@ -215,6 +304,15 @@ class CSRController extends Controller
                     ELSE 0
                 END as rmo_percentage
             ')
+            // Only the CSRs who did something in the range — see
+            // BREAKDOWN_FIGURES. The clause reads the joined subqueries rather
+            // than the aliases above it, which MySQL will not have resolved yet
+            // at WHERE.
+            ->where(function ($query) {
+                foreach (self::BREAKDOWN_FIGURES as $figure) {
+                    $query->orWhere($figure, '<>', 0);
+                }
+            })
             ->allowedSorts([
                 AllowedSort::field('name', 'pancake_users.name'),
                 'total_orders',
@@ -224,9 +322,25 @@ class CSRController extends Controller
                 'total_called',
                 'total_call_time',
                 'total_rmo_call_attempts',
+                'total_rmo_orders',
                 'total_confirmed',
                 'rts_rate',
                 'rmo_percentage',
+                'total_delivered_count',
+                'total_returning_count',
+                'total_all_called',
+                'total_all_call_time',
+                'total_rmo_connected_called',
+                'total_rmo_real_called',
+                'longest_rmo_call_time',
+                'total_rmo_customer_called',
+                'total_rmo_customer_call_time',
+                'total_rmo_rider_called',
+                'total_rmo_rider_call_time',
+                'total_verification_called',
+                'total_verification_call_time',
+                'total_verification_real_called',
+                'total_verified_orders',
             ])
             ->allowedFilters([
                 AllowedFilter::callback('search', function ($query, $value) {
@@ -240,6 +354,14 @@ class CSRController extends Controller
         return Inertia::render('workspaces/csr/analytics', [
             'workspace' => $workspace,
             'records' => $records,
+            // The manual rollup trigger is a test-server convenience — production
+            // keeps to the nightly schedule, so the button is not rendered there.
+            // CSRController@runSync refuses the call on the same terms.
+            'canRunSync' => ! app()->environment('production'),
+            // Everything the comparison panel's selector lists. Shipped with
+            // the page so the dropdown is populated on the first paint, rather
+            // than filling in once the figures land behind it.
+            'comparisonMetrics' => CsrComparisonMetrics::options(),
             'query' => [
                 'from' => $from,
                 'to' => $to,

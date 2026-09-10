@@ -6,6 +6,7 @@ use App\Models\Page;
 use App\Models\Workspace;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Modules\Pancake\Actions\LinkVerificationCallLogsAction;
 use Modules\Pancake\Actions\SyncCustomerAction;
 use Modules\Pancake\Actions\SyncOrderItemsAction;
 use Modules\Pancake\Actions\SyncParcelTrackingAction;
@@ -30,6 +31,7 @@ class SyncOrder implements ShouldQueue
         SyncShippingAddressAction $syncAddress,
         SyncParcelTrackingAction $syncTracking,
         SyncPhoneNumberReportsAction $syncPhoneReports,
+        LinkVerificationCallLogsAction $linkCallLogs,
     ): void {
         $savedOrder = $upsertOrder->execute($this->workspace, $this->data);
 
@@ -38,5 +40,11 @@ class SyncOrder implements ShouldQueue
         $syncAddress->execute($savedOrder, $this->data);
         $syncTracking->execute($savedOrder, $this->data, $this->page, $this->workspace);
         $syncPhoneReports->execute($savedOrder, $this->data);
+
+        // Last, and after the address: it matches on the number written there.
+        // Calls sync on their own schedule and are stamped unmatched when the
+        // order they were about had not arrived yet, so the order claims them
+        // on the way in.
+        $linkCallLogs->execute($savedOrder);
     }
 }
