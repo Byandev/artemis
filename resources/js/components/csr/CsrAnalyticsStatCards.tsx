@@ -47,8 +47,11 @@ export interface RmoCalledStat extends StatPayload {
 }
 
 export interface TotalRmoCalledStat extends StatPayload {
+    /** RMO calls placed — the ringing, not the parcels it got through. */
     value: number;
     seconds: number;
+    /** The deliveries behind those calls, counted once however often rung. */
+    orders: number;
 }
 
 export interface RmoCallTimeStat extends StatPayload {
@@ -351,6 +354,21 @@ export function RmoCalledStatCard({
     );
 }
 
+/**
+ * RMO calls placed over the range, and the deliveries they were about.
+ *
+ * The two are far apart and the gap is the point: RMO rings the same parcel
+ * more than once by design — the customer, then the rider, then the customer
+ * again when nobody picked up — so forty calls are commonly twenty parcels.
+ * The headline stays the calls, since that is the effort the card measures;
+ * the footnote says how many deliveries that effort actually covered.
+ *
+ * Calls with no orders behind them is not a real reading — every RMO call is
+ * about a delivery — so it means the rollup has not been re-run since the
+ * column was added and the range is answering from rows that predate it. The
+ * footnote drops back to naming the unit rather than reporting a nought that
+ * would read as "rang forty times, reached nothing".
+ */
 export function TotalRmoCalledStatCard({
     stat,
     loading,
@@ -365,12 +383,16 @@ export function TotalRmoCalledStatCard({
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
             // The time behind these is the card beside this one, so the
-            // footnote names the unit rather than restating that figure — the
-            // same split the verification pair already makes.
+            // footnote spends itself on the figure nothing else on the page
+            // carries: the parcels the calls got through. Unless there are
+            // none to report against calls that happened, which is a rollup
+            // that has not caught up rather than a period that reached nobody.
             footnote={
-                stat
-                    ? `RMO call${stat.value === 1 ? '' : 's'} in the range`
-                    : ''
+                !stat
+                    ? ''
+                    : stat.orders === 0 && stat.value > 0
+                      ? `RMO call${stat.value === 1 ? '' : 's'} in the range`
+                      : `RMO call${stat.value === 1 ? '' : 's'} across ${stat.orders.toLocaleString()} order${stat.orders === 1 ? '' : 's'}`
             }
             trend={
                 <Trend

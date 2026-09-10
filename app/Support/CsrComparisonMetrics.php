@@ -154,6 +154,19 @@ class CsrComparisonMetrics
             'higher_is_better' => true,
         ],
         [
+            // The same work as "RMO calls placed" counted by delivery rather
+            // than by call: a parcel rung three times is three there and one
+            // here.
+            'key' => 'total_rmo_orders',
+            'label' => 'RMO orders called',
+            'group' => 'Calls',
+            'source' => 'call',
+            'column' => 'total_rmo_orders',
+            'aggregate' => 'SUM',
+            'format' => 'number',
+            'higher_is_better' => true,
+        ],
+        [
             'key' => 'total_rmo_call_time',
             'label' => 'RMO call time',
             'group' => 'Calls',

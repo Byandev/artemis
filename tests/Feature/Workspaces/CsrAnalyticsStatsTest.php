@@ -518,12 +518,77 @@ test('a verification call is not an RMO call', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     rmoCall($workspace, '2026-08-02', 120);
-    // An order with no delivery behind it goes in the verification columns.
+    // An order with no delivery behind it goes in the verification columns —
+    // including the order count, which is the deliveries RMO rang about.
     verificationCall($workspace, '2026-08-02', 600);
 
     csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 1)
-        ->assertJsonPath('seconds', 120);
+        ->assertJsonPath('seconds', 120)
+        ->assertJsonPath('orders', 1);
+});
+
+test('the calls come back with the deliveries behind them', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $order = Order::factory()->forWorkspace($workspace)->create();
+
+    // One parcel rung three times — customer, rider, customer again — and a
+    // second rung once. Four calls, two deliveries: the gap the footnote is
+    // there to show.
+    rmoCall($workspace, '2026-08-02', 60, order: $order, delivery: 1);
+    rmoCall($workspace, '2026-08-02', 30, order: $order, delivery: 1);
+    rmoCall($workspace, '2026-08-02', 45, order: $order, delivery: 1);
+    rmoCall($workspace, '2026-08-02', 20, order: $order, delivery: 2);
+
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 4)
+        ->assertJsonPath('orders', 2);
+});
+
+test('rollup rows written before the column report no orders, not zero of them', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $csr = PancakeUser::create(['name' => 'Backdated CSR']);
+
+    // A row as it stands before the rollup is re-run: the calls counted, the
+    // deliveries behind them still at the column default.
+    DB::table('pancake_user_daily_call_reports')->insert([
+        'workspace_id' => $workspace->id,
+        'pancake_user_id' => $csr->id,
+        'shop_id' => 0,
+        'date' => '2026-08-02',
+        'total_rmo_called' => 4,
+        'total_rmo_call_time' => 300,
+        'total_rmo_orders' => 0,
+    ]);
+
+    // Every RMO call is about a delivery, so calls with no orders behind them
+    // is a sync that has not caught up rather than a period that reached
+    // nobody. The endpoint reports it as it finds it; the card is what declines
+    // to read the nought as a coverage figure.
+    csrStat($owner, $workspace, 'analytics-total-rmo-called', '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 4)
+        ->assertJsonPath('orders', 0);
+});
+
+test('a parcel chased across two days is counted on each of them', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $order = Order::factory()->forWorkspace($workspace)->create();
+
+    rmoCall($workspace, '2026-08-02', 60, order: $order, delivery: 1);
+    rmoCall($workspace, '2026-08-03', 60, order: $order, delivery: 1);
+
+    // The rollup takes its distinct within a CSR's day on a shop, so a range
+    // that sums two days counts the parcel twice. Much narrower than counting
+    // every call, but not a workspace-wide distinct — pinned so the limit is
+    // stated rather than discovered.
+    csrTotalRmoCalledStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 2)
+        ->assertJsonPath('orders', 2);
 });
 
 test('the two halves add up to the total called', function () {
@@ -885,8 +950,21 @@ function csrRmoTimeStat($owner, Workspace $workspace, string $from, string $to)
  * for one that reached a number belonging to no order at all — the nightly
  * report has no row for it, so no card can count it.
  */
-function rmoCall(Workspace $workspace, string $date, int $seconds, bool $matched = true): void
-{
+/**
+ * An RMO call — one stamped to a delivery.
+ *
+ * $order and $delivery are only passed when a test needs several calls about
+ * the same parcel; left alone, every call gets an order of its own, which is
+ * an order per shop and so a rollup row per call.
+ */
+function rmoCall(
+    Workspace $workspace,
+    string $date,
+    int $seconds,
+    bool $matched = true,
+    ?Order $order = null,
+    int $delivery = 1,
+): void {
     CallLog::factory()->create([
         'workspace_id' => $workspace->id,
         'user_id' => rmoAssignee()->id,
@@ -894,11 +972,11 @@ function rmoCall(Workspace $workspace, string $date, int $seconds, bool $matched
         'call_date' => $date,
         'duration' => $seconds,
         'order_id' => $matched
-            ? Order::factory()->forWorkspace($workspace)->create()->id
+            ? ($order ?? Order::factory()->forWorkspace($workspace)->create())->id
             : null,
         // The delivery stamp is what makes a call RMO work rather than order
         // verification; the order beside it is what names the shop.
-        'order_for_delivery_id' => $matched ? 1 : null,
+        'order_for_delivery_id' => $matched ? $delivery : null,
     ]);
 }
 

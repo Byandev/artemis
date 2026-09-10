@@ -295,6 +295,15 @@ class CSRController extends Controller
         ]);
     }
 
+    /**
+     * The range's RMO calls, and the deliveries behind them.
+     *
+     * The count is calls, because that is what the card is about — how much
+     * ringing the CSRs did. The orders come back beside it because the two are
+     * far apart and the gap is the point: RMO rings the same parcel more than
+     * once by design, so forty calls are commonly twenty parcels, and the card
+     * that showed only the forty read as forty deliveries chased.
+     */
     public function analyticsTotalRmoCalled(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
@@ -309,6 +318,9 @@ class CSRController extends Controller
             'value' => $current['calls'],
             // The talk time behind them; RMO has no card of its own for it.
             'seconds' => $current['seconds'],
+            // The same calls counted by delivery — a parcel rung three times is
+            // three calls and one order.
+            'orders' => $current['orders'],
             'previous_value' => $previous['calls'],
             // Relative, unlike the rate cards: this is a count.
             'change' => $previous['calls'] > 0
@@ -798,20 +810,27 @@ class CSRController extends Controller
      * order. Together the two make up `total_called`. The rollup is nightly, so
      * a range the sync has not reached is zero on both.
      *
-     * @return array{calls: int, seconds: int}
+     * `orders` is the same work counted by delivery rather than by call — the
+     * rollup's own `total_rmo_orders`, distinct within a CSR's day on a shop.
+     * RMO rings a parcel more than once by design, so forty calls are commonly
+     * twenty parcels.
+     *
+     * @return array{calls: int, seconds: int, orders: int}
      */
     private function rmoCalledTotals(Workspace $workspace, string $from, string $to): array
     {
         $row = $this->callReport($workspace, $from, $to)
             ->selectRaw('
                 COALESCE(SUM(total_rmo_called), 0)    as calls,
-                COALESCE(SUM(total_rmo_call_time), 0) as seconds
+                COALESCE(SUM(total_rmo_call_time), 0) as seconds,
+                COALESCE(SUM(total_rmo_orders), 0)    as orders
             ')
             ->first();
 
         return [
             'calls' => (int) ($row->calls ?? 0),
             'seconds' => (int) ($row->seconds ?? 0),
+            'orders' => (int) ($row->orders ?? 0),
         ];
     }
 

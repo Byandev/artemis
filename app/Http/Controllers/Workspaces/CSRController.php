@@ -167,6 +167,7 @@ class CSRController extends Controller
                 SUM(total_rmo_assigned_count)  as total_called,
                 SUM(total_rmo_call_time)       as total_call_time,
                 SUM(total_rmo_called)          as total_rmo_call_attempts,
+                SUM(total_rmo_orders)          as total_rmo_orders,
                 SUM(total_rmo_confirmed_count) as total_confirmed
             ')
             // The rest of the call report. The table's own `total_called` and
@@ -219,6 +220,7 @@ class CSRController extends Controller
             ->selectRaw('COALESCE(rmo.total_called, 0)             as total_called')
             ->selectRaw('COALESCE(rmo.total_call_time, 0)          as total_call_time')
             ->selectRaw('COALESCE(rmo.total_rmo_call_attempts, 0)  as total_rmo_call_attempts')
+            ->selectRaw('COALESCE(rmo.total_rmo_orders, 0)         as total_rmo_orders')
             ->selectRaw('COALESCE(rmo.total_confirmed, 0)          as total_confirmed')
             ->selectRaw('COALESCE(dr.total_delivered_count, 0)     as total_delivered_count')
             ->selectRaw('COALESCE(dr.total_returning_count, 0)     as total_returning_count')
@@ -268,6 +270,7 @@ class CSRController extends Controller
                 'total_called',
                 'total_call_time',
                 'total_rmo_call_attempts',
+                'total_rmo_orders',
                 'total_confirmed',
                 'rts_rate',
                 'rmo_percentage',
