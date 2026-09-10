@@ -594,6 +594,113 @@ class CSRController extends Controller
     }
 
     /**
+     * The same effort and results, laid across the hours of a day.
+     *
+     * The chart above this one reads the nightly rollup, which is keyed to a
+     * date and so cannot say when in the day the work happened. This one goes
+     * back to the call log that rollup is built from and groups by the hour
+     * stamped on each call.
+     *
+     * Every day in the range comes back with its own round of the clock rather
+     * than the range being flattened into one: an hour of a Tuesday and the
+     * same hour of a Saturday are different things, and averaging them hides
+     * the day that went wrong. The chart shows one day at a time and steps
+     * between them, which costs no request — the range arrives whole.
+     *
+     * The rules are the sync's own, so a day here adds up to the day above it:
+     * an order beside the call is what names the shop, a delivery stamp is what
+     * makes it RMO work rather than order verification, and a conversation is a
+     * call that lasted past RmoDailyStats::CONNECTED_CALL_MIN_SECONDS. Reading
+     * the log direct does mean this chart covers today, where the daily one is
+     * only as fresh as the last rollup.
+     *
+     * Every day in the range is returned, and every one of its 24 hours, zeros
+     * included.
+     */
+    public function analyticsHourlyEffort(Request $request, Workspace $workspace)
+    {
+        $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
+
+        [$from, $to] = $this->range($request);
+
+        $real = RmoDailyStats::CONNECTED_CALL_MIN_SECONDS;
+
+        $rows = $this->callLogs($workspace, $from, $to)
+            ->groupByRaw('cl.call_date, HOUR(cl.call_time)')
+            ->selectRaw("
+                cl.call_date as date,
+                HOUR(cl.call_time) as hour,
+
+                SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN 1 ELSE 0 END) as calls,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration >= {$real} THEN 1 ELSE 0 END) as real_conversations,
+
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN 1 ELSE 0 END) as verification_calls,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL AND cl.duration >= {$real} THEN 1 ELSE 0 END) as verification_real
+            ")
+            ->get()
+            // date comes back with or without a time part depending on the
+            // driver — key on the first ten characters.
+            ->groupBy(fn ($row) => substr((string) $row->date, 0, 10));
+
+        $days = [];
+        $cursor = CarbonImmutable::parse($from);
+        $end = CarbonImmutable::parse($to);
+
+        while ($cursor->lessThanOrEqualTo($end)) {
+            $date = $cursor->toDateString();
+            $byHour = ($rows->get($date) ?? collect())->keyBy(fn ($row) => (int) $row->hour);
+
+            $hours = [];
+
+            for ($hour = 0; $hour < 24; $hour++) {
+                $row = $byHour->get($hour);
+
+                $hours[] = [
+                    'hour' => $hour,
+                    'calls' => (int) ($row->calls ?? 0),
+                    'real' => (int) ($row->real_conversations ?? 0),
+                    'verification_calls' => (int) ($row->verification_calls ?? 0),
+                    'verification_real' => (int) ($row->verification_real ?? 0),
+                ];
+            }
+
+            $days[] = [
+                'date' => $date,
+                'hours' => $hours,
+                // The day's own figures, so the picker can open on a day that
+                // has something to show without adding up 24 hours to find out.
+                'totals' => $this->sumEffort($hours),
+            ];
+
+            $cursor = $cursor->addDay();
+        }
+
+        return response()->json([
+            'range' => ['from' => $from, 'to' => $to],
+            'days' => $days,
+            // The range as a whole, which is the daily chart's totals over the
+            // same range — only the grouping differs, never the counting.
+            'totals' => $this->sumEffort(array_merge(...array_column($days, 'hours'))),
+        ]);
+    }
+
+    /**
+     * The four effort figures added up over whatever rows carry them.
+     *
+     * @param  array<int, array<string, int>>  $rows
+     * @return array{calls: int, real: int, verification_calls: int, verification_real: int}
+     */
+    private function sumEffort(array $rows): array
+    {
+        return [
+            'calls' => array_sum(array_column($rows, 'calls')),
+            'real' => array_sum(array_column($rows, 'real')),
+            'verification_calls' => array_sum(array_column($rows, 'verification_calls')),
+            'verification_real' => array_sum(array_column($rows, 'verification_real')),
+        ];
+    }
+
+    /**
      * Where each day's calls ended up — the table under the effort chart.
      *
      * Three buckets narrowing in turn: no_answer never joined, answered picked
@@ -888,6 +995,27 @@ class CSRController extends Controller
                 ->where('workspace_id', $workspace->id)
                 ->whereBetween('date', [$from, $to]),
             $workspace,
+        );
+    }
+
+    /**
+     * The raw call log over a range, narrowed to what the viewer may see.
+     *
+     * What the nightly rollup is built from, for the one chart that needs
+     * something the rollup threw away — the hour a call was placed. The order
+     * is joined for the same reason the sync joins it: it is what puts the call
+     * in a shop, which is both how the team filter bites and why a call
+     * matched to no order is not counted at all.
+     */
+    private function callLogs(Workspace $workspace, string $from, string $to)
+    {
+        return $this->scopeToVisibleShops(
+            DB::table('call_logs as cl')
+                ->join('pancake_orders as po', 'po.id', '=', 'cl.order_id')
+                ->where('cl.workspace_id', $workspace->id)
+                ->whereBetween('cl.call_date', [$from, $to]),
+            $workspace,
+            'po.shop_id',
         );
     }
 
