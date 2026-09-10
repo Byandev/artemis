@@ -35,7 +35,6 @@ import flatpickr from 'flatpickr';
 import { omit } from 'lodash';
 import type { LucideIcon } from 'lucide-react';
 import {
-    CalendarClock,
     ChartColumn,
     Check,
     ChevronDown,
@@ -63,7 +62,6 @@ import {
     SetStateAction,
     useEffect,
     useMemo,
-    useRef,
     useState,
 } from 'react';
 import { InlineOwner, OwnerOption } from '../components/inline-owner';
@@ -262,17 +260,17 @@ function useCreatorTagging(
         setRows((prev) =>
             prev
                 ? {
-                      ...prev,
-                      data: prev.data.map((r) =>
-                          ids.has(r.id)
-                              ? {
-                                    ...r,
-                                    creator_id: creator?.id ?? null,
-                                    creator_name: creator?.name ?? null,
-                                }
-                              : r,
-                      ),
-                  }
+                    ...prev,
+                    data: prev.data.map((r) =>
+                        ids.has(r.id)
+                            ? {
+                                ...r,
+                                creator_id: creator?.id ?? null,
+                                creator_name: creator?.name ?? null,
+                            }
+                            : r,
+                    ),
+                }
                 : prev,
         );
 
@@ -303,17 +301,17 @@ function useCreatorTagging(
             snapshot = prev;
             return prev
                 ? {
-                      ...prev,
-                      data: prev.data.map((r) =>
-                          ids.includes(r.id)
-                              ? {
-                                    ...r,
-                                    creator_id: next?.id ?? null,
-                                    creator_name: next?.name ?? null,
-                                }
-                              : r,
-                      ),
-                  }
+                    ...prev,
+                    data: prev.data.map((r) =>
+                        ids.includes(r.id)
+                            ? {
+                                ...r,
+                                creator_id: next?.id ?? null,
+                                creator_name: next?.name ?? null,
+                            }
+                            : r,
+                    ),
+                }
                 : prev;
         });
         axios
@@ -354,9 +352,9 @@ function useRowSelection() {
  * clear the creator across the currently selected ads.
  */
 function BulkCreatorControl({
-    members,
-    onAssign,
-}: {
+                                members,
+                                onAssign,
+                            }: {
     members: OwnerOption[];
     onAssign: (creatorId: number | null) => void;
 }) {
@@ -451,28 +449,28 @@ interface GroupTarget {
  * per-dimension column presets re-init when the dimension changes.
  */
 function GridTable({
-    groupBy,
-    groupLabel,
-    rows,
-    loading,
-    sort,
-    onFetch,
-    onSelectAd,
-    onOpenGroup,
-    onOpenTimeline,
-    // Creator tagging (only wired for the `ad` grouping + the ads-in-group modal).
-    showCreator = false,
-    members = [],
-    canEditCreator = false,
-    creatorSaving = {},
-    onAssignCreator,
-    // Bulk selection.
-    selectedIds,
-    onToggleRow,
-    onToggleAll,
-    onClearSelection,
-    onBulkAssignCreator,
-}: {
+                       groupBy,
+                       groupLabel,
+                       rows,
+                       loading,
+                       sort,
+                       onFetch,
+                       onSelectAd,
+                       onOpenGroup,
+                       onOpenTimeline,
+                       // Creator tagging (only wired for the `ad` grouping + the ads-in-group modal).
+                       showCreator = false,
+                       members = [],
+                       canEditCreator = false,
+                       creatorSaving = {},
+                       onAssignCreator,
+                       // Bulk selection.
+                       selectedIds,
+                       onToggleRow,
+                       onToggleAll,
+                       onClearSelection,
+                       onBulkAssignCreator,
+                   }: {
     groupBy: GroupBy;
     groupLabel: string;
     rows: PaginatedData<Row> | null;
@@ -641,79 +639,79 @@ function GridTable({
         },
         ...(showStatus
             ? [
-                  {
-                      id: 'status',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'status',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Status
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => (
-                          <StatusLabel
-                              status={
-                                  row.original.effective_status ??
-                                  row.original.status ??
-                                  null
-                              }
-                          />
-                      ),
-                  } as ColumnDef<Row>,
-              ]
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => (
+                        <StatusLabel
+                            status={
+                                row.original.effective_status ??
+                                row.original.status ??
+                                null
+                            }
+                        />
+                    ),
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...(showBudget
             ? [
-                  {
-                      id: 'budget',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="text-right font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'budget',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="text-right font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Budget
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => {
-                          const b = formatBudget(
-                              row.original.daily_budget ?? null,
-                              row.original.lifetime_budget ?? null,
-                          );
-                          return (
-                              <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
-                                  {b.value}
-                                  {b.label && (
-                                      <span className="block text-[10px] text-gray-400 dark:text-gray-500">
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => {
+                        const b = formatBudget(
+                            row.original.daily_budget ?? null,
+                            row.original.lifetime_budget ?? null,
+                        );
+                        return (
+                            <div className="text-right font-mono text-[12px] text-gray-700 dark:text-gray-300">
+                                {b.value}
+                                {b.label && (
+                                    <span className="block text-[10px] text-gray-400 dark:text-gray-500">
                                           {b.label}
                                       </span>
-                                  )}
-                              </div>
-                          );
-                      },
-                  } as ColumnDef<Row>,
-              ]
+                                )}
+                            </div>
+                        );
+                    },
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...(showCreator
             ? [
-                  {
-                      id: 'creator',
-                      enableSorting: false,
-                      header: () => (
-                          <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                {
+                    id: 'creator',
+                    enableSorting: false,
+                    header: () => (
+                        <span className="font-mono text-[11px] text-gray-500 dark:text-gray-400">
                               Creator
                           </span>
-                      ),
-                      cell: ({ row }: { row: { original: Row } }) => (
-                          <InlineOwner
-                              label="Creator"
-                              owner={creatorOf(row.original)}
-                              users={members}
-                              canEdit={canEditCreator}
-                              saving={creatorSaving[row.original.id] ?? false}
-                              onAssign={(id) =>
-                                  onAssignCreator?.(row.original, id)
-                              }
-                          />
-                      ),
-                  } as ColumnDef<Row>,
-              ]
+                    ),
+                    cell: ({ row }: { row: { original: Row } }) => (
+                        <InlineOwner
+                            label="Creator"
+                            owner={creatorOf(row.original)}
+                            users={members}
+                            canEdit={canEditCreator}
+                            saving={creatorSaving[row.original.id] ?? false}
+                            onAssign={(id) =>
+                                onAssignCreator?.(row.original, id)
+                            }
+                        />
+                    ),
+                } as ColumnDef<Row>,
+            ]
             : []),
         ...buildInsightsColumns<Row>(),
     ];
@@ -721,8 +719,8 @@ function GridTable({
     const rowClick = showThumbnail
         ? (r: unknown) => onSelectAd(r as Row)
         : onOpenGroup
-          ? (r: unknown) => onOpenGroup(r as Row)
-          : undefined;
+            ? (r: unknown) => onOpenGroup(r as Row)
+            : undefined;
 
     return (
         <div className="relative overflow-hidden rounded-[14px] border border-black/6 bg-white dark:border-white/6 dark:bg-zinc-900">
@@ -790,17 +788,17 @@ function GridTable({
 }
 
 function GroupAdsModal({
-    slug,
-    target,
-    dateRange,
-    selectedAccounts,
-    accountsTotal,
-    members,
-    canEditCreator,
-    onClose,
-    onSelectAd,
-    onOpenTimeline,
-}: {
+                           slug,
+                           target,
+                           dateRange,
+                           selectedAccounts,
+                           accountsTotal,
+                           members,
+                           canEditCreator,
+                           onClose,
+                           onSelectAd,
+                           onOpenTimeline,
+                       }: {
     slug: string;
     target: GroupTarget | null;
     dateRange: { since: string; until: string };
@@ -945,10 +943,10 @@ interface AdDetail {
 }
 
 function DimRow({
-    label,
-    value,
-    mono,
-}: {
+                    label,
+                    value,
+                    mono,
+                }: {
     label: string;
     value: ReactNode;
     mono?: boolean;
@@ -971,10 +969,10 @@ function DimRow({
 }
 
 function CreativeDetailDrawer({
-    slug,
-    ad,
-    onClose,
-}: {
+                                  slug,
+                                  ad,
+                                  onClose,
+                              }: {
     slug: string;
     ad: Row | null;
     onClose: () => void;
@@ -1012,8 +1010,8 @@ function CreativeDetailDrawer({
     const isImage = dim?.media_type
         ? dim.media_type !== 'video'
         : ad
-          ? !isVideoCreative(ad)
-          : false;
+            ? !isVideoCreative(ad)
+            : false;
     // Spinner while the detail request is in flight OR the iframe is still painting.
     const showSpinner = loading || (!!src && !iframeLoaded);
 
@@ -1127,10 +1125,10 @@ interface AccountMultiPickerProps {
 }
 
 function AccountMultiPicker({
-    accounts,
-    selected,
-    onChange,
-}: AccountMultiPickerProps) {
+                                accounts,
+                                selected,
+                                onChange,
+                            }: AccountMultiPickerProps) {
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
 
@@ -1157,8 +1155,8 @@ function AccountMultiPicker({
     const label = allSelected
         ? 'All accounts'
         : selected.length === 0
-          ? 'No accounts'
-          : `${selected.length} of ${accounts.length} accounts`;
+            ? 'No accounts'
+            : `${selected.length} of ${accounts.length} accounts`;
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -1233,245 +1231,10 @@ function AccountMultiPicker({
 
 /* ───────────────────── Group-by selector ────────────────────── */
 
-type StartTimeOp = 'on' | 'before' | 'after' | 'between';
-
-interface StartTimeFilter {
-    op: StartTimeOp;
-    value: string; // YYYY-MM-DD
-    value2?: string; // upper bound, 'between' only
-}
-
-const START_OP_LABELS: Record<StartTimeOp, string> = {
-    on: 'is on',
-    before: 'is before',
-    after: 'is after',
-    between: 'is between',
-};
-
-/**
- * Breakdowns whose rows carry a start time. Ads have none of their own, so an
- * ad-grained filter resolves through the owning ad set (the server does that);
- * ad accounts have no such date at all, so the filter can't apply there.
- */
-const START_TIME_UNSUPPORTED: GroupBy[] = ['account'];
-
-/** Compact "Jan 3" / "Jan 3 – Jan 9" summary for the trigger button. */
-function startTimeSummary(f: StartTimeFilter): string {
-    const short = (d: string) => formatDate(new Date(d), 'MMM d');
-
-    return f.op === 'between'
-        ? `${short(f.value)} – ${short(f.value2 ?? f.value)}`
-        : `${START_OP_LABELS[f.op].replace('is ', '')} ${short(f.value)}`;
-}
-
-/**
- * flatpickr appends its calendar to <body> unless it finds a dialog to live in
- * — a Popover is `popover-content`, not `dialog-content`, so it never does here.
- * That puts the calendar outside the popover's DOM, and Radix dismisses on any
- * interaction outside it, so picking a date would shut the whole thing.
- *
- * The calendar stays in <body> on purpose (the popover is `overflow-hidden` and
- * would clip it); this just tells Radix that clicks in there are not "outside".
- */
-function isInsideCalendar(
-    event: Event & { detail?: { originalEvent?: Event } },
-) {
-    const node = (event.detail?.originalEvent?.target ??
-        event.target) as HTMLElement | null;
-
-    return !!node?.closest?.('.flatpickr-calendar');
-}
-
-/**
- * Filters rows by when their ads started running — distinct from the page's
- * date range, which picks which insight days to sum.
- */
-function StartTimeSelect({
-    value,
-    supported,
-    onChange,
-}: {
-    value: StartTimeFilter | null;
-    supported: boolean;
-    onChange: (next: StartTimeFilter | null) => void;
-}) {
-    const [open, setOpen] = useState(false);
-
-    // DatePicker only rebuilds flatpickr when `defaultDate` changes, so its
-    // onChange can hold a closure captured before an operator switch. Merging
-    // against a ref of the current filter keeps that switch from being reverted.
-    const current = useRef(value);
-    current.current = value;
-
-    const patch = (next: Partial<StartTimeFilter>) => {
-        const base = current.current ?? {
-            op: 'after' as StartTimeOp,
-            value: moment().format('YYYY-MM-DD'),
-        };
-        onChange({ ...base, ...next });
-    };
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!supported}
-                    title={
-                        supported
-                            ? undefined
-                            : 'Ad accounts have no start time to filter on'
-                    }
-                    className={clsx(
-                        'h-9 gap-1.5 font-mono! text-[12px]!',
-                        !supported && 'cursor-not-allowed opacity-50',
-                    )}
-                >
-                    <CalendarClock className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
-                    <span className="text-gray-400 dark:text-gray-500">
-                        Start time
-                    </span>
-                    {value && (
-                        <span className="font-medium">
-                            {startTimeSummary(value)}
-                        </span>
-                    )}
-                    <ChevronDown className="h-3 w-3 text-gray-400" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                align="start"
-                onInteractOutside={(e) => {
-                    if (isInsideCalendar(e as unknown as Event)) {
-                        e.preventDefault();
-                    }
-                }}
-                className="w-80 overflow-hidden p-0 font-mono text-[12px]"
-            >
-                <div className="border-b border-black/6 px-3.5 py-2.5 dark:border-white/6">
-                    <p className="text-[12px] font-medium text-gray-700 dark:text-gray-200">
-                        Start time
-                    </p>
-                    <p className="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
-                        When the ads began running — not the reporting range
-                        above.
-                    </p>
-                </div>
-
-                <div className="space-y-3 p-3">
-                    <div>
-                        <p className="pb-1.5 text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
-                            Condition
-                        </p>
-                        <Select
-                            value={value?.op ?? 'after'}
-                            onValueChange={(op) =>
-                                patch({
-                                    op: op as StartTimeOp,
-                                    // Seed the upper bound so "between" is
-                                    // valid the moment it's picked.
-                                    value2:
-                                        op === 'between'
-                                            ? (current.current?.value2 ??
-                                              current.current?.value ??
-                                              moment().format('YYYY-MM-DD'))
-                                            : undefined,
-                                })
-                            }
-                        >
-                            <SelectTrigger className="h-9 w-full font-mono text-[12px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {(
-                                    Object.keys(
-                                        START_OP_LABELS,
-                                    ) as StartTimeOp[]
-                                ).map((op) => (
-                                    <SelectItem
-                                        key={op}
-                                        value={op}
-                                        className="text-[12px]"
-                                    >
-                                        {START_OP_LABELS[op]}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div>
-                        <p className="pb-1.5 text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
-                            {value?.op === 'between' ? 'From' : 'Date'}
-                        </p>
-                        <DatePicker
-                            id="meta-ads-start-time-from"
-                            fullWidth
-                            clearable={false}
-                            placeholder="Pick a date"
-                            defaultDate={value?.value}
-                            onChange={(dates) => {
-                                if (dates.length > 0) {
-                                    patch({
-                                        value: moment(dates[0]).format(
-                                            'YYYY-MM-DD',
-                                        ),
-                                    });
-                                }
-                            }}
-                        />
-                    </div>
-
-                    {value?.op === 'between' && (
-                        <div>
-                            <p className="pb-1.5 text-[11px] tracking-wide text-gray-400 dark:text-gray-500">
-                                To
-                            </p>
-                            <DatePicker
-                                id="meta-ads-start-time-to"
-                                fullWidth
-                                clearable={false}
-                                placeholder="Pick an end date"
-                                defaultDate={value.value2 ?? value.value}
-                                onChange={(dates) => {
-                                    if (dates.length > 0) {
-                                        patch({
-                                            value2: moment(dates[0]).format(
-                                                'YYYY-MM-DD',
-                                            ),
-                                        });
-                                    }
-                                }}
-                            />
-                        </div>
-                    )}
-                </div>
-
-                {value && (
-                    <div className="border-t border-black/6 p-2 dark:border-white/6">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                onChange(null);
-                                setOpen(false);
-                            }}
-                            className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg text-[12px] text-gray-500 transition-colors hover:bg-stone-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-zinc-700 dark:hover:text-gray-200"
-                        >
-                            <X className="h-3.5 w-3.5" />
-                            Clear filter
-                        </button>
-                    </div>
-                )}
-            </PopoverContent>
-        </Popover>
-    );
-}
-
 function GroupBySelect({
-    value,
-    onChange,
-}: {
+                           value,
+                           onChange,
+                       }: {
     value: GroupBy;
     onChange: (next: GroupBy) => void;
 }) {
@@ -1497,76 +1260,39 @@ function GroupBySelect({
             </PopoverTrigger>
             <PopoverContent
                 align="start"
-                className="w-80 overflow-hidden p-0 font-mono text-[12px]"
+                className="w-44 p-1 font-mono text-[11px]"
             >
-                <p className="border-b border-black/6 px-3.5 py-2.5 text-[12px] font-medium text-gray-700 dark:border-white/6 dark:text-gray-200">
-                    Group rows by
-                </p>
-                <div className="p-2">
-                    {GROUP_BY_OPTIONS.map((o) => {
-                        const active = o.value === value;
-
-                        return (
-                            <button
-                                key={o.value}
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={active}
-                                onClick={() => {
-                                    onChange(o.value);
-                                    setOpen(false);
-                                }}
-                                className={clsx(
-                                    'flex w-full items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
-                                    active
-                                        ? 'bg-emerald-50 dark:bg-emerald-500/10'
-                                        : 'hover:bg-stone-100 dark:hover:bg-zinc-700',
-                                )}
-                            >
-                                <o.icon
-                                    className={clsx(
-                                        'mt-0.5 h-4 w-4 shrink-0',
-                                        active
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-gray-400 dark:text-gray-500',
-                                    )}
-                                />
-                                <span className="min-w-0 flex-1">
-                                    <span
-                                        className={clsx(
-                                            'block truncate font-medium',
-                                            active
-                                                ? 'text-emerald-700 dark:text-emerald-300'
-                                                : 'text-gray-700 dark:text-gray-300',
-                                        )}
-                                    >
-                                        {o.label}
-                                    </span>
-                                    <span className="mt-0.5 block truncate text-[11px] text-gray-400 dark:text-gray-500">
-                                        {o.hint}
-                                    </span>
-                                </span>
-                                {active && (
-                                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
+                {GROUP_BY_OPTIONS.map((o) => (
+                    <button
+                        key={o.value}
+                        type="button"
+                        onClick={() => {
+                            onChange(o.value);
+                            setOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-gray-700 transition-colors hover:bg-stone-100 dark:text-gray-300 dark:hover:bg-zinc-700"
+                    >
+                        <o.icon className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+                        <span className="flex-1">{o.label}</span>
+                        {o.value === value && (
+                            <Check className="h-3 w-3 shrink-0 text-emerald-500" />
+                        )}
+                    </button>
+                ))}
             </PopoverContent>
         </Popover>
     );
 }
 
 export default function MetaAdsManager({
-    workspace,
-    accounts,
-    members,
-    selectedAccounts,
-    objectives = [],
-    dateRange,
-    query,
-}: Props) {
+                                           workspace,
+                                           accounts,
+                                           members,
+                                           selectedAccounts,
+                                           objectives = [],
+                                           dateRange,
+                                           query,
+                                       }: Props) {
     const canEditCreator = usePermission(PERMISSIONS.ManageMetaAdsAccounts);
 
     const [groupBy, setGroupBy] = useState<GroupBy>(
@@ -1603,9 +1329,6 @@ export default function MetaAdsManager({
     const [loading, setLoading] = useState(true);
     const [previewAd, setPreviewAd] = useState<Row | null>(null);
     const [groupTarget, setGroupTarget] = useState<GroupTarget | null>(null);
-    const [startTime, setStartTime] = useState<StartTimeFilter | null>(
-        query?.startTime ?? null,
-    );
     const [timelineTarget, setTimelineTarget] = useState<TimelineTarget | null>(
         null,
     );
@@ -1619,11 +1342,6 @@ export default function MetaAdsManager({
 
     // The creator column, filter, and selection are only meaningful per-ad.
     const showCreator = groupBy === 'ad';
-    const startTimeSupported = !START_TIME_UNSUPPORTED.includes(groupBy);
-    const serializedDateFilters =
-        startTime && startTimeSupported
-            ? JSON.stringify([{ field: 'started_date', ...startTime }])
-            : null;
 
     const groupLabel =
         GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? 'Ad Name';
@@ -1694,7 +1412,6 @@ export default function MetaAdsManager({
         serializedDateFilters,
         creatorFilter,
         debouncedSearch,
-        serializedDateFilters,
         accounts.length,
         workspace.slug,
     ]);
@@ -1709,11 +1426,6 @@ export default function MetaAdsManager({
         clear();
         // The creator filter only applies to the ad grouping.
         if (next !== 'ad') setCreatorFilter('');
-    };
-    const onStartTime = (next: StartTimeFilter | null) => {
-        setStartTime(next);
-        setPage(1);
-        clear();
     };
     const onCreatorFilter = (value: string) => {
         setCreatorFilter(value === 'all' ? '' : value);
@@ -1787,11 +1499,6 @@ export default function MetaAdsManager({
                         onChange={onAccounts}
                     />
                     <GroupBySelect value={groupBy} onChange={onGroupBy} />
-                    <StartTimeSelect
-                        value={startTime}
-                        supported={startTimeSupported}
-                        onChange={onStartTime}
-                    />
                     <div className="relative min-w-[180px] flex-1">
                         <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
