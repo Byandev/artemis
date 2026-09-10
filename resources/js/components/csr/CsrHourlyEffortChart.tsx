@@ -5,6 +5,8 @@ import CsrEffortChart, {
 export interface HourlyEffortHour {
     /** 0–23. All twenty-four are present, zeros included. */
     hour: number;
+    /** Every call the hour carried, counted as the rollup counts a day. */
+    total_calls: number;
     /** Every RMO call placed in that hour, however short. */
     calls: number;
     /** The subset that lasted long enough to be a conversation. */
@@ -16,6 +18,7 @@ export interface HourlyEffortHour {
 }
 
 export interface HourlyEffortTotals {
+    total_calls: number;
     calls: number;
     real: number;
     verification_calls: number;
@@ -68,6 +71,7 @@ const hourTooltip = (hour: number, dayCount: number) =>
 function rangeHours(days: HourlyEffortDay[]): HourlyEffortHour[] {
     const clock: HourlyEffortHour[] = Array.from({ length: 24 }, (_, hour) => ({
         hour,
+        total_calls: 0,
         calls: 0,
         real: 0,
         verification_calls: 0,
@@ -80,6 +84,7 @@ function rangeHours(days: HourlyEffortDay[]): HourlyEffortHour[] {
 
             if (!slot) continue;
 
+            slot.total_calls += hour.total_calls;
             slot.calls += hour.calls;
             slot.real += hour.real;
             slot.verification_calls += hour.verification_calls;
@@ -122,6 +127,7 @@ export default function CsrHourlyEffortChart({
         // The axis has room for "9a" and no more; a row has room to say it in
         // full, and the heading above already says which days these are.
         rowLabel: hourRange(hour.hour),
+        total_calls: hour.total_calls,
         calls: hour.calls,
         real: hour.real,
         verification_calls: hour.verification_calls,

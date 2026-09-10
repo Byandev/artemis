@@ -552,9 +552,14 @@ class CSRController extends Controller
      *
      * Both kinds of call come back on every day: `calls`/`real` are the RMO
      * ones the cards report, `verification_calls`/`verification_real` the
-     * order-verification ones beside them. The chart draws either the pair
-     * stacked or the RMO half alone, and switching between the two is a
-     * client-side filter — one request answers both.
+     * order-verification ones beside them. The chart draws one kind or the
+     * other, and switching between them is a client-side filter — one request
+     * answers both.
+     *
+     * `total_calls` is the rollup's own `total_called` rather than those two
+     * added up. They agree by construction — every counted call is stamped to a
+     * delivery or it is not — but the all-calls view is the workspace's total as
+     * the rollup recorded it, not a sum this endpoint performed.
      */
     public function analyticsDailyEffort(Request $request, Workspace $workspace)
     {
@@ -566,6 +571,7 @@ class CSRController extends Controller
             ->groupBy('date')
             ->selectRaw('
                 date,
+                COALESCE(SUM(total_called), 0) as total_calls,
                 COALESCE(SUM(total_rmo_called), 0) as calls,
                 COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
                 COALESCE(SUM(total_verification_called), 0) as verification_calls,
@@ -586,6 +592,7 @@ class CSRController extends Controller
 
             $days[] = [
                 'date' => $date,
+                'total_calls' => (int) ($row->total_calls ?? 0),
                 'calls' => (int) ($row->calls ?? 0),
                 'real' => (int) ($row->real_conversations ?? 0),
                 'verification_calls' => (int) ($row->verification_calls ?? 0),
@@ -598,12 +605,7 @@ class CSRController extends Controller
         return response()->json([
             'range' => ['from' => $from, 'to' => $to],
             'days' => $days,
-            'totals' => [
-                'calls' => array_sum(array_column($days, 'calls')),
-                'real' => array_sum(array_column($days, 'real')),
-                'verification_calls' => array_sum(array_column($days, 'verification_calls')),
-                'verification_real' => array_sum(array_column($days, 'verification_real')),
-            ],
+            'totals' => $this->sumEffort($days),
         ]);
     }
 
@@ -628,6 +630,10 @@ class CSRController extends Controller
      * the log direct does mean this chart covers today, where the daily one is
      * only as fresh as the last rollup.
      *
+     * `total_calls` is every call the hour carried, counted off the log the way
+     * the rollup's `total_called` counts a day — the figure the all-calls view
+     * draws, rather than the two kinds added up.
+     *
      * Every day in the range is returned, and every one of its 24 hours, zeros
      * included.
      */
@@ -644,6 +650,8 @@ class CSRController extends Controller
             ->selectRaw("
                 cl.call_date as date,
                 HOUR(cl.call_time) as hour,
+
+                COUNT(*) as total_calls,
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN 1 ELSE 0 END) as calls,
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration >= {$real} THEN 1 ELSE 0 END) as real_conversations,
@@ -671,6 +679,7 @@ class CSRController extends Controller
 
                 $hours[] = [
                     'hour' => $hour,
+                    'total_calls' => (int) ($row->total_calls ?? 0),
                     'calls' => (int) ($row->calls ?? 0),
                     'real' => (int) ($row->real_conversations ?? 0),
                     'verification_calls' => (int) ($row->verification_calls ?? 0),
@@ -699,14 +708,15 @@ class CSRController extends Controller
     }
 
     /**
-     * The four effort figures added up over whatever rows carry them.
+     * The effort figures added up over whatever rows carry them.
      *
      * @param  array<int, array<string, int>>  $rows
-     * @return array{calls: int, real: int, verification_calls: int, verification_real: int}
+     * @return array{total_calls: int, calls: int, real: int, verification_calls: int, verification_real: int}
      */
     private function sumEffort(array $rows): array
     {
         return [
+            'total_calls' => array_sum(array_column($rows, 'total_calls')),
             'calls' => array_sum(array_column($rows, 'calls')),
             'real' => array_sum(array_column($rows, 'real')),
             'verification_calls' => array_sum(array_column($rows, 'verification_calls')),

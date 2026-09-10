@@ -5,6 +5,8 @@ import CsrEffortChart, {
 export interface DailyEffortDay {
     /** `YYYY-MM-DD`. Every day in the range is present, zeros included. */
     date: string;
+    /** The rollup's own `total_called` — every call the day carried. */
+    total_calls: number;
     /** Every RMO call placed that day, however short. */
     calls: number;
     /** The subset that lasted long enough to be a conversation. */
@@ -19,6 +21,7 @@ export interface DailyEffortResponse {
     range: { from: string; to: string };
     days: DailyEffortDay[];
     totals: {
+        total_calls: number;
         calls: number;
         real: number;
         verification_calls: number;
@@ -51,6 +54,7 @@ export default function CsrDailyEffortChart({
         key: day.date,
         label: dayLabel(day.date),
         tooltip: dayLabel(day.date),
+        total_calls: day.total_calls,
         calls: day.calls,
         real: day.real,
         verification_calls: day.verification_calls,

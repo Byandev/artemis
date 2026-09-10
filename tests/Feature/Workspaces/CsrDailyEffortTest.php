@@ -89,6 +89,7 @@ test('a day nobody worked is returned as a zero rather than dropped', function (
     expect($days)->toHaveCount(3);
     expect($days[1])->toMatchArray([
         'date' => '2026-08-15',
+        'total_calls' => 0,
         'calls' => 0,
         'real' => 0,
         'verification_calls' => 0,
@@ -206,6 +207,7 @@ test('the totals are the days added up, matching the cards above', function () {
     $response = dailyEffort($owner, $workspace)->assertOk();
 
     expect($response->json('totals'))->toMatchArray([
+        'total_calls' => 4,
         'calls' => 3,
         'real' => 2,
         'verification_calls' => 1,
@@ -214,6 +216,27 @@ test('the totals are the days added up, matching the cards above', function () {
     expect($response->json('range'))->toMatchArray([
         'from' => EFFORT_FROM,
         'to' => EFFORT_TO,
+    ]);
+});
+
+test('a day carries the rollup\'s own total of every call placed', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    effortCall($workspace, '2026-08-14', 120);
+    effortCall($workspace, '2026-08-14', 30, rmo: false);
+    // No order behind it, so the rollup has no row to file it under and the
+    // total cannot see it either.
+    effortCall($workspace, '2026-08-14', 90, ordered: false);
+
+    $day = collect(dailyEffort($owner, $workspace)->assertOk()->json('days'))
+        ->firstWhere('date', '2026-08-14');
+
+    // total_called off the rollup, which is the two kinds it also reports — the
+    // all-calls view reads the recorded figure rather than adding them up.
+    expect($day)->toMatchArray([
+        'total_calls' => 2,
+        'calls' => 1,
+        'verification_calls' => 1,
     ]);
 });
 

@@ -26,6 +26,11 @@ export interface EffortBucket {
      * so "9:00 AM – 9:59 AM" can replace "9a". Falls back to `label`.
      */
     rowLabel?: string;
+    /**
+     * Every call placed, however short — the rollup's own total rather than the
+     * two kinds added up. What the all-calls view draws.
+     */
+    total_calls: number;
     /** Every RMO call placed, however short. */
     calls: number;
     /** The subset that lasted long enough to be a conversation. */
@@ -46,18 +51,23 @@ const SCOPES: {
     key: Scope;
     label: string;
     blurb: string;
-    /** The same, for the table — it has no bars and no colour to explain. */
+    /** The same, for the table — it has no bars to explain. */
     tableBlurb: string;
     /** What the empty state says was not placed. */
     noun: string;
+    /** The two figure columns, named for the cut they are counting. */
+    placedColumn: string;
+    realColumn: string;
 }[] = [
     {
         key: 'all',
         label: 'All calls',
-        blurb: 'The pale bar is every call placed; the solid bar beside it is the ones that became a conversation. Blue is chasing a parcel, green is confirming an order. Where the two are furthest apart, effort is being spent without return.',
+        blurb: 'The pale bar is every call placed, as the rollup counted them; the solid bar beside it is the ones that became a conversation. Where the two are furthest apart, effort is being spent without return.',
         tableBlurb:
-            'Every call placed beside the ones that became a conversation, split into chasing a parcel (RMO) and confirming an order (verification). Reached is conversations over calls placed.',
+            'Every call placed, as the rollup counted them, beside the ones that became a conversation. Reached is conversations over calls placed.',
         noun: 'calls',
+        placedColumn: 'Total placed',
+        realColumn: 'Total conversations',
     },
     {
         key: 'rmo',
@@ -66,6 +76,8 @@ const SCOPES: {
         tableBlurb:
             'The RMO calls placed beside the ones that became a conversation. Reached is conversations over calls placed.',
         noun: 'RMO calls',
+        placedColumn: 'Calls placed',
+        realColumn: 'Conversations',
     },
     {
         key: 'verification',
@@ -74,6 +86,8 @@ const SCOPES: {
         tableBlurb:
             'The order-verification calls placed beside the ones that became a conversation. Reached is conversations over calls placed.',
         noun: 'order-verification calls',
+        placedColumn: 'Calls placed',
+        realColumn: 'Conversations',
     },
 ];
 
@@ -93,21 +107,33 @@ const VIEWS: { key: View; label: string; icon: typeof ChartColumn }[] = [
 /**
  * Two hues, two weights, and between them the whole chart.
  *
- * The hue is the kind of call — blue for RMO work, green for order
- * verification, the same two the comparison panel draws from. The weight is how
- * far the call got: a pale step for every call placed, the full step for the
- * ones that became a conversation. So a pale bar is always the whole and the
- * solid bar beside it is always the part, whichever hue they are wearing.
+ * The weight is how far the call got: a pale step for every call placed, the
+ * full step for the ones that became a conversation. So the pale bar is always
+ * the whole and the solid bar beside it is always the part.
+ *
+ * The hue is which calls are on screen — blue for every call and for the RMO
+ * cut of them, green when the view narrows to order verification, the same two
+ * the comparison panel draws from. One pair of bars per slot either way: a slot
+ * is a single figure and its subset, not a mix to be stacked.
  *
  * Validated against both surfaces. Each hue reads as a ramp (light-end 2.65:1
- * light / 2.16:1 dark, clear of the 2:1 ordinal floor); the two stacks separate
- * at each weight — pale pair and solid pair both pass CVD and normal-vision
- * gates in both modes.
+ * light / 2.16:1 dark, clear of the 2:1 ordinal floor), and the two hues
+ * separate at each weight — pale pair and solid pair both pass CVD and
+ * normal-vision gates in both modes.
  */
-const RMO_PLACED = 'bg-[#86b6ef] dark:bg-[#184f95]';
-const RMO_REAL = 'bg-[#2a78d6] dark:bg-[#3987e5]';
+const CALLS_PLACED = 'bg-[#86b6ef] dark:bg-[#184f95]';
+const CALLS_REAL = 'bg-[#2a78d6] dark:bg-[#3987e5]';
 const VERIFICATION_PLACED = 'bg-[#53b05b] dark:bg-[#115d1e]';
 const VERIFICATION_REAL = 'bg-[#008300] dark:bg-[#008300]';
+
+/** Which pair of fills a scope wears. */
+const swatches = (scope: Scope) =>
+    scope === 'verification'
+        ? { placed: VERIFICATION_PLACED, real: VERIFICATION_REAL }
+        : { placed: CALLS_PLACED, real: CALLS_REAL };
+
+/** The pale fill and the solid one a scope draws with. */
+type Fill = { placed: string; real: string };
 
 /** Plot height in pixels. Bars are sized against it. */
 const PLOT_HEIGHT = 240;
@@ -141,12 +167,13 @@ function axisCeiling(peak: number) {
 }
 
 /**
- * One slot reduced to what the selected scope draws: two stacks, each split the
- * same way.
+ * One slot reduced to what the selected scope draws: the calls placed, and the
+ * ones that became a conversation.
  *
- * Both kinds of call arrive on every slot, so narrowing to RMO is arithmetic
- * rather than another request — verification drops out of both stacks and what
- * is left is a plain pair of bars.
+ * Every slot arrives carrying both kinds of call and the rollup's own total of
+ * them, so narrowing the scope is arithmetic rather than another request.
+ * All calls reads that total rather than adding the kinds up — the figure the
+ * rollup recorded, which is also what the cards at the top of the page report.
  */
 interface EffortColumnData {
     key: string;
@@ -154,33 +181,27 @@ interface EffortColumnData {
     tooltip: string;
     /** The long form, for a table row. */
     rowLabel: string;
-    rmoCalls: number;
-    verificationCalls: number;
-    /** The two together — what the effort stack measures. */
+    /** Every call the scope counts, however short — the whole. */
     placed: number;
-    rmoReal: number;
-    verificationReal: number;
-    /** The two together — what the results stack measures. */
+    /** The ones that lasted long enough to be a conversation — the part. */
     real: number;
 }
 
 function toColumn(bucket: EffortBucket, scope: Scope): EffortColumnData {
-    const rmoCalls = scope === 'verification' ? 0 : bucket.calls;
-    const rmoReal = scope === 'verification' ? 0 : bucket.real;
-    const verificationCalls = scope === 'rmo' ? 0 : bucket.verification_calls;
-    const verificationReal = scope === 'rmo' ? 0 : bucket.verification_real;
+    const [placed, real] =
+        scope === 'rmo'
+            ? [bucket.calls, bucket.real]
+            : scope === 'verification'
+              ? [bucket.verification_calls, bucket.verification_real]
+              : [bucket.total_calls, bucket.real + bucket.verification_real];
 
     return {
         key: bucket.key,
         label: bucket.label,
         tooltip: bucket.tooltip,
         rowLabel: bucket.rowLabel ?? bucket.label,
-        rmoCalls,
-        verificationCalls,
-        placed: rmoCalls + verificationCalls,
-        rmoReal,
-        verificationReal,
-        real: rmoReal + verificationReal,
+        placed,
+        real,
     };
 }
 
@@ -236,11 +257,7 @@ export default function CsrEffortChart({
     const hasCalls = columns.some((column) => column.placed > 0);
 
     const copy = SCOPES.find((option) => option.key === scope) ?? SCOPES[0];
-    const showsRmo = scope !== 'verification';
-    const showsVerification = scope !== 'rmo';
-    // With one kind on screen the hue carries no meaning of its own, so the
-    // legend drops the qualifier and names the two weights plainly.
-    const qualify = showsRmo && showsVerification;
+    const fill = swatches(scope);
 
     return (
         <div className="mt-6 mb-4">
@@ -296,46 +313,14 @@ export default function CsrEffortChart({
                     the table heads its own columns instead. */}
                 {view === 'chart' && (
                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                        {showsRmo && (
-                            <>
-                                <LegendItem
-                                    swatch={RMO_PLACED}
-                                    label={
-                                        qualify
-                                            ? 'RMO calls placed'
-                                            : 'Calls placed'
-                                    }
-                                />
-                                <LegendItem
-                                    swatch={RMO_REAL}
-                                    label={
-                                        qualify
-                                            ? 'RMO conversations'
-                                            : 'Real conversations'
-                                    }
-                                />
-                            </>
-                        )}
-                        {showsVerification && (
-                            <>
-                                <LegendItem
-                                    swatch={VERIFICATION_PLACED}
-                                    label={
-                                        qualify
-                                            ? 'Verification calls placed'
-                                            : 'Calls placed'
-                                    }
-                                />
-                                <LegendItem
-                                    swatch={VERIFICATION_REAL}
-                                    label={
-                                        qualify
-                                            ? 'Verification conversations'
-                                            : 'Real conversations'
-                                    }
-                                />
-                            </>
-                        )}
+                        <LegendItem
+                            swatch={fill.placed}
+                            label={copy.placedColumn}
+                        />
+                        <LegendItem
+                            swatch={fill.real}
+                            label={copy.realColumn}
+                        />
                     </div>
                 )}
 
@@ -352,13 +337,14 @@ export default function CsrEffortChart({
                 ) : view === 'chart' ? (
                     <EffortPlot
                         columns={columns}
-                        scope={scope}
+                        fill={fill}
                         columnWidth={columnWidth}
                     />
                 ) : (
                     <EffortTable
                         columns={columns}
-                        scope={scope}
+                        copy={copy}
+                        fill={fill}
                         rowHeading={rowHeading}
                     />
                 )}
@@ -420,15 +406,13 @@ function LegendItem({ swatch, label }: { swatch: string; label: string }) {
 
 function EffortPlot({
     columns,
-    scope,
+    fill,
     columnWidth,
 }: {
     columns: EffortColumnData[];
-    scope: Scope;
+    fill: Fill;
     columnWidth: number;
 }) {
-    // Each stack is measured whole, so the axis has to clear the two segments
-    // together rather than the taller of them.
     const peak = Math.max(
         ...columns.map((column) => Math.max(column.placed, column.real)),
     );
@@ -474,7 +458,7 @@ function EffortPlot({
                         <EffortColumn
                             key={column.key}
                             column={column}
-                            scope={scope}
+                            fill={fill}
                             height={height}
                             columnWidth={columnWidth}
                         />
@@ -497,35 +481,20 @@ function EffortPlot({
     );
 }
 
-/**
- * RMO on the bottom, verification above it, parted by a 2px sliver of the card
- * so the two fills never touch. Only the segment that ends the stack is
- * rounded — the join stays square.
- */
-function BarStack({
-    base,
-    top,
-    baseSwatch,
-    topSwatch,
+function Bar({
+    value,
+    swatch,
     height,
 }: {
-    base: number;
-    top: number;
-    baseSwatch: string;
-    topSwatch: string;
+    value: number;
+    swatch: string;
     height: (value: number) => string;
 }) {
     return (
         <div className="flex h-full w-2.5 flex-col justify-end">
-            {top > 0 && (
-                <div
-                    className={`w-full rounded-t-[4px] ${topSwatch} ${base > 0 ? 'mb-[2px]' : ''}`}
-                    style={{ height: height(top) }}
-                />
-            )}
             <div
-                className={`w-full ${baseSwatch} ${top > 0 ? '' : 'rounded-t-[4px]'}`}
-                style={{ height: height(base) }}
+                className={`w-full rounded-t-[4px] ${swatch}`}
+                style={{ height: height(value) }}
             />
         </div>
     );
@@ -533,12 +502,12 @@ function BarStack({
 
 function EffortColumn({
     column,
-    scope,
+    fill,
     height,
     columnWidth,
 }: {
     column: EffortColumnData;
-    scope: Scope;
+    fill: Fill;
     height: (value: number) => string;
     columnWidth: number;
 }) {
@@ -552,20 +521,8 @@ function EffortColumn({
             className="group relative flex h-full flex-1 items-end justify-center gap-1.5"
             style={{ minWidth: columnWidth }}
         >
-            <BarStack
-                base={column.rmoCalls}
-                top={column.verificationCalls}
-                baseSwatch={RMO_PLACED}
-                topSwatch={VERIFICATION_PLACED}
-                height={height}
-            />
-            <BarStack
-                base={column.rmoReal}
-                top={column.verificationReal}
-                baseSwatch={RMO_REAL}
-                topSwatch={VERIFICATION_REAL}
-                height={height}
-            />
+            <Bar value={column.placed} swatch={fill.placed} height={height} />
+            <Bar value={column.real} swatch={fill.real} height={height} />
 
             {/* Hovering anywhere in the slot's column, not just on the 10px bar
                 itself — the target is the whole slot. */}
@@ -577,19 +534,6 @@ function EffortColumn({
                     {column.placed.toLocaleString()} placed ·{' '}
                     {column.real.toLocaleString()} real
                 </p>
-                {scope === 'all' && (
-                    <>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                            RMO {column.rmoCalls.toLocaleString()} placed ·{' '}
-                            {column.rmoReal.toLocaleString()} real
-                        </p>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                            Verification{' '}
-                            {column.verificationCalls.toLocaleString()} placed ·{' '}
-                            {column.verificationReal.toLocaleString()} real
-                        </p>
-                    </>
-                )}
                 {reach !== null && (
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
                         {reach.toFixed(1)}% reached
@@ -631,10 +575,9 @@ function EffortSkeleton({ bars }: { bars: number[] }) {
 /**
  * The same columns as figures.
  *
- * The scope filter applies here as it does to the bars, so a narrowed table is
- * a plain calls-and-conversations pair; the all-calls table carries the RMO and
- * verification split alongside the totals, because that split is what the two
- * stacked bars are saying.
+ * Three of them whatever the scope — what was placed, what it came to, and the
+ * one over the other — because that is what a slot is. The headings take the
+ * scope's own wording, so the all-calls table says it is reading totals.
  *
  * Quiet rows are listed rather than dropped — that a Sunday, or the small hours,
  * carried nothing is worth reading — so the rows scroll inside the card with the
@@ -642,39 +585,22 @@ function EffortSkeleton({ bars }: { bars: number[] }) {
  */
 function EffortTable({
     columns,
-    scope,
+    copy,
+    fill,
     rowHeading,
 }: {
     columns: EffortColumnData[];
-    scope: Scope;
+    copy: (typeof SCOPES)[number];
+    fill: Fill;
     rowHeading: string;
 }) {
-    const split = scope === 'all';
-
     const totals = columns.reduce(
         (sum, column) => ({
-            rmoCalls: sum.rmoCalls + column.rmoCalls,
-            rmoReal: sum.rmoReal + column.rmoReal,
-            verificationCalls: sum.verificationCalls + column.verificationCalls,
-            verificationReal: sum.verificationReal + column.verificationReal,
             placed: sum.placed + column.placed,
             real: sum.real + column.real,
         }),
-        {
-            rmoCalls: 0,
-            rmoReal: 0,
-            verificationCalls: 0,
-            verificationReal: 0,
-            placed: 0,
-            real: 0,
-        },
+        { placed: 0, real: 0 },
     );
-
-    // The single-kind tables wear that kind's hues, so a column means the same
-    // thing it meant on the bar it replaces.
-    const placedSwatch =
-        scope === 'verification' ? VERIFICATION_PLACED : RMO_PLACED;
-    const realSwatch = scope === 'verification' ? VERIFICATION_REAL : RMO_REAL;
 
     return (
         <div className="mt-4 max-h-96 overflow-auto rounded-[14px] border border-black/6 dark:border-white/6">
@@ -685,25 +611,8 @@ function EffortTable({
                 <thead className="sticky top-0 z-10 bg-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.06)] dark:bg-zinc-900 dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.06)]">
                     <tr>
                         <Th align="left">{rowHeading}</Th>
-                        {split ? (
-                            <>
-                                <Th swatch={RMO_PLACED}>RMO placed</Th>
-                                <Th swatch={RMO_REAL}>RMO conversations</Th>
-                                <Th swatch={VERIFICATION_PLACED}>
-                                    Verification placed
-                                </Th>
-                                <Th swatch={VERIFICATION_REAL}>
-                                    Verification conversations
-                                </Th>
-                                <Th>Total placed</Th>
-                                <Th>Total conversations</Th>
-                            </>
-                        ) : (
-                            <>
-                                <Th swatch={placedSwatch}>Calls placed</Th>
-                                <Th swatch={realSwatch}>Conversations</Th>
-                            </>
-                        )}
+                        <Th swatch={fill.placed}>{copy.placedColumn}</Th>
+                        <Th swatch={fill.real}>{copy.realColumn}</Th>
                         <Th>Reached</Th>
                     </tr>
                 </thead>
@@ -717,21 +626,8 @@ function EffortTable({
                             <td className="px-4 py-3 text-left font-mono text-[12px] whitespace-nowrap text-gray-700 dark:text-gray-300">
                                 {column.rowLabel}
                             </td>
-                            {split ? (
-                                <>
-                                    <Td>{column.rmoCalls}</Td>
-                                    <Td>{column.rmoReal}</Td>
-                                    <Td>{column.verificationCalls}</Td>
-                                    <Td>{column.verificationReal}</Td>
-                                    <Td strong>{column.placed}</Td>
-                                    <Td strong>{column.real}</Td>
-                                </>
-                            ) : (
-                                <>
-                                    <Td>{column.placed}</Td>
-                                    <Td>{column.real}</Td>
-                                </>
-                            )}
+                            <Td>{column.placed}</Td>
+                            <Td>{column.real}</Td>
                             <Reached
                                 placed={column.placed}
                                 real={column.real}
@@ -747,21 +643,8 @@ function EffortTable({
                         <td className="px-4 py-3 text-left font-mono text-[10px] tracking-[0.08em] text-gray-400 uppercase dark:text-gray-500">
                             Total
                         </td>
-                        {split ? (
-                            <>
-                                <Td strong>{totals.rmoCalls}</Td>
-                                <Td strong>{totals.rmoReal}</Td>
-                                <Td strong>{totals.verificationCalls}</Td>
-                                <Td strong>{totals.verificationReal}</Td>
-                                <Td strong>{totals.placed}</Td>
-                                <Td strong>{totals.real}</Td>
-                            </>
-                        ) : (
-                            <>
-                                <Td strong>{totals.placed}</Td>
-                                <Td strong>{totals.real}</Td>
-                            </>
-                        )}
+                        <Td strong>{totals.placed}</Td>
+                        <Td strong>{totals.real}</Td>
                         <Reached placed={totals.placed} real={totals.real} />
                     </tr>
                 </tfoot>

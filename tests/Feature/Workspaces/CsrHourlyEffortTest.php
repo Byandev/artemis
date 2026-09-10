@@ -109,6 +109,7 @@ test('every day in the range comes back with every hour of its clock', function 
     expect($response->json('days.1.date'))->toBe('2026-08-15');
     expect($response->json('days.1.hours'))->toHaveCount(24);
     expect($response->json('days.1.totals'))->toMatchArray([
+        'total_calls' => 0,
         'calls' => 0,
         'real' => 0,
         'verification_calls' => 0,
@@ -116,6 +117,7 @@ test('every day in the range comes back with every hour of its clock', function 
     ]);
     expect($response->json('days.0.hours.0'))->toMatchArray([
         'hour' => 0,
+        'total_calls' => 0,
         'calls' => 0,
         'real' => 0,
     ]);
@@ -251,6 +253,7 @@ test('the range totals are every day added up, matching the daily chart', functi
     // The same four figures the daily chart's totals carry over the same range:
     // only the grouping differs, never the counting.
     expect($response->json('totals'))->toMatchArray([
+        'total_calls' => 4,
         'calls' => 3,
         'real' => 2,
         'verification_calls' => 1,
@@ -259,6 +262,23 @@ test('the range totals are every day added up, matching the daily chart', functi
     expect($response->json('range'))->toMatchArray([
         'from' => HOURLY_FROM,
         'to' => HOURLY_TO,
+    ]);
+});
+
+test('an hour carries every call it placed, whichever kind', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    hourlyCall($workspace, '2026-08-14', '09:05:00', 120);
+    hourlyCall($workspace, '2026-08-14', '09:40:00', 30, rmo: false);
+    // No order behind it, so nothing counts it — the total included.
+    hourlyCall($workspace, '2026-08-14', '09:50:00', 90, ordered: false);
+
+    // The all-calls view draws this figure rather than adding the kinds up, so
+    // it is counted the way the rollup counts a day.
+    expect(hoursOf(hourlyEffort($owner, $workspace))[9])->toMatchArray([
+        'total_calls' => 2,
+        'calls' => 1,
+        'verification_calls' => 1,
     ]);
 });
 
