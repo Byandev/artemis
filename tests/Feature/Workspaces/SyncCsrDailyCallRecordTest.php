@@ -98,6 +98,25 @@ test('the customer and rider calls are split, and add up to the RMO figures', fu
         ->and((int) $row->total_rmo_call_time)->toBe(180);
 });
 
+test('the RMO orders count the deliveries, however often each was rung', function () {
+    $order = callOrder();
+
+    // One parcel rung twice — the customer, then the rider — and a second rung
+    // once. Three calls, two deliveries.
+    csrCall($order, CallLogPersona::CUSTOMER, 100, '10:00:00', delivery: 1);
+    csrCall($order, CallLogPersona::RIDER, 50, '10:30:00', delivery: 1);
+    csrCall($order, CallLogPersona::CUSTOMER, 30, '11:00:00', delivery: 2);
+    // No delivery on it, so nothing to count: this is verification work.
+    csrCall($order, CallLogPersona::CUSTOMER, 40, '12:00:00', delivery: null);
+
+    (new SyncCsrDailyCallRecord('2026-08-02'))->handle();
+
+    $row = callReport();
+
+    expect((int) $row->total_rmo_called)->toBe(3)
+        ->and((int) $row->total_rmo_orders)->toBe(2);
+});
+
 test('a call about no order is not recorded at all', function () {
     csrCall(null);
 

@@ -56,6 +56,7 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                     'total_rmo_called' => (int) ($call?->total_rmo_called ?? 0),
                     'total_rmo_call_time' => (int) ($call?->total_rmo_call_time ?? 0),
+                    'total_rmo_orders' => (int) ($call?->total_rmo_orders ?? 0),
                     'total_rmo_connected_called' => (int) ($call?->total_rmo_connected_called ?? 0),
                     'total_rmo_real_called' => (int) ($call?->total_rmo_real_called ?? 0),
                     'longest_rmo_call_time' => (int) ($call?->longest_rmo_call_time ?? 0),
@@ -109,7 +110,14 @@ class SyncCsrDailyCallRecord implements ShouldQueue
      * call matched to neither is not counted here at all — there is no row to
      * put it in.
      *
-     * The verification half is counted twice over, and deliberately:
+     * Both halves are counted twice over, and deliberately: once by call and
+     * once by the thing the calls were about. RMO rings the same parcel more
+     * than once by design — customer, then rider, then customer again — so
+     * `total_rmo_called` is the ringing and `total_rmo_orders` the deliveries
+     * it got through. NULL is not counted by COUNT(DISTINCT), so that column
+     * needs no CASE: a verification call has no delivery id to count.
+     *
+     * The verification half splits the same way:
      * `total_verification_called` is the calls placed, `total_verified_orders`
      * the distinct orders behind them. An order rung three times is three and
      * one. Read against the orders that needed verifying, only the second is a
@@ -137,6 +145,7 @@ class SyncCsrDailyCallRecord implements ShouldQueue
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN 1 ELSE 0 END) AS total_rmo_called,
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN cl.duration ELSE 0 END) AS total_rmo_call_time,
+                COUNT(DISTINCT cl.order_for_delivery_id) AS total_rmo_orders,
 
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration > 0 THEN 1 ELSE 0 END) AS total_rmo_connected_called,
                 SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 ELSE 0 END) AS total_rmo_real_called,

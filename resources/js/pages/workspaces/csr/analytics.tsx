@@ -90,6 +90,7 @@ interface CsrRecord {
     total_confirmed: number;
     total_called: number;
     total_rmo_call_attempts: number;
+    total_rmo_orders: number;
     rmo_percentage: number;
     total_call_time: number;
     total_rmo_connected_called: number;
@@ -279,6 +280,11 @@ const COLUMN_OPTIONS: ColumnOption[] = [
     {
         id: 'total_rmo_call_attempts',
         label: 'RMO Called',
+        group: 'Call report',
+    },
+    {
+        id: 'total_rmo_orders',
+        label: 'RMO Orders Called',
         group: 'Call report',
     },
     { id: 'rmo_percentage', label: 'RMO %', group: 'Call report' },
@@ -632,6 +638,9 @@ export default function Analytics({
             countColumn('total_confirmed', 'RMO Confirmed'),
             countColumn('total_called', 'RMO Assigned'),
             countColumn('total_rmo_call_attempts', 'RMO Called'),
+            // The same calls counted by delivery rather than by call: a parcel
+            // rung three times is three above and one here.
+            countColumn('total_rmo_orders', 'RMO Orders Called'),
             {
                 accessorKey: 'rmo_percentage',
                 header: ({ column }) => (
