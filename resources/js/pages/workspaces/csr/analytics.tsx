@@ -40,12 +40,12 @@ import CsrComparisonPanel, {
     type ComparisonMetricOption,
     type ComparisonResponse,
 } from '@/components/csr/CsrComparisonPanel';
-import CsrDailyCallOutcomesTable, {
-    type DailyCallOutcomesResponse,
-} from '@/components/csr/CsrDailyCallOutcomesTable';
 import CsrDailyEffortChart, {
     type DailyEffortResponse,
 } from '@/components/csr/CsrDailyEffortChart';
+import CsrHourlyEffortChart, {
+    type HourlyEffortResponse,
+} from '@/components/csr/CsrHourlyEffortChart';
 import CsrSyncButton from '@/components/csr/CsrSyncButton';
 import {
     ColumnsDropdown,
@@ -556,12 +556,12 @@ export default function Analytics({
             toStr,
         );
 
-    // The same days as numbers, under the chart. Its own request: the table
-    // answers a different question and carries columns the chart never draws.
-    const [callOutcomes, callOutcomesLoading] =
-        useAnalyticsStat<DailyCallOutcomesResponse>(
+    // The same calls folded into one round of the clock. Its own request, and
+    // its own source: the hour is on the call log, not on the nightly rollup.
+    const [hourlyEffort, hourlyEffortLoading] =
+        useAnalyticsStat<HourlyEffortResponse>(
             workspace.slug,
-            'analytics-daily-call-outcomes',
+            'analytics-hourly-effort',
             fromStr,
             toStr,
         );
@@ -851,9 +851,9 @@ export default function Analytics({
                     loading={dailyEffortLoading}
                 />
 
-                <CsrDailyCallOutcomesTable
-                    data={callOutcomes}
-                    loading={callOutcomesLoading}
+                <CsrHourlyEffortChart
+                    data={hourlyEffort}
+                    loading={hourlyEffortLoading}
                 />
 
                 {/* The same header row the sections above use: the section's

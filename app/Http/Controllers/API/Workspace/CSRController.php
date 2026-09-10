@@ -564,9 +564,14 @@ class CSRController extends Controller
      *
      * Both kinds of call come back on every day: `calls`/`real` are the RMO
      * ones the cards report, `verification_calls`/`verification_real` the
-     * order-verification ones beside them. The chart draws either the pair
-     * stacked or the RMO half alone, and switching between the two is a
-     * client-side filter — one request answers both.
+     * order-verification ones beside them. The chart draws one kind or the
+     * other, and switching between them is a client-side filter — one request
+     * answers both.
+     *
+     * `total_calls` is the rollup's own `total_called` rather than those two
+     * added up. They agree by construction — every counted call is stamped to a
+     * delivery or it is not — but the all-calls view is the workspace's total as
+     * the rollup recorded it, not a sum this endpoint performed.
      */
     public function analyticsDailyEffort(Request $request, Workspace $workspace)
     {
@@ -578,6 +583,7 @@ class CSRController extends Controller
             ->groupBy('date')
             ->selectRaw('
                 date,
+                COALESCE(SUM(total_called), 0) as total_calls,
                 COALESCE(SUM(total_rmo_called), 0) as calls,
                 COALESCE(SUM(total_rmo_real_called), 0) as real_conversations,
                 COALESCE(SUM(total_verification_called), 0) as verification_calls,
@@ -598,6 +604,7 @@ class CSRController extends Controller
 
             $days[] = [
                 'date' => $date,
+                'total_calls' => (int) ($row->total_calls ?? 0),
                 'calls' => (int) ($row->calls ?? 0),
                 'real' => (int) ($row->real_conversations ?? 0),
                 'verification_calls' => (int) ($row->verification_calls ?? 0),
@@ -610,82 +617,106 @@ class CSRController extends Controller
         return response()->json([
             'range' => ['from' => $from, 'to' => $to],
             'days' => $days,
-            'totals' => [
-                'calls' => array_sum(array_column($days, 'calls')),
-                'real' => array_sum(array_column($days, 'real')),
-                'verification_calls' => array_sum(array_column($days, 'verification_calls')),
-                'verification_real' => array_sum(array_column($days, 'verification_real')),
-            ],
+            'totals' => $this->sumEffort($days),
         ]);
     }
 
     /**
-     * Where each day's calls ended up — the table under the effort chart.
+     * The same effort and results, laid across the hours of a day.
      *
-     * Three buckets narrowing in turn: no_answer never joined, answered picked
-     * up, conversations lasted past the five-second threshold. So calls =
-     * no_answer + answered, and conversations is a cut of answered. `hit_rate`
-     * is conversations over every attempt — the reach rate card, per day.
+     * The chart above this one reads the nightly rollup, which is keyed to a
+     * date and so cannot say when in the day the work happened. This one goes
+     * back to the call log that rollup is built from and groups by the hour
+     * stamped on each call.
+     *
+     * The hour alone, not the day and the hour: the range arrives folded into
+     * one round of the clock, every day's 9am added into a single 9am. That is
+     * the question the hour is asked — when in the day the work lands — and one
+     * Tuesday is too small a sample to answer it. Narrowing to a single day is
+     * the date range at the top of the page, which this reads like any other
+     * card. Folding in SQL rather than after the fact also keeps the response
+     * at twenty-four rows however long the range is.
+     *
+     * The rules are the sync's own, so this adds up to the chart above it: an
+     * order beside the call is what names the shop, a delivery stamp is what
+     * makes it RMO work rather than order verification, and a conversation is a
+     * call that lasted past RmoDailyStats::CONNECTED_CALL_MIN_SECONDS. Reading
+     * the log direct does mean this chart covers today, where the daily one is
+     * only as fresh as the last rollup.
+     *
+     * `total_calls` is every call the hour carried, counted off the log the way
+     * the rollup's `total_called` counts a day — the figure the all-calls view
+     * draws, rather than the two kinds added up.
+     *
+     * All twenty-four hours come back, zeros included, beside the count of days
+     * that were folded into them.
      */
-    public function analyticsDailyCallOutcomes(Request $request, Workspace $workspace)
+    public function analyticsHourlyEffort(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
 
         [$from, $to] = $this->range($request);
 
-        $rows = $this->callReport($workspace, $from, $to)
-            ->groupBy('date')
-            ->selectRaw('
-                date,
-                COALESCE(SUM(total_rmo_called), 0) as calls,
-                COALESCE(SUM(total_rmo_connected_called), 0) as answered,
-                COALESCE(SUM(total_rmo_real_called), 0) as real_conversations
-            ')
+        $real = RmoDailyStats::CONNECTED_CALL_MIN_SECONDS;
+
+        $rows = $this->callLogs($workspace, $from, $to)
+            ->groupByRaw('HOUR(cl.call_time)')
+            ->selectRaw("
+                HOUR(cl.call_time) as hour,
+
+                COUNT(*) as total_calls,
+
+                SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL THEN 1 ELSE 0 END) as calls,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NOT NULL AND cl.duration >= {$real} THEN 1 ELSE 0 END) as real_conversations,
+
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL THEN 1 ELSE 0 END) as verification_calls,
+                SUM(CASE WHEN cl.order_for_delivery_id IS NULL AND cl.duration >= {$real} THEN 1 ELSE 0 END) as verification_real
+            ")
             ->get()
-            // date comes back with or without a time part depending on the
-            // driver — key on the first ten characters.
-            ->keyBy(fn ($row) => substr((string) $row->date, 0, 10));
+            ->keyBy(fn ($row) => (int) $row->hour);
 
-        $days = [];
-        $cursor = CarbonImmutable::parse($from);
-        $end = CarbonImmutable::parse($to);
+        $hours = [];
 
-        while ($cursor->lessThanOrEqualTo($end)) {
-            $date = $cursor->toDateString();
-            $row = $rows->get($date);
+        for ($hour = 0; $hour < 24; $hour++) {
+            $row = $rows->get($hour);
 
-            $calls = (int) ($row->calls ?? 0);
-            $answered = (int) ($row->answered ?? 0);
-            $real = (int) ($row->real_conversations ?? 0);
-
-            // Every day gets a row, quiet ones included.
-            $days[] = [
-                'date' => $date,
-                'calls' => $calls,
-                'no_answer' => $calls - $answered,
-                'answered' => $answered,
-                'conversations' => $real,
-                'hit_rate' => $calls > 0 ? round($real / $calls * 100, 1) : null,
+            $hours[] = [
+                'hour' => $hour,
+                'total_calls' => (int) ($row->total_calls ?? 0),
+                'calls' => (int) ($row->calls ?? 0),
+                'real' => (int) ($row->real_conversations ?? 0),
+                'verification_calls' => (int) ($row->verification_calls ?? 0),
+                'verification_real' => (int) ($row->verification_real ?? 0),
             ];
-
-            $cursor = $cursor->addDay();
         }
-
-        $calls = array_sum(array_column($days, 'calls'));
-        $conversations = array_sum(array_column($days, 'conversations'));
 
         return response()->json([
             'range' => ['from' => $from, 'to' => $to],
-            'days' => $days,
-            'totals' => [
-                'calls' => $calls,
-                'no_answer' => array_sum(array_column($days, 'no_answer')),
-                'answered' => array_sum(array_column($days, 'answered')),
-                'conversations' => $conversations,
-                // The period's own rate, not the mean of the daily ones.
-                'hit_rate' => $calls > 0 ? round($conversations / $calls * 100, 1) : null,
-            ],
+            // How many days went into each bar. The chart says so — an hour
+            // reading 40 over a week is a different figure from 40 in a day.
+            'day_count' => (int) CarbonImmutable::parse($from)->diffInDays(CarbonImmutable::parse($to)) + 1,
+            'hours' => $hours,
+            // The range as a whole, which is the daily chart's totals over the
+            // same range — only the grouping differs, never the counting.
+            'totals' => $this->sumEffort($hours),
         ]);
+    }
+
+    /**
+     * The effort figures added up over whatever rows carry them.
+     *
+     * @param  array<int, array<string, int>>  $rows
+     * @return array{total_calls: int, calls: int, real: int, verification_calls: int, verification_real: int}
+     */
+    private function sumEffort(array $rows): array
+    {
+        return [
+            'total_calls' => array_sum(array_column($rows, 'total_calls')),
+            'calls' => array_sum(array_column($rows, 'calls')),
+            'real' => array_sum(array_column($rows, 'real')),
+            'verification_calls' => array_sum(array_column($rows, 'verification_calls')),
+            'verification_real' => array_sum(array_column($rows, 'verification_real')),
+        ];
     }
 
     /**
@@ -933,6 +964,27 @@ class CSRController extends Controller
                 ->where('workspace_id', $workspace->id)
                 ->whereBetween('date', [$from, $to]),
             $workspace,
+        );
+    }
+
+    /**
+     * The raw call log over a range, narrowed to what the viewer may see.
+     *
+     * What the nightly rollup is built from, for the one chart that needs
+     * something the rollup threw away — the hour a call was placed. The order
+     * is joined for the same reason the sync joins it: it is what puts the call
+     * in a shop, which is both how the team filter bites and why a call
+     * matched to no order is not counted at all.
+     */
+    private function callLogs(Workspace $workspace, string $from, string $to)
+    {
+        return $this->scopeToVisibleShops(
+            DB::table('call_logs as cl')
+                ->join('pancake_orders as po', 'po.id', '=', 'cl.order_id')
+                ->where('cl.workspace_id', $workspace->id)
+                ->whereBetween('cl.call_date', [$from, $to]),
+            $workspace,
+            'po.shop_id',
         );
     }
 

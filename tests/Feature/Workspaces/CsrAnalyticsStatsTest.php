@@ -856,23 +856,6 @@ test('the hit rate is conversations over every RMO call placed', function () {
         ->assertJsonPath('calls', 4);
 });
 
-test('the hit rate agrees with the daily outcomes table it summarises', function () {
-    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
-
-    rmoCall($workspace, '2026-08-02', 120);
-    rmoCall($workspace, '2026-08-02', 0);
-
-    // The card is the table's totals row — pinned so the two cannot drift on
-    // what a hit rate means.
-    $outcomes = csrStat($owner, $workspace, 'analytics-daily-call-outcomes', '2026-08-01', '2026-08-05')
-        ->json('totals');
-
-    csrRmoHitRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
-        ->assertJsonPath('value', $outcomes['hit_rate'])
-        ->assertJsonPath('conversations', $outcomes['conversations'])
-        ->assertJsonPath('calls', $outcomes['calls']);
-});
-
 test('a verification call is in neither half of the hit rate', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
