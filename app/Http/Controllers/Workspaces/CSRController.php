@@ -9,6 +9,7 @@ use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CsrComparisonMetrics;
 use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -109,17 +110,17 @@ class CSRController extends Controller
     }
 
     /**
-     * Which CSR comparison tab the page opens on.
+     * Which CSR comparison metric the page opens on.
      *
      * Kept in the URL rather than the browser so a reload, a shared link and
-     * the back button all land on the metric that was being read. Anything
-     * that isn't one of the endpoint's four keys falls back to sales.
+     * the back button all land on the metric that was being read. Anything the
+     * catalogue does not name falls back to total sales; the four keys the
+     * panel used to tab between resolve to what they now point at, so older
+     * links still open where they say.
      */
     private function comparisonTab(Request $request): string
     {
-        $tab = (string) $request->input('comparison', 'sales');
-
-        return in_array($tab, ['sales', 'rts', 'rmo_called', 'call_time'], true) ? $tab : 'sales';
+        return CsrComparisonMetrics::resolveKey($request->input('comparison'));
     }
 
     public function analytics(Request $request, Workspace $workspace)
@@ -299,6 +300,10 @@ class CSRController extends Controller
             // keeps to the nightly schedule, so the button is not rendered there.
             // CSRController@runSync refuses the call on the same terms.
             'canRunSync' => ! app()->environment('production'),
+            // Everything the comparison panel's selector lists. Shipped with
+            // the page so the dropdown is populated on the first paint, rather
+            // than filling in once the figures land behind it.
+            'comparisonMetrics' => CsrComparisonMetrics::options(),
             'query' => [
                 'from' => $from,
                 'to' => $to,
