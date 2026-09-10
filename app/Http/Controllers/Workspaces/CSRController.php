@@ -24,6 +24,49 @@ class CSRController extends Controller
 {
     use AuthorizesRequests;
 
+    /**
+     * The figures that decide whether a CSR belongs in the breakdown at all,
+     * qualified by the joined subquery each comes from.
+     *
+     * A CSR is on the roster of the workspace's shops whether or not they
+     * worked in the range being read, and both rollups come in as left joins
+     * coalesced to zero — so anyone who did nothing used to fill a row of
+     * zeros, pushing the CSRs who did work down the table and onto page two.
+     * One figure moving is enough to be listed; none of them moving is not a
+     * row. A CSR with no rollup row at all reads NULL here, which is not `<> 0`
+     * either, so the same clause covers them.
+     *
+     * The two rates are deliberately absent: both are computed from amounts
+     * already on this list, so a CSR with a rate has the figures behind it too.
+     */
+    private const BREAKDOWN_FIGURES = [
+        'dr.total_orders',
+        'dr.total_sales',
+        'dr.total_delivered',
+        'dr.total_returning',
+        'dr.total_delivered_count',
+        'dr.total_returning_count',
+
+        'rmo.total_called',
+        'rmo.total_call_time',
+        'rmo.total_rmo_call_attempts',
+        'rmo.total_rmo_orders',
+        'rmo.total_confirmed',
+        'rmo.total_all_called',
+        'rmo.total_all_call_time',
+        'rmo.total_rmo_connected_called',
+        'rmo.total_rmo_real_called',
+        'rmo.longest_rmo_call_time',
+        'rmo.total_rmo_customer_called',
+        'rmo.total_rmo_customer_call_time',
+        'rmo.total_rmo_rider_called',
+        'rmo.total_rmo_rider_call_time',
+        'rmo.total_verification_called',
+        'rmo.total_verification_call_time',
+        'rmo.total_verification_real_called',
+        'rmo.total_verified_orders',
+    ];
+
     public function dashboard(Request $request, Workspace $workspace)
     {
         abort_unless($workspace->csr_dashboard_module_enabled, 404);
@@ -261,6 +304,15 @@ class CSRController extends Controller
                     ELSE 0
                 END as rmo_percentage
             ')
+            // Only the CSRs who did something in the range — see
+            // BREAKDOWN_FIGURES. The clause reads the joined subqueries rather
+            // than the aliases above it, which MySQL will not have resolved yet
+            // at WHERE.
+            ->where(function ($query) {
+                foreach (self::BREAKDOWN_FIGURES as $figure) {
+                    $query->orWhere($figure, '<>', 0);
+                }
+            })
             ->allowedSorts([
                 AllowedSort::field('name', 'pancake_users.name'),
                 'total_orders',

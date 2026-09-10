@@ -1474,11 +1474,19 @@ class CSRController extends Controller
 
     /**
      * One CSR's figure for a metric in one of the two periods, or null when the
-     * period gives them nothing to plot — no sales, no parcel settled, no call.
+     * period gives them nothing to plot — no sales, no parcel settled, no call,
+     * or a rate that came out at zero because they did none of the work.
      *
      * Null rather than zero: it keeps them off the axis and out of the average,
      * which is what "the average of the CSRs who did this" has to mean. A rate
      * with nothing under the line is no rate at all, not a zero one.
+     *
+     * A rate of zero is dropped from the ranked period only. Most of the roster
+     * confirms RMO deliveries without ever calling one, and every one of them
+     * used to land at 0% — ranked below the CSRs doing the work and dragging the
+     * average line down with them. The period behind stays free to be zero, so
+     * a CSR who went 0% → 60% still reads as +60 pts rather than as nothing to
+     * compare against.
      */
     private function comparisonValue(array $metric, $row, string $period): ?float
     {
@@ -1493,9 +1501,13 @@ class CSRController extends Controller
             $metric['rate']['whole'],
         ));
 
-        return $whole > 0
-            ? $this->rate((float) $row->{"{$period}_{$metric['rate']['part']}"}, $whole)
-            : null;
+        if ($whole <= 0) {
+            return null;
+        }
+
+        $rate = $this->rate((float) $row->{"{$period}_{$metric['rate']['part']}"}, $whole);
+
+        return $period === 'current' && $rate === 0.0 ? null : $rate;
     }
 
     /**

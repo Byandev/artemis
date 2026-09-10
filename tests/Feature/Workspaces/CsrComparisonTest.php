@@ -228,6 +228,56 @@ test('the RMO metrics come off the nightly rollup', function () {
     expect($time['rows'][0]['change'])->toEqual(100);
 });
 
+test('a CSR who called none of their RMO deliveries is left out of the rate', function () {
+    $working = cmpCsr('Mariel Bautista');
+    $idle = cmpCsr('Cylde Dela Cruz');
+
+    cmpRollup($this->workspace, $working, '2026-08-16', ['called' => 8, 'confirmed' => 10]);
+    // Most of the roster looks like this: deliveries confirmed, none of them
+    // called. A rate of 0% is nothing done, not a figure to rank — it used to
+    // sit at the bottom of the chart and pull the average line down with it.
+    cmpRollup($this->workspace, $idle, '2026-08-16', ['called' => 0, 'confirmed' => 66]);
+
+    $called = metricBlock(comparison($this->owner, $this->workspace, 'rmo_called_rate'));
+
+    expect(collect($called['rows'])->pluck('name')->all())->toBe(['Mariel Bautista']);
+    expect($called['total'])->toBe(1);
+    // 80 on its own, not the 40 that averaging in a zero would have given.
+    expect($called['average'])->toEqual(80);
+});
+
+test('a rate of zero the period before still reads as a climb', function () {
+    $csr = cmpCsr('Mariel Bautista');
+
+    cmpRollup($this->workspace, $csr, '2026-08-16', ['called' => 6, 'confirmed' => 10]);
+    // Nothing called last period, plenty confirmed. Only the ranked period
+    // drops its zeros, so this stays a comparison rather than becoming a dash.
+    cmpRollup($this->workspace, $csr, '2026-08-09', ['called' => 0, 'confirmed' => 10]);
+
+    $row = metricBlock(comparison($this->owner, $this->workspace, 'rmo_called_rate'))['rows'][0];
+
+    expect($row['value'])->toEqual(60);
+    expect($row['previous_value'])->toEqual(0);
+    expect($row['change'])->toEqual(60);
+});
+
+test('a CSR who returned nothing is left out of RTS rate', function () {
+    $some = cmpCsr('Rafael Gutierrez');
+    $none = cmpCsr('Precious Ann Dela Cruz');
+
+    cmpSettled($this->workspace, $some, '2026-08-16 09:00:00', 100, true);
+    cmpSettled($this->workspace, $some, '2026-08-16 09:00:00', 900, false);
+    // A clean 0% — the best RTS there is. It goes the same way as every other
+    // zero: dropped from the ranked period, so the chart plots the CSRs with
+    // parcels coming back rather than the ones with none.
+    cmpSettled($this->workspace, $none, '2026-08-16 09:00:00', 1000, false);
+
+    $rts = metricBlock(comparison($this->owner, $this->workspace, 'rts_rate'));
+
+    expect(collect($rts['rows'])->pluck('name')->all())->toBe(['Rafael Gutierrez']);
+    expect($rts['total'])->toBe(1);
+});
+
 test('a CSR who did nothing this period is left out of that metric', function () {
     $active = cmpCsr('Angeline Mercado');
     $quiet = cmpCsr('Dennis Ocampo');
