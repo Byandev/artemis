@@ -16,6 +16,19 @@ const changelog: ChangelogEntry[] = [
         date: '2026-09-10',
         sections: [
             {
+                title: 'CSR Analytics — RMO Call Figures',
+                items: [
+                    'RMO Answered, RMO Real Conversations and Longest RMO Call now exist on every workspace, including the ones whose call report was set up before those three figures were added — there the breakdown had nothing to read and the page came up in error rather than simply short a few columns',
+                    'Days already stored read zero on the three until their rollup is re-run, which the nightly pass does over the trailing fortnight — so a range inside the last two weeks fills itself in by the next morning, and anything older needs its own re-run to show the calls it actually carried',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.36.0',
+        date: '2026-09-10',
+        sections: [
+            {
                 title: 'RTS — Heat Map (New)',
                 items: [
                     'A map of the Philippines now sits under RTS with every province shaded by its RTS rate — the share of shipped value that came back rather than the share of parcels, so a ₱5,000 return doesn’t read as the equal of a ₱200 one — and the period’s rate, parcels returned, orders and sales are stated above it',
