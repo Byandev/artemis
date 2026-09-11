@@ -29,6 +29,11 @@ return new class extends Migration
             // measures: one row per distinct (fail, success) pair seen that day.
             // total_orders is order_fail + order_success, stored so callers can
             // filter and sort on history depth without recomputing it.
+            //
+            // total_orders = 0 is the day's orders with no usable history at all,
+            // collapsed into one row per page: the customer's number was either
+            // unknown to Pancake or known with nothing on it. So any aggregate
+            // over the history columns wants total_orders >= 1 first.
             $table->unsignedInteger('order_fail')->default(0);
             $table->unsignedInteger('order_success')->default(0);
             $table->unsignedInteger('total_orders')->default(0);

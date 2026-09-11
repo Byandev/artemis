@@ -20,10 +20,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * overwrites. orders_count is how many of that day's orders carried that exact
  * pair; total_orders is the pair's sum, i.e. how deep that customer's history was.
  *
- * total_orders is always >= 1: orders whose customer had no prior history are not
- * rolled up, because that bucket cannot be read as the new-customer count anyway
- * (see PageOrderReportBreakdownBuilder). So this table counts orders from
- * returning customers only, never the day's full order volume.
+ * Rows come in two kinds, told apart by total_orders:
+ *
+ *  - total_orders >= 1 — the customer had prior orders; order_fail and
+ *                        order_success describe how those went.
+ *  - total_orders = 0  — no usable history, collapsed into one row per page per
+ *                        day: either Pancake had never seen the number, or it
+ *                        had seen it with no orders on it. The history columns
+ *                        are 0 because there is nothing to report, not because
+ *                        the customer had a clean record.
+ *
+ * So any aggregate over the history columns wants total_orders >= 1 first, or the
+ * no-history rows will dilute it with zeroes. Nothing is dropped, so summing
+ * orders_count across a day gives that day's confirmed, non-cancelled orders.
  *
  * The grain is deliberately the raw pair rather than a fixed set of risk bands,
  * so any bucketing a report wants — including the 0-10 / 11-20 / … bands

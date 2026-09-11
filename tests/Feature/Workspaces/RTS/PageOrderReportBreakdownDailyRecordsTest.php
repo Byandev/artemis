@@ -180,40 +180,113 @@ it('ignores an order that was never confirmed', function () {
     expect(PageOrderReportBreakdownDailyRecord::where('workspace_id', $workspace->id)->count())->toBe(0);
 });
 
-it('ignores orders that arrived without a phone number report', function () {
+it('collapses orders with no usable history into one zero row per page', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     $page = breakdownPage($workspace);
 
+    // Two ways to have no usable history: no report at all, and a report that
+    // shows no orders (which only ever happens when it carries a warning).
     breakdownOrder($workspace, $page, '2026-03-10');
-
-    rebuildBreakdown(['--date' => '2026-03-10']);
-
-    expect(PageOrderReportBreakdownDailyRecord::where('workspace_id', $workspace->id)->count())->toBe(0);
-});
-
-it('excludes orders whose customer had no prior history', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    $page = breakdownPage($workspace);
-
-    // 0/0 only ever reaches us carrying a warning — a real first-time customer
-    // has no report row at all. Neither belongs in a history breakdown.
+    breakdownOrder($workspace, $page, '2026-03-10');
     breakdownOrder($workspace, $page, '2026-03-10', fail: 0, success: 0);
-    breakdownOrder($workspace, $page, '2026-03-10', fail: 0, success: 1);
 
     rebuildBreakdown(['--date' => '2026-03-10']);
 
     $row = PageOrderReportBreakdownDailyRecord::where('workspace_id', $workspace->id)->sole();
 
-    expect($row->total_orders)->toBe(1)
-        ->and($row->order_success)->toBe(1)
-        ->and($row->orders_count)->toBe(1);
+    expect($row->total_orders)->toBe(0)
+        ->and($row->orders_count)->toBe(3)
+        ->and($row->order_fail)->toBe(0)
+        ->and($row->order_success)->toBe(0)
+        ->and($row->page_id)->toBe($page->id);
 });
 
-it('drops a zero-history row left behind by an earlier build', function () {
+it('keeps the zero row separate from the history rows', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     $page = breakdownPage($workspace);
 
-    // A row written before the zero-history filter existed.
+    breakdownOrder($workspace, $page, '2026-03-10');
+    breakdownOrder($workspace, $page, '2026-03-10', fail: 1, success: 2);
+    breakdownOrder($workspace, $page, '2026-03-10', fail: 1, success: 2);
+
+    rebuildBreakdown(['--date' => '2026-03-10']);
+
+    $rows = PageOrderReportBreakdownDailyRecord::where('workspace_id', $workspace->id)
+        ->get()
+        ->keyBy(fn ($row) => $row->total_orders === 0 ? 'none' : 'history');
+
+    expect($rows)->toHaveCount(2)
+        ->and($rows['none']->orders_count)->toBe(1)
+        ->and($rows['history']->orders_count)->toBe(2)
+        ->and($rows['history']->total_orders)->toBe(3);
+});
+
+it('holds the zero row to the same confirmed and status rules', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = breakdownPage($workspace);
+
+    // All three lack usable history; only the first belongs in the day.
+    breakdownOrder($workspace, $page, '2026-03-10');
+    breakdownOrder($workspace, $page, '2026-03-10', status: 6);
+    breakdownOrder($workspace, $page, '2026-03-10')->update(['confirmed_at' => null]);
+
+    rebuildBreakdown(['--date' => '2026-03-10']);
+
+    $row = PageOrderReportBreakdownDailyRecord::where('workspace_id', $workspace->id)->sole();
+
+    expect($row->total_orders)->toBe(0)
+        ->and($row->orders_count)->toBe(1);
+});
+
+it('counts an order with both a blank and a real report as history only', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = breakdownPage($workspace);
+
+    // Two phone numbers on one order: one Pancake knows nothing about, one it does.
+    $order = breakdownOrder($workspace, $page, '2026-03-10', fail: 0, success: 0);
+
+    OrderPhoneNumberReport::create([
+        'order_id' => $order->id,
+        'phone_number' => '09'.fake()->unique()->numerify('########'),
+        'order_fail' => 1,
+        'order_success' => 3,
+        'warning' => 0,
+        'type' => 'initial',
+    ]);
+
+    rebuildBreakdown(['--date' => '2026-03-10']);
+
+    $row = PageOrderReportBreakdownDailyRecord::where('workspace_id', $workspace->id)->sole();
+
+    expect($row->total_orders)->toBe(4)
+        ->and($row->orders_count)->toBe(1);
+});
+
+it('accounts for every order of the day', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = breakdownPage($workspace);
+
+    breakdownOrder($workspace, $page, '2026-03-10');                          // no report
+    breakdownOrder($workspace, $page, '2026-03-10', fail: 0, success: 0);     // blank report
+    breakdownOrder($workspace, $page, '2026-03-10', fail: 1, success: 2);     // history
+    breakdownOrder($workspace, $page, '2026-03-10', fail: 4, success: 0);     // history
+    breakdownOrder($workspace, $page, '2026-03-10', fail: 1, success: 1, status: 6); // cancelled
+
+    rebuildBreakdown(['--date' => '2026-03-10']);
+
+    $total = PageOrderReportBreakdownDailyRecord::where('workspace_id', $workspace->id)
+        ->sum('orders_count');
+
+    // The four that were confirmed and not cancelled, none counted twice.
+    expect((int) $total)->toBe(4);
+});
+
+it('clears a stale row for a day whose orders have all gone', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    $page = breakdownPage($workspace);
+
+    // Left behind by an earlier build; every order it counted has since been
+    // cancelled, so the day rebuilds to nothing at all.
     PageOrderReportBreakdownDailyRecord::create([
         'workspace_id' => $workspace->id,
         'page_id' => $page->id,
