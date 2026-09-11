@@ -29,6 +29,17 @@ function orderRows(Workspace $workspace, array $filter = []): array
         ->viewData('page')['props']['orders']['data'];
 }
 
+/**
+ * The statuses of the rows a filter left standing — the shortest way to say
+ * which orders survived it, now that the page no longer counts them per status.
+ *
+ * @return array<int, string>
+ */
+function statusesOn(Workspace $workspace, array $filter = []): array
+{
+    return collect(orderRows($workspace, $filter))->pluck('status_name')->all();
+}
+
 /** A phone-number report giving the order's customer a return history. */
 function phoneReport(Order $order, int $fail, int $success, string $type = 'latest'): void
 {
@@ -97,14 +108,11 @@ it('narrows the status tab counts on the same date as the rows', function () {
         'confirmed_at' => '2026-08-15 09:00:00',
     ]);
 
-    $counts = fn (array $filter) => ordersPage($workspace, $filter)->assertOk()
-        ->viewData('page')['props']['statusCounts'];
-
-    // The tab bar has to agree with the list, or the tabs promise rows that
-    // aren't there once you click them.
-    expect($counts(['date_from' => '2026-08-01', 'date_to' => '2026-08-31']))->toBe([])
-        ->and($counts(['date_from' => '2026-08-01', 'date_to' => '2026-08-31', 'date_type' => 'confirmed_at']))
-        ->toBe(['delivered' => 1]);
+    // August holds the confirmation but not the insert, so which column the
+    // range is pointed at is the whole answer.
+    expect(statusesOn($workspace, ['date_from' => '2026-08-01', 'date_to' => '2026-08-31']))->toBe([])
+        ->and(statusesOn($workspace, ['date_from' => '2026-08-01', 'date_to' => '2026-08-31', 'date_type' => 'confirmed_at']))
+        ->toBe(['delivered']);
 });
 
 it('bands each order by the customer own return rate', function () {
@@ -202,7 +210,10 @@ it('compares the return rate against the percentage typed beside the operator', 
         ->and($numbers('lt', '30'))->toBe(['LOW'])
         // The rate is compared as a whole percent, so "= 30" catches the row
         // whose badge reads 30% rather than nothing at all.
-        ->and($numbers('eq', '30'))->toBe(['MED']);
+        ->and($numbers('eq', '30'))->toBe(['MED'])
+        // And the boundary belongs to both of the inclusive comparisons.
+        ->and($numbers('gte', '30'))->toBe(['HIGH', 'MED'])
+        ->and($numbers('lte', '30'))->toBe(['LOW', 'MED']);
 });
 
 it('keeps every reported order when the comparison is incomplete or unknown', function () {
@@ -227,12 +238,9 @@ it('narrows the status tab counts on the report filter too', function () {
 
     phoneReport($reported, fail: 7, success: 3);
 
-    $counts = fn (array $filter) => ordersPage($workspace, $filter)->assertOk()
-        ->viewData('page')['props']['statusCounts'];
-
-    expect($counts(['report' => 'has_report']))->toBe(['delivered' => 1])
-        ->and($counts(['report' => 'no_report']))->toBe(['returned' => 1])
-        ->and($counts(['report' => 'has_report', 'rts_op' => 'lt', 'rts_value' => '50']))->toBe([]);
+    expect(statusesOn($workspace, ['report' => 'has_report']))->toBe(['delivered'])
+        ->and(statusesOn($workspace, ['report' => 'no_report']))->toBe(['returned'])
+        ->and(statusesOn($workspace, ['report' => 'has_report', 'rts_op' => 'lt', 'rts_value' => '50']))->toBe([]);
 });
 
 it('reads a between comparison as a band, whichever way round it is typed', function () {
@@ -312,24 +320,22 @@ it('falls back to the insert date when asked for a stamp it no longer offers', f
     expect($rows)->toHaveCount(1);
 });
 
-it('counts every status tab while one of them is open', function () {
+it('narrows on one status, or on several at once', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $this->actingAs($owner);
 
     Order::factory()->forWorkspace($workspace)->create(['status_name' => 'delivered']);
     Order::factory()->forWorkspace($workspace)->create(['status_name' => 'returned']);
+    Order::factory()->forWorkspace($workspace)->create(['status_name' => 'shipped']);
 
-    $page = ordersPage($workspace, ['status' => 'delivered'])->assertOk()
-        ->viewData('page')['props'];
-
-    // The counts run through the same Spatie filter set as the rows, so the
-    // request's `status` has to be declared there — but ignored, or the tab bar
-    // would only ever show a number on the tab already open.
-    expect($page['orders']['data'])->toHaveCount(1)
-        ->and($page['statusCounts'])->toBe(['delivered' => 1, 'returned' => 1]);
+    // Spatie splits the list apart before the filter sees it, which is what
+    // lets the Status row name more than one at a time.
+    expect(statusesOn($workspace, ['status' => 'delivered']))->toBe(['delivered'])
+        ->and(statusesOn($workspace, ['status' => 'delivered,returned']))
+        ->toEqualCanonicalizing(['delivered', 'returned']);
 });
 
-it('narrows the tab counts on the search box as well as the rows', function () {
+it('narrows on the search box', function () {
     ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
     $this->actingAs($owner);
 
@@ -342,10 +348,7 @@ it('narrows the tab counts on the search box as well as the rows', function () {
         'status_name' => 'returned',
     ]);
 
-    $counts = ordersPage($workspace, ['search' => 'KEEP'])->assertOk()
-        ->viewData('page')['props']['statusCounts'];
-
-    expect($counts)->toBe(['delivered' => 1]);
+    expect(statusesOn($workspace, ['search' => 'KEEP']))->toBe(['delivered']);
 });
 
 it('searches on a phrase containing a comma', function () {

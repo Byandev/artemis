@@ -13,6 +13,7 @@ use Inertia\Inertia;
 use Modules\Pancake\Filters\CustomerOrdersFilter;
 use Modules\Pancake\Filters\CustomerRtsReportFilter;
 use Modules\Pancake\Filters\IgnoredFilter;
+use Modules\Pancake\Filters\OrderCallLogsFilter;
 use Modules\Pancake\Filters\OrderDateFilter;
 use Modules\Pancake\Filters\OrderIdFilter;
 use Modules\Pancake\Filters\OrderRiderFilter;
@@ -70,30 +71,48 @@ class OrderController extends Controller
 
     /**
      * Every comparison the page may offer, in the order it lists them. Shared by
-     * the Customer RTS and Customer orders chips, both of which compare a number
-     * the same way; the SQL behind each key lives on the ComparesNumeric trait,
-     * and `between` takes a second number and is built by hand there.
+     * the Customer RTS and Customer orders filters, both of which compare a
+     * number the same way; the SQL behind each key lives on the ComparesNumeric
+     * trait, and `between` takes a second number and is built by hand there.
      */
-    public const RTS_COMPARISONS = ['gt', 'lt', 'eq', 'between'];
+    public const RTS_COMPARISONS = ['gt', 'gte', 'lt', 'lte', 'eq', 'between'];
 
     /**
-     * The filter set the list runs under, shared with the tab counts below so a
-     * filter added here cannot silently miss one of them.
+     * The Pancake POS lifecycle, in order — the values the Status filter
+     * offers.
+     *
+     * A fixed list rather than the statuses the workspace's orders happen to
+     * carry: working that out meant a second pass over the filtered list on
+     * every request, and it answered a question nobody asked once the status
+     * tabs and their counts came off the page.
+     */
+    public const STATUSES = [
+        'new',
+        'confirmed',
+        'submitted',
+        'shipped',
+        'delivered',
+        'returning',
+        'returned',
+        'canceled',
+    ];
+
+    /** Orders per page, unless the table asks for another size. */
+    private const PER_PAGE = 10;
+
+    /**
+     * The filter set the list runs under.
      *
      * Each entry is a Spatie filter class from Modules\Pancake\Filters, so the
      * rule itself is testable on its own and this method stays a list of what
      * the page may be narrowed by. The ones that only feed another filter —
      * `date_type` picks the column, `rts_*` and `customer_orders_*` carry the
-     * comparisons — are declared as IgnoredFilter so Spatie accepts them without
-     * applying them twice.
-     *
-     * The counts pass `withStatus: false`, which swaps the status rule for the
-     * same no-op, so each tab shows its own total instead of the count of the
-     * tab already open.
+     * comparisons, `call_logs_kind` says which calls count — are declared as
+     * IgnoredFilter so Spatie accepts them without applying them twice.
      *
      * @return array<int, AllowedFilter>
      */
-    private function allowedFilters(Request $request, string $dateColumn, bool $withStatus = true): array
+    private function allowedFilters(Request $request, Workspace $workspace, string $dateColumn): array
     {
         return [
             AllowedFilter::custom('search', new OrderSearchFilter),
@@ -102,7 +121,12 @@ class OrderController extends Controller
             AllowedFilter::custom('date_to', new OrderDateFilter($dateColumn, '<=')),
             AllowedFilter::custom('date_type', new IgnoredFilter),
             AllowedFilter::custom('rider', new OrderRiderFilter),
-            AllowedFilter::custom('status', $withStatus ? new OrderStatusFilter : new IgnoredFilter),
+            AllowedFilter::custom('call_logs', new OrderCallLogsFilter(
+                $workspace->id,
+                (string) $request->input('filter.call_logs_kind', OrderCallLogsFilter::ANY),
+            )),
+            AllowedFilter::custom('call_logs_kind', new IgnoredFilter),
+            AllowedFilter::custom('status', new OrderStatusFilter),
             AllowedFilter::custom('report', new CustomerRtsReportFilter(
                 (string) $request->input('filter.rts_op'),
                 $request->input('filter.rts_value'),
@@ -134,7 +158,7 @@ class OrderController extends Controller
 
         $dateColumn = $this->dateColumn($request);
 
-        $orders = QueryBuilder::for(clone $base)
+        $orders = QueryBuilder::for($base)
             ->with([
                 'shippingAddress:id,order_id,full_name,phone_number,full_address',
                 'items:id,order_id,name,quantity',
@@ -145,10 +169,10 @@ class OrderController extends Controller
             ->select('pancake_orders.*')
             ->selectRaw(CustomerRtsRisk::rateSql().' as cx_rts_rate')
             ->selectRaw(CustomerOrderHistory::totalSql().' as cx_orders_total')
-            ->allowedFilters($this->allowedFilters($request, $dateColumn))
+            ->allowedFilters($this->allowedFilters($request, $workspace, $dateColumn))
             ->allowedSorts(['order_number', 'total_amount', 'inserted_at', 'updated_at', 'confirmed_at', 'status_name', 'cx_rts_rate', 'cx_orders_total'])
             ->defaultSort('-inserted_at')
-            ->paginate((int) $request->input('per_page', 50))
+            ->paginate((int) $request->input('per_page', self::PER_PAGE))
             ->withQueryString();
 
         // Banded here rather than in the select so the thresholds live in one
@@ -159,23 +183,14 @@ class OrderController extends Controller
             CustomerRtsRisk::level($order->cx_rts_rate === null ? null : (float) $order->cx_rts_rate),
         ));
 
-        // Per-status counts for the tab bar, run through the same filter set as
-        // the rows so a tab cannot promise rows that aren't there once it is
-        // clicked. Status alone is ignored, so each tab shows its own total.
-        $statusCounts = QueryBuilder::for(clone $base)
-            ->allowedFilters($this->allowedFilters($request, $dateColumn, withStatus: false))
-            ->selectRaw('status_name, COUNT(*) as total')
-            ->groupBy('status_name')
-            ->pluck('total', 'status_name');
-
         return Inertia::render('workspaces/pancake/orders/index', [
             'workspace' => $workspace,
             'orders' => $orders,
-            'statusCounts' => $statusCounts,
-            'totalCount' => (int) $statusCounts->sum(),
             'shippingFeeImport' => ShippingFeeImportStatus::get($workspace->id),
             'dateFields' => self::DATE_FIELDS,
             'rtsOperators' => self::RTS_COMPARISONS,
+            'statuses' => self::STATUSES,
+            'callLogKinds' => OrderCallLogsFilter::KINDS,
             'query' => [
                 ...$request->only(['sort', 'perPage', 'page']),
                 'filter' => $request->input('filter', []),

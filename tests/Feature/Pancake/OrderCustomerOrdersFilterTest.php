@@ -123,6 +123,10 @@ it('compares the order count against the number typed beside the operator', func
     expect($numbers('gt', '10'))->toBe(['MANY'])
         ->and($numbers('lt', '10'))->toBe(['FEW'])
         ->and($numbers('eq', '10'))->toBe(['SOME'])
+        // The customer sitting exactly on the number counts in both of the
+        // inclusive comparisons and neither of the strict ones.
+        ->and($numbers('gte', '10'))->toBe(['MANY', 'SOME'])
+        ->and($numbers('lte', '10'))->toBe(['FEW', 'SOME'])
         // An unknown customer answers no comparison at all — not even "< 10".
         ->and($numbers('lt', '100'))->toBe(['FEW', 'MANY', 'SOME']);
 });
@@ -176,13 +180,11 @@ it('narrows the status tab counts on the order count too', function () {
     cxHistory($repeat, '09170000001', fail: 2, success: 8); // 10
     cxHistory($first, '09170000002', fail: 0, success: 1);  // 1
 
-    $counts = fn (array $filter) => cxOrdersPage($workspace, $filter)->assertOk()
-        ->viewData('page')['props']['statusCounts'];
+    $statuses = fn (array $filter) => collect(cxOrdersRows($workspace, $filter))
+        ->pluck('status_name')->all();
 
-    // The tab bar runs through the same filter set as the rows, or the tabs
-    // promise rows that aren't there once you click them.
-    expect($counts(['customer_orders' => '5', 'customer_orders_op' => 'gt']))->toBe(['delivered' => 1])
-        ->and($counts(['customer_orders' => '5', 'customer_orders_op' => 'lt']))->toBe(['returned' => 1]);
+    expect($statuses(['customer_orders' => '5', 'customer_orders_op' => 'gt']))->toBe(['delivered'])
+        ->and($statuses(['customer_orders' => '5', 'customer_orders_op' => 'lt']))->toBe(['returned']);
 });
 
 it('sorts on the customer order count', function () {

@@ -24,7 +24,9 @@ trait ComparesNumeric
      */
     public const OPERATORS = [
         'gt' => '>',
+        'gte' => '>=',
         'lt' => '<',
+        'lte' => '<=',
         'eq' => '=',
     ];
 
