@@ -95,10 +95,17 @@ export function ColumnsDropdown({
     options,
     visibility,
     onChange,
+    contentClassName,
 }: {
     options: ColumnOption[];
     visibility: VisibilityState;
     onChange: (next: VisibilityState) => void;
+    /**
+     * Extra classes for the menu panel. For a menu long enough to run off the
+     * screen, this is where a tighter height cap goes — the default 70vh suits
+     * the shorter menus, so caller-specific limits stay with the caller.
+     */
+    contentClassName?: string;
 }) {
     const fallback = defaultVisibility(options);
     const shownCount = options.filter((o) => visibility[o.id] !== false).length;
@@ -132,7 +139,10 @@ export function ColumnsDropdown({
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="end"
-                className="max-h-[70vh] w-60 overflow-y-auto p-1"
+                className={cn(
+                    'max-h-[70vh] w-60 overflow-y-auto p-1',
+                    contentClassName,
+                )}
             >
                 {Object.entries(groups).map(([heading, groupOptions], index) => (
                     <div key={heading || `group-${index}`}>

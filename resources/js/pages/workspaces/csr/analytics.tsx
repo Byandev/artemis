@@ -880,6 +880,14 @@ export default function Analytics({
                                 options={COLUMN_OPTIONS}
                                 visibility={columnVisibility}
                                 onChange={setColumnVisibility}
+                                // Two dozen columns in two groups make this the
+                                // tallest of these menus, and the table sits far
+                                // enough down the page that the trigger is often
+                                // near the bottom of the viewport — so the shared
+                                // 70vh cap still spills off screen. Cap it to the
+                                // room Radix measured on the side it opened to,
+                                // less a little breathing space at the edge.
+                                contentClassName="max-h-[min(70vh,calc(var(--radix-dropdown-menu-content-available-height)_-_1rem))]"
                             />
                         </div>
                     </div>
