@@ -12,6 +12,81 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
+        version: 'v3.36.0',
+        date: '2026-09-10',
+        sections: [
+            {
+                title: 'CSR Analytics — RMO Call Figures',
+                items: [
+                    'RMO Answered, RMO Real Conversations and Longest RMO Call now exist on every workspace, including the ones whose call report was set up before those three figures were added — there the breakdown had nothing to read and the page came up in error rather than simply short a few columns',
+                    'Days already stored read zero on the three until their rollup is re-run, which the nightly pass does over the trailing fortnight — so a range inside the last two weeks fills itself in by the next morning, and anything older needs its own re-run to show the calls it actually carried',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.36.0',
+        date: '2026-09-10',
+        sections: [
+            {
+                title: 'RTS — Heat Map (New)',
+                items: [
+                    'A map of the Philippines now sits under RTS with every province shaded by its RTS rate — the share of shipped value that came back rather than the share of parcels, so a ₱5,000 return doesn’t read as the equal of a ₱200 one — and the period’s rate, parcels returned, orders and sales are stated above it',
+                    'Two ways to colour it: RTS on its own, on bands that are fixed rather than taken from the range, so a province is the same colour in June as in August and can be read against itself; or RTS + Orders, which sorts each province into one of the four CSR monitoring groups and prints the handling that group calls for — double confirm, strict validation, strong address and COD confirmation, or ship as normal — beside the areas in it',
+                    'Region rolls the same figures up to island groups. The CSR groups rank provinces against one another, which means nothing across five island groups, so that colouring is offered on the province view only and says so when it isn’t',
+                    'It opens on the last 30 days rather than the current month — on the 1st there is almost nothing delivered or returned yet, and a map that opens blank reads as broken — and it takes the same team, page and shop filters as the rest of RTS, remembered per workspace',
+                    'Destinations the map can’t place are counted as unplaced beside the province count and still added into the totals, so the headline figures cover the whole period rather than only the part that could be drawn',
+                ],
+            },
+            {
+                title: 'Call Logs (New)',
+                items: [
+                    'Every call the phones have synced is now a page of its own under Orders — newest first, with who placed it, the number, the type, how long it ran and the order it was about; the same rows the RMO breakdown showed one day at a time, listed whole',
+                    'Each call is labelled RMO Customer, RMO Rider or Order Verification. A number that was on no delivery and on no order confirmed that day reads as Unmatched rather than being filed under a kind of call it wasn’t',
+                    'Order verification is new as a kind of call: a CSR ringing a customer on the day their order was confirmed, before the parcel is ever loaded for delivery. An order that syncs in after the call was placed claims the calls that were waiting for it, so a number rung minutes before its order landed doesn’t stay unmatched',
+                    'Search takes a phone number or an order id, and the date, persona and call type narrow the list; the order id on a row opens the orders list on that one order rather than searching for the digits',
+                    'The page needs the new View Call Logs permission, so someone with role access has to hand it out before it appears in the menu',
+                ],
+            },
+            {
+                title: 'CSR Analytics',
+                items: [
+                    'RMO calls and order-verification calls are counted apart throughout, and the headline row is twelve figures rather than eight: RMO Called, RMO Call Time, RMO Real Conversation and Hit Rate cover the parcel chasing, Total Verification Called, Total Verification Call Time, Total Order needs Verification and Total Verified Orders cover the confirming, and each is still measured against the equally long stretch ending the day before your range',
+                    'The breakdown table now carries every column of both nightly reports instead of eleven of them — RMO Answered, RMO Real Conversations, the customer and rider splits, every verification figure, the longest call and the report’s own totals, each sortable — with a columns menu that groups them into the sales report and the call report and remembers what you left showing',
+                    'The comparison panel plots any one of those figures, picked from a dropdown, rather than the four it used to tab between; it fetches only the metric you asked for, and a link made back when they were tabs still opens on the metric it named',
+                    'A second chart folds the period’s calls into one round of the clock, so the shape that shows is the working day itself — when the dialling starts, where it peaks, and the hours where the calls go out but nobody picks up. Both charts split into All calls, RMO and Verification, and either can be read as a table of figures instead of bars',
+                    'CSRs who did nothing in the range are no longer listed. The roster is everyone attached to a workspace shop whether they worked or not, so a live week put 110 rows in the breakdown for the 22 people with figures and pushed them onto page two, and filled the comparison with 0.0% rates that dragged the average line down with them',
+                ],
+            },
+            {
+                title: 'Meta Ads Manager',
+                items: [
+                    'Two more groupings: Optimization Goal, from the ad set, and Campaign Objective, from the campaign — campaigns Meta reported no objective for land in an unassigned row rather than dropping out of the totals',
+                    'The filter builder takes more than metric thresholds now: Created Date and Start Date, compared on / before / after / between, and Campaign Objective is / is not, picked from the objectives actually running in your accounts. A date is only offered where the breakdown you are on carries it — an ad account has neither, so a filter that could only be ignored isn’t listed',
+                    'The day-by-day timeline that opens from a row now honours the filters the grid is under, so an objective filter narrows the chart to the same ads it narrowed the row to instead of plotting all of them',
+                    'When Meta renders nothing for a creative preview, other placements are tried and then the account’s other linked logins — a colleague with a role on the page renders the same ad fine — and the drawer says which placement it settled on; a post that has been deleted falls back to the creative we synced, with links out to Ads Manager and the Ad Library',
+                ],
+            },
+            {
+                title: 'Orders',
+                items: [
+                    'The date range can be pointed at any of the order’s own dates — Created (Pancake), Confirmed, Shipped, Delivered, Returning or Returned — instead of always filtering on the Pancake created date, and which date it applies to sits beside the picker, because moving a range from the confirmed date to the delivered one is a change to the filter rather than a setting somewhere else',
+                    'Every row carries the customer’s RTS risk — Low, Medium, High or No report, read off that phone number’s own return history, the same rate the CSR verification card ranks on — and the column sorts, so the riskiest customers in a batch come to the top',
+                    'A Customer RTS filter narrows the list to customers with a return history or without one, and to a rate greater than, less than, equal to or between the figures you type. No report is its own answer rather than a low one: an unknown customer is exactly the case the verification call exists for',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Leaving the team schedule with unsaved shifts now asks first — the week arrows, the sidebar, the browser’s Back and closing the tab all stop and offer to save on the way out, where before the edits simply went',
+                    'The RMO call cards and the daily Discord report count RMO calls only — the customer and the rider on that day’s deliveries — and are named Total RMO Calls and Total RMO Call Duration to say so; counting every call synced put the total above the sum of its own parts in the breakdown beside it',
+                    'A call now counts as connected at 3 seconds rather than 5, on the cards, in the nightly reports and in the Discord post alike',
+                    'CSR Analytics follows the viewing as team switcher: both nightly reports are written per shop now, so picking a team leaves only that team’s shops on every figure on the page',
+                ],
+            },
+        ],
+    },
+    {
         version: 'v3.35.0',
         date: '2026-09-03',
         sections: [
