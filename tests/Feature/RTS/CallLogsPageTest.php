@@ -3,6 +3,8 @@
 use App\Enums\Permission;
 use App\Models\CallLog;
 use App\Models\Order;
+use App\Models\Shop;
+use App\Models\Team;
 use App\Support\CallLogPersona;
 use Modules\Pancake\Models\User as PancakeUser;
 
@@ -19,6 +21,38 @@ function logCall($workspace, array $attributes = []): CallLog
         'call_date' => '2026-07-20',
         ...$attributes,
     ]);
+}
+
+/**
+ * An order on a shop assigned to the given teams.
+ *
+ * A call reaches a team only through its order, and an order through its shop
+ * (team_shop) — the path Modules\Pancake\Models\Order scopes on. Pass no teams
+ * for an order no team owns.
+ *
+ * @param  array<int, Team>  $teams
+ */
+function orderForTeams($workspace, array $teams = []): Order
+{
+    $shop = Shop::factory()->forWorkspace($workspace)->create();
+
+    if ($teams) {
+        $shop->teams()->attach(collect($teams)->pluck('id')->all());
+    }
+
+    return Order::factory()->forWorkspace($workspace)->create(['shop_id' => $shop->id]);
+}
+
+/** A member holding View Call Logs but not View All Workspace Data, in the given teams. */
+function callLogViewer($workspace, array $teams = [])
+{
+    $user = makeMemberWithPermissions($workspace, [Permission::ViewCallLogs->value], 'RTS');
+
+    foreach ($teams as $team) {
+        $user->teams()->attach($team);
+    }
+
+    return $user;
 }
 
 it('lists the workspace calls with the caller, persona and order on each row', function () {
@@ -154,4 +188,93 @@ it('leads with the most recent call, day then time', function () {
 
     expect(collect($rows)->pluck('phone_number')->all())
         ->toBe(['09170000003', '09170000002', '09170000001']);
+});
+
+it('limits a scoped viewer to the calls on their own teams orders', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $mine = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $theirs = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    logCall($workspace, ['phone_number' => '09170000001', 'persona' => CallLogPersona::CUSTOMER, 'order_id' => orderForTeams($workspace, [$mine])->id]);
+    logCall($workspace, ['phone_number' => '09170000002', 'persona' => CallLogPersona::CUSTOMER, 'order_id' => orderForTeams($workspace, [$theirs])->id]);
+
+    $rows = $this->actingAs(callLogViewer($workspace, [$mine]))
+        ->get(route('workspaces.rts.call-logs', ['workspace' => $workspace]))
+        ->assertOk()
+        ->viewData('page')['props']['logs']['data'];
+
+    expect(collect($rows)->pluck('phone_number')->all())->toBe(['09170000001']);
+});
+
+it('hides the unmatched calls from a scoped viewer, along with the filter for them', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $team = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    logCall($workspace, ['phone_number' => '09170000001', 'persona' => CallLogPersona::CUSTOMER, 'order_id' => orderForTeams($workspace, [$team])->id]);
+    // No order, so no team: nothing says whose call this was.
+    logCall($workspace, ['phone_number' => '09170000002', 'persona' => null, 'order_id' => null]);
+
+    $props = $this->actingAs(callLogViewer($workspace, [$team]))
+        ->get(route('workspaces.rts.call-logs', ['workspace' => $workspace]))
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect(collect($props['logs']['data'])->pluck('phone_number')->all())->toBe(['09170000001'])
+        // The filter goes too — it could only ever come back empty.
+        ->and($props['personas'])->not->toContain('unmatched');
+});
+
+it('leaves a scoped viewer in no team with nothing', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $team = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    logCall($workspace, ['phone_number' => '09170000001', 'order_id' => orderForTeams($workspace, [$team])->id]);
+    logCall($workspace, ['phone_number' => '09170000002', 'order_id' => null]);
+
+    $rows = $this->actingAs(callLogViewer($workspace))
+        ->get(route('workspaces.rts.call-logs', ['workspace' => $workspace]))
+        ->assertOk()
+        ->viewData('page')['props']['logs']['data'];
+
+    expect($rows)->toBeEmpty();
+});
+
+it('shows the whole register, unmatched calls included, to an unrestricted viewer', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $team = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    logCall($workspace, ['phone_number' => '09170000001', 'order_id' => orderForTeams($workspace, [$team])->id]);
+    logCall($workspace, ['phone_number' => '09170000002', 'order_id' => null]);
+
+    $props = $this->actingAs($owner)
+        ->get(route('workspaces.rts.call-logs', ['workspace' => $workspace]))
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect(collect($props['logs']['data'])->pluck('phone_number')->all())
+        ->toEqualCanonicalizing(['09170000001', '09170000002'])
+        ->and($props['personas'])->toContain('unmatched');
+});
+
+it('narrows an unrestricted viewer to the team they are viewing as', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+
+    $teamA = Team::factory()->create(['workspace_id' => $workspace->id]);
+    $teamB = Team::factory()->create(['workspace_id' => $workspace->id]);
+
+    logCall($workspace, ['phone_number' => '09170000001', 'order_id' => orderForTeams($workspace, [$teamA])->id]);
+    logCall($workspace, ['phone_number' => '09170000002', 'order_id' => orderForTeams($workspace, [$teamB])->id]);
+    logCall($workspace, ['phone_number' => '09170000003', 'order_id' => null]);
+
+    // "Viewing as team" is a view filter, so it narrows the owner too.
+    $rows = $this->actingAs($owner)
+        ->get(route('workspaces.rts.call-logs', ['workspace' => $workspace, 'team_id' => $teamA->id]))
+        ->assertOk()
+        ->viewData('page')['props']['logs']['data'];
+
+    expect(collect($rows)->pluck('phone_number')->all())->toBe(['09170000001']);
 });
