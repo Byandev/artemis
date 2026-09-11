@@ -490,43 +490,43 @@ class CSRController extends Controller
         ]);
     }
 
-    public function analyticsReachRate(Request $request, Workspace $workspace)
+    public function analyticsConfirmedRiskyOrders(Request $request, Workspace $workspace)
     {
         $this->authorize(Permission::ViewCsrAnalytics->value, $workspace);
 
         [$from, $to] = $this->range($request);
         [$previousFrom, $previousTo] = $this->previousRange($from, $to);
 
-        $current = $this->verificationBacklog($workspace, $from, $to);
-        $previous = $this->verificationBacklog($workspace, $previousFrom, $previousTo);
+        $current = $this->confirmedRiskyOrders($workspace, $from, $to);
+        $previous = $this->confirmedRiskyOrders($workspace, $previousFrom, $previousTo);
 
         return response()->json([
-            'value' => $current['needs_verification'],
+            'value' => $current['risky_orders'],
             // The two reasons, so the card can say which is driving it.
             'no_report' => $current['no_report'],
             'high_rts' => $current['high_rts'],
             'orders' => $current['orders'],
-            'previous_value' => $previous['needs_verification'],
+            'previous_value' => $previous['risky_orders'],
             // Relative: this is a count of orders, not a rate.
-            'change' => $previous['needs_verification'] > 0
+            'change' => $previous['risky_orders'] > 0
                 ? round((
-                    $current['needs_verification'] - $previous['needs_verification']
-                ) / $previous['needs_verification'] * 100, 1)
+                    $current['risky_orders'] - $previous['risky_orders']
+                ) / $previous['risky_orders'] * 100, 1)
                 : null,
             'previous_period' => ['from' => $previousFrom, 'to' => $previousTo],
         ]);
     }
 
     /**
-     * How much of the range's verification backlog got verified.
+     * How many of the range's risky orders got verified.
      *
-     * Orders verified over "Total Order needs Verification" — orders on both
+     * Orders verified over "Confirmed Risky Orders" — orders on both
      * sides, so three calls at one order cover one order rather than three.
      * Counting the calls instead is what read a two-order backlog rung three
      * times as 150%.
      *
      * The counts behind the rate come back with it: the orders verified, the
-     * backlog they are read against, and the calls it took to get through them
+     * risky orders they are read against, and the calls it took to get through them
      * — an order rung three times is three calls and one order.
      */
     public function analyticsVerifiedOrders(Request $request, Workspace $workspace)
@@ -545,7 +545,7 @@ class CSRController extends Controller
             // and the calls behind the orders — the effort against the coverage.
             'orders' => $current['orders'],
             'calls' => $current['calls'],
-            'needs_verification' => $current['needs_verification'],
+            'risky_orders' => $current['risky_orders'],
             'previous_value' => $previous['rate'],
             // Percentage points, as on the other rate cards.
             'change' => $current['rate'] !== null && $previous['rate'] !== null
@@ -751,74 +751,83 @@ class CSRController extends Controller
      * any length that washes out, but a single-day range can read oddly when
      * the calls chase the day before's orders.
      *
-     * @return array{rate: float|null, orders: int, calls: int, needs_verification: int}
+     * @return array{rate: float|null, orders: int, calls: int, risky_orders: int}
      */
     private function verifiedCoverage(Workspace $workspace, string $from, string $to): array
     {
         $verification = $this->verificationTotals($workspace, $from, $to);
-        $needed = $this->verificationBacklog($workspace, $from, $to)['needs_verification'];
+        $risky = $this->confirmedRiskyOrders($workspace, $from, $to)['risky_orders'];
 
         return [
-            'rate' => $needed > 0 ? round($verification['orders'] / $needed * 100, 1) : null,
+            'rate' => $risky > 0 ? round($verification['orders'] / $risky * 100, 1) : null,
             'orders' => $verification['orders'],
             'calls' => $verification['calls'],
-            'needs_verification' => $needed,
+            'risky_orders' => $risky,
         ];
     }
 
-    /**
-     * The customer's own return rate for an order, or NULL when the number has
-     * no report behind it.
-     *
-     * The same expression CxRtsRateSort and RiskScoreSort rank on, so an order
-     * this card counts is one the RTS pages show at the same rate. `latest` is
-     * the report as it stands now; the `initial` row beside it is what the
-     * number looked like when the order came in.
-     */
-    private const CX_RTS_SQL = "(
-        SELECT SUM(r.order_fail) / NULLIF(SUM(r.order_fail) + SUM(r.order_success), 0)
-        FROM pancake_order_phone_number_reports r
-        WHERE r.order_id = po.id AND r.type = 'latest'
-    )";
-
-    /** At or above this customer return rate, an order is worth ringing first. */
-    private const VERIFICATION_RTS_THRESHOLD = 0.55;
+    /** At or above this customer return rate, an order is risky. */
+    private const RISKY_RTS_THRESHOLD = 0.40;
 
     /**
-     * Orders confirmed in a range that are worth a verification call.
+     * Below this many past orders, the rate is not taken as evidence of risk.
      *
-     * Two reasons qualify, and they cannot overlap: the customer's number has
-     * no report at all — nothing is known about them — or it has one and the
-     * return rate on it is at or above the threshold. Everything else is a
-     * customer with a record of taking delivery.
-     *
-     * Counted on `confirmed_at`, so the card is the work the range created:
-     * verification is what happens between a CSR confirming an order and the
-     * parcel going out. Orders never confirmed have no date to fall in and are
-     * out of it entirely.
-     *
-     * @return array{orders: int, no_report: int, high_rts: int, needs_verification: int}
+     * One order back out of one is a 100% return rate on a customer nobody has
+     * seen twice. The floor is what separates a customer with a habit from a
+     * customer with an accident, and without it the rate alone swept in every
+     * near-new number that had a single bad delivery.
      */
-    private function verificationBacklog(Workspace $workspace, string $from, string $to): array
+    private const RISKY_MIN_ORDERS = 6;
+
+    /**
+     * Orders confirmed in a range whose customer is risky.
+     *
+     * Two reasons qualify, and they cannot overlap: the customer's number had
+     * no report at all — nothing was known about them — or it had one showing at
+     * least RISKY_MIN_ORDERS past orders with a return rate at or above
+     * the threshold. Everything else is a customer with either a record of
+     * taking delivery or too short a history to read as a risk.
+     *
+     * Read off page_order_report_breakdown_daily_records, the nightly rollup of
+     * each day's orders by the history their customer arrived with, rather than
+     * by asking every order for its customer's record one at a time. Three
+     * things follow from the rollup being the source, and all three are wanted:
+     *
+     *  - The history is the `initial` report — what the number looked like when
+     *    the order came in, which is what the CSR confirming it could have acted
+     *    on, and which does not drift afterwards the way `latest` does. A figure
+     *    for last Tuesday reads the same today as it did on Tuesday.
+     *  - Cancelled and removed orders are out, because the rollup leaves them
+     *    out. An order that never shipped never needed the call.
+     *  - A day the rollup has not been built for reads as zero, the same way the
+     *    sales card reads zero for a day the nightly sync has not reached.
+     *
+     * Counted on the day of confirmation, so the card is the work the range
+     * created: verification is what happens between a CSR confirming an order
+     * and the parcel going out. Orders never confirmed have no day to fall in
+     * and are out of it entirely.
+     *
+     * @return array{orders: int, no_report: int, high_rts: int, risky_orders: int}
+     */
+    private function confirmedRiskyOrders(Workspace $workspace, string $from, string $to): array
     {
-        $orders = $this->scopeToVisibleShops(
-            DB::table('pancake_orders as po')
-                ->where('po.workspace_id', $workspace->id)
-                ->whereBetween(DB::raw('DATE(po.confirmed_at)'), [$from, $to])
-                ->selectRaw(self::CX_RTS_SQL.' as cx_rts'),
+        $rows = $this->scopeToVisibleShops(
+            DB::table('page_order_report_breakdown_daily_records')
+                ->where('workspace_id', $workspace->id)
+                ->whereBetween('date', [$from, $to]),
             $workspace,
-            'po.shop_id',
+            'shop_id',
         );
 
-        // Wrapped rather than repeated in the SELECT: the rate is a correlated
-        // subquery, and both tests would run it once each per order.
-        $row = DB::query()
-            ->fromSub($orders, 'o')
-            ->selectRaw('
-                COUNT(*)                  as orders,
-                SUM(o.cx_rts IS NULL)     as no_report,
-                SUM(o.cx_rts >= ?)        as high_rts
-            ', [self::VERIFICATION_RTS_THRESHOLD])
+        // total_orders = 0 is the rollup's "nothing known" row — no report at
+        // all, or one carrying only a warning. The >= guard keeps the division
+        // off those rows; MySQL would hand back NULL rather than counting them
+        // either way, but leaning on that reads as an accident.
+        $row = $rows->selectRaw('
+            COALESCE(SUM(orders_count), 0) as orders,
+            COALESCE(SUM(CASE WHEN total_orders = 0 THEN orders_count ELSE 0 END), 0) as no_report,
+            COALESCE(SUM(CASE WHEN total_orders >= ? AND order_fail / total_orders >= ? THEN orders_count ELSE 0 END), 0) as high_rts
+        ', [self::RISKY_MIN_ORDERS, self::RISKY_RTS_THRESHOLD])
             ->first();
 
         $noReport = (int) ($row->no_report ?? 0);
@@ -828,7 +837,7 @@ class CSRController extends Controller
             'orders' => (int) ($row->orders ?? 0),
             'no_report' => $noReport,
             'high_rts' => $highRts,
-            'needs_verification' => $noReport + $highRts,
+            'risky_orders' => $noReport + $highRts,
         ];
     }
 

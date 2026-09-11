@@ -12,7 +12,7 @@ import {
 } from '@/components/csr/CsrAnalyticsLeaderCards';
 import {
     CallsPlacedStatCard,
-    ReachRateStatCard,
+    ConfirmedRiskyOrdersStatCard,
     RealConversationsStatCard,
     RmoCallTimeStatCard,
     RmoCalledStatCard,
@@ -24,7 +24,7 @@ import {
     TotalRmoCalledStatCard,
     VerifiedOrdersStatCard,
     type CallsPlacedStat,
-    type ReachRateStat,
+    type ConfirmedRiskyOrdersStat,
     type RealConversationsStat,
     type RmoCallTimeStat,
     type RmoCalledStat,
@@ -508,12 +508,13 @@ export default function Analytics({
             fromStr,
             toStr,
         );
-    const [reachRateStat, reachRateLoading] = useAnalyticsStat<ReachRateStat>(
-        workspace.slug,
-        'analytics-reach-rate',
-        fromStr,
-        toStr,
-    );
+    const [riskyOrdersStat, riskyOrdersLoading] =
+        useAnalyticsStat<ConfirmedRiskyOrdersStat>(
+            workspace.slug,
+            'analytics-confirmed-risky-orders',
+            fromStr,
+            toStr,
+        );
     const [verifiedOrdersStat, verifiedOrdersLoading] =
         useAnalyticsStat<VerifiedOrdersStat>(
             workspace.slug,
@@ -789,9 +790,9 @@ export default function Analytics({
                         stat={realConversationsStat}
                         loading={realConversationsLoading}
                     />
-                    <ReachRateStatCard
-                        stat={reachRateStat}
-                        loading={reachRateLoading}
+                    <ConfirmedRiskyOrdersStatCard
+                        stat={riskyOrdersStat}
+                        loading={riskyOrdersLoading}
                     />
                     <VerifiedOrdersStatCard
                         stat={verifiedOrdersStat}
