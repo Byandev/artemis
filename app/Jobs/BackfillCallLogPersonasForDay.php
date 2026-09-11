@@ -29,7 +29,7 @@ use Throwable;
  *   customer      — the number is customer_phone on a delivery loaded that day.
  *   rider         — the number is rider_phone on a delivery loaded that day.
  *   verification  — the number is the shipping-address phone on an order the
- *                   workspace confirmed that same day.
+ *                   workspace took in, or confirmed, that same day.
  *
  * Each statement only touches rows still carrying no persona, so the earlier
  * rules win: a delivery match outranks a verification one (a call to a customer
@@ -153,7 +153,11 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
     }
 
     /**
-     * Calls matching an order the workspace confirmed that day.
+     * Calls matching an order the workspace took in, or confirmed, that day.
+     *
+     * Both stamps, because CallLogPersona::resolveVerification reads both: an
+     * order is rung either side of its confirmation, and one never confirmed at
+     * all has only the day it came in.
      *
      * Normalized on both sides, because this rule reaches past the delivery the
      * number was copied onto and back to the address Pancake was given —
@@ -163,11 +167,16 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
      * guard is its null: anything under ten digits would otherwise be padded
      * into a key that could collide with a real number.
      *
-     * confirmed_at is bounded by a half-open range rather than wrapped in
-     * DATE(), which would hide the column from idx_orders_workspace_confirmed_status.
+     * Each stamp is bounded by a half-open range rather than wrapped in DATE(),
+     * which would hide the column from its index, and the two are unioned
+     * rather than OR-ed so each half keeps to one —
+     * idx_orders_workspace_confirmed_status and idx_orders_workspace_inserted.
+     * An order both taken in and confirmed that day turns up on both halves,
+     * with the same order id on each.
      *
-     * Ties — the same number on two orders confirmed that day — go to the
-     * earliest confirmation, matching CallLogPersona::resolveVerification.
+     * Ties — the same number on two of that day's orders — go to the earliest
+     * stamp that put one of them in the day, matching
+     * CallLogPersona::resolveVerification.
      *
      * order_for_delivery_id is written back to null rather than left alone: a
      * verification call is by definition one no delivery accounted for.
@@ -181,22 +190,23 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
         $orderKey = sprintf($key, 'sa.phone_number');
         $callKey = sprintf($key, 'cl.phone_number');
 
+        $confirmed = $this->ordersStampedOnSql('confirmed_at', $orderKey);
+        $inserted = $this->ordersStampedOnSql('inserted_at', $orderKey);
+
         return DB::affectingStatement(<<<SQL
             UPDATE call_logs cl
             JOIN (
-                SELECT o.id AS order_id,
-                       {$orderKey} AS phone_key,
+                SELECT d.order_id,
+                       d.phone_key,
                        ROW_NUMBER() OVER (
-                           PARTITION BY {$orderKey}
-                           ORDER BY o.confirmed_at, o.id
+                           PARTITION BY d.phone_key
+                           ORDER BY d.matched_at, d.order_id
                        ) AS rn
-                  FROM pancake_orders o
-                  JOIN shipping_addresses sa ON sa.order_id = o.id
-                 WHERE o.workspace_id = ?
-                   AND o.confirmed_at >= ?
-                   AND o.confirmed_at < ?
-                   AND sa.phone_number IS NOT NULL
-                   AND CHAR_LENGTH(REGEXP_REPLACE(sa.phone_number, '[^0-9]', '')) >= 10
+                  FROM (
+                      {$confirmed}
+                      UNION ALL
+                      {$inserted}
+                  ) d
             ) v ON v.phone_key = {$callKey} AND v.rn = 1
                SET cl.persona = '{$persona}',
                    cl.order_id = v.order_id,
@@ -206,6 +216,32 @@ class BackfillCallLogPersonasForDay implements ShouldQueue
                AND cl.call_date = ?
                AND cl.persona IS NULL
                AND CHAR_LENGTH(REGEXP_REPLACE(cl.phone_number, '[^0-9]', '')) >= 10
-        SQL, [$this->workspaceId, $day, $day->copy()->addDay(), now(), $this->workspaceId, $this->date]);
+        SQL, [
+            $this->workspaceId, $day, $day->copy()->addDay(),
+            $this->workspaceId, $day, $day->copy()->addDay(),
+            now(), $this->workspaceId, $this->date,
+        ]);
+    }
+
+    /**
+     * One half of the verification candidates: the day's orders on one stamp.
+     *
+     * Three bindings, in the order the statement above supplies them —
+     * workspace, the day, and the day after.
+     */
+    private function ordersStampedOnSql(string $column, string $orderKey): string
+    {
+        return <<<SQL
+            SELECT o.id AS order_id,
+                   {$orderKey} AS phone_key,
+                   o.{$column} AS matched_at
+              FROM pancake_orders o
+              JOIN shipping_addresses sa ON sa.order_id = o.id
+             WHERE o.workspace_id = ?
+               AND o.{$column} >= ?
+               AND o.{$column} < ?
+               AND sa.phone_number IS NOT NULL
+               AND CHAR_LENGTH(REGEXP_REPLACE(sa.phone_number, '[^0-9]', '')) >= 10
+        SQL;
     }
 }

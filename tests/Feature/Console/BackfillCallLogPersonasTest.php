@@ -17,17 +17,24 @@ use Illuminate\Support\Facades\Queue;
  * match against had landed.
  *
  * The rules are the sync's own, in the sync's own order — a delivery loaded that
- * day first, and only what is left over offered to the orders confirmed that day
- * — so a row this fills in is indistinguishable from one stamped at sync time.
+ * day first, and only what is left over offered to the orders that day took in
+ * or confirmed — so a row this fills in is indistinguishable from one stamped at
+ * sync time.
  *
  * The command only picks the workspace-days worth doing and hands them to the
  * queue; the matching is the job's, so that is where it is tested.
  */
-function backfillOrder(Workspace $workspace, mixed $confirmedAt = null, ?string $phone = null): AppOrder
+function backfillOrder(Workspace $workspace, mixed $confirmedAt = null, ?string $phone = null, mixed $insertedAt = null): AppOrder
 {
     $page = Page::factory()->forWorkspace($workspace)->create();
 
-    $order = AppOrder::factory()->forPage($page)->create(['confirmed_at' => $confirmedAt]);
+    // inserted_at is the other stamp the verification rule reads, so it is left
+    // on the factory's now() — a day of its own — unless a test wants it in the
+    // day being backfilled.
+    $order = AppOrder::factory()->forPage($page)->create(array_filter([
+        'confirmed_at' => $confirmedAt,
+        'inserted_at' => $insertedAt,
+    ]));
 
     if ($phone !== null) {
         ShippingAddress::factory()->create([
@@ -144,6 +151,38 @@ it('stamps a call to an order confirmed that day, spelled either way, as verific
         ->order_for_delivery_id->toBeNull();
 });
 
+it('stamps a call to an order that came in that day but was never confirmed', function () {
+    $workspace = Workspace::factory()->create();
+
+    // Nothing on confirmed_at to match on, so on that stamp alone this call
+    // stays unmatched however often the backfill is re-run.
+    $order = backfillOrder($workspace, null, '09171234567', Carbon::parse('2026-09-02 07:30'));
+
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    expect(backfillDay($workspace))->toMatchArray(['verification' => 1]);
+
+    expect($call->refresh())
+        ->persona->toBe(CallLogPersona::VERIFICATION)
+        ->order_id->toBe($order->id)
+        ->order_for_delivery_id->toBeNull();
+});
+
+it('gives a number on an order taken in that day and one confirmed that day to the earlier stamp', function () {
+    $workspace = Workspace::factory()->create();
+
+    // Came in that morning; nobody has confirmed it.
+    $earliest = backfillOrder($workspace, null, '09171234567', Carbon::parse('2026-09-02 08:00'));
+    // Came in days before and was confirmed that afternoon.
+    backfillOrder($workspace, Carbon::parse('2026-09-02 16:00'), '09171234567');
+
+    $call = backfillCall($workspace, '09171234567', '2026-09-02');
+
+    backfillDay($workspace);
+
+    expect($call->refresh()->order_id)->toBe($earliest->id);
+});
+
 it('prefers the delivery in front of it over an order confirmed the same day', function () {
     $workspace = Workspace::factory()->create();
 
@@ -164,6 +203,8 @@ it('prefers the delivery in front of it over an order confirmed the same day', f
 it('gives a number confirmed on two orders that day to the earliest confirmation', function () {
     $workspace = Workspace::factory()->create();
 
+    // Both came in on days of their own, so the confirmation is the only stamp
+    // either has in this day and the earlier of the two takes the call.
     $earliest = backfillOrder($workspace, Carbon::parse('2026-09-02 08:00'), '09171234567');
     backfillOrder($workspace, Carbon::parse('2026-09-02 16:00'), '09171234567');
 

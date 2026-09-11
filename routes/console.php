@@ -16,6 +16,13 @@ Schedule::command('build-page-daily-performance --days=3')->dailyAt('01:15')->wi
 // delivered/returning timestamp can land well after it was placed and a status
 // correction moves it between days.
 Schedule::command('build-order-location-daily-records --days=7')->dailyAt('01:30')->withoutOverlapping();
+// Breakdown of each day's orders by the customer history they arrived with
+// (the 'initial' phone-number report). A 7-day window, matching the location
+// rollup above: orders are bucketed on confirmed_at and cancelled ones are
+// dropped, so a settled day still changes when an order is cancelled days after
+// it was confirmed. Fans out one job per (workspace, day) onto the analytics
+// queue, so the scheduler returns immediately and the rebuild parallelises.
+Schedule::command('build-page-order-report-breakdown-daily-records --days=7')->dailyAt('01:45')->withoutOverlapping();
 Schedule::command('trigger-fetch-shop-orders')->hourly();
 Schedule::command('inventory:sync-averages')->hourly();
 
