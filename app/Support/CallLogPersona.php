@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -16,9 +17,9 @@ use Illuminate\Support\Facades\DB;
  * A number on neither was not part of an RMO delivery at all.
  *
  * Such a number can still be a verification call — a CSR ringing a customer on
- * the day their order was confirmed, before it is ever loaded for delivery.
- * That match is resolveVerification(), tried at sync time on whatever the
- * delivery rule could not place: it reads pancake_orders, which lands on its
+ * the day their order came in or was confirmed, before it is ever loaded for
+ * delivery. That match is resolveVerification(), tried at sync time on whatever
+ * the delivery rule could not place: it reads pancake_orders, which lands on its
  * own schedule, so a call synced minutes after it was placed can still find
  * nothing there yet. An order arriving afterwards claims the calls that were
  * waiting for it from its own side, in LinkVerificationCallLogsAction.
@@ -30,7 +31,7 @@ class CallLogPersona
     public const RIDER = 'rider';
 
     /**
-     * A call placed to a customer on the day their order was confirmed.
+     * A call placed to a customer on the day their order came in or was confirmed.
      *
      * Kept to 12 characters on purpose: call_logs.persona is a string(16).
      */
@@ -120,7 +121,8 @@ class CallLogPersona
      *
      * Both rules run, deliveries first: a number on that day's deliveries is
      * RMO work — customer or rider — and only what is left over is offered to
-     * the verification rule, against the orders confirmed that same day.
+     * the verification rule, against the orders that same day took in or
+     * confirmed.
      *
      * @param  list<array<string, mixed>>  $rows  each with workspace_id, phone_number, call_date
      * @return list<array<string, mixed>>
@@ -173,14 +175,19 @@ class CallLogPersona
      * Verification matches for each phone number, keyed by the number as given.
      *
      * A call counts as verification when the number is the shipping-address
-     * phone on an order this workspace confirmed that same day. shipping_addresses
-     * is the source because it is the one pancake_order_for_delivery.customer_phone
-     * is itself populated from, so a customer matched here is the same customer
-     * the delivery rule would have matched.
+     * phone on an order this workspace either took in or confirmed that same
+     * day. Both stamps count because the ringing happens either side of the
+     * confirmation: a CSR rings to confirm an order that has just come in, and
+     * an order that is never confirmed at all has no confirmation day to be
+     * rung on — read on confirmed_at alone, those calls are matched to nothing
+     * and counted nowhere. shipping_addresses is the source because it is the
+     * one pancake_order_for_delivery.customer_phone is itself populated from,
+     * so a customer matched here is the same customer the delivery rule would
+     * have matched.
      *
-     * Ties — the same number on two orders confirmed the same day — go to the
-     * earliest confirmation. Nothing in the data says which of the two a call
-     * was about; earliest is deterministic rather than right.
+     * Ties — the same number on two of that day's orders — go to the earliest
+     * stamp that put one of them in the day. Nothing in the data says which of
+     * the two a call was about; earliest is deterministic rather than right.
      *
      * @param  list<string>  $phoneNumbers
      * @return array<string, array{persona: string, order_id: int, order_for_delivery_id: null}>
@@ -202,20 +209,24 @@ class CallLogPersona
             return [];
         }
 
-        // A half-open range rather than whereDate: DATE(confirmed_at) hides the
-        // column from idx_orders_workspace_confirmed_status, and this query is on
-        // the sync path.
         $day = Carbon::parse($date)->startOfDay();
 
-        $orders = DB::table('pancake_orders as o')
-            ->join('shipping_addresses as sa', 'sa.order_id', '=', 'o.id')
-            ->where('o.workspace_id', $workspaceId)
-            ->where('o.confirmed_at', '>=', $day)
-            ->where('o.confirmed_at', '<', $day->copy()->addDay())
-            ->whereNotNull('sa.phone_number')
-            ->orderBy('o.confirmed_at')
+        // Unioned rather than OR-ed across the two stamps: each half is then a
+        // range on an index of its own — idx_orders_workspace_confirmed_status
+        // and idx_orders_workspace_inserted — where an OR over both columns
+        // leaves the optimizer free to scan instead, and this query is on the
+        // sync path. An order both taken in and confirmed that day comes back
+        // on both halves; it is the same order id either way, and the ordering
+        // settles it on the earlier of its two stamps.
+        $orders = DB::query()
+            ->fromSub(
+                self::ordersStampedOn($workspaceId, 'confirmed_at', $day)
+                    ->unionAll(self::ordersStampedOn($workspaceId, 'inserted_at', $day)),
+                'o',
+            )
+            ->orderBy('o.matched_at')
             ->orderBy('o.id')
-            ->get(['o.id', 'sa.phone_number']);
+            ->get();
 
         $resolved = [];
 
@@ -228,8 +239,8 @@ class CallLogPersona
 
             foreach ($byKey[$key] as $raw) {
                 if (isset($resolved[$raw])) {
-                    // Ordered by confirmed_at, so the first one seen is the
-                    // earliest and keeps the row.
+                    // Ordered by the stamp that put each order in the day, so
+                    // the first one seen is the earliest and keeps the row.
                     continue;
                 }
 
@@ -242,5 +253,26 @@ class CallLogPersona
         }
 
         return $resolved;
+    }
+
+    /**
+     * The day's orders on one stamp, with the number to match them on.
+     *
+     * A half-open range rather than whereDate: DATE(confirmed_at) hides the
+     * column from idx_orders_workspace_confirmed_status, and DATE(inserted_at)
+     * does the same to idx_orders_workspace_inserted. `matched_at` comes back
+     * with the row because it is what the caller orders ties on, and which of
+     * the two stamps it holds depends on the half it came from.
+     */
+    private static function ordersStampedOn(int $workspaceId, string $column, Carbon $day): Builder
+    {
+        return DB::table('pancake_orders as o')
+            ->join('shipping_addresses as sa', 'sa.order_id', '=', 'o.id')
+            ->where('o.workspace_id', $workspaceId)
+            ->where("o.{$column}", '>=', $day)
+            ->where("o.{$column}", '<', $day->copy()->addDay())
+            ->whereNotNull('sa.phone_number')
+            ->select(['o.id', 'sa.phone_number'])
+            ->selectRaw("o.{$column} as matched_at");
     }
 }

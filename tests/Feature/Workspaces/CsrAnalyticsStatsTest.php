@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\RmoDailyStats;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Modules\Pancake\Models\OrderForDelivery;
 use Modules\Pancake\Models\User as PancakeUser;
@@ -251,7 +252,7 @@ test('the endpoint needs the CSR analytics permission', function () {
     $outsider = User::factory()->create();
     $workspace->users()->attach($outsider->id);
 
-    foreach (['analytics-sales', 'analytics-rts', 'analytics-rmo-called', 'analytics-total-rmo-called', 'analytics-rmo-call-time', 'analytics-rmo-real-conversations', 'analytics-rmo-hit-rate', 'analytics-rmo-time', 'analytics-calls-placed', 'analytics-real-conversations', 'analytics-reach-rate', 'analytics-verified-orders', 'analytics-leader-sales', 'analytics-leader-rts', 'analytics-leader-rmo-called', 'analytics-leader-rmo-duration'] as $stat) {
+    foreach (['analytics-sales', 'analytics-rts', 'analytics-rmo-called', 'analytics-total-rmo-called', 'analytics-rmo-call-time', 'analytics-rmo-real-conversations', 'analytics-rmo-hit-rate', 'analytics-rmo-time', 'analytics-calls-placed', 'analytics-real-conversations', 'analytics-confirmed-risky-orders', 'analytics-verified-orders', 'analytics-leader-sales', 'analytics-leader-rts', 'analytics-leader-rmo-called', 'analytics-leader-rmo-duration'] as $stat) {
         $this->actingAs($outsider)
             ->getJson("/api/workspaces/{$workspace->slug}/csrs/stats/{$stat}?from=2026-08-01&to=2026-08-05")
             ->assertForbidden();
@@ -1233,9 +1234,28 @@ test('another workspace\'s verification talk time is not counted', function () {
         ->assertJsonPath('value', 0);
 });
 
-function csrReachRateStat($owner, Workspace $workspace, string $from, string $to)
+/**
+ * The card reads the nightly breakdown rollup, so build it before asking — the
+ * same shape as syncCallReport above, and over the same stretch: the range
+ * itself plus the equally long one before it that the endpoint compares against.
+ */
+function buildBreakdownRollup(string $from, string $to): void
 {
-    return csrStat($owner, $workspace, 'analytics-reach-rate', $from, $to);
+    $start = CarbonImmutable::parse($from);
+    $end = CarbonImmutable::parse($to);
+
+    Artisan::call('build-page-order-report-breakdown-daily-records', [
+        '--from' => $start->subDays($start->diffInDays($end) + 1)->toDateString(),
+        '--to' => $end->toDateString(),
+        '--sync' => true,
+    ]);
+}
+
+function csrConfirmedRiskyOrdersStat($owner, Workspace $workspace, string $from, string $to)
+{
+    buildBreakdownRollup($from, $to);
+
+    return csrStat($owner, $workspace, 'analytics-confirmed-risky-orders', $from, $to);
 }
 
 /**
@@ -1277,10 +1297,11 @@ test('an order needs verification when the number has no report at all', functio
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
     orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
-    // A customer who takes delivery: 1 of 10 back is 10%.
+    // A customer who takes delivery: 1 of 10 back is 10%, over enough orders
+    // for the rate to count for something.
     orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 1, success: 9);
 
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
         ->assertJsonPath('value', 1)
         ->assertJsonPath('no_report', 1)
@@ -1288,20 +1309,52 @@ test('an order needs verification when the number has no report at all', functio
         ->assertJsonPath('orders', 2);
 });
 
-test('an order needs verification at or above the 55% threshold', function () {
+test('an order is risky at or above the 40% threshold', function () {
     ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
 
-    // Exactly 55% counts — the threshold is inclusive.
-    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: 55, success: 45);
+    // Exactly 40% counts — the threshold is inclusive.
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: 40, success: 60);
     orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 6, success: 4);
-    // 54% is under it, however close.
-    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 54, success: 46);
+    // 39% is under it, however close.
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 39, success: 61);
 
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 2)
         ->assertJsonPath('high_rts', 2)
         ->assertJsonPath('no_report', 0)
         ->assertJsonPath('orders', 3);
+});
+
+test('a rate drawn from fewer than six past orders is not read as risk', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Every one of these is at or above 40%, and only the six-order ones count:
+    // one delivery back out of one says nothing about a habit.
+    orderNeedingCheck($workspace, '2026-08-02 09:00:00', fail: 1, success: 0);
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 2, success: 3);
+    // Six past orders exactly — the floor is inclusive.
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 3, success: 3);
+    orderNeedingCheck($workspace, '2026-08-02 12:00:00', fail: 4, success: 6);
+
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 2)
+        ->assertJsonPath('high_rts', 2)
+        ->assertJsonPath('no_report', 0)
+        ->assertJsonPath('orders', 4);
+});
+
+test('a short history with no returns is not risky either', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    // Under the floor and under the rate: nothing about this one is risky, and
+    // it must not fall through into no_report — it has a report.
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 0, success: 3);
+
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('high_rts', 0)
+        ->assertJsonPath('no_report', 0)
+        ->assertJsonPath('orders', 1);
 });
 
 test('a report of nothing at all is unreported rather than a clean record', function () {
@@ -1311,9 +1364,73 @@ test('a report of nothing at all is unreported rather than a clean record', func
     // the same "nothing known" as having no row, not a 0% record.
     orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 0, success: 0);
 
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 1)
         ->assertJsonPath('no_report', 1);
+});
+
+test('the history read is the one the order came in with, not the one since', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $order = Order::factory()->forWorkspace($workspace)->create([
+        'status' => 1,
+        'confirmed_at' => '2026-08-02 10:00:00',
+        'confirmed_by' => salesCsr()->id,
+    ]);
+
+    // Clean when the CSR confirmed it; gone bad since. The card is the work the
+    // range created, so it reads what could have been acted on at the time.
+    foreach ([['initial', 0, 10], ['latest', 9, 1]] as [$type, $fail, $success]) {
+        DB::table('pancake_order_phone_number_reports')->insert([
+            'order_id' => $order->id,
+            'phone_number' => '09170000002',
+            'order_fail' => $fail,
+            'order_success' => $success,
+            'warning' => 0,
+            'type' => $type,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('high_rts', 0)
+        ->assertJsonPath('orders', 1);
+});
+
+test('a cancelled order is not a risky one', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+
+    // Unreported, so it would have qualified — but it never shipped, and an
+    // order that never shipped never needed the call.
+    Order::factory()->forWorkspace($workspace)->create([
+        'status' => 6,
+        'confirmed_at' => '2026-08-02 11:00:00',
+        'confirmed_by' => salesCsr()->id,
+    ]);
+
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertJsonPath('value', 1)
+        ->assertJsonPath('no_report', 1)
+        ->assertJsonPath('orders', 1);
+});
+
+test('a range the breakdown rollup has not reached reads as zero', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
+    orderNeedingCheck($workspace, '2026-08-02 11:00:00', fail: 8, success: 2);
+
+    // Deliberately not built: the card reads the nightly rollup, so a stretch
+    // the build has not covered has nothing to report rather than quietly
+    // going back to counting the orders itself.
+    csrStat($owner, $workspace, 'analytics-confirmed-risky-orders', '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 0)
+        ->assertJsonPath('orders', 0);
 });
 
 test('orders confirmed outside the range are not counted', function () {
@@ -1322,7 +1439,7 @@ test('orders confirmed outside the range are not counted', function () {
     orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: null);
     orderNeedingCheck($workspace, '2026-08-09 10:00:00', fail: null);
 
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 1)
         ->assertJsonPath('orders', 1);
 });
@@ -1339,7 +1456,7 @@ test('an order that was never confirmed is not counted', function () {
         'confirmed_at' => null,
     ]);
 
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 1)
         ->assertJsonPath('orders', 1);
 });
@@ -1355,7 +1472,7 @@ test('the verification backlog change is relative, as a count of orders', functi
     orderNeedingCheck($workspace, '2026-08-03 10:00:00', fail: null);
 
     // 2 to 3 is +50%.
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 3)
         ->assertJsonPath('previous_value', 2)
         ->assertJsonPath('change', 50);
@@ -1366,7 +1483,7 @@ test('a range where every customer has a clean record reads zero', function () {
 
     orderNeedingCheck($workspace, '2026-08-02 10:00:00', fail: 0, success: 10);
 
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 0)
         ->assertJsonPath('orders', 1)
         ->assertJsonPath('change', null);
@@ -1378,13 +1495,16 @@ test('another workspace\'s orders are not in the verification backlog', function
 
     orderNeedingCheck($other, '2026-08-02 10:00:00', fail: null);
 
-    csrReachRateStat($owner, $workspace, '2026-08-01', '2026-08-05')
+    csrConfirmedRiskyOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 0)
         ->assertJsonPath('orders', 0);
 });
 
 function csrVerifiedOrdersStat($owner, Workspace $workspace, string $from, string $to)
 {
+    // Reads the same backlog as the card beside it, so it needs the same rollup.
+    buildBreakdownRollup($from, $to);
+
     return csrStat($owner, $workspace, 'analytics-verified-orders', $from, $to);
 }
 
@@ -1436,7 +1556,7 @@ test('a backlog nobody rang reads zero rather than no rate', function () {
         ->assertJsonPath('value', 0)
         ->assertJsonPath('orders', 0)
         ->assertJsonPath('calls', 0)
-        ->assertJsonPath('needs_verification', 2);
+        ->assertJsonPath('risky_orders', 2);
 });
 
 test('verified orders % is the orders verified over the orders needing one', function () {
@@ -1456,7 +1576,7 @@ test('verified orders % is the orders verified over the orders needing one', fun
         ->assertJsonPath('value', 50)
         ->assertJsonPath('orders', 1)
         ->assertJsonPath('calls', 1)
-        ->assertJsonPath('needs_verification', 2);
+        ->assertJsonPath('risky_orders', 2);
 });
 
 test('ringing one order three times does not verify it three times over', function () {
@@ -1477,7 +1597,7 @@ test('ringing one order three times does not verify it three times over', functi
         ->assertJsonPath('value', 50)
         ->assertJsonPath('orders', 1)
         ->assertJsonPath('calls', 3)
-        ->assertJsonPath('needs_verification', 2);
+        ->assertJsonPath('risky_orders', 2);
 });
 
 test('the rate passes 100% when more orders were verified than needed it', function () {
@@ -1539,7 +1659,7 @@ test('a range where nothing needed verifying has no rate rather than zero', func
 
     csrVerifiedOrdersStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', null)
-        ->assertJsonPath('needs_verification', 0)
+        ->assertJsonPath('risky_orders', 0)
         ->assertJsonPath('change', null);
 });
 
