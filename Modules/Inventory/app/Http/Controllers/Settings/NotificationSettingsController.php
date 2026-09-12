@@ -21,6 +21,7 @@ class NotificationSettingsController extends Controller
     public function edit(Request $request, Workspace $workspace): Response
     {
         $this->ensureMember($request, $workspace);
+        abort_unless($workspace->discord_notifications_module_enabled, 404);
         $this->authorize(Permission::ManageDiscordNotifications->value, $workspace);
 
         $setting = InventoryNotificationSetting::forWorkspace($workspace->id);
@@ -42,6 +43,7 @@ class NotificationSettingsController extends Controller
     public function update(Request $request, Workspace $workspace): RedirectResponse
     {
         $this->ensureMember($request, $workspace);
+        abort_unless($workspace->discord_notifications_module_enabled, 404);
         $this->authorize(Permission::ManageDiscordNotifications->value, $workspace);
 
         $validated = $request->validate([

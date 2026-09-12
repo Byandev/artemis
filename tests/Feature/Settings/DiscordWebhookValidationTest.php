@@ -19,7 +19,10 @@ function notificationPayload(array $overrides = []): array
 
 beforeEach(function () {
     $this->user = User::factory()->create();
-    $this->workspace = Workspace::factory()->create(['owner_id' => $this->user->id]);
+    $this->workspace = Workspace::factory()->create([
+        'owner_id' => $this->user->id,
+        'discord_notifications_module_enabled' => true,
+    ]);
 });
 
 it('rejects a URL that is not a discord webhook', function (string $url) {

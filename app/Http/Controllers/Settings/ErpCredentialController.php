@@ -19,6 +19,7 @@ class ErpCredentialController extends Controller
     public function edit(Request $request, Workspace $workspace): Response
     {
         $this->ensureMember($request, $workspace);
+        abort_unless($workspace->erp_integration_module_enabled, 404);
 
         return Inertia::render('settings/erp-credentials', [
             // Hidden/append casts ensure the encrypted password never leaves the
@@ -33,6 +34,7 @@ class ErpCredentialController extends Controller
     public function update(ErpCredentialUpdateRequest $request, Workspace $workspace): RedirectResponse
     {
         $this->ensureMember($request, $workspace);
+        abort_unless($workspace->erp_integration_module_enabled, 404);
 
         $validated = $request->validated();
 
@@ -56,6 +58,7 @@ class ErpCredentialController extends Controller
     public function destroy(Request $request, Workspace $workspace): RedirectResponse
     {
         $this->ensureMember($request, $workspace);
+        abort_unless($workspace->erp_integration_module_enabled, 404);
 
         $workspace->update(['erp_password' => null]);
 

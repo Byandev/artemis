@@ -33,7 +33,10 @@ beforeEach(function () {
     // The workspace owner is implicitly all-powerful, so the subjects below are
     // plain members of a workspace someone else owns.
     $this->owner = User::factory()->create();
-    $this->workspace = Workspace::factory()->create(['owner_id' => $this->owner->id]);
+    $this->workspace = Workspace::factory()->create([
+        'owner_id' => $this->owner->id,
+        'discord_notifications_module_enabled' => true,
+    ]);
     $this->url = route('notifications.update', ['workspace' => $this->workspace->slug]);
     $this->payload = [
         'deliveries_webhook_url' => null,
