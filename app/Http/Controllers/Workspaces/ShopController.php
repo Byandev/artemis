@@ -15,6 +15,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Modules\Pancake\Jobs\FetchShopOrders;
@@ -26,6 +27,30 @@ use Spatie\QueryBuilder\QueryBuilder;
 class ShopController extends Controller
 {
     use AuthorizesRequests;
+
+    /**
+     * Pancake order status codes, from the POS API's own `status` enum
+     * (x-enum-descriptions). Only the two the presets below restrict to.
+     */
+    private const POS_STATUS_NEW = 0;
+
+    private const POS_STATUS_CANCELED = 6;
+
+    /**
+     * The order tags every shop is expected to have, and the order statuses
+     * each one may be applied to. Created on demand from the shops page so
+     * they don't have to be typed into Pancake shop by shop.
+     *
+     * @var list<array{name: string, tag_color: string, statuses: list<int>}>
+     */
+    private const ORDER_TAG_PRESETS = [
+        ['name' => 'High RTS', 'tag_color' => '#f04134', 'statuses' => [self::POS_STATUS_CANCELED]],
+        ['name' => 'Cancel by Customer', 'tag_color' => '#fa8c16', 'statuses' => [self::POS_STATUS_CANCELED]],
+        ['name' => 'Has Returned Orders', 'tag_color' => '#faad14', 'statuses' => [self::POS_STATUS_CANCELED]],
+        ['name' => 'Troll', 'tag_color' => '#722ed1', 'statuses' => [self::POS_STATUS_CANCELED]],
+        ['name' => 'Reserved', 'tag_color' => '#096dd9', 'statuses' => [self::POS_STATUS_NEW]],
+        ['name' => 'Incomplete Details', 'tag_color' => '#13c2c2', 'statuses' => [self::POS_STATUS_NEW]],
+    ];
 
     private function assertShopLimitNotReached(Workspace $workspace): void
     {
@@ -303,6 +328,141 @@ class ShopController extends Controller
                 'message' => 'Could not reach Pancake API.',
             ]);
         }
+    }
+
+    /**
+     * Proxy the shop's POS order tags (GET /shops/{id}/orders/tags) for the
+     * "Order Tags" modal on the shops page. Read-only and not persisted — the
+     * modal always shows what Pancake has right now.
+     */
+    public function orderTags(Request $request, Workspace $workspace, Shop $shop)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $this->authorize(Permission::ViewShops->value, $workspace);
+
+        if ($shop->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        if (! $shop->pos_token) {
+            return response()->json([
+                'tags' => [],
+                'message' => 'This shop has no POS token, so its order tags cannot be fetched.',
+            ], 422);
+        }
+
+        try {
+            $response = Http::timeout(15)
+                ->get('https://pos.pages.fm/api/v1/shops/'.$shop->id.'/orders/tags', [
+                    'api_key' => $shop->pos_token,
+                ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'tags' => [],
+                'message' => 'Could not reach the Pancake API.',
+            ], 502);
+        }
+
+        if ($response->failed()) {
+            return response()->json([
+                'tags' => [],
+                'message' => 'Pancake rejected the request. Check the shop\'s POS token.',
+            ], 502);
+        }
+
+        return response()->json([
+            'tags' => $response->json('data') ?? [],
+        ]);
+    }
+
+    /**
+     * Create the preset order tags (self::ORDER_TAG_PRESETS) on this shop via
+     * POST /shops/{id}/orders/tags. A preset whose name already exists on the
+     * shop is skipped, so the button is safe to press more than once.
+     *
+     * Pancake creates tags one at a time with no transaction, so a failure
+     * part-way through leaves the earlier tags in place — the response reports
+     * each preset's outcome rather than pretending it was all-or-nothing.
+     */
+    public function createPresetOrderTags(Request $request, Workspace $workspace, Shop $shop)
+    {
+        if (! $request->user()->isMemberOf($workspace)) {
+            abort(403, 'You do not have access to this workspace.');
+        }
+
+        $this->authorize(Permission::EditShops->value, $workspace);
+
+        if ($shop->workspace_id !== $workspace->id) {
+            abort(403);
+        }
+
+        if (! $shop->pos_token) {
+            return response()->json([
+                'message' => 'This shop has no POS token, so its order tags cannot be created.',
+            ], 422);
+        }
+
+        $endpoint = 'https://pos.pages.fm/api/v1/shops/'.$shop->id.'/orders/tags';
+
+        try {
+            $existingResponse = Http::timeout(15)->get($endpoint, ['api_key' => $shop->pos_token]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Could not reach the Pancake API.'], 502);
+        }
+
+        if ($existingResponse->failed()) {
+            return response()->json([
+                'message' => 'Could not read the existing tags, so nothing was created.',
+            ], 502);
+        }
+
+        // Match on the name alone — the list endpoint does not return each tag's
+        // statuses, so an existing tag is left exactly as the shop has it.
+        $existingNames = collect($existingResponse->json('data') ?? [])
+            ->map(fn ($tag) => Str::lower(trim((string) ($tag['name'] ?? ''))))
+            ->all();
+
+        $created = [];
+        $skipped = [];
+        $failed = [];
+
+        foreach (self::ORDER_TAG_PRESETS as $preset) {
+            if (in_array(Str::lower($preset['name']), $existingNames, true)) {
+                $skipped[] = $preset['name'];
+
+                continue;
+            }
+
+            try {
+                $response = Http::timeout(15)
+                    ->withQueryParameters(['api_key' => $shop->pos_token])
+                    ->post($endpoint, $preset);
+            } catch (\Throwable $e) {
+                $failed[] = ['name' => $preset['name'], 'message' => 'Could not reach the Pancake API.'];
+
+                continue;
+            }
+
+            if ($response->failed() || $response->json('success') === false) {
+                $failed[] = [
+                    'name' => $preset['name'],
+                    'message' => $response->json('message') ?? 'Pancake rejected the tag.',
+                ];
+
+                continue;
+            }
+
+            $created[] = $preset['name'];
+        }
+
+        return response()->json([
+            'created' => $created,
+            'skipped' => $skipped,
+            'failed' => $failed,
+        ]);
     }
 
     public function refreshUsers(Request $request, Workspace $workspace, Shop $shop)
