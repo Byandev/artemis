@@ -478,3 +478,208 @@ test('shops index rejects unknown sort field', function () {
         ->get("/workspaces/{$w->slug}/shops?sort=hax")
         ->assertStatus(400);
 });
+
+test('order tags endpoint returns the shop tags from the POS API', function () {
+    Http::fake([
+        'pos.pages.fm/api/v1/shops/*/orders/tags*' => Http::response([
+            'data' => [
+                ['id' => 1, 'name' => 'Waiting', 'color' => '#096dd9', 'is_system_tag' => true, 'groups' => []],
+                ['id' => 75, 'name' => 'VIP', 'color' => '#123123', 'is_system_tag' => false, 'groups' => [['id' => 13, 'name' => 'Group 1']]],
+            ],
+            'success' => true,
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => 'tok-123']);
+
+    $this->actingAs($owner)
+        ->getJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags")
+        ->assertOk()
+        ->assertJsonPath('tags.1.name', 'VIP')
+        ->assertJsonCount(2, 'tags');
+});
+
+test('order tags endpoint reports a shop with no POS token', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => null]);
+
+    $this->actingAs($owner)
+        ->getJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags")
+        ->assertStatus(422)
+        ->assertJsonPath('tags', []);
+});
+
+test('order tags endpoint surfaces a POS API failure', function () {
+    Http::fake([
+        'pos.pages.fm/*' => Http::response(['message' => 'unauthorized'], 401),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => 'bad-token']);
+
+    $this->actingAs($owner)
+        ->getJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags")
+        ->assertStatus(502);
+});
+
+test('order tags on a foreign-workspace shop returns 403', function () {
+    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    $foreignShop = Shop::factory()->forWorkspace($workspaceB)->create(['pos_token' => 'tok']);
+
+    $this->actingAs($owner)
+        ->getJson("/workspaces/{$workspaceA->slug}/shops/{$foreignShop->id}/order-tags")
+        ->assertForbidden();
+});
+
+test('preset order tags creates only the tags the shop is missing', function () {
+    // Matched on method, so the list read and the creates can't be confused.
+    Http::fake(function ($request) {
+        if ($request->method() === 'GET') {
+            // The shop already has two of the six presets.
+            return Http::response([
+                'data' => [
+                    ['id' => 1, 'name' => 'Troll'],
+                    ['id' => 2, 'name' => '  reserved '],
+                ],
+                'success' => true,
+            ], 200);
+        }
+
+        return Http::response(['data' => ['id' => 99], 'success' => true], 200);
+    });
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => 'tok-123']);
+
+    $response = $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags/presets")
+        ->assertOk()
+        ->assertJsonCount(4, 'created')
+        ->assertJsonCount(0, 'failed');
+
+    // Name matching is case- and whitespace-insensitive.
+    expect($response->json('skipped'))->toBe(['Troll', 'Reserved']);
+    expect($response->json('created'))->toBe([
+        'High RTS',
+        'Cancel by Customer',
+        'Has Returned Orders',
+        'Incomplete Details',
+    ]);
+
+    // Four creates, each restricted to the right Pancake status code.
+    Http::assertSentCount(5); // 1 list + 4 creates
+
+    $posted = collect();
+    Http::recorded(function ($request) use ($posted) {
+        if ($request->method() === 'POST') {
+            $posted->push(['body' => $request->data(), 'url' => $request->url()]);
+        }
+
+        return true;
+    });
+
+    expect($posted)->toHaveCount(4);
+    expect($posted->pluck('body.statuses')->all())->toBe([[6], [6], [6], [0]]);
+    expect($posted->pluck('body.name')->all())->toBe([
+        'High RTS',
+        'Cancel by Customer',
+        'Has Returned Orders',
+        'Incomplete Details',
+    ]);
+    expect($posted->every(fn ($sent) => str_starts_with($sent['body']['tag_color'], '#')))->toBeTrue();
+    // Pancake authenticates by query string, so the key has to survive the POST.
+    expect($posted->every(fn ($sent) => str_contains($sent['url'], 'api_key=tok-123')))->toBeTrue();
+});
+
+test('preset order tags skips everything when all presets already exist', function () {
+    Http::fake([
+        'pos.pages.fm/*' => Http::response([
+            'data' => [
+                ['id' => 1, 'name' => 'High RTS'],
+                ['id' => 2, 'name' => 'Cancel by Customer'],
+                ['id' => 3, 'name' => 'Has Returned Orders'],
+                ['id' => 4, 'name' => 'Troll'],
+                ['id' => 5, 'name' => 'Reserved'],
+                ['id' => 6, 'name' => 'Incomplete Details'],
+            ],
+            'success' => true,
+        ], 200),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => 'tok-123']);
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags/presets")
+        ->assertOk()
+        ->assertJsonCount(0, 'created')
+        ->assertJsonCount(6, 'skipped');
+
+    // Only the list call — nothing was created.
+    Http::assertSentCount(1);
+});
+
+test('preset order tags reports a per-tag failure without aborting the rest', function () {
+    $calls = 0;
+
+    Http::fake(function ($request) use (&$calls) {
+        if ($request->method() === 'GET') {
+            return Http::response(['data' => [], 'success' => true], 200);
+        }
+
+        $calls++;
+
+        // The second create fails; the remaining four must still be attempted.
+        return $calls === 2
+            ? Http::response(['message' => 'Tag limit reached'], 400)
+            : Http::response(['data' => ['id' => 10 + $calls], 'success' => true], 200);
+    });
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => 'tok-123']);
+
+    $response = $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags/presets")
+        ->assertOk()
+        ->assertJsonCount(5, 'created')
+        ->assertJsonCount(1, 'failed');
+
+    expect($response->json('failed.0.name'))->toBe('Cancel by Customer');
+    expect($response->json('failed.0.message'))->toBe('Tag limit reached');
+});
+
+test('preset order tags creates nothing when the existing tags cannot be read', function () {
+    Http::fake([
+        'pos.pages.fm/*' => Http::response(['message' => 'unauthorized'], 401),
+    ]);
+
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => 'bad']);
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags/presets")
+        ->assertStatus(502);
+
+    Http::assertSentCount(1);
+});
+
+test('preset order tags rejects a shop with no POS token', function () {
+    ['user' => $owner, 'workspace' => $workspace] = makeWorkspaceWithOwner();
+    $shop = Shop::factory()->forWorkspace($workspace)->create(['pos_token' => null]);
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspace->slug}/shops/{$shop->id}/order-tags/presets")
+        ->assertStatus(422);
+});
+
+test('preset order tags on a foreign-workspace shop returns 403', function () {
+    ['user' => $owner, 'workspace' => $workspaceA] = makeWorkspaceWithOwner();
+    ['workspace' => $workspaceB] = makeWorkspaceWithOwner();
+    $foreignShop = Shop::factory()->forWorkspace($workspaceB)->create(['pos_token' => 'tok']);
+
+    $this->actingAs($owner)
+        ->postJson("/workspaces/{$workspaceA->slug}/shops/{$foreignShop->id}/order-tags/presets")
+        ->assertForbidden();
+});

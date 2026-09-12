@@ -47,11 +47,13 @@ import {
     Plus,
     RefreshCw,
     Search,
+    Tags,
     Trash2,
     Users,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner'; // Added toast import
+import OrderTagsModal from './partials/OrderTagsModal';
 
 const inputClass =
     'h-10 w-full rounded-[10px] border border-black/8 bg-stone-50 px-3 font-mono! text-[13px]! text-gray-800 placeholder:text-gray-300 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 dark:border-white/8 dark:bg-zinc-800 dark:text-gray-100 dark:placeholder:text-gray-600 dark:focus:border-emerald-400';
@@ -115,6 +117,7 @@ const Shops = ({
     const [addOpen, setAddOpen] = useState(false);
     const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
     const [shopToEdit, setShopToEdit] = useState<Shop | null>(null);
+    const [shopForTags, setShopForTags] = useState<Shop | null>(null);
     const { post, processing } = useForm({});
     const { delete: destroy, processing: deleting } = useForm({});
     const canRefreshShops = usePermission(PERMISSIONS.RefreshShops);
@@ -122,8 +125,6 @@ const Shops = ({
     const canEditShops = usePermission(PERMISSIONS.EditShops);
     const canDeleteShops = usePermission(PERMISSIONS.DeleteShops);
     const canViewChecklist = usePermission(PERMISSIONS.ViewChecklist);
-    const canUseShopActions =
-        canRefreshShops || canViewChecklist || canEditShops || canDeleteShops;
 
     const addForm = useForm({
         shop_id: '',
@@ -296,86 +297,82 @@ const Shops = ({
                 );
             },
         },
-        ...(canUseShopActions
-            ? [
-                  {
-                      id: 'actions',
-                      cell: ({ row }) => {
-                          const shop = row.original;
+        {
+            id: 'actions',
+            cell: ({ row }) => {
+                const shop = row.original;
 
-                          return (
-                              <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="sm">
-                                          <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                      {canViewChecklist && (
-                                          <DropdownMenuItem
-                                              onClick={() =>
-                                                  openChecklist(shop)
-                                              }
-                                          >
-                                              <ListChecks className="mr-2 h-4 w-4" />
-                                              View Checklist
-                                          </DropdownMenuItem>
-                                      )}
-                                      {canRefreshShops && (
-                                          <DropdownMenuItem
-                                              onClick={() => refreshPages(shop)}
-                                              disabled={processing}
-                                          >
-                                              <LayoutGrid className="mr-2 h-4 w-4" />
-                                              Refresh pages
-                                          </DropdownMenuItem>
-                                      )}
-                                      {canRefreshShops && (
-                                          <DropdownMenuItem
-                                              onClick={() => refreshUsers(shop)}
-                                              disabled={processing}
-                                          >
-                                              <Users className="mr-2 h-4 w-4" />
-                                              Refresh users
-                                          </DropdownMenuItem>
-                                      )}
-                                      {canRefreshShops && (
-                                          <DropdownMenuItem
-                                              onClick={() =>
-                                                  refreshOrders(shop)
-                                              }
-                                              disabled={processing}
-                                          >
-                                              <RefreshCw className="mr-2 h-4 w-4" />
-                                              Refresh orders
-                                          </DropdownMenuItem>
-                                      )}
-                                      {canEditShops && (
-                                          <DropdownMenuItem
-                                              onClick={() => openEdit(shop)}
-                                          >
-                                              <Pencil className="mr-2 h-4 w-4" />
-                                              Edit shop
-                                          </DropdownMenuItem>
-                                      )}
-                                      {canDeleteShops && (
-                                          <DropdownMenuItem
-                                              onClick={() =>
-                                                  setShopToDelete(shop)
-                                              }
-                                              className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-                                          >
-                                              <Trash2 className="mr-2 h-4 w-4" />
-                                              Delete shop
-                                          </DropdownMenuItem>
-                                      )}
-                                  </DropdownMenuContent>
-                              </DropdownMenu>
-                          );
-                      },
-                  } as ColumnDef<Shop>,
-              ]
-            : []),
+                return (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={() => setShopForTags(shop)}
+                            >
+                                <Tags className="mr-2 h-4 w-4" />
+                                Order tags
+                            </DropdownMenuItem>
+                            {canViewChecklist && (
+                                <DropdownMenuItem
+                                    onClick={() => openChecklist(shop)}
+                                >
+                                    <ListChecks className="mr-2 h-4 w-4" />
+                                    View Checklist
+                                </DropdownMenuItem>
+                            )}
+                            {canRefreshShops && (
+                                <DropdownMenuItem
+                                    onClick={() => refreshPages(shop)}
+                                    disabled={processing}
+                                >
+                                    <LayoutGrid className="mr-2 h-4 w-4" />
+                                    Refresh pages
+                                </DropdownMenuItem>
+                            )}
+                            {canRefreshShops && (
+                                <DropdownMenuItem
+                                    onClick={() => refreshUsers(shop)}
+                                    disabled={processing}
+                                >
+                                    <Users className="mr-2 h-4 w-4" />
+                                    Refresh users
+                                </DropdownMenuItem>
+                            )}
+                            {canRefreshShops && (
+                                <DropdownMenuItem
+                                    onClick={() => refreshOrders(shop)}
+                                    disabled={processing}
+                                >
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    Refresh orders
+                                </DropdownMenuItem>
+                            )}
+                            {canEditShops && (
+                                <DropdownMenuItem
+                                    onClick={() => openEdit(shop)}
+                                >
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Edit shop
+                                </DropdownMenuItem>
+                            )}
+                            {canDeleteShops && (
+                                <DropdownMenuItem
+                                    onClick={() => setShopToDelete(shop)}
+                                    className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete shop
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                );
+            },
+        } as ColumnDef<Shop>,
     ];
 
     return (
@@ -732,6 +729,14 @@ const Shops = ({
                         </AlertDialogContent>
                     </AlertDialog>
                 )}
+
+                <OrderTagsModal
+                    open={!!shopForTags}
+                    onOpenChange={(open) => !open && setShopForTags(null)}
+                    workspace={workspace}
+                    shop={shopForTags}
+                    canCreatePresets={canEditShops}
+                />
 
                 {canViewChecklist && (
                     <TargetChecklistDrawer
