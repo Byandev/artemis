@@ -33,7 +33,7 @@ class TriggerFetchShopOrders extends Command
 
         // At the scheduled hours it pulls shipped orders; --shipped forces it on.
         $shipped = $this->option('shipped')
-            || in_array((int) now()->format('G'), [9, 11, 12, 15, 18, 21], true);
+            || in_array((int) now()->format('G'), [9, 10, 11, 12, 15, 18, 21], true);
 
         Shop::whereNotNull('orders_last_synced_at')
             ->whereNotNull('pos_token')
