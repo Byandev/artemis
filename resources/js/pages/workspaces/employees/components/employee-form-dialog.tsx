@@ -37,7 +37,10 @@ export function EmployeeFormDialog({
     useEffect(() => {
         if (open && employee) {
             setData({
-                status: employee.status || 'ACTIVE',
+                // Older rows were written with a lowercase status, which matches
+                // neither option and leaves the select blank. Fold it so the
+                // dialog opens on the value the roster is showing.
+                status: (employee.status || 'ACTIVE').toUpperCase(),
                 user_id:
                     (employee as any).system_user?.id ||
                     (employee as any).user_id ||
