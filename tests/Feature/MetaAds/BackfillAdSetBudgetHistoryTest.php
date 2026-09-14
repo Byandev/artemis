@@ -3,6 +3,7 @@
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Modules\MetaAds\Exceptions\MetaGraphException;
 use Modules\MetaAds\Jobs\BackfillAdSetBudgets;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
@@ -433,4 +434,49 @@ it('skips ad accounts whose sync is switched off', function () {
 
     Queue::assertPushed(BackfillAdSetBudgets::class, 1);
     Queue::assertNotPushed(BackfillAdSetBudgets::class, fn ($job) => (int) $job->adAccount->id === 771000998);
+});
+
+it('tags the ad account once its budgets have been backfilled', function () {
+    seedBackfillAdSet(current: 750.00);
+
+    expect(AdAccount::find(771000333)->budgets_backfilled_at)->toBeNull();
+
+    fakeActivities([budgetEvent(771000335, '2026-09-11 14:00:00', 50000, 75000)]);
+
+    runBackfill(days: 5);
+
+    expect(AdAccount::find(771000333)->budgets_backfilled_at->toDateTimeString())
+        ->toBe('2026-09-14 10:00:00');
+});
+
+it('tags the account even when it had no budget events to replay', function () {
+    seedBackfillAdSet(current: 750.00);
+
+    fakeActivities([]);
+
+    runBackfill(days: 5);
+
+    // Nothing changed in the window, but the window was still rebuilt from it —
+    // the rows carry the current budget, so the account is genuinely backfilled.
+    expect(AdAccount::find(771000333)->budgets_backfilled_at)->not->toBeNull();
+});
+
+it('leaves the tag alone on a dry run', function () {
+    seedBackfillAdSet(current: 750.00);
+
+    fakeActivities([budgetEvent(771000335, '2026-09-11 14:00:00', 50000, 75000)]);
+
+    runBackfill(days: 5, dryRun: true);
+
+    expect(AdAccount::find(771000333)->budgets_backfilled_at)->toBeNull();
+});
+
+it('does not tag an account whose fetch failed', function () {
+    seedBackfillAdSet(current: 750.00);
+
+    Http::fake(['graph.facebook.com/*' => Http::response(['error' => ['message' => 'boom', 'code' => 100]], 400)]);
+
+    expect(fn () => runBackfill(days: 5))->toThrow(MetaGraphException::class);
+
+    expect(AdAccount::find(771000333)->budgets_backfilled_at)->toBeNull();
 });

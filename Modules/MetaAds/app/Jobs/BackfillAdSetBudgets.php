@@ -105,6 +105,14 @@ class BackfillAdSetBudgets implements ShouldQueue
 
         $summary = $this->backfillAccount($fetched['events'], $from);
 
+        // Tag the account as backfilled — but only when rows were actually
+        // written. A dry run inspects and reports without touching the table,
+        // so claiming it had been backfilled would be a lie that stops anyone
+        // from noticing the real run never happened.
+        if (! $this->dryRun) {
+            $this->adAccount->forceFill(['budgets_backfilled_at' => Carbon::now()])->save();
+        }
+
         Log::info('Ad-set budget backfill finished', array_merge($summary, [
             'ad_account_id' => $this->adAccount->id,
             'from' => $from->toDateString(),

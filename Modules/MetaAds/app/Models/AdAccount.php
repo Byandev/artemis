@@ -31,6 +31,7 @@ class AdAccount extends Model
         'last_synced_at' => 'datetime',
         'uses_system_user' => 'boolean',
         'active_sync' => 'boolean',
+        'budgets_backfilled_at' => 'datetime',
     ];
 
     public function graphAccountId(): string
