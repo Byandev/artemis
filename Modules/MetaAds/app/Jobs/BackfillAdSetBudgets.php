@@ -128,7 +128,7 @@ class BackfillAdSetBudgets implements ShouldQueue
      */
     public function fetchBudgetActivities(Carbon $since, Carbon $until): array
     {
-        $client = $this->adAccount->graphClient();
+        $client = $this->adAccount->graphClient(true);
         $maxPages = max(1, $this->maxPages);
 
         $events = [];
