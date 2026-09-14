@@ -88,7 +88,7 @@ class ApplyOptimizationAction implements ShouldQueue
         }
 
         $client = $this->adAccount->graphClient(true);
-        
+
         $fbId = (string) $this->target->getKey();
         $isBudget = in_array($this->rule->action, ['increase_budget', 'decrease_budget'], true);
 

@@ -4,6 +4,7 @@ use App\Models\Page;
 use App\Models\PageDailyBudgetRecord;
 use Modules\MetaAds\Models\AdAccount;
 use Modules\MetaAds\Models\AdSet;
+use Modules\MetaAds\Models\BudgetSnapshot;
 use Modules\MetaAds\Models\Campaign;
 
 function captureBudgets(string $date): void
@@ -166,4 +167,134 @@ it('skips pages that do not exist locally', function () {
     captureBudgets('2026-06-13');
 
     expect(PageDailyBudgetRecord::count())->toBe(0);
+});
+
+it('snapshots each ad set budget for the date', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509301, 'auto_update_ad_budget' => true]);
+
+    seedPageAdSet($page->id, daily: 500.00);
+    $adSetId = $page->id * 10 + 2;
+
+    captureBudgets('2026-06-13');
+
+    $history = BudgetSnapshot::where('entity_type', BudgetSnapshot::ENTITY_AD_SET)
+        ->where('entity_id', $adSetId)
+        ->where('date', '2026-06-13')
+        ->first();
+
+    expect($history)->not->toBeNull()
+        ->and((float) $history->daily_budget)->toBe(500.00)
+        ->and($history->effective_status)->toBe('ACTIVE')
+        ->and($history->source)->toBe(BudgetSnapshot::SOURCE_CAPTURE);
+});
+
+it('keeps one row per ad set per date and overwrites it with the latest budget', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509302, 'auto_update_ad_budget' => true]);
+
+    seedPageAdSet($page->id, daily: 500.00);
+    $adSetId = $page->id * 10 + 2;
+
+    captureBudgets('2026-06-13');
+
+    // The budget is raised later the same day; the next run replaces the row.
+    AdSet::where('id', $adSetId)->update(['daily_budget' => 750.00]);
+
+    captureBudgets('2026-06-13');
+
+    $histories = BudgetSnapshot::where('entity_type', BudgetSnapshot::ENTITY_AD_SET)
+        ->where('entity_id', $adSetId)
+        ->get();
+
+    expect($histories)->toHaveCount(1)
+        ->and((float) $histories->first()->daily_budget)->toBe(750.00);
+});
+
+it('keeps a separate row per date so history builds up', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509303, 'auto_update_ad_budget' => true]);
+
+    seedPageAdSet($page->id, daily: 500.00);
+    $adSetId = $page->id * 10 + 2;
+
+    captureBudgets('2026-06-13');
+
+    AdSet::where('id', $adSetId)->update(['daily_budget' => 750.00]);
+
+    captureBudgets('2026-06-14');
+
+    $history = AdSet::find($adSetId)->budgetSnapshots()->get();
+
+    expect($history)->toHaveCount(2)
+        // Relation orders newest first.
+        ->and((float) $history[0]->daily_budget)->toBe(750.00)
+        ->and((float) $history[1]->daily_budget)->toBe(500.00);
+});
+
+it('skips ad sets with no budget of their own (CBO)', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+    $page = Page::factory()->forWorkspace($workspace)->create(['id' => 118273645509304, 'auto_update_ad_budget' => true]);
+
+    $account = AdAccount::firstOrCreate(['id' => 555], ['name' => 'Acct']);
+    $campaign = Campaign::create(['id' => 900900920, 'meta_ads_account_id' => $account->id, 'name' => 'CBO', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE', 'daily_budget' => 750.00]);
+    AdSet::create([
+        'id' => 900900921,
+        'meta_ads_account_id' => $account->id,
+        'meta_ads_campaign_id' => $campaign->id,
+        'meta_page_id' => $page->id,
+        'name' => 'CBO AS',
+        'daily_budget' => null,
+        'lifetime_budget' => null,
+        'status' => 'ACTIVE',
+        'effective_status' => 'ACTIVE',
+    ]);
+
+    captureBudgets('2026-06-13');
+
+    expect(BudgetSnapshot::where('entity_id', 900900921)->exists())->toBeFalse();
+});
+
+it('ignores ad sets on ad accounts whose sync is switched off', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $account = AdAccount::firstOrCreate(['id' => 556], ['name' => 'Paused acct', 'active_sync' => false]);
+    $campaign = Campaign::create(['id' => 900900930, 'meta_ads_account_id' => $account->id, 'name' => 'C', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE']);
+    AdSet::create([
+        'id' => 900900931,
+        'meta_ads_account_id' => $account->id,
+        'meta_ads_campaign_id' => $campaign->id,
+        'name' => 'AS',
+        'daily_budget' => 500.00,
+        'status' => 'ACTIVE',
+        'effective_status' => 'ACTIVE',
+    ]);
+
+    captureBudgets('2026-06-13');
+
+    expect(BudgetSnapshot::where('entity_id', 900900931)->exists())->toBeFalse();
+});
+
+it('snapshots paused ad sets too, recording the status alongside the budget', function () {
+    ['workspace' => $workspace] = actingAsWorkspaceOwner();
+
+    $account = AdAccount::firstOrCreate(['id' => 555], ['name' => 'Acct']);
+    $campaign = Campaign::create(['id' => 900900940, 'meta_ads_account_id' => $account->id, 'name' => 'C', 'status' => 'ACTIVE', 'effective_status' => 'ACTIVE']);
+    AdSet::create([
+        'id' => 900900941,
+        'meta_ads_account_id' => $account->id,
+        'meta_ads_campaign_id' => $campaign->id,
+        'name' => 'Paused AS',
+        'daily_budget' => 300.00,
+        'status' => 'PAUSED',
+        'effective_status' => 'PAUSED',
+    ]);
+
+    captureBudgets('2026-06-13');
+
+    $history = BudgetSnapshot::where('entity_id', 900900941)->first();
+
+    expect($history)->not->toBeNull()
+        ->and((float) $history->daily_budget)->toBe(300.00)
+        ->and($history->status)->toBe('PAUSED');
 });
