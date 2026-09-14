@@ -41,6 +41,7 @@ class CaptureBudgetSnapshotsCommand extends Command
             ->whereNotNull('meta_ads_sets.meta_page_id')
             ->where('meta_ads_sets.effective_status', 'ACTIVE')
             ->whereDate('meta_ads_sets.start_time', '<=', $date)
+            ->whereNot('meta_ads_accounts.account_status', 2)
             ->groupBy('meta_ads_sets.meta_page_id')
             ->selectRaw('meta_ads_sets.meta_page_id AS meta_page_id, SUM(meta_ads_sets.daily_budget) AS daily_budget')
             ->get();
