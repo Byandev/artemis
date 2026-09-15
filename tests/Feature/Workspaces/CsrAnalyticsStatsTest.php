@@ -1094,7 +1094,28 @@ test('total verification called counts the calls with no delivery behind them', 
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertOk()
-        ->assertJsonPath('value', 3);
+        ->assertJsonPath('value', 3)
+        // Three calls against three orders of their own, so the two agree.
+        ->assertJsonPath('orders', 3);
+});
+
+test('total verification called reports the unique orders those calls reached', function () {
+    ['owner' => $owner, 'workspace' => $workspace] = csrStatsContext();
+
+    $rung = Order::factory()->forWorkspace($workspace)->create();
+
+    // The same order rung three times across two days, plus one of its own.
+    verificationCall($workspace, '2026-08-02', 30, $rung);
+    verificationCall($workspace, '2026-08-02', 45, $rung);
+    verificationCall($workspace, '2026-08-03', 20, $rung);
+    verificationCall($workspace, '2026-08-03', 60);
+
+    csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
+        ->assertOk()
+        ->assertJsonPath('value', 4)
+        // Distinct within a CSR's day on a shop, so the repeat-rung order is
+        // one on each of its two days: 1 + 1 for it, plus the single other.
+        ->assertJsonPath('orders', 3);
 });
 
 test('an RMO call is not a verification call', function () {
@@ -1143,6 +1164,7 @@ test('a range with no verification calls reads zero', function () {
 
     csrCallsPlacedStat($owner, $workspace, '2026-08-01', '2026-08-05')
         ->assertJsonPath('value', 0)
+        ->assertJsonPath('orders', 0)
         ->assertJsonPath('change', null);
 });
 

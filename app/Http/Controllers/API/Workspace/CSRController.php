@@ -455,6 +455,10 @@ class CSRController extends Controller
 
         return response()->json([
             'value' => $current['calls'],
+            // The same work counted by order — an order rung three times is
+            // three calls and one order — so the card can say how much of the
+            // ringing was repeat ringing.
+            'orders' => $current['orders'],
             'previous_value' => $previous['calls'],
             // Relative, like the time card: a count is a magnitude, not a rate.
             'change' => $previous['calls'] > 0
