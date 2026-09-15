@@ -187,3 +187,25 @@ test('kpi validates user_id must be an integer', function () {
         ->assertStatus(422)
         ->assertJsonValidationErrors(['user_id']);
 });
+
+test('sync skips calls with no phone number and syncs the rest', function () {
+    ['workspace' => $workspace] = makeWorkspaceWithOwner();
+    ['raw' => $raw] = makeApiKey($workspace);
+    $userId = fake()->uuid();
+
+    $this->postJson('/api/v1/public/call-logs/sync', [
+        'user_id' => $userId,
+        'call_logs' => [
+            // Number withheld by the handset.
+            ['phone_number' => null, 'type' => 'incoming', 'duration' => 20, 'timestamp' => '2026-04-30T10:15:00+00:00'],
+            // Key missing from the entry altogether.
+            ['type' => 'incoming', 'duration' => 25, 'timestamp' => '2026-04-30T11:15:00+00:00'],
+            ['phone_number' => '+639170000001', 'type' => 'outgoing', 'duration' => 45, 'timestamp' => '2026-04-30T12:15:00+00:00'],
+        ],
+    ], ['Authorization' => 'Bearer '.$raw])
+        ->assertOk()
+        ->assertJson(['total' => 1]);
+
+    expect(CallLog::where('workspace_id', $workspace->id)->pluck('phone_number')->all())
+        ->toBe(['+639170000001']);
+});
