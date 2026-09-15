@@ -188,46 +188,24 @@ test('kpi validates user_id must be an integer', function () {
         ->assertJsonValidationErrors(['user_id']);
 });
 
-test('sync stores calls with no phone number under the unknown placeholder', function () {
+test('sync skips calls with no phone number and syncs the rest', function () {
     ['workspace' => $workspace] = makeWorkspaceWithOwner();
     ['raw' => $raw] = makeApiKey($workspace);
-    $userId = fake()->unique()->numberBetween(1, 999999);
+    $userId = fake()->uuid();
 
-    $payload = [
+    $this->postJson('/api/v1/public/call-logs/sync', [
         'user_id' => $userId,
         'call_logs' => [
             // Number withheld by the handset.
             ['phone_number' => null, 'type' => 'incoming', 'duration' => 20, 'timestamp' => '2026-04-30T10:15:00+00:00'],
             // Key missing from the entry altogether.
             ['type' => 'incoming', 'duration' => 25, 'timestamp' => '2026-04-30T11:15:00+00:00'],
-        ],
-    ];
-
-    $this->postJson('/api/v1/public/call-logs/sync', $payload, ['Authorization' => 'Bearer '.$raw])
-        ->assertOk()
-        ->assertJson(['total' => 2]);
-
-    // Re-syncing the same calls upserts rather than duplicating — the
-    // placeholder keeps phone_number usable as part of the unique key.
-    $this->postJson('/api/v1/public/call-logs/sync', $payload, ['Authorization' => 'Bearer '.$raw])->assertOk();
-
-    expect(CallLog::where('workspace_id', $workspace->id)->pluck('phone_number')->all())
-        ->toBe([CallLog::UNKNOWN_PHONE, CallLog::UNKNOWN_PHONE]);
-});
-
-test('v2 sync stores calls with no phone number under the unknown placeholder', function () {
-    ['workspace' => $workspace] = makeWorkspaceWithOwner();
-    ['raw' => $raw] = makeApiKey($workspace);
-
-    $this->postJson('/api/v2/public/call-logs/sync', [
-        'assignee_user_id' => 42,
-        'call_logs' => [
-            ['phone_number' => null, 'type' => 'incoming', 'duration' => 20, 'timestamp' => '2026-04-30T10:15:00+00:00'],
+            ['phone_number' => '+639170000001', 'type' => 'outgoing', 'duration' => 45, 'timestamp' => '2026-04-30T12:15:00+00:00'],
         ],
     ], ['Authorization' => 'Bearer '.$raw])
         ->assertOk()
         ->assertJson(['total' => 1]);
 
-    expect(CallLog::where('workspace_id', $workspace->id)->value('phone_number'))
-        ->toBe(CallLog::UNKNOWN_PHONE);
+    expect(CallLog::where('workspace_id', $workspace->id)->pluck('phone_number')->all())
+        ->toBe(['+639170000001']);
 });

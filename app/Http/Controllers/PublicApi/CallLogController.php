@@ -27,6 +27,16 @@ class CallLogController extends Controller
         $workspace = $request->attributes->get('workspace');
         $now = now();
 
+        // A call the handset reported no number for is dropped rather than
+        // stored: there is nothing to match it to a delivery or an order on,
+        // and phone_number is part of the upsert key, so every re-sync of the
+        // same numberless call would land as another row. The rest of the
+        // batch still syncs — one such entry no longer rejects the payload.
+        $logs = array_values(array_filter(
+            $request->input('call_logs'),
+            fn ($log) => filled($log['phone_number'] ?? null),
+        ));
+
         $rows = array_map(function ($log) use ($workspace, $request, $now) {
             // Normalize to the app timezone (Asia/Singapore) so call_date/call_time
             // reflect local wall-clock. Without this, a UTC timestamp pushes early
@@ -37,9 +47,7 @@ class CallLogController extends Controller
             return [
                 'workspace_id' => $workspace->id,
                 'user_id' => $request->input('user_id'),
-                'phone_number' => filled($log['phone_number'] ?? null)
-                    ? $log['phone_number']
-                    : CallLog::UNKNOWN_PHONE,
+                'phone_number' => $log['phone_number'],
                 'type' => $log['type'],
                 'duration' => $log['duration'],
                 'call_date' => $timestamp->toDateString(),
@@ -48,7 +56,7 @@ class CallLogController extends Controller
                 'updated_at' => $now,
             ];
 
-        }, $request->input('call_logs'));
+        }, $logs);
 
         // Match each number against that day's deliveries to work out whether
         // it was the customer or the rider, and which order. The payload is
