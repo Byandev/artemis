@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\API\Workspace\AnalyticsController;
 use App\Http\Controllers\API\Workspace\CSRController;
+use App\Http\Controllers\API\Workspace\CsrDashboardController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ParcelJourneyStatsController;
@@ -56,6 +57,30 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-real-conversations', [CSRController::class, 'analyticsRealConversations']);
         Route::get('/csrs/stats/analytics-confirmed-risky-orders', [CSRController::class, 'analyticsConfirmedRiskyOrders']);
         Route::get('/csrs/stats/analytics-verified-orders', [CSRController::class, 'analyticsVerifiedOrders']);
+        // CSR dashboard cards — the signed-in CSR's own figures, off the same
+        // POS rollup the analytics cards read, narrowed to the pancake accounts
+        // linked to them. Own controller: membership is the gate rather than
+        // the analytics permission, and the rows narrow by identity rather than
+        // by team. See CsrDashboardController.
+        Route::get('/csrs/stats/dashboard-sales', [CsrDashboardController::class, 'sales']);
+        Route::get('/csrs/stats/dashboard-rts', [CsrDashboardController::class, 'rts']);
+        Route::get('/csrs/stats/dashboard-rmo-called', [CsrDashboardController::class, 'rmoCalled']);
+        Route::get('/csrs/stats/dashboard-rmo-time', [CsrDashboardController::class, 'rmoTime']);
+        Route::get('/csrs/stats/dashboard-total-rmo-called', [CsrDashboardController::class, 'totalRmoCalled']);
+        Route::get('/csrs/stats/dashboard-rmo-call-time', [CsrDashboardController::class, 'rmoCallTime']);
+        Route::get('/csrs/stats/dashboard-rmo-real-conversations', [CsrDashboardController::class, 'rmoRealConversations']);
+        Route::get('/csrs/stats/dashboard-rmo-hit-rate', [CsrDashboardController::class, 'rmoHitRate']);
+        Route::get('/csrs/stats/dashboard-calls-placed', [CsrDashboardController::class, 'callsPlaced']);
+        Route::get('/csrs/stats/dashboard-real-conversations', [CsrDashboardController::class, 'realConversations']);
+        Route::get('/csrs/stats/dashboard-confirmed-risky-orders', [CsrDashboardController::class, 'confirmedRiskyOrders']);
+        Route::get('/csrs/stats/dashboard-verified-orders', [CsrDashboardController::class, 'verifiedOrders']);
+        // Effort against results, the CSR's own: day by day off the nightly
+        // rollup, and hour by hour off the call log that rollup is built from.
+        Route::get('/csrs/stats/dashboard-daily-effort', [CsrDashboardController::class, 'dailyEffort']);
+        Route::get('/csrs/stats/dashboard-hourly-effort', [CsrDashboardController::class, 'hourlyEffort']);
+        // The CSR's own days, every figure of both rollups — the analytics
+        // breakdown's columns at a per-day grain instead of per-CSR.
+        Route::get('/csrs/stats/dashboard-breakdown', [CsrDashboardController::class, 'breakdown']);
         // Leaders for the period — who came top, same source as the cards above.
         Route::get('/csrs/stats/analytics-leader-sales', [CSRController::class, 'analyticsLeaderSales']);
         Route::get('/csrs/stats/analytics-leader-rts', [CSRController::class, 'analyticsLeaderRts']);
