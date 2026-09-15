@@ -14,6 +14,7 @@ use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Modules\Pancake\Models\User as PancakeUser;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -82,6 +83,109 @@ class CSRController extends Controller
         return Inertia::render('workspaces/csr/dashboard', [
             'workspace' => $workspace->only('id', 'name', 'slug'),
         ]);
+    }
+
+    /**
+     * The pancake logins linked to the signed-in user, in full.
+     *
+     * The dashboard next door sums exactly these users' rollup rows without
+     * ever naming them, so a CSR reading a figure they do not recognise has no
+     * way to tell whether a second login is folded in, or whether the one they
+     * expected was never linked at all. This page is that answer: who the
+     * workspace thinks they are, and which shops each identity works.
+     *
+     * Gated and scoped like the dashboard it explains — the module toggle, then
+     * the CSR's own membership or the dashboard permission, and rows narrowed
+     * by the same `user_id` link and workspace-shop test that
+     * CsrDashboardController::ownPancakeUserIds() applies.
+     */
+    public function pancakeUsers(Request $request, Workspace $workspace)
+    {
+        abort_unless($workspace->csr_dashboard_module_enabled, 404);
+
+        if (! $request->user()->isCsrOf($workspace)) {
+            $this->authorize(Permission::ViewCsrDashboard->value, $workspace);
+        }
+
+        $pancakeUsers = PancakeUser::query()
+            ->where('user_id', $request->user()->id)
+            ->whereHas('shopUsers.shop', fn ($query) => $query->where('workspace_id', $workspace->id))
+            // Only this workspace's shops: a pancake login can work shops in
+            // several workspaces, and the others are not this page's business.
+            ->with(['shops' => fn ($query) => $query
+                ->where('shops.workspace_id', $workspace->id)
+                ->select('shops.id', 'shops.name')
+                ->orderBy('shops.name'),
+            ])
+            ->orderBy('name')
+            ->get();
+
+        $lastActive = $this->lastActiveDates($workspace, $pancakeUsers->pluck('id')->all());
+
+        return Inertia::render('workspaces/csr/pancake-users', [
+            'workspace' => $workspace->only('id', 'name', 'slug'),
+            'pancakeUsers' => $pancakeUsers->map(fn (PancakeUser $pancakeUser) => [
+                'id' => $pancakeUser->id,
+                'name' => $pancakeUser->name,
+                'email' => $pancakeUser->email,
+                'phone_number' => $pancakeUser->phone_number,
+                'fb_id' => $pancakeUser->fb_id,
+                // Defaulted the way the CSR management table defaults it, so a
+                // row synced before the column existed reads as active rather
+                // than as an unknown state.
+                'status' => $pancakeUser->status ?: 'ACTIVE',
+                'shops' => $pancakeUser->shops
+                    ->map(fn ($shop) => ['id' => $shop->id, 'name' => $shop->name])
+                    ->values(),
+                'last_active_on' => $lastActive[$pancakeUser->id] ?? null,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * The last day each account shows up in either nightly rollup.
+     *
+     * Both tables are read because the two are filled independently: a CSR who
+     * only took calls has no POS row, and one whose shop reports sales without
+     * call logs has no call row. The later of the two is the day the account
+     * was last doing anything this workspace recorded — which is how a CSR
+     * tells a live login from one left over from a previous role.
+     *
+     * @param  array<int, string>  $pancakeUserIds
+     * @return array<string, string> Pancake user id => `YYYY-MM-DD`.
+     */
+    private function lastActiveDates(Workspace $workspace, array $pancakeUserIds): array
+    {
+        if ($pancakeUserIds === []) {
+            return [];
+        }
+
+        $latest = [];
+
+        $tables = [
+            (new PancakeUserPosDailyReport)->getTable(),
+            (new PancakeUserDailyCallReport)->getTable(),
+        ];
+
+        foreach ($tables as $table) {
+            $rows = DB::table($table)
+                ->where('workspace_id', $workspace->id)
+                ->whereIn('pancake_user_id', $pancakeUserIds)
+                ->groupBy('pancake_user_id')
+                ->selectRaw('pancake_user_id, MAX(date) as last_date')
+                ->get();
+
+            foreach ($rows as $row) {
+                $current = $latest[$row->pancake_user_id] ?? null;
+
+                // Both are `YYYY-MM-DD`, so the later date is the larger string.
+                if ($row->last_date !== null && ($current === null || $row->last_date > $current)) {
+                    $latest[$row->pancake_user_id] = $row->last_date;
+                }
+            }
+        }
+
+        return $latest;
     }
 
     public function index(Request $request, Workspace $workspace)
