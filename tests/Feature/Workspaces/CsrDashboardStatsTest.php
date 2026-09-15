@@ -376,7 +376,9 @@ it('splits RMO calls from verification calls', function () {
         ->assertJsonPath('average_seconds', 80);
 
     dashCard($member, $this->workspace, 'calls-placed')
-        ->assertJsonPath('value', 20);
+        ->assertJsonPath('value', 20)
+        // The orders behind them — an order rung three times is one order.
+        ->assertJsonPath('orders', 8);
 
     dashCard($member, $this->workspace, 'real-conversations')
         ->assertJsonPath('value', 600)
@@ -413,7 +415,9 @@ it('leaves another CSR\'s calls out of every call card', function () {
 
     dashCard($member, $this->workspace, 'rmo-called')->assertJsonPath('value', 50);
     dashCard($member, $this->workspace, 'total-rmo-called')->assertJsonPath('value', 30);
-    dashCard($member, $this->workspace, 'calls-placed')->assertJsonPath('value', 20);
+    dashCard($member, $this->workspace, 'calls-placed')
+        ->assertJsonPath('value', 20)
+        ->assertJsonPath('orders', 8);
     dashCard($member, $this->workspace, 'verified-orders')->assertJsonPath('orders', 8);
 });
 

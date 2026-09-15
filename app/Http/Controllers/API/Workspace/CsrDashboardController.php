@@ -275,6 +275,9 @@ class CsrDashboardController extends Controller
 
         return response()->json([
             'value' => $current['calls'],
+            // The same calls counted by order, so the card can say how many
+            // orders the ringing actually got through.
+            'orders' => $current['orders'],
             'previous_value' => $previous['calls'],
             'change' => $this->relativeChange($current['calls'], $previous['calls']),
             'previous_period' => $previousPeriod,

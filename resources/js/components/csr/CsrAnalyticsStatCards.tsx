@@ -85,6 +85,12 @@ export interface RmoTimeStat extends StatPayload {
 
 export interface CallsPlacedStat extends StatPayload {
     value: number;
+    /**
+     * The same calls counted by order — an order rung three times is three
+     * calls and one order — so the two read together say how much of the
+     * ringing was repeat ringing.
+     */
+    orders: number;
 }
 
 export interface RealConversationsStat extends StatPayload {
@@ -563,10 +569,12 @@ export function CallsPlacedStatCard({
             loading={loading || stat === null}
             value={stat ? stat.value.toLocaleString() : ''}
             // The time behind these is the card beside this one, so the
-            // footnote names the unit rather than restating that figure.
+            // footnote spends itself on the figure nothing else carries: the
+            // distinct orders those calls reached, which is what says whether
+            // the count is breadth or repeat ringing.
             footnote={
                 stat
-                    ? `verification call${stat.value === 1 ? '' : 's'} in the range`
+                    ? `across ${stat.orders.toLocaleString()} unique order${stat.orders === 1 ? '' : 's'}`
                     : ''
             }
             trend={
