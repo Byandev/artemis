@@ -1,16 +1,5 @@
 import PageHeader from '@/components/common/PageHeader';
 import {
-    HighestRmoCalledLeaderCard,
-    HighestRmoDurationLeaderCard,
-    HighestSalesLeaderCard,
-    LowestRtsLeaderCard,
-    type LeaderResponse,
-    type RmoCalledLeader,
-    type RmoDurationLeader,
-    type RtsLeader,
-    type SalesLeader,
-} from '@/components/csr/CsrAnalyticsLeaderCards';
-import {
     CallsPlacedStatCard,
     ConfirmedRiskyOrdersStatCard,
     RealConversationsStatCard,
@@ -209,25 +198,6 @@ export default function CsrDashboard({ workspace }: Props) {
         toStr,
     );
 
-    // Who came top in the workspace — the one part of the page not narrowed to
-    // the reader. A board ranking a roster of one would crown them on every
-    // figure; this is the scale the cards above are read against.
-    const [salesLeader, salesLeaderLoading] = useCsrStat<
-        LeaderResponse<SalesLeader>
-    >(workspace.slug, 'dashboard-leader-sales', fromStr, toStr);
-    const [rtsLeader, rtsLeaderLoading] = useCsrStat<LeaderResponse<RtsLeader>>(
-        workspace.slug,
-        'dashboard-leader-rts',
-        fromStr,
-        toStr,
-    );
-    const [rmoCalledLeader, rmoCalledLeaderLoading] = useCsrStat<
-        LeaderResponse<RmoCalledLeader>
-    >(workspace.slug, 'dashboard-leader-rmo-called', fromStr, toStr);
-    const [rmoDurationLeader, rmoDurationLeaderLoading] = useCsrStat<
-        LeaderResponse<RmoDurationLeader>
-    >(workspace.slug, 'dashboard-leader-rmo-duration', fromStr, toStr);
-
     // The two call cards' totals, spread across the days that made them and
     // again across the hours of the day — the CSR's own calls, so the shape is
     // their working week rather than the workspace's.
@@ -378,29 +348,6 @@ export default function CsrDashboard({ workspace }: Props) {
                     <RmoHitRateStatCard
                         stat={rmoHitRateStat}
                         loading={rmoHitRateLoading}
-                    />
-                </div>
-
-                <h2 className="mt-6 mb-3 text-[11px] font-medium tracking-wider text-gray-400 uppercase dark:text-gray-500">
-                    Leaders for this period
-                </h2>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    <HighestSalesLeaderCard
-                        data={salesLeader}
-                        loading={salesLeaderLoading}
-                    />
-                    <LowestRtsLeaderCard
-                        data={rtsLeader}
-                        loading={rtsLeaderLoading}
-                    />
-                    <HighestRmoCalledLeaderCard
-                        data={rmoCalledLeader}
-                        loading={rmoCalledLeaderLoading}
-                    />
-                    <HighestRmoDurationLeaderCard
-                        data={rmoDurationLeader}
-                        loading={rmoDurationLeaderLoading}
                     />
                 </div>
 

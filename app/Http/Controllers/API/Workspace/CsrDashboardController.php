@@ -6,7 +6,6 @@ use App\Http\Controllers\Concerns\ResolvesCsrDateRange;
 use App\Http\Controllers\Controller;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\Workspace;
-use App\Support\CsrLeaders;
 use App\Support\RiskyOrders;
 use App\Support\RmoDailyStats;
 use Carbon\CarbonImmutable;
@@ -725,56 +724,6 @@ class CsrDashboardController extends Controller
         return collect(['total_calls', 'calls', 'real', 'verification_calls', 'verification_real'])
             ->mapWithKeys(fn (string $figure) => [$figure => array_sum(array_column($rows, $figure))])
             ->all();
-    }
-
-    /*
-     |--------------------------------------------------------------------------
-     | Leaders for the period
-     |--------------------------------------------------------------------------
-     |
-     | Who came top, rather than what this CSR did — the one part of the page
-     | that is deliberately not narrowed to them. A leader card ranking a roster
-     | of one would crown the reader on every figure and tell them nothing; the
-     | board is what gives the cards above it a scale to be read against.
-     |
-     | The rankings are App\Support\CsrLeaders, shared with the analytics page,
-     | so the winner a CSR sees is the winner their manager sees. Passing null
-     | for the shops is what differs: team scoping fails closed for a CSR in no
-     | team, and this workspace already publishes CSR leaderboards through the
-     | unauthenticated /api/public/leaderboards endpoints, so an empty board
-     | here would withhold nothing and break the page for the people it is for.
-     */
-
-    public function leaderSales(Request $request, Workspace $workspace)
-    {
-        return $this->leader($request, $workspace, CsrLeaders::sales(...));
-    }
-
-    public function leaderRts(Request $request, Workspace $workspace)
-    {
-        return $this->leader($request, $workspace, CsrLeaders::rts(...));
-    }
-
-    public function leaderRmoCalled(Request $request, Workspace $workspace)
-    {
-        return $this->leader($request, $workspace, CsrLeaders::rmoCalled(...));
-    }
-
-    public function leaderRmoDuration(Request $request, Workspace $workspace)
-    {
-        return $this->leader($request, $workspace, CsrLeaders::rmoDuration(...));
-    }
-
-    /** Authorize, resolve the range, and answer one ranking's leader. */
-    private function leader(Request $request, Workspace $workspace, callable $ranking)
-    {
-        $this->authorizeDashboard($request, $workspace);
-
-        [$from, $to] = $this->range($request);
-
-        return response()->json([
-            'leader' => $ranking($workspace, $from, $to, null),
-        ]);
     }
 
     /*

@@ -74,13 +74,6 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/dashboard-real-conversations', [CsrDashboardController::class, 'realConversations']);
         Route::get('/csrs/stats/dashboard-confirmed-risky-orders', [CsrDashboardController::class, 'confirmedRiskyOrders']);
         Route::get('/csrs/stats/dashboard-verified-orders', [CsrDashboardController::class, 'verifiedOrders']);
-        // Leaders for the period — the whole roster, not just the reader: a
-        // board of one would crown them on every figure. Same rankings the
-        // analytics page shows, drawn from every shop in the workspace.
-        Route::get('/csrs/stats/dashboard-leader-sales', [CsrDashboardController::class, 'leaderSales']);
-        Route::get('/csrs/stats/dashboard-leader-rts', [CsrDashboardController::class, 'leaderRts']);
-        Route::get('/csrs/stats/dashboard-leader-rmo-called', [CsrDashboardController::class, 'leaderRmoCalled']);
-        Route::get('/csrs/stats/dashboard-leader-rmo-duration', [CsrDashboardController::class, 'leaderRmoDuration']);
         // Effort against results, the CSR's own: day by day off the nightly
         // rollup, and hour by hour off the call log that rollup is built from.
         Route::get('/csrs/stats/dashboard-daily-effort', [CsrDashboardController::class, 'dailyEffort']);
