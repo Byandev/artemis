@@ -383,6 +383,17 @@ class CSRController extends Controller
             abort(404);
         }
 
+        // The column's default was lowercase `active` until a later migration
+        // changed it to `ACTIVE`, and that change never touched the rows already
+        // written. The dialog posts back whatever it was handed, so a CSR from
+        // that window used to fail `in:` on its own stored value. Fold the case
+        // before validating and write back the canonical spelling.
+        $request->merge([
+            'status' => is_string($status = $request->input('status'))
+                ? strtoupper(trim($status))
+                : $status,
+        ]);
+
         $validated = $request->validate([
             'status' => 'required|string|in:ACTIVE,INACTIVE',
             'user_id' => 'nullable|exists:users,id',
