@@ -12,6 +12,17 @@ class CallLog extends Model
 {
     use HasFactory;
 
+    /**
+     * Stands in for a number the syncing app could not read.
+     *
+     * A handset withholds the number on a private call, and some call-log
+     * entries carry none at all. The call still happened and still counts, so
+     * it is stored under this placeholder rather than dropped — phone_number is
+     * part of the upsert key, and a null there would match nothing, turning
+     * every re-sync of the same call into another row.
+     */
+    public const UNKNOWN_PHONE = '<unknown>';
+
     protected $guarded = [];
 
     protected $casts = [

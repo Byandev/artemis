@@ -18,7 +18,7 @@ class CallLogController extends Controller
         $request->validate([
             'user_id' => ['required'],
             'call_logs' => ['required', 'array', 'min:1'],
-            'call_logs.*.phone_number' => ['required', 'string'],
+            'call_logs.*.phone_number' => ['nullable', 'string'],
             'call_logs.*.type' => ['required', 'string'],
             'call_logs.*.duration' => ['required', 'integer', 'min:0'],
             'call_logs.*.timestamp' => ['required', 'date'],
@@ -37,7 +37,9 @@ class CallLogController extends Controller
             return [
                 'workspace_id' => $workspace->id,
                 'user_id' => $request->input('user_id'),
-                'phone_number' => $log['phone_number'],
+                'phone_number' => filled($log['phone_number'] ?? null)
+                    ? $log['phone_number']
+                    : CallLog::UNKNOWN_PHONE,
                 'type' => $log['type'],
                 'duration' => $log['duration'],
                 'call_date' => $timestamp->toDateString(),
