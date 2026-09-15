@@ -34,6 +34,7 @@ import {
     FileText,
     Goal,
     GraduationCap,
+    Headset,
     History,
     Landmark,
     Layers,
@@ -211,6 +212,12 @@ export function AppSidebar() {
                       title: 'My Pancake Users',
                       href: `/workspaces/${slug}/csr/pancake-users`,
                       icon: UserRound,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
+                  {
+                      title: 'My Calls',
+                      href: `/workspaces/${slug}/csr/call-logs`,
+                      icon: Headset,
                       permission: PERMISSIONS.ViewCsrDashboard,
                   },
               ]

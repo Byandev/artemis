@@ -4,14 +4,18 @@ namespace App\Http\Controllers\Workspaces;
 
 use App\Enums\Permission;
 use App\Http\Controllers\Controller;
+use App\Models\CallLog;
 use App\Models\PancakeUserDailyCallReport;
 use App\Models\PancakeUserErpDailyReport;
 use App\Models\PancakeUserPosDailyReport;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CallLogPersona;
 use App\Support\CsrComparisonMetrics;
+use App\Support\RmoDailyStats;
 use App\Support\TeamVisibility;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +44,9 @@ class CSRController extends Controller
      * The two rates are deliberately absent: both are computed from amounts
      * already on this list, so a CSR with a rate has the figures behind it too.
      */
+    /** Personas a call can be filtered to, plus the pseudo-value for an unmatched one. */
+    private const UNMATCHED = 'unmatched';
+
     private const BREAKDOWN_FIGURES = [
         'dr.total_orders',
         'dr.total_sales',
@@ -186,6 +193,181 @@ class CSRController extends Controller
         }
 
         return $latest;
+    }
+
+    /**
+     * Every call the signed-in user placed in this workspace.
+     *
+     * The RTS register next door lists the whole workspace and names a caller
+     * against each row; this is the same table read from one person's side, so
+     * the "User" column is gone and the rows are narrowed instead. A CSR asking
+     * "what did I call today" has nowhere else to look — the dashboard's call
+     * cards are nightly totals, and the RMO modal only opens one number at a
+     * time.
+     *
+     * Gated like the dashboard it sits under: the module toggle, then the CSR's
+     * own membership or the dashboard permission. Team visibility is not
+     * applied, for the reason CsrDashboardController gives — these rows are
+     * already narrowed to the caller's own identities, so there is nothing a
+     * team scope could withhold, and TeamVisibility fails closed for a CSR in
+     * no team, which would blank their own register.
+     */
+    public function callLogs(Request $request, Workspace $workspace)
+    {
+        abort_unless($workspace->csr_dashboard_module_enabled, 404);
+
+        if (! $request->user()->isCsrOf($workspace)) {
+            $this->authorize(Permission::ViewCsrDashboard->value, $workspace);
+        }
+
+        // Resolved once and closed over: both queries below read the same rows,
+        // and the roster lookup behind them does not need doing twice.
+        $pancakeUserIds = $this->ownPancakeUserIds($request->user(), $workspace);
+        $base = fn () => $this->ownCalls($workspace, $request->user(), $pancakeUserIds);
+
+        // Built once and used by both queries below, so the totals strip and
+        // the table can never be reading different rows.
+        $filters = [
+            // Phone number or order id — the two things someone arrives at this
+            // page holding, and the two the table itself shows. The id is
+            // matched whole: it is the order's primary key, so a `like` on a
+            // short run of digits would answer with unrelated orders.
+            AllowedFilter::callback('search', function ($query, $value) {
+                $query->where(function ($q) use ($value) {
+                    $q->where('phone_number', 'like', "%{$value}%")
+                        // Through the relation, not call_logs.order_id: a call
+                        // can point at an order that has since gone from the
+                        // synced table, and the Order column shows those as
+                        // unmatched, so searching must not find them either.
+                        ->orWhereHas('order', fn ($o) => $o->whereKey($value));
+                });
+            }),
+            AllowedFilter::callback('start_date', fn ($query, $value) => $query->whereDate('call_date', '>=', $value)),
+            AllowedFilter::callback('end_date', fn ($query, $value) => $query->whereDate('call_date', '<=', $value)),
+            // "Unmatched" is a real answer, not a missing one: the number was
+            // on no delivery and no order confirmed that day.
+            AllowedFilter::callback('persona', fn ($query, $value) => $value === self::UNMATCHED
+                ? $query->whereNull('persona')
+                : $query->where('persona', $value)),
+            AllowedFilter::exact('type'),
+        ];
+
+        $logs = QueryBuilder::for($base())
+            ->allowedFilters($filters)
+            ->allowedSorts(['call_date', 'duration', 'persona', 'type', 'phone_number'])
+            // call_time is a time, not a timestamp, so the day has to lead the sort;
+            // id breaks ties within a second so paging can't repeat or skip a row.
+            ->defaultSort('-call_date')
+            ->orderByDesc('call_time')
+            ->orderByDesc('id')
+            ->with('order:id')
+            ->paginate($request->integer('per_page', 25))
+            ->withQueryString();
+
+        $logs->setCollection(
+            $logs->getCollection()->map(fn (CallLog $log) => [
+                ...$log->only(['id', 'phone_number', 'type', 'duration', 'call_date', 'call_time', 'persona']),
+                // Read off the relation rather than the column: a call can carry an
+                // order_id whose row has since gone from the synced table, and an
+                // id with nothing behind it is not something to link to.
+                'order_id' => $log->order?->id,
+            ])
+        );
+
+        return Inertia::render('workspaces/csr/call-logs', [
+            'workspace' => $workspace->only('id', 'name', 'slug'),
+            'logs' => $logs,
+            'totals' => $this->callTotals(QueryBuilder::for($base())->allowedFilters($filters)),
+            // Filterable persona values, server-supplied so the page's list and
+            // the column's labels can't drift. "Unmatched" is kept here, unlike
+            // the team-scoped RTS register: nothing has removed those rows.
+            'personas' => [
+                CallLogPersona::CUSTOMER,
+                CallLogPersona::RIDER,
+                CallLogPersona::VERIFICATION,
+                self::UNMATCHED,
+            ],
+            'query' => [
+                ...$request->only(['sort', 'page']),
+                'perPage' => $request->input('per_page', $request->input('perPage')),
+                'filter' => $request->input('filter', []),
+            ],
+        ]);
+    }
+
+    /**
+     * The workspace's calls narrowed to the ones the signed-in user placed.
+     *
+     * A row carries whichever id the app that synced it knew about: the older
+     * mobile build writes a Pancake user id to `user_id`, the newer one writes
+     * the system user id to `assignee_user_id` — the same split
+     * App\Support\CallLogCallers resolves when it has to name a caller. Both are
+     * matched, or a CSR's register would silently end at whichever build their
+     * handset was on.
+     *
+     * A user with no linked pancake account still gets their
+     * `assignee_user_id` rows, and someone the log names by neither id gets an
+     * empty register rather than the workspace's.
+     *
+     * @param  array<int, string>  $pancakeUserIds  see ownPancakeUserIds()
+     */
+    private function ownCalls(Workspace $workspace, User $user, array $pancakeUserIds): Builder
+    {
+        return CallLog::query()
+            ->where('call_logs.workspace_id', $workspace->id)
+            ->where(function ($query) use ($user, $pancakeUserIds) {
+                $query->where('call_logs.assignee_user_id', $user->id);
+
+                if ($pancakeUserIds !== []) {
+                    $query->orWhereIn('call_logs.user_id', $pancakeUserIds);
+                }
+            });
+    }
+
+    /**
+     * The pancake accounts the user is linked to within this workspace.
+     *
+     * The same link CsrDashboardController::ownPancakeUserIds() reads for the
+     * dashboard's figures, and the one "My Pancake Users" lists in full: an
+     * account pointing at this user that works a shop of this workspace. The
+     * two must agree — a register missing a login the dashboard counts would
+     * leave a CSR unable to account for their own totals.
+     *
+     * @return array<int, string>
+     */
+    private function ownPancakeUserIds(User $user, Workspace $workspace): array
+    {
+        return PancakeUser::query()
+            ->where('user_id', $user->id)
+            ->whereHas('shopUsers.shop', fn ($query) => $query->where('workspace_id', $workspace->id))
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Calls, talk time and connected calls over whatever the filters left.
+     *
+     * Read off the filtered rows rather than the page of them, so the strip
+     * describes the whole selection and not the twenty-five in front of it.
+     * "Connected" uses the threshold the RMO stats use, so a call that counts
+     * as answered here counts as answered on the dashboard too.
+     *
+     * @param  QueryBuilder<CallLog>  $query
+     * @return array{calls: int, duration: int, connected: int}
+     */
+    private function callTotals(QueryBuilder $query): array
+    {
+        $row = $query->selectRaw('
+            COUNT(*) as calls,
+            COALESCE(SUM(duration), 0) as duration,
+            COUNT(CASE WHEN duration >= '.RmoDailyStats::CONNECTED_CALL_MIN_SECONDS.' THEN 1 END) as connected
+        ')->first();
+
+        return [
+            'calls' => (int) ($row->calls ?? 0),
+            'duration' => (int) ($row->duration ?? 0),
+            'connected' => (int) ($row->connected ?? 0),
+        ];
     }
 
     public function index(Request $request, Workspace $workspace)
