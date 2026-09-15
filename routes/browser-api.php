@@ -86,7 +86,7 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/dashboard-daily-effort', [CsrDashboardController::class, 'dailyEffort']);
         Route::get('/csrs/stats/dashboard-hourly-effort', [CsrDashboardController::class, 'hourlyEffort']);
         // The CSR's own days, every figure of both rollups — the analytics
-        // breakdown's columns at a per-day grain instead of per-CSR.
+        // breakdown's columns at a per-da  y grain instead of per-CSR.
         Route::get('/csrs/stats/dashboard-breakdown', [CsrDashboardController::class, 'breakdown']);
         // Leaders for the period — who came top, same source as the cards above.
         Route::get('/csrs/stats/analytics-leader-sales', [CSRController::class, 'analyticsLeaderSales']);
