@@ -461,6 +461,7 @@ Route::middleware(['auth'])->group(function () {
     // The pancake logins behind the CSR dashboard's figures. Same gate as the
     // dashboard — see CSRController::pancakeUsers().
     Route::get('/workspaces/{workspace}/csr/pancake-users', [CSRController::class, 'pancakeUsers'])->name('workspaces.csr.pancake-users');
+    Route::get('/workspaces/{workspace}/csr/call-logs', [CSRController::class, 'callLogs'])->name('workspaces.csr.call-logs');
 
     // CSR RMO Management (authenticated)
     Route::get('/workspaces/{workspace}/csr/rmo-management', [ForDeliveryController::class, 'csrRmoManagement'])->name('workspaces.csr.rmo-management');
