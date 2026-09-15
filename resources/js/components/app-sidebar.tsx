@@ -63,6 +63,7 @@ import {
     Trophy,
     Truck,
     User,
+    UserRound,
     Users,
     Wallet,
 } from 'lucide-react';
@@ -202,6 +203,14 @@ export function AppSidebar() {
                       title: 'CSR Dashboard',
                       href: `/workspaces/${slug}/csr/dashboard`,
                       icon: User,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
+                  // The pancake logins the dashboard's figures are summed from.
+                  // Gated with it, since it is only the legend for that page.
+                  {
+                      title: 'My Pancake Users',
+                      href: `/workspaces/${slug}/csr/pancake-users`,
+                      icon: UserRound,
                       permission: PERMISSIONS.ViewCsrDashboard,
                   },
               ]
