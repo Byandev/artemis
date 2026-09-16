@@ -191,6 +191,68 @@ class WelleStatsController extends Controller
         ]);
     }
 
+    /**
+     * The month's calendar — one entry per day Welle has a record of, with how
+     * many of the three pillars were ticked on it.
+     *
+     * The rows themselves rather than a count: the calendar colours a day by
+     * how complete it was, which is a figure no aggregate can give back. Days
+     * still to come, and days before the account was connected, simply have no
+     * row — the grid draws those as untracked rather than as empty days.
+     */
+    public function calendar(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeCards($workspace);
+
+        $month = $this->month($request);
+
+        $days = $this->days($request, $workspace, $month)
+            ->orderBy('date')
+            ->get(['date', 'pillars_completed'])
+            ->map(fn (WelleDailyRecord $day) => [
+                'date' => $day->date->toDateString(),
+                'pillars_completed' => (int) $day->pillars_completed,
+            ]);
+
+        return response()->json([
+            'total_days' => $days->count(),
+            'days' => $days,
+            ...$this->context($request, $month),
+        ]);
+    }
+
+    /**
+     * The day-by-day log — every day Welle has a record of, with the three
+     * pillars as they were ticked on it.
+     *
+     * The calendar above colours a day by how many pillars it carried; this
+     * says which, which is the one question the grid cannot answer. Same rows,
+     * read one column further out.
+     */
+    public function dailyLog(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeCards($workspace);
+
+        $month = $this->month($request);
+
+        $days = $this->days($request, $workspace, $month)
+            ->orderBy('date')
+            ->get(['date', 'movement', 'meditation', 'learning', 'is_esc'])
+            ->map(fn (WelleDailyRecord $day) => [
+                'date' => $day->date->toDateString(),
+                'movement' => (bool) $day->movement,
+                'meditation' => (bool) $day->meditation,
+                'learning' => (bool) $day->learning,
+                'is_esc' => (bool) $day->is_esc,
+            ]);
+
+        return response()->json([
+            'total_days' => $days->count(),
+            'days' => $days,
+            ...$this->context($request, $month),
+        ]);
+    }
+
     /** The page's two gates, re-applied to the data behind it. */
     private function authorizeCards(Workspace $workspace): void
     {
