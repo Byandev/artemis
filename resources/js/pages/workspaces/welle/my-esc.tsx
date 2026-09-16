@@ -3,8 +3,13 @@ import {
     learning as learningRoute,
     meditation as meditationRoute,
     movement as movementRoute,
+    pillarBreakdown as pillarBreakdownRoute,
 } from '@/actions/App/Http/Controllers/API/Workspace/WelleStatsController';
 import PageHeader from '@/components/common/PageHeader';
+import {
+    PillarBreakdown,
+    type PillarBreakdownStat,
+} from '@/components/welle/PillarBreakdown';
 import {
     DaysWithPillarStatCard,
     EscRateStatCard,
@@ -50,6 +55,8 @@ export default function MyEsc({ workspace }: Props) {
             movement: movementRoute({ workspace: workspace.slug }).url,
             meditation: meditationRoute({ workspace: workspace.slug }).url,
             learning: learningRoute({ workspace: workspace.slug }).url,
+            pillarBreakdown: pillarBreakdownRoute({ workspace: workspace.slug })
+                .url,
         }),
         [workspace.slug],
     );
@@ -64,6 +71,9 @@ export default function MyEsc({ workspace }: Props) {
     );
     const [learning, learningLoading] = useWelleStat<DaysWithPillarStat>(
         urls.learning,
+    );
+    const [breakdown, breakdownLoading] = useWelleStat<PillarBreakdownStat>(
+        urls.pillarBreakdown,
     );
 
     return (
@@ -93,6 +103,13 @@ export default function MyEsc({ workspace }: Props) {
                         pillar="learning"
                         stat={learning}
                         loading={learningLoading}
+                    />
+                </div>
+
+                <div className="mb-6">
+                    <PillarBreakdown
+                        stat={breakdown}
+                        loading={breakdownLoading}
                     />
                 </div>
 

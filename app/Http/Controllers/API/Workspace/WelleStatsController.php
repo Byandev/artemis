@@ -139,6 +139,58 @@ class WelleStatsController extends Controller
         ]);
     }
 
+    /**
+     * Pillar Breakdown — the three pillars side by side, each read over the
+     * same month of days the cards are.
+     *
+     * One row per pillar rather than one card: the point of the chart is the
+     * comparison, so the three counts have to come back together or two bars
+     * could be drawn from different months.
+     */
+    public function pillarBreakdown(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeCards($workspace);
+
+        $month = $this->month($request);
+
+        $totals = $this->days($request, $workspace, $month)
+            ->selectRaw('COUNT(*) as total_days')
+            ->selectRaw('COALESCE(SUM(movement), 0) as movement_days')
+            ->selectRaw('COALESCE(SUM(meditation), 0) as meditation_days')
+            ->selectRaw('COALESCE(SUM(learning), 0) as learning_days')
+            ->first();
+
+        $total = (int) $totals->total_days;
+        $movement = (int) $totals->movement_days;
+        $meditation = (int) $totals->meditation_days;
+        $learning = (int) $totals->learning_days;
+
+        return response()->json([
+            'total_days' => $total,
+            // A list rather than a map, in the order the bars are drawn — the
+            // same order the Welle dashboard lists the pillars in.
+            'pillars' => [
+                [
+                    'pillar' => 'movement',
+                    'days' => $movement,
+                    // Null rather than 0% with nothing recorded, as the cards do.
+                    'rate' => $total === 0 ? null : round($movement / $total * 100, 2),
+                ],
+                [
+                    'pillar' => 'meditation',
+                    'days' => $meditation,
+                    'rate' => $total === 0 ? null : round($meditation / $total * 100, 2),
+                ],
+                [
+                    'pillar' => 'learning',
+                    'days' => $learning,
+                    'rate' => $total === 0 ? null : round($learning / $total * 100, 2),
+                ],
+            ],
+            ...$this->context($request, $month),
+        ]);
+    }
+
     /** The page's two gates, re-applied to the data behind it. */
     private function authorizeCards(Workspace $workspace): void
     {
