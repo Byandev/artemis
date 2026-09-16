@@ -53,6 +53,7 @@ class Workspace extends Model
         'ad_spend_goals_module_enabled',
         'billing_module_enabled',
         'courses_module_enabled',
+        'welle_module_enabled',
         'inventory_sync',
         'public_password',
         'erp_username',
@@ -92,6 +93,7 @@ class Workspace extends Model
         'ad_spend_goals_module_enabled' => 'boolean',
         'billing_module_enabled' => 'boolean',
         'courses_module_enabled' => 'boolean',
+        'welle_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
         // Reversible encryption so the automation pipeline can read it back.

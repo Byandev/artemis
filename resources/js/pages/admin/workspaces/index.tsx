@@ -74,6 +74,7 @@ interface Workspace {
     ad_spend_goals_module_enabled: boolean;
     billing_module_enabled: boolean;
     courses_module_enabled: boolean;
+    welle_module_enabled: boolean;
     metric_settings?: { metric_key: string }[];
 }
 
@@ -100,6 +101,7 @@ const MODULE_FIELDS: Array<{
         | 'ad_spend_goals_module_enabled'
         | 'billing_module_enabled'
         | 'courses_module_enabled'
+        | 'welle_module_enabled'
     >;
     label: string;
     description: string;
@@ -204,6 +206,11 @@ const MODULE_FIELDS: Array<{
         label: 'Courses',
         description: 'Training courses and learning material',
     },
+    {
+        key: 'welle_module_enabled',
+        label: 'Welle',
+        description: 'Connect a Welle account from workspace settings',
+    },
 ];
 
 type ModuleKey = (typeof MODULE_FIELDS)[number]['key'];
@@ -257,6 +264,11 @@ const MODULE_GROUPS: {
         title: 'Learning',
         description: 'Training material for workspace members',
         keys: ['courses_module_enabled'],
+    },
+    {
+        title: 'Integrations',
+        description: 'External accounts connected to this workspace',
+        keys: ['welle_module_enabled'],
     },
     {
         title: 'Public Pages',
@@ -999,6 +1011,7 @@ function ModulesModal({
         ad_spend_goals_module_enabled: workspace.ad_spend_goals_module_enabled,
         billing_module_enabled: workspace.billing_module_enabled,
         courses_module_enabled: workspace.courses_module_enabled,
+        welle_module_enabled: workspace.welle_module_enabled,
     });
 
     function handleSubmit(e: React.FormEvent) {

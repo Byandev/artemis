@@ -29,6 +29,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'gotyme_number',
+        'welle_email',
+        'welle_password',
         'password',
         'role',
         'is_super_admin',
@@ -41,6 +43,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected $hidden = [
         'password',
+        'welle_password',
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
@@ -57,7 +60,20 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
+            // Reversible encryption — the Welle integration signs in with the
+            // plaintext, unlike the account password above.
+            'welle_password' => 'encrypted',
         ];
+    }
+
+    /**
+     * Whether a Welle password is stored, read without decrypting it. Lets the
+     * Settings → Integrations page show a "connected" state while the password
+     * itself stays on the server.
+     */
+    public function hasWellePassword(): bool
+    {
+        return ! empty($this->getAttributes()['welle_password'] ?? null);
     }
 
     /**
