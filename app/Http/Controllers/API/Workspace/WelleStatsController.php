@@ -191,6 +191,36 @@ class WelleStatsController extends Controller
         ]);
     }
 
+    /**
+     * The month's calendar — one entry per day Welle has a record of, with how
+     * many of the three pillars were ticked on it.
+     *
+     * The rows themselves rather than a count: the calendar colours a day by
+     * how complete it was, which is a figure no aggregate can give back. Days
+     * still to come, and days before the account was connected, simply have no
+     * row — the grid draws those as untracked rather than as empty days.
+     */
+    public function calendar(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeCards($workspace);
+
+        $month = $this->month($request);
+
+        $days = $this->days($request, $workspace, $month)
+            ->orderBy('date')
+            ->get(['date', 'pillars_completed'])
+            ->map(fn (WelleDailyRecord $day) => [
+                'date' => $day->date->toDateString(),
+                'pillars_completed' => (int) $day->pillars_completed,
+            ]);
+
+        return response()->json([
+            'total_days' => $days->count(),
+            'days' => $days,
+            ...$this->context($request, $month),
+        ]);
+    }
+
     /** The page's two gates, re-applied to the data behind it. */
     private function authorizeCards(Workspace $workspace): void
     {

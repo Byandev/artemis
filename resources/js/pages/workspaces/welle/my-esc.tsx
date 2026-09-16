@@ -1,4 +1,5 @@
 import {
+    calendar as calendarRoute,
     escRate as escRateRoute,
     learning as learningRoute,
     meditation as meditationRoute,
@@ -6,6 +7,10 @@ import {
     pillarBreakdown as pillarBreakdownRoute,
 } from '@/actions/App/Http/Controllers/API/Workspace/WelleStatsController';
 import PageHeader from '@/components/common/PageHeader';
+import {
+    EscCalendar,
+    type EscCalendarStat,
+} from '@/components/welle/EscCalendar';
 import {
     PillarBreakdown,
     type PillarBreakdownStat,
@@ -20,7 +25,6 @@ import { useWelleStat } from '@/hooks/use-welle-stat';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
 
 interface Props {
@@ -32,11 +36,12 @@ interface Props {
 }
 
 /**
- * My ESC — the signed-in user's own Extreme Self Care record.
+ * My ESC — the signed-in user's own Extreme Self Care record: the month's
+ * figures as cards, the three pillars against each other, and the month itself
+ * day by day.
  *
- * The cards are fetched over XHR rather than shared by the page, so the page
- * renders at once and each card skeletons on its own. The day-by-day record
- * under them is still to come.
+ * Every piece is fetched over XHR rather than shared by the page, so the page
+ * renders at once and each one skeletons on its own.
  */
 export default function MyEsc({ workspace }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
@@ -57,6 +62,7 @@ export default function MyEsc({ workspace }: Props) {
             learning: learningRoute({ workspace: workspace.slug }).url,
             pillarBreakdown: pillarBreakdownRoute({ workspace: workspace.slug })
                 .url,
+            calendar: calendarRoute({ workspace: workspace.slug }).url,
         }),
         [workspace.slug],
     );
@@ -74,6 +80,9 @@ export default function MyEsc({ workspace }: Props) {
     );
     const [breakdown, breakdownLoading] = useWelleStat<PillarBreakdownStat>(
         urls.pillarBreakdown,
+    );
+    const [calendar, calendarLoading] = useWelleStat<EscCalendarStat>(
+        urls.calendar,
     );
 
     return (
@@ -106,23 +115,12 @@ export default function MyEsc({ workspace }: Props) {
                     />
                 </div>
 
-                <div className="mb-6">
+                <div className="mb-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
                     <PillarBreakdown
                         stat={breakdown}
                         loading={breakdownLoading}
                     />
-                </div>
-
-                <div className="rounded-[14px] border border-dashed border-black/10 bg-white p-10 text-center dark:border-white/10 dark:bg-zinc-900">
-                    <span className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800">
-                        <Sparkles className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-                    </span>
-                    <p className="text-[13px] font-semibold text-gray-800 dark:text-gray-100">
-                        More to come here
-                    </p>
-                    <p className="mx-auto mt-1 max-w-md text-[12px] text-gray-400 dark:text-gray-500">
-                        Your day-by-day ESC record will live under these cards.
-                    </p>
+                    <EscCalendar stat={calendar} loading={calendarLoading} />
                 </div>
             </div>
         </AppLayout>
