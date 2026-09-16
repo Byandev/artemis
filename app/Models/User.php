@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\IntegrationService;
 use App\Enums\Permission;
 use App\Notifications\ResetPasswordNotification;
 use BackedEnum;
@@ -29,7 +30,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'gotyme_number',
-        'welle_email',
         'password',
         'role',
         'is_super_admin',
@@ -42,7 +42,6 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected $hidden = [
         'password',
-        'welle_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
@@ -59,32 +58,24 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
-            // Reversible encryption — the integration sends this token to
-            // Welle verbatim, unlike the account password above, which is
-            // hashed and never needs to be read back.
-            'welle_token' => 'encrypted',
-            'welle_last_synced_at' => 'datetime',
         ];
     }
 
     /**
-     * Whether a Welle token is stored, read without decrypting it. Lets the
-     * Settings → Integrations page show a "connected" state while the token
-     * itself stays on the server.
+     * Third-party accounts this user has connected.
+     *
+     * One row per service, holding a token and nothing else — see
+     * UserIntegration for why no credential is kept alongside it.
      */
-    public function hasWelleToken(): bool
+    public function integrations(): HasMany
     {
-        return ! empty($this->getAttributes()['welle_token'] ?? null);
+        return $this->hasMany(UserIntegration::class);
     }
 
-    /**
-     * Whether the Welle account is connected and the last fetch failed, which
-     * in practice means the password changed on Welle's side and the user has
-     * to reconnect. Cleared by the next successful fetch.
-     */
-    public function welleNeedsReconnect(): bool
+    /** This user's connection to one service, if they have one. */
+    public function integrationFor(IntegrationService $service): ?UserIntegration
     {
-        return $this->hasWelleToken() && filled($this->welle_last_error);
+        return $this->integrations()->forService($service)->first();
     }
 
     /**

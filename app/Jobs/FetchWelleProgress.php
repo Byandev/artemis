@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Enums\IntegrationService;
 use App\Exceptions\WelleAuthException;
 use App\Models\User;
+use App\Models\UserIntegration;
 use App\Models\WelleDailyRecord;
 use App\Services\Welle\WelleClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -62,8 +64,9 @@ class FetchWelleProgress implements ShouldQueue
     public function handle(WelleClient $client): void
     {
         $user = User::find($this->userId);
+        $integration = $user?->integrationFor(IntegrationService::Welle);
 
-        if (! $user || ! $user->hasWelleToken()) {
+        if (! $integration?->hasToken()) {
             return;
         }
 
@@ -78,12 +81,12 @@ class FetchWelleProgress implements ShouldQueue
 
         try {
             $window = $this->start === null
-                ? $client->week($user->welle_token)
-                : $client->range($user->welle_token, $this->start, $this->end ?? now()->toDateString());
+                ? $client->week($integration->token)
+                : $client->range($integration->token, $this->start, $this->end ?? now()->toDateString());
         } catch (WelleAuthException $e) {
             // A revoked or expired token does not improve on a retry. Stop, say
             // so on the user, and let them reconnect from Settings.
-            $this->recordFailure($user, 'Welle rejected your token — reconnect your account.');
+            $this->recordFailure($integration, 'Welle rejected your token — reconnect your account.');
 
             Log::warning('Welle token rejected', ['user_id' => $user->getKey()]);
 
@@ -103,11 +106,16 @@ class FetchWelleProgress implements ShouldQueue
             }
         }
 
+        // The streaks are the person's own figures, mirrored like the daily
+        // rows; how the fetch went belongs to the connection that did it.
         $user->forceFill([
             'welle_streak_days' => $window['streak_days'] ?? null,
             'welle_longest_streak' => $window['longest_streak'] ?? null,
-            'welle_last_synced_at' => now(),
-            'welle_last_error' => null,
+        ])->save();
+
+        $integration->forceFill([
+            'last_synced_at' => now(),
+            'last_error' => null,
         ])->save();
     }
 
@@ -134,10 +142,10 @@ class FetchWelleProgress implements ShouldQueue
     /** The last retry gave up — leave the reason where the user can see it. */
     public function failed(Throwable $exception): void
     {
-        $user = User::find($this->userId);
+        $integration = User::find($this->userId)?->integrationFor(IntegrationService::Welle);
 
-        if ($user) {
-            $this->recordFailure($user, 'Could not reach Welle: '.$exception->getMessage());
+        if ($integration) {
+            $this->recordFailure($integration, 'Could not reach Welle: '.$exception->getMessage());
         }
     }
 
@@ -145,8 +153,8 @@ class FetchWelleProgress implements ShouldQueue
      * Stamp the reason on the user for Settings → Integrations to show.
      * Truncated to the column width, and never carrying credentials.
      */
-    private function recordFailure(User $user, string $message): void
+    private function recordFailure(UserIntegration $integration, string $message): void
     {
-        $user->forceFill(['welle_last_error' => mb_substr($message, 0, 255)])->save();
+        $integration->forceFill(['last_error' => mb_substr($message, 0, 255)])->save();
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\IntegrationService;
 use App\Jobs\FetchWelleProgress;
 use App\Models\User;
 use App\Models\Workspace;
@@ -129,17 +130,16 @@ class FetchWelleDailyRecords extends Command
     }
 
     /**
-     * Users who have both halves of a Welle login on file and are a member of
-     * at least one workspace with the module switched on. A workspace that
-     * turned Welle off contributes nobody.
+     * Users with a connected Welle account who are a member of at least one
+     * workspace with the module switched on. A workspace that turned Welle off
+     * contributes nobody.
      *
      * @return Collection<int, int>
      */
     private function connectedUserIds(?int $workspaceId, ?int $userId): Collection
     {
         return User::query()
-            ->whereNotNull('welle_email')
-            ->whereNotNull('welle_token')
+            ->whereHas('integrations', fn ($query) => $query->forService(IntegrationService::Welle))
             ->whereHas('workspaces', fn ($query) => $query
                 ->where('welle_module_enabled', true)
                 ->when($workspaceId, fn ($q, $id) => $q->where('workspaces.id', $id)))

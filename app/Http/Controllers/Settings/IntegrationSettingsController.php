@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Enums\IntegrationService;
 use App\Exceptions\WelleAuthException;
 use App\Exceptions\WelleException;
 use App\Http\Controllers\Controller;
@@ -30,18 +31,17 @@ class IntegrationSettingsController extends Controller
         $this->ensureMember($request, $workspace);
         $this->ensureWelleEnabled($workspace);
 
-        $user = $request->user();
+        $welle = $request->user()->integrationFor(IntegrationService::Welle);
 
         return Inertia::render('settings/integrations', [
             'workspace' => $workspace,
-            // The encrypted token never leaves the server — the page only
-            // learns the email, whether a token is on file, and how the last
-            // unattended fetch went.
+            // The encrypted token never leaves the server, and there is no
+            // address to show either — the page learns only that something is
+            // connected, and how the last unattended fetch went.
             'welle' => [
-                'email' => $user->welle_email,
-                'connected' => $user->hasWelleToken(),
-                'last_synced_at' => $user->welle_last_synced_at?->toIso8601String(),
-                'last_error' => $user->welle_last_error,
+                'connected' => (bool) $welle?->hasToken(),
+                'last_synced_at' => $welle?->last_synced_at?->toIso8601String(),
+                'last_error' => $welle?->last_error,
             ],
         ]);
     }
@@ -79,31 +79,30 @@ class IntegrationSettingsController extends Controller
             ]);
         }
 
-        $request->user()->forceFill([
-            'welle_email' => $validated['welle_email'],
-            'welle_token' => $token,
-            // A fresh token makes any previous "reconnect" stale.
-            'welle_last_error' => null,
-        ])->save();
+        $request->user()->integrations()->updateOrCreate(
+            ['service' => IntegrationService::Welle],
+            [
+                'token' => $token,
+                // A fresh token makes any previous "reconnect" stale.
+                'last_error' => null,
+            ],
+        );
 
         return Redirect::route('integrations.edit', ['workspace' => $workspace->slug])
             ->with('status', 'welle-connected');
     }
 
     /**
-     * Disconnect the Welle account, dropping the token and the sync state.
+     * Disconnect the Welle account, dropping the token and its sync state with
+     * it — there is nothing else to clear, which is the point of the token
+     * living in its own row.
      */
     public function destroyWelle(Request $request, Workspace $workspace): RedirectResponse
     {
         $this->ensureMember($request, $workspace);
         $this->ensureWelleEnabled($workspace);
 
-        $request->user()->forceFill([
-            'welle_email' => null,
-            'welle_token' => null,
-            'welle_last_synced_at' => null,
-            'welle_last_error' => null,
-        ])->save();
+        $request->user()->integrations()->forService(IntegrationService::Welle)->delete();
 
         return Redirect::route('integrations.edit', ['workspace' => $workspace->slug])
             ->with('status', 'welle-disconnected');

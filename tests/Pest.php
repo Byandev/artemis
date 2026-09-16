@@ -1,9 +1,11 @@
 <?php
 
+use App\Enums\IntegrationService;
 use App\Jobs\SyncCsrDailyCallRecord;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserIntegration;
 use App\Models\Workspace;
 use App\Models\WorkspaceApiKey;
 use Carbon\CarbonImmutable;
@@ -197,4 +199,19 @@ function makeApiKey(Workspace $workspace, ?string $name = null): array
     ]);
 
     return ['model' => $model, 'raw' => $generated['raw']];
+}
+
+/**
+ * Give a user a stored Welle token — the only credential that is ever kept.
+ *
+ * Lives here rather than beside one Welle test because several of them need a
+ * connected account, and a helper declared inside a test file only exists for
+ * a run that happens to load that file.
+ */
+function connectWelleAccount(User $user, string $token = 'welle-token-abc'): UserIntegration
+{
+    return $user->integrations()->updateOrCreate(
+        ['service' => IntegrationService::Welle],
+        ['token' => $token],
+    );
 }
