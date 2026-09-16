@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Exceptions\WelleAuthException;
+use App\Exceptions\WelleException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\WelleIntegrationUpdateRequest;
 use App\Models\Workspace;
+use App\Services\Welle\WelleClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,52 +34,76 @@ class IntegrationSettingsController extends Controller
 
         return Inertia::render('settings/integrations', [
             'workspace' => $workspace,
-            // The encrypted password never leaves the server — the page only
-            // learns the email and whether a password is on file.
+            // The encrypted token never leaves the server — the page only
+            // learns the email, whether a token is on file, and how the last
+            // unattended fetch went.
             'welle' => [
                 'email' => $user->welle_email,
-                'connected' => $user->hasWellePassword(),
+                'connected' => $user->hasWelleToken(),
+                'last_synced_at' => $user->welle_last_synced_at?->toIso8601String(),
+                'last_error' => $user->welle_last_error,
             ],
         ]);
     }
 
     /**
-     * Connect (or re-save) the signed-in user's Welle account.
+     * Connect the signed-in user's Welle account.
+     *
+     * The password is sent straight to Welle, exchanged for an API token, and
+     * then dropped — it is never written down. That is the whole point of doing
+     * the exchange here rather than storing credentials and replaying them on
+     * every fetch: what sits in the database is a token Welle can revoke, not a
+     * password the person probably uses elsewhere.
      */
-    public function updateWelle(WelleIntegrationUpdateRequest $request, Workspace $workspace): RedirectResponse
-    {
+    public function updateWelle(
+        WelleIntegrationUpdateRequest $request,
+        Workspace $workspace,
+        WelleClient $client,
+    ): RedirectResponse {
         $this->ensureMember($request, $workspace);
         $this->ensureWelleEnabled($workspace);
 
         $validated = $request->validated();
-        $user = $request->user();
 
-        $user->welle_email = $validated['welle_email'];
-
-        // Only overwrite the stored password when a new one was supplied; an
-        // empty field leaves the existing credential in place.
-        if (filled($validated['welle_password'] ?? null)) {
-            $user->welle_password = $validated['welle_password'];
+        try {
+            $token = $client->login($validated['welle_email'], $validated['welle_password']);
+        } catch (WelleAuthException) {
+            throw ValidationException::withMessages([
+                'welle_password' => 'Welle did not accept that email and password.',
+            ]);
+        } catch (WelleException) {
+            // Welle being unreachable is not the person's mistake, and saying
+            // so on the password field would read as one.
+            throw ValidationException::withMessages([
+                'welle_email' => 'Could not reach Welle just now. Try again in a moment.',
+            ]);
         }
 
-        $user->save();
+        $request->user()->forceFill([
+            'welle_email' => $validated['welle_email'],
+            'welle_token' => $token,
+            // A fresh token makes any previous "reconnect" stale.
+            'welle_last_error' => null,
+        ])->save();
 
         return Redirect::route('integrations.edit', ['workspace' => $workspace->slug])
             ->with('status', 'welle-connected');
     }
 
     /**
-     * Disconnect the Welle account, clearing both the email and the password.
+     * Disconnect the Welle account, dropping the token and the sync state.
      */
     public function destroyWelle(Request $request, Workspace $workspace): RedirectResponse
     {
         $this->ensureMember($request, $workspace);
         $this->ensureWelleEnabled($workspace);
 
-        $request->user()->update([
+        $request->user()->forceFill([
             'welle_email' => null,
-            'welle_password' => null,
-        ]);
+            'welle_token' => null,
+            'welle_last_synced_at' => null,
+            'welle_last_error' => null,
+        ])->save();
 
         return Redirect::route('integrations.edit', ['workspace' => $workspace->slug])
             ->with('status', 'welle-disconnected');

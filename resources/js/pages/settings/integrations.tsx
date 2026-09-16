@@ -10,7 +10,8 @@ import { type BreadcrumbItem } from '@/types';
 import { Workspace } from '@/types/models/Workspace';
 import { Transition } from '@headlessui/react';
 import { Form, Head, router } from '@inertiajs/react';
-import { CheckCircle2, Plug } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import { AlertTriangle, CheckCircle2, Plug } from 'lucide-react';
 
 export default function Integrations({
     workspace,
@@ -18,7 +19,14 @@ export default function Integrations({
 }: {
     workspace: Workspace;
     /** The signed-in user's Welle account — credentials are per user. */
-    welle: { email: string | null; connected: boolean };
+    welle: {
+        email: string | null;
+        connected: boolean;
+        /** When the nightly fetch last succeeded, ISO-8601. */
+        last_synced_at: string | null;
+        /** Why the last fetch failed, or null once one succeeds. */
+        last_error: string | null;
+    };
 }) {
     const baseUrl = `/workspaces/${workspace.slug}/settings/integrations`;
     const welleUrl = `${baseUrl}/welle`;
@@ -28,6 +36,11 @@ export default function Integrations({
     ];
 
     const connected = welle.connected;
+    const lastSynced = welle.last_synced_at
+        ? formatDistanceToNow(new Date(welle.last_synced_at), {
+              addSuffix: true,
+          })
+        : null;
 
     const disconnect = () => {
         router.delete(welleUrl, { preserveScroll: true });
@@ -45,22 +58,43 @@ export default function Integrations({
                             description="Connect your Welle account for this workspace."
                         />
                         <HelpTooltip side="right">
-                            These credentials let the integration sign in to{' '}
-                            <span className="font-semibold">Welle</span> as you.
-                            They are stored on your own account — not the
-                            workspace — and the password is kept encrypted and
-                            never shown again after saving.
+                            Your password is sent to{' '}
+                            <span className="font-semibold">Welle</span> once,
+                            exchanged for an access token, and then discarded —
+                            it is never stored here. The token lives on your own
+                            account, not the workspace, and you can revoke it
+                            from Welle at any time.
                         </HelpTooltip>
                     </div>
 
                     <div className="flex items-start gap-2.5 rounded-[12px] border border-emerald-500/20 bg-emerald-500/[0.04] p-3 text-[12px] leading-relaxed text-emerald-800 dark:text-emerald-300">
                         <Plug className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                         <p>
-                            Enter the login the integration should use. Your
-                            Welle account is yours alone: other members of this
+                            Enter your Welle login. It is used once to obtain a
+                            token; your password is not saved. Your Welle
+                            account is yours alone — other members of this
                             workspace connect their own.
                         </p>
                     </div>
+
+                    {connected && welle.last_error && (
+                        <div className="flex items-start gap-2.5 rounded-[12px] border border-amber-500/20 bg-amber-500/[0.06] p-3 text-[12px] leading-relaxed text-amber-800 dark:text-amber-300">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                            <p>
+                                <span className="font-semibold">
+                                    Last sync failed.
+                                </span>{' '}
+                                {welle.last_error} Saving your password again
+                                clears this.
+                            </p>
+                        </div>
+                    )}
+
+                    {connected && !welle.last_error && lastSynced && (
+                        <p className="text-[12px] text-neutral-500 dark:text-neutral-400">
+                            Daily records last synced {lastSynced}.
+                        </p>
+                    )}
 
                     <Form
                         action={welleUrl}
@@ -110,7 +144,7 @@ export default function Integrations({
                                         autoComplete="new-password"
                                         placeholder={
                                             connected
-                                                ? '•••••••• (leave blank to keep current)'
+                                                ? 'Re-enter to reconnect'
                                                 : 'Enter Welle password'
                                         }
                                     />

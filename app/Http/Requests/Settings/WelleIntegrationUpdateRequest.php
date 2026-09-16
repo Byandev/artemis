@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Settings;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class WelleIntegrationUpdateRequest extends FormRequest
 {
@@ -21,19 +20,12 @@ class WelleIntegrationUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
-        $passwordSet = (bool) $this->user()?->hasWellePassword();
-
         return [
             'welle_email' => ['required', 'email', 'max:255'],
-            // Required on first connect; optional afterwards so a blank field
-            // leaves the stored password untouched.
-            'welle_password' => [
-                Rule::requiredIf(! $passwordSet),
-                'nullable',
-                'string',
-                'min:6',
-                'max:255',
-            ],
+            // Always required, unlike before: the password is not stored, so
+            // there is nothing to leave untouched. Reconnecting means proving
+            // the account again and taking a fresh token.
+            'welle_password' => ['required', 'string', 'min:6', 'max:255'],
         ];
     }
 

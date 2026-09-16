@@ -30,7 +30,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'gotyme_number',
         'welle_email',
-        'welle_password',
         'password',
         'role',
         'is_super_admin',
@@ -43,7 +42,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected $hidden = [
         'password',
-        'welle_password',
+        'welle_token',
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
@@ -60,20 +59,32 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_super_admin' => 'boolean',
-            // Reversible encryption — the Welle integration signs in with the
-            // plaintext, unlike the account password above.
-            'welle_password' => 'encrypted',
+            // Reversible encryption — the integration sends this token to
+            // Welle verbatim, unlike the account password above, which is
+            // hashed and never needs to be read back.
+            'welle_token' => 'encrypted',
+            'welle_last_synced_at' => 'datetime',
         ];
     }
 
     /**
-     * Whether a Welle password is stored, read without decrypting it. Lets the
-     * Settings → Integrations page show a "connected" state while the password
+     * Whether a Welle token is stored, read without decrypting it. Lets the
+     * Settings → Integrations page show a "connected" state while the token
      * itself stays on the server.
      */
-    public function hasWellePassword(): bool
+    public function hasWelleToken(): bool
     {
-        return ! empty($this->getAttributes()['welle_password'] ?? null);
+        return ! empty($this->getAttributes()['welle_token'] ?? null);
+    }
+
+    /**
+     * Whether the Welle account is connected and the last fetch failed, which
+     * in practice means the password changed on Welle's side and the user has
+     * to reconnect. Cleared by the next successful fetch.
+     */
+    public function welleNeedsReconnect(): bool
+    {
+        return $this->hasWelleToken() && filled($this->welle_last_error);
     }
 
     /**
