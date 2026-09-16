@@ -16,6 +16,7 @@ import {
     EscCalendar,
     type EscCalendarStat,
 } from '@/components/welle/EscCalendar';
+import { MonthPicker, currentMonth } from '@/components/welle/MonthPicker';
 import {
     PillarBreakdown,
     type PillarBreakdownStat,
@@ -30,7 +31,7 @@ import { useWelleStat } from '@/hooks/use-welle-stat';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 interface Props {
     workspace: {
@@ -46,7 +47,8 @@ interface Props {
  * day by day.
  *
  * Every piece is fetched over XHR rather than shared by the page, so the page
- * renders at once and each one skeletons on its own.
+ * renders at once and each one skeletons on its own. They all read the month
+ * the picker names, so changing it moves the whole page together.
  */
 export default function MyEsc({ workspace }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
@@ -56,22 +58,25 @@ export default function MyEsc({ workspace }: Props) {
         },
     ];
 
+    const [month, setMonth] = useState(currentMonth);
+
     // The hook keys its request on the URL, and a route helper builds a new
     // string on every render — memoised so each card is fetched once rather
     // than on every one.
-    const urls = useMemo(
-        () => ({
-            escRate: escRateRoute({ workspace: workspace.slug }).url,
-            movement: movementRoute({ workspace: workspace.slug }).url,
-            meditation: meditationRoute({ workspace: workspace.slug }).url,
-            learning: learningRoute({ workspace: workspace.slug }).url,
-            pillarBreakdown: pillarBreakdownRoute({ workspace: workspace.slug })
-                .url,
-            calendar: calendarRoute({ workspace: workspace.slug }).url,
-            dailyLog: dailyLogRoute({ workspace: workspace.slug }).url,
-        }),
-        [workspace.slug],
-    );
+    const urls = useMemo(() => {
+        const args = { workspace: workspace.slug };
+        const query = { query: { month } };
+
+        return {
+            escRate: escRateRoute(args, query).url,
+            movement: movementRoute(args, query).url,
+            meditation: meditationRoute(args, query).url,
+            learning: learningRoute(args, query).url,
+            pillarBreakdown: pillarBreakdownRoute(args, query).url,
+            calendar: calendarRoute(args, query).url,
+            dailyLog: dailyLogRoute(args, query).url,
+        };
+    }, [workspace.slug, month]);
 
     // One call per card, one endpoint behind each.
     const [escRate, escRateLoading] = useWelleStat<EscRateStat>(urls.escRate);
@@ -103,7 +108,10 @@ export default function MyEsc({ workspace }: Props) {
                     title="My ESC"
                     description="Your own Extreme Self Care record from Welle"
                     divider={false}
-                />
+                    stackActionsOnMobile
+                >
+                    <MonthPicker value={month} onChange={setMonth} />
+                </PageHeader>
 
                 <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <EscRateStatCard stat={escRate} loading={escRateLoading} />
