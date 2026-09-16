@@ -1,5 +1,6 @@
 import {
     calendar as calendarRoute,
+    dailyLog as dailyLogRoute,
     escRate as escRateRoute,
     learning as learningRoute,
     meditation as meditationRoute,
@@ -7,6 +8,10 @@ import {
     pillarBreakdown as pillarBreakdownRoute,
 } from '@/actions/App/Http/Controllers/API/Workspace/WelleStatsController';
 import PageHeader from '@/components/common/PageHeader';
+import {
+    DailyLogTable,
+    type DailyLogStat,
+} from '@/components/welle/DailyLogTable';
 import {
     EscCalendar,
     type EscCalendarStat,
@@ -63,6 +68,7 @@ export default function MyEsc({ workspace }: Props) {
             pillarBreakdown: pillarBreakdownRoute({ workspace: workspace.slug })
                 .url,
             calendar: calendarRoute({ workspace: workspace.slug }).url,
+            dailyLog: dailyLogRoute({ workspace: workspace.slug }).url,
         }),
         [workspace.slug],
     );
@@ -83,6 +89,9 @@ export default function MyEsc({ workspace }: Props) {
     );
     const [calendar, calendarLoading] = useWelleStat<EscCalendarStat>(
         urls.calendar,
+    );
+    const [dailyLog, dailyLogLoading] = useWelleStat<DailyLogStat>(
+        urls.dailyLog,
     );
 
     return (
@@ -122,6 +131,8 @@ export default function MyEsc({ workspace }: Props) {
                     />
                     <EscCalendar stat={calendar} loading={calendarLoading} />
                 </div>
+
+                <DailyLogTable stat={dailyLog} loading={dailyLogLoading} />
             </div>
         </AppLayout>
     );

@@ -221,6 +221,38 @@ class WelleStatsController extends Controller
         ]);
     }
 
+    /**
+     * The day-by-day log — every day Welle has a record of, with the three
+     * pillars as they were ticked on it.
+     *
+     * The calendar above colours a day by how many pillars it carried; this
+     * says which, which is the one question the grid cannot answer. Same rows,
+     * read one column further out.
+     */
+    public function dailyLog(Request $request, Workspace $workspace): JsonResponse
+    {
+        $this->authorizeCards($workspace);
+
+        $month = $this->month($request);
+
+        $days = $this->days($request, $workspace, $month)
+            ->orderBy('date')
+            ->get(['date', 'movement', 'meditation', 'learning', 'is_esc'])
+            ->map(fn (WelleDailyRecord $day) => [
+                'date' => $day->date->toDateString(),
+                'movement' => (bool) $day->movement,
+                'meditation' => (bool) $day->meditation,
+                'learning' => (bool) $day->learning,
+                'is_esc' => (bool) $day->is_esc,
+            ]);
+
+        return response()->json([
+            'total_days' => $days->count(),
+            'days' => $days,
+            ...$this->context($request, $month),
+        ]);
+    }
+
     /** The page's two gates, re-applied to the data behind it. */
     private function authorizeCards(Workspace $workspace): void
     {
