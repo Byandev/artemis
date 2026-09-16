@@ -6,6 +6,39 @@ export function currentMonth(): string {
 }
 
 /**
+ * The month the URL asks for, or this one.
+ *
+ * The month lives in the address bar rather than in state alone, so a reload
+ * comes back to the month that was being read and a link to it carries the
+ * month with it. Anything unreadable falls back to this month — the same thing
+ * the endpoints do with a `?month=` they cannot parse.
+ */
+export function monthFromUrl(): string {
+    if (typeof window === 'undefined') return currentMonth();
+
+    const asked = new URLSearchParams(window.location.search).get('month');
+
+    return asked && /^\d{4}-\d{2}$/.test(asked) ? asked : currentMonth();
+}
+
+/**
+ * Put the month in the address bar, without a visit.
+ *
+ * `replaceState` rather than Inertia's router: the figures are fetched over
+ * XHR, so there is nothing for the server to re-render — the URL just has to
+ * agree with what is on screen. The existing history state is passed back
+ * untouched so Inertia's own record of the page survives.
+ */
+export function rememberMonth(month: string): void {
+    if (typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('month', month);
+
+    window.history.replaceState(window.history.state, '', url);
+}
+
+/**
  * Which month every figure on the page is read over — a step back, a step
  * forward, and the month between them.
  *

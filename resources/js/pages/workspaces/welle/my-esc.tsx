@@ -16,7 +16,11 @@ import {
     EscCalendar,
     type EscCalendarStat,
 } from '@/components/welle/EscCalendar';
-import { MonthPicker, currentMonth } from '@/components/welle/MonthPicker';
+import {
+    MonthPicker,
+    monthFromUrl,
+    rememberMonth,
+} from '@/components/welle/MonthPicker';
 import {
     PillarBreakdown,
     type PillarBreakdownStat,
@@ -58,7 +62,14 @@ export default function MyEsc({ workspace }: Props) {
         },
     ];
 
-    const [month, setMonth] = useState(currentMonth);
+    // Seeded from the URL and written back to it, so a reload comes back to
+    // the month that was being read rather than to this one.
+    const [month, setMonth] = useState(monthFromUrl);
+
+    const pickMonth = (next: string) => {
+        setMonth(next);
+        rememberMonth(next);
+    };
 
     // The hook keys its request on the URL, and a route helper builds a new
     // string on every render — memoised so each card is fetched once rather
@@ -110,7 +121,7 @@ export default function MyEsc({ workspace }: Props) {
                     divider={false}
                     stackActionsOnMobile
                 >
-                    <MonthPicker value={month} onChange={setMonth} />
+                    <MonthPicker value={month} onChange={pickMonth} />
                 </PageHeader>
 
                 <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
