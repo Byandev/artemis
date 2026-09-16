@@ -12,6 +12,7 @@ use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
+use App\Http\Controllers\API\Workspace\WelleStatsController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
 
@@ -208,6 +209,17 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/supplier-deliveries', [PurchaseOrderFlowController::class, 'supplierDeliveries'])->name('supplier-deliveries');
             Route::get('/stage-timings', [PurchaseOrderFlowController::class, 'stageTimings'])->name('stage-timings');
             Route::get('/unfulfilled-split', [PurchaseOrderFlowController::class, 'unfulfilledSplit'])->name('unfulfilled-split');
+        });
+
+        // My ESC — the signed-in user's own Welle figures, one endpoint per
+        // card so each skeletons on its own. Behind the workspace's Welle
+        // module toggle and the "View My ESC" grant, both re-checked in the
+        // controller. See WelleStatsController.
+        Route::prefix('welle/stats')->name('welle.stats.')->group(function () {
+            Route::get('/esc-rate', [WelleStatsController::class, 'escRate'])->name('esc-rate');
+            Route::get('/movement', [WelleStatsController::class, 'movement'])->name('movement');
+            Route::get('/meditation', [WelleStatsController::class, 'meditation'])->name('meditation');
+            Route::get('/learning', [WelleStatsController::class, 'learning'])->name('learning');
         });
     });
 });
