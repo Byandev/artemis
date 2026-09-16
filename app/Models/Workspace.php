@@ -53,6 +53,8 @@ class Workspace extends Model
         'ad_spend_goals_module_enabled',
         'billing_module_enabled',
         'courses_module_enabled',
+        'discord_notifications_module_enabled',
+        'erp_integration_module_enabled',
         'inventory_sync',
         'public_password',
         'erp_username',
@@ -92,6 +94,8 @@ class Workspace extends Model
         'ad_spend_goals_module_enabled' => 'boolean',
         'billing_module_enabled' => 'boolean',
         'courses_module_enabled' => 'boolean',
+        'discord_notifications_module_enabled' => 'boolean',
+        'erp_integration_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
         // Reversible encryption so the automation pipeline can read it back.
@@ -155,6 +159,9 @@ class Workspace extends Model
             $this->rmo_module_enabled ? null : PermissionEnum::ViewRmoManagement->value,
             $this->rmo_module_enabled ? null : PermissionEnum::ManageRmoSettings->value,
             $this->leaderboard_module_enabled ? null : PermissionEnum::ViewLeaderboards->value,
+            // Discord notifications sit in the broad 'Settings' category, so the
+            // module toggle hides just this one grant rather than the category.
+            $this->discord_notifications_module_enabled ? null : PermissionEnum::ManageDiscordNotifications->value,
             // Gencys partners read page ROAS in Gencys itself, so the tracker is
             // hidden for them even with the rest of the S&M group switched on.
             $this->is_gencys_partner ? PermissionEnum::ViewPageRoasTracker->value : null,
