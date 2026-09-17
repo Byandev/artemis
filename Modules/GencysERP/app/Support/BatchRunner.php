@@ -123,7 +123,7 @@ class BatchRunner
 
         $batch->refreshCounts();
 
-        $this->tick();
+//        $this->tick();
 
         return $batch->refresh();
     }
