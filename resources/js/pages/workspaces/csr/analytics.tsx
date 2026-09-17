@@ -63,6 +63,7 @@ import { Head, router } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import { format, parseISO, subDays } from 'date-fns';
 import { omit } from 'lodash';
+import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
@@ -352,6 +353,11 @@ const COLUMN_OPTIONS: ColumnOption[] = [
     },
 ];
 
+// The Export button, matched to the ColumnsDropdown trigger it stands beside so
+// the row reads as one set of controls rather than two.
+const TOOLBAR_BUTTON =
+    'flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] border border-black/10 bg-white px-3 font-mono! text-[12px]! text-gray-700 transition-colors hover:bg-stone-50 dark:border-white/10 dark:bg-zinc-900 dark:text-gray-300 dark:hover:bg-zinc-800';
+
 const COLUMNS_STORAGE_KEY = 'csr-analytics-cols';
 
 export default function Analytics({
@@ -591,6 +597,38 @@ export default function Analytics({
 
     const { visibility: columnVisibility, setVisibility: setColumnVisibility } =
         useColumnVisibility(COLUMN_OPTIONS, COLUMNS_STORAGE_KEY);
+
+    // The columns the reader has left on, in the order the table lays them out
+    // — which is the order the sheet's columns come out in. The ids are the
+    // export's own column keys, so the menu above doubles as the export's
+    // column picker instead of asking the same question twice.
+    const visibleColumnIds = useMemo(
+        () =>
+            COLUMN_OPTIONS.filter(
+                (option) => columnVisibility[option.id] !== false,
+            ).map((option) => option.id),
+        [columnVisibility],
+    );
+
+    // The breakdown as a spreadsheet: the filters the table is showing, the
+    // columns it is showing, and every CSR they match rather than the page on
+    // screen. The response is a file, so this is a plain navigation — nothing
+    // on the page moves, and the table's own state is untouched.
+    const exportBreakdown = () => {
+        const params = new URLSearchParams({
+            type: currentType,
+            from: fromStr,
+            to: toStr,
+            sort: currentSort,
+            columns: visibleColumnIds.join(','),
+        });
+
+        if (searchInput) {
+            params.set('filter[search]', searchInput);
+        }
+
+        window.location.href = `/workspaces/${workspace.slug}/csr/analytics/export?${params.toString()}`;
+    };
 
     const baseColumns = useMemo<ColumnDef<CsrRecord>[]>(
         () => [
@@ -874,6 +912,16 @@ export default function Analytics({
                             onChange={(e) => setSearchInput(e.target.value)}
                             className="h-9 w-full min-w-0 rounded-lg border border-zinc-200 bg-white px-3 text-sm! text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none sm:w-64 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white dark:placeholder-zinc-500 dark:focus:border-zinc-500"
                         />
+
+                        <button
+                            type="button"
+                            onClick={exportBreakdown}
+                            className={TOOLBAR_BUTTON}
+                            title="Download this breakdown as .xlsx — the selected date range, search and columns, every matching CSR"
+                        >
+                            <Download className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                            Export
+                        </button>
 
                         <div className="shrink-0">
                             <ColumnsDropdown

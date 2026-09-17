@@ -12,7 +12,47 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
     {
-        version: 'v3.36.0',
+        version: 'v3.36.2',
+        date: '2026-09-11',
+        sections: [
+            {
+                title: 'CSR Analytics — Confirmed Risky Orders',
+                items: [
+                    'Total Order needs Verification is now Confirmed Risky Orders, and what it counts has moved with the name: a customer nobody has any record of, or one with six or more past orders who has sent back 40% or more of them. The old rule asked for a 55% return rate with no floor under it at all, so one parcel refused by a first-time buyer read as a customer who returns everything, while a steady 45% returner over a dozen orders did not register',
+                    'The figure is read off the nightly breakdown of each day’s orders rather than worked out from scratch on every load, and two things follow that are worth knowing: the history a customer is judged on is the one their number carried when the order came in, so last Tuesday’s figure reads the same today as it did on Tuesday instead of drifting as records change; and cancelled orders have dropped out of it, because an order that never shipped never needed the call',
+                    'The footnote still splits the two reasons and now says the rule out loud — so many with no report, so many at 40%+ RTS over 6+ orders — because a batch of unknown numbers and a batch of known bad ones are different problems and the split is what tells you which you are looking at',
+                    'That nightly breakdown has to have been built over a range before the card can report on it. A stretch it hasn’t reached reads as no risky orders rather than as an error, so the first build after this goes out needs to cover as far back as people actually look',
+                ],
+            },
+            {
+                title: 'Order Verification — Which Calls Count',
+                items: [
+                    'A call counts as order verification when it was placed on the day the order came in as well as the day it was confirmed. The ringing happens either side of the confirming, and an order that is never confirmed at all has no confirmation day to be rung on — read on the confirmed date alone, calls about those orders matched nothing and were counted nowhere',
+                    'Calls that read as Unmatched on Call Logs for that reason now carry the Order Verification label, and Total Verification Called on CSR Analytics rises to take them in. The calls were always there; they had nothing to attach themselves to',
+                    'An order that syncs in after its calls were placed still claims them the moment it lands, now on either of its two days rather than only on the day it was confirmed',
+                    'Calls already synced keep whatever label they were given until that day is matched again, so the figures for past days move when their day is re-run rather than on their own',
+                ],
+            },
+            {
+                title: 'Call Logs — Team Scoping',
+                items: [
+                    'Call Logs follows the viewing as team switcher now, the way the rest of the app already does — pick a team and the register narrows to the calls on that team’s orders, where before it listed every call the workspace had synced no matter who was looking or what they were scoped to',
+                    'Unmatched drops out of the persona filter while you’re scoped to a team: a call that matched no order belongs to no team either, so the rows it selects are exactly the ones the scope has already taken out and the filter could only ever have come back empty',
+                    'Someone restricted to a team who hasn’t been put in one sees an empty register rather than the whole of it, which is the way the rest of the app treats the same situation',
+                ],
+            },
+            {
+                title: 'Smaller Improvements & Fixes',
+                items: [
+                    'Parcels already on their way have their status re-checked on every scheduled pass again — the pass meant to go and fetch them was asking for orders changed in the last day or so instead, so anything shipped further back than that stopped being picked up and sat on whatever status it last had until something else went and touched it',
+                    'That same check now runs at 11am as well as 9am, midday, 3pm, 6pm and 9pm, closing the longest gap of the working morning',
+                    'Total Verified Orders is read against the card beside it, so its footnote counts against risky orders now rather than orders needing verification, and a period with none of them says so instead of reporting a rate of nothing',
+                ],
+            },
+        ],
+    },
+    {
+        version: 'v3.36.1',
         date: '2026-09-10',
         sections: [
             {
