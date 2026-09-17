@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\API\Workspace\AnalyticsController;
 use App\Http\Controllers\API\Workspace\CSRController;
+use App\Http\Controllers\API\Workspace\CsrDashboardController;
 use App\Http\Controllers\API\Workspace\CsrPerformanceController;
 use App\Http\Controllers\API\Workspace\PageController;
 use App\Http\Controllers\API\Workspace\ParcelJourneyStatsController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\API\Workspace\ShopController;
 use App\Http\Controllers\API\Workspace\TeamController;
 use App\Http\Controllers\API\Workspace\UserController;
 use App\Http\Controllers\API\Workspace\VideoEditorDashboardController;
+use App\Http\Controllers\API\Workspace\WelleStatsController;
 use Modules\Inventory\Http\Controllers\Api\InventoryDashboardStatsController;
 use Modules\Inventory\Http\Controllers\Api\PurchaseOrderFlowController;
 
@@ -56,6 +58,30 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
         Route::get('/csrs/stats/analytics-real-conversations', [CSRController::class, 'analyticsRealConversations']);
         Route::get('/csrs/stats/analytics-confirmed-risky-orders', [CSRController::class, 'analyticsConfirmedRiskyOrders']);
         Route::get('/csrs/stats/analytics-verified-orders', [CSRController::class, 'analyticsVerifiedOrders']);
+        // CSR dashboard cards — the signed-in CSR's own figures, off the same
+        // POS rollup the analytics cards read, narrowed to the pancake accounts
+        // linked to them. Own controller: membership is the gate rather than
+        // the analytics permission, and the rows narrow by identity rather than
+        // by team. See CsrDashboardController.
+        Route::get('/csrs/stats/dashboard-sales', [CsrDashboardController::class, 'sales']);
+        Route::get('/csrs/stats/dashboard-rts', [CsrDashboardController::class, 'rts']);
+        Route::get('/csrs/stats/dashboard-rmo-called', [CsrDashboardController::class, 'rmoCalled']);
+        Route::get('/csrs/stats/dashboard-rmo-time', [CsrDashboardController::class, 'rmoTime']);
+        Route::get('/csrs/stats/dashboard-total-rmo-called', [CsrDashboardController::class, 'totalRmoCalled']);
+        Route::get('/csrs/stats/dashboard-rmo-call-time', [CsrDashboardController::class, 'rmoCallTime']);
+        Route::get('/csrs/stats/dashboard-rmo-real-conversations', [CsrDashboardController::class, 'rmoRealConversations']);
+        Route::get('/csrs/stats/dashboard-rmo-hit-rate', [CsrDashboardController::class, 'rmoHitRate']);
+        Route::get('/csrs/stats/dashboard-calls-placed', [CsrDashboardController::class, 'callsPlaced']);
+        Route::get('/csrs/stats/dashboard-real-conversations', [CsrDashboardController::class, 'realConversations']);
+        Route::get('/csrs/stats/dashboard-confirmed-risky-orders', [CsrDashboardController::class, 'confirmedRiskyOrders']);
+        Route::get('/csrs/stats/dashboard-verified-orders', [CsrDashboardController::class, 'verifiedOrders']);
+        // Effort against results, the CSR's own: day by day off the nightly
+        // rollup, and hour by hour off the call log that rollup is built from.
+        Route::get('/csrs/stats/dashboard-daily-effort', [CsrDashboardController::class, 'dailyEffort']);
+        Route::get('/csrs/stats/dashboard-hourly-effort', [CsrDashboardController::class, 'hourlyEffort']);
+        // The CSR's own days, every figure of both rollups — the analytics
+        // breakdown's columns at a per-da  y grain instead of per-CSR.
+        Route::get('/csrs/stats/dashboard-breakdown', [CsrDashboardController::class, 'breakdown']);
         // Leaders for the period — who came top, same source as the cards above.
         Route::get('/csrs/stats/analytics-leader-sales', [CSRController::class, 'analyticsLeaderSales']);
         Route::get('/csrs/stats/analytics-leader-rts', [CSRController::class, 'analyticsLeaderRts']);
@@ -183,6 +209,20 @@ Route::group(['prefix' => 'api', 'as' => 'api.', 'middleware' => ['auth']], func
             Route::get('/supplier-deliveries', [PurchaseOrderFlowController::class, 'supplierDeliveries'])->name('supplier-deliveries');
             Route::get('/stage-timings', [PurchaseOrderFlowController::class, 'stageTimings'])->name('stage-timings');
             Route::get('/unfulfilled-split', [PurchaseOrderFlowController::class, 'unfulfilledSplit'])->name('unfulfilled-split');
+        });
+
+        // My ESC — the signed-in user's own Welle figures, one endpoint per
+        // card so each skeletons on its own. Behind the workspace's Welle
+        // module toggle and the "View My ESC" grant, both re-checked in the
+        // controller. See WelleStatsController.
+        Route::prefix('welle/stats')->name('welle.stats.')->group(function () {
+            Route::get('/esc-rate', [WelleStatsController::class, 'escRate'])->name('esc-rate');
+            Route::get('/movement', [WelleStatsController::class, 'movement'])->name('movement');
+            Route::get('/meditation', [WelleStatsController::class, 'meditation'])->name('meditation');
+            Route::get('/learning', [WelleStatsController::class, 'learning'])->name('learning');
+            Route::get('/pillar-breakdown', [WelleStatsController::class, 'pillarBreakdown'])->name('pillar-breakdown');
+            Route::get('/calendar', [WelleStatsController::class, 'calendar'])->name('calendar');
+            Route::get('/daily-log', [WelleStatsController::class, 'dailyLog'])->name('daily-log');
         });
     });
 });

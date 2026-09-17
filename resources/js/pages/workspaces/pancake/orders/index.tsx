@@ -65,6 +65,9 @@ interface Order {
     cx_rts_rate: string | number | null;
     /** That rate banded — see Modules\Pancake\Support\CustomerRtsRisk. */
     cx_rts_level: 'no_report' | 'low' | 'medium' | 'high';
+    /** Every order the customer has placed, failed and successful together, out
+     *  of their phone number's Pancake report. Null when it has none. */
+    cx_orders_total: string | number | null;
 }
 
 interface ShippingFeeImport {
@@ -107,6 +110,9 @@ interface Props {
             rts_op?: string;
             rts_value?: string;
             rts_value2?: string;
+            customer_orders?: string;
+            customer_orders_op?: string;
+            customer_orders_to?: string;
         };
     };
 }
@@ -186,6 +192,10 @@ const RTS_COMPARISON_LABELS: Record<string, string> = {
 const DEFAULT_RTS_REPORT = 'any';
 const DEFAULT_RTS_COMPARISON = 'gt';
 
+// The Customer orders chip compares the same way, so it reads from the same
+// label map and starts on the same operator.
+const DEFAULT_CX_ORDERS_COMPARISON = 'gt';
+
 // One object rather than a run of same-typed positional arguments — every filter
 // here is a string, so a transposed pair would not be a type error.
 interface FilterState {
@@ -207,6 +217,12 @@ interface FilterState {
     rtsValue: string;
     /** The upper bound, for `between` only. */
     rtsValue2: string;
+    /** How many orders the customer has placed in total, '' until a number is
+     *  typed — the chip narrows nothing while it is empty. */
+    cxOrders: string;
+    cxOrdersOp: string;
+    /** The upper bound, for `between` only. */
+    cxOrdersTo: string;
 }
 
 // How the customer's return history reads on a row. The bands themselves are
@@ -241,6 +257,9 @@ const COLUMN_OPTIONS: ColumnOption[] = [
     { id: 'total_amount', label: 'Total amount' },
     { id: 'products', label: 'Products' },
     { id: 'cx_rts_rate', label: 'Customer RTS' },
+    // Off by default: the list is already wide, and the count is mostly asked
+    // for through the filter beside it rather than read row by row.
+    { id: 'cx_orders_total', label: 'Customer orders', defaultVisible: false },
     { id: 'inserted_at', label: 'Created at' },
     { id: 'updated_at', label: 'Status updated at' },
     { id: 'status_name', label: 'Status' },
@@ -305,6 +324,15 @@ export default function PancakeOrdersIndex({
     );
     const [rtsValue2, setRtsValue2] = useState<string>(
         query?.filter?.rts_value2 ?? '',
+    );
+    const [cxOrders, setCxOrders] = useState<string>(
+        query?.filter?.customer_orders ?? '',
+    );
+    const [cxOrdersOp, setCxOrdersOp] = useState<string>(
+        query?.filter?.customer_orders_op ?? DEFAULT_CX_ORDERS_COMPARISON,
+    );
+    const [cxOrdersTo, setCxOrdersTo] = useState<string>(
+        query?.filter?.customer_orders_to ?? '',
     );
 
     const canImportFees = usePermission(PERMISSIONS.ImportOrderShippingFees);
@@ -427,6 +455,18 @@ export default function PancakeOrdersIndex({
                           : undefined,
               }
             : {}),
+        // Same rule for the order count: the operator alone is not a filter, so
+        // nothing is sent until there is a number to compare against.
+        ...(f.cxOrders !== ''
+            ? {
+                  customer_orders: f.cxOrders,
+                  customer_orders_op: f.cxOrdersOp,
+                  customer_orders_to:
+                      f.cxOrdersOp === 'between' && f.cxOrdersTo !== ''
+                          ? f.cxOrdersTo
+                          : undefined,
+              }
+            : {}),
     });
 
     const currentFilter = (): FilterState => ({
@@ -441,6 +481,9 @@ export default function PancakeOrdersIndex({
         rtsOp,
         rtsValue,
         rtsValue2,
+        cxOrders,
+        cxOrdersOp,
+        cxOrdersTo,
     });
 
     const reload = useCallback(
@@ -484,6 +527,9 @@ export default function PancakeOrdersIndex({
         rtsOp,
         rtsValue,
         rtsValue2,
+        cxOrders,
+        cxOrdersOp,
+        cxOrdersTo,
     ]);
 
     // The two standing filters are always on the bar, so their presence says
@@ -495,6 +541,7 @@ export default function PancakeOrdersIndex({
         !!dateFrom ||
         !!dateTo ||
         !!rider ||
+        !!cxOrders ||
         report !== DEFAULT_RTS_REPORT;
 
     const clearFilters = () => {
@@ -509,6 +556,9 @@ export default function PancakeOrdersIndex({
         setRtsOp(DEFAULT_RTS_COMPARISON);
         setRtsValue('');
         setRtsValue2('');
+        setCxOrders('');
+        setCxOrdersOp(DEFAULT_CX_ORDERS_COMPARISON);
+        setCxOrdersTo('');
     };
 
     const { visibility: columnVisibility, setVisibility: setColumnVisibility } =
@@ -685,6 +735,29 @@ export default function PancakeOrdersIndex({
                                 {Math.round(Number(rate) * 100)}%
                             </span>
                         )}
+                    </span>
+                );
+            },
+        },
+        {
+            accessorKey: 'cx_orders_total',
+            id: 'cx_orders_total',
+            enableSorting: true,
+            header: ({ column }) => (
+                <SortableHeader column={column} title="Customer orders" />
+            ),
+            cell: ({ row }) => {
+                const total = row.original.cx_orders_total;
+
+                // No report is not a history of zero orders — the same
+                // distinction the Customer RTS badge draws beside it.
+                return total === null ? (
+                    <span className="text-[11px] text-gray-400 dark:text-gray-600">
+                        —
+                    </span>
+                ) : (
+                    <span className="font-mono text-[11px] text-gray-700 dark:text-gray-300">
+                        {Number(total).toLocaleString('en-PH')}
                     </span>
                 );
             },
@@ -893,6 +966,16 @@ export default function PancakeOrdersIndex({
                         onOpChange={setRtsOp}
                         onValueChange={setRtsValue}
                         onValue2Change={setRtsValue2}
+                    />
+
+                    <CustomerOrdersFilterChip
+                        op={cxOrdersOp}
+                        value={cxOrders}
+                        value2={cxOrdersTo}
+                        comparisons={rtsOperators}
+                        onOpChange={setCxOrdersOp}
+                        onValueChange={setCxOrders}
+                        onValue2Change={setCxOrdersTo}
                     />
 
                     {orderId && (
@@ -1153,6 +1236,72 @@ function CustomerRtsFilterChip({
                     {/* Beside the boxes rather than inside them — a number
                         input's spinners already own that corner. */}
                     <span className="text-xs text-gray-400">%</span>
+                </>
+            )}
+        </FilterChip>
+    );
+}
+
+/**
+ * How many orders the customer has placed in total, compared against the
+ * number(s) typed beside the operator.
+ *
+ * No "any / none" select ahead of it, unlike the Customer RTS chip: the count
+ * comes from the same report, so whether the customer has a history at all is a
+ * question that chip already answers, and asking it twice would let the bar hold
+ * two filters that disagree.
+ */
+function CustomerOrdersFilterChip({
+    op,
+    value,
+    value2,
+    comparisons,
+    onOpChange,
+    onValueChange,
+    onValue2Change,
+}: {
+    op: string;
+    value: string;
+    value2: string;
+    /** The comparisons the server accepts, straight from its own list. */
+    comparisons: string[];
+    onOpChange: (op: string) => void;
+    onValueChange: (value: string) => void;
+    onValue2Change: (value: string) => void;
+}) {
+    return (
+        <FilterChip label="Customer orders">
+            <Select value={op} onValueChange={onOpChange}>
+                <SelectTrigger className="h-7 w-[125px] text-xs">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {comparisons.map((c) => (
+                        <SelectItem key={c} value={c}>
+                            {RTS_COMPARISON_LABELS[c] ?? c}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Input
+                type="number"
+                min={0}
+                value={value}
+                onChange={(e) => onValueChange(e.target.value)}
+                placeholder="any"
+                className="h-7 w-[70px] text-xs"
+            />
+            {op === 'between' && (
+                <>
+                    <span className="text-xs text-gray-400">and</span>
+                    <Input
+                        type="number"
+                        min={0}
+                        value={value2}
+                        onChange={(e) => onValue2Change(e.target.value)}
+                        placeholder="any"
+                        className="h-7 w-[70px] text-xs"
+                    />
                 </>
             )}
         </FilterChip>

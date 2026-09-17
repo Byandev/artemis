@@ -40,6 +40,7 @@ use App\Http\Controllers\Workspaces\TeamController;
 use App\Http\Controllers\Workspaces\TeamScheduleController;
 use App\Http\Controllers\Workspaces\TeamShopController;
 use App\Http\Controllers\Workspaces\VideoEditorDashboardController;
+use App\Http\Controllers\Workspaces\WelleController;
 use App\Http\Controllers\Workspaces\WorkspaceApiKeyController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use App\Http\Controllers\Workspaces\WorkspaceInvitationController;
@@ -459,6 +460,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/csr/management', [CSRController::class, 'index'])->name('workspaces.csr.index');
     Route::get('/workspaces/{workspace}/csr/analytics', [CSRController::class, 'analytics'])->name('workspaces.csr.analytics');
     Route::get('/workspaces/{workspace}/csr/analytics/export', [CSRController::class, 'analyticsExport'])->name('workspaces.csr.analytics.export');
+    // The pancake logins behind the CSR dashboard's figures. Same gate as the
+    // dashboard — see CSRController::pancakeUsers().
+    Route::get('/workspaces/{workspace}/csr/pancake-users', [CSRController::class, 'pancakeUsers'])->name('workspaces.csr.pancake-users');
+    Route::get('/workspaces/{workspace}/csr/call-logs', [CSRController::class, 'callLogs'])->name('workspaces.csr.call-logs');
 
     // CSR RMO Management (authenticated)
     Route::get('/workspaces/{workspace}/csr/rmo-management', [ForDeliveryController::class, 'csrRmoManagement'])->name('workspaces.csr.rmo-management');
@@ -470,6 +475,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs', [ForDeliveryController::class, 'callLogs'])->name('workspaces.csr.rmo-management.callLogs');
     Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs/export', [ForDeliveryController::class, 'publicExportCallLogs'])->name('workspaces.csr.rmo-management.callLogs.export');
     Route::get('/workspaces/{workspace}/csr/rmo-management/call-logs/breakdown', [ForDeliveryController::class, 'callLogsBreakdown'])->name('workspaces.csr.rmo-management.callLogs.breakdown');
+
+    // Welle — the signed-in user's own record, behind the workspace's Welle
+    // module toggle. See WelleController.
+    Route::get('/workspaces/{workspace}/welle/my-esc', [WelleController::class, 'myEsc'])->name('workspaces.welle.my-esc');
 
     // Checklist routes
     Route::get('/workspaces/{workspace}/checklist', [ChecklistController::class, 'index'])->name('workspaces.checklist.index');

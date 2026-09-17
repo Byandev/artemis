@@ -34,6 +34,7 @@ import {
     FileText,
     Goal,
     GraduationCap,
+    Headset,
     History,
     Landmark,
     Layers,
@@ -63,6 +64,7 @@ import {
     Trophy,
     Truck,
     User,
+    UserRound,
     Users,
     Wallet,
 } from 'lucide-react';
@@ -204,6 +206,20 @@ export function AppSidebar() {
                       icon: User,
                       permission: PERMISSIONS.ViewCsrDashboard,
                   },
+                  // The pancake logins the dashboard's figures are summed from.
+                  // Gated with it, since it is only the legend for that page.
+                  {
+                      title: 'My Pancake Users',
+                      href: `/workspaces/${slug}/csr/pancake-users`,
+                      icon: UserRound,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
+                  {
+                      title: 'My Calls',
+                      href: `/workspaces/${slug}/csr/call-logs`,
+                      icon: Headset,
+                      permission: PERMISSIONS.ViewCsrDashboard,
+                  },
               ]
             : []),
         ...(currentWorkspace.video_editor_dashboard_module_enabled
@@ -213,6 +229,19 @@ export function AppSidebar() {
                       href: `/workspaces/${slug}/video-editor/dashboard`,
                       icon: Clapperboard,
                       permission: PERMISSIONS.ViewVideoEditorDashboard,
+                  },
+              ]
+            : []),
+        // The personal Welle record. Only the workspaces a super admin has
+        // switched Welle on for have the page at all, and the grant is hidden
+        // with the toggle — see Workspace::hiddenPermissionNames().
+        ...(currentWorkspace.welle_module_enabled
+            ? [
+                  {
+                      title: 'My ESC',
+                      href: `/workspaces/${slug}/welle/my-esc`,
+                      icon: Sparkles,
+                      permission: PERMISSIONS.ViewMyEsc,
                   },
               ]
             : []),

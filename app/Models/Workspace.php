@@ -53,6 +53,7 @@ class Workspace extends Model
         'ad_spend_goals_module_enabled',
         'billing_module_enabled',
         'courses_module_enabled',
+        'welle_module_enabled',
         'inventory_sync',
         'public_password',
         'erp_username',
@@ -92,6 +93,7 @@ class Workspace extends Model
         'ad_spend_goals_module_enabled' => 'boolean',
         'billing_module_enabled' => 'boolean',
         'courses_module_enabled' => 'boolean',
+        'welle_module_enabled' => 'boolean',
         'inventory_sync' => 'boolean',
         'max_shops' => 'integer',
         // Reversible encryption so the automation pipeline can read it back.
@@ -155,6 +157,9 @@ class Workspace extends Model
             $this->rmo_module_enabled ? null : PermissionEnum::ViewRmoManagement->value,
             $this->rmo_module_enabled ? null : PermissionEnum::ManageRmoSettings->value,
             $this->leaderboard_module_enabled ? null : PermissionEnum::ViewLeaderboards->value,
+            // My ESC is the only page behind the Welle toggle, so the toggle
+            // hides its one grant rather than a whole category.
+            $this->welle_module_enabled ? null : PermissionEnum::ViewMyEsc->value,
             // Gencys partners read page ROAS in Gencys itself, so the tracker is
             // hidden for them even with the rest of the S&M group switched on.
             $this->is_gencys_partner ? PermissionEnum::ViewPageRoasTracker->value : null,

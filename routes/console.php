@@ -50,8 +50,19 @@ Schedule::command('inventory:snapshot-items')->dailyAt('20:30')->withoutOverlapp
 // Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('13:30')->withoutOverlapping();
 // Schedule::command('gencys-erp:trigger-fetch-intern-daily-records')->dailyAt('16:30')->withoutOverlapping();
 
-Schedule::command('sync:csr-daily-records')->dailyAt('03:00');
-Schedule::command('sync:csr-daily-call-records')->dailyAt('04:15');
+// Welle ESC records, one job per connected user.
+//
+// 06:00 catches yesterday once it has settled. The command always writes the
+// whole elapsed week rather than a single day, so each run also re-states the
+// days before it — which is free, and corrects anything logged late.
+//
+// Caveat worth knowing: Welle's progress endpoint only ever answers for the
+// week containing today. On a Monday the week has already rolled over, so the
+// Sunday just gone is not in the response and this run cannot capture it.
+Schedule::command('welle:fetch-daily-records')->dailyAt('06:00')->withoutOverlapping();
+
+Schedule::command('sync:csr-daily-records')->everyTwoHours('03:00');
+Schedule::command('sync:csr-daily-call-records')->everyTwoHours('04:15');
 
 // Roll each shop's previous-14-days RTS rate onto shops.rts_snapshot so the RMO
 // table can show and sort by it without aggregating pancake_orders per request.
